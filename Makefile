@@ -52,3 +52,4 @@ clean:
 	SNS_DAS_design.pdf revision.tex *.idx */*.idx */*.aux */*.bbl */*.blg \
 	*/*.pdf */*.aux.old */*.old */*.log
 	if test "$$destdir" != "" ; then rm -f $$destdir/sns_das_design.pdf ; fi
+
