@@ -1,0 +1,62 @@
+\section{Streaming Translation Services}
+
+
+\subsection{Proposed Architecture}
+
+The purpose of the new Streaming Translation Service (STS) design is to enable
+``near real-time delivery'' of experimental data to analysis, in the form of
+both Event and Histogram NeXus files, within seconds or minutes of the
+completion of a run.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=3.5in]{chunky.png}
+\caption{Initial ``Chunky'' Streaming Translation Architecture, Includes
+generation of ``Mini-NeXus'' files for preliminary analysis and transport to
+Central computing center.}
+\end{figure}
+
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=3.5in]{creamy.png}
+\caption{Effective Potential ``Extra Creamy'' Streaming Translation
+Architecture, does Not include generation of ``Mini-NeXus'' files, only produces
+a Full NeXus file for ``soon after post-mortem'' analysis, via transport (or
+direct writing) to the Central computing center.}
+\end{figure}
+
+
+The basic proposed architecture for this STS design is illustrated in Figures
+1 and 2, for two incremental configurations based on use of intermediate
+``Mini-NeXus'' file generation. Note that the actual boundary/separation between
+the Data Acquisition System (DAS) and Central Computing Center is transient
+here, and is expected to move as changes to the underlying network
+infrastructure solidify. Yet moving or removing that boundary does not
+fundamentally change the design elements or associated development tasks; e.g.
+Parts 1 \& 2 of the Streaming Translation software can be combined into a
+single Translation entity on the Central Computing side, without loss of
+generality.
+
+
+Much existing technology can be applied to assemble this new Streaming
+Translation architecture, pulling code and expertise from each of the Live
+Data Processing (LDP) ``Event Catcher'', the HistoTools Event- and
+Histogram-based NeXus file generation applications \& library, and the
+existing static Translation Service (TS) Client and TS Monitor GUI.  
+
+
+In short, the intent is to attach an LDP ``front end'' onto a HistoTools
+library ``back end'' to parse the Live Data Stream coming from the DAS and
+generate Live Event (and Histogram) NeXus files while the experiment is
+running. Based on existing technological capabilities, this Streaming
+Translation solution should be able to adequately ``keep up'' with even the
+highest bandwidth SNS beamline, and effectively be ``done'' creating a given
+NeXus file (whether as a single monolithic file, or via the assembly of a
+sequence of Mini-NeXus files) within moments after the last data packet
+arrives, signaling the end of the experiment. Then the traditional Translation
+Service Client can perform its usual Archiving and Cataloging services, along
+with new extensions to improve performance, such as providing multi-threaded
+concurrency in the translation processing to effectively ``overlap'' independent
+operations and capitalize on powerful computational resources at SNS.
+
