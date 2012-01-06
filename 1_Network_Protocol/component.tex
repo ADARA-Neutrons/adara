@@ -1,0 +1,863 @@
+
+\section{ADARA Network Protocol}
+
+\subsection{Overview}
+
+The objective of this protocol is to provide a simple, easy to parse
+structure for the transmission and storage of the data associated with
+an experimental run at the SNS. It must accomodate high data rate of the
+neuton event information from the detector electronics while offering
+the flexability to describe and report data from a diverse and dynamic
+collection of sample environment sensors and control systems.
+
+While the format is primarily used for network transmission over TCP
+streams, certain packets will also be used over UDP connections when
+communicating with embedded systems. Other packets are defined to enable
+partial recovery from disk errors at inopportune locations in the stream.
+
+Some devices (and/or processes) in the system will only generate or
+operate on a subset of the defined packet formats. For example, it is
+expected that the Data Stream Packetizers will generate Raw Event packets,
+which will be later transformed into Neutron Event packets once the
+physical to logical mapping is performed. To this end, the protocol is
+designed allow parsers to skip over packets that are unknown or irrelevant
+to the task at hand.
+
+\subsection{Common Protocol Information}
+
+As the bulk of computing power at the SNS is based on the Intel architecture,
+all multi-byte values in the protocol will be represeneted in little-endian
+format to avoid the overhead of byte-swaping every value. Any big-endian
+hardware added in the future will need to accomodate the existing format.
+
+All packets must be a multiple of 4 bytes in length to keep the integer
+fields naturally aligned.
+
+The common field types are given in Table~\ref{table:protocol_field_types}.
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{l | l}
+	Type & Definition \\
+	\hline
+	{\bf byte} & 8 bit value, unspecified sign \\
+	{\bf word} & 32 bit value, unspecified sign \\
+	{\bf u16} & 16 bit unsigned integer \\
+	{\bf s32} & 32 bit signed integer \\
+	{\bf u32} & 32 bit unsigned integer \\
+	{\bf u64} & 64 bit unsigned integer \\
+	{\bf u128} & 128 bit unsigned integer \\
+	{\bf double} & IEEE 754 64-bit floating point number \\
+	{\bf string} & UTF-8 encoded character data of specified length \\
+    \end{tabular}
+  \end{center}
+  \caption {Field Type Definitions}
+  \label{table:protocol_field_types}
+\end{table}
+
+\subsection{Common Packet Header}
+
+To ensure that parsers are able to find the next packet in the stream, each
+packet includes a 16 byte header. This header consists of a payload length,
+packet type, and timestamp information as seen in
+Figure~\ref{fig:protocol_packet}.
+
+Each packet has an option payload. If the packet carries information beyond the
+header itself, then the Payload Length field will be non-zero and a mulitple of
+4. It is expected that stream parsers will first read the 16 byte header. The
+Payload Length field will then give the length remaining to be read from the
+stream for the packet.
+
+Following the Payload Length, there is a Format field. This 4 byte field allows
+for over 4 billion packet types when used sequentially, though the field may be
+broken up into subfields. Once a field type has been deployed to production,
+the packet format associated with that number shall become immutable. Should
+changes be needed to the physical layout or semantic content of that packet, a
+new packet type must be allocated and defined in this document. This will
+ensure that tools are able to recognize when they are operating on data that
+they do not understand.
+
+\decision{Packet Format Field Semantics}{%
+Will we use a sequentially allocated space, or break the 32 bits into
+sub-fields? Jim has detailed a possible break-out, using four 8-bit fields:
+Type Code and Major.Minor.Patch versioning. The Type Code would indicate
+the overal functional semantic of the packet (e.g. Neutron Event or Slow
+Control information). The verion fields are used to indicate semantic and
+physical layout changes for that packet type.}
+
+\todo{Build table of packet types}{%
+Once a decision is reached regarding the allocation policy of
+packet types, we must assign values to the packet formats described
+in this document, and should include them in a table for easy reference.
+Bonus points if we have a \LaTeX command to automatically populate the
+table and check for duplicates.}
+
+Following the Format field, there is a 64-bit Timestamp, broken into two 32-bit
+fields. The timestamp gives the seconds (first field) and nanoseconds since the
+EPICS epoch, defined as midnight, January 1, 1990.  All timestamp values are
+given in UTC time.  This field shall be filled with the pulse ID given by the
+accelerator system for all data packets carrying neutron or ``fast''
+environment data. As this field will be used to correlate data from different
+sources with the neutron event data, all other packets shall use as accurate a
+clock as is available on the local system. This clock should be closely
+synchronized to same reference source as the accelerator system.
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \begin{leftwordgroup}{Header}
+      \wordbox{1}{Payload Length (u32)} \\
+      \wordbox{1}{Format (u32)} \\
+      \wordbox{1}{Timestamp (seconds, u32)} \\
+      \wordbox{1}{Timestamp (nanoseconds, u32)}
+    \end{leftwordgroup} \\
+    \begin{leftwordgroup}{Payload}
+      \wordbox[lrt]{1}{Data} \\
+      \skippedwords \\
+      \wordbox[lrb]{1}{}
+    \end{leftwordgroup}
+  \end{bytefield}
+  \caption{ADARA Network Packet Structure}
+  \label{fig:protocol_packet}
+\end{figure}
+
+\subsection{Detector System generated packets}
+
+The following packets are generated by the detector system. As such, they will
+use the Pulse ID from the Real Time Data Link (RTDL) system to identify each
+event an accelerator pulse. Note that while the time-of-flight information for
+each pixel has been corrected for frame skew~\footnote{Frame skew indicates a
+time-of-flight larger than the intra-pulse time.  For more information on frame
+skew, please see the document ``Neutron Event Timing''.}, the ``fast'' metadata
+information has no correction applied.
+
+\todo{Define Detector Control Packets}{%
+We have currently defined the packets required to communicate event data from
+the detectors to the rest of the aquisition system, but have not defined the
+packets that will be used to initialize and control the detector system, as
+they are not believed to block progress and the software developers do not
+currently have the knowledge required to define them. The detector system
+developers will fill them in at a later date.}
+
+\newpage
+\subsubsection{Detector System: Raw event data}
+\label{section:protocol_raw_event_packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Length $8 N + 16$} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Pulse ID (seconds)} \\
+    \wordbox{1}{Pulse ID (nanoseconds)} \\
+
+    \bitheader{31,30,24,23,14,13,0} \\
+    \wordbox{1}{Source ID} \\
+    \bitbox{1}{\tiny E \\ O \\ P} &
+    \bitbox{7}{Reserved} &
+    \bitbox{10}{Cycle} &
+    \bitbox{14}{Pkt Seq} \\
+    \wordbox{1}{Pulse Charge (units of 10.1 pC, u32)} \\
+    \wordbox{1}{Pulse Energy (eV?, u32)} \\
+    \wordbox{2}{Event 1} \\
+    \wordbox{2}{Event 2} \\
+    \wordbox[lrt]{1}{Event $N$} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Raw Event Data}
+  \label{fig:protocol_packet_raw_event}
+\end{figure}
+
+The ``Raw Event Data'' packet described in
+Figure~\ref{fig:protocol_packet_raw_event} is generated by the neutron
+detector system and is used to convey time-of-flight and physical location
+information for detected neutrons. It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is defined by the number of events in the packet. There
+are 16 bytes of pulse and packet information followed by 8 bytes of data
+for each event.
+\item{\bf Pulse ID} identifies the most recent pulse generated by the
+accelerator. This ID may not be orginating pulse for the events in this packet
+due to frame skew.
+\item{\bf Source ID} identifies the upstream detector hardware that
+processed these events.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+resent pulse. This may not be the originating pulse for the events in this
+packet due to frame skew.
+\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
+current pulse.
+\item{\bf EOP} (End of Packet) indicates that this is the last event packet
+to be sent for the current pulse.
+\item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
+number must be mulitplied by 10.1 to get the charge in picoColumbs. This
+value may not be the charge for the events in this packet due to frame skew.
+\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
+given in electron volts (See TODO). This value may not be the voltage for the
+events in this packet due to frame skew.
+\item{\bf Event(s)} give the time of flight and location of the detected
+neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
+Pixel ID is the physical pixel associated with this neutron event.
+\end{itemize}
+
+When run over a network transport that does not provide reliable service, such
+as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
+and {\bf EOP} field to detect the loss of packets describing the events for a
+pulse. Each packet source ({\bf Source ID}) sequentially numbers the raw event
+packets it sends for a pulse, starting at zero. The source must set {\bf EOP}
+on the last raw event packet it sends for a pulse before sending any packet
+with a new {\bf Pulse ID}. The receiver will then be able to detect lost
+packets by the missing sequence numbers. Should the {\bf EOP} packet be lost,
+this will be detected when the sources sends the first packet with a new {\bf
+Pulse ID}. This loss-detection protocol assumes that the transport does not
+reorder packets; additional measures must be taken in the receiver should be
+taken to deal with reordering should it be necessary.
+
+There are seven unused bits ({\bf Reserved}) for this packet type. These bits
+must be zero.
+
+``Raw Event Data'' packets may also be used to transmit ``fast'' metadata
+about the sample environment, such as the torque being applied to the sample
+by a load frame. These packets will be distinguishable from neutron data
+by theour {\bf Source ID} and may also feature unique pixel IDs that further
+differentiate them from neutron event packets.
+
+\todo{Define units for ``Pulse Charge''}{%
+It came out in a meeting that the current number in ``Pulse Charge'' needs
+to be multiplied by 10.1 to get the proper pC charge for the pulse. This
+needs to be verified.}
+\todo{Define units for ``Pulse Energy''}{%
+We need to define the units for the Pulse Energy fields for the raw event
+data. I assume it is eV, but we need to be sure.}
+\todo{Better documentaion of frame skew}{%
+It is discussed in ``Neutron Event Timing'', but we need to be specific
+about it anywhere it could be confused.}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Time-of-flight (units of 100ns, u32)} \\
+    \wordbox{1}{Pixel ID (u32)}
+  \end{bytefield}
+  \caption{Event Data Format}
+  \label{fig:protocol_packet_event_data}
+\end{figure}
+
+\newpage
+\subsubsection{Detector System: Real Time Data Link Information}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{64} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Pulse ID (seconds)} \\
+    \wordbox{1}{Pulse ID (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Pulse Charge (units of 10.1 pC, u32)} \\
+    \wordbox{1}{Pulse Energy (eV?, u32)} \\
+    \wordbox[lrt]{1}{14 Reserved words} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Real Time Data Link Information}
+  \label{fig:protocol_packet_rtdl}
+\end{figure}
+
+The ``Real Time Data Link'' packet described in
+Figure~\ref{fig:protocol_packet_rtdl} is generated by the neutron
+detector system and is used to information about the most recent pulse
+from the accelerator.  It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is always 64 bytes.
+\item{\bf Pulse ID} identifies the most recent pulse generated by the
+accelerator.
+\item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
+number must be mulitplied by 10.1 to get the charge in picoColumbs. This
+value may not be the charge for the events in this packet due to frame skew.
+\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
+given in electron volts (See TODO). This value may not be the voltage for the
+events in this packet due to frame skew.
+\item{\bf Reserved} is 52 bytes of room for future values from the RTDL
+system (see TODO).
+\end{itemize}
+
+\todo{Accelerator Cycle in RTDL?}{%
+We have the accelerator cycle number in the raw event packet, but not in
+the RTDL packet?}
+\todo{RTDL Reserved fields?}{%
+Do we need to have reserved fields in the RTDL packet? Once a packet format
+has been seen in production, we're not supposed to change its definition,
+so how would follow on software know if these fields are now valid vs
+having a zero in them when processing historical event files?}
+
+\subsection{Stream Management Service generated events}
+
+The following packet types are generally generated by, or used when
+communicating with the Stream Management Service. These packets generally use
+the current time-of-day clock for their {\bf Timestamp} fields, though the
+Banked Event Data packets will use the Pulse ID. While all of these
+packets may be seen over a network transport, several have meaning only
+when seen on permament storage and should be ignored when seen on the network.
+
+
+\newpage
+\subsubsection{Banked Event Data}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Length $8 N + 16$} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Pulse ID (seconds)} \\
+    \wordbox{1}{Pulse ID (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Pulse Charge (units of 10.1 pC, u32)} \\
+    \wordbox{1}{Pulse Energy (eV?, u32)} \\
+    \wordbox{1}{Accelerator Cycle} \\
+    \bitbox{16}{Flags (u16)} &
+    \bitbox{16}{Bank ID (u16)} \\
+    \wordbox{2}{Event 1} \\
+    \wordbox{2}{Event 2} \\
+    \wordbox[lrt]{1}{Event $N$} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Banked Event Data}
+  \label{fig:protocol_packet_banked_event_data}
+\end{figure}
+
+The ``Banked Event Data'' packet described in
+Figure~\ref{fig:protocol_packet_banked_event_data} is generated by the
+Stream Management Service and is used to convey time-of-flight and logical
+location information for detected neutrons. It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is defined by the number of events in the packet. There
+are 16 bytes of pulse and packet information followed by 8 bytes of data
+for each event.
+\item{\bf Pulse ID} identifies the most recent pulse generated by the
+accelerator. This ID may not be orginating pulse for the events in this packet
+due to frame skew.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+resent pulse. This may not be the originating pulse for the events in this
+packet due to frame skew.
+\item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
+number must be mulitplied by 10.1 to get the charge in picoColumbs. This
+value may not be the charge for the events in this packet due to frame skew.
+\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
+given in electron volts (See TODO). This value may not be the voltage for the
+events in this packet due to frame skew.
+\item{\bf Bank ID} indicates which detector bank is the source of the events
+in this packet.
+\item{\bf Flags} gives space for indicating various properties about these
+events (see TODO).
+\item{\bf Event(s)} give the time of flight and location of the detected
+neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
+Pixel ID is the logical pixel, translated from the physical ID given by the
+detector.
+\end{itemize}
+
+While the ``Raw Event Data'' packets described in
+section~\ref{section:protocol_raw_event_packet} is defined for primary use over
+an unreliable transports and relatively small transmission sizes, the ``Banked
+Event Data'' packets are oriented for consumption by analysis systems
+communicating over reliable transports, with the ability to send larger
+messages. Thus, the Banked packet does not require mechanisms to detect lost
+events for a pulse.
+
+The physical layout of pixel IDs in the detector systems for an instrument
+do not always match up with the layout that the scientists wish to use for
+analysis. The Stream Managment Service will transform the pixel IDs from
+physical in the Raw packets to logical in the Banked packets using a
+one-to-one mapping (communicated in the stream via ``Pixel Mapping Table''
+packets defined in Section~\ref{section:protocol_pixel_mapping_table}.
+These logical pixels are then communicated in the ``Banked Event Data''
+packets. As part of this mapping process, the detector bank is determined,
+and the events are sorted into buckets accordingly.
+
+\todo{Define units for ``Pulse Charge'' (2)}{%
+It came out in a meeting that the current number in ``Pulse Charge'' needs
+to be multiplied by 10.1 to get the proper pC charge for the pulse. This
+needs to be verified.}
+\todo{Define units for ``Pulse Energy'' (2)}{%
+We need to define the units for the Pulse Energy fields for the raw event
+data. I assume it is eV, but we need to be sure.}
+\todo{Define Banked Event Data Flags field}{%
+We have space here, are there flags that make sense in this context?}
+
+\newpage
+\subsubsection{Pixel Mapping Table Packet}
+\label{section:protocol_pixel_mapping_table}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{$N$} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox[lrt]{1}{Mapping Data ($N$ bytes, format TBD)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Pixel Map Packet}
+  \label{fig:protocol_packet_pixel_map}
+\end{figure}
+
+As part of its processing of the neutron event data, it will map the physical
+pixel ID to a logical pixel ID. This mapping shall me a one-to-one, reverisble
+mapping, and the ``Pixel Mapping Table'' packet defined in
+Figure~\ref{fig:protocol_packet_pixel_map} will preserve the table for
+consumers of the event stream. This packet must be present near the beginning
+of a new experiment recording, but may occur multiple times in the transmitted
+stream. Each additional copy transmitted must be identical to the first copy
+for a given experiment recording.
+
+\todo{Define format for the pixel map}{%
+We need a format to define the mapping table. This is likely to be
+just an array of tuples: physical ID, logical ID, bank ID. There may be a
+segment header that indicates the base physical ID and number of entries
+in the segment -- this would reduce the size for sparse mappings.}
+
+\newpage
+\subsubsection{Synchronization Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{28 + roundup($N$, 4)} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{4}{Signature (16 bytes)} \\
+    \wordbox{2}{File Offset (u64)} \\
+    \wordbox{1}{Comment Length (u32)} \\
+    \wordbox[lrt]{1}{Comment ($N$ byte string, optional)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Synchronization Packet}
+  \label{fig:protocol_packet_sync}
+\end{figure}
+
+While the ADARA protocol is primarily used for network transmission of
+event data, it is necessary to store the raw data on storage media during
+processing and for archival storage. The ``Synchronization`` packet defined
+in Figure~\ref{fig:protocol_packet_sync} allows partial recovery of experiment
+data in the event that a media error or other corruption destroys a packet
+header. Without a marker in the data stream, it may be impossible to find
+the beginning of the next packet, rendering all data after the media defect
+unusable. Periodically placing synchronization packets in the stream contains
+the damage that the error can cause.
+
+\begin{itemize}
+\item{\bf Length} is 28 bytes plus the length of the optional comment field,
+rounded up to the nearest multiple of 4 bytes.
+\item{\bf Timestamp} is the current system time when the packet is stored
+to disk.
+\item{\bf Signature} TODO.
+\item{\bf File Offset} is the offset from the beginning of the file to the
+length field of this packet. This is used to further verify that we have a
+valid Synchronization Packet.
+\item{\bf Comment Length} is the length of the comment that follows, not
+including padding.
+\item{\bf Comment} is an optional UTF-8 encoded comment. This may be used
+to store a small amount of human readable information that may be displayed
+by the Unix `file' command. This field is padded by zeros to the nearest
+multiple of 4.
+\end{itemize}
+
+Every file containing ADARA data should begin with a Synchronization packet to
+allow system utilities to identify the file as such. Additional synchronization
+packets should be added to the file as desired to contain any potential damage.
+As the Synchonization packet is only useful when used for storage, it should be
+ignored when encountered over a network transport.
+
+\todo{Define signature}{%
+We need a signature to put in this packet; I syspect using the string
+``SNSADARA'' followed by the IEEE double NaN value (signalling, positive sign)
+should suffice when combined with the file offset. We could also work ``ORNL''
+into the NaN value, as there are many don't care bits available.}
+
+\newpage
+\subsubsection{Run Status Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{12} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Run Number(u32)} \\
+    \wordbox{1}{Run Start (seconds, u32)} \\
+    \wordbox{1}{Status (u32)} \\
+  \end{bytefield}
+  \caption{Packet Type TBD: Run Status Packet}
+  \label{fig:protocol_packet_status}
+\end{figure}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0 & No current run \\
+	1 & Beginning new run \\
+	2 & Continuing current run (new file marker) \\
+    \end{tabular}
+  \end{center}
+  \caption {Run Status Definitions}
+  \label{table:protocol_run_status_values}
+\end{table}
+
+The ``Run Status'' packet is used to indicate if we are currently in an
+experimental run, and if so, identify it. This packet must be sent/written at
+the start of each experimental run, and should be written to the start of
+each event data file to tag it with the run data it contains.
+
+\begin{itemize}
+\item{\bf Length} is 12 bytes.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Run Number} is the identifier for the current experimental run. This
+field is 0 if we are not currently recording data.
+\item{\bf Run Start} contains the seconds portion of the time that we began
+the current experiment run. This field is 0 if we are not currently recording
+data.
+\item{\bf Status} is defined in Table~\ref{table:protocol_run_status_values}.
+\end{itemize}
+
+\newpage
+\subsubsection{Heartbeat Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{0} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)}
+  \end{bytefield}
+  \caption{Packet Type TBD: Heartbeat Packet}
+  \label{fig:protocol_packet_heartbeat}
+\end{figure}
+
+In order for clients to distinguish between a crashed server and one with
+no event data to transmit (ie, shutter is closed), there must be periodic
+traffic over the network transport. The ``Heartbeat'' packet fills this need.
+
+This role may also be performed by the network transport's keepalive settings,
+though that does not help communication with the detector system which is
+expected to use an unreliable transport.
+
+\newpage
+\subsubsection{Run Information Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{XML Length (u32)} \\
+    \wordbox[lrt]{1}{XML Run Information ($N$ byte string data)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Run Information Packet}
+  \label{fig:protocol_packet_runinfo_run}
+\end{figure}
+
+\todo{Define Run Information packet}{%
+
+We need to finalize the mechanims for getting this information to interested
+parties. Jim had defined a number of semi-fixed fields; I put XML in for
+now. I suspect we may want to break some of the information out into its
+own packet types -- perhaps things like comments should be treated like
+variables and have a fixed variable ID? The PI variable could be a
+string variable that contains an XML document that XCAMS and real names as
+its elements.}
+
+\newpage
+\subsubsection{Client Hello Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Start Timestamp (seconds)} \\
+  \end{bytefield}
+  \caption{Packet Type TBD: Client Hello Packet}
+  \label{fig:protocol_client_hello}
+\end{figure}
+
+After first connecting the the Stream Management Service, a client will send
+a ``Client Hello'' packet to indicate from where in the stream it would like
+begin receiving event data. No data will be sent to the client prior to
+receiving this packet.
+
+\begin{itemize}
+\item{\bf Length} is 4 bytes.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Start Timestamp} suggests to the server where in the live stream to
+start sending events to this client, as defined below.
+\end{itemize}
+
+The value given in {\bf Start Timestamp} is a suggestion to the server and
+may be ignored. The client may receive events preceeding its requested
+timestamp, or may only receive live data if historical data is not available.
+
+The requested value is bounded by run state transitions. If the client
+requests data from before the current run started, the server will start
+sending events from the beginning of the run. If there is no current run and
+the requested timestamp is before the end of the previous run, the server will
+begin sending events from immediately after the previous run ended.
+
+The requested timestamp may be rounded to the granularity of the event indexing
+used by the Stream Management Service. In this case, the timestamp will be
+rounded towards the historical data, and the client may receive events that
+preceed the requested point in time. The client is responsible for filtering
+the undesired requests from the the stream.
+
+If the requested {\bf Start Timestamp} is zero, the server will not send
+historical data and will begin sending events with the next pulse.
+
+\newpage
+\subsubsection{Run Completion Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \bitbox{16}{Status (u16)} &
+    \bitbox{16}{Reason Length (u16)} \\
+    \wordbox[lrt]{1}{Reason ($N$ byte string, optional)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Run Completion Packet}
+  \label{fig:protocol_packet_run_completion}
+\end{figure}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0 & Success \\
+	0x0001 to 0x7fff & Transient Error \\
+	0x8000 to 0xffff & Permament Error \\
+    \end{tabular}
+  \end{center}
+  \caption {Status Definitions}
+  \label{table:protocol_completion_status_values}
+\end{table}
+
+The ``Completion'' Packet allows the Stream Management Service to signal to the
+Translation Service that it has transmitted all of the data related to an
+experimental run. The Translation Servce will use this same packet format to
+indicate the results of translation back to the SMS.
+
+\begin{itemize}
+\item{\bf Length} is 8 bytes plus the length of the optional {\bf Reason} field
+rounded up to the next multiple of four.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Status} indicates the result of translation as defined in
+Table~\ref{table:protocol_completion_status_values}.
+\item{\bf Reason Length} is the length of the comment that follows, not
+including padding.
+\item{\bf Reason} is an optional UTF-8 encoded reason. This may be used
+to communicate a small amount of human readable information to explain
+a non-successful status. This field is padded by zeros to the nearest
+multiple of 4.
+\end{itemize}
+
+
+\newpage
+\subsection{Meta Data Packets}
+
+In addition to the neutron events from the detector systems, the SNS must
+collect information about the environment of the sample being studied. This
+data comes from a diverse and dynamic collection of devices.
+
+\todo{Expand metadata description}{%
+Jim has a good description about the metadata, just need to clean it up
+and bring it into this document.}
+\todo{Define Variable Status/Severity Fields}{%
+We should have a common table here for the status and severity fields. This
+is likely to be derived from EPICS.}
+
+\newpage
+\subsubsection{Variable Descriptor Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{8 + roundup($N$, 4)} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \wordbox{1}{Descriptor Length (u32)} \\
+    \wordbox[lrt]{1}{XML Descriptor ($N$ byte string)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Variable Descriptor Packet}
+  \label{fig:protocol_packet_variable_desc}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 8 bytes plus the length of the {\bf XML Descriptor} field
+rounded up to the next multiple of four.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Variable ID} indicates the ID number assigned to this variable.
+\item{\bf Descriptor Length} is the length of the XML descriptor that follows,
+not including padding.
+\item{\bf XML Descriptor} is a UTF-8 encoded XML document describing the
+properties of this variable. This field is padded by zeros to the nearest
+multiple of 4.
+\end{itemize}
+
+\newpage
+\subsubsection{Variable Value (u32) Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{12} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+    \wordbox{1}{Variable Value (u32)}
+  \end{bytefield}
+  \caption{Packet Type TBD: Variable Value (u32) Packet}
+  \label{fig:protocol_packet_value_u32}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 12 bytes.
+\item{\bf Timestamp} indicates the time that the variable changed.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable. See TODO.
+\item{\bf Severity} of this variable. See TODO.
+\item{\bf Variable Value} is an unsigned 32 bit value for this variable.
+\end{itemize}
+
+\todo{Use u32 for enumerations?}{%
+Do we really need a different packet type to carry enumerations? The only
+difference from this packet will be the format code.}
+
+\newpage
+\subsubsection{Variable Value (double) Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+    \wordbox{2}{Variable Value (IEEE 754 double)}
+  \end{bytefield}
+  \caption{Packet Type TBD: Variable Value (double) Packet}
+  \label{fig:protocol_packet_value_double}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes.
+\item{\bf Timestamp} indicates the time that the variable changed.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable. See TODO.
+\item{\bf Severity} of this variable. See TODO.
+\item{\bf Variable Value} is an IEEE 754 double floating point value for this
+variable.
+\end{itemize}
+
+\newpage
+\subsubsection{Variable Value (string) Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{12 + roundup($N$, 4)} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+    \wordbox{1}{String Length (u32)} \\
+    \wordbox[lrt]{1}{Variable Value ($N$ byte string data)} \\
+    \skippedwords \\
+    \wordbox[lrb]{1}{}
+  \end{bytefield}
+  \caption{Packet Type TBD: Variable Value (string) Packet}
+  \label{fig:protocol_packet_value_string}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 12 bytes plus the length of the {\bf Variable Value} field
+rounded up to the next multiple of four.
+\item{\bf Timestamp} indicates the time that the variable changed.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable. See TODO.
+\item{\bf Severity} of this variable. See TODO.
+\item{\bf String Length} is the length of the string that follows,
+not including padding.
+\item{\bf Variable Value} is a UTF-8 encoded string containing the new value
+for this variable. This field is padded by zeros to the nearest multiple of 4.
+\end{itemize}
+
+
