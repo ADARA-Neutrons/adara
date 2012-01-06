@@ -10,10 +10,10 @@ It will form the basis of the development of this aspect of the framework and ac
 
 \subsection{Definition of Terms}
 
-ADD	The Architectural Design Document (this document), the high level design document for the entire system.
-URD	The User Requirements Document, records the users' requirements for the system.
-SRD	The Software Requirements Document, specifies the behaviour of the software system.
-API	Application Programming Interface, defines the interface through which two programs may interact.
+ADD : The Architectural Design Document (this document), the high level design document for the entire system.
+URD :	The User Requirements Document, records the users' requirements for the system.
+SRD : The Software Requirements Document, specifies the behaviour of the software system.
+API : Application Programming Interface, defines the interface through which two programs may interact.
 
 \section{Detailed Design}
 
@@ -41,3 +41,9 @@ We will also look at how a user will easily submit and monitor jobs using a back
 \input{4_mpi.tex}
 
 \input{5_tasksubmission.tex}
+
+\subsection{Parallel IO}
+
+In order to make most efficient use of a parallel file system we may need to implement addition techniques and methodology for some IO tasks within Mantid.  Until we have access to a Parallel File System, it is impossible to determine what these changes are and if indeed they are necessary.  
+This will be revisited once we have done sufficient testing and parameterisation using a parallel file system.
+
