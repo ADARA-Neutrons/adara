@@ -853,6 +853,43 @@ corrected the root cause. Only if {\bf Status} is successful may the SMS
 consider the experimental run safely on disk at the Translation Service and
 mark the storage space valid for eventual reclaimation.
 
+\newpage
+\subsubsection{Statistics Reset Packet}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{0} \\
+    \wordbox{1}{TBD} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)}
+  \end{bytefield}
+  \caption{Packet Type TBD: Statistics Reset Packet}
+  \label{fig:protocol_packet_stats_reset}
+\end{figure}
+
+During manual operation of a beamline such as performing sample alignment, the
+scientist/user may not be recording neutron event data for translation. In
+these situations, the user may wish to reset the live histogram generation and
+any other temporary or partial analysis result between each phase of the
+process. To allow ease of use and manipulation, the live tools should be able
+to receive this request via the same data stream as the experiment data. This
+allows precise, common boundaries between data sets to be aligned among all of
+the live tools, and avoids the need to have the user manipulate multiple tools
+to perform the reset.
+
+When non-translation clients receive a ``Statistics Reset Packet'' (defined in
+Figure~\ref{fig:protocol_packet_stats_reset}) in the data stream, they should
+discard previous neutron data. The Translation Service may note the occurance
+of these packets in the appropriate place.
+
+The contents of the packet field are as follows:
+\begin{itemize}
+\item{\bf Length} is 0 bytes.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\end{itemize}
+
 
 \newpage
 \subsection{Meta Data Packets}
