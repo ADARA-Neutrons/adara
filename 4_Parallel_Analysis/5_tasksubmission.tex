@@ -1,3 +1,22 @@
 \subsection{Mantid Task Submssion}
+\subsubsection{Overview}
+We want to be able to submit and monitor parallel jobs from within MantidPlot.  This implies some kind of network communication between the client running MantidPlot and the parallel cluster.
 
-Ross
+Condor is a cluster-management package from the University of Wisconsin (http://research.cs.wisc.edu/condor/) that should fit our needs quite well.  It is designed to schedule jobs on otherwise unused computing resources (for example, idle computers in a student lab), but will function just fine on a dedicated cluster.  More importantly for the Mantid project, Condor is designed to allow remote job submission.  It has a complete API for submitting jobs, monitoring jobs and retrieving results over the network via SOAP calls.  That means that we only need to write a minimal amount of code for MantidPlot to actually call the Condor API's.
+
+\subsubsection{GUI}
+We envision creating another box on the right side of the MantidPlot window below the algorithms box.  This one would be called ``Remote Algorithms''and would list the tools that Russell has developed (see \ref{subsec:ParallelExtensions}).  The list of available algorithms could either be hard-coded, or - with a little bit of work - we could probably query the cluster for the list of available algorithms.  Clicking on one of these remote algorithms would open a dialog box containing user-selectable options (number of processes, input files, etc...) and a ``Submit'' button.
+
+There should also be a ``Job Monitor'' button (or perhaps a menu choice) that will bring up a window showing current and completed jobs.
+
+\subsubsection{Data Transfer}
+There's going to be some interesting issues with transferring data.  (Or, more specifically, avoiding data transfers wherever possible.)  If necessary, Condor's API's do allow for transferring the input (and output) data to the cluster, but it would be far more efficient to access it locally via a shared filesystem.  Ideally, MantidPlot would know if the data it's working on is located on the shared filesystem.  Otherwise, that is something that will have to be specified in the options dialog before the job is submitted.
+
+\subsubsection{Configuration / Setup / Security}
+We will need a dialog box in MantidPlot to hold various configuration options, such as the address of the cluster head node.  Given that there is only one cluster right now and that there will probably never be more than a few, it seems practical to hard-code all the necessary configuration options and then let the user just select the cluster from a drop-down list.
+
+\subsubsection{User Authentication and Authorization}
+Condor accepts a number of different authentication/authorization options.  We would like something that would allow the user to authenticate once yet allow multiple connections to the cluster.  For example, forcing the user to enter a password every time he/she wanted to check on the status of a running job would not be ideal.
+
+One possible option is to use X.509 certificates.  We can set up a server (either the cluster head node or some other convenient server) that will issue X.509 certificates.  The user logs in and obtains a certificate that is valid for a reasonable amount of time (12 hours, for example).  This certificate is then used for all of the Condor API calls.  We can also probably integrate the act of obtaining the certificate into MantidPlot so that needn't even be aware that certificates are in use.
+
