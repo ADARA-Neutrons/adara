@@ -38,6 +38,8 @@
 
 % Easy bytefield creation (local package)
 \usepackage[endianness=big]{packages/bytefield}
+% Allow includes/inputs in subfolders
+\usepackage{chapterfolder}
 
 \hypersetup{bookmarksopen=true,
             pdfauthor={Oak Ridge National Laboratory},
@@ -201,7 +203,7 @@ built on \today
 \input 1_Network_Protocol/component.tex
 \input 2_SMS/component.tex
 \input 3_Live_Analysis/component.tex
-\input 4_Parallel_Analysis/component.tex
+\cfchapter {}{4_Parallel_Analysis}{component.tex}
 \input 8_Translation_Services/component.tex
 
 \end{document}
