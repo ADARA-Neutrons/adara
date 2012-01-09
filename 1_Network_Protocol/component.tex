@@ -348,14 +348,14 @@ The Translation Service may recieve a Statistics Reset Packet
 that these packets be logged at minimum, though the Translation Service
 is free to respond to these packets as it deems appropriate.
 
-At the end of an experiment recording, the SMS will send a Run Completion
-Packet (Section~\ref{section:protocol_run_completion}) to indicate that all
-data has been sent. The Translation Service will finalize its work, and respond
-with its own Run Completion Packet indicating sucess or the error encountered.
-The Translation Service need not wait for receipt of the Run Completion Packet
-from the SMS prior to indicating an error; early notification is preferred.
-Once the Run Completion is received from the Translation Service, the SMS will
-terminate its connection.
+At the end of an experiment recording, the SMS will send a Run Status Packet
+indicating the end of a run and that all data has been sent. The Translation
+Service will finalize its work, and respond with a Translation Complete Packet
+(Section~\ref{section:protocol_translation_complete}) indicating sucess or the
+error encountered.  The Translation Service need not wait for receipt of the
+Run Status Packet from the SMS prior to indicating an error; early notification
+is preferred.  Once the Translation Complete Packet is received from the
+Translation Service, the SMS will terminate its connection.
 
 
 {\large \bf Communication with the Live Event Clients}
@@ -384,14 +384,14 @@ The client may also receive Synchronization Packets
 and Heartbeat Packets (Section~\ref{section:protocol_heartbeat}), both of
 which it should discard. These may appear prior to the prologue.
 
-At the end of an experiment recording, the client will receive both
-Run Completion and Run Status packets. The client may take such action as
-it deems appropriate, but should not respond to the SMS. If the client
-chooses to remain connected to the SMS, it will continue to receive event
-data. If a new experiment recording is started, the client will receive
-the prologue defined above and all subsequent data will be associated with
-that experimental recording until it receives another Run Completion/Run
-Status packets indicating the completion of the recording.
+At the end of an experiment recording, the client will receive a Run Status
+Packet with its status set to indicate the end of a run.  The client may take
+such action as it deems appropriate, but should not respond to the SMS. If the
+client chooses to remain connected to the SMS, it will continue to receive
+event data. If a new experiment recording is started, the client will receive
+the prologue defined above and all subsequent data will be associated with that
+experimental recording until it receives another Run Status Packet
+indicating the completion of the that run.
 
 A live event client  may recieve a Statistics Reset Packet
 (Section~\ref{section:protocol_stats_reset}) at any time. It is recommended
@@ -595,7 +595,7 @@ for the same experiment recording.
 \begin{figure}[ht]
   \centering
   \begin{bytefield}{48}
-    \bitheader{48,16,15,0} \\
+    \bitheader{47,16,15,0} \\
     \bitbox{32}{Base Physical ID (u32)} &
     \bitbox{16}{Count (u16)} \\
     \wordbox{1}{Map Entry 0} \\
@@ -610,7 +610,7 @@ for the same experiment recording.
 \begin{figure}[ht]
   \centering
   \begin{bytefield}{48}
-    \bitheader{48,16,15,0} \\
+    \bitheader{47,16,15,0} \\
     \bitbox{32}{Logical ID (u32)} &
     \bitbox{16}{Bank ID (u16)} \\
   \end{bytefield}
@@ -666,7 +666,9 @@ pad the total packet length to a multiple of 4 bytes.
 	\hline
 	0 & No current run \\
 	1 & Beginning new run \\
-	2 & Continuing current run (new file marker) \\
+	2 & Continuing current run (end of file marker) \\
+	3 & Continuing current run (new file marker) \\
+	4 & Ending current run \\
     \end{tabular}
   \end{center}
   \caption {Run Status Definitions}
@@ -732,8 +734,8 @@ metadata value packets.}
 
 
 \newpage
-\subsubsection{Run Completion Packet}
-\label{section:protocol_run_completion}
+\subsubsection{Translation Complete Packet}
+\label{section:protocol_translation_complete}
 
 \begin{figure}[h]
   \centering
@@ -749,8 +751,8 @@ metadata value packets.}
     \bitbox{16}{Reason Length (u16)} \\
     \wordbox{2}{Reason ($N$ byte string, optional)} \\
   \end{bytefield}
-  \caption{Packet Type TBD: Run Completion Packet}
-  \label{fig:protocol_packet_run_completion}
+  \caption{Packet Type TBD: Translation Complete Packet}
+  \label{fig:protocol_packet_translation_complete}
 \end{figure}
 
 \begin{table}[h]
@@ -767,10 +769,9 @@ metadata value packets.}
   \label{table:protocol_completion_status_values}
 \end{table}
 
-The ``Run Completion'' Packet allows the Stream Management Service to signal to
-the Translation Service that it has transmitted all of the data related to an
-experimental run. The Translation Servce will use this same packet format to
-indicate the results of translation back to the SMS.
+The ``Translation Complete'' Packet allows the Translation Service to signal
+the Stream Management Service that is has completed processing the data sent
+for this experimental run.
 
 \begin{itemize}
 \item{\bf Length} is 8 bytes plus the length of the optional {\bf Reason} field
@@ -793,6 +794,10 @@ should not resend this experimental run until a human has inspected and
 corrected the root cause. Only if {\bf Status} is successful may the SMS
 consider the experimental run safely on disk at the Translation Service and
 mark the storage space valid for eventual reclaimation.
+
+The Translation Service may send this packet immediately upon detecting an
+error and need not wait for the SMS to signal the end of data for the
+experiment.
 
 
 \newpage
