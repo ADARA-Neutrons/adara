@@ -23,6 +23,13 @@ physical to logical mapping is performed. To this end, the protocol is
 designed allow parsers to skip over packets that are unknown or irrelevant
 to the task at hand.
 
+\todo{Need to transfer geometry information}{%
+It is desirable to communicate the geometry of the instrument alongside
+the event data generated. This allows Mantid and other tools to stop using
+thier own geometry files and avoids a potential source of inconsistency.
+In order to do this, we will need to define one or more packet type(s) for
+this data, and also how to store it in the NeXus files.}
+
 \subsection{Common Protocol Information}
 
 As the bulk of computing power at the SNS is based on the Intel architecture,
