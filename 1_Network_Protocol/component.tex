@@ -992,9 +992,6 @@ data comes from a diverse and dynamic collection of devices.
 \todo{Expand metadata description}{%
 Jim has a good description about the metadata, just need to clean it up
 and bring it into this document.}
-\todo{Define Variable Status/Severity Fields}{%
-We should have a common table here for the status and severity fields. This
-is likely to be derived from EPICS.}
 \todo{Device ID 0 is a pseudo device}{%
 We will use device ID 0 as a pseudo device to collect user comments and
 parameters such as the binning configuration for the translation service.
@@ -1005,6 +1002,61 @@ devices.}
 I'm expecting to translate fast metadata into these packets; we need to
 verify that chopper data will fit, and determine exactly how we should
 handle it.}
+
+\newpage
+\subsubsection{Variable Status and Severity}
+
+Each variable carries with it an associated alarm status and severity. These
+values are derived from the EPICS Record Reference Manual.
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l | l}
+	Value & EPICS Name & Definition \\
+	\hline
+	0 & None & No alarm \\
+	1 & Read & Unable to read value \\
+	2 & Write & Unable to write value \\
+	3 & HiHi & Analog value is above the high ``high'' limit \\
+	4 & High & Analog value is above the low ``high'' limit \\
+	5 & LoLo & Analog value is below the low ``low'' limit \\
+	6 & Low & Analog value is below the high ``low'' limit \\
+	7 & State & Record is considered to be in bad state \\
+	8 & Cos & Digital value changed state \\
+	9 & Comm & Device not communicating \\
+	10 & Timeout & Device communications timed out \\
+	11 & HwLimit & Device indicated hardware limit \\
+	12 & Calc & Bad calculation \\
+	13 & Scan & Invalid SCAN field \\
+	14 & Link & Failed to link to another record \\
+	15 & Soft & Record is in invalid state (software error) \\
+	16 & BadSub & Subroutine not found \\
+	17 & UDF & Alarm status is undefined \\
+	18 & Disable & Record was disabled \\
+	19 & Simm & Record is in simulation mode \\
+	20 & ReadAcess & No Read Access \\
+	21 & WriteAccess & No Write Access \\
+    \end{tabular}
+  \end{center}
+  \caption {Variable Status Definitions}
+  \label{table:protocol_variable_status_values}
+\end{table}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0 & No Alarm \\
+	1 & Minor \\
+	2 & Major \\
+	3 & Invalid \\
+    \end{tabular}
+  \end{center}
+  \caption {Variable Alarm Severity Definitions}
+  \label{table:protocol_variable_severity_values}
+\end{table}
+
 
 \newpage
 \subsubsection{Device Descriptor Packet}
@@ -1077,8 +1129,10 @@ Jim and Marie will define the schema for the XML content of this packet.}
 \item{\bf Timestamp} indicates the time that the variable changed.
 \item{\bf Device ID} indicates the device this variable is from.
 \item{\bf Variable ID} indicates the variable that changed.
-\item{\bf Status} of this variable. See TODO.
-\item{\bf Severity} of this variable. See TODO.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
 \item{\bf Variable Value} is an unsigned 32 bit value for this variable.
 \end{itemize}
 
@@ -1115,8 +1169,10 @@ associated with the Device ID.
 \item{\bf Timestamp} indicates the time that the variable changed.
 \item{\bf Device ID} indicates the device this variable is from.
 \item{\bf Variable ID} indicates the variable that changed.
-\item{\bf Status} of this variable. See TODO.
-\item{\bf Severity} of this variable. See TODO.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
 \item{\bf Variable Value} is an IEEE 754 double floating point value for this
 variable.
 \end{itemize}
@@ -1152,8 +1208,10 @@ rounded up to the next multiple of four.
 \item{\bf Timestamp} indicates the time that the variable changed.
 \item{\bf Device ID} indicates the device this variable is from.
 \item{\bf Variable ID} indicates the variable that changed.
-\item{\bf Status} of this variable. See TODO.
-\item{\bf Severity} of this variable. See TODO.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
 \item{\bf String Length} is the length of the string that follows,
 not including padding.
 \item{\bf Variable Value} is a UTF-8 encoded string containing the new value
