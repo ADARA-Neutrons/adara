@@ -26,10 +26,9 @@ experiment metadata such as the ``run number''. While the SMS is not
 user-facing, it will provide an interface for those applications which are
 to associate user-collected meta-data with the appropriate experimental data.
 
-\decision{Beam Monitor Input}{We need to decide how to bring beam monitor data
-into the new stream. Currently monitor data is in a histogram format, but it
-would be preferable to bring it in as another detector input.}
-
+\todo{Distiguishing beam monitor data}{Does the BM data come in via a
+separate set of preprocessors? Or does it come mixed into the main detector
+stream with a specific set of pixel IDs?}
 \todo{Glossary}{We need a glossary or other section in which we
 introduce EPICs process variables and other terms used throughout this
 document.}
@@ -37,6 +36,12 @@ document.}
 items that may be set by the user via EPICS PVs. It seems likely that we will
 want a method to reset those to default values to make things easy during
 changeovers.}
+\todo{Pulse ID precision}{During review of this document, a question
+was raised about the precision in the pulse ID -- is it correct to 1us, or
+to 100ns?}
+\todo{Find document}{107030200-TD005-R05 Instrument Systems Data
+Aquisition File Formats Technical Reference Manual}
+
 
 \subsection{Detector Input}
 
@@ -83,12 +88,6 @@ containing accelerating timing information will be parsed and the values fed
 to the appropriate tranformation engines as needed. Unknown packets will be
 logged and dropped.
 
-\assumption{Single-type Raw Packets}{It is currently assumed that a raw event
-packet from the preprocessor will include neutron event data or fast metadata,
-but not both at the same time. However, it should not be a huge undertaking to
-change this assumption, as we could demultiplex based on pixel ids instead
-of packet source.}
-
 \decision{Hostname or IP?}{We need to decide if we will uses host names (FQDNs)
 or IP addresses in the configuration file. Host names have the advantage of
 human readability and can contain additional semantic information, but carry
@@ -97,8 +96,6 @@ we will also need to decide if the lookup is done during the parsing of the
 configuration file, or if it will need to be performed each time we try to
 connect to a preprocessor. The latter will allow for changes without a full
 restart of SMS, but add some additional complexity to the code.}
-\decision{Single Purpose Preprocessors?}{Is it expected/permissible for a
-single preprocessor to send both neutron and fast metadata?}
 \decision{Handling Reported Errors}{There are provisions in the packet format
 to report hardware errors from the detectors. This information must be
 incorporated into our design.}
@@ -113,7 +110,10 @@ associated with the preprocessor and their form and function.}
 
 \subsubsection{Neutron Event Transformation}
 
-As each raw event is processed, the pixel id will be remapped to its new value
+As each raw event is processed, the source and pixel id from the raw
+event packet will be used to determine if this event is for a detected neutron
+or fast metadata. If the event is for a neutron, the physical pixel ID from
+the raw data packet will be remapped to its new logical ID
 given by a lookup table. This lookup will also give us the bank associated
 with the pixel. Any pixel id that does not have a mapping in the table will
 have its high-bit (bit 31) set to indicate a raw pixel value, and the bank will
@@ -139,33 +139,18 @@ data, and extract it as part of processing. The reversible mapping algorithm
 requires upstream to leave clear a known bit in order to indicate a mapping
 failure. We currently have chosen bit 31, but this could be changed.}
 
-\decision{Frame Correction}{Neutrons may/often take more than the nominal
-16.67ms inter-pulse gap (IPG) to transit from the moderator to the detectors.
-The length of time is determined by the settings of the chopper(s), the
-geometry of the beamline, the position of the detector, and other factors.
-Neutrons that take longer than the IPG will show up in the event data
-one or more frames (pulses) after their originating pulse, and require
-corrections to their time-of-flight. Currently this is done during analysis,
-but there may be some desire to move that upstream. We need to decide if
-that is the case, what would be required to do it, and how to ensure that
-the analysis tools can easily tell corrected from un-corrected data.}
-\decision{Handling Missing Packets}{The raw packets contain a sequence number
-so that we may be able to detect dropped packets. What do we do in that case?}
-
 \todo{Define Remapping/Banking Config Format}{This could be a straight
 key-value table, though I understand there may be an existing language for
 this.}
-\todo{Determine How To Identify End-of-Pulse}{We need to know when we have
-received all data for a given pulse so that we know when to push things
-through the pipeline. It appears that the raw frames have a sequence number
-and an end-of-pulse flag we can use for this purpose. We may also be able
-to use the presence of raw event packets with a different pulse ID field, or
-the reception of an RTDL packet to indicate EOP.}
-\todo{Define Processed Neutron Event Packet}{This may already be in Lloyd and
-Jim's document describing the streaming procotol. If not, it will need to
-be defined -- it will be very similar to the raw event packet, but will
-have bank information and other data as needed from the RTDL packets or
-other sources.}
+\todo{Document End-of-Pulse Detection}{Pull in description
+of how we determine that we have all of the data for a given pulse
+and proceed to detect missing packets.}
+\todo{Have variable to document dropped packets}{We need a metadata variable
+to document packets get dropped from each preprocessor. Timestamp of update
+packet would be pulse ID.}
+\todo{Mark fast metadata as suspect on dropped packets}{If we drop
+a packet from a preprocessor, we need to mark all potentially affected
+variables as suspect until we get a new update with full contents.}
 
 \subsubsection{Fast Metadata Transformation}
 
@@ -177,14 +162,15 @@ for the end-of-pulse.
 
 \assumption{Frame Correction and Metadata}{Because the fast metadata
 information is not based on neutron flight time, the pulse timestamp will
-always be correct and no frame correction is needed.}
+always be correct and no frame correction in DAS is needed. Analysis will
+need to consider neutron time-of-flight and instrument geometry to determine
+how much frame skew is present and if events from prior pulse IDs need to
+be associated with this metadata.}
 
-\decision{How to handle unknown fast-metadata pixel ids?}{The metadata format
-for the new protocol expects there to be a ``Variable Descriptor'' (actual
-term likely differs) in the stream prior to the variable being updated. If
-we get an unexpected pixel id for fast metadata, what do we do? Make up a
-descriptor and carry on? It would seem we want to record the data given, even
-if it is from a glitch.}
+\todo{How to handle unknown fast-metadata pixel ids?}{%
+If we recieve an unknown pixel ID for fast metadata, we will use the
+standard transformation for unknown pixel IDs. This allows someone to
+recover that fast metadata later. Update the document to reflect the handling.}
 
 \todo{Define Variable Config File Format}{We need to configure the mapping
 from source/pixel id to metadata variable. We will need the XML descriptor
@@ -194,6 +180,16 @@ desired units. It would be nice to have a format that avoids my parsing XML,
 but this is not a hard requirement and XML parsing may be required for other
 functionality in any event.}
 
+\todo{TOF is the only data frame-corrected}{%
+TOF is updated for the appropriate frame skew, but Pulse ID, charge, etc
+are not. There are situations where the TOF can be borderline for an instrument
+such as when the detectors are different lengths away from the sample and
+want to straddle the pulse delay (ie, one has a delay of 3 and the other 4.).
+There is some effort underway to let the detector system handle this. It seems
+like no TOF correction should be handled by the HW, but there is resistance
+to changing that. It also appears that there may be insuffienct resolution
+for the TOF/PulseID to fix this later.}
+
 \subsection{Slow Controls}
 
 The SMS must maintain a list of descriptions and current values of the PVs
@@ -201,19 +197,12 @@ describing the sample environment. This is needed in order to provide
 new aggregation clients the current operating paramters as well as to
 record the environment for each experiment run. 
 
-\decision{How to integrate slow controls?}{There have been discussions of SMS
-being a direct EPICs client to obtain PVs and incorporate those into the
-stream. This approach seems to be duplicative of work that will be needed in
-the scan server and perhaps other parts of the system, and as such -- while not
-completely off the table -- is not the currently favored approach. More
-discussions are required to determine a coherent approach to slow controls for
-the system.}
-
-\todo{Scan Server Handshake}{Assuming we go forward with the scan server
-providing all-things-sample-environment, we will need to determine the
-steps required for the SMS and the Scan Server to establish communications.
-We will also need a mechanism to indicate that the environment has changed
-and to rebuild the description.}
+\todo{Slow control config file}{%
+SMS will read/monitor EPICS PV's over channel access.  The scan server and SMS
+will share a configuration file to determine which PVs should be monitored and
+sent for translation. The scan server will be able to manipulate variables via
+channel access on the SMS to insert statistical reset packets, start/stop runs,
+and perform other tasks.}
 
 \subsection{Run Management}
 
@@ -328,6 +317,7 @@ its archival files, but it can filter and add its own hash as it sees fit.}
 policy of the timestamp index data.}
 \todo{Add PVs for monitoring}{I expect we will define some PVs to export
 various state information about space used, etc.}
+\todo{Reword}{Reword this section a bit for clarity.}
 
 
 \subsection{Translation Client}
@@ -395,6 +385,7 @@ them their own packet type? Does it go into the run info?}
 round-robin, then we may need to do a DNS lookup here. If it is handled by port
 mapping by an intermediate network device, we may not need to do the lookups,
 but we may have some issues getting full bandwidth out of it.}
+\todo{Add text}{Add text to be clear that we send data as soon as we can.}
 
 
 \subsection{Event Stream Server}
@@ -404,21 +395,12 @@ aggregated event stream. The SMS will listen on a well-defined port for new
 subscribers. Once connected, subscribers will send an initialization packet to
 establish their requested service.
 
-\decision{Passing run markers}{We will want to pass run recording/end events to
-listeners for their perusal. While those events will generated by SMS, there
-will also need to be events from the scan server to indicate points of interest
-and/or when to reset counters for streaming analysis tools. We need to decide
-what those look like and what their semantics will be.}
-\decision{Allow metadata only clients?}{Life becomes much easier for the SMS if
-we only provide access to the full aggregated stream and do not do any
-filtering on behalf of subscribers. If we wish to provide a reduced stream for
-allowing external monitoring or other use, we may wish to write a client that
-performs that task and only forwards what it needs.}
-
-\todo{Elaborate on Event Stream Server}{There have been many conversations
-about this topic, such as allowing for a simple request to go back to a
-timestamp or beginning of current run, whichever is more recent. I need to
-capture those in this section, but the screen is going blurry.}
+\todo{Add list of control PVs}{We will send down statistical reset
+packets to indicate to live clients that they should descard previous
+data and start anew. This will be triggered by writing a PV using CAS.}
+\todo{Update this section}{We've covered live data selection a bit in the 
+protocol document, but need to discuss it here with ancillary topics such
+as configuring the timestamp index resolution.}
 
 
 \section{Stream Histogram Tool}
