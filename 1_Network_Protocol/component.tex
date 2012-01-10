@@ -1,13 +1,14 @@
 
 \section{ADARA Network Protocol}
+\label{network_protocol}
 
 \subsection{Overview}
 
 The objective of this protocol is to provide a simple, easy to parse
 structure for the transmission and storage of the data associated with
-an experimental run at the SNS. It must accomodate high data rate of the
-neuton event information from the detector electronics while offering
-the flexability to describe and report data from a diverse and dynamic
+an experimental run at the SNS. It must accommodate high data rate of the
+neutron event information from the detector electronics while offering
+the flexibility to describe and report data from a diverse and dynamic
 collection of sample environment sensors and control systems.
 
 While the format is primarily used for network transmission over TCP
@@ -26,16 +27,16 @@ to the task at hand.
 \todo{Need to transfer geometry information}{%
 It is desirable to communicate the geometry of the instrument alongside
 the event data generated. This allows Mantid and other tools to stop using
-thier own geometry files and avoids a potential source of inconsistency.
+their own geometry files and avoids a potential source of inconsistency.
 In order to do this, we will need to define one or more packet type(s) for
 this data, and also how to store it in the NeXus files.}
 
 \subsection{Common Protocol Information}
 
 As the bulk of computing power at the SNS is based on the Intel architecture,
-all multi-byte values in the protocol will be represeneted in little-endian
-format to avoid the overhead of byte-swaping every value. Any big-endian
-hardware added in the future will need to accomodate the existing format.
+all multi-byte values in the protocol will be represented in little-endian
+format to avoid the overhead of byte-swapping every value. Any big-endian
+hardware added in the future will need to accommodate the existing format.
 
 All packets must be a multiple of 4 bytes in length to keep the integer
 fields naturally aligned.
