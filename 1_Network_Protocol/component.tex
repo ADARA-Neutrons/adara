@@ -389,9 +389,9 @@ Packet with its status set to indicate the end of a run.  The client may take
 such action as it deems appropriate, but should not respond to the SMS. If the
 client chooses to remain connected to the SMS, it will continue to receive
 event data. If a new experiment recording is started, the client will receive
-the prologue defined above and all subsequent data will be associated with that
-experimental recording until it receives another Run Status Packet
-indicating the completion of the that run.
+the prologue as defined for communication with the Translation Service, and all
+subsequent data will be associated with that experimental recording until it
+receives another Run Status Packet indicating the completion of the that run.
 
 A live event client  may recieve a Statistics Reset Packet
 (Section~\ref{section:protocol_stats_reset}) at any time. It is recommended
