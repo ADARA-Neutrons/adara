@@ -1,4 +1,79 @@
 \subsection{Parallel Extensions to Mantid}
 \label{subsec:ParallelExtensions}
 
-Russell
+Here we discuss extensions to Mantid to allow the effective use of a processing cluster, in situations where the jobs are not perfectly independent, through the use of MPI for example. 
+
+\subsubsection{Using GatherWorkspaces}
+
+Mantid currently has an experimental algorithm called GatherWorkspaces which uses MPI to spread out work over several processes or nodes. The NOMAD_mpi_example.py script is an example of its use. The data loading and processing of NOMAD's 99 banks is spread over 99 processes. A small python script is run for each bank, processing the data. At the end of the script is a call to GatherWorkspaces which takes the spectra generated in each of the 99 MPI processes and collects them into one workspace.
+
+\paragraph{Extension to GatherWorkspaces}
+
+GatherWorkspaces currently only works on histogram data (Workspace2D's). It may be desirable to gather EventWorkspaces. This would require transfering event data back to the master. In most cases this will be less data; however in the case of NOMAD this would be significantly more data to transfer.
+
+
+\subsubsection{Merging Multiple Runs}
+
+Our most demanding use case is a large inelastic neutron scattering data set, with measurements performed at many goniomieter angles.
+
+\paragraph{Initial Conditions}
+
+Let us take as an example an inelastic data set consisting of 100 separate runs sweeping through a range of goniometer angles. Let us assume that the data volume is approximately 1 GB for each run.
+
+Using techniques described in the Automated Data Reduction in section \ref{subsec:Automated}, each run is converted to a reciprocal space MDWorkspace with a fixed box structure - that is, the box structure is common to all the runs. This requires that we have a reasonably good guess of the size (in reciprocal space) that will be covered by the data. 
+
+For example, we might split space into 1 million boxes. On average, this will be 1 kB of data per box, though in reality some boxes will contain much more than this, and many others will be empty. This processing can be performed as the experiment occurs, so that each file is ready a few seconds after the completion of the run (most likely bottleneck: file saving).
+
+\paragraph{Merging Files}
+
+Once all runs have been saved to 100 separate 1GB MDWorkspace files, it is then desired to combine these into one 100 GB MDWorkspace. The MergeMD algorithm, currently present in Mantid, can perform this task with < 100 GB of available memory by reading from disk and writing out to a single large 100 GB file. However, this operation is severely disk I/O limited.
+
+Performance could be significantly improved by using a cluster; let's say that you have 10 nodes with > 10 GB each available. An initial step would be to distribute the events between these 10 nodes. We can relatively quickly read the header information of the 100 files in order to determine where the memory will be used. A simple way to distribute the memory is to randomly assign it to each node. 
+
+Through MPI, the root node assigns a list of boxes for each node to load. Each node loads that section of events into memory (POSSIBLE ISSUE: hammering the file system? 10 nodes will be reading from 100 files each). Once data is loaded, it can be reorganized effectively in memory using MDWorkspace's adaptive mesh refinement. Each MDWorkspace on each node will contain about 10 GB worth of events in a random distribution along Multi-dimensional space.
+
+\paragraph{Using Merged MDWorkspace}
+
+Once loaded on the 10 nodes, these 10 MDWorkspaces representing a single large MDWorkspace. Since all 10 nodes have the 10 GB of data in memory, further processing will be quite quick. The merging script should therefore take advantage of this opportunity to generate some desired visualisation data sets.
+
+The BinMD algorithm bins MDWorkspaces into dense, multi-dimensional histograms (called MDHistoWorkspaces). Each node can perform binning of its (partial) MDWorkspace. The algorithm is parallelized using OpenMP and can effectively use all of the cores. Each MDHistoWorkspace created may be in the range of a few million voxels (from tens to a few hundred MB).
+
+After binning, a version of GatherWorkspaces designed for MDHistoWorkspaces will be needed to gather all of the data. In this case, the MDHistoWorkspaces will need be summed into a final MDHistoWorkspace that represents the visualisation of the total MDWorkspace. This operation should be fairly quick once the data has been transferred.
+
+\paragraph{Re-using MDWorkspaces}
+
+For later processing, each node could save its partial MDWorkspace to a file for later re-loading. Depending on the performance of the file system, this could take a significant amount of time. A later job could then refer to the file to do further processing.
+
+MDWorkspaces can be backed to a file - that is, the data is not entirely loaded into memory. Instead, only the box structure and a reference to the position of the data on file is loaded. Relevant data is loaded from file on demand. This means that a new call to BinMD, for example, will be relatively quick if it is only for part of the workspace, and therefore only touches a small fraction of the file. These follow-up calls would have to be run on the same number of nodes as the number of separate files.
+
+\subsubsection{Interactive Parallel Jobs}
+
+As mentionned above, loading/saving the very large MDWorkspaces to file will be a significant slow down. It may become useful in those cases to keep the MDWorkspaces loaded on each node and run Mantid in an interactive way.
+
+\paragraph{Client-Server Interface}
+
+One possible solution would be to run Mantid in an interactive way using a client-server interface. This would be similar to the client-server interface offerred by paraview. In paraview, the pvserver application is run in MPI (mpirun pvserver). The client application communicates with the root MPI node (only), sending rendering commands.
+
+In Mantid, the client could send python commands that would then be evaluated by the MPI root node. Processing would be distributed as needed/possible by the MPI root node.
+
+\paragraph{Possible Implementation}
+
+ZeroMQ (http://www.zeromq.org/, aka zmq) is a very interesting option for this purpose. It is a socket library that abstracts of lot of the specifics of implementation. It can communicate through TCP, IPC or inproc so that it could handle a server on the local machine or a distant remote server.
+
+Although it would be a significant redesign, the MantidPlot GUI could operate on the same client/server interface as well. For desktop applications, the server would run locally; or the client could connect to a large remote machine, or it could connect to the root node of a cluster.
+
+\paragraph{Advantages}
+
+\begin{itemize}
+\item Data remains in memory, avoiding constantly re-loading it.
+\item Much more responsive for a user.
+\end{itemize}
+
+\paragraph{Disadvantages}
+
+\begin{itemize}
+\item The required number of nodes must be available on the cluster. This may mean that the user has to wait until an interactive session is available.
+\item Resources are "claimed" even when they are not used. 
+\end{itemize}
+
+
