@@ -5,7 +5,7 @@ Here we discuss extensions to Mantid to allow the effective use of a processing 
 
 \subsubsection{Using GatherWorkspaces}
 
-Mantid currently has an experimental algorithm called GatherWorkspaces which uses MPI to spread out work over several processes or nodes. The NOMAD_mpi_example.py script is an example of its use. The data loading and processing of NOMAD's 99 banks is spread over 99 processes. A small python script is run for each bank, processing the data. At the end of the script is a call to GatherWorkspaces which takes the spectra generated in each of the 99 MPI processes and collects them into one workspace.
+Mantid currently has an experimental algorithm called GatherWorkspaces which uses MPI to spread out work over several processes or nodes. The NOMAD\_mpi\_example.py script is an example of its use. The data loading and processing of NOMAD's 99 banks is spread over 99 processes. A small python script is run for each bank, processing the data. At the end of the script is a call to GatherWorkspaces which takes the spectra generated in each of the 99 MPI processes and collects them into one workspace.
 
 \paragraph{Extension to GatherWorkspaces}
 
