@@ -10,27 +10,27 @@ completion of a run.
 
 \begin{figure}[htb]
 \centering
-\label{fig.chunky_sts}
-\includegraphics[width=3.5in]{chunky.png}
+\includegraphics[width=5.5in]{chunky.png}
 \caption{Initial ``Chunky'' Streaming Translation Architecture, Includes
 generation of ``Mini-NeXus'' files for preliminary analysis and transport to
 Central computing center.}
+\label{fig:chunky_sts}
 \end{figure}
 
 
 \begin{figure}[htb]
 \centering
-\label{fig.creamy_sts}
-\includegraphics[width=3.5in]{creamy.png}
+\includegraphics[width=5.5in]{creamy.png}
 \caption{Effective Potential ``Extra Creamy'' Streaming Translation
 Architecture, does Not include generation of ``Mini-NeXus'' files, only produces
 a Full NeXus file for ``soon after post-mortem'' analysis, via transport (or
 direct writing) to the Central computing center.}
+\label{fig:creamy_sts}
 \end{figure}
 
 
 The basic proposed architecture for this STS design
-is illustrated in Figures \ref{fig.chunky_sts} and \ref{fig.creamy_sts},
+is illustrated in Figures~\ref{fig:chunky_sts} and \ref{fig:creamy_sts},
 for two incremental configurations based on use of intermediate
 ``Mini-NeXus'' file generation. Note that the actual boundary/separation between
 the Data Acquisition System (DAS) and Central Computing Center is transient
@@ -67,7 +67,7 @@ operations and capitalize on powerful computational resources at SNS.
 
 The STS implementation relies heavily on completion of the
 Hybrid Streaming Network Protocol,
-as described in Section \ref{network_protocol}.
+as described in Section~\ref{network_protocol}.
 While some STS architectural re-organization and development can proceed
 in unison with the design of the network protocol,
 some practical results will need to be available early
@@ -95,9 +95,9 @@ and produce transient live histogram-based NeXus files
 while an experiment is running.
 An optional intermediate development step for STS would be to enable a
 preliminary extension of the existing LDP stand-alone subsystem to produce
-live \em{Event-based} ``Mini-NeXus'' files,
+live {\em Event-based} ``Mini-NeXus'' files,
 in preparation for subsequent potential streaming translation service needs.
-These Mini-NeXus files \em{might} prove ``interesting''
+These Mini-NeXus files {\em might} prove ``interesting''
 for early Live Analysis developments.
 
 Otherwise, the eventual usage for the current LDP Event Catcher
