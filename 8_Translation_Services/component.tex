@@ -61,7 +61,8 @@ arrives, signaling the end of the experiment. Then the traditional Translation
 Service Client can perform its usual Archiving and Cataloging services, along
 with new extensions to improve performance, such as providing multi-threaded
 concurrency in the translation processing to effectively ``overlap'' independent
-operations and capitalize on powerful computational resources at SNS.
+operations and capitalize on powerful computational resources at SNS and
+CCSD.
 
 \subsubsection{Implementation Plan}
 
@@ -70,12 +71,11 @@ Hybrid Streaming Network Protocol,
 as described in Section~\ref{network_protocol}.
 While some STS architectural re-organization and development can proceed
 in unison with the design of the network protocol,
-some practical results will need to be available early
-in the STS development.
+some practical results will be required early in the STS development.
 Specifically, a ``Protocol Generator'' must be created to take existing
-historical SNS data (likely in the ``Pre-NeXus'' binary format, and the
-associated XML meta-data files) and produce a network stream using
-the new hybrid network protocol,
+historical SNS data (likely in the ``Pre-NeXus'' binary format and the
+associated XML meta-data files) and produce a network packet stream
+using the new hybrid network protocol,
 for proper design and testing of STS subsystems.
 All specific packet types should be well defined,
 including accelerator pulses, neutron events, beam monitor events,
@@ -84,100 +84,118 @@ polarization state transitions, slow controls meta-data/motor positions
 (geometry) and accelerator information.
 Beyond this preliminary stand-alone network protocol generator,
 eventually a full ``side-by-side'' testbed should be provided,
-in a real beamline such as HYSPEC, for testing in a production
-experiment environment.
+in a real beamline hutch such as HYSPEC,
+for testing in a production experimental environment.
 
 The front-end of the new STS system will be derived from the
 existing SNS production ``Live Data Processing'' (LDP)
 Event Catcher software,
 which is utilized to snoop packets from the legacy DAS live event stream
-and produce transient live histogram-based NeXus files
+and incrementally produce transient ``Live'' histogram-based NeXus files
 while an experiment is running.
 An optional intermediate development step for STS would be to enable a
 preliminary extension of the existing LDP stand-alone subsystem to produce
 live {\em Event-based} ``Mini-NeXus'' files,
-in preparation for subsequent potential streaming translation service needs.
-These Mini-NeXus files {\em might} prove ``interesting''
+in preparation for subsequent potential STS needs.
+These Mini-NeXus files {\em might} prove ``interesting'' or useful
 for early Live Analysis developments.
 
-Otherwise, the eventual usage for the current LDP Event Catcher
+Otherwise, the eventual plan for usage
+of the current LDP Event Catcher infrastructure
 would be as the front-end linkage between the new hybrid network protocol
-and a back-end streaming translation client.
+and a back-end streaming HistoTools/Translation Service Client.
 Based on the new network protocol,
 a modified communication/control linkage will be incorporated
 into the existing LDP network handler,
-and then data can be captured and delivered appropriately
-to the back-end client for processing and storing the data into NeXus files.
-This will require modified handling for beamline geometry information,
+and then the new data stream can be captured and delivered appropriately
+to the back-end client for processing
+and collating the data into NeXus files.
+This will require modified handling
+for any beamline-specific geometry information,
 which is currently extracted from a Live Geometry MySQL Database
 in the existing Event Catcher software.
 A migration must occur from this database infrastructure
 to instead extract slow controls process variable updates
 from the new network protocol packet types,
-and including all experiment-related meta-data on
-users, proposal ids, motor positions, etc.
+including all experiment-related meta-data on
+users and proposal ids, in addition to motor positions, etc.
 
-This back-end streaming translation client
+The back-end Streaming Translation Client (STC)
 will itself consist of several subsystems,
-also to be constructed from other existing production SNS software projects,
-namely the ``HistoTools'' NeXus file generation effort
-and the legacy Translation Service Client.
+also to be constructed from existing production SNS software projects,
+namely the ``HistoTools'' NeXus file generation system
+and the legacy static Translation Service Client.
 The HistoTools application code and library can be applied,
-by a straightforward manipulation of the data input method,
+by a straightforward manipulation of their current data input method,
 to process a network stream instead of file based data.
-This is especially true given the recent optimizations and
+This is especially feasible given the recent optimizations and
 algorithmic reworking in the impending HistoTools 4.0.0 production release,
-which processes input data from a ``pulse-driven'' mode
+which processes input data using a ``pulse-driven'' mode
 instead of an ``event-driven'' one.
-While more efficient in terms of file-based processing,
-this high-level data handling approach is also directly amenable
-to the processing of network packets in the new data protocol.
-A first step in this development will be to effectively replace
-the existing LDP back-end NeXus file generation code
-with linkage to the new HistoTools application/library.
+This data handling approach,
+while more efficient in terms of file-based processing,
+is also directly amenable
+to the processing of network packets in the new data protocol,
+which are primarily pulse-driven with references to corresponding events.
 
-An optional companion effort with the HistoTools software
-would be to provide basic technology for
-splitting and merging ``partial'' Mini-NeXus files,
-as would be needed to cooperate with any Mini-NeXus files
-generated in conjunction with the LDP Event Mini-NeXus file option,
-or as part of the ``Chunky'' STS design.
-As such, a file merger application/library should be developed
+A first step in this integration-based development
+will be to effectively merge the LDP front end
+with a proper HistoTools back end,
+to replace the existing custom LDP NeXus file generation code
+with linkage to the new HistoTools application/library.
+An optional companion effort in this merging of LDP with HistoTools
+would be to provide a common technology basis for
+generating and merging ``partial'' Mini-NeXus files.
+Any existing knowledge base for creating and managing Mini-NeXus files,
+as generated in conjunction with the LDP Event Mini-NeXus option,
+could be incorporated as part of the ``Chunky'' STS design.
+A useful tool to create here, to aid development and testing,
+is a ``file merger'' application/library,
 for incrementally concatenating Mini-NeXus Files into
 single monolithic NeXus files.
-This work would include a full performance evaluation
+This tool development should include a full performance evaluation
 and code ``hot-spot'' optimization exploration
 to determine the feasibility of this approach in the STS overall design.
 For example, an optimal ``chunk size'' for Mini-NeXus files
 could be determined,
 based on the overheads involved in concatenating them, etc.
 
-The second key area of functionality in the STS back-end
-comes from the existing production Translation Service Client software.
-This software currently manages the
-notification of experiment completion,
-coordinates the execution of the HistoTools software
-to produce Histogram and Event-based NeXus files,
-and then archives and catalogs these files in ICAT and VFS,
-along with the original raw experiment data.
+The second key area of functionality in the STS back-end comes
+from the existing production Translation Service (TS) Client software.
+This software handles the notification of experiment completion,
+and coordinates the execution of the HistoTools software applications
+to produce Histogram and Event-based NeXus files.
+The TS Client then archives and catalogs these files in ICAT and VFS,
+along with the original raw experiment data and associated meta-data.
 In the new STS design, many of these same tasks will still be required,
-with the exception of the experiment completion notification,
-which will now be handled via direct communication in the
-hybrid network protocol,
+e.g. to properly archive and catalog the raw and processed experiment data.
+But in the STS, data processing and NeXus file creation will proceed
+{\em concurrently} with experimental data collection,
+hence changing the nature of the completion notifications
+and their handling.
+The starting/stopping of data collection will now be handled
+via direct communication in the hybrid network protocol,
+using the ``Run Status'' packet type,
 as part of the modified STS LDP/HistoTools linkage.
-Yet the Translation Service Client will still need to manage
+Similarly, the HistoTools back-end libraries will be continuously engaged
+in data processing and creation of NeXus files,
+rather than being triggered monotonically by the TS Client.
+Yet the TS Client will still manage
 the archiving and cataloging of experimental data,
-including the captured network protocol stream,
+including an additional new ``raw data'' file,
+in the form of the captured network protocol stream,
 which must also be written to local storage during processing.
 
-Additional features must be explored for this
-new STS back-end Translation service,
-including incorporation of ``Event Mode'' Beam Monitor data,
+Several additional features will be explored for improving the
+capabilities, resilience and efficiency of the Translation Service Client
+in this new STS back-end context.
+New data products will be incorporated for ``Event Mode'' Beam Monitor data
 and other ``Fast'' Meta-Data,
 such as from Magnet Pulses on SEQUOIA
-and High-Voltage/Analog Pump Probe on VULCAN.
-Usage requirements must be collected to ensure proper handling
-of these specialized data products.
+or High-Voltage/Analog Pump Probe on VULCAN.
+Usage requirements for these emerging features
+must be collected to ensure proper handling
+and disposition of these specialized data products into NeXus files.
 
 Because the existing production Translation Service Client
 is used for a variety of experimental facilities beyond SNS,
@@ -185,18 +203,49 @@ including HFIR at ORNL,
 it will be necessary to generalize/separate the workflow handling
 of data for SNS versus HFIR and other facilities.
 A new architecture for the Translation Service Client
-will be designed,
-to be continued... :-D
+will be designed, with specialized workflow handling for SNS,
+while preserving the existing generic workflow for HFIR, LENS, etc.
+The new STS Translation Service will also need to be enhanced
+to interoperate with the impending ICAT3 database infrastructure,
+for extended analysis meta-data searching and retrieval capabilities.
 
-XXX START HERE XXX
-March 9, 2012: Design and Implement Streaming Translation “Part 1” Front-End Control Infrastructure, Including Workflow, Communication and Oversight with LDP and HistoTools Data Collection and Processing
-March 9, 2012: Design and Implement (Borrowing Significantly from Existing Translation Client Code ☺) Streaming Translation “Part 2” Back-End Archiving, Permissions Setting and Cataloging Infrastructure, Including Integration with ICAT2/ICAT3 and Orbiter VFS, and Accounting for Computing/Network Hardware Design Choices
-May 31, 2012: Extend Translation Monitor to Display End-to-End System Status and Error Logging for Entire System from DAS through Live Streaming to Analysis
-May 31, 2012: Optimize Streaming Translation Internal Workflow, by Incorporating Concurrency via Multi-Threading, Using “Pool of Tasks” Algorithm Approach at Each Stage to Independently Process the Sequence of Translation Phases
-May 31, 2012: Explore \& Design Auto-Recovery Approach for Coordinating Recovery from Streaming Exceptions During an Experiment
-XXX START HERE XXX
+Finally, the Translation Service Client itself will be {\em optimized}
+to allow more concurrency and flexibility in processing incoming data.
+The current TS Client is primarily ``static'' in design,
+and processes a {\em single} run at a time,
+through all possible stages including final archiving and cataloging.
+Yet indeed, often the processing of a given experiment run can get
+bogged down in a specific stage, and hold up subsequent runs which
+would otherwise be quickly and easily processed.
+By dividing the TS Client processing into discrete ``pipeline stages''
+and handling each stage independently
+using its own pool of computational threads,
+it will be easy for the TS Client to always ``make progress''
+on trouble-free runs, even in the wake of other problematic runs
+that have somehow gummed up the works.
+Separate thread pools can be allocated for each type
+of NeXus file post-processing,
+e.g. to append Monitor histograms/events, beamline geometry,
+or even for assembling ``complete'' NeXus files from Mini-NeXus elements.
+Likewise, the sequential archiving and cataloging of the resulting
+NeXus (and raw data) files can be decoupled into their own thread pools
+and handled asynchronously.
 
-Integral to the development of the Streaming Translation Service
+Implicit in this new dynamic TS Client design
+is the concept of ``processing state'',
+which tracks the progress of each individual experimental run
+through the post-processing pipeline.
+A new database system will be enlisted to keep track
+of each run's status and error conditions,
+to provide a more meaningful overview of the full processing state.
+This database will provide extended information
+to the TS Monitor web application,
+to more accurately show bottlenecks and processing problems,
+and allow manual ``re-submission'' of failed pipeline stages.
+Such a system would represent a fundamental improvement
+over the existing ``all or nothing'' pass/fail TS Monitor reporting.
+
+Integral to this detailed STS development
 is proper capturing, handling and reporting of
 System Status and Error conditions.
 To emphasize the importance of this information
