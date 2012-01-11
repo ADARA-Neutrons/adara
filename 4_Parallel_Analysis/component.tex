@@ -1,15 +1,5 @@
 \section{Parallel Reduction}
 
-\subsection{Introduction}
-This document describes the detailed design of the components required for the parallel/batch processing data analysis of Mantid.  This will include aspects to both the Mantid Framework and MantidPlot.  
-
-
-It is based on the design of the Mantid Framework specified in the Architectural Design Document [ADD]
-
-
-It will form the basis of the development of this aspect of the framework and act as a guide for maintaining the system.
-
-While live data analysis of the neutron data stream will provide users with much needed timely feedback and the ability to make informed decisions on steering subsequent experiments, a number of challenges must be addressed for the Mantid software to carry out analysis of datasets in the 10-100's of gigabytes or more. These datasets are currently processed in Mantid using big-memory analysis nodes (128-256 GB RAM) on which Mantid currently provides node-level parallelism through the use of OpenMP. As dataset sizes continue to increase, the memory requirements alone will require parallel analysis techniques. In addition to a large memory footprint, many analysis workloads currently require staging datasets from one file system to another, prior to parallel data analysis, in such an environment, the time for this staging will dominate the analysis workflow.  At the SNS there are plans to implement a parallel file system to help alleviate this bottleneck.  Analysis tasks that are heavily compute or memory footprint bound will be accelerated by developing parallel analysis capabilities within Mantid. In this architecture, Mantid analysis tasks can be run concurrently on an analysis cluster and the local experimental workstation with summary analysis results displayed on the experimenter's workstation.
 
 \subsection{Overview}
 
@@ -17,7 +7,7 @@ Once the NeXus raw data file has been written (and is accessible to be read) an 
 
 We will need a set of strategies for intelligently splitting up larger jobs into smaller ones, this will also be of use in the future for running reduction procedures on machines of limited resources, for which case we can just run each of the jobs in serial when we don't have access to a parallel resource (but this use case is outside the scope of this project).
 
-Various parts of the Mantid Framework will need modification in order to efficiently make use of any parallel resource (such as a cluster).  Some prototype work has been done in this area and is detailed later in this document.
+Various parts of the Mantid Framework will need modification in order to efficiently make use of any parallel resource (such as a cluster).  
 
 We will also look at how a user will easily submit and monitor jobs using a backend parallel compute resource.
 
