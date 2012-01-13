@@ -8,22 +8,24 @@ Such a solution would not prohibit the submission of simple batch jobs - with on
 
 \subsubsection{MPI prototype}
 
-An initial prototype of an MPI-enabled Mantid is available within the Mantid codebase. A description of this prototype can be found at: https://github.com/mantidproject/documents/blob/master/Design/ParallelAnalysis/MPI_Prototype.odt
+An initial prototype of an MPI-enabled Mantid is available within the Mantid codebase. A description of this prototype can be found at: https://github.com/mantidproject/documents/blob/master/Design/ParallelAnalysis/MPI\_Prototype.odt
 
 We envisage proceeding along the direction that this has taken thus far, with continous evaluation of which particular technologies/implementations will best serve our needs (and continuation of the Mantid practice of placing implementation details behind abstract interfaces where possible).
 
 Salient points of the implementation are:
 
-* It consists of a special MPI-enabled build of the Mantid Framework (i.e. without the GUI layers).
-* The submitted analysis jobs will be Python scripts.
-* The MPI parts will be encapsulated within special MPI 'algorithms' (in the Mantid sense of the word) which mirror the simple MPI operations (e.g. broadcast, gather, reduce). (Eventually, it may become unavoidable to place MPI code within individual analysis algorithms, but this carries the risk that the path through the code will be different depending on where it is running.)
-* The output of the job is a file.
+\begin{itemize}
+\item It consists of a special MPI-enabled build of the Mantid Framework (i.e. without the GUI layers).
+\item The submitted analysis jobs will be Python scripts.
+\item The MPI parts will be encapsulated within special MPI 'algorithms' (in the Mantid sense of the word) which mirror the simple MPI operations (e.g. broadcast, gather, reduce). (Eventually, it may become unavoidable to place MPI code within individual analysis algorithms, but this carries the risk that the path through the code will be different depending on where it is running.)
+\item The output of the job is a file.
+\end{itemize}
 
-\paragraph{GatherWorkspaces & BroadcastWorkspace}
+\paragraph{GatherWorkspaces \& BroadcastWorkspace}
 
 Mantid currently has an two experimental algorithms called GatherWorkspaces and BroadcastWorkspace, which uses MPI to spread out work over several processes or nodes. The NOMAD\_mpi\_example.py script is an example of its use. The data loading and processing of NOMAD's 99 banks is spread over 99 processes. A small python script is run for each bank, processing the data. At the end of the script is a call to GatherWorkspaces which takes the spectra generated in each of the 99 MPI processes and collects them into one workspace. BroadcastWorkspace is used in the PG3\_mpi\_example.py script to distribute a normalization workspace to all of the processes.
 
-\paragraph{Extensions to GatherWorkspaces & BroadcastWorkspace}
+\paragraph{Extensions to GatherWorkspaces \& BroadcastWorkspace}
 
 GatherWorkspaces currently only distributes data in its histogram form (i.e. the result is a Workspace2D). We will extend this (or write an alternative algorithm) to gather EventWorkspaces. This would require transfering event data back to the master. Often this will be less data; however in the case of NOMAD this would be significantly more data to transfer and a challenge will be to try and ensure that user jobs use the most appropriate mode to avoid unnecessarily large results files.
 
@@ -94,5 +96,3 @@ Although it would be a significant redesign, the MantidPlot GUI could operate on
 \item The required number of nodes must be available on the cluster. This may mean that the user has to wait until an interactive session is available.
 \item Resources are "claimed" even when they are not used. 
 \end{itemize}
-
-
