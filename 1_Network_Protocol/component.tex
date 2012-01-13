@@ -1108,7 +1108,8 @@ data comes from a diverse and dynamic collection of devices.
 
 \todo{Expand metadata description}{%
 Jim has a good description about the metadata, just need to clean it up
-and bring it into this document.}
+and bring it into this document. I'll copy the raw text in here for now,
+to be fully formatted later... :-D}
 \todo{Device ID 0 is a pseudo device}{%
 We will use device ID 0 as a pseudo device to collect user comments and
 parameters such as the binning configuration for the translation service.
@@ -1119,6 +1120,116 @@ devices.}
 I'm expecting to translate fast metadata into these packets; we need to
 verify that chopper data will fit, and determine exactly how we should
 handle it.}
+
+Self-Describing Payload Structures (i.e. Meta-Data “Descriptor” Packets)
+Due to the diverse and dynamic collection of potential devices that could be incorporated into the Slow Controls and Sample Environments, a mechanism is proposed for “Self-Describing” data formats in the hybrid network protocol. This means that Meta-Data “Descriptor” information can be included Directly into the packet stream, for “on-the-fly” definitions of the specific structure and availability of data fields (“Process Variables”) that can be associated with a given Slow Controls or Sample Environment device. Aside from general device information such as a Device ID, Serial Number, Manufacturer and Contact information, other key Meta-Data details can be defined for each Process Variable in the device, including a Process Variable ID, Friendly Name, Data Type, Units, Minimum and Maximum limits, Access/Control Capabilities (r, w, rw), Alarm Limits, Value Reporting Thresholds, and a human-readable Description.
+There are ultimately 2 ways that this additional Meta-Data Descriptor information can be provided – either embedded directly “with” the actual Slow Controls data, within each actual Meta-Data packet as it is sent, or else by defining an additional distinct “Descriptor” network packet type that is specifically purposed just for defining Meta-Data Descriptor information. The benefit of the former (“embedded”) solution is that the Meta-Data information would always be available directly with the very data that it describes (in the same network packet), so there is no “bookkeeping” required. However, this approach is less efficient, especially for beamlines which might produce large amounts of Slow Control or Sample Environment data (e.g. VULCAN). The Meta-Data information would be redundantly included/copied many times over, occupying significant overhead bytes in each Meta-Data packet, and might also imply specific re-parsing of the information for every packet received. Further, it has become apparent that the entire set of a given device’s Process Variables are never updated in unison; each Process Variable is independently monitored and modified.
+Therefore, it is indeed prudent to define one distinct all-encompassing Meta-Data “Descriptor” packet that defines all such Process Variable fields for a given device, and then subsequent Meta-Data packets can be sent simply as streamlined single-value updates when the system state changes. In the spirit of other highly successful self-describing event formats from the High-Performance Computing domain, such as SDDF (“Self-Describing Data Format”, Reed et al, U. of Illinois, http://wotug.org/parallel/performance/tools/pablo/SDDFlibrary.ps.gz), a distinct Meta-Data Descriptor packet type is defined here for describing the structure of each given Slow Control/Sample Environment device’s Meta-Data. A proposed Descriptor payload structure for this packet type is shown in Table 10 below.
+
+“DeviceID” [31:0] (4 bytes) ~ Globally Unique Device ID Number (unsigned integer)
+“DescLen” [31:0] (4 bytes) ~ Length of XML Meta-Data Descriptor in Bytes (unsigned integer)“DescriptorXML” (DescLen bytes) ~ Character String Containing XML Meta-Data Descriptor
+Table 10: Meta-Data Descriptor Payload Structure
+
+The “DeviceID” is a (hopefully) globally unique numerical ID number that identifies a specific Slow Controls or Sample Environment device in the system. This DeviceID number might be derived from (or combined with) the associated DAS “AppID” for the Satellite Software Application that coordinates and controls the given device. The DeviceID index can be used to look up/identify the set of specific Process Variable values that can be passed in subsequent Meta-Data packets, for fast look-ups and parsing of the associated payload structures.
+The “DescLen” value specifies the length of an XML-formatted character string, which is the actual Slow Controls or Sample Environment Meta-Data Format Description specification. This “DescriptorXML” is a self-contained XML document that defines all details of the given device’s Meta-Data, as will be applied to generate and process any associated Meta-Data packet payloads, including embedded definitions of any enumerated data types. This XML specification will have its own formal XML Schema, to allow validation and programmatic parsing.
+XML is introduced here to allow flexibility moving forward as the system
+evolves, whether in modifying existing meta-data fields or incorporating
+additional meta-data fields, without the need for updating or adding any
+specific hard-coded Descriptor packet formats. Such fundamental protocol
+changes, even for simple additions, could require widespread updates to
+a variety of system components to support the new protocol. For example,
+any new XML tags introduced in a modified schema could simply be ignored
+by any “uninterested” components, as long as the schema changes
+are backward compatible, whereas a Descriptor re-organization or even a
+“New \& Improved” Descriptor packet format would be “unparsable” without some overall system modification to handle the new packet type.
+A hypothetical example of an XML Meta-Data Descriptor specification is shown in Table 11.
+<?xml version=“1.0” encoding=“UTF-8”?>
+<descriptor>
+	<device>
+		<name>LoadFrame123</name>
+		<app\_id>1031</app\_id>
+		<device\_id>1031 + 123</device\_id>
+		<description>A Monster Load Frame for VULCAN...</description>
+<manufacturer>
+	<name>Bob’s Load Frames</name>
+	<phone>800-BOB-LOAD</phone>
+	<email>bob@loadframes.com</email>
+</manufacturer>
+<serial\_number>123-456-7890</serial\_number>
+	</device>
+	<typedefs>
+		<typedef>
+			<name>what\_enumeration</name>
+			<type>enumeration</type>
+			<enum\_value>
+				<name>Off</name>
+				<value>0</value>
+			</enum\_value>
+			<enum\_value>
+				<name>On</name>
+				<value>1</value>
+			</enum\_value>
+		</typedef>
+	</typedef>
+	<process\_variables>
+		<process\_variable>
+			<data\_id>1031 + 123 + 101</data\_id>
+			<friendly\_name>x\_pos</friendly\_name>
+			<description>Widget X Position</description>
+			<type>float64</type>
+			<units>millimeters</units>
+			<min>10.0</min>
+			<max>101.0</max>
+			<access>rw</access>
+		</process\_variable>
+		<process\_variable>
+			<data\_id>1031 + 123 + 103</data\_id>
+			<friendly\_name>whatsit\_state</friendly\_name>
+			<description>State of the Whatsit</description>
+<type>what\_enumeration</type>
+			<access>r</access>
+		</process\_variable>
+		<process\_variable>
+			<data\_id>1031 + 123 + 107</data\_id>
+			<friendly\_name>foo\_str</friendly\_name>
+			<description>Example of a String Process Variable</description>
+<type>string</type>
+			<access>r</access>
+		</process\_variable>
+	</process\_variables>
+</descriptor>
+Table 11: Example XML Meta-Data Descriptor Specification
+A subsequent Meta-Data packet for the “LoadFrame123” device, with a global “DeviceID” value of “1031 + 123” (combining the associated “AppID” with the specific Device, likely as a more complex “bit field” solution, but represented simply here as “addition”…), could provide its Meta-Data information “as is” without any additional information or data markers/definitions, as shown in the examples of Tables 12, 13 and 14. (Note that the “effective” data field name references listed below are for convenience here only, and would not be explicitly included in the final Meta-Data network packet payload. ☺)
+
+(“DeviceID”) 1031 + 123 (4 bytes, unsigned integer)
+(“x\_pos” Process Variable ID) 1031 + 123 + 101 
+(“x\_pos”) 1.2345 (8 bytes, float64)
+“Status” (4 bytes) ~ Validity/Error Specification (unsigned integer)
+“Severity” (4 bytes) ~ Severity Specification (unsigned integer)
+Table 12: Corresponding LoadFrame123 Meta-Data Payload, “x\_pos” PV
+
+(“DeviceID”) 1031 + 123 (4 bytes, unsigned integer)
+(“whatsit\_state” Process Variable ID) 1031 + 123 + 103
+(“whatsit\_state”) 1
+(“On”, 4 bytes, enumeration)
+“Status” (4 bytes) ~ Validity/Error Specification (unsigned integer)
+“Severity” (4 bytes) ~ Severity Specification (unsigned integer)
+Table 13: Corresponding LoadFrame123 Meta-Data Payload, “whatsit\_state” PV
+
+(“DeviceID”) 1031 + 123 (4 bytes, unsigned integer)
+(“foo\_str” Process Variable ID) 1031 + 123 + 107 
+(“foo\_str” Length) 27 (4 bytes, unsigned)
+(“foo\_str” Value) “This is an example string.” (27 bytes w/0x0 terminator)
+“Status” (4 bytes) ~ Validity/Error Specification (unsigned integer)
+“Severity” (4 bytes) ~ Severity Specification (unsigned integer)
+Table 14: Corresponding LoadFrame123 Meta-Data Payload, “foo\_str” PV
+
+The “Status” value indicates a spectrum of Status or Error Conditions (4 byte unsigned integer) for the variety of possible system hardware and software failures (to be determined) that might be associated with this given Meta-Data packet. Likewise, the “Severity” value indicates one of a collection of possible failure or status “intensities,” degrees or error levels, that can be interpreted relative to the Status value, and the specific Device type, to properly log/handle any errors or even dispense with the given Meta-Data packet.
+To expedite parsing and handling of these actual Meta-Data packets, several basic packet types could be defined for each possible fundamental Data Type, e.g. Doubles (“Float64”), Integers (“Uint32”), Enumerations (“Uint32” but “different” ☺), and Character Strings (“Uint32” for Length plus actual String). Then the details of the specific Device Meta-Data Descriptor would not be required for basic logging and forwarding of the Meta-Data packets, but only for final processing, e.g. in the Streaming Translation Service.
+Note that this same Meta-Data Descriptor specification mechanism could
+also be applied for any other well-defined network packet payloads, e.g.
+even EVENT\_DATA, RTDL\_DATA, etc, although these packet types are fundamental to the system architecture, and would probably require associated protocol changes with any modifications.
+
 
 \newpage
 \subsubsection{Variable Status and Severity}
