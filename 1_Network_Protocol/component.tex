@@ -29,7 +29,9 @@ It is desirable to communicate the geometry of the instrument alongside
 the event data generated. This allows Mantid and other tools to stop using
 their own geometry files and avoids a potential source of inconsistency.
 In order to do this, we will need to define one or more packet type(s) for
-this data, and also how to store it in the NeXus files.}
+this data, as an alternative to the existing post-mortem XML file-based
+transmission of this information. (There are already well-defined locations
+for storing the geometry information in the NeXus files.)}
 
 \subsection{Common Protocol Information}
 
@@ -745,7 +747,8 @@ pad the total packet length to a multiple of 4 bytes.
 Is it possible we will see the same physical ID in raw packets containing
 different source IDs? Ie, can a given beamline have two pixels with the same
 physical ID such that the SMS will need to distinguish between them based
-on the source of the packet?}
+on the source of the packet? I don't think so, Dave, I think they're unique
+per beamline. -Jeeem}
 
 \newpage
 \subsubsection{Run Status Packet}
@@ -962,6 +965,9 @@ the undesired requests from the the stream.
 
 If the {\bf Requested Start Timestamp} is zero, the server will not send
 historical data and will begin sending events with the next pulse.
+Note, therefore, that to request a replay of all historical data for
+a currently active run, the {\bf Requested Start Timestamp} could simply
+be set to ``1'' to indicate the oldest possible timestamp greater than 0.
 
 \newpage
 \subsubsection{Statistics Reset Packet}
