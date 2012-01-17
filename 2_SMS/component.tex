@@ -26,9 +26,6 @@ experiment metadata such as the ``run number''. While the SMS is not
 user-facing, it will provide an interface for those applications which are
 to associate user-collected meta-data with the appropriate experimental data.
 
-\todo{Distiguishing beam monitor data}{Does the BM data come in via a
-separate set of preprocessors? Or does it come mixed into the main detector
-stream with a specific set of pixel IDs?}
 \todo{Glossary}{We need a glossary or other section in which we
 introduce EPICs process variables and other terms used throughout this
 document.}
@@ -45,60 +42,41 @@ Aquisition File Formats Technical Reference Manual}
 
 \subsection{Detector Input}
 
-\assumption{Preprocessor Rework}{There is a project to change how the
-detectors and Data Stream Packetizers (DSPs) communicate with the rest of
-the DAS system. This project is not currently considered in this document.
-We assume that the data will be made available in the new protocol format,
-either as the result of a rework of the DSP/preprocessor interface, or via
-a service that translates the existing network protocol to the new format.}
-
-Neutron time-of-flight data and ``Fast Metadata'' are currently delivered
+Neutron time-of-flight data and ``Fast Metadata'' are delivered
 through the ``preprocessor'', a process that communicates with the detector
-hardware and translates that data to the streaming protocol.
+hardware and translates that data to the streaming protocol. Metadata
+and neutron events are sent comingled in the same data stream, separable
+via distinct physical pixel IDs. Currently, there are separate preprocessors
+for the beam monitors, but their events are also distinguishable via
+the pixel ID value.
 
 \subsubsection{Detector (Preprocessor) Communications}
 
-Upon startup of the SMS daemon, a configuration file will be parsed to
-determine how many preprocessors are in the system for this beamline. Each
-preprocess will be identified by an address and TCP port, and other information
-will be required as deemed appropriate. Each preprocessor will be identified by
-a set of EPICs process variables. Many of these will be read-only and provide
-access to the current configuration loaded into SMS as well as the connectivity
-and status information. Each preprocessor will have the ability to be
-configured into ``bypass'' or ``discard'' modes via EPICs.  These modes will
-control which event sources are required for a given run, and how to handle
-communication disruptions.
-
-The SMS will attempt to maintain communications at all times with each
-preprocessor configured. The SMS will initiate the TCP connection to the
-preprocessor at the address and port given in the config file. Once connected,
-the preprocessor will stream its data in the new format to the SMS until the
+The SMS daemon will attempt to maintain communication at all times with each
+configured preprocesor.  The SMS will initiate a TCP connection to the
+preprocessor at the address and port given in the config file, performing any
+needed hostname to IP address resolution asynchronously. Once connected, the
+preprocessor will stream its data in the new format to the SMS until the
 connection is closed. Should the connection be broken, whether by a timeout,
 remote service reset, or deliberate acction on behalf of the preprocessor, a
-new connection attempt will be immeditately scheduled. Should this connection
-attempt fail (timeout, refusal, or otherwise), another attempt will be
-scheduled for a configurable time in the future.
+new connection attempt will be immeditately scheduled. Should this new
+connection attempt fail (timeout, refusal, or otherwise), additional attempts
+will be scheduled for configurable times in the future.
 
 When connected, all data sourced by the preprocessor will be processed and
 stored onto local stable storage as described in section~\ref{sec:storage}.
 This processing will occur whether or not there is currently an experimental
-run being recorded. Based on a combination of source and pixel id, each
-packet will be passed to the appropriate transformation engine. Packets
-containing accelerating timing information will be parsed and the values fed
+run being recorded. Based on a combination of source and pixel id, each packet
+will be passed to the appropriate transformation engine. Packets containing
+accelerator timing and/or error information will be parsed and the events fed
 to the appropriate tranformation engines as needed. Unknown packets will be
 logged and dropped.
 
-\decision{Hostname or IP?}{We need to decide if we will uses host names (FQDNs)
-or IP addresses in the configuration file. Host names have the advantage of
-human readability and can contain additional semantic information, but carry
-cost of a dependency on DNS or a local host file. If host names are employed,
-we will also need to decide if the lookup is done during the parsing of the
-configuration file, or if it will need to be performed each time we try to
-connect to a preprocessor. The latter will allow for changes without a full
-restart of SMS, but add some additional complexity to the code.}
-\decision{Handling Reported Errors}{There are provisions in the packet format
-to report hardware errors from the detectors. This information must be
-incorporated into our design.}
+The SMS will export status and configuration information for each known
+preprocessor in process variables accessible via the EPIC Channel Access
+protocol. Each preprocessor may be configured at runtime into various
+modes to indicate that a preprocessor is or is not required for an
+experimental recording.
 
 \todo{Configuration Format}{A format must be defined for the configuration
 file.}
@@ -145,9 +123,6 @@ this.}
 \todo{Document End-of-Pulse Detection}{Pull in description
 of how we determine that we have all of the data for a given pulse
 and proceed to detect missing packets.}
-\todo{Have variable to document dropped packets}{We need a metadata variable
-to document packets get dropped from each preprocessor. Timestamp of update
-packet would be pulse ID.}
 \todo{Mark fast metadata as suspect on dropped packets}{If we drop
 a packet from a preprocessor, we need to mark all potentially affected
 variables as suspect until we get a new update with full contents.}
