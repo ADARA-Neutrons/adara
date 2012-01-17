@@ -275,7 +275,8 @@ starting a new experimental run, the current sample environment state must be
 put in the file, along with the experiment information, geometry, translation
 tables, and any other data required to understand the neutron events contained
 in the file. This replication of data into each file ensures that it is not
-lost, rendering the neutron data useless, as old data files are pruned.
+lost, rendering the neutron data useless, as old data files are pruned after
+translation.
 
 At the beginning of a data file, and again at configurable intervals, the SMS
 storage process will add signature packets to the stream stored on disk. These
@@ -284,34 +285,28 @@ provide some level of data recovery in the event that an IO error occurs during
 readback of the file.
 
 At periodic intervals based on event timestamps, the storage system will add an
-entry to index for the current data file. This entry will include the current
-pulse ID, the file and offset of the first packet describing data related to
-the pulse ID, and a snapshot of the sample environment. This index will be used
-to provide the clients of the Event Stream Server the ability to request data
-from a given timestamp. It is expected that there will be limited granularity
-for these entries -- on the order of 5 to 15 minutes. This value is expected to
-be configured for each beamline to balance index growth against minimizing the
-transfer of extra event data prior to the timestamp requested.
+entry to the index for the current data file. This entry will include the
+current pulse ID, the file and offset of the first packet describing data
+related to the pulse ID, and a snapshot of the sample environment. This index
+will be used to provide the clients of the Event Stream Server the ability to
+request data from a given timestamp. It is expected that there will be limited
+granularity for these entries -- on the order of 5 to 15 minutes -- and the
+granularity may become more coarse the older the timestamp is. This value is
+expected to be configured for each beamline to balance index growth against
+minimizing the transfer of extra event data prior to the timestamp requested.
+The index is transient, and any transition between recording states will reset
+it.
 
-\decision{What do we do if we exhaust our storage?}{While this pruning is
-expected to keep the storage area managable, there is the risk of exhausting
-the space if the translation services are down for an extended period and/or
-other data is placed on the same partition without adjusting the SMS's idea of
-the maximum space it should use. Should the SMS keep track of the free space on
-the disk and try to prune itself even if it is below its limit? What do we do
-if we hit an ENOSPC error when writing event data? How hard do we try to
-recover vs expecting the system managers to avoid reaching that point?}
-\decision{What do we do on IO error?}{Disk IO is a physical process, and we are
-bound to hit IO errors at some point in the life of the system. How do we plan
-to handle them?}
-\decision{Hash data for corruption checking?}{Do we want to include a hash of
-the contents of the file to the end-of-file packet to be able to check for
-corruption? This adds computational overhead, and the gain may not be worth it
-for these temporary files. The translation service may or may not want this for
-its archival files, but it can filter and add its own hash as it sees fit.}
+The storage system expects that the system administrators will place the
+data store on its own file system, or will limit other uses on a shared
+file system to avoid impacting the configured size of the data store. To
+help guard against inadvertent encroachment, the SMS will periodically check
+that the free space reported by the operating system exceeds the room
+SMS believes it can use. Should the reported free space drop below that level,
+a message will be logged and a status variable exported via EPICS Channel
+Access will be placed into an alarm state.
 
-\todo{Management policy for index data}{We will need to determine the pruning
-policy of the timestamp index data.}
+
 \todo{Add PVs for monitoring}{I expect we will define some PVs to export
 various state information about space used, etc.}
 \todo{Reword}{Reword this section a bit for clarity.}
