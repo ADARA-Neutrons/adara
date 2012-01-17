@@ -26,16 +26,10 @@ experiment metadata such as the ``run number''. While the SMS is not
 user-facing, it will provide an interface for those applications which are
 to associate user-collected meta-data with the appropriate experimental data.
 
-\todo{Glossary}{We need a glossary or other section in which we
-introduce EPICs process variables and other terms used throughout this
-document.}
 \todo{Resetting environment to defaults}{There are a number of configuration
 items that may be set by the user via EPICS PVs. It seems likely that we will
 want a method to reset those to default values to make things easy during
 changeovers.}
-\todo{Pulse ID precision}{During review of this document, a question
-was raised about the precision in the pulse ID -- is it correct to 1us, or
-to 100ns?}
 \todo{Find document}{107030200-TD005-R05 Instrument Systems Data
 Aquisition File Formats Technical Reference Manual}
 
@@ -78,11 +72,6 @@ protocol. Each preprocessor may be configured at runtime into various
 modes to indicate that a preprocessor is or is not required for an
 experimental recording.
 
-\todo{Configuration Format}{A format must be defined for the configuration
-file.}
-\todo{Preprocessor Info}{We need to determine what information is needed for
-each preprocessor. Some of this will be dictated by the transformation
-done on the stream.}
 \todo{Preprocessor PVs}{Add a table to this document containing the PVs
 associated with the preprocessor and their form and function.}
 
@@ -133,10 +122,6 @@ actual data or is garbage. Assuming valid data in the error events, the
 SMS can put those into a separate packet type for errors, freeing up bit
 31 in the processed packets for mapping errors.}
 
-\todo{Define Remapping/Banking Config Format}{This could be a straight
-key-value table, though I understand there may be an existing language for
-this.}
-
 \subsubsection{Fast Metadata Transformation}
 
 Raw events from fast-metadata sources will be passed to the fast metadata
@@ -157,14 +142,6 @@ The variable value packets presented to the aggregation component will
 use the current pulse ID for their timestamp. Analysis of the experimental
 data must consider neutron velocity and instrument geometry to correlate the
 updated values with the proper neutron events.
-
-\todo{Define Variable Config File Format}{We need to configure the mapping
-from source/pixel id to metadata variable. We will need the XML descriptor
-to insert into the stream for this variable, and may wish to provide for
-simple transformations on the value to convert from an integer to the
-desired units. It would be nice to have a format that avoids my parsing XML,
-but this is not a hard requirement and XML parsing may be required for other
-functionality in any event.}
 
 \todo{TOF is the only data frame-corrected}{%
 TOF is updated for the appropriate frame skew, but Pulse ID, charge, etc
