@@ -9,7 +9,7 @@ positioning of the sample under study is generally provided by ``Slow
 Controls'', though certain pieces -- such as strain force and chopper phase
 information -- come in as ``Fast Metadata''.  All of this information must be
 connected to user-provided information such as the sample material being
-investigated and which proposal number for which the experimental data is being
+investigated and the proposal number for which the experimental data is being
 generated.
 
 There are currently several consumers of the totality of this information, and
@@ -23,8 +23,8 @@ The Stream Management Service (SMS) provides this functionality for the DAS
 system. It will operate as a Unix-style daemon, and aggregate experiment data
 into a coherent data stream. It will further manage certain pieces of
 experiment metadata such as the ``run number''. While the SMS is not
-user-facing, it will provide an interface for those applications which are
-to associate user-collected meta-data with the appropriate experimental data.
+user-facing, it will provide an interface to associate user-collected meta-data
+with the appropriate experimental data.
 
 \todo{Resetting environment to defaults}{There are a number of configuration
 items that may be set by the user via EPICS PVs. It seems likely that we will
@@ -167,6 +167,8 @@ via Channel Access, the file will contain any data needed fill the gaps.
 
 \subsection{Run Management}
 
+\subsubsection{Run Number}
+
 The SMS will be responsible for managing the current run identifier. It is
 expected that there will be PVs for the {\bf previous}, {\bf current}, and {\bf
 next} run number to be used. The PVs for current and next are mutually
@@ -191,20 +193,20 @@ Note: the aggregated data stream will always be sent to the local disk.
 ``Recording'' in this context means that we are sending this data to the
 translation service.
 
+\subsubsection{Run Information}
 
-\subsection{Statistics Reset}
+Each experiment must have certain information associated with it, such items as
+the instrument performing the experiment, the proposal number, the
+investigators, the user associated with the proposal, and the sample being
+studied. The SMS will provide EPICS process variables for these items, and will
+lock the values as part of the entrance to the ``recording'' state. The values
+will be used to populate the run information for the experiment, and will be
+included in each data file written to stable storage by the SMS.
 
-During sample alignment, calibration, and other routine procedures on
-the SNS beamlines, it is desirable to collect data for immediate use
-without sending it to the Translation Service for conversion to NeXus
-format and archiving. During these periods of operation, it may be
-necessary to inform clients of the live-data feed that they should reset
-their statistical counters and discard any temporary or partially
-analyzed data. The SNS will enable this reset by inserting a ``statistics
-reset'' packet into the aggregated stream. This insertion will be
-generated on the rising edge of a self-resetting EPICS PV. The reset packet
-will be inserted prior to the beginning of the next pulse, ensuring that
-all clients will begin new analysis at the same point in the data stream.
+The SMS will expose a comment field via an EPICS process variable. At
+the beginning of a run -- and when ever this PV is updated during the run --
+the contents of this field will be copied into the state sample environment
+and included in the protocol stream using variable value packets.
 
 
 \subsection{Stream Storage}
@@ -355,7 +357,21 @@ value system.}
 The SMS will provide a mechanism to allow clients to subscribe to the
 aggregated event stream. The SMS will listen on a well-defined port for new
 subscribers. Once connected, subscribers will send an initialization packet to
-establish their requested service.
+establish their requested service. This ``hello'' packet will indicate
+the requested timestamp from which they wish to begin receiving data.
+
+During sample alignment, calibration, and other routine procedures on
+the SNS beamlines, it is desirable to collect data for immediate use
+without sending it to the Translation Service for conversion to NeXus
+format and archiving. During these periods of operation, it may be
+necessary to inform clients of the live-data feed that they should reset
+their statistical counters and discard any temporary or partially
+analyzed data. The SNS will enable this reset by inserting a ``statistics
+reset'' packet into the aggregated stream. This insertion will be
+generated on the rising edge of a self-resetting EPICS PV. The reset packet
+will be inserted prior to the beginning of the next pulse, ensuring that
+all clients will begin new analysis at the same point in the data stream.
+
 
 \todo{Add list of control PVs}{We will send down statistical reset
 packets to indicate to live clients that they should descard previous
