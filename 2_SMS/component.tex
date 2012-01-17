@@ -204,6 +204,10 @@ the current run number to {\bf previous} and generate a new number for {\bf
 next}. When we transition from ``end'' to ``recording'' (``record'' to true) we
 would move the number from {\bf next} to {\bf current}.
 
+The run number will be monotonically increasing. The SMS will maintain
+the next value to use on stable media to prevent issuing duplicate numbers
+in the event of an abnormal system termination.
+
 \addvspace{\baselineskip}
 \noindent
 Note: the aggregated data stream will always be sent to the local disk.
@@ -211,16 +215,20 @@ Note: the aggregated data stream will always be sent to the local disk.
 translation service.
 
 
-\todo{Confusing Run-number PVs}{The current description for communicating run
-numbers seems a bit confusing and could probably be simplified. It may be
-better to always have all three fields populated and make sure the GUI is doing
-the right thing. We could also just have two PVs, with the {\bf current} and
-{\bf next} values merged; the meaning would still be determined by the
-recording state, but we'd just use the one PV.}
-\todo{Statistics Reset}{%
-The SMS will allow the programmatic insertion of ``statistics reset'' packets
-into the aggregated stream via the rising edge of an EPICS PV it exports.
-Need to find a place to put that in the document.}
+\subsection{Statistics Reset}
+
+During sample alignment, calibration, and other routine procedures on
+the SNS beamlines, it is desirable to collect data for immediate use
+without sending it to the Translation Service for conversion to NeXus
+format and archiving. During these periods of operation, it may be
+necessary to inform clients of the live-data feed that they should reset
+their statistical counters and discard any temporary or partially
+analyzed data. The SNS will enable this reset by inserting a ``statistics
+reset'' packet into the aggregated stream. This insertion will be
+generated on the rising edge of a self-resetting EPICS PV. The reset packet
+will be inserted prior to the beginning of the next pulse, ensuring that
+all clients will begin new analysis at the same point in the data stream.
+
 
 \subsection{Stream Storage}
 \label{sec:storage}
