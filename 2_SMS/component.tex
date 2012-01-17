@@ -314,14 +314,15 @@ various state information about space used, etc.}
 
 \subsection{Translation Client}
 
-The SMS daemon will manage the transmission of ``recorded'' experimental runs
-to the translation service (TS). For each run to be translated, the SMS will
-open a separate connection to the TS. The data from the file(s) associated with
-that run will be relayed across the the socket until the end of the run. Once
-the data has been transfered to the TS, the SMS will wait for a response packet
-indicating the success or failure of the translation.  On a successful
-translation, the SMS will mark the current run as translated and eligible for
-pruning.
+The SMS daemon will manage the transmission of ``recorded'' (including runs
+currently being recorded) experimental runs to the translation service (TS).
+For each run to be translated, the SMS will open a separate connection to the
+TS, performing any needed hostname to address translation asynchronously. The
+data from the file(s) associated with that run will be relayed across the the
+socket until the end of the run. Once the data has been transfered to the TS,
+the SMS will wait for a response packet indicating the success or failure of
+the translation.  On a successful translation, the SMS will mark the current
+run as translated and eligible for pruning.
 
 If there is a communication error or the TS indicates that an error occurred,
 the run will \emph{not} be marked as translated. On receipt of a permament
@@ -340,12 +341,23 @@ the SMS will allow for a configurable number of connections to be opened. This
 will allow a beamline to realize the benefits of having a cluster of
 translation servers. One slot will be reserved for the current experimental run
 on the theory that the users should continue to get new data as soon as
-possible. This mechanism will need tuning to avoid having beamlines monopolize
+possible. This mechanism must be tuned to avoid having beamlines monopolize
 the bandwidth/CPU/memory available to the TS, and may benefit from being
 controlled via a PV to allow administrators to make on-the-fly adjustments
-based on operating conditions. We will need to restrict write-access from users
--- or at least limit the range that they can set -- in order to avoid
-unintentional denial of service attacks.
+based on operating conditions. These adjustments must be restricted to
+avoid unintentional denial of service attacks.
+
+The translation queue may be managed via an alogorithm selected via a process
+variable exported via EPICS Channel Access. By default, the system will
+give the oldest experiment runs priority to ensure that their storage may
+be reclaimed in a timely manner. However, it should also be possible to
+direct the system to give the newest runs priority, or to process the backlog
+from both ends of the queue.
+
+The translation client will export status information via Channel Access.
+Potential items that may be monitored include the number of experiment runs
+waiting for translation, the number of runs currently being translated from
+this beamline, and the oldest run number waiting for translation.
 
 As the translation client will be using OS facilities to avoid memory copies,
 the translation service will need to tolerate certain packets that make little
@@ -354,30 +366,11 @@ end-of-file packets. It is expected that the TS will discard these packets and
 insert its own instance of them as needed by its local configuration aimed more
 at archival than transient storage.
 
-\decision{Translation Status Indication}{It would be good to give the user some
-insight as to the progress of translation. Jim mentioned a service monitor that
-exists, but there seemed to be some potential difficulties with integrating it
-into the proposed systyem that I do not currently recall. As for the SMS's
-side, we may want to provide basic information about if we're currently
-connected, and how big our translation backlog is.}
-\decision{Queue service order for translation}{We need to have a policy for
-which order we send our backlog of queued runs to the TS. It seems like we may
-wish to work from more recent back to older, but this could lead to those
-getting farther and farther back in the queue in the face of ongoing problems.
-We could over a user-settable PV with ennumerated values {\bf Recent first},
-{\bf Oldest first}, and {\bf Candle}.}
-\decision{Setting NeXus histogram parameters}{We need to decide how to set the
-histogram parameters for use by the translation service. It seems like this
-should be user controlled at the beamline, though there will be some
-restrictions on what can be request, and what kind of changes, if any, would be
-allowed during a run. Would these come in as regular metadata or would we give
-them their own packet type? Does it go into the run info?}
 
-\todo{Host name handling}{If load balancing for the TS is handled by DNS
-round-robin, then we may need to do a DNS lookup here. If it is handled by port
-mapping by an intermediate network device, we may not need to do the lookups,
-but we may have some issues getting full bandwidth out of it.}
-\todo{Add text}{Add text to be clear that we send data as soon as we can.}
+\decision{Setting NeXus histogram parameters}{We need to decide how to set the
+histogram parameters for use by the translation service. This may be
+communicated via a specific packet type (likely) or via the variable
+value system.}
 
 
 \subsection{Event Stream Server}
