@@ -90,8 +90,11 @@ associated with the preprocessor and their form and function.}
 
 As each raw event is processed, the source and pixel id from the raw
 event packet will be used to determine if this event is for a detected neutron
-or fast metadata. If the event is for a neutron, the physical pixel ID from
-the raw data packet will be remapped to its new logical ID
+or fast metadata. If the event is for a neutron, the pixel ID will be decoded
+to determine if this is an event from a beam monitor or from the detector
+array. For beam monitor events, the time-of-flight will be collected with
+other data for the source beam monitor. For detector array events, the
+raw physical ID will be remapped to its new logical ID
 given by a lookup table. This lookup will also give us the bank associated
 with the pixel. Any pixel id that does not have a mapping in the table will
 have its high-bit (bit 31) set to indicate a raw pixel value, and the bank will
@@ -105,47 +108,55 @@ that no two input values map to the same output value. The revisibilty property
 shall be enforced during load of the configuration, and violation will be
 considered a fatal error preventing startup of the service.
 
-Once the end of raw frames for a pulse has been detected, the current buffers
+Once the end of raw frames for a pulse has been detected, the transformation
+engine will check that all packets for the pulse were received using the
+packet sequence and end-of-packet fields of the raw event data packet. If
+we successfully received all of the data for the pulse, the current buffers
 for each bank will be pushed to the aggregation component for storage and
 publication to interested subscribers. These buffers will be in a packet format
 for processed neutron event data, similar but separate from the raw event
 format.
 
+If missing packets are detected, the SMS will log the occurance, mark the
+event data buffers as incomplete, and push the buffers to the aggregation
+component. Additionally, the device variable corresponding to packet loss
+for each preprocessor missing data will be incremented, and the updated
+value placed into the aggregated stream to be preserved for later analysis.
+
 \assumption{Pixel ID High Bits}{The current system stores various pieces of
 information in the high bits of each pixel. We will need to account for that
 data, and extract it as part of processing. The reversible mapping algorithm
 requires upstream to leave clear a known bit in order to indicate a mapping
-failure. We currently have chosen bit 31, but this could be changed.}
+failure. Bit 31 is currently used in the raw event packets to denote an
+error. It has not been clarified if the rest of the ID and TOF data carry
+actual data or is garbage. Assuming valid data in the error events, the
+SMS can put those into a separate packet type for errors, freeing up bit
+31 in the processed packets for mapping errors.}
 
 \todo{Define Remapping/Banking Config Format}{This could be a straight
 key-value table, though I understand there may be an existing language for
 this.}
-\todo{Document End-of-Pulse Detection}{Pull in description
-of how we determine that we have all of the data for a given pulse
-and proceed to detect missing packets.}
-\todo{Mark fast metadata as suspect on dropped packets}{If we drop
-a packet from a preprocessor, we need to mark all potentially affected
-variables as suspect until we get a new update with full contents.}
 
 \subsubsection{Fast Metadata Transformation}
 
-Raw event packets from fast-metadata sources will be passed here for
-transformation into protocol metadata packets. The pixel ids will be matched to
-variable ids loaded from the configuration file. As each pixel is translated,
-the variable change packet will be forwarded to the aggregator without waiting
-for the end-of-pulse.
+Raw events from fast-metadata sources will be passed to the fast metadata
+transformation code for mapping into variable value packets. The pixel ids will
+be decoded and matched to variable ids loaded from the configuration file. As
+each pixel is translated, the variable value packet will be forwarded to the
+aggregator without waiting for the end-of-pulse. Optionally, variables that
+were not updated in a pulse may be placed into a minor alarm state and their
+status marked as ``not communicating'' until they receive a future update.
 
-\assumption{Frame Correction and Metadata}{Because the fast metadata
-information is not based on neutron flight time, the pulse timestamp will
-always be correct and no frame correction in DAS is needed. Analysis will
-need to consider neutron time-of-flight and instrument geometry to determine
-how much frame skew is present and if events from prior pulse IDs need to
-be associated with this metadata.}
+Pixel IDs that map to metadata but do not map to a configured ADARA device
+variable will be handled as an invalid detector event -- the high bit will
+be set and the bank ID set to all ones. This will preserve the raw ID and
+data value for manual correction during analysis, or by semi-automated
+reprocessing with a corrected metadata mapping.
 
-\todo{How to handle unknown fast-metadata pixel ids?}{%
-If we recieve an unknown pixel ID for fast metadata, we will use the
-standard transformation for unknown pixel IDs. This allows someone to
-recover that fast metadata later. Update the document to reflect the handling.}
+The variable value packets presented to the aggregation component will
+use the current pulse ID for their timestamp. Analysis of the experimental
+data must consider neutron velocity and instrument geometry to correlate the
+updated values with the proper neutron events.
 
 \todo{Define Variable Config File Format}{We need to configure the mapping
 from source/pixel id to metadata variable. We will need the XML descriptor
@@ -167,17 +178,15 @@ for the TOF/PulseID to fix this later.}
 
 \subsection{Slow Controls}
 
-The SMS must maintain a list of descriptions and current values of the PVs
-describing the sample environment. This is needed in order to provide
-new aggregation clients the current operating paramters as well as to
-record the environment for each experiment run. 
+The SMS must maintain a list of descriptions and current values of the process
+variables describing the sample environment in order to record the environment
+for each experiment as well as provide newly-connecting live clients to obtain
+the current operating parameters. These process variables will be monitored
+using the EPICS Channel Access protocol, and the list will be obtained from a
+confinguration file shared with the Scan Server. While most of the information
+required to generate the device descriptor packets should be available
+via Channel Access, the file will contain any data needed fill the gaps.
 
-\todo{Slow control config file}{%
-SMS will read/monitor EPICS PV's over channel access.  The scan server and SMS
-will share a configuration file to determine which PVs should be monitored and
-sent for translation. The scan server will be able to manipulate variables via
-channel access on the SMS to insert statistical reset packets, start/stop runs,
-and perform other tasks.}
 
 \subsection{Run Management}
 
@@ -201,12 +210,17 @@ Note: the aggregated data stream will always be sent to the local disk.
 ``Recording'' in this context means that we are sending this data to the
 translation service.
 
+
 \todo{Confusing Run-number PVs}{The current description for communicating run
 numbers seems a bit confusing and could probably be simplified. It may be
 better to always have all three fields populated and make sure the GUI is doing
 the right thing. We could also just have two PVs, with the {\bf current} and
 {\bf next} values merged; the meaning would still be determined by the
 recording state, but we'd just use the one PV.}
+\todo{Statistics Reset}{%
+The SMS will allow the programmatic insertion of ``statistics reset'' packets
+into the aggregated stream via the rising edge of an EPICS PV it exports.
+Need to find a place to put that in the document.}
 
 \subsection{Stream Storage}
 \label{sec:storage}
