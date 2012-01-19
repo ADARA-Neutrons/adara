@@ -39,15 +39,45 @@
 % Hyper references
 %\usepackage[pdfborder={0 0 0}]{hyperref}
 \usepackage{color}
+\usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{multind}
 
+% Allow conditionals
+\usepackage{ifthen}
 % Easy bytefield creation (local package, put high bits to the left)
 \usepackage[endianness=big]{../packages/bytefield}
 
 \definecolor{lightgrey}{gray}{0.8}
 
-%\newcommand{name of new command}[number of arguments]{definition} 
 
+% Set to false to hide comments
+\newboolean{CommentsVisible}
+\setboolean{CommentsVisible}{true}
+\colorlet{commentbg}{SkyBlue}
+
+% Show implementation details?
+\newboolean{ImplementationDetailsVisible}
+\setboolean{ImplementationDetailsVisible}{true}
+
+% command to mark comments that are easily hidden
+%\comment{this is a comment}
+\ifthenelse{\boolean{CommentsVisible}}{%
+\newcommand{\comment}[1]{%
+\par%
+\addvspace{\baselineskip}%
+\noindent%
+\fcolorbox{black}{commentbg}{%
+\begin{minipage}{\textwidth}%
+{\large \bf Review Comment}\\[2pt]%
+#1%
+\end{minipage}%
+}%
+\\[5pt]%
+}}
+%comments are not visible
+{\newcommand{\comment}[1]{}}
+
+%\newcommand{name of new command}[number of arguments]{definition} 
 %\callout{indexname}{bgcolor}{leader}{shortname}{text}
 \newcommand{\callout}[5]{%
 \par%
@@ -74,6 +104,12 @@
 %\decision{title}{text}
 \makeindex{decisions}
 \newcommand{\decision}[2]{\callout{decisions}{yellow}{Decision Needed}{#1}{#2}}
+
+%\detail{title}{text}
+%\makeindex{detail}
+\newcommand{\detail}[2]{%
+\ifthenelse{\boolean{ImplementationDetailsVisible}}{%
+\callout{detail}{lightgrey}{Implementation Detail}{#1}{#2}}{}}
 
 
 % LaTeX is simply confused.  \frenchspacing should be the default, everywhere.

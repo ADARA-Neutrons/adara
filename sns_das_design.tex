@@ -41,16 +41,28 @@
 % Allow includes/inputs in subfolders
 \usepackage{chapterfolder}
 
+% Allow conditionals
+\usepackage{ifthen}
+
 \hypersetup{bookmarksopen=true,
             pdfauthor={Oak Ridge National Laboratory},
             pdftitle={Accelerating Data Acquisition, Reduction, and Analysis (ADARA) at the Spallation Neutron Source},
             pdfsubject={ADARA}}
 
 \usepackage{color}
+\usepackage[usenames,dvipsnames]{xcolor}
 \usepackage{multind}
 
 \definecolor{lightgrey}{gray}{0.8}
 
+% Set to false to hide comments
+\newboolean{CommentsVisible}
+\setboolean{CommentsVisible}{true}
+\colorlet{commentbg}{SkyBlue}
+
+% Show implementation details?
+\newboolean{ImplementationDetailsVisible}
+\setboolean{ImplementationDetailsVisible}{true}
 
 %\callout{indexname}{bgcolor}{leader}{shortname}{text}
 \newcommand{\callout}[5]{%
@@ -78,6 +90,30 @@
 %\decision{title}{text}
 %\makeindex{decisions}
 \newcommand{\decision}[2]{\callout{decisions}{yellow}{Decision Needed}{#1}{#2}}
+
+%\detail{title}{text}
+%\makeindex{detail}
+\newcommand{\detail}[2]{%
+\ifthenelse{\boolean{ImplementationDetailsVisible}}{%
+\callout{detail}{lightgrey}{Implementation Detail}{#1}{#2}}{}}
+
+% command to mark comments that are easily hidden
+%\comment{this is a comment}
+\ifthenelse{\boolean{CommentsVisible}}{%
+\newcommand{\comment}[1]{%
+\par%
+\addvspace{\baselineskip}%
+\noindent%
+\fcolorbox{black}{commentbg}{%
+\begin{minipage}{\textwidth}%
+{\large \bf Review Comment}\\[2pt]%
+#1%
+\end{minipage}%
+}%
+\\[5pt]%
+}}
+%comments are not visible
+{\newcommand{\comment}[1]{}}
 
 
 % LaTeX is simply confused.  \frenchspacing should be the default, everywhere.

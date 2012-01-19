@@ -24,14 +24,16 @@ physical to logical mapping is performed. To this end, the protocol is
 designed allow parsers to skip over packets that are unknown or irrelevant
 to the task at hand.
 
-\todo{Need to transfer geometry information}{%
+\detail{Geometry Information}{%
 It is desirable to communicate the geometry of the instrument alongside
 the event data generated. This allows Mantid and other tools to stop using
 their own geometry files and avoids a potential source of inconsistency.
 In order to do this, we will need to define one or more packet type(s) for
 this data, as an alternative to the existing post-mortem XML file-based
-transmission of this information. (There are already well-defined locations
-for storing the geometry information in the NeXus files.)}
+transmission of this information. There are locations for storing the
+geometry information in the NeXus files, but these are specified in
+absolute positions and Mantid needs relative position information, so
+there will be some standards work here.}
 
 \subsection{Common Protocol Information}
 
@@ -125,7 +127,7 @@ new packet type must be allocated and defined in this document. This will
 ensure that tools are able to recognize when they are operating on data that
 they do not understand.
 
-\todo{Build table of packet types}{%
+\detail{Table of packet types}{%
 Once a decision is reached regarding the allocation policy of
 packet types, we must assign values to the packet formats described
 in this document, and should include them in a table for easy reference.
@@ -155,7 +157,7 @@ time-of-flight larger than the intra-pulse time.  For more information on frame
 skew, please see the document ``Neutron Event Timing''.}, the ``fast'' metadata
 information has no correction applied.
 
-\todo{Define Detector Control Packets}{%
+\detail{Detector Control Packets}{%
 We have currently defined the packets required to communicate event data from
 the detectors to the rest of the aquisition system, but have not defined the
 packets that will be used to initialize and control the detector system, as
@@ -581,7 +583,7 @@ These logical pixels are then communicated in the ``Banked Event Data''
 packets. As part of this mapping process, the detector bank is determined,
 and the events are sorted into buckets accordingly.
 
-\todo{Define Banked Event Data Flags field}{%
+\detail{Define Banked Event Data Flags field}{%
 We need a flag to indicate that we may be missing data from this frame.
 We may need a veto flag, and perhaps some of this space should be used
 to indicate polarization state, though I believe that should be handled
@@ -664,7 +666,7 @@ This is especially important as the monitors may often be exposed to ``white
 beam'' conditions, generating non-trivial amounts of data in spite of their
 low detection efficiency.
 
-\todo{Define Beam Monitor Event Data Flags field}{%
+\detail{Define Beam Monitor Event Data Flags field}{%
 We need a flag to indicate that we may be missing data from this frame.
 We may need a veto flag, and perhaps some of this space should be used
 to indicate polarization state, though I believe that should be handled
@@ -839,10 +841,9 @@ of time and approximate data missing by using the {\bf Run Start} and
   \label{fig:protocol_packet_runinfo_run}
 \end{figure}
 
-\todo{Define Run Information packet}{%
-We need to finalize the mechanims for getting this information to interested
-parties. Jim and Marie will define the XML schema for this packet, and we
-will reference it from the protocol document. User comments, bin sizes,
+\detail{Define Run Information packet}{%
+Jim and Marie will define the XML schema for this packet, and we
+will reference it from the protocol document. User comments
 and other information that is not specifically related will be moved to
 metadata value packets.}
 
@@ -1232,7 +1233,7 @@ multiple of 4.
 The value in the {\bf Device ID} field is used to identify a device in the
 ADARA, and to provide separate variable namespaces for each one.
 
-\todo{Define Device Descriptor XML Schema}{%
+\detail{Define Device Descriptor XML Schema}{%
 Jim and Marie will define the schema for the XML content of this packet.}
 
 \newpage

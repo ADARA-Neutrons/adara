@@ -26,11 +26,11 @@ experiment metadata such as the ``run number''. While the SMS is not
 user-facing, it will provide an interface to associate user-collected meta-data
 with the appropriate experimental data.
 
-\todo{Resetting environment to defaults}{There are a number of configuration
+\detail{Resetting environment to defaults}{There are a number of configuration
 items that may be set by the user via EPICS PVs. It seems likely that we will
 want a method to reset those to default values to make things easy during
 changeovers.}
-\todo{Find document}{107030200-TD005-R05 Instrument Systems Data
+\comment{Find the document 107030200-TD005-R05 Instrument Systems Data
 Aquisition File Formats Technical Reference Manual}
 
 
@@ -72,7 +72,7 @@ protocol. Each preprocessor may be configured at runtime into various
 modes to indicate that a preprocessor is or is not required for an
 experimental recording.
 
-\todo{Preprocessor PVs}{Add a table to this document containing the PVs
+\detail{Preprocessor PVs}{Add a table to this document containing the PVs
 associated with the preprocessor and their form and function.}
 
 \subsubsection{Neutron Event Transformation}
@@ -286,9 +286,9 @@ a message will be logged and a status variable exported via EPICS Channel
 Access will be placed into an alarm state.
 
 
-\todo{Add PVs for monitoring}{I expect we will define some PVs to export
+\detail{Add PVs for monitoring}{I expect we will define some PVs to export
 various state information about space used, etc.}
-\todo{Reword}{Reword this section a bit for clarity.}
+\comment{Reword this section a bit for clarity?}
 
 
 \subsection{Translation Client}
@@ -373,7 +373,7 @@ will be inserted prior to the beginning of the next pulse, ensuring that
 all clients will begin new analysis at the same point in the data stream.
 
 
-\todo{Add list of control PVs}{We will send down statistical reset
+\detail{List of control PVs}{We will send down statistical reset
 packets to indicate to live clients that they should descard previous
 data and start anew. This will be triggered by writing a PV using CAS.}
 \todo{Update this section}{We've covered live data selection a bit in the 
