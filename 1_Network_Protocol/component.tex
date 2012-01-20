@@ -18,13 +18,13 @@ partial recovery from disk errors at inopportune locations in the stream.
 
 Some devices (and/or processes) in the system will only generate or operate on
 a subset of the defined packet formats.  To this end, the protocol is designed
-allow parsers to skip over packets that are unknown or irrelevant to the task
-at hand.  For example, the SMS will use the same format for stable storage
+to allow parsers to skip over packets that are unknown or irrelevant to the
+task at hand.  For example, the SMS will use the same format for stable storage
 as it uses for network traffic. The SMS will place synchronization packets
-(section~\ref{section:protocol_sync}) onto stable storage which may be
-visible to live-event clients due to the mechanism used for transmission.
-Those clients would ignore the synchronization packets as irrelevant to
-their funciton.
+(section~\ref{section:protocol_sync}) onto stable storage which may be visible
+to live-event clients due to the mechanism used for transmission.  Those
+clients would ignore the synchronization packets as irrelevant to their
+funciton.
 
 \detail{Geometry Information}{%
 It is desirable to communicate the geometry of the instrument alongside
