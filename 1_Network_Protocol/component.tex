@@ -260,13 +260,10 @@ must be zero.
 \begin{figure}[h]
   \centering
   \begin{bytefield}{32}
-    \bitheader{31,30,28,27,26,25,24,23,22,21,0} \\
+    \bitheader{31,30,28,27,0} \\
     \bitbox{1}{\tiny E \\ R \\ R} &
     \bitbox{3}{Src} &
-    \bitbox{2}{Y} &
-    \bitbox{2}{X} &
-    \bitbox{2}{Str} &
-    \bitbox{22}{Raw ID}
+    \bitbox{28}{Raw ID}
   \end{bytefield}
   \caption{Raw Pixel ID Fields}
   \label{fig:protocol_raw_pixel_id}
@@ -293,7 +290,7 @@ must be zero.
 	Value & Source \\
 	\hline
 	0 & Detector \\
-	1,2,3 & Unused \\
+	1,2,3 & Available for future use \\
 	4 & Beam Monitor \\
 	5 & Special 1 \\
 	6 & Special 2 \\
@@ -310,12 +307,6 @@ Figure~\ref{fig:protocol_raw_pixel_id}:
 \item {\bf ERR} indicates an error occurred when set.
 \item {\bf Src} indicates the source of this event as defined in
 Table~\ref{table:protocol_event_source_id}.
-\item {\bf X} is an unknown field, valid only for events with {\bf Src}
-5 and 6.
-\item {\bf X} is an unknown field, valid only for events with {\bf Src}
-5 and 6.
-\item {\bf Str} is an unknown field, valid only for events with {\bf Src}
-5 and 6.
 \item {\bf Raw ID} indicates pixel state and ID, chopper variable, beam
 monitor ID, or metadata ID, depending on {\bf Src}.
 \end{itemize}
@@ -330,12 +321,34 @@ remainder.
 When {\bf Src} is 4, {\bf Raw ID} indicates which beam monitor generated
 this event.
 
+{\bf Src} values 5 and 6 indicate that this event carries fast metadata
+information. The remaining portion of the pixel ID and TOF field currently
+remain undefined.
+
 When {\bf Src} is 7, {\bf Raw ID} indicates the chopper and specific variable
 contained in the event, according to Figure~\ref{fig:protocol_chopper_id}.
 {\bf Num} indicates the chopper number less one (0 is chopper 1, etc.)
 {\bf TRG} set indicates that this is a Trigger time; clear indicates that
 this is a Top Dead Center time. {\bf RIS} set indicates that this is the
 rising edge; clear indicates falling edge.
+
+\detail{Polarization State Information}{%
+As part of the ADARA system upgrade, we expect to use fast metadata events to
+memoralize transition between polarization states. These will be transformed
+into variable update packets once out of the detector system. While this
+is the plan, there may be other reasons to keep the current mapping scheme,
+which will be determined during implementation.}
+\detail{Beam Monitor Mapping}{%
+It is assumed, but not yet assured, that the pixel ID for a beam monitor
+is in fact the actual beam monitor number. If this is determined not to be
+the case, a mapping table will needed.}
+\detail{Fast Metadata}{%
+There are many formats for the fast metadata pixel IDs, and the pixel ID
+also carries the actual value of the metadata variable. The TOF field's
+current use is still somewhat unclear to the author, but will contain a
+indication of the frame correction applied. During implementaion, effort
+will need to be spent documenting and implementing transforms for the
+fast metadata pixel ID formats.}
 
 \newpage
 \subsubsection{Detector System: Real Time Data Link Information}
