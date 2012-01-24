@@ -110,15 +110,12 @@ component. Additionally, the device variable corresponding to packet loss
 for each preprocessor missing data will be incremented, and the updated
 value placed into the aggregated stream to be preserved for later analysis.
 
-\assumption{Pixel ID High Bits}{The current system stores various pieces of
-information in the high bits of each pixel. We will need to account for that
-data, and extract it as part of processing. The reversible mapping algorithm
-requires upstream to leave clear a known bit in order to indicate a mapping
-failure. Bit 31 is currently used in the raw event packets to denote an
-error. It has not been clarified if the rest of the ID and TOF data carry
-actual data or is garbage. Assuming valid data in the error events, the
-SMS can put those into a separate packet type for errors, freeing up bit
-31 in the processed packets for mapping errors.}
+\detail{Pixel ID error bit}{%
+The current preprocessor is not believed to pass on events with the error
+bit set, and if it does, those events are corrupt and should be discarded
+(and logged/accounted/etc). This allows SMS to use bit 31 ({\bf ERR}) to
+indicate that there was no physical-to-logical mapping for this event.}
+
 
 \subsubsection{Fast Metadata Transformation}
 
@@ -141,15 +138,6 @@ use the current pulse ID for their timestamp. Analysis of the experimental
 data must consider neutron velocity and instrument geometry to correlate the
 updated values with the proper neutron events.
 
-\todo{TOF is the only data frame-corrected}{%
-TOF is updated for the appropriate frame skew, but Pulse ID, charge, etc
-are not. There are situations where the TOF can be borderline for an instrument
-such as when the detectors are different lengths away from the sample and
-want to straddle the pulse delay (ie, one has a delay of 3 and the other 4.).
-There is some effort underway to let the detector system handle this. It seems
-like no TOF correction should be handled by the HW, but there is resistance
-to changing that. It also appears that there may be insuffienct resolution
-for the TOF/PulseID to fix this later.}
 
 \subsection{Slow Controls}
 
@@ -344,10 +332,10 @@ insert its own instance of them as needed by its local configuration aimed more
 at archival than transient storage.
 
 
-\decision{Setting NeXus histogram parameters}{We need to decide how to set the
-histogram parameters for use by the translation service. This may be
-communicated via a specific packet type (likely) or via the variable
-value system.}
+\detail{Setting histogram/reduction parameters}{We need to decide how to set
+the histogram parameters for use by the translation service and automatic
+reduction handling. This may be communicated via a specific packet type
+(likely) or via the variable value system.}
 
 
 \subsection{Event Stream Server}
@@ -357,6 +345,19 @@ aggregated event stream. The SMS will listen on a well-defined port for new
 subscribers. Once connected, subscribers will send an initialization packet to
 establish their requested service. This ``hello'' packet will indicate
 the requested timestamp from which they wish to begin receiving data.
+
+To avoid the need to index every pulse generated in the system, the SMS will
+limit the resolution of timestamps that may be requested by clients. The
+timestamp requested will be rounded further into the past to the nearest
+indexed pulse. In this manner, the client will always receive the data
+for the timestamp it requests, but may be required to discard data prior
+to that timestamp.
+
+The timestamp requested will be further clamped to the most recent transistion
+of run state. In other words, the client will be able to go back to the
+beginning of the current run, but no further. If there is no run currently
+being recorded, the client will be able to go back to the first pulse after
+the previous run completed.
 
 During sample alignment, calibration, and other routine procedures on
 the SNS beamlines, it is desirable to collect data for immediate use
@@ -374,8 +375,4 @@ all clients will begin new analysis at the same point in the data stream.
 \detail{List of control PVs}{We will send down statistical reset
 packets to indicate to live clients that they should descard previous
 data and start anew. This will be triggered by writing a PV using CAS.}
-\todo{Update this section}{We've covered live data selection a bit in the 
-protocol document, but need to discuss it here with ancillary topics such
-as configuring the timestamp index resolution.}
-
 
