@@ -180,14 +180,21 @@ developers will fill them in at a later date.}
     \wordbox{1}{Pulse ID (seconds)} \\
     \wordbox{1}{Pulse ID (nanoseconds)} \\
 
-    \bitheader{31,30,24,23,14,13,0} \\
+    \bitheader{31,30,29,24,23,22,21,16,15,10,9,0} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny E \\ O \\ P} &
-    \bitbox{7}{Reserved} &
-    \bitbox{10}{Cycle} &
-    \bitbox{14}{Pkt Seq} \\
-    \wordbox{1}{Pulse Charge (units of 10 nC, u32)} \\
-    \wordbox{1}{Pulse Energy (eV, u32)} \\
+    \bitbox{15}{Pkt Seq} &
+    \bitbox{16}{DSP Seq} \\
+    \bitbox{8}{Flavor} &
+    \bitbox{24}{Pulse Charge (units of 10 nC)} \\
+    \bitbox{1}{\tiny B \\ V \\ T } &
+    \bitbox{1}{\tiny B \\ C \\ Y } &
+    \bitbox{8}{TSTAT} &
+    \bitbox{12}{Veto} &
+    \bitbox{10}{Cycle} \\
+    \wordbox{1}{Intra-pulse time (units of 100 ns)} \\
+    \bitbox{1}{\tiny R \\ A \\ W} &
+    \bitbox{31}{TOF Offset (units of 100 ns)} \\
     \wordbox{2}{Event 1} \\
     \wordbox{2}{$\cdots$} \\
     \wordbox{2}{Event $N$} \\
@@ -209,19 +216,36 @@ accelerator. This ID may not be orginating pulse for the events in this packet
 due to frame skew.
 \item{\bf Source ID} identifies the upstream detector hardware that
 processed these events.
-\item{\bf Cycle} identifies the Accelerator cycle number for the most
-recent pulse. This may not be the originating pulse for the events in this
-packet due to frame skew.
-\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
-current pulse.
 \item{\bf EOP} (End of Packet) indicates that this is the last event packet
 to be sent for the current pulse.
+\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
+current pulse.
+\item{\bf DSP Seq} is a monotonically increasing packet number for this source.
+This field is incremented for every packet sent by the source and does not
+reset for each pulse.
+\item{\bf Flavor} contains the accelerator pulse flavor as defined by
+the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
 number must be multiplied by 10 to get the charge in nanoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
-\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
-given in electron volts. This value may not be the voltage for the
-events in this packet due to frame skew.
+\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
+Real Time Data Link.
+\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
+\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+Functional Description.
+\item{\bf Veto} contains the veto information for this frame as defined
+in the SNS Timing Master Functional Description. A non-zero value indicates
+a veto.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+recent pulse. This may not be the originating pulse for the events in this
+packet due to frame skew.
+\item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
+The intra-pulse time is the time between the previous $T_{SYNC}$ and the
+current $T_{SYNC}$.
+\item{\bf RAW} indicates that the time of flight values in this packet are
+not corrected for frame skew.
+\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf RAW}
+is set) added to these events to correct for frame skew.
 \item{\bf Event(s)} give the time of flight and location of the detected
 neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
 Pixel ID is the physical pixel associated with this neutron event.
@@ -240,8 +264,6 @@ Pulse ID}. This loss-detection protocol assumes that the transport does not
 reorder packets; additional measures must be taken in the receiver
 to deal with reordering should it be necessary.
 
-There are seven unused bits ({\bf Reserved}) for this packet type. These bits
-must be zero.
 
 \begin{figure}
   \centering
@@ -357,17 +379,28 @@ fast metadata pixel ID formats.}
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{64} \\
+    \wordbox{1}{128} \\
     \wordbox{1}{TBD} \\
     \wordbox{1}{Pulse ID (seconds)} \\
     \wordbox{1}{Pulse ID (nanoseconds)} \\
 
-    \bitheader{31,0} \\
-    \wordbox{1}{Pulse Charge (units of 10 nC, u32)} \\
+    \bitheader{31,30,29,24,23,22,21,10,9,0} \\
+    \bitbox{8}{Flavor} &
+    \bitbox{24}{Pulse Charge (units of 10 nC)} \\
+    \bitbox{1}{\tiny B \\ V \\ T } &
+    \bitbox{1}{\tiny B \\ C \\ Y } &
+    \bitbox{8}{TSTAT} &
+    \bitbox{12}{Veto} &
+    \bitbox{10}{Cycle} \\
+    \wordbox{1}{Intra-pulse time (units of 100 ns)} \\
+    \bitbox{1}{\tiny R \\ A \\ W} &
+    \bitbox{31}{TOF Offset (units of 100 ns)} \\
     \wordbox{1}{Ring Period (picoseconds, u32)} \\
-    \wordbox[lrt]{1}{14 Reserved words} \\
-    \skippedwords \\
-    \wordbox[lrb]{1}{}
+    \bitbox{8}{FNA 0} &
+    \bitbox{24}{Frame Data 0} \\
+    \wordbox{1}{$\cdots$} \\
+    \bitbox{8}{FNA 26} &
+    \bitbox{24}{Frame Data 26} \\
   \end{bytefield}
   \caption{Packet Type TBD: Real Time Data Link Information}
   \label{fig:protocol_packet_rtdl}
@@ -375,30 +408,43 @@ fast metadata pixel ID formats.}
 
 The ``Real Time Data Link'' packet described in
 Figure~\ref{fig:protocol_packet_rtdl} is generated by the neutron
-detector system and is used to information about the most recent pulse
+detector system and is used to information about the a given pulse
 from the accelerator.  It contains the following fields:
 \begin{itemize}
-\item{\bf Length} is always 64 bytes.
+\item{\bf Length} is always 128 bytes.
 \item{\bf Pulse ID} identifies the most recent pulse generated by the
 accelerator.
-\item{\bf Pulse Charge} indicates the charge of the most recent pulse units of
-10 nanoColumbs. This value may not be the charge for the events in this packet
-due to frame skew.
+\item{\bf Flavor} contains the accelerator pulse flavor as defined by
+the SNS Timing Master Functional Description.
+\item{\bf Pulse Charge} indicates the charge of the previous pulse. This
+number must be multiplied by 10 to get the charge in nanoColumbs.
+\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
+Real Time Data Link.
+\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
+\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+Functional Description.
+\item{\bf Veto} contains the veto information for the previous frame as defined
+in the SNS Timing Master Functional Description. A non-zero value indicates
+a veto.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+recent pulse.
+\item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
+The intra-pulse time is the time between the previous $T_{SYNC}$ and the
+current $T_{SYNC}$.
+\item{\bf RAW} indicates that the time of flight values in this packet are
+not corrected for frame skew.
+\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf RAW}
+is set) added to these events to correct for frame skew.
 \item{\bf Ring Period} indicates the number of picoseconds the proton beam
 takes to travel the circumference of the accumulator ring. This is used
 to calculate beam energy.
-\item{\bf Reserved} is 52 bytes of room for future values from the RTDL
-system (see TODO).
+\item{\bf FNA $X$} indicates the source RTDL Frame number for
+{\bf Frame Data $X$}. A zero in this field indicates no data in
+the corresponding frame data field.
+\item{\bf Frame Data $X$} contains the data for the RTDL Frame given by
+{\bf FNA $X$}.
 \end{itemize}
 
-\todo{Accelerator Cycle in RTDL?}{%
-We have the accelerator cycle number in the raw event packet, but not in
-the RTDL packet?}
-\todo{RTDL Reserved fields?}{%
-Do we need to have reserved fields in the RTDL packet? Once a packet format
-has been seen in production, we're not supposed to change its definition,
-so how would follow on software know if these fields are now valid vs
-having a zero in them when processing historical event files?}
 
 \newpage
 \subsection{Stream Management Service generated events}
@@ -594,6 +640,14 @@ We may need a veto flag, and perhaps some of this space should be used
 to indicate polarization state, though I believe that should be handled
 via a variable update packet.
 We have space here, are there other flags that make sense in this context?}
+\detail{Use additional information from RTDL}{%
+We now have the intra-pulse time and other fields we will want to record
+in this packet. However, can different pixels in the same detector bank
+get different TOF offsets? If so, that will cause a problem when mixing
+those. The intra-pulse time will be OK, but what about $T_{DELAY}$? If
+$T_{DELAY}$ is in the reported TOF, but not in the intra-pulse time, then
+we should be OK, as we the intra-pulse time is the same for all events.
+Resolve this for implementation.}
 
 \newpage
 \subsubsection{Beam Monitor Event Data}
