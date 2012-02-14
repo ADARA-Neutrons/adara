@@ -650,7 +650,7 @@ to calculate beam energy.
 missing event data as defined in
 Table~\ref{table:protocol_packet_banked_event_flags}.
 \item{\bf Banked Event Section(s)} contains the Bank ID and events for each
-bank. There will be one section for each known bank in the detector. The
+bank. There will be one section for each bank with events for this pulse. The
 format of the section is given in
 Figure~\ref{fig:protocol_banked_event_section}.
 \end{itemize}
@@ -690,7 +690,7 @@ a single ``Banked Event Data'' packet will be sent by the SMS for each pulse.
 \end{figure}
 
 Each ``Banked Event Data'' packet contains one ``Banked Event Section'' for
-each detector bank known to the system. As defined in
+each detector bank with events in this pulse. As defined in
 Figure~\ref{fig:protocol_banked_event_section}, each section contains
 the following fields:
 \begin{itemize}
@@ -790,8 +790,8 @@ missing event data as defined in
 Table~\ref{table:protocol_packet_banked_event_flags}.
 \item{\bf Beam Monitor Section(s)} contain the Beam Monitor ID and events
 for each Beam Monitor. There will be one section for each known beam monitor
-on the beam line. The format of the section is given in
-Figure~\ref{fig:protocol_monitor_event_section}.
+on this beam line that has events for this pulse. The format of the section
+is given in Figure~\ref{fig:protocol_monitor_event_section}.
 \end{itemize}
 
 While the ``Raw Event Data'' packet described in
@@ -803,7 +803,7 @@ messages. Thus, the Beam Monitor packet does not require mechanisms to detect
 lost events for a pulse.
 
 Each ``Beam Monitor Event Data'' packet contains one ``Beam Monitor Section''
-for each Beam Monitor known to thse system. As defined in
+for each Beam Monitor that has events in this pulse. As defined in
 Figure~\ref{fig:protocol_monitor_event_section}, each section contains the
 following fields:
 \begin{itemize}
