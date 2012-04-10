@@ -1,0 +1,20 @@
+*.o
+.*.swp
+adara-client
+adara-gen
+storage-test
+smsd
+
+# All of this crap is from autotools
+.deps
+configure
+config.log
+config.status
+missing
+install-sh
+compile
+depcomp
+aclocal.m4
+Makefile
+Makefile.in
+autom4te.cache
