@@ -254,6 +254,10 @@ public:
 	 */
 	bool read(int fd, unsigned int max_read = 0);
 
+	/* Flush the internal buffers and get ready to restart parsing.
+	 */
+	void reset(void);
+
 protected:
 	/* This function gets called for every packet that fits in the
 	 * internal buffer; oversize packets will be sent to rxOversizePkt().

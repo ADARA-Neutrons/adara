@@ -41,17 +41,22 @@ Packet::~Packet()
 
 /* ------------------------------------------------------------------------ */
 
-Parser::Parser(unsigned int buffer_size, unsigned int max_pkt_size)
+Parser::Parser(unsigned int buffer_size, unsigned int max_pkt_size) :
+		m_size(buffer_size), m_max_size(max_pkt_size), m_len(0),
+		m_oversize_len(0)
 {
 	m_buffer = new uint8_t[buffer_size];
-	m_size = buffer_size;
-	m_max_size = max_pkt_size;
-	m_len = 0;
 }
 
 Parser::~Parser()
 {
 	delete [] m_buffer;
+}
+
+void Parser::reset(void)
+{
+	m_len = 0;
+	m_oversize_len = 0;
 }
 
 bool Parser::read(int fd, unsigned int max_read)
@@ -239,3 +244,22 @@ EXPAND_HANDLER(DeviceDescriptorPkt)
 EXPAND_HANDLER(VariableU32Pkt)
 EXPAND_HANDLER(VariableDoublePkt)
 EXPAND_HANDLER(VariableStringPkt)
+
+#define EXPAND_CONSTRUCTOR(type) \
+type::type(const uint8_t *data, uint32_t len) : Packet(data, len) { }
+EXPAND_CONSTRUCTOR(RawDataPkt)
+EXPAND_CONSTRUCTOR(RTDLPkt)
+EXPAND_CONSTRUCTOR(BankedEventPkt)
+EXPAND_CONSTRUCTOR(BeamMonitorPkt)
+EXPAND_CONSTRUCTOR(PixelMappingPkt)
+EXPAND_CONSTRUCTOR(RunStatusPkt)
+EXPAND_CONSTRUCTOR(RunInfoPkt)
+EXPAND_CONSTRUCTOR(TransCompletePkt)
+EXPAND_CONSTRUCTOR(ClientHelloPkt)
+EXPAND_CONSTRUCTOR(StatsResetPkt)
+EXPAND_CONSTRUCTOR(SyncPkt)
+EXPAND_CONSTRUCTOR(HeartbeatPkt)
+EXPAND_CONSTRUCTOR(DeviceDescriptorPkt)
+EXPAND_CONSTRUCTOR(VariableU32Pkt)
+EXPAND_CONSTRUCTOR(VariableDoublePkt)
+EXPAND_CONSTRUCTOR(VariableStringPkt)
