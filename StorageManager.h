@@ -18,7 +18,8 @@ public:
 	static void startRecording(uint32_t run);
 	static void stopRecording(void);
 
-	static void addPacket(void *pkt, uint32_t len, bool notify = true);
+	static void addPacket(const void *pkt, uint32_t len,
+			      bool notify = true);
 	static int base_fd() { return m_base_fd; }
 
 private:

@@ -164,7 +164,7 @@ void StorageFile::add_run_status(ADARA::RunStatus status)
 	write(&spkt, sizeof(spkt));
 }
 
-void StorageFile::write(void *data, uint32_t count)
+void StorageFile::write(const void *data, uint32_t count)
 {
 	uint8_t *p = (uint8_t *) data;
 	int rc;

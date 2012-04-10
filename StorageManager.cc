@@ -111,7 +111,7 @@ void StorageManager::stopRecording(void)
 	endCurrentContainer();
 }
 
-void StorageManager::addPacket(void *pkt, uint32_t len, bool notify)
+void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 {
 	struct header *hdr = (struct header *) pkt;
 	off_t blocks;

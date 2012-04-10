@@ -33,7 +33,7 @@ private:
 	static off_t m_max_sync_distance;
 
 	void open(int flags);
-	void write(void *data, uint32_t count);
+	void write(const void *data, uint32_t count);
 	void add_sync(void);
 	void add_run_status(ADARA::RunStatus status);
 	void terminate(ADARA::RunStatus status);
