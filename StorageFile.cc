@@ -207,7 +207,7 @@ void StorageFile::terminate(ADARA::RunStatus status)
 StorageFile::StorageFile(boost::shared_ptr<StorageContainer> &container,
 			 uint32_t number, bool create,
 			 ADARA::RunStatus status) :
-	m_container(container), m_oversize(false), m_active(create),
+	m_container(container), m_oversize(false), m_active(create), m_size(0),
 	m_file_number(number), m_fd(-1)
 {
 	if (!create) {
