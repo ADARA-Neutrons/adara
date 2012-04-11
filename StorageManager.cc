@@ -5,6 +5,7 @@
 
 #include <string>
 #include <stdexcept>
+#include <boost/foreach.hpp>
 
 #include "StorageManager.h"
 #include "StorageContainer.h"
@@ -23,6 +24,8 @@ int StorageManager::m_base_fd = -1;
 
 boost::shared_ptr<StorageFile> StorageManager::m_cur_file;
 boost::shared_ptr<StorageContainer> StorageManager::m_cur_container;
+
+std::list<StorageNotifier *> StorageManager::m_notifiers;
 
 uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
@@ -49,6 +52,30 @@ void StorageManager::stop(void)
 	close(m_base_fd);
 }
 
+void StorageManager::notifyFileAdded(void)
+{
+	BOOST_FOREACH(StorageNotifier *n, m_notifiers) {
+		n->fileAdded(m_cur_file);
+	}
+}
+
+void StorageManager::notifyFileUpdated(void)
+{
+	BOOST_FOREACH(StorageNotifier *n, m_notifiers) {
+		n->fileUpdated(m_cur_file);
+	}
+}
+
+void StorageManager::subscribe(StorageNotifier *n)
+{
+	m_notifiers.push_back(n);
+}
+
+void StorageManager::unsubscribe(StorageNotifier *n)
+{
+	m_notifiers.remove(n);
+}
+
 void StorageManager::endCurrentFile(ADARA::RunStatus status)
 {
 	off_t blocks;
@@ -62,9 +89,10 @@ void StorageManager::endCurrentFile(ADARA::RunStatus status)
 	blocks /= m_block_size;
 	m_blocks_used += blocks;
 
-	/* TODO need to let clients know about the end of
-	 * this file.
+	/* Let clients know about the final update to this file before
+	 * we drop our reference
 	 */
+	notifyFileUpdated();
 	m_cur_file.reset();
 }
 
@@ -152,9 +180,8 @@ void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 
 		/* TODO add persistant information to beginning of file */
 
-		if (notify) {
-			/* TODO tell clients about new files */
-		}
+		if (notify)
+			notifyFileAdded();
 	}
 
 	m_cur_file->write(pkt, len);
@@ -181,6 +208,6 @@ void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 		if (m_cur_file->size() >= StorageFile::m_max_file_size)
 			m_cur_file->m_oversize = true;
 
-		/* TODO Notify clients of update */
+		notifyFileUpdated();
 	}
 }
