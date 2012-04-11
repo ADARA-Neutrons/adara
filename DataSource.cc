@@ -18,17 +18,6 @@ double DataSource::m_data_timeout = 5.0;
 
 unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
 
-class DataSourceReadyFd : public fdReg {
-public:
-	DataSourceReadyFd(DataSource *obj, fdRegType reg) :
-		fdReg(obj->m_fd, reg), m_obj(obj) { }
-
-private:
-	DataSource *m_obj;
-
-	void callBack(void) { m_obj->fdReady(); }
-};
-
 class DataSourceTimer : public epicsTimerNotify {
 public:
 	DataSourceTimer(DataSource *obj) :
@@ -136,7 +125,7 @@ void DataSource::timerExpired(void)
 	}
 }
 
-void DataSource::fdReady(void)
+void DataSource::fdReady(fdRegType type)
 {
 	switch (m_state) {
 	case IDLE:
@@ -185,10 +174,8 @@ void DataSource::startConnect(void)
 		 * the first packet from the source unless we look for the
 		 * connection becoming writable.
 		 */
-		if (m_state == CONNECTING)
-			m_fdreg = new DataSourceReadyFd(this, fdrWrite);
-		else
-			m_fdreg = new DataSourceReadyFd(this, fdrRead);
+		fdRegType type = (m_state == CONNECTING) ? fdrWrite : fdrRead;
+		m_fdreg = new ReadyAdapter<DataSource>(m_fd, type, this);
 	} catch (std::bad_alloc e) {
 		goto error_fd;
 	}
@@ -212,7 +199,7 @@ void DataSource::connectComplete(void)
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
 		delete m_fdreg;
-		m_fdreg = new DataSourceReadyFd(this, fdrRead);
+		m_fdreg = new ReadyAdapter<DataSource>(m_fd, fdrRead, this);
 
 		m_timer->cancel();
 		m_timer->start(m_data_timeout);

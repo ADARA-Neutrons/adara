@@ -2,12 +2,12 @@
 #define __DATA_SOURCE_H
 
 #include "ADARAParser.h"
+#include "ReadyAdapter.h"
 
 extern "C" {
 struct addrinfo;
 }
 
-class DataSourceReadyFd;
 class DataSourceTimer;
 
 class DataSource : public ADARA::Parser {
@@ -17,8 +17,8 @@ public:
 
 private:
 	enum State { IDLE, CONNECTING, ACTIVE };
-	
-	DataSourceReadyFd *m_fdreg;
+
+	ReadyAdapter<DataSource> *m_fdreg;
 	DataSourceTimer *m_timer;
 	struct addrinfo *m_addrinfo;
 	State m_state;
@@ -29,7 +29,7 @@ private:
 	static double m_connect_timeout;
 	static double m_data_timeout;
 
-	void fdReady(void);
+	void fdReady(fdRegType type);
 
 	void startConnect(void);
 	void connectComplete(void);
@@ -52,7 +52,7 @@ private:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
-	friend class DataSourceReadyFd;
+	friend class ReadyAdapter<DataSource>;
 	friend class DataSourceTimer;
 };
 
