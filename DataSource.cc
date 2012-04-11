@@ -65,8 +65,6 @@ DataSource::DataSource(const std::string &uri) :
 	} else
 		node = uri;
 
-	m_timer = new DataSourceTimer(this);
-
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_STREAM;
@@ -77,14 +75,18 @@ fprintf(stderr, "Looking up %s %s\n", node.c_str(), service.c_str());
 
 	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
-		/* Clean up to avoid leaking resources */
-		delete m_timer;
-
 		std::string msg("Unable to lookup data source '");
 		msg += uri;
 		msg += "': ";
 		msg += gai_strerror(rc);
 		throw std::runtime_error(msg);
+	}
+
+	try {
+		m_timer = new DataSourceTimer(this);
+	} catch(...) {
+		freeaddrinfo(m_addrinfo);
+		throw;
 	}
 
 	startConnect();
