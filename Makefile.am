@@ -14,10 +14,10 @@ noinst_PROGRAMS = storage-test
 
 smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
 		DataSource.cc ADARAParser.cc LiveClient.cc LiveServer.cc \
-		SMSControl.cc SMSControlPV.cc
+		SMSControl.cc SMSControlPV.cc SignalEvents.cc
 smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
 smsd_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
-smsd_LDADD = $(EPICS_LIBS)
+smsd_LDADD = $(EPICS_LIBS) -lpthread
 
 storage_test_SOURCES = storage-test.cc StorageManager.cc \
 		StorageContainer.cc StorageFile.cc
