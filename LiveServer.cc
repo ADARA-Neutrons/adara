@@ -4,6 +4,8 @@
 #include <errno.h>
 #include <netdb.h>
 
+#include <boost/bind.hpp>
+
 #include "EPICS.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
@@ -65,7 +67,9 @@ LiveServer::LiveServer(const std::string &service)
 	}
 
 	try {
-		m_fdreg = new ReadyAdapter<LiveServer>(m_fd, fdrRead, this);
+		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
+					boost::bind(&LiveServer::newConnection,
+						    this));
 	} catch(...) {
 		close(m_fd);
 		freeaddrinfo(ai);
@@ -82,7 +86,7 @@ error:
 	throw std::runtime_error(msg);
 }
 
-void LiveServer::fdReady(fdRegType type)
+void LiveServer::newConnection(void)
 {
 	int rc;
 

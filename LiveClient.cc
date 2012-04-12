@@ -2,6 +2,8 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 
+#include <boost/bind.hpp>
+
 #include "EPICS.h"
 #include "LiveClient.h"
 #include "StorageFile.h"
@@ -19,7 +21,8 @@ LiveClient::LiveClient(int fd) :
 	m_read(NULL), m_write(NULL), m_hello_received(false), m_cur_offset(0),
 	m_client_fd(fd), m_file_fd(-1)
 {
-	m_read = new ReadyAdapter<LiveClient>(m_client_fd, fdrRead, this);
+	m_read = new ReadyAdapter(m_client_fd, fdrRead,
+				  boost::bind(&LiveClient::readable, this));
 
 	try {
 		m_timer = new TimerAdapter<LiveClient>(this);
@@ -46,14 +49,6 @@ bool LiveClient::timerExpired(void)
 	/* TODO log no hello from live client */
 	delete this;
 	return false;
-}
-
-void LiveClient::fdReady(fdRegType type)
-{
-	if (type == fdrRead)
-		readable();
-	else
-		writable();
 }
 
 void LiveClient::writable(void)
@@ -126,8 +121,8 @@ more:
 	 * there is room in the socket buffer.
 	 */
 	if (!m_write)
-		m_write = new ReadyAdapter<LiveClient>(m_client_fd, fdrWrite,
-						       this);
+		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
+				boost::bind(&LiveClient::writable, this));
 }
 
 void LiveClient::fileAdded(boost::shared_ptr<StorageFile> &f)

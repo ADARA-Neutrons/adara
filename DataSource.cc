@@ -3,6 +3,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 
+#include <boost/bind.hpp>
 #include <stdexcept>
 
 #include "EPICS.h"
@@ -107,7 +108,7 @@ bool DataSource::timerExpired(void)
 	return false;
 }
 
-void DataSource::fdReady(fdRegType type)
+void DataSource::fdReady(void)
 {
 	switch (m_state) {
 	case IDLE:
@@ -157,7 +158,8 @@ void DataSource::startConnect(void)
 		 * connection becoming writable.
 		 */
 		fdRegType type = (m_state == CONNECTING) ? fdrWrite : fdrRead;
-		m_fdreg = new ReadyAdapter<DataSource>(m_fd, type, this);
+		m_fdreg = new ReadyAdapter(m_fd, type,
+				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
 		goto error_fd;
 	}
@@ -181,7 +183,8 @@ void DataSource::connectComplete(void)
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
 		delete m_fdreg;
-		m_fdreg = new ReadyAdapter<DataSource>(m_fd, fdrRead, this);
+		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
+				boost::bind(&DataSource::fdReady, this));
 
 		m_timer->cancel();
 		m_timer->start(m_data_timeout);

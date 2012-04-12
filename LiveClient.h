@@ -18,8 +18,8 @@ public:
 	void fileUpdated(boost::shared_ptr<StorageFile> &f);
 
 private:
-	ReadyAdapter<LiveClient> *m_read;
-	ReadyAdapter<LiveClient> *m_write;
+	ReadyAdapter *m_read;
+	ReadyAdapter *m_write;
 	bool m_hello_received;
 	off_t m_cur_offset;
 	int m_client_fd;
@@ -28,7 +28,6 @@ private:
 
 	void writable(void);
 	void readable(void);
-	void fdReady(fdRegType type);
 
 	bool timerExpired(void);
 
@@ -43,7 +42,7 @@ private:
 	static unsigned int m_max_send_chunk;
 	static double m_hello_timeout;
 
-	friend class ReadyAdapter<LiveClient>;
+	friend class ReadyAdapter;
 	friend class TimerAdapter<LiveClient>;
 };
 

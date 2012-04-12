@@ -17,7 +17,7 @@ public:
 private:
 	enum State { IDLE, CONNECTING, ACTIVE };
 
-	ReadyAdapter<DataSource> *m_fdreg;
+	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
 	State m_state;
@@ -28,7 +28,7 @@ private:
 	static double m_connect_timeout;
 	static double m_data_timeout;
 
-	void fdReady(fdRegType type);
+	void fdReady(void);
 
 	void startConnect(void);
 	void connectComplete(void);
@@ -51,7 +51,7 @@ private:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
-	friend class ReadyAdapter<DataSource>;
+	friend class ReadyAdapter;
 	friend class TimerAdapter<DataSource>;
 };
 

@@ -9,12 +9,12 @@ public:
 	LiveServer(const std::string &service);
 
 private:
-	ReadyAdapter<LiveServer> *m_fdreg;
+	ReadyAdapter *m_fdreg;
 	int m_fd;
 
-	void fdReady(fdRegType type);
+	void newConnection(void);
 
-	friend class ReadyAdapter<LiveServer>;
+	friend class ReadyAdapter;
 };
 
 #endif /* __LIVE_SERVER_H */
