@@ -146,7 +146,7 @@ void StorageFile::add_run_status(ADARA::RunStatus status)
 {
 	struct run_status_packet spkt = {
 		hdr : {
-			payload_len : 28,
+			payload_len : 12,
 			pkt_format : ADARA::ADARA_PKT_RUN_STATUS_V0,
 		},
 	};
