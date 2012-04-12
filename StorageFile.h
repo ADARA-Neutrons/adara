@@ -2,11 +2,12 @@
 #define __STORAGE_FILE
 
 #include <boost/smart_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include "ADARA.h"
 
 class StorageContainer;
 
-class StorageFile {
+class StorageFile : boost::noncopyable {
 public:
 	/* TODO can we convert this to a shared_ptr/weak_ptr setup
 	 * for some fd class?

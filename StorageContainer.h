@@ -1,11 +1,12 @@
 #ifndef __STORAGE_CONTAINER_H
 #define __STORAGE_CONTAINER_H
 
+#include <boost/noncopyable.hpp>
 #include <time.h>
 #include <stdint.h>
 #include <string>
 
-class StorageContainer {
+class StorageContainer : boost::noncopyable {
 public:
 	const struct timespec &startTime(void) const { return m_startTime; }
 	uint64_t runNumber (void) const { return m_runNumber; }
