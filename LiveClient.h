@@ -7,6 +7,7 @@
 #include "ADARAParser.h"
 #include "StorageManager.h"
 #include "ReadyAdapter.h"
+#include "TimerAdapter.h"
 
 class LiveClient : public StorageNotifier, ADARA::Parser {
 public:
@@ -23,10 +24,13 @@ private:
 	off_t m_cur_offset;
 	int m_client_fd;
 	int m_file_fd;
+	TimerAdapter<LiveClient> *m_timer;
 
 	void writable(void);
 	void readable(void);
 	void fdReady(fdRegType type);
+
+	bool timerExpired(void);
 
 	bool rxPacket(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr, const uint8_t *chunk,
@@ -37,8 +41,10 @@ private:
 	std::list<boost::shared_ptr<StorageFile> > m_files;
 
 	static unsigned int m_max_send_chunk;
+	static double m_hello_timeout;
 
 	friend class ReadyAdapter<LiveClient>;
+	friend class TimerAdapter<LiveClient>;
 };
 
 #endif /* __LIVE_CLIENT_H */

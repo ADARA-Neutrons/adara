@@ -11,6 +11,7 @@
 #define MAX_PKT_SIZE 1024
 
 unsigned int LiveClient::m_max_send_chunk = 2 * 1024 * 1024;
+double LiveClient::m_hello_timeout = 30.0;
 
 LiveClient::LiveClient(int fd) : 
 	ADARA::Parser(MAX_PKT_SIZE, MAX_PKT_SIZE),
@@ -18,6 +19,14 @@ LiveClient::LiveClient(int fd) :
 	m_client_fd(fd), m_file_fd(-1)
 {
 	m_read = new ReadyAdapter<LiveClient>(m_client_fd, fdrRead, this);
+
+	try {
+		m_timer = new TimerAdapter<LiveClient>(this);
+		m_timer->start(m_hello_timeout);
+	} catch (...) {
+		delete m_read;
+		throw;
+	}
 }
 
 LiveClient::~LiveClient()
@@ -29,6 +38,13 @@ LiveClient::~LiveClient()
 	close(m_client_fd);
 	if (m_file_fd != -1)
 		m_files.front()->put_fd();
+}
+
+bool LiveClient::timerExpired(void)
+{
+	/* TODO log no hello from live client */
+	delete this;
+	return false;
 }
 
 void LiveClient::fdReady(fdRegType type)
@@ -172,6 +188,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	boost::shared_ptr<StorageFile> cur_file;
 
 	/* TODO setup replay of historical data */
+	m_timer->cancel();
 	m_hello_received = true;
 
 	cur_file = StorageManager::subscribe(this);
