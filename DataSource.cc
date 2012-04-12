@@ -5,8 +5,6 @@
 
 #include <stdexcept>
 
-#include <fdManager.h>
-#include <epicsTimer.h>
 #include "DataSource.h"
 #include "StorageManager.h"
 
@@ -17,25 +15,6 @@ double DataSource::m_connect_timeout = 5.0;
 double DataSource::m_data_timeout = 5.0;
 
 unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
-
-class DataSourceTimer : public epicsTimerNotify {
-public:
-	DataSourceTimer(DataSource *obj) :
-		m_obj(obj), m_timer(fileDescriptorManager.createTimer()) {}
-	virtual ~DataSourceTimer() { m_timer.destroy(); }
-
-	void start(double delaySeconds) { m_timer.start(*this, delaySeconds); }
-	void cancel(void) { m_timer.cancel(); }
-
-private:
-	DataSource *m_obj;
-	epicsTimer &m_timer;
-
-	expireStatus expire(const epicsTime &currentTime) {
-		m_obj->timerExpired();
-		return expireStatus(noRestart);
-	}
-};
 
 DataSource::DataSource(const std::string &uri) :
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
@@ -72,7 +51,7 @@ fprintf(stderr, "Looking up %s %s\n", node.c_str(), service.c_str());
 	}
 
 	try {
-		m_timer = new DataSourceTimer(this);
+		m_timer = new TimerAdapter<DataSource>(this);
 	} catch(...) {
 		freeaddrinfo(m_addrinfo);
 		throw;
@@ -108,7 +87,7 @@ fprintf(stderr, "%s\n", __func__);
 	m_timer->start(m_connect_retry);
 }
 
-void DataSource::timerExpired(void)
+bool DataSource::timerExpired(void)
 {
 	switch (m_state) {
 	case IDLE:
@@ -123,6 +102,8 @@ void DataSource::timerExpired(void)
 		connectionFailed();
 		break;
 	}
+
+	return false;
 }
 
 void DataSource::fdReady(fdRegType type)

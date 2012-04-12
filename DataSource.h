@@ -3,12 +3,11 @@
 
 #include "ADARAParser.h"
 #include "ReadyAdapter.h"
+#include "TimerAdapter.h"
 
 extern "C" {
 struct addrinfo;
 }
-
-class DataSourceTimer;
 
 class DataSource : public ADARA::Parser {
 public:
@@ -19,7 +18,7 @@ private:
 	enum State { IDLE, CONNECTING, ACTIVE };
 
 	ReadyAdapter<DataSource> *m_fdreg;
-	DataSourceTimer *m_timer;
+	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
 	State m_state;
 	int m_fd;
@@ -37,7 +36,7 @@ private:
 
 	void connectionFailed(void);
 
-	void timerExpired(void);
+	bool timerExpired(void);
 
 	bool rxPacket(const ADARA::Packet &pkt);
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
@@ -53,7 +52,7 @@ private:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
 	friend class ReadyAdapter<DataSource>;
-	friend class DataSourceTimer;
+	friend class TimerAdapter<DataSource>;
 };
 
 #endif /* __DATA_SOURCE_H */
