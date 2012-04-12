@@ -5,7 +5,6 @@
 
 #include <string>
 #include <stdexcept>
-#include <boost/foreach.hpp>
 
 #include "StorageManager.h"
 #include "StorageContainer.h"
@@ -54,21 +53,36 @@ void StorageManager::stop(void)
 
 void StorageManager::notifyFileAdded(void)
 {
-	BOOST_FOREACH(StorageNotifier *n, m_notifiers) {
-		n->fileAdded(m_cur_file);
+	std::list<StorageNotifier *>::iterator it, next;
+
+	next = m_notifiers.begin();
+	while (next != m_notifiers.end()) {
+		/* It's possible the notifier will remove itself, so
+		 * protect against iterator invalidation.
+		 */
+		it = next++;
+		(*it)->fileAdded(m_cur_file);
 	}
 }
 
 void StorageManager::notifyFileUpdated(void)
 {
-	BOOST_FOREACH(StorageNotifier *n, m_notifiers) {
-		n->fileUpdated(m_cur_file);
+	std::list<StorageNotifier *>::iterator it, next;
+
+	next = m_notifiers.begin();
+	while (next != m_notifiers.end()) {
+		/* It's possible the notifier will remove itself, so
+		 * protect against iterator invalidation.
+		 */
+		it = next++;
+		(*it)->fileUpdated(m_cur_file);
 	}
 }
 
-void StorageManager::subscribe(StorageNotifier *n)
+boost::shared_ptr<StorageFile> &StorageManager::subscribe(StorageNotifier *n)
 {
 	m_notifiers.push_back(n);
+	return m_cur_file;
 }
 
 void StorageManager::unsubscribe(StorageNotifier *n)

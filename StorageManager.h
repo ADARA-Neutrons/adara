@@ -30,7 +30,7 @@ public:
 			      bool notify = true);
 	static int base_fd() { return m_base_fd; }
 
-	static void subscribe(StorageNotifier *);
+	static boost::shared_ptr<StorageFile> &subscribe(StorageNotifier *);
 	static void unsubscribe(StorageNotifier *);
 
 private:
