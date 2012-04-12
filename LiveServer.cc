@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <netdb.h>
 
-#include <fdManager.h>
+#include "EPICS.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
 

@@ -4,10 +4,9 @@
 #include <time.h>
 #include <string>
 
-#include "EPICS.h"
-
 #include <gddAppFuncTable.h>
 #include <smartGDDPointer.h>
+#include <casdef.h>
 
 class SMSControl;
 

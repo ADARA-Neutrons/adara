@@ -5,8 +5,10 @@
 #include <string>
 #include <map>
 
-#include "EPICS.h"
-#include "SMSControlPV.h"
+#include <casdef.h>
+
+class smsRunNumberPV;
+class smsRecordingPV;
 
 class SMSControl : public caServer {
 public:

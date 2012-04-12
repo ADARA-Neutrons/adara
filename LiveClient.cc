@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 
+#include "EPICS.h"
 #include "LiveClient.h"
 #include "StorageFile.h"
 

@@ -1,4 +1,6 @@
+#include "EPICS.h"
 #include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "StorageManager.h"
 
 SMSControl::SMSControl(const std::string &beamline) :

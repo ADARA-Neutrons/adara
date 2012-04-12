@@ -1,4 +1,6 @@
+#include "EPICS.h"
 #include "SMSControl.h"
+#include "SMSControlPV.h"
 
 #include <gddApps.h>
 

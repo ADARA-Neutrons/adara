@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+#include "EPICS.h"
 #include "SMSControl.h"
 #include "StorageManager.h"
 #include "DataSource.h"

@@ -5,6 +5,5 @@
  */
 #define epicsAssertAuthor "Dave Dillow <dad@ornl.gov>"
 #define caNetAddrSock
-#include <casdef.h>
 
 #endif /* __EPICS_H */

@@ -5,6 +5,7 @@
 
 #include <stdexcept>
 
+#include "EPICS.h"
 #include "DataSource.h"
 #include "StorageManager.h"
 
