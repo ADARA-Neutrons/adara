@@ -81,7 +81,7 @@ bool Parser::read(int fd, unsigned int max_read)
 		m_len += rc;
 
 		if (parseBuffer())
-			return true;
+			return false;
 	}
 
 	return true;

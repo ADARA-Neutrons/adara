@@ -246,11 +246,12 @@ public:
 
 	virtual ~Parser();
 
-	/* Returns false if we hit EOF, true if a callback asked to stop or
-	 * we got EAGAIN/EINTR from reading the fd. We throw exceptions
-	 * on error, but may hold those until we complete all packets
-	 * in the buffer. max_read, if non-zero, limites the amount of
-	 * maximum amount of data read and parsed from the file descriptor.
+	/* Returns false if we hit EOF or a callback asked to stop. We return
+	 * true if we got we got EAGAIN/EINTR from reading the fd. We throw
+	 * exceptions on error, but may hold those until we complete all
+	 * packets in the buffer. The max_read parameter, if non-zero,
+	 * limits the amount of maximum amount of data read and parsed
+	 * from the file descriptor.
 	 */
 	bool read(int fd, unsigned int max_read = 0);
 
