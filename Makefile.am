@@ -16,7 +16,7 @@ noinst_PROGRAMS = storage-test
 #noinst_PROGRAMS = storage-test adara-client adara-gen adara-sts
 
 smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
-		DataSource.cc ADARAParser.cc
+		DataSource.cc ADARAParser.cc LiveClient.cc LiveServer.cc
 #smsd_SOURCES = smsd.c sources.c live.c storage.c ts-client.c epics.cc smsCAS.cc smsPV.cc
 smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
 smsd_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
