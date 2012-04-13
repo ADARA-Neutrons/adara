@@ -30,6 +30,12 @@ uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
 
+/* Default implementation of notifiers is to do nothing */
+void StorageNotifier::runStart(boost::shared_ptr<StorageContainer> &c) {}
+void StorageNotifier::runEnd(boost::shared_ptr<StorageContainer> &c) {}
+void StorageNotifier::fileAdded(boost::shared_ptr<StorageFile> &f) {}
+void StorageNotifier::fileUpdated(boost::shared_ptr<StorageFile> &f) {}
+
 void StorageManager::init(const std::string &baseDir)
 {
 	struct stat stats;
@@ -49,6 +55,34 @@ void StorageManager::stop(void)
 {
 	endCurrentContainer();
 	close(m_base_fd);
+}
+
+void StorageManager::notifyRunStart(void)
+{
+	std::list<StorageNotifier *>::iterator it, next;
+
+	next = m_notifiers.begin();
+	while (next != m_notifiers.end()) {
+		/* It's possible the notifier will remove itself, so
+		 * protect against iterator invalidation.
+		 */
+		it = next++;
+		(*it)->runStart(m_cur_container);
+	}
+}
+
+void StorageManager::notifyRunEnd(void)
+{
+	std::list<StorageNotifier *>::iterator it, next;
+
+	next = m_notifiers.begin();
+	while (next != m_notifiers.end()) {
+		/* It's possible the notifier will remove itself, so
+		 * protect against iterator invalidation.
+		 */
+		it = next++;
+		(*it)->runEnd(m_cur_container);
+	}
 }
 
 void StorageManager::notifyFileAdded(void)
@@ -121,7 +155,8 @@ void StorageManager::endCurrentContainer(void)
 			       ADARA::ADARA_RUN_STATUS_NO_RUN);
 	}
 
-	/* TODO need to let STS client know about the end of this run. */
+	if (m_cur_container->runNumber())
+		notifyRunEnd();
 
 	m_cur_container.reset();
 }
@@ -129,6 +164,9 @@ void StorageManager::endCurrentContainer(void)
 void StorageManager::startRecording(uint32_t run)
 {
 	struct timespec now;
+
+	if (!run)
+		throw std::runtime_error("Invalid run number");
 
 	if (m_cur_container) {
 		if (m_cur_container->runNumber())
@@ -141,11 +179,7 @@ void StorageManager::startRecording(uint32_t run)
 	m_cur_container = boost::shared_ptr<StorageContainer>(
 				new StorageContainer(now, run));
 
-	if (run) {
-		/* TODO notify STS client of new run
-		 * XXX find a better place for this?
-		 */
-	}
+	notifyRunStart();
 }
 
 void StorageManager::stopRecording(void)

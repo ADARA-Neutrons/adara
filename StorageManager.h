@@ -14,8 +14,10 @@ class StorageContainer;
 
 class StorageNotifier {
 public:
-	virtual void fileAdded(boost::shared_ptr<StorageFile> &f) = 0;
-	virtual void fileUpdated(boost::shared_ptr<StorageFile> &f) = 0;
+	virtual void runStart(boost::shared_ptr<StorageContainer> &c);
+	virtual void runEnd(boost::shared_ptr<StorageContainer> &c);
+	virtual void fileAdded(boost::shared_ptr<StorageFile> &f);
+	virtual void fileUpdated(boost::shared_ptr<StorageFile> &f);
 };
 
 class StorageManager {
@@ -37,6 +39,8 @@ private:
 	static void endCurrentFile(ADARA::RunStatus status);
 	static void endCurrentContainer(void);
 
+	static void notifyRunStart(void);
+	static void notifyRunEnd(void);
 	static void notifyFileAdded(void);
 	static void notifyFileUpdated(void);
 
