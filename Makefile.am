@@ -17,7 +17,8 @@ smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
 		SMSControl.cc SMSControlPV.cc SignalEvents.cc
 smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
 smsd_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
-smsd_LDADD = $(EPICS_LIBS) -lpthread
+smsd_LDADD = $(EPICS_LIBS) -lboost_signals -lpthread
 
 storage_test_SOURCES = storage-test.cc StorageManager.cc \
 		StorageContainer.cc StorageFile.cc
+storage_test_LDADD = -lboost_signals

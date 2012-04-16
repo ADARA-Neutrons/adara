@@ -21,20 +21,13 @@ struct header {
 
 int StorageManager::m_base_fd = -1;
 
-boost::shared_ptr<StorageFile> StorageManager::m_cur_file;
 boost::shared_ptr<StorageContainer> StorageManager::m_cur_container;
 
-std::list<StorageNotifier *> StorageManager::m_notifiers;
+StorageManager::onContChange StorageManager::m_contChange;
 
 uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
-
-/* Default implementation of notifiers is to do nothing */
-void StorageNotifier::runStart(boost::shared_ptr<StorageContainer> &c) {}
-void StorageNotifier::runEnd(boost::shared_ptr<StorageContainer> &c) {}
-void StorageNotifier::fileAdded(boost::shared_ptr<StorageFile> &f) {}
-void StorageNotifier::fileUpdated(boost::shared_ptr<StorageFile> &f) {}
 
 void StorageManager::init(const std::string &baseDir)
 {
@@ -57,91 +50,16 @@ void StorageManager::stop(void)
 	close(m_base_fd);
 }
 
-void StorageManager::notifyRunStart(void)
-{
-	std::list<StorageNotifier *>::iterator it, next;
-
-	next = m_notifiers.begin();
-	while (next != m_notifiers.end()) {
-		/* It's possible the notifier will remove itself, so
-		 * protect against iterator invalidation.
-		 */
-		it = next++;
-		(*it)->runStart(m_cur_container);
-	}
-}
-
-void StorageManager::notifyRunEnd(void)
-{
-	std::list<StorageNotifier *>::iterator it, next;
-
-	next = m_notifiers.begin();
-	while (next != m_notifiers.end()) {
-		/* It's possible the notifier will remove itself, so
-		 * protect against iterator invalidation.
-		 */
-		it = next++;
-		(*it)->runEnd(m_cur_container);
-	}
-}
-
-void StorageManager::notifyFileAdded(void)
-{
-	std::list<StorageNotifier *>::iterator it, next;
-
-	next = m_notifiers.begin();
-	while (next != m_notifiers.end()) {
-		/* It's possible the notifier will remove itself, so
-		 * protect against iterator invalidation.
-		 */
-		it = next++;
-		(*it)->fileAdded(m_cur_file);
-	}
-}
-
-void StorageManager::notifyFileUpdated(void)
-{
-	std::list<StorageNotifier *>::iterator it, next;
-
-	next = m_notifiers.begin();
-	while (next != m_notifiers.end()) {
-		/* It's possible the notifier will remove itself, so
-		 * protect against iterator invalidation.
-		 */
-		it = next++;
-		(*it)->fileUpdated(m_cur_file);
-	}
-}
-
-boost::shared_ptr<StorageFile> &StorageManager::subscribe(StorageNotifier *n)
-{
-	m_notifiers.push_back(n);
-	return m_cur_file;
-}
-
-void StorageManager::unsubscribe(StorageNotifier *n)
-{
-	m_notifiers.remove(n);
-}
-
-void StorageManager::endCurrentFile(ADARA::RunStatus status)
+void StorageManager::addBaseStorage(off_t size)
 {
 	off_t blocks;
 
-	if (!m_cur_file)
-		return;
-
-	m_cur_file->terminate(status);
-
-	blocks = m_cur_file->size() + m_block_size - 1;
+	/* Now that the file is no longer being written to, we can add
+	 * account for its use of blocks
+	 */
+	blocks = size + m_block_size - 1;
 	blocks /= m_block_size;
 	m_blocks_used += blocks;
-
-	/* Let clients know about the final update to this file before
-	 * we drop our reference
-	 */
-	notifyFileUpdated();
-	m_cur_file.reset();
 }
 
 void StorageManager::endCurrentContainer(void)
@@ -149,15 +67,8 @@ void StorageManager::endCurrentContainer(void)
 	if (!m_cur_container)
 		return;
 
-	if (m_cur_file) {
-		endCurrentFile(m_cur_container->runNumber() ?
-			       ADARA::ADARA_RUN_STATUS_END_RUN :
-			       ADARA::ADARA_RUN_STATUS_NO_RUN);
-	}
-
-	if (m_cur_container->runNumber())
-		notifyRunEnd();
-
+	m_cur_container->terminate();
+	m_contChange(m_cur_container, false);
 	m_cur_container.reset();
 }
 
@@ -179,7 +90,7 @@ void StorageManager::startRecording(uint32_t run)
 	m_cur_container = boost::shared_ptr<StorageContainer>(
 				new StorageContainer(now, run));
 
-	notifyRunStart();
+	m_contChange(m_cur_container, true);
 }
 
 void StorageManager::stopRecording(void)
@@ -190,11 +101,33 @@ void StorageManager::stopRecording(void)
 void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 {
 	struct header *hdr = (struct header *) pkt;
-	off_t blocks;
+	off_t size, blocks;
 
 	if (len < sizeof(*hdr))
 		throw std::runtime_error("Packet too small");
 
+	if (!m_cur_container) {
+		/* We're not in a run, as we'd already have a container. */
+		struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
+		m_cur_container = boost::shared_ptr<StorageContainer>(
+					new StorageContainer(ts, 0));
+		m_contChange(m_cur_container, true);
+	}
+
+	size = m_cur_container->write(pkt, len, notify);
+
+	/* Is it time to initiate a purge of old data?
+	 *
+	 * m_blocks_used contains the size of all of our closed files,
+	 * and we don't add the current file until we're done with it.
+	 */
+	blocks = size + m_block_size - 1;
+	blocks /= m_block_size;
+	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
+		/* TODO start a purge of the storage pool */
+	}
+
+#if 0
 	/* We don't immediately close a file when we exceed the size limit
 	 * in order to avoid creating a new file just for the end-of-run
 	 * marker. Instead, we wait for the run to start or the next packet
@@ -258,4 +191,5 @@ void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 
 		notifyFileUpdated();
 	}
+#endif
 }

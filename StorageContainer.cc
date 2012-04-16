@@ -9,13 +9,14 @@
 
 #include "StorageContainer.h"
 #include "StorageManager.h"
+#include "StorageFile.h"
 #include "ADARA.h"
 
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
 
 StorageContainer::StorageContainer(const struct timespec &start,
 				   uint32_t run) :
-	m_startTime(start), m_runNumber(run)
+	m_startTime(start), m_runNumber(run), m_numFiles(0)
 {
 	char path[64];
 	struct tm tm;
@@ -53,4 +54,45 @@ StorageContainer::StorageContainer(const std::string &name)
 	 * directory and count the number of files in it.
 	 */
 	throw std::runtime_error("not implemented");
+}
+
+void StorageContainer::terminateFile(void)
+{
+	m_cur_file->terminate(m_runNumber ?  ADARA::ADARA_RUN_STATUS_END_RUN :
+					     ADARA::ADARA_RUN_STATUS_NO_RUN);
+	StorageManager::addBaseStorage(m_cur_file->size());
+	m_cur_file.reset();
+}
+
+off_t StorageContainer::write(const void *data, uint32_t count, bool notify)
+{
+	/* We don't immediately close a file when we exceed the size limit
+	 * in order to avoid creating a new file just for the end-of-run
+	 * marker. Instead, we wait for the run to start or the next packet
+	 * to be written (and clients notified).
+	 */
+	if (m_cur_file && m_cur_file->oversize())
+		terminateFile();
+
+	if (!m_cur_file) {
+		ADARA::RunStatus status = ADARA::ADARA_RUN_STATUS_NO_RUN;
+
+		if (m_runNumber) {
+			status = ADARA::ADARA_RUN_STATUS_NEW_RUN;
+			if (m_numFiles)
+				status = ADARA::ADARA_RUN_STATUS_RUN_BOF;
+		}
+
+		m_cur_file.reset(new StorageFile(*this, ++m_numFiles,
+						 true, status));
+		m_newFile(m_cur_file);
+	}
+
+	return m_cur_file->write(data, count, notify);
+}
+
+void StorageContainer::terminate(void)
+{
+	if (m_cur_file)
+		terminateFile();
 }

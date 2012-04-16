@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -36,8 +35,10 @@ struct run_status_packet {
 	uint32_t	status_number;
 } __attribute__((packed));
 
-off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
-off_t StorageFile::m_max_file_size = 100 * 1024 * 1024;
+//off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
+//off_t StorageFile::m_max_file_size = 100 * 1024 * 1024;
+off_t StorageFile::m_max_sync_distance = 256 * 1024;
+off_t StorageFile::m_max_file_size = 1024 * 1024;
 
 StorageFile::~StorageFile()
 {
@@ -47,8 +48,8 @@ StorageFile::~StorageFile()
 
 int StorageFile::get_fd(void)
 {
-	if (m_fd_refs) {
-		m_fd_refs++;
+	if (m_fdRefs) {
+		m_fdRefs++;
 		return m_fd;
 	}
 
@@ -61,46 +62,45 @@ void StorageFile::put_fd(void)
 	//TODO C++ way for this?
 	//assert(m_fd_refs);
 
-	m_fd_refs--;
-	if (!m_fd_refs) {
+	m_fdRefs--;
+	if (!m_fdRefs) {
 		::close(m_fd);
 		m_fd = -1;
 	}
 }
 
-void StorageFile::open(int flags)
+void StorageFile::makePath(const StorageContainer &c)
 {
-	std::string path;
-	char name[8];
-	uint64_t run;
+	char name[16];
 
-	//assert(m_fd < 0 && !m_fd_refs);
+	m_path = c.name();
 
-	path = m_container->name();
+	snprintf(name, sizeof(name), "/f%05u", m_fileNumber);
+	m_path += name;
 
-	snprintf(name, sizeof(name), "/f%05u", m_file_number);
-	path += name;
-
-	run = m_container->runNumber();
-	if (run) {
+	if (m_runNumber) {
 		char postfix[32];
 
 		/* 25 chars max */
-		snprintf(postfix, sizeof(postfix), "-run-%lu", run);
-		path += postfix;
+		snprintf(postfix, sizeof(postfix), "-run-%u", m_runNumber);
+		m_path += postfix;
 	}
 
 	/* +6 chars, maximum size is 38 incl NULL */
-	path += ".adara";
+	m_path += ".adara";
+}
 
-	m_fd = openat(StorageManager::base_fd(), path.c_str(), flags, 0660);
+void StorageFile::open(int flags)
+{
+	//assert(m_fd < 0 && !m_fd_refs);
+	m_fd = openat(StorageManager::base_fd(), m_path.c_str(), flags, 0660);
 	if (m_fd < 0)
 		throw ADARA::Exception(errno, "StorageFile::open");
 
-	m_fd_refs = 1;
+	m_fdRefs = 1;
 }
 
-void StorageFile::add_sync(void)
+void StorageFile::addSync(void)
 {
 	struct sync_packet sync = {
 		hdr : {
@@ -125,12 +125,12 @@ void StorageFile::add_sync(void)
 			if (errno == EINTR)
 				continue;
 
-			throw ADARA::Exception(errno, "StorageFile add_sync");
+			throw ADARA::Exception(errno, "StorageFile addSync");
 		}
 
 		/* XXX This should not be possible */
 		if (!rc)
-			throw ADARA::Exception(0, "StorageFile add_sync");
+			throw ADARA::Exception(0, "StorageFile addSync");
 
 		m_size += rc;
 		p += rc;
@@ -139,10 +139,10 @@ void StorageFile::add_sync(void)
 	/* We want to try to keep sync packets as close to a multiple of
 	 * the desired distance as possible.
 	 */
-	m_sync_distance %= m_max_sync_distance;
+	m_syncDistance %= m_max_sync_distance;
 }
 
-void StorageFile::add_run_status(ADARA::RunStatus status)
+void StorageFile::addRunStatus(ADARA::RunStatus status)
 {
 	struct run_status_packet spkt = {
 		hdr : {
@@ -156,15 +156,15 @@ void StorageFile::add_run_status(ADARA::RunStatus status)
 	spkt.hdr.ts_sec = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	spkt.hdr.ts_nsec = now.tv_nsec;
 
-	spkt.run_number = m_container->runNumber();
-	if (m_container->runNumber())
-		spkt.run_start = m_container->startTime().tv_sec;
-	spkt.status_number = m_file_number | ((uint32_t) status << 24);
+	spkt.run_number = m_runNumber;
+	if (m_runNumber)
+		spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
 
-	write(&spkt, sizeof(spkt));
+	write(&spkt, sizeof(spkt), false);
 }
 
-void StorageFile::write(const void *data, uint32_t count)
+off_t StorageFile::write(const void *data, uint32_t count, bool notify)
 {
 	uint8_t *p = (uint8_t *) data;
 	int rc;
@@ -182,14 +182,32 @@ void StorageFile::write(const void *data, uint32_t count)
 		if (!rc)
 			throw ADARA::Exception(0, "StorageFile write");
 
-		m_sync_distance += rc;
+		m_syncDistance += rc;
 		m_size += rc;
 		p += rc;
 		count -= rc;
 	}
 
-	if (m_sync_distance >= m_max_sync_distance)
-		add_sync();
+	/* We want the final run status to be the last packet in the file,
+	 * so don't add a sync packet if we're no longer active.
+	 */
+	if (m_syncDistance >= m_max_sync_distance && m_active)
+		addSync();
+
+	/* We don't check the file size unless we're notifying subscribers --
+	 * this keeps all of the data for a pulse in the same file. We also
+	 * don't want to just end the file here, as we may be instructed
+	 * to stop recording before more data comes in, and we don't want
+	 * to have a file that's only contents are the "I'm done" indication.
+	 */
+	if (notify) {
+		if (m_size >= m_max_file_size)
+			m_oversize = true;
+
+		m_update(*this);
+	}
+
+	return m_size;
 }
 
 void StorageFile::terminate(ADARA::RunStatus status)
@@ -197,19 +215,22 @@ void StorageFile::terminate(ADARA::RunStatus status)
 	/* Disable the generation of a sync packet as we're closing out
 	 * the file and want the run status to be the last packet.
 	 */
-	m_sync_distance = 0;
+	m_syncDistance = 0;
 	m_active = false;
 
-	add_run_status(status);
+	addRunStatus(status);
+	m_update(*this);
 	put_fd();
 }
 
-StorageFile::StorageFile(boost::shared_ptr<StorageContainer> &container,
-			 uint32_t number, bool create,
+StorageFile::StorageFile(const StorageContainer &container,
+			 uint32_t fileNumber, bool create,
 			 ADARA::RunStatus status) :
-	m_container(container), m_oversize(false), m_active(create), m_size(0),
-	m_file_number(number), m_fd(-1)
+	m_runNumber(container.runNumber()), m_fileNumber(fileNumber),
+	m_startTime(container.startTime().tv_sec), m_oversize(false),
+	m_active(create), m_size(0), m_syncDistance(0), m_fd(-1)
 {
+	makePath(container);
 	if (!create) {
 		struct stat statbuf;
 		int rc;
@@ -228,6 +249,6 @@ StorageFile::StorageFile(boost::shared_ptr<StorageContainer> &container,
 	}
 
 	open(O_CREAT|O_EXCL|O_RDWR);
-	add_sync();
-	add_run_status(status);
+	addSync();
+	addRunStatus(status);
 }

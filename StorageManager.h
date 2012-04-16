@@ -3,25 +3,20 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
+#include <boost/signal.hpp>
 #include <stdint.h>
 #include <string>
-#include <list>
 
 #include "ADARA.h"
 
 class StorageFile;
 class StorageContainer;
 
-class StorageNotifier {
-public:
-	virtual void runStart(boost::shared_ptr<StorageContainer> &c);
-	virtual void runEnd(boost::shared_ptr<StorageContainer> &c);
-	virtual void fileAdded(boost::shared_ptr<StorageFile> &f);
-	virtual void fileUpdated(boost::shared_ptr<StorageFile> &f);
-};
-
 class StorageManager {
 public:
+	typedef boost::shared_ptr<StorageContainer> ContainerSharedPtr;
+	typedef boost::signal<void (ContainerSharedPtr &, bool)> onContChange;
+
 	static void init(const std::string &baseDir);
 	static void stop(void);
 
@@ -32,27 +27,29 @@ public:
 			      bool notify = true);
 	static int base_fd() { return m_base_fd; }
 
-	static boost::shared_ptr<StorageFile> &subscribe(StorageNotifier *);
-	static void unsubscribe(StorageNotifier *);
+	static boost::signals::connection connect(
+					const onContChange::slot_type &s) {
+		return m_contChange.connect(s);
+	}
+
+	static ContainerSharedPtr &container (void) { return m_cur_container; }
 
 private:
-	static void endCurrentFile(ADARA::RunStatus status);
-	static void endCurrentContainer(void);
-
-	static void notifyRunStart(void);
-	static void notifyRunEnd(void);
-	static void notifyFileAdded(void);
-	static void notifyFileUpdated(void);
-
 	static int m_base_fd;
-	static boost::shared_ptr<StorageFile> m_cur_file;
-	static boost::shared_ptr<StorageContainer> m_cur_container;
-
-	static std::list<StorageNotifier *> m_notifiers;
 
 	static uint32_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
+
+	static boost::shared_ptr<StorageContainer> m_cur_container;
+
+	static onContChange m_contChange;
+
+	static void addBaseStorage(off_t size);
+
+	static void endCurrentContainer(void);
+
+	friend class StorageContainer;
 };
 
 #endif /* __STORAGE_MANAGER_H */

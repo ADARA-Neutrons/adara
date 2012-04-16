@@ -35,10 +35,11 @@ LiveClient::LiveClient(int fd) :
 
 LiveClient::~LiveClient()
 {
-	StorageManager::unsubscribe(this);
-	delete (m_read);
-	if (m_write)
-		delete m_write;
+	m_mgrConnection.disconnect();
+	m_contConnection.disconnect();
+	m_fileConnection.disconnect();
+	delete m_read;
+	delete m_write;
 	close(m_client_fd);
 	if (m_file_fd != -1)
 		m_files.front()->put_fd();
@@ -125,26 +126,42 @@ more:
 				boost::bind(&LiveClient::writable, this));
 }
 
-void LiveClient::fileAdded(boost::shared_ptr<StorageFile> &f)
+void LiveClient::containerChange(StorageManager::ContainerSharedPtr &c,
+				 bool starting)
+{
+	if (starting)
+		m_contConnection = c->connect(
+				boost::bind(&LiveClient::fileAdded, this, _1));
+	else
+		m_contConnection.disconnect();
+}
+
+void LiveClient::fileAdded(StorageContainer::FileSharedPtr &f)
 {
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
 	m_files.push_back(f);
+	m_fileConnection = f->connect(boost::bind(&LiveClient::fileUpdated,
+						  this, _1));
 }
 
-void LiveClient::fileUpdated(boost::shared_ptr<StorageFile> &f)
+void LiveClient::fileUpdated(const StorageFile &f)
 {
 	/* The current file just got updated; if we're not already waiting
 	 * for buffer space in the socket, try to send the new data
 	 */
 	if (!m_write)
 		writable();
+
+	if (!f.active())
+		m_fileConnection.disconnect();
 }
 
 void LiveClient::readable(void)
 {
+	/* TODO protect against invalid packets from clients */
 	if (!read(m_client_fd, MAX_PKT_SIZE)) {
 		/* EOF or our handlers indicated it was time to stop, so
 		 * kill ourselves off. We can't do this from the handlers,
@@ -181,20 +198,34 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 
 bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 {
-	boost::shared_ptr<StorageFile> cur_file;
+	StorageManager::ContainerSharedPtr cur_cont;
+	StorageContainer::FileSharedPtr cur_file;
 
 	/* TODO setup replay of historical data */
 	m_timer->cancel();
 	m_hello_received = true;
 
-	cur_file = StorageManager::subscribe(this);
-	if (cur_file) {
-		/* TODO send current state of the system (ie, pixel map,
-		 * runinfo, environment setup, etc) to the client
-		 * before we send event data.
-		 */
-		m_files.push_back(cur_file);
-		m_cur_offset = cur_file->size();
+	m_mgrConnection = StorageManager::connect(
+		boost::bind(&LiveClient::containerChange, this, _1, _2));
+
+	/* TODO send current state of the system (ie, pixel map,
+	 * runinfo, environment setup, etc) to the client
+	 * before we send event data.
+	 */
+
+	cur_cont = StorageManager::container();
+	if (cur_cont) {
+		m_contConnection = cur_cont->connect(
+				boost::bind(&LiveClient::fileAdded, this, _1));
+		cur_file = cur_cont->file();
+		if (cur_file) {
+			m_fileConnection = cur_file->connect(
+					boost::bind(&LiveClient::fileUpdated,
+						    this, _1));
+			m_files.push_back(cur_file);
+			m_cur_offset = cur_file->size();
+		}
 	}
+
 	return false;
 }

@@ -6,18 +6,19 @@
 
 #include "ADARAParser.h"
 #include "StorageManager.h"
+#include "StorageContainer.h"
+#include "StorageFile.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
-class LiveClient : public StorageNotifier, ADARA::Parser {
+class LiveClient : public ADARA::Parser {
 public:
 	LiveClient(int fd);
 	~LiveClient();
 
-	void fileAdded(boost::shared_ptr<StorageFile> &f);
-	void fileUpdated(boost::shared_ptr<StorageFile> &f);
-
 private:
+	typedef boost::signals::connection connection;
+
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
 	bool m_hello_received;
@@ -25,6 +26,13 @@ private:
 	int m_client_fd;
 	int m_file_fd;
 	TimerAdapter<LiveClient> *m_timer;
+	connection m_mgrConnection;
+	connection m_contConnection;
+	connection m_fileConnection;
+
+	void containerChange(StorageManager::ContainerSharedPtr &, bool);
+	void fileAdded(StorageContainer::FileSharedPtr &f);
+	void fileUpdated(const StorageFile &f);
 
 	void writable(void);
 	void readable(void);
@@ -37,7 +45,7 @@ private:
 
 	bool rxPacket(const ADARA::ClientHelloPkt &pkt);
 
-	std::list<boost::shared_ptr<StorageFile> > m_files;
+	std::list<StorageContainer::FileSharedPtr> m_files;
 
 	static unsigned int m_max_send_chunk;
 	static double m_hello_timeout;
