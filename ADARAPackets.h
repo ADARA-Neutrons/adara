@@ -64,9 +64,30 @@ private:
 class RawDataPkt : public Packet {
 public:
 	RawDataPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+
+	uint32_t sourceID(void) const { return m_fields[0]; }
+	bool endOfPulse(void) const { return !!(m_fields[1] & 0x8000000); }
+	uint16_t pktSeq(void) const { return (m_fields[1] >> 16) & 0x7fff; }
+	uint16_t dspSeq(void) const { return m_fields[1] & 0x7fff; }
+	PulseFlavor::Enum flavor(void) const {
+		return static_cast<PulseFlavor::Enum>
+						((m_fields[2] >> 24) & 0x7);
+	}
+	uint32_t pulseCharge(void) const { return m_fields[2] & 0x00ffffff; }
+	bool badVeto(void) const { return !!(m_fields[3] & 0x8000000); }
+	bool badCycle(void) const { return !!(m_fields[3] & 0x40000000); }
+	uint8_t timingStatus(void) const { return m_fields[3] >> 22; }
+	uint16_t veto(void) const { return (m_fields[3] >> 10) & 0xfff; }
+	uint16_t cycle(void) const { return m_fields[3] &0x3ff; }
+	uint32_t intraPulseTime(void) const { return m_fields[4]; }
+	bool rawTOF(void) const { return !!(m_fields[5] & 0x80000000); }
+	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
+
+	// TODO implment event accessors
 
 private:
+	uint32_t *m_fields;
+
 	RawDataPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -74,10 +95,28 @@ private:
 
 class RTDLPkt : public Packet {
 public:
-	RTDLPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	RTDLPkt(const RTDLPkt &pkt);
+
+	PulseFlavor::Enum flavor(void) const {
+		return static_cast<PulseFlavor::Enum>
+						((m_fields[0] >> 24) & 0x7);
+	}
+	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
+	bool badVeto(void) const { return !!(m_fields[1] & 0x8000000); }
+	bool badCycle(void) const { return !!(m_fields[1] & 0x40000000); }
+	uint8_t timingStatus(void) const { return m_fields[1] >> 22; }
+	uint16_t veto(void) const { return (m_fields[1] >> 10) & 0xfff; }
+	uint16_t cycle(void) const { return m_fields[1] &0x3ff; }
+	uint32_t intraPulseTime(void) const { return m_fields[2]; }
+	bool rawTOF(void) const { return !!(m_fields[3] & 0x80000000); }
+	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
+	uint32_t ringPeriod(void) const { return m_fields[4]; }
+
+	// TODO implement accessor for optional fields
 
 private:
+	uint32_t *m_fields;
+
 	RTDLPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -85,10 +124,19 @@ private:
 
 class BankedEventPkt : public Packet {
 public:
-	BankedEventPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	BankedEventPkt(const BankedEventPkt &pkt);
+
+	uint32_t pulseCharge(void) const { return m_fields[0]; }
+	uint32_t pulseEnergy(void) const { return m_fields[1]; }
+	uint32_t ringPeriod(void) const { return m_fields[2]; }
+	uint32_t cycle(void) const { return m_fields[3]; }
+	uint32_t flags(void) const { return m_fields[4]; }
+
+	// TODO implment bank/event accessors
 
 private:
+	uint32_t *m_fields;
+
 	BankedEventPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -96,10 +144,19 @@ private:
 
 class BeamMonitorPkt : public Packet {
 public:
-	BeamMonitorPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	BeamMonitorPkt(const BeamMonitorPkt &pkt);
+
+	uint32_t pulseCharge(void) const { return m_fields[0]; }
+	uint32_t pulseEnergy(void) const { return m_fields[1]; }
+	uint32_t ringPeriod(void) const { return m_fields[2]; }
+	uint32_t cycle(void) const { return m_fields[3]; }
+	uint32_t flags(void) const { return m_fields[4]; }
+
+	// TODO implment monitor/event accessors
 
 private:
+	uint32_t *m_fields;
+
 	BeamMonitorPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -107,7 +164,7 @@ private:
 
 class PixelMappingPkt : public Packet {
 public:
-	PixelMappingPkt(const RawDataPkt &pkt);
+	PixelMappingPkt(const PixelMappingPkt &pkt);
 	// TODO implement accessors for fields
 
 private:
@@ -118,10 +175,18 @@ private:
 
 class RunStatusPkt : public Packet {
 public:
-	RunStatusPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	RunStatusPkt(const RunStatusPkt &pkt);
+
+	uint32_t runNumber(void) const { return m_fields[0]; }
+	uint32_t runStart(void) const { return m_fields[1]; }
+	uint32_t fileNumber(void) const { return m_fields[2] & 0xffffff; }
+	RunStatus status(void) const {
+		return static_cast<RunStatus>(m_fields[2] >> 24);
+	}
 
 private:
+	uint32_t *m_fields;
+
 	RunStatusPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -129,10 +194,13 @@ private:
 
 class RunInfoPkt : public Packet {
 public:
-	RunInfoPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	RunInfoPkt(const RunInfoPkt &pkt);
+
+	const std::string &info(void) const { return m_xml; }
 
 private:
+	std::string m_xml;
+
 	RunInfoPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -140,10 +208,15 @@ private:
 
 class TransCompletePkt : public Packet {
 public:
-	TransCompletePkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	TransCompletePkt(const TransCompletePkt &pkt);
+
+	uint16_t status(void) const { return m_status; }
+	const std::string &reason(void) const { return m_reason; }
 
 private:
+	uint16_t m_status;
+	std::string m_reason;
+
 	TransCompletePkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -151,10 +224,13 @@ private:
 
 class ClientHelloPkt : public Packet {
 public:
-	ClientHelloPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	ClientHelloPkt(const ClientHelloPkt &pkt);
+
+	uint32_t requestedStartTime(void) const { return m_reqStart; }
 
 private:
+	uint32_t m_reqStart;
+
 	ClientHelloPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -162,8 +238,7 @@ private:
 
 class StatsResetPkt : public Packet {
 public:
-	StatsResetPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	StatsResetPkt(const StatsResetPkt &pkt);
 
 private:
 	StatsResetPkt(const uint8_t *data, uint32_t len);
@@ -173,7 +248,7 @@ private:
 
 class SyncPkt : public Packet {
 public:
-	SyncPkt(const RawDataPkt &pkt);
+	SyncPkt(const SyncPkt &pkt);
 	// TODO implement accessors for fields
 
 private:
@@ -184,8 +259,7 @@ private:
 
 class HeartbeatPkt : public Packet {
 public:
-	HeartbeatPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	HeartbeatPkt(const HeartbeatPkt &pkt);
 
 private:
 	HeartbeatPkt(const uint8_t *data, uint32_t len);
@@ -195,10 +269,15 @@ private:
 
 class DeviceDescriptorPkt : public Packet {
 public:
-	DeviceDescriptorPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt);
+
+	uint32_t devId(void) const { return m_devId; }
+	const std::string &description(void) const { return m_desc; }
 
 private:
+	uint32_t m_devId;
+	std::string m_desc;
+
 	DeviceDescriptorPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -206,10 +285,22 @@ private:
 
 class VariableU32Pkt : public Packet {
 public:
-	VariableU32Pkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	VariableU32Pkt(const VariableU32Pkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	uint32_t value(void) const { return m_fields[3]; }
 
 private:
+	uint32_t *m_fields;
+
 	VariableU32Pkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -217,10 +308,22 @@ private:
 
 class VariableDoublePkt : public Packet {
 public:
-	VariableDoublePkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	VariableDoublePkt(const VariableDoublePkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	double value(void) const { return *(double *) &m_fields[3]; }
 
 private:
+	uint32_t *m_fields;
+
 	VariableDoublePkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
@@ -228,10 +331,23 @@ private:
 
 class VariableStringPkt : public Packet {
 public:
-	VariableStringPkt(const RawDataPkt &pkt);
-	// TODO implement accessors for fields
+	VariableStringPkt(const VariableStringPkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+						(m_fields[2] & 0xffff);
+	}
+	const std::string &value(void) const { return m_val; }
 
 private:
+	uint32_t *m_fields;
+	std::string m_val;
+
 	VariableStringPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;

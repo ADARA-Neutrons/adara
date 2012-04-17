@@ -1,21 +1,10 @@
-#include "ADARAParser.h"
-
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
 
+#include "ADARAParser.h"
+
 using namespace ADARA;
-
-Exception::Exception(int err) : m_error(err)
-{
-	char *msg, buf[256];
-
-	/* We use the GNU version of strerror_r(). If _GNU_SOURCE isn't
-	 * defined, this returns an int and the compiler will complain.
-	 */
-	msg = strerror_r(err, buf, sizeof(buf));
-	m_msg = msg;
-}
 
 /* ------------------------------------------------------------------------ */
 
@@ -49,7 +38,10 @@ bool Parser::read(int fd, unsigned int max_read)
 						errno == EWOULDBLOCK)
 				return true;
 
-			throw Exception(errno);
+			int err = errno;
+			std::string msg("Parser::read(): ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
 		}
 
 		if (rc == 0)
@@ -89,10 +81,9 @@ bool Parser::parseBuffer(void)
 	while (!stopped && m_len > PacketHeader::header_length()) {
 		PacketHeader hdr(p);
 
-		if (hdr.payload_length() % 4) {
-			throw Exception(EINVAL,
-					"Payload length not multiple of 4");
-		}
+		if (hdr.payload_length() % 4)
+			throw invalid_packet("Payload length not "
+					     "multiple of 4");
 
 		if (m_max_size < hdr.packet_length()) {
 			/* This packet is over the maximum limit; we'll
