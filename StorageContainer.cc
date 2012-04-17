@@ -16,7 +16,7 @@
 
 StorageContainer::StorageContainer(const struct timespec &start,
 				   uint32_t run) :
-	m_startTime(start), m_runNumber(run), m_numFiles(0)
+	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true)
 {
 	char path[64];
 	struct tm tm;
@@ -85,6 +85,7 @@ off_t StorageContainer::write(const void *data, uint32_t count, bool notify)
 
 		m_cur_file.reset(new StorageFile(*this, ++m_numFiles,
 						 true, status));
+		m_files.push_back(m_cur_file);
 		m_newFile(m_cur_file);
 	}
 
@@ -93,6 +94,22 @@ off_t StorageContainer::write(const void *data, uint32_t count, bool notify)
 
 void StorageContainer::terminate(void)
 {
+	m_active = false;
 	if (m_cur_file)
 		terminateFile();
+}
+
+void StorageContainer::getFiles(std::list<FileSharedPtr> &list)
+{
+	if (m_active || !m_files.empty()) {
+		/* We've already loaded the list of files from disk, or
+		 * we're currently active, so we can just copy our list
+		 * into the caller's.
+		 */
+		list = m_files;
+		return;
+	}
+
+	/* TODO load files from disk */
+	throw std::runtime_error("not implemented");
 }

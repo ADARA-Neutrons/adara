@@ -20,13 +20,15 @@ public:
 	uint32_t numFiles (void) const { return m_numFiles; }
 	const std::string &name(void) const { return m_name; }
 
-	bool active(void) const { return m_cur_file; }
+	bool active(void) const { return m_active; }
 
 	boost::signals::connection connect(const onNewFile::slot_type &slot) {
 		return m_newFile.connect(slot);
 	}
 
 	FileSharedPtr &file(void) { return m_cur_file; }
+
+	void getFiles(std::list<FileSharedPtr> &list);
 
 private:
 	struct timespec m_startTime;
@@ -35,6 +37,9 @@ private:
 	std::string m_name;
 	FileSharedPtr m_cur_file;
 	onNewFile m_newFile;
+	bool m_active;
+
+	std::list<FileSharedPtr> m_files;
 
 	StorageContainer(const struct timespec &start, uint32_t run);
 	StorageContainer(const std::string &name);
