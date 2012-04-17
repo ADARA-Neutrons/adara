@@ -13,7 +13,8 @@ bin_PROGRAMS = smsd
 noinst_PROGRAMS = storage-test
 
 smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
-		DataSource.cc ADARAParser.cc LiveClient.cc LiveServer.cc \
+		DataSource.cc ADARAPackets.cc ADARAParser.cc \
+		LiveClient.cc LiveServer.cc \
 		SMSControl.cc SMSControlPV.cc SignalEvents.cc \
 		STSClient.cc STSClientMgr.cc
 smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
