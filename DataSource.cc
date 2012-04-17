@@ -152,6 +152,8 @@ void DataSource::startConnect(void)
 		m_state = ACTIVE;
 	}
 
+	/* TODO handle any other error here */
+
 	try {
 		/* We won't notice that the connect completed until we get
 		 * the first packet from the source unless we look for the
