@@ -216,7 +216,7 @@ void DataSource::dataReady(void)
 	try {
 		if (!read(m_fd, m_max_read_chunk))
 			connectionFailed();
-	} catch (ADARA::Exception) {
+	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		connectionFailed();
 	}

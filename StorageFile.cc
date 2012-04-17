@@ -94,8 +94,12 @@ void StorageFile::open(int flags)
 {
 	//assert(m_fd < 0 && !m_fd_refs);
 	m_fd = openat(StorageManager::base_fd(), m_path.c_str(), flags, 0660);
-	if (m_fd < 0)
-		throw ADARA::Exception(errno, "StorageFile::open");
+	if (m_fd < 0) {
+		int err = errno;
+		std::string msg("StorageFile::open() openat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
 
 	m_fdRefs = 1;
 }
@@ -121,16 +125,15 @@ void StorageFile::addSync(void)
 
 	for (len = sizeof(sync); len; len -= rc) {
 		rc = ::write(m_fd, p, len);
-		if (rc < 0) {
+		if (rc <= 0) {
 			if (errno == EINTR)
 				continue;
 
-			throw ADARA::Exception(errno, "StorageFile addSync");
+			int err = errno;
+			std::string msg("StorageFile::addSync() write error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
 		}
-
-		/* XXX This should not be possible */
-		if (!rc)
-			throw ADARA::Exception(0, "StorageFile addSync");
 
 		m_size += rc;
 		p += rc;
@@ -171,16 +174,15 @@ off_t StorageFile::write(const void *data, uint32_t count, bool notify)
 
 	while (count) {
 		rc = ::write(m_fd, p, count);
-		if (rc < 0) {
+		if (rc <= 0) {
 			if (errno == EINTR)
 				continue;
 
-			throw ADARA::Exception(errno, "StorageFile write");
+			int err = errno;
+			std::string msg("StorageFile::write() error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
 		}
-
-		/* XXX This should not be possible */
-		if (!rc)
-			throw ADARA::Exception(0, "StorageFile write");
 
 		m_syncDistance += rc;
 		m_size += rc;
@@ -241,8 +243,13 @@ StorageFile::StorageFile(const StorageContainer &container,
 			rc = errno;
 		put_fd();
 
-		if (rc)
-			throw ADARA::Exception(rc, "StorageFile::StorageFile stat");
+		if (rc) {
+			int err = errno;
+			std::string msg("StorageFile::StorageFile()"
+					" stat error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
 
 		m_size = statbuf.st_size;
 		return;

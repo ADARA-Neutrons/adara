@@ -33,13 +33,21 @@ void StorageManager::init(const std::string &baseDir)
 {
 	struct stat stats;
 
-	if (stat(baseDir.c_str(), &stats))
-		throw ADARA::Exception(errno, "StorageManager::init");
+	if (stat(baseDir.c_str(), &stats)) {
+		int err = errno;
+		std::string msg("StorageManager::init() stat() error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
 
 	m_block_size = stats.st_blksize;
 	m_base_fd = open(baseDir.c_str(), O_RDONLY | O_DIRECTORY);
-	if (m_base_fd < 0)
-		throw ADARA::Exception(errno, "StorageManager::init");
+	if (m_base_fd < 0) {
+		int err = errno;
+		std::string msg("StorageManager::init() open() error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
 
 	/* TODO kick off background scan */
 }

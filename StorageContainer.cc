@@ -22,17 +22,25 @@ StorageContainer::StorageContainer(const struct timespec &start,
 	struct tm tm;
 
 	if (!gmtime_r(&m_startTime.tv_sec, &tm))
-		throw ADARA::Exception(ERANGE, "StorageContainer gmtime_r");
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " gmtime_r failed");
 
 	if (!strftime(path, sizeof(path), "%Y%m%d", &tm))
-		throw ADARA::Exception(EINVAL, "StorageContainer base strftime");
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " base strftime failed");
 
 	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE) &&
-							errno != EEXIST)
-		throw ADARA::Exception(errno, "StorageContainer base mkdirat");
+							errno != EEXIST) {
+		int err = errno;
+		std::string msg("StorageContainer::StorageContainer(): "
+				"base mkdirat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
 
 	if (!strftime(path, sizeof(path), "%Y%m%d/%Y%m%d-%H%M%S", &tm))
-		throw ADARA::Exception(EINVAL, "StorageContainer strftime");
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " path strftime failed");
 
 	m_name = path;
 
@@ -44,8 +52,14 @@ StorageContainer::StorageContainer(const struct timespec &start,
 		m_name += path;
 	}
 
-	if (mkdirat(StorageManager::base_fd(), m_name.c_str(), CONTAINER_MODE))
-		throw ADARA::Exception(ERANGE, "StorageContainer mkdirat");
+	if (mkdirat(StorageManager::base_fd(), m_name.c_str(),
+							CONTAINER_MODE)) {
+		int err = errno;
+		std::string msg("StorageContainer::StorageContainer(): "
+				"container mkdirat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
 }
 
 StorageContainer::StorageContainer(const std::string &name)
