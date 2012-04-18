@@ -182,7 +182,7 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 	/* We only care about translation complete packets; everything else
 	 * is an error and we should drop the connection.
 	 */
-	if (pkt.type() == ADARA::ADARA_PKT_TRANSLATION_COMPLETE_V0)
+	if (pkt.type() == ADARA::PacketType::TRANS_COMPLETE_V0)
 		return ADARA::Parser::rxPacket(pkt);
 
 	/* TODO log unexpected packet */

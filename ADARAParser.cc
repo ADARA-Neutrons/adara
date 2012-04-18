@@ -155,22 +155,22 @@ bool Parser::rxPacket(const Packet &pkt)
 	}
 
 	switch (pkt.type()) {
-		MAP_TYPE(ADARA_PKT_RAW_EVENT_V0, RawDataPkt);
-		MAP_TYPE(ADARA_PKT_RTDL_V0, RTDLPkt);
-		MAP_TYPE(ADARA_PKT_BANKED_EVENT_V0, BankedEventPkt);
-		MAP_TYPE(ADARA_PKT_BEAM_MONITOR_EVENT_V0, BeamMonitorPkt);
-		MAP_TYPE(ADARA_PKT_PIXEL_MAPPING_V0, PixelMappingPkt);
-		MAP_TYPE(ADARA_PKT_RUN_STATUS_V0, RunStatusPkt);
-		MAP_TYPE(ADARA_PKT_RUN_INFO_V0, RunInfoPkt);
-		MAP_TYPE(ADARA_PKT_TRANSLATION_COMPLETE_V0, TransCompletePkt);
-		MAP_TYPE(ADARA_PKT_CLIENT_HELLO_V0, ClientHelloPkt);
-		MAP_TYPE(ADARA_PKT_STATS_RESET_V0, StatsResetPkt);
-		MAP_TYPE(ADARA_PKT_SYNC_V0, SyncPkt);
-		MAP_TYPE(ADARA_PKT_HEARTBEAT_V0, HeartbeatPkt);
-		MAP_TYPE(ADARA_PKT_DEVICE_DESC_V0, DeviceDescriptorPkt);
-		MAP_TYPE(ADARA_PKT_VAR_VALUE_U32_V0, VariableU32Pkt);
-		MAP_TYPE(ADARA_PKT_VAR_VALUE_DOUBLE_V0, VariableDoublePkt);
-		MAP_TYPE(ADARA_PKT_VAR_VALUE_STRING_V0, VariableStringPkt);
+		MAP_TYPE(PacketType::RAW_EVENT_V0, RawDataPkt);
+		MAP_TYPE(PacketType::RTDL_V0, RTDLPkt);
+		MAP_TYPE(PacketType::BANKED_EVENT_V0, BankedEventPkt);
+		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_V0, BeamMonitorPkt);
+		MAP_TYPE(PacketType::PIXEL_MAPPING_V0, PixelMappingPkt);
+		MAP_TYPE(PacketType::RUN_STATUS_V0, RunStatusPkt);
+		MAP_TYPE(PacketType::RUN_INFO_V0, RunInfoPkt);
+		MAP_TYPE(PacketType::TRANS_COMPLETE_V0, TransCompletePkt);
+		MAP_TYPE(PacketType::CLIENT_HELLO_V0, ClientHelloPkt);
+		MAP_TYPE(PacketType::STATS_RESET_V0, StatsResetPkt);
+		MAP_TYPE(PacketType::SYNC_V0, SyncPkt);
+		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
+		MAP_TYPE(PacketType::DEVICE_DESC_V0, DeviceDescriptorPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_U32_V0, VariableU32Pkt);
+		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_V0, VariableDoublePkt);
+		MAP_TYPE(PacketType::VAR_VALUE_STRING_V0, VariableStringPkt);
 
 		/* No default handler; we want the compiler to warn about
 		 * the unhandled PacketType values when we add new packets.

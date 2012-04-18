@@ -177,7 +177,7 @@ bool LiveClient::rxPacket(const ADARA::Packet &pkt)
 	/* We only care about client hello packets; everything else is an
 	 * error and we should drop the connection.
 	 */
-	if (pkt.type() == ADARA::ADARA_PKT_CLIENT_HELLO_V0)
+	if (pkt.type() == ADARA::PacketType::CLIENT_HELLO_V0)
 		return ADARA::Parser::rxPacket(pkt);
 
 	/* TODO log unexpected packet */

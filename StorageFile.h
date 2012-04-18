@@ -48,12 +48,12 @@ private:
 	void open(int flags);
 	off_t write(const void *data, uint32_t count, bool notify = true);
 	void addSync(void);
-	void addRunStatus(ADARA::RunStatus status);
-	void terminate(ADARA::RunStatus status);
+	void addRunStatus(ADARA::RunStatus::Enum status);
+	void terminate(ADARA::RunStatus::Enum status);
 
 	StorageFile(const StorageContainer &container,
 		    uint32_t number, bool create = false,
-		    ADARA::RunStatus = ADARA::ADARA_RUN_STATUS_NO_RUN);
+		    ADARA::RunStatus::Enum = ADARA::RunStatus::NO_RUN);
 
 	/* XXX can we remove the manager? */
 	friend class StorageManager;

@@ -226,16 +226,16 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
 //fprintf(stderr, "%s type 0x%08x len %u\n", __func__, pkt.type(), pkt.packet_length());
 	switch (pkt.type()) {
-	case ADARA::ADARA_PKT_HEARTBEAT_V0:
-	case ADARA::ADARA_PKT_SYNC_V0:
+	case ADARA::PacketType::HEARTBEAT_V0:
+	case ADARA::PacketType::SYNC_V0:
 		/* We don't care about these packets, just drop them */
 		return false;
-	case ADARA::ADARA_PKT_RAW_EVENT_V0:
-	case ADARA::ADARA_PKT_RTDL_V0:
-	case ADARA::ADARA_PKT_DEVICE_DESC_V0:
-	case ADARA::ADARA_PKT_VAR_VALUE_U32_V0:
-	case ADARA::ADARA_PKT_VAR_VALUE_DOUBLE_V0:
-	case ADARA::ADARA_PKT_VAR_VALUE_STRING_V0:
+	case ADARA::PacketType::RAW_EVENT_V0:
+	case ADARA::PacketType::RTDL_V0:
+	case ADARA::PacketType::DEVICE_DESC_V0:
+	case ADARA::PacketType::VAR_VALUE_U32_V0:
+	case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
+	case ADARA::PacketType::VAR_VALUE_STRING_V0:
 		return Parser::rxPacket(pkt);
 	default:
 		/* We don't expect to see any other packet types here. */

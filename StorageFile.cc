@@ -109,7 +109,7 @@ void StorageFile::addSync(void)
 	struct sync_packet sync = {
 		hdr : {
 			payload_len : 28,
-			pkt_format : ADARA::ADARA_PKT_SYNC_V0,
+			pkt_format : ADARA::PacketType::SYNC_V0,
 		},
 		signature : { 0x53, 0x4e, 0x53, 0x41, 0x44, 0x41, 0x52, 0x41,
 			      0x4f, 0x52, 0x4e, 0x4c, 0x00, 0x00, 0xf0, 0x7f },
@@ -145,12 +145,12 @@ void StorageFile::addSync(void)
 	m_syncDistance %= m_max_sync_distance;
 }
 
-void StorageFile::addRunStatus(ADARA::RunStatus status)
+void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 {
 	struct run_status_packet spkt = {
 		hdr : {
 			payload_len : 12,
-			pkt_format : ADARA::ADARA_PKT_RUN_STATUS_V0,
+			pkt_format : ADARA::PacketType::RUN_STATUS_V0,
 		},
 	};
 	struct timespec now;
@@ -212,7 +212,7 @@ off_t StorageFile::write(const void *data, uint32_t count, bool notify)
 	return m_size;
 }
 
-void StorageFile::terminate(ADARA::RunStatus status)
+void StorageFile::terminate(ADARA::RunStatus::Enum status)
 {
 	/* Disable the generation of a sync packet as we're closing out
 	 * the file and want the run status to be the last packet.
@@ -227,7 +227,7 @@ void StorageFile::terminate(ADARA::RunStatus status)
 
 StorageFile::StorageFile(const StorageContainer &container,
 			 uint32_t fileNumber, bool create,
-			 ADARA::RunStatus status) :
+			 ADARA::RunStatus::Enum status) :
 	m_runNumber(container.runNumber()), m_fileNumber(fileNumber),
 	m_startTime(container.startTime().tv_sec), m_oversize(false),
 	m_active(create), m_size(0), m_syncDistance(0), m_fd(-1)

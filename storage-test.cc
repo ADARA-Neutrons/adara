@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	int i;
 
 	hdr->payload_len = sizeof(pkt) - sizeof(*hdr);
-	hdr->pkt_format = ADARA::ADARA_PKT_RAW_EVENT_V0;
+	hdr->pkt_format = ADARA::PacketType::RAW_EVENT_V0;
 
 	StorageManager::init("/data/dad/adara");
 

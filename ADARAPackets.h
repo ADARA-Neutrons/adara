@@ -13,7 +13,7 @@ public:
 		const uint32_t *field = (const uint32_t *) data;
 
 		m_payload_len = field[0];
-		m_type = (PacketType) field[1];
+		m_type = (PacketType::Enum) field[1];
 
 		/* Convert EPICS epoch to Unix epoch,
 		 * Jan 1, 1990 ==> Jan 1, 1970
@@ -22,7 +22,7 @@ public:
 		m_timestamp.tv_nsec = field[3];
 	}
 
-	PacketType type(void) const { return m_type; }
+	PacketType::Enum type(void) const { return m_type; }
 	uint32_t payload_length(void) const { return m_payload_len; }
 	const struct timespec &timestamp(void) const { return m_timestamp; }
 	uint32_t packet_length(void) const { return m_payload_len + 16; }
@@ -30,8 +30,8 @@ public:
 	static uint32_t header_length(void) { return 16; }
 
 protected:
-	uint32_t	m_payload_len;
-	PacketType	m_type;
+	uint32_t m_payload_len;
+	PacketType::Enum m_type;
 	struct timespec m_timestamp;
 
 	/* Don't allow the default constructor */
@@ -180,8 +180,8 @@ public:
 	uint32_t runNumber(void) const { return m_fields[0]; }
 	uint32_t runStart(void) const { return m_fields[1]; }
 	uint32_t fileNumber(void) const { return m_fields[2] & 0xffffff; }
-	RunStatus status(void) const {
-		return static_cast<RunStatus>(m_fields[2] >> 24);
+	RunStatus::Enum status(void) const {
+		return static_cast<RunStatus::Enum>(m_fields[2] >> 24);
 	}
 
 private:
