@@ -1290,8 +1290,10 @@ choppers.
 \newpage
 \subsubsection{Variable Status and Severity}
 
-Each variable carries with it an associated alarm status and severity. These
-values are derived from the EPICS Record Reference Manual.
+Each variable carries with it an associated alarm status and severity.  Except
+for "not reported", these values are derived from the EPICS Record Reference
+Manual. "Not reported" is used to interface with pre-EPICS controls that
+do not have a reporting mechanism for variable status and severity.
 
 \begin{table}[h]
   \begin{center}
@@ -1320,6 +1322,7 @@ values are derived from the EPICS Record Reference Manual.
 	19 & Simm & Record is in simulation mode \\
 	20 & ReadAcess & No Read Access \\
 	21 & WriteAccess & No Write Access \\
+	0xFFFF & Not Reported & Status was not reported \\
     \end{tabular}
   \end{center}
   \caption {Variable Status Definitions}
@@ -1335,6 +1338,7 @@ values are derived from the EPICS Record Reference Manual.
 	1 & Minor \\
 	2 & Major \\
 	3 & Invalid \\
+	0xFFFF & Not Reported \\
     \end{tabular}
   \end{center}
   \caption {Variable Alarm Severity Definitions}
