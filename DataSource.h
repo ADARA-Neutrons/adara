@@ -53,6 +53,8 @@ private:
 
 	friend class ReadyAdapter;
 	friend class TimerAdapter<DataSource>;
+
+	using ADARA::Parser::rxPacket;
 };
 
 #endif /* __DATA_SOURCE_H */

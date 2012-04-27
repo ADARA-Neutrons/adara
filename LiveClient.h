@@ -52,6 +52,8 @@ private:
 
 	friend class ReadyAdapter;
 	friend class TimerAdapter<LiveClient>;
+
+	using ADARA::Parser::rxPacket;
 };
 
 #endif /* __LIVE_CLIENT_H */

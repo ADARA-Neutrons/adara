@@ -52,6 +52,8 @@ private:
 	static unsigned int m_max_send_chunk;
 
 	friend class ReadyAdapter;
+
+	using ADARA::Parser::rxPacket;
 };
 
 #endif /* __STS_CLIENT_H */

@@ -28,7 +28,7 @@ void Parser::reset(void)
 
 bool Parser::read(int fd, unsigned int max_read)
 {
-	unsigned int bytes_read = 0;
+	unsigned long bytes_read = 0;
 	ssize_t rc;
 
 	while (!max_read || bytes_read < max_read) {
@@ -47,8 +47,11 @@ bool Parser::read(int fd, unsigned int max_read)
 		if (rc == 0)
 			return false;
 
+		/* m_len cannot overflow when adding in rc, as we'll never
+		 * ask for more data in the read() call than will fit.
+		 */
+		m_len += (unsigned int) rc;
 		bytes_read += rc;
-		m_len += rc;
 
 		if (parseBuffer())
 			return false;
