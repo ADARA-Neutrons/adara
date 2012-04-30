@@ -184,14 +184,14 @@ bool Parser::rxPacket(const Packet &pkt)
 #undef MAP_TYPE
 }
 
-bool Parser::rxUnknownPkt(const Packet &pkt)
+bool Parser::rxUnknownPkt(const Packet &)
 {
 	/* Default is to discard the data */
 	return false;
 }
 
-bool Parser::rxOversizePkt(const PacketHeader *hdr, const uint8_t *chunk,
-			   unsigned int chunk_offset, unsigned int chunk_len)
+bool Parser::rxOversizePkt(const PacketHeader *, const uint8_t *,
+			   unsigned int, unsigned int)
 {
 	/* Default is to discard the data */
 	return false;
