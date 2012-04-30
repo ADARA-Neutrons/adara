@@ -56,7 +56,7 @@ void LiveClient::writable(void)
 {
 	std::list<boost::shared_ptr<StorageFile> >::iterator it;
 	StorageFile *f;
-	size_t len, rc;
+	ssize_t len, rc;
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
 		f = it->get();

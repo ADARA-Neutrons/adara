@@ -57,7 +57,7 @@ void STSClient::writable(void)
 {
 	std::list<boost::shared_ptr<StorageFile> >::iterator it;
 	StorageFile *f;
-	size_t len, rc;
+	ssize_t len, rc;
 
 	/* We're trying to send data, so cancel the hearbeat timer. We'll
 	 * re-enable it if we go idle.
