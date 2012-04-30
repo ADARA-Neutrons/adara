@@ -3,8 +3,9 @@ AUTOMAKE_OPTIONS = -Wall foreign
 ACLOCAL_AMFLAGS = ${ALOCAL_FLAGS}
 
 AM_CFLAGS = -Wall -Werror
-AM_CXXFLAGS = -Wall -Werror -Winit-self -Wpointer-arith -Wcast-align \
-		-Woverloaded-virtual
+AM_CXXFLAGS = -Wall -Wextra -Werror -Winit-self -Wpointer-arith -Wcast-align \
+		-Woverloaded-virtual -Wno-missing-field-initializers \
+		-Wno-unused-parameter
 
 # These reduces warnings, which we don't want
 # -Wno-write-strings, -Wno-deprecated, -Wno-unused-result
@@ -30,7 +31,8 @@ smsd_LDADD = $(EPICS_LIBS) -lboost_signals -lpthread
 # to get a pass with increaed warnings
 #
 parser_test_SOURCES = parser-test.cc ADARAPackets.cc ADARAParser.cc
-parser_test_CXXFLAGS = $(AM_CXXFLAGS) -Wcast-qual -Wconversion -std=c++0x
+parser_test_CXXFLAGS = $(AM_CXXFLAGS) -Wunused-parameter \
+				-Wcast-qual -Wconversion -std=c++0x
 
 storage_test_SOURCES = storage-test.cc StorageManager.cc \
 		StorageContainer.cc StorageFile.cc
