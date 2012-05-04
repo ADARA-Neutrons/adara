@@ -21,6 +21,7 @@ public:
 				  const char *pv_name);
 	pvAttachReturn pvAttach(const casCtx &ctx, const char *pv_name);
 
+	static SMSControl *getInstance(void) { return m_singleton; }
 
 private:
 	std::map<std::string, boost::shared_ptr<casPV> > m_pv_map;
@@ -28,6 +29,7 @@ private:
 	bool m_recording;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	static SMSControl *m_singleton;
 
 	void addPV(boost::shared_ptr<casPV> pv);
 

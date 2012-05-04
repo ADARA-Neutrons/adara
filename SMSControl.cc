@@ -3,9 +3,14 @@
 #include "SMSControlPV.h"
 #include "StorageManager.h"
 
+SMSControl *SMSControl::m_singleton = NULL;
+
 SMSControl::SMSControl(const std::string &beamline) :
 	m_nextRunNumber(1), m_recording(false)
 {
+	if (m_singleton)
+		throw std::runtime_error("SMSControl is a singleton");
+
 	std::string prefix(beamline);
 	prefix += ":SMS";
 
@@ -18,6 +23,8 @@ SMSControl::SMSControl(const std::string &beamline) :
 	addPV(m_pvRunNumber);
 
 	/* TODO get old run number information from StorageManager */
+
+	m_singleton = this;
 }
 
 SMSControl::~SMSControl()
