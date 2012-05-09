@@ -4,11 +4,14 @@
 #include <boost/smart_ptr.hpp>
 #include <string>
 #include <map>
+#include <vector>
 
 #include <casdef.h>
 
 class smsRunNumberPV;
 class smsRecordingPV;
+
+class DataSource;
 
 class SMSControl : public caServer {
 public:
@@ -23,12 +26,16 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
+	void addSource(const std::string &uri);
+
 private:
 	std::map<std::string, boost::shared_ptr<casPV> > m_pv_map;
 	uint32_t m_nextRunNumber;
 	bool m_recording;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	std::vector<boost::shared_ptr<DataSource> > m_sources;
+
 	static SMSControl *m_singleton;
 
 	void addPV(boost::shared_ptr<casPV> pv);

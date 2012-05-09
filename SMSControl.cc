@@ -2,6 +2,7 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "StorageManager.h"
+#include "DataSource.h"
 
 SMSControl *SMSControl::m_singleton = NULL;
 
@@ -95,4 +96,10 @@ bool SMSControl::setRecording(bool v)
 
 	m_recording = v;
 	return true;
+}
+
+void SMSControl::addSource(const std::string &uri)
+{
+	boost::shared_ptr<DataSource> src(new DataSource(uri));
+	m_sources.push_back(src);
 }
