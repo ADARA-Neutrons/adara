@@ -17,7 +17,7 @@ dnl PKG_CHECK_MODULES([libevent2], [libevent >= 2.0.10])
 
 tryepicsdir=""
 AC_ARG_WITH(epics,
-       [ --with-epics=PATH Specify path to EPICS installation ],
+       [  --with-epics=PATH Specify path to EPICS installation ],
        [
                 if test "x$withval" != "xno" ; then
                         tryepicsdir=$withval
