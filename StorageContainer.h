@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "Storage.h"
+
 class StorageFile;
 
 class StorageContainer : boost::noncopyable {
@@ -44,7 +46,7 @@ private:
 	StorageContainer(const struct timespec &start, uint32_t run);
 	StorageContainer(const std::string &name);
 
-	off_t write(const void *data, uint32_t count, bool notify = true);
+	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminateFile(void);
 	void terminate(void);
 

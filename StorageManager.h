@@ -5,9 +5,12 @@
 #include <boost/function.hpp>
 #include <boost/signal.hpp>
 #include <stdint.h>
+#include <sys/uio.h>
 #include <string>
+#include <vector>
 
 #include "ADARA.h"
+#include "Storage.h"
 
 class StorageFile;
 class StorageContainer;
@@ -23,8 +26,14 @@ public:
 	static void startRecording(uint32_t run);
 	static void stopRecording(void);
 
+	static void addPacket(IoVector &iovec, bool notify = true);
 	static void addPacket(const void *pkt, uint32_t len,
-			      bool notify = true);
+			      bool notify = true) {
+		IoVector iovec(1);
+		iovec[0].iov_base = (void *) pkt;
+		iovec[0].iov_len = len;
+		addPacket(iovec, notify);
+	}
 	static int base_fd() { return m_base_fd; }
 
 	static boost::signals::connection connect(

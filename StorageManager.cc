@@ -106,10 +106,19 @@ void StorageManager::stopRecording(void)
 	endCurrentContainer();
 }
 
-void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
+void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
-	struct header *hdr = (struct header *) pkt;
+	struct header *hdr = (struct header *) iovec[0].iov_base;
 	off_t size, blocks;
+	IoVector::iterator it;
+	uint32_t len = 0;
+
+	/* XXX We assume there is no overflow */
+	for (it = iovec.begin(); it != iovec.end(); it++)
+		len += it->iov_len;
+
+	if (iovec[0].iov_len < (2 * sizeof(uint32_t)))
+		throw std::runtime_error("Initial fragment too small");
 
 	if (len < sizeof(*hdr))
 		throw std::runtime_error("Packet too small");
@@ -122,7 +131,7 @@ void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 		m_contChange(m_cur_container, true);
 	}
 
-	size = m_cur_container->write(pkt, len, notify);
+	size = m_cur_container->write(iovec, len, notify);
 
 	/* Is it time to initiate a purge of old data?
 	 *
@@ -134,70 +143,4 @@ void StorageManager::addPacket(const void *pkt, uint32_t len, bool notify)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		/* TODO start a purge of the storage pool */
 	}
-
-#if 0
-	/* We don't immediately close a file when we exceed the size limit
-	 * in order to avoid creating a new file just for the end-of-run
-	 * marker. Instead, we wait for the run to start or the next packet
-	 * to be written (and clients notified).
-	 */
-	if (m_cur_file && m_cur_file->oversize()) {
-		endCurrentFile(m_cur_container->runNumber() ?
-			       ADARA::ADARA_RUN_STATUS_RUN_EOF :
-			       ADARA::ADARA_RUN_STATUS_NO_RUN);
-	}
-
-	if (!m_cur_file) {
-		ADARA::RunStatus status = ADARA::ADARA_RUN_STATUS_NO_RUN;
-
-		if (!m_cur_container) {
-			/* We're not in a run, as we'd have a container. */
-			struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
-			m_cur_container = boost::shared_ptr<StorageContainer>(
-						new StorageContainer(ts, 0));
-		} else if (m_cur_container->runNumber()) {
-			status = ADARA::ADARA_RUN_STATUS_NEW_RUN;
-			if (m_cur_container->runNumber())
-				status = ADARA::ADARA_RUN_STATUS_RUN_BOF;
-		}
-
-		m_cur_file = boost::shared_ptr<StorageFile>(
-				new StorageFile(m_cur_container,
-						m_cur_container->numFiles() + 1,
-						true, status));
-		m_cur_container->m_numFiles++;
-
-		/* TODO add persistant information to beginning of file */
-
-		if (notify)
-			notifyFileAdded();
-	}
-
-	m_cur_file->write(pkt, len);
-
-	/* Is it time to initiate a purge of old data?
-	 *
-	 * m_blocks_used contains the size of all of our closed files,
-	 * and we don't add the current file until we're done with it.
-	 */
-	blocks = m_cur_file->size() + m_block_size - 1;
-	blocks /= m_block_size;
-	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		/* TODO start a purge of the storage pool */
-	}
-
-	/* We don't check the file size unless we're notifying watchers --
-	 * this keeps all of the data for a pulse in the same file. We also
-	 * don't want to just end the file here, as we may be instructed
-	 * to stop recording before more data comes in, and we don't want
-	 * to have a file that's sole contents are the "I'm done" indication.
-	 */
-	if (notify) {
-		/* TODO this should reside in StorageFile */
-		if (m_cur_file->size() >= StorageFile::m_max_file_size)
-			m_cur_file->m_oversize = true;
-
-		notifyFileUpdated();
-	}
-#endif
 }

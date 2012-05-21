@@ -78,7 +78,7 @@ void StorageContainer::terminateFile(void)
 	m_cur_file.reset();
 }
 
-off_t StorageContainer::write(const void *data, uint32_t count, bool notify)
+off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 {
 	/* We don't immediately close a file when we exceed the size limit
 	 * in order to avoid creating a new file just for the end-of-run
@@ -103,7 +103,7 @@ off_t StorageContainer::write(const void *data, uint32_t count, bool notify)
 		m_newFile(m_cur_file);
 	}
 
-	return m_cur_file->write(data, count, notify);
+	return m_cur_file->write(iovec, len, notify);
 }
 
 void StorageContainer::terminate(void)

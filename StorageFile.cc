@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #include "StorageFile.h"
 #include "StorageContainer.h"
@@ -164,30 +165,55 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 		spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
 	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
 
-	write(&spkt, sizeof(spkt), false);
+	IoVector iovec(1);
+	iovec[0].iov_base = &spkt;
+	iovec[0].iov_len = sizeof(spkt);
+	write(iovec, sizeof(spkt), false);
 }
 
-off_t StorageFile::write(const void *data, uint32_t count, bool notify)
+off_t StorageFile::write(IoVector &iovec, uint32_t len, bool notify)
 {
-	uint8_t *p = (uint8_t *) data;
-	int rc;
+	struct iovec *vec = &iovec.front();
+	int nvecs = iovec.size();
+	int iovcnt;
+	ssize_t rc;
 
-	while (count) {
-		rc = ::write(m_fd, p, count);
+	while (len) {
+		iovcnt = nvecs;
+		if (iovcnt > IOV_MAX)
+			iovcnt = IOV_MAX;
+
+		rc = writev(m_fd, vec, iovcnt);
 		if (rc <= 0) {
 			if (errno == EINTR)
 				continue;
 
 			int err = errno;
-			std::string msg("StorageFile::write() error: ");
+			std::string msg("StorageFile::writev() error: ");
 			msg += strerror(err);
 			throw std::runtime_error(msg);
 		}
 
 		m_syncDistance += rc;
 		m_size += rc;
-		p += rc;
-		count -= rc;
+
+		if (rc == len)
+			break;
+
+		len -= rc;
+		while (rc) {
+			if (vec->iov_len <= (size_t) rc) {
+				rc -= vec->iov_len;
+				vec++;
+				nvecs--;
+			} else {
+				uint8_t *p = (uint8_t *) vec->iov_len;
+				p += rc;
+				vec->iov_base = p;
+				vec->iov_len -= rc;
+				break;
+			}
+		}
 	}
 
 	/* We want the final run status to be the last packet in the file,

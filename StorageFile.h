@@ -4,7 +4,9 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/signal.hpp>
+
 #include "ADARA.h"
+#include "Storage.h"
 
 class StorageContainer;
 
@@ -46,7 +48,7 @@ private:
 
 	void makePath(const StorageContainer &c);
 	void open(int flags);
-	off_t write(const void *data, uint32_t count, bool notify = true);
+	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
 	void terminate(ADARA::RunStatus::Enum status);
