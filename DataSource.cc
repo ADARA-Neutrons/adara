@@ -134,6 +134,9 @@ void DataSource::startConnect(void)
 {
 	int flags, rc;
 
+	/* Clear out any old state from the ADARA parser. */
+	reset();
+
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0)
 		goto error;
