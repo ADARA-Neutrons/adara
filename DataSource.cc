@@ -8,7 +8,7 @@
 
 #include "EPICS.h"
 #include "DataSource.h"
-#include "StorageManager.h"
+#include "SMSControl.h"
 
 #include <stdio.h>
 
@@ -18,9 +18,10 @@ double DataSource::m_data_timeout = 5.0;
 
 unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
 
-DataSource::DataSource(const std::string &uri) :
+DataSource::DataSource(const std::string &uri, uint32_t id) :
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
-	m_state(IDLE), m_fd(-1)
+	m_state(IDLE), m_sourceId(id), m_fd(-1), m_newPulse(false),
+	m_lastPulseId(0), m_dupCount(0), m_expectedPktSeq(0), m_pulseEOP(false)
 {
 	std::string node;
 	std::string service("31416");
@@ -87,6 +88,13 @@ fprintf(stderr, "%s\n", __func__);
 	}
 	m_state = IDLE;
 	m_timer->start(m_connect_retry);
+
+	/* Complete any outstanding pulse, and inform the manager of our
+	 * failure
+	 */
+	endPulse(false);
+	m_lastPulseId = 0;
+	SMSControl::getInstance()->sourceDown(m_sourceId);
 }
 
 bool DataSource::timerExpired(void)
@@ -150,6 +158,7 @@ void DataSource::startConnect(void)
 		break;
 	case 0:
 		m_state = ACTIVE;
+		SMSControl::getInstance()->sourceUp(m_sourceId);
 	}
 
 	/* TODO handle any other error here */
@@ -191,6 +200,7 @@ void DataSource::connectComplete(void)
 		m_timer->cancel();
 		m_timer->start(m_data_timeout);
 		m_state = ACTIVE;
+		SMSControl::getInstance()->sourceUp(m_sourceId);
 
 		/* TODO log connection to source */
 		return;
@@ -260,17 +270,100 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	return true;
 }
 
+void DataSource::endPulse(bool dup)
+{
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	/* Do we even have a pulse to close out? */
+	if (!m_lastPulseId)
+		return;
+
+	if (!m_pulseEOP) {
+		/* TODO rate-limited logging of dropped packets */
+		ctrl->markPartial(m_lastPulseId, m_dupCount);
+	}
+
+	ctrl->markComplete(m_lastPulseId, m_dupCount, m_sourceId);
+
+	m_newPulse = true;
+	m_expectedPktSeq = 0;
+	m_pulseEOP = false;
+	if (dup) {
+		/* TODO rate-limited logging of duplicate pulses? */
+		m_dupCount++;
+	} else
+		m_dupCount = 0;
+}
+
+bool DataSource::checkPulseInvariants(const ADARA::RawDataPkt &pkt)
+{
+	/* These fields should be the same for every Raw Data Event
+	 * in this pulse. If not, then we have a duplicate pulse on
+	 * our hands.
+	 */
+	return pkt.flavor() == m_pulseFlavor &&
+	       pkt.pulseCharge() == m_pulseCharge &&
+	       pkt.veto() == m_pulseVeto &&
+	       pkt.cycle() == m_pulseCycle &&
+	       pkt.timingStatus() == m_pulseTimingStatus &&
+	       pkt.intraPulseTime() == m_pulseIntraTime &&
+	       pkt.tofOffset() == m_pulseTofOffset;
+}
+
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	// TODO
-	StorageManager::addPacket(pkt.packet(), pkt.packet_length());
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	/* We check for the end of pulses here as well as the RTDL handler,
+	 * as it is not clear that they cannot be lost by the preprocessor.
+	 * If we already know we're in a new pulse, there's no reason to
+	 * perform these checks.
+	 */
+	if (!m_newPulse) {
+		if (pkt.pulseId() != m_lastPulseId)
+			endPulse(false);
+		else if (m_pulseEOP || pkt.pktSeq() < m_expectedPktSeq ||
+			 !checkPulseInvariants(pkt))
+			endPulse(true);
+	}
+
+	if (m_newPulse) {
+		m_newPulse = false;
+		m_lastPulseId = pkt.pulseId();
+		m_pulseFlavor = pkt.flavor();
+		m_pulseCharge = pkt.pulseCharge();
+		m_pulseVeto = pkt.veto();
+		m_pulseCycle = pkt.cycle();
+		m_pulseTimingStatus = pkt.timingStatus();
+		m_pulseIntraTime = pkt.intraPulseTime();
+		m_pulseTofOffset = pkt.tofOffset();
+	}
+
+	if (pkt.pktSeq() != m_expectedPktSeq)
+		ctrl->markPartial(pkt.pulseId(), m_dupCount);
+
+	m_expectedPktSeq = pkt.pktSeq() + 1;
+	if (pkt.endOfPulse())
+		m_pulseEOP = true;
+
+	ctrl->pulseEvents(pkt, m_sourceId, m_dupCount);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 {
-	// TODO
-	StorageManager::addPacket(pkt.packet(), pkt.packet_length());
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	/* Getting an RTDL packet means the last pulse is complete, we
+	 * just need to know if the new one is a duplicate or not.
+	 *
+	 * If we don't get an RTDL for some reason, we'll detect duplicate
+	 * pulses from the Raw Event packets.
+	 */
+	endPulse(pkt.pulseId() == m_lastPulseId);
+	m_lastPulseId = pkt.pulseId();
+
+	ctrl->pulseRTDL(pkt, m_sourceId, m_dupCount);
 	return false;
 }
 

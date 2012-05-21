@@ -11,7 +11,7 @@ struct addrinfo;
 
 class DataSource : public ADARA::Parser {
 public:
-	DataSource(const std::string &uri);
+	DataSource(const std::string &uri, uint32_t id);
 	~DataSource();
 
 private:
@@ -21,7 +21,21 @@ private:
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
 	State m_state;
+	uint32_t m_sourceId;
 	int m_fd;
+
+	bool m_newPulse;
+	uint64_t m_lastPulseId;
+	uint32_t m_dupCount;
+	uint16_t m_expectedPktSeq;
+	bool m_pulseEOP;
+	ADARA::PulseFlavor::Enum m_pulseFlavor;
+	uint32_t m_pulseCharge;
+	uint16_t m_pulseVeto;
+	uint16_t m_pulseCycle;
+	uint8_t m_pulseTimingStatus;
+	uint32_t m_pulseIntraTime;
+	uint32_t m_pulseTofOffset;
 
 	static unsigned int m_max_read_chunk;
 	static double m_connect_retry;
@@ -37,6 +51,9 @@ private:
 	void connectionFailed(void);
 
 	bool timerExpired(void);
+
+	void endPulse(bool dup);
+	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt);
 
 	bool rxPacket(const ADARA::Packet &pkt);
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
