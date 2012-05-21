@@ -93,6 +93,11 @@ namespace VariableSeverity {
 	};
 }
 
+struct Event {
+	uint32_t pixel;
+	uint32_t tof;
+};
+
 class invalid_packet : public std::runtime_error {
 public:
 	explicit invalid_packet(const std::string &msg) : runtime_error(msg) {}

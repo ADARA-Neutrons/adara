@@ -25,6 +25,9 @@ public:
 	PacketType::Enum type(void) const { return m_type; }
 	uint32_t payload_length(void) const { return m_payload_len; }
 	const struct timespec &timestamp(void) const { return m_timestamp; }
+	uint64_t pulseId(void) const {
+		return (m_timestamp.tv_sec << 32) | m_timestamp.tv_nsec;
+	}
 	uint32_t packet_length(void) const { return m_payload_len + 16; }
 
 	static uint32_t header_length(void) { return 16; }
@@ -85,7 +88,10 @@ public:
 	bool rawTOF(void) const { return !!(m_fields[5] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
 
-	// TODO implment event accessors
+	const Event *events(void) const { return (Event *) &m_fields[6]; }
+	uint32_t num_events(void) const {
+		return (m_payload_len - 24) / (2 * sizeof (uint32_t));
+	}
 
 private:
 	uint32_t *m_fields;
