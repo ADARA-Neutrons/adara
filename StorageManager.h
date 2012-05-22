@@ -36,7 +36,7 @@ public:
 	}
 	static int base_fd() { return m_base_fd; }
 
-	static boost::signals::connection connect(
+	static boost::signals::connection onContainerChange(
 					const onContChange::slot_type &s) {
 		return m_contChange.connect(s);
 	}

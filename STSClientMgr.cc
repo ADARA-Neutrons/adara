@@ -47,7 +47,7 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_gai_hints.ai_protocol = IPPROTO_TCP;
 	m_gai_hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
 
-	m_mgrConnection = StorageManager::connect(
+	m_mgrConnection = StorageManager::onContainerChange(
 				boost::bind(&STSClientMgr::containerChange,
 					    this, _1, _2));
 }

@@ -205,7 +205,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	m_timer->cancel();
 	m_hello_received = true;
 
-	m_mgrConnection = StorageManager::connect(
+	m_mgrConnection = StorageManager::onContainerChange(
 		boost::bind(&LiveClient::containerChange, this, _1, _2));
 
 	/* TODO send current state of the system (ie, pixel map,
