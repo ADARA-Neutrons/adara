@@ -98,6 +98,13 @@ struct Event {
 	uint32_t tof;
 };
 
+struct Header {
+	uint32_t payload_len;
+	uint32_t pkt_format;
+	uint32_t ts_sec;
+	uint32_t ts_nsec;
+};
+
 class invalid_packet : public std::runtime_error {
 public:
 	explicit invalid_packet(const std::string &msg) : runtime_error(msg) {}
