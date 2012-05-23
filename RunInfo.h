@@ -3,6 +3,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/signal.hpp>
 
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -39,6 +40,8 @@ private:
 	bool m_packetValid;
 	uint8_t *m_packet;
 	uint32_t m_packetSize;
+
+	boost::signals::connection m_connection;
 
 	void addPV(const std::string &prefix, const char *name,
 		   RunInfoMap &map, SMSControl *sms);

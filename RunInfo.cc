@@ -101,11 +101,12 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	 */
 	// TODO handle "user" element
 
-	StorageManager::onPrologue(boost::bind(&RunInfo::onPrologue, this));
+	m_connection = StorageManager::onPrologue(boost::bind(&RunInfo::onPrologue, this));
 }
 
 RunInfo::~RunInfo()
 {
+	m_connection.disconnect();
 	delete [] m_packet;
 }
 
