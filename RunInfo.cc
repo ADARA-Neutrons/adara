@@ -194,7 +194,7 @@ void RunInfo::generatePacket(void)
 
 	fields[0] = payload_len;
 	fields[1] = ADARA::PacketType::RUN_INFO_V0;
-	fields[2] = ts.tv_sec;
+	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	fields[3] = ts.tv_nsec;
 	fields[4] = xml.size();
 
