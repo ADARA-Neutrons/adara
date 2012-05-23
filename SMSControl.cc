@@ -343,7 +343,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 	uint32_t i, ioidx;
 	std::vector<EventVector> &banks = pulse->m_banks;
 
-	data[0] = 9 + (3 * pulse->m_activeBanks) + (2 * pulse->m_numEvents);
+	data[0] = 5 + (2 * pulse->m_activeBanks) + (2 * pulse->m_numEvents);
 	data[0] *= sizeof(uint32_t);
 
 	data[1] = ADARA::PacketType::BANKED_EVENT_V0;
