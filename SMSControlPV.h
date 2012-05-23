@@ -13,6 +13,7 @@ class SMSControl;
 class smsPV : public casPV {
 public:
 	smsPV();
+	smsPV(const std::string &name);
 	~smsPV();
 
 	const char *getName(void) const;
@@ -34,11 +35,9 @@ public:
 protected:
 	smartGDDPointer m_value;
 	std::string m_pv_name;
+	bool m_interested;
 
 	void notify(void);
-
-private:
-	bool m_interested;
 };
 
 class smsReadOnlyChannel : public casChannel {
@@ -85,6 +84,45 @@ private:
 
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
+};
+
+class smsStringPV : public smsPV {
+public:
+	smsStringPV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void unset(void);
+	bool valid(void);
+	const std::string value(void);
+
+public:
+	gddAppFuncTable<smsStringPV>	m_read_table;
+
+	gddAppFuncTableStatus getValue(gdd &value);
+
+	virtual void changed(void);
+};
+
+class smsTriggerPV : public smsPV {
+public:
+	smsTriggerPV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+public:
+	gddAppFuncTable<smsTriggerPV>	m_read_table;
+
+	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual void triggered(void) = 0;
 };
 
 #endif /* __SMS_CONTROL_PV_H */

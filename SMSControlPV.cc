@@ -19,9 +19,13 @@ void fixedStringDestructor::run(void *p)
 
 /* ----------------------------------------------------------------------- */
 
-smsPV::smsPV()
+smsPV::smsPV() : m_interested(false)
 {
-	m_interested = false;
+}
+
+smsPV::smsPV(const std::string &name) :
+	m_pv_name(name), m_interested(false)
+{
 }
 
 smsPV::~smsPV()
@@ -159,6 +163,7 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 
 	notify();
 }
+
 /* ----------------------------------------------------------------------- */
 
 smsRecordingPV::smsRecordingPV(const std::string &prefix, SMSControl *sms) :
@@ -261,4 +266,205 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 	m_value = val;
 
 	notify();
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsStringPV::smsStringPV(const std::string &name) : smsPV(name)
+{
+	m_pv_name = name;
+	m_read_table.installReadFunc ("value", &smsStringPV::getValue);
+	unset();
+}
+
+aitEnum smsStringPV::bestExternalType(void) const
+{
+	return aitEnumString;
+}
+
+gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+caStatus smsStringPV::read(const casCtx &ctx, gdd &prototype)
+{
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
+{
+	aitString old_str, new_str;
+
+	if (!val.isScalar())
+		return S_casApp_noSupport;
+
+	/* TODO need to be able to conditionally deny this change request;
+	 * ie, we don't want to change RunInfo during a run
+	 */
+
+	m_value->get(old_str);
+	val.get(new_str);
+	if (strcmp(old_str.string(), new_str.string())) {
+		struct timespec ts;
+		val.getTimeStamp(&ts);
+
+		/* One would think nv->copy(&val) would work, but no. It
+		 * cauaes nv to become a container, which won't convert
+		 * back to string.
+		 */
+		gdd *nv = new gddScalar(gddAppType_value, aitEnumString);
+		nv->put(new_str);
+		nv->setTimeStamp(&ts);
+		m_value = nv;
+		notify();
+		changed();
+	}
+
+	return S_casApp_success;
+}
+
+void smsStringPV::unset(void)
+{
+	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
+		return;
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	m_value = new gddScalar(gddAppType_value, aitEnumString);
+	m_value->put(aitString("(unset)"));
+	m_value->setStat(epicsAlarmUDF);
+	m_value->setSevr(epicsSevNone);
+	m_value->setTimeStamp(&ts);
+
+	notify();
+	changed();
+}
+
+bool smsStringPV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+const std::string smsStringPV::value(void)
+{
+	std::string val;
+
+	if (m_value.valid()) {
+		aitString str;
+		m_value->get(str);
+		val = str.string();
+	}
+
+	return val;
+}
+
+void smsStringPV::changed(void)
+{
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsTriggerPV::smsTriggerPV(const std::string &name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	/* We'll stay false except for briefly when someone sets us true */
+	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+
+	m_read_table.installReadFunc ("value", &smsTriggerPV::getValue);
+	m_read_table.installReadFunc ("enums", &smsTriggerPV::getEnums);
+
+	m_pv_name = name;
+}
+
+aitEnum smsTriggerPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
+}
+
+gddAppFuncTableStatus smsTriggerPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsTriggerPV::getEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[2];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+
+	strncpy(str[0].fixed_string, "false", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "true", sizeof(str[1].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 2);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
+
+caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
+{
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
+{
+	aitUint16 v;
+
+	if (!val.isScalar())
+		return S_casApp_noSupport;
+
+	val.get(v);
+	if (v > 1)
+		return S_casApp_noSupport;
+
+	if (v) {
+		triggered();
+
+		if (m_interested) {
+			caServer *cas = getCAS();
+			casEventMask mask = cas->valueEventMask() |
+					    cas->logEventMask();
+			smartGDDPointer edge;
+			struct timespec ts;
+
+			val.getTimeStamp(&ts);
+			edge = new gddScalar(gddAppType_value, aitEnumEnum16);
+			edge->setTimeStamp(&ts);
+			edge->put(1);
+			postEvent(mask, *edge);
+
+			ts.tv_nsec++;
+			if (ts.tv_nsec > 1000000000) {
+				ts.tv_sec++;
+				ts.tv_nsec -= 1000000000;
+			}
+			m_value->setTimeStamp(&ts);
+			postEvent(mask, *m_value);
+		}
+	}
+
+	return S_casApp_success;
 }
