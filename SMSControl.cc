@@ -3,6 +3,7 @@
 #include "SMSControlPV.h"
 #include "StorageManager.h"
 #include "DataSource.h"
+#include "RunInfo.h"
 
 #include <math.h>
 
@@ -48,6 +49,8 @@ SMSControl::SMSControl(const std::string &beamline) :
 	 * (and will need to have REAL_BANK_OFFSET added to it
 	 */
 
+	m_runInfo.reset(new RunInfo(beamline, this));
+
 	m_singleton = this;
 }
 
@@ -88,7 +91,7 @@ pvAttachReturn SMSControl::pvAttach(const casCtx &ctx, const char *pv_name)
 	return *(iter->second);
 }
 
-void SMSControl::addPV(boost::shared_ptr<casPV> pv)
+void SMSControl::addPV(PVSharedPtr pv)
 {
 	m_pv_map[pv->getName()] = pv;
 }
@@ -99,6 +102,9 @@ bool SMSControl::setRecording(bool v)
 
 	/* If we didn't change state, only give an error if someone
 	 * tried to start a new recording.
+	 *
+	 * TODO don't allow recording to start unless we have all required
+	 * fields from RunInfo.
 	 */
 	if (v == m_recording)
 		return !v;
@@ -107,11 +113,13 @@ bool SMSControl::setRecording(bool v)
 	if (v) {
 		/* Starting a new recording */
 		/* TODO persist the run number */
+		m_runInfo->setRunNumber(m_nextRunNumber);
 		StorageManager::startRecording(m_nextRunNumber);
 		m_pvRunNumber->update(m_nextRunNumber++, &now);
 		m_pvRecording->update(v, &now);
 	} else {
 		/* Stop the current recording */
+		m_runInfo->setRunNumber(0);
 		StorageManager::stopRecording();
 		m_pvRunNumber->update(0, &now);
 		m_pvRecording->update(v, &now);

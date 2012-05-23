@@ -14,11 +14,14 @@
 
 class smsRunNumberPV;
 class smsRecordingPV;
+class RunInfo;
 
 class DataSource;
 
 class SMSControl : public caServer {
 public:
+	typedef boost::shared_ptr<casPV> PVSharedPtr;
+
 	SMSControl(const std::string &beamline);
 	~SMSControl();
 
@@ -27,6 +30,7 @@ public:
 	pvExistReturn pvExistTest(const casCtx &, const caNetAddr &,
 				  const char *pv_name);
 	pvAttachReturn pvAttach(const casCtx &ctx, const char *pv_name);
+	void addPV(PVSharedPtr pv);
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
@@ -79,7 +83,7 @@ private:
 	typedef boost::shared_ptr<Pulse> PulsePtr;
 	typedef std::map<PulseIdentifier, PulsePtr> PulseMap;
 
-	std::map<std::string, boost::shared_ptr<casPV> > m_pv_map;
+	std::map<std::string, PVSharedPtr> m_pv_map;
 	uint32_t m_nextRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
@@ -91,11 +95,10 @@ private:
 	uint32_t m_lastRingPeriod;
 	uint32_t m_numBanks;
 	uint32_t m_bankReserve;
+	boost::shared_ptr<RunInfo> m_runInfo;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;
-
-	void addPV(boost::shared_ptr<casPV> pv);
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
