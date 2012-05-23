@@ -22,8 +22,10 @@ struct header {
 int StorageManager::m_base_fd = -1;
 
 boost::shared_ptr<StorageContainer> StorageManager::m_cur_container;
+StorageContainer::FileSharedPtr StorageManager::m_prologueFile;
 
-StorageManager::onContChange StorageManager::m_contChange;
+StorageManager::ContainerSignal StorageManager::m_contChange;
+StorageManager::PrologueSignal StorageManager::m_prologue;
 
 uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
@@ -80,6 +82,16 @@ void StorageManager::endCurrentContainer(void)
 	m_cur_container.reset();
 }
 
+void StorageManager::fileCreated(StorageContainer::FileSharedPtr &f)
+{
+	if (m_prologueFile)
+		throw std::runtime_error("Recursive use of prologue files");
+
+	m_prologueFile = f;
+	m_prologue();
+	m_prologueFile.reset();
+}
+
 void StorageManager::startRecording(uint32_t run)
 {
 	struct timespec now;
@@ -108,23 +120,12 @@ void StorageManager::stopRecording(void)
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
-	struct header *hdr = (struct header *) iovec[0].iov_base;
+	uint32_t len = validatePacket(iovec);
 	off_t size, blocks;
-	IoVector::iterator it;
-	uint32_t len = 0;
-
-	/* XXX We assume there is no overflow */
-	for (it = iovec.begin(); it != iovec.end(); it++)
-		len += it->iov_len;
-
-	if (iovec[0].iov_len < (2 * sizeof(uint32_t)))
-		throw std::runtime_error("Initial fragment too small");
-
-	if (len < sizeof(*hdr))
-		throw std::runtime_error("Packet too small");
 
 	if (!m_cur_container) {
 		/* We're not in a run, as we'd already have a container. */
+		struct header *hdr = (struct header *) iovec[0].iov_base;
 		struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
 		m_cur_container = boost::shared_ptr<StorageContainer>(
 					new StorageContainer(ts, 0));
@@ -143,4 +144,36 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		/* TODO start a purge of the storage pool */
 	}
+}
+
+void StorageManager::addPrologue(IoVector &iovec)
+{
+	/* We're writing a prologue before putting event data or slow control
+	 * updates into a file, so we know we have a current container.
+	 */
+	if (!m_prologueFile) {
+		throw std::runtime_error("Invalid use of "
+					 "StorageManager::addPrologue");
+	}
+
+	uint32_t len = validatePacket(iovec);
+	m_prologueFile->write(iovec, len, false);
+}
+
+uint32_t StorageManager::validatePacket(const IoVector &iovec)
+{
+	IoVector::const_iterator it;
+	uint32_t len = 0;
+
+	/* XXX We assume there is no overflow */
+	for (it = iovec.begin(); it != iovec.end(); it++)
+		len += it->iov_len;
+
+	if (iovec[0].iov_len < (2 * sizeof(uint32_t)))
+		throw std::runtime_error("Initial fragment too small");
+
+	if (len < sizeof(struct header))
+		throw std::runtime_error("Packet too small");
+
+	return len;
 }

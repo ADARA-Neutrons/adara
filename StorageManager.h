@@ -11,14 +11,15 @@
 
 #include "ADARA.h"
 #include "Storage.h"
+#include "StorageContainer.h"
 
 class StorageFile;
-class StorageContainer;
 
 class StorageManager {
 public:
 	typedef boost::shared_ptr<StorageContainer> ContainerSharedPtr;
-	typedef boost::signal<void (ContainerSharedPtr &, bool)> onContChange;
+	typedef boost::signal<void (ContainerSharedPtr &, bool)> ContainerSignal;
+	typedef boost::signal<void (void)> PrologueSignal;
 
 	static void init(const std::string &baseDir);
 	static void stop(void);
@@ -34,16 +35,32 @@ public:
 		iovec[0].iov_len = len;
 		addPacket(iovec, notify);
 	}
+
+	static void addPrologue(IoVector &iovec);
+	static void addPrologue(const void *pkt, uint32_t len) {
+		IoVector iovec(1);
+		iovec[0].iov_base = (void *) pkt;
+		iovec[0].iov_len = len;
+		addPrologue(iovec);
+	}
+
 	static int base_fd() { return m_base_fd; }
 
 	static boost::signals::connection onContainerChange(
-					const onContChange::slot_type &s) {
+					const ContainerSignal::slot_type &s) {
 		return m_contChange.connect(s);
+	}
+
+	static boost::signals::connection onPrologue(
+					const PrologueSignal::slot_type &s) {
+		return m_prologue.connect(s);
 	}
 
 	static ContainerSharedPtr &container (void) { return m_cur_container; }
 
 private:
+	typedef boost::signals::connection connection;
+
 	static int m_base_fd;
 
 	static uint32_t m_block_size;
@@ -51,12 +68,15 @@ private:
 	static uint64_t m_max_blocks_allowed;
 
 	static boost::shared_ptr<StorageContainer> m_cur_container;
+	static StorageContainer::FileSharedPtr m_prologueFile;
 
-	static onContChange m_contChange;
+	static ContainerSignal m_contChange;
+	static PrologueSignal m_prologue;
 
 	static void addBaseStorage(off_t size);
-
 	static void endCurrentContainer(void);
+	static void fileCreated(StorageContainer::FileSharedPtr &f);
+	static uint32_t validatePacket(const IoVector &iovec);
 
 	friend class StorageContainer;
 };

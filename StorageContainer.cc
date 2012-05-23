@@ -100,6 +100,11 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 		m_cur_file.reset(new StorageFile(*this, ++m_numFiles,
 						 true, status));
 		m_files.push_back(m_cur_file);
+
+		/* Tell the storage manager about the new file so we can
+		 * add the prologue before anyone else sees it.
+		 */
+		StorageManager::fileCreated(m_cur_file);
 		m_newFile(m_cur_file);
 	}
 

@@ -57,7 +57,6 @@ private:
 		    uint32_t number, bool create = false,
 		    ADARA::RunStatus::Enum = ADARA::RunStatus::NO_RUN);
 
-	/* XXX can we remove the manager? */
 	friend class StorageManager;
 	friend class StorageContainer;
 };
