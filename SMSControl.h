@@ -15,7 +15,7 @@
 class smsRunNumberPV;
 class smsRecordingPV;
 class RunInfo;
-
+class Geometry;
 class DataSource;
 
 class SMSControl : public caServer {
@@ -96,6 +96,7 @@ private:
 	uint32_t m_numBanks;
 	uint32_t m_bankReserve;
 	boost::shared_ptr<RunInfo> m_runInfo;
+	boost::shared_ptr<Geometry> m_geometry;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;

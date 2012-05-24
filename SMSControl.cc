@@ -4,6 +4,7 @@
 #include "StorageManager.h"
 #include "DataSource.h"
 #include "RunInfo.h"
+#include "Geometry.h"
 
 #include <math.h>
 
@@ -50,6 +51,7 @@ SMSControl::SMSControl(const std::string &beamline) :
 	 */
 
 	m_runInfo.reset(new RunInfo(beamline, this));
+	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
 
 	m_singleton = this;
 }
