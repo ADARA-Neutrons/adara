@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv)
 {
-	StorageManager::init("/data/dad/adara");
+	StorageManager::init("/adara/data");
 	LiveServer liveServer("31415");
 	SMSControl control("BL0");
 	STSClientMgr stsclient("localhost:31417");
