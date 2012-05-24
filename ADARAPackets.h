@@ -286,6 +286,20 @@ private:
 	friend class Parser;
 };
 
+class GeometryPkt : public Packet {
+public:
+	GeometryPkt(const GeometryPkt &pkt);
+
+	const std::string &info(void) const { return m_xml; }
+
+private:
+	std::string m_xml;
+
+	GeometryPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
 class DeviceDescriptorPkt : public Packet {
 public:
 	DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt);
