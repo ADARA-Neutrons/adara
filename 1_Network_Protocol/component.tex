@@ -165,6 +165,8 @@ system.
 		\ref{section:protocol_sync} \\
 	0x4009.0 & Heartbeat &
 		\ref{section:protocol_heartbeat} \\
+	0x400A.0 & Geometry &
+		\ref{section:protocol_geometry} \\
 	0x8000.0 & Device Descriptor &
 		\ref{section:protocol_device_descriptor} \\
 	0x8001.0 & Variable Value (u32) &
@@ -1250,6 +1252,44 @@ traffic over the network transport. The ``Heartbeat'' packet fills this need.
 This role may also be performed by the network transport's keepalive settings,
 though that does not help communication with the detector system which is
 expected to use an unreliable transport.
+
+
+\newpage
+\subsubsection{Geometry Packet}
+\label{section:protocol_geometry}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{0x00400A00} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{XML Length (u32)} \\
+    \wordbox{4}{XML Geometry Information ($N$ byte string data)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x400A.0: Geometry Packet}
+  \label{fig:protocol_packet_geometry}
+\end{figure}
+
+The Geometry packet contains information regarding the geometry of the beamline
+that created this stream of event data. As defined in
+figure~\ref{fig:protocol_packet_geometry}, it consists of the following fields:
+\begin{itemize}
+\item{\bf Timestamp} does not carry significant information and may be the
+last-modified time of the original file, the startup time of the SMS, or
+another value altogether.
+\item{\bf XML Length} indicates the length of the following XML, not including
+padding.
+\item{\bf XML Geometry Information} describes the geometry of the beamline
+producing this stream, as defined by the Mantid project at
+\url{http://www.mantidproject.org/InstrumentDefinitionFile}. The contents of
+this field must be padded to a multple of 4 bytes.
+\end{itemize}
+
 
 \newpage
 \subsection{Meta Data Packets}
