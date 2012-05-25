@@ -406,7 +406,11 @@ which will be determined during implementation.}
 \detail{Beam Monitor Mapping}{%
 It is assumed, but not yet assured, that the pixel ID for a beam monitor
 is in fact the actual beam monitor number. If this is determined not to be
-the case, a mapping table will needed.}
+the case, a mapping table will needed.
+
+Additionally, we'd like to use a bit to indicate leading/trailing edge of
+detection. Leading edge would be indicated by a zero, and would be the
+only value initially sent.}
 \detail{Fast Metadata}{%
 There are many formats for the fast metadata pixel IDs, and the pixel ID
 also carries the actual value of the metadata variable. The TOF field's
@@ -754,12 +758,23 @@ Resolve this for implementation.}
     \bitheader{31,24,23,0} \\
     \bitbox{8}{Monitor ID} &
     \bitbox{24}{Event Count} \\
-    \wordbox{1}{Time-of-flight 1 (units of 100 ns, u32)} \\
+    \wordbox{1}{Monitor Event 1 (u32)} \\
     \wordbox{1}{$\cdots$} \\
-    \wordbox{1}{Time-of-flight $N$} \\
+    \wordbox{1}{Monitor Event $N$} \\
   \end{bytefield}
   \caption{Beam Monitor Section}
   \label{fig:protocol_monitor_event_section}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,30,0} \\
+    \bitbox{1}{\tiny E \\ D \\ G} &
+    \bitbox{30}{Time-of-flight (units of 100 ns)}
+  \end{bytefield}
+  \caption{Beam Monitor Event}
+  \label{fig:protocol_monitor_event_fields}
 \end{figure}
 
 The ``Beam Monitor Event Data'' packet described in
@@ -813,8 +828,10 @@ following fields:
 in this section.
 \item{\bf Event Count} indicates the number of events in this section. This
 may be zero if there were no events for this pulse from this beam monitor.
-\item{\bf Time-of-flight} give the time-of-flight in units of 100 nanoseconds
-of the detected neutrons.
+\item{\bf Monitor Event(s)}, defined in
+Figure~\ref{fig:protocol_monitor_event_fields} give the time-of-flight in units
+of 100 nanoseconds of the detected neutrons. If this is from the trailing edge
+of the discriminator, bit {\bf EDG} will be set.
 \end{itemize}
 
 Beam monitors do not record pixel IDs to record the location of detected
