@@ -933,7 +933,7 @@ pad the total packet length to a multiple of 4 bytes.
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{12} \\
+    \wordbox{1}{16 + roundup($N$, 4)} \\
     \wordbox{1}{0x00400300} \\
     \wordbox{1}{Timestamp (seconds)} \\
     \wordbox{1}{Timestamp (nanoseconds)} \\
@@ -943,6 +943,11 @@ pad the total packet length to a multiple of 4 bytes.
     \wordbox{1}{Run Start (seconds, u32)} \\
     \bitbox{8}{Status} &
     \bitbox{24}{File Number} \\
+    \bitbox{8}{Unused} &
+    \bitbox{8}{Id Len} &
+    \bitbox{8}{Short Len} &
+    \bitbox{8}{Long Len} \\
+    \wordbox{2}{Beamline Data ($N$ byte string data)}
   \end{bytefield}
   \caption{Packet Type 0x4003.0: Run Status Packet}
   \label{fig:protocol_packet_status}
@@ -979,7 +984,17 @@ the current experiment run. This field is 0 if we are not currently recording
 data.
 \item{\bf Status} is defined in Table~\ref{table:protocol_run_status_values}.
 \item{\bf File Number} indentifies which file this data is stored in. This
-field is undefined in we are not currently recording an experimental run.
+field is undefined if we are not currently recording an experimental run.
+\item{\bf Id Len} gives the length of the numeric beamline identifier in the
+{\bf Beamline Data} field.
+\item{\bf Short Len} gives the length of the short name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Long Len} gives the length of the long name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Beamline Data} contains the numeric identifier, short name, and long
+name for the beamline that generated this data. These strings are concatenated
+together without intervening NULLs. This field must be padded to a multiple of
+4 bytes.
 \end{itemize}
 
 The Stream Management Service breaks experimental recordings into multiple
