@@ -18,7 +18,7 @@ void SignalEvents::check_init(void)
 	if (m_fd != -1)
 		return;
 
-	m_sig_map.reserve(SIGRTMAX);
+	m_sig_map.resize(SIGRTMAX);
 
 	sigemptyset(&m_sig_set);
 	m_fd = signalfd(-1, &m_sig_set, SFD_NONBLOCK | SFD_CLOEXEC);
