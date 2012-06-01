@@ -5,6 +5,7 @@
 #include "DataSource.h"
 #include "RunInfo.h"
 #include "Geometry.h"
+#include "PixelMap.h"
 
 #include <math.h>
 
@@ -29,7 +30,7 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 
 SMSControl::SMSControl(const std::string &beamline) :
 	m_nextRunNumber(1), m_recording(false), m_nextSrcId(0),
-	m_lastRingPeriod(0), m_numBanks(18), m_bankReserve(4096)
+	m_lastRingPeriod(0), m_bankReserve(4096)
 {
 	if (m_singleton)
 		throw std::runtime_error("SMSControl is a singleton");
@@ -46,12 +47,10 @@ SMSControl::SMSControl(const std::string &beamline) :
 	addPV(m_pvRunNumber);
 
 	/* TODO get old run number information from StorageManager */
-	/* TODO m_numBanks will be set when we read in the bank map file,
-	 * (and will need to have REAL_BANK_OFFSET added to it
-	 */
 
 	m_runInfo.reset(new RunInfo(beamline, this));
 	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
+	m_pixelMap.reset(new PixelMap("/adara/conf/pixelmap"));
 
 	m_singleton = this;
 }
@@ -151,22 +150,13 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	if (it != m_pulses.end())
 		return it;
 
-	PulsePtr new_pulse(new Pulse(pid, m_activeSources, m_numBanks));
+	PulsePtr new_pulse(new Pulse(pid, m_activeSources,
+			   m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET));
 
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
 	return m_pulses.insert(make_pair(pid, new_pulse)).first;
-}
-
-bool SMSControl::mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank)
-{
-	/* TODO use pixel map to do mapping */
-	logical = phys / 16;
-	bank = phys % 16;
-
-	/* XXX return true on error */
-	return false;
 }
 
 void SMSControl::sourceUp(uint32_t id)
@@ -229,7 +219,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
 
 	const ADARA::Event *events = pkt.events();
 	uint32_t i, count = pkt.num_events();
-	uint32_t phys, logical, bank;
+	uint32_t phys, logical;
+	uint16_t bank;
 	ADARA::Event translated;
 
 	for (i = 0; i < count; i++) {
@@ -237,7 +228,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
 
 		switch (phys >> 24) {
 		case 0:
-			if (mapEvent(phys, logical, bank))
+			if (m_pixelMap->mapEvent(phys, logical, bank))
 				pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
 			bank += Pulse::REAL_BANK_OFFSET;
 			break;

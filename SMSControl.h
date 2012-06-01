@@ -17,6 +17,7 @@ class smsRecordingPV;
 class RunInfo;
 class Geometry;
 class DataSource;
+class PixelMap;
 
 class SMSControl : public caServer {
 public:
@@ -93,10 +94,10 @@ private:
 	SourceSet m_activeSources;
 	PulseMap m_pulses;
 	uint32_t m_lastRingPeriod;
-	uint32_t m_numBanks;
 	uint32_t m_bankReserve;
 	boost::shared_ptr<RunInfo> m_runInfo;
 	boost::shared_ptr<Geometry> m_geometry;
+	boost::shared_ptr<PixelMap> m_pixelMap;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;
