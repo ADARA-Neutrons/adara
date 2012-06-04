@@ -159,18 +159,13 @@ void RunInfo::generatePacket(void)
 	xml += m_beamline;
 	xml += "</instrument_name>";
 
-	/* TODO we use run number 0 to indicate no run, need to update
-	 * schema to make everything optional for that case
-	 */
 	xml += "<run_number>";
 	xml += boost::lexical_cast<std::string>(m_runNumber);
 	xml += "</run_number>";
 
-	if (m_runNumber) {
-		addElements(xml, m_required);
-		addElements(xml, m_optional);
-		addElements(xml, m_sample, "sample");
-	}
+	addElements(xml, m_required);
+	addElements(xml, m_optional);
+	addElements(xml, m_sample, "sample");
 
 	xml += "</runinfo>";
 
@@ -213,6 +208,8 @@ void RunInfo::onPrologue(void)
 	 * STS. But it may not be a bad idea to give this to live viewers
 	 * as well.
 	 */
-	generatePacket();
-	StorageManager::addPrologue(m_packet, m_packetSize);
+	if (m_runNumber) {
+		generatePacket();
+		StorageManager::addPrologue(m_packet, m_packetSize);
+	}
 }
