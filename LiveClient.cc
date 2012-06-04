@@ -40,6 +40,7 @@ LiveClient::~LiveClient()
 	m_fileConnection.disconnect();
 	delete m_read;
 	delete m_write;
+	delete m_timer;
 	close(m_client_fd);
 	if (m_file_fd != -1)
 		m_files.front().first->put_fd();
