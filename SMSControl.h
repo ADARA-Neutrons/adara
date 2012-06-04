@@ -18,12 +18,15 @@ class RunInfo;
 class Geometry;
 class DataSource;
 class PixelMap;
+class BeamlineInfo;
 
 class SMSControl : public caServer {
 public:
 	typedef boost::shared_ptr<casPV> PVSharedPtr;
 
-	SMSControl(const std::string &beamline);
+	SMSControl(const std::string &beamlineId,
+		   const std::string &beamlineShortName,
+		   const std::string &beamlineLongName);
 	~SMSControl();
 
 	void show(unsigned level) const;
@@ -98,6 +101,7 @@ private:
 	boost::shared_ptr<RunInfo> m_runInfo;
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
+	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;

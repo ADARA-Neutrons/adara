@@ -6,6 +6,7 @@
 #include "RunInfo.h"
 #include "Geometry.h"
 #include "PixelMap.h"
+#include "BeamlineInfo.h"
 
 #include <math.h>
 
@@ -28,14 +29,16 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 	return (E0 / sqrt(1 - (beta * beta))) - E0;
 }
 
-SMSControl::SMSControl(const std::string &beamline) :
+SMSControl::SMSControl(const std::string &beamlineId,
+		       const std::string &beamlineShortName,
+		       const std::string &beamlineLongName) :
 	m_nextRunNumber(1), m_recording(false), m_nextSrcId(0),
 	m_lastRingPeriod(0), m_bankReserve(4096)
 {
 	if (m_singleton)
 		throw std::runtime_error("SMSControl is a singleton");
 
-	std::string prefix(beamline);
+	std::string prefix(beamlineShortName);
 	prefix += ":SMS";
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
@@ -48,7 +51,9 @@ SMSControl::SMSControl(const std::string &beamline) :
 
 	/* TODO get old run number information from StorageManager */
 
-	m_runInfo.reset(new RunInfo(beamline, this));
+	m_beamlineInfo.reset(new BeamlineInfo(beamlineId, beamlineShortName,
+					      beamlineLongName));
+	m_runInfo.reset(new RunInfo(beamlineShortName, this));
 	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
 	m_pixelMap.reset(new PixelMap("/adara/conf/pixelmap"));
 

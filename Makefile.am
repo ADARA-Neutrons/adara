@@ -22,7 +22,7 @@ smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
 		LiveClient.cc LiveServer.cc \
 		SMSControl.cc SMSControlPV.cc SignalEvents.cc \
 		STSClient.cc STSClientMgr.cc RunInfo.cc \
-		Geometry.cc PixelMap.cc
+		Geometry.cc PixelMap.cc BeamlineInfo.cc
 smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
 smsd_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
 smsd_LDADD = $(EPICS_LIBS) -lboost_signals -lpthread
