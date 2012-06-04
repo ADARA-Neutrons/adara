@@ -70,8 +70,9 @@ initWinSocket( char *a_address, unsigned short a_port, SOCKET &a_socket )
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-    char *address = "localhost";
-    unsigned short port = 31416;
+    char            *address = "localhost";
+    unsigned short  port = 31416;
+    unsigned long   pkt_count = 0;
 
     for ( int i = 1; i < argc; ++i )
     {
@@ -99,34 +100,49 @@ int _tmain(int argc, _TCHAR* argv[])
 
     while (1)
     {
-        rc = recv(pvs_socket, (char*)&pkt, sizeof(SNS::PVS::ADARA::ADARAPacket),0);
-        if ( rc > 0 )
+        //rc = recv(pvs_socket, (char*)&pkt, sizeof(SNS::PVS::ADARA::ADARAPacket),0);
+        // Rcv ADARA header ONLY
+        rc = recv(pvs_socket, (char*)&pkt, 16,0);
+        if ( rc == 16 )
         {
-            cout << "got packet." << endl;
-            cout << "format: " << hex << pkt.format << dec << endl;
-            cout << "payload len: " << pkt.payload_len << endl;
-            cout << "dev_id: " << pkt.dev_id << endl;
-            cout << "time: " << pkt.sec << "." << pkt.nsec << endl;
+            // Get payload len from header
+            cout << "Pkt: " << ++pkt_count << endl;
+            cout << "  format: " << hex << pkt.format << dec << endl;
+            cout << "  payload len: " << pkt.payload_len << endl;
+            cout << "  time: " << pkt.sec << "." << pkt.nsec << endl;
 
-            if ( pkt.format == 0x800000 )
+            rc = recv(pvs_socket, (char*)&pkt.dev_id, pkt.payload_len, 0 );
+            if ( rc == pkt.payload_len )
             {
-                cout << "xml len: " << pkt.ddp.xml_len << endl;
-                cout << "xml: " << pkt.ddp.xml << endl;
+                cout << "  dev_id: " << pkt.dev_id << endl;
+
+                if ( pkt.format == 0x800000 )
+                {
+                    cout << "  xml len: " << pkt.ddp.xml_len << endl;
+                    cout << "  xml: " << pkt.ddp.xml << endl;
+                }
+                else if ( pkt.format == 0x800100 )
+                {
+                    cout << "  pv id: " << pkt.vvp.var_id << endl;
+                    cout << "  pv value: " << pkt.vvp.uval << endl;
+                }
+                else if ( pkt.format == 0x800200 )
+                {
+                    cout << "  pv id: " << pkt.vvp.var_id << endl;
+                    cout << "  pv value: " << pkt.vvp.dval << endl;
+                }
+                else
+                {
+                    cout << "  unknown pkt type!" << endl;
+                }
             }
-            else if ( pkt.format == 0x800100 )
+            else if ( rc == 0 )
             {
-                cout << "pv id: " << pkt.vvp.var_id << endl;
-                cout << "pv value: " << pkt.vvp.uval << endl;
+                cout << "  connection closed." << endl;
+                break;
             }
-            else if ( pkt.format == 0x800200 )
-            {
-                cout << "pv id: " << pkt.vvp.var_id << endl;
-                cout << "pv value: " << pkt.vvp.dval << endl;
-            }
-            else
-            {
-                cout << "unknown pkt type!" << endl;
-            }
+            else if ( rc < 0 )
+                cout << "  recv error: " << rc << endl;
         }
         else if ( rc == 0 )
         {
