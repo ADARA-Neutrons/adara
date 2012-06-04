@@ -34,14 +34,29 @@ bool Parser::read(int fd, unsigned int max_read)
 	while (!max_read || bytes_read < max_read) {
 		rc = ::read(fd, m_buffer + m_len, m_size - m_len);
 		if (rc < 0) {
-			if (errno == EINTR || errno == EAGAIN ||
-						errno == EWOULDBLOCK)
+			switch (errno) {
+			case EINTR:
+			case EAGAIN:
+				/* We didn't get any data, but we're OK */
 				return true;
-
-			int err = errno;
-			std::string msg("Parser::read(): ");
-			msg += strerror(err);
-			throw std::runtime_error(msg);
+			case EPIPE:
+			case ECONNRESET:
+			case ETIMEDOUT:
+			case EHOSTUNREACH:
+			case ENETUNREACH:
+				/* The host went away, but this shouldn't
+				 * be fatal.
+				 */
+				return false;
+			default:
+				/* TODO consider if we should throw an
+				 * exception at all.
+				 */
+				int err = errno;
+				std::string msg("Parser::read(): ");
+				msg += strerror(err);
+				throw std::runtime_error(msg);
+			}
 		}
 
 		if (rc == 0)
