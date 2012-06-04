@@ -167,6 +167,8 @@ system.
 		\ref{section:protocol_heartbeat} \\
 	0x400A.0 & Geometry &
 		\ref{section:protocol_geometry} \\
+	0x400B.0 & Beamline Info &
+		\ref{section:protocol_beamline_info} \\
 	0x8000.0 & Device Descriptor &
 		\ref{section:protocol_device_descriptor} \\
 	0x8001.0 & Variable Value (u32) &
@@ -515,6 +517,7 @@ for the run, the SMS will send the following prologue:
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Run Information (Section~\ref{section:protocol_run_information})
 \item Geometry (Section~\ref{section:protocol_geometry})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info})
 \item one or more Device Descriptors and Variable Value packets
 (Section~\ref{section:protocol_meta_data_packets})
 \end{itemize}
@@ -554,6 +557,7 @@ Hello, it will send the following prologue:
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table})
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Geometry (Section~\ref{section:protocol_geometry})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info})
 \item one or more Device Descriptors and Variable Value packets
 (Section~\ref{section:protocol_meta_data_packets})
 \end{itemize}
@@ -933,7 +937,7 @@ pad the total packet length to a multiple of 4 bytes.
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{16 + roundup($N$, 4)} \\
+    \wordbox{1}{12} \\
     \wordbox{1}{0x00400300} \\
     \wordbox{1}{Timestamp (seconds)} \\
     \wordbox{1}{Timestamp (nanoseconds)} \\
@@ -943,11 +947,6 @@ pad the total packet length to a multiple of 4 bytes.
     \wordbox{1}{Run Start (seconds, u32)} \\
     \bitbox{8}{Status} &
     \bitbox{24}{File Number} \\
-    \bitbox{8}{Unused} &
-    \bitbox{8}{Id Len} &
-    \bitbox{8}{Short Len} &
-    \bitbox{8}{Long Len} \\
-    \wordbox{2}{Beamline Data ($N$ byte string data)}
   \end{bytefield}
   \caption{Packet Type 0x4003.0: Run Status Packet}
   \label{fig:protocol_packet_status}
@@ -963,6 +962,7 @@ pad the total packet length to a multiple of 4 bytes.
 	2 & Continuing current run (end of file marker) \\
 	3 & Continuing current run (new file marker) \\
 	4 & Ending current run \\
+	5 & System status snapshot \\
     \end{tabular}
   \end{center}
   \caption {Run Status Definitions}
@@ -985,16 +985,6 @@ data.
 \item{\bf Status} is defined in Table~\ref{table:protocol_run_status_values}.
 \item{\bf File Number} indentifies which file this data is stored in. This
 field is undefined if we are not currently recording an experimental run.
-\item{\bf Id Len} gives the length of the numeric beamline identifier in the
-{\bf Beamline Data} field.
-\item{\bf Short Len} gives the length of the short name for the beamline in the
-{\bf Beamline Data} field.
-\item{\bf Long Len} gives the length of the long name for the beamline in the
-{\bf Beamline Data} field.
-\item{\bf Beamline Data} contains the numeric identifier, short name, and long
-name for the beamline that generated this data. These strings are concatenated
-together without intervening NULLs. This field must be padded to a multiple of
-4 bytes.
 \end{itemize}
 
 The Stream Management Service breaks experimental recordings into multiple
@@ -1324,6 +1314,49 @@ producing this stream, as defined by the Mantid project at
 this field must be padded to a multple of 4 bytes.
 \end{itemize}
 
+
+\newpage
+\subsubsection{Beamline Info Packet}
+\label{section:protocol_beamline_info}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{0x00400B00} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,24,23,16,15,8,7,0} \\
+    \bitbox{8}{Unused} &
+    \bitbox{8}{Id Len} &
+    \bitbox{8}{Short Len} &
+    \bitbox{8}{Long Len} \\
+    \wordbox{2}{Beamline Data ($N$ byte string data)}
+  \end{bytefield}
+  \caption{Packet Type 0x400B.0: Beamline Info Packet}
+  \label{fig:protocol_packet_beamline_info}
+\end{figure}
+
+The ``Beamline Info'' packet contains information to identify the beamline that
+created the event data in this stream.
+
+\begin{itemize}
+\item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
+\item{\bf Timestamp} does not carry significant information and may be the
+startup time of the SMS, or the time the packet was send, if not another value
+altogether.
+\item{\bf Id Len} gives the length of the numeric beamline identifier in the
+{\bf Beamline Data} field.
+\item{\bf Short Len} gives the length of the short name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Long Len} gives the length of the long name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Beamline Data} contains the numeric identifier, short name, and long
+name for the beamline. These strings are concatenated together without
+intervening NULLs. This field must be padded to a multiple of 4 bytes.
+\end{itemize}
 
 \newpage
 \subsection{Meta Data Packets}
