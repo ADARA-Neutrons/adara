@@ -3,6 +3,7 @@
 adara-client
 adara-gen
 storage-test
+parser-test
 smsd
 
 # All of this crap is from autotools
