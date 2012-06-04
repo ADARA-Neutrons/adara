@@ -9,8 +9,6 @@
 #include <string>
 #include <map>
 
-#include "OSDefs.h"
-
 namespace SNS { namespace PVS {
 
 typedef unsigned long Protocol;
