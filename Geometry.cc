@@ -34,6 +34,8 @@ Geometry::Geometry(const std::string &path)
 	m_packet = new uint8_t[m_packetSize];
 	fields = (uint32_t *) m_packet;
 
+	clock_gettime(CLOCK_REALTIME, &ts);
+
 	fields[0] = payloadSize;
 	fields[1] = ADARA::PacketType::GEOMETRY_V0;
 	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
