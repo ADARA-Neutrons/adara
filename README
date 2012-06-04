@@ -1,0 +1,45 @@
+
+Prerequisites
+
+EPICS (http://www.aps.anl.gov/epics/download/base/baseR3.14.12.2.tar.gz)
+
+Boost (1.47 tested)
+automake (1.11 tested)
+autoconf (2.68 tested)
+
+
+Building
+
+1. Build EPICS (just extract and type make)
+2. cd sms-repo
+3. ./bootstrap (only need to do once)
+4. ./configure --with-epics=/path/to/epics/
+5. make (-jX)
+6. Make /adara writable by yourself (once)
+7. Make /adara/data, writable by yourself (once)
+8. Copy the configuration in sms-repo to /adara/conf (once)
+9. Run as ./smsd
+
+If you need to change the configuration (paths, ports, etc), edit smsd.cc and SMSControl.cc; a proper configuration system is on the the TODO list.
+
+You can use caput, caget, and camonitor from EPICS to control recording.
+
+PVs currently supported:
+CNCS:SMS:recording
+CNCS:SMS:run_number
+CNCS:SMS:RunInfo:reset
+CNCS:SMS:RunInfo:proposal_id
+CNCS:SMS:RunInfo:collection_number
+CNCS:SMS:RunInfo:proposal_title
+CNCS:SMS:RunInfo:collection_title
+CNCS:SMS:RunInfo:run_title
+CNCS:SMS:RunInfo:sample:id
+CNCS:SMS:RunInfo:sample:name
+CNCS:SMS:RunInfo:sample:nature
+CNCS:SMS:RunInfo:sample:formula
+CNCS:SMS:RunInfo:sample:environment
+
+
+I've used CNCS here as that matches the configuration files in the repo;
+you can change the CNCS in the PVs to be a string of your choosing by editing
+the values given to the SMSControl constructor in smsd.cc.
