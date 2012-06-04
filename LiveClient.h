@@ -18,11 +18,13 @@ public:
 
 private:
 	typedef boost::signals::connection connection;
+	typedef std::pair<StorageContainer::FileSharedPtr, off_t> FileEntry;
+	typedef std::list<FileEntry> FileList;
 
+	FileList m_files;
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
 	bool m_hello_received;
-	off_t m_cur_offset;
 	int m_client_fd;
 	int m_file_fd;
 	TimerAdapter<LiveClient> *m_timer;
@@ -31,6 +33,7 @@ private:
 	connection m_fileConnection;
 
 	void containerChange(StorageManager::ContainerSharedPtr &, bool);
+	void historicalFile(StorageContainer::FileSharedPtr &f, off_t start);
 	void fileAdded(StorageContainer::FileSharedPtr &f);
 	void fileUpdated(const StorageFile &f);
 
@@ -44,8 +47,6 @@ private:
 			   unsigned int chunk_offset, unsigned int chunk_len);
 
 	bool rxPacket(const ADARA::ClientHelloPkt &pkt);
-
-	std::list<StorageContainer::FileSharedPtr> m_files;
 
 	static unsigned int m_max_send_chunk;
 	static double m_hello_timeout;

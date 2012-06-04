@@ -18,7 +18,7 @@ double LiveClient::m_hello_timeout = 30.0;
 
 LiveClient::LiveClient(int fd) : 
 	ADARA::Parser(MAX_PKT_SIZE, MAX_PKT_SIZE),
-	m_read(NULL), m_write(NULL), m_hello_received(false), m_cur_offset(0),
+	m_read(NULL), m_write(NULL), m_hello_received(false),
 	m_client_fd(fd), m_file_fd(-1)
 {
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
@@ -42,7 +42,7 @@ LiveClient::~LiveClient()
 	delete m_write;
 	close(m_client_fd);
 	if (m_file_fd != -1)
-		m_files.front()->put_fd();
+		m_files.front().first->put_fd();
 }
 
 bool LiveClient::timerExpired(void)
@@ -54,20 +54,21 @@ bool LiveClient::timerExpired(void)
 
 void LiveClient::writable(void)
 {
-	std::list<boost::shared_ptr<StorageFile> >::iterator it;
+	FileList::iterator it;
 	StorageFile *f;
 	ssize_t len, rc;
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
-		f = it->get();
+		f = it->first.get();
 		if (m_file_fd == -1)
 			m_file_fd = f->get_fd();
 
-		len = f->size() - m_cur_offset;
+		off_t &cur_offset = it->second;
+		len = f->size() - cur_offset;
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
 
-		rc = sendfile(m_client_fd, m_file_fd, &m_cur_offset, len);
+		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				goto more;
@@ -91,7 +92,7 @@ void LiveClient::writable(void)
 		 */
 
 		/* Did we catch up to the current EOF? */
-		if (m_cur_offset != f->size())
+		if (cur_offset != f->size())
 			goto more;
 
 		/* At EOF, do we expect to get more? */
@@ -102,7 +103,6 @@ void LiveClient::writable(void)
 		 * coming for it; close it out and go to the next one.
 		 */
 		m_file_fd = -1;
-		m_cur_offset = 0;
 		f->put_fd();
 		it = m_files.erase(it);
 	}
@@ -136,13 +136,20 @@ void LiveClient::containerChange(StorageManager::ContainerSharedPtr &c,
 		m_contConnection.disconnect();
 }
 
+void LiveClient::historicalFile(StorageContainer::FileSharedPtr &f, off_t start)
+{
+	/* This is an old file, so just put it on the list to be sent.
+	 */
+	m_files.push_back(std::make_pair(f, start));
+}
+
 void LiveClient::fileAdded(StorageContainer::FileSharedPtr &f)
 {
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
-	m_files.push_back(f);
+	m_files.push_back(std::make_pair(f, 0));
 	m_fileConnection = f->connect(boost::bind(&LiveClient::fileUpdated,
 						  this, _1));
 }
@@ -201,31 +208,41 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	StorageManager::ContainerSharedPtr cur_cont;
 	StorageContainer::FileSharedPtr cur_file;
 
-	/* TODO setup replay of historical data */
 	m_timer->cancel();
 	m_hello_received = true;
 
 	m_mgrConnection = StorageManager::onContainerChange(
 		boost::bind(&LiveClient::containerChange, this, _1, _2));
 
-	/* TODO send current state of the system (ie, pixel map,
-	 * runinfo, environment setup, etc) to the client
-	 * before we send event data.
+	/* Request the system state at the given timestamp, or just prior.
 	 */
+	StorageManager::iterateHistory(pkt.requestedStartTime(),
+				boost::bind(&LiveClient::historicalFile,
+						this, _1, _2));
 
+	/* Register for updates and notification of new files if we
+	 * have anything active.
+	 */
 	cur_cont = StorageManager::container();
 	if (cur_cont) {
 		m_contConnection = cur_cont->connect(
 				boost::bind(&LiveClient::fileAdded, this, _1));
 		cur_file = cur_cont->file();
 		if (cur_file) {
+			/* StorageManager::iterateHistory() will have already
+			 * added this file to our list with the appropriate
+			 * offset, so just register for new updates.
+			 */
 			m_fileConnection = cur_file->connect(
 					boost::bind(&LiveClient::fileUpdated,
 						    this, _1));
-			m_files.push_back(cur_file);
-			m_cur_offset = cur_file->size();
 		}
 	}
+
+	/* And try to send the data we've queued up.
+	 */
+	m_write = new ReadyAdapter(m_client_fd, fdrWrite,
+				boost::bind(&LiveClient::writable, this));
 
 	return false;
 }

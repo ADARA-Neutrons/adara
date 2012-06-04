@@ -118,6 +118,34 @@ void StorageManager::stopRecording(void)
 	endCurrentContainer();
 }
 
+void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
+{
+	/* TODO allow requests of actual historical data */
+
+	/* Ok, we don't want any historical data, so just create a
+	 * transient file to hold the current state information.
+	 */
+
+	uint32_t run = 0;
+	if (m_cur_container)
+		run = m_cur_container->runNumber();
+
+	/* Create a file for the current state, and call the prologue
+	 * handlers to populate it.
+	 */
+	StorageContainer::FileSharedPtr state(new StorageFile(run));
+	fileCreated(state);
+	cb(state, 0);
+
+	/* Now, tell the callback about the current file we're working on.
+	 */
+	if (m_cur_container) {
+		StorageContainer::FileSharedPtr &f = m_cur_container->file();
+		if (f)
+			cb(f, f->size());
+	}
+}
+
 void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
 	uint32_t len = validatePacket(iovec);

@@ -20,12 +20,16 @@ public:
 	typedef boost::shared_ptr<StorageContainer> ContainerSharedPtr;
 	typedef boost::signal<void (ContainerSharedPtr &, bool)> ContainerSignal;
 	typedef boost::signal<void (void)> PrologueSignal;
+	typedef boost::function<void (StorageContainer::FileSharedPtr &,
+				      off_t)> FileOffSetFunc;
 
 	static void init(const std::string &baseDir);
 	static void stop(void);
 
 	static void startRecording(uint32_t run);
 	static void stopRecording(void);
+
+	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
 	static void addPacket(IoVector &iovec, bool notify = true);
 	static void addPacket(const void *pkt, uint32_t len,
