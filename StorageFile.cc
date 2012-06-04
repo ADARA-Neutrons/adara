@@ -43,12 +43,21 @@ off_t StorageFile::m_max_file_size = 1024 * 1024;
 
 StorageFile::~StorageFile()
 {
+	if (m_tempFile)
+		close(m_fd);
+
 	//assert(!m_fd_refs);
 	//assert(m_fd == -1);
 }
 
 int StorageFile::get_fd(void)
 {
+	/* We don't do reference counting for temporary files; if we close
+	 * the file descriptor, we'll loose the data.
+	 */
+	if (m_tempFile)
+		return m_fd;
+
 	if (m_fdRefs) {
 		m_fdRefs++;
 		return m_fd;
@@ -60,6 +69,12 @@ int StorageFile::get_fd(void)
 
 void StorageFile::put_fd(void)
 {
+	/* We don't do reference counting for temporary files; if we close
+	 * the file descriptor, we'll loose the data.
+	 */
+	if (m_tempFile)
+		return;
+
 	//TODO C++ way for this?
 	//assert(m_fd_refs);
 
@@ -256,7 +271,8 @@ StorageFile::StorageFile(const StorageContainer &container,
 			 ADARA::RunStatus::Enum status) :
 	m_runNumber(container.runNumber()), m_fileNumber(fileNumber),
 	m_startTime(container.startTime().tv_sec), m_oversize(false),
-	m_active(create), m_size(0), m_syncDistance(0), m_fd(-1)
+	m_active(create), m_size(0), m_syncDistance(0), m_fd(-1),
+	m_tempFile(false)
 {
 	makePath(container);
 	if (!create) {
@@ -284,4 +300,44 @@ StorageFile::StorageFile(const StorageContainer &container,
 	open(O_CREAT|O_EXCL|O_RDWR);
 	addSync();
 	addRunStatus(status);
+}
+
+StorageFile::StorageFile(const std::string &path, uint32_t runNumber,
+			 uint32_t fileNumber, uint32_t startTime) :
+	m_runNumber(runNumber), m_fileNumber(fileNumber),
+	m_startTime(startTime), m_oversize(false),
+	m_active(true), m_size(0), m_syncDistance(0), m_fd(-1),
+	m_tempFile(false)
+{
+	open(O_CREAT|O_EXCL|O_RDWR);
+	addSync();
+	addRunStatus(ADARA::RunStatus::STATE);
+}
+
+StorageFile::StorageFile(uint32_t runNumber) :
+	m_runNumber(runNumber), m_fileNumber(0),
+	m_startTime(0), m_oversize(false),
+	m_active(false), m_size(0), m_syncDistance(0), m_fd(-1), m_fdRefs(1),
+	m_tempFile(true)
+{
+	/* This constructor is used to generate a temporary state file
+	 * for live clients that don't care about historical data.
+	 */
+	char path_template[] = "/tmp/SMS-Storage-State-XXXXXX";
+
+	m_fd = mkstemp(path_template);
+	if (m_fd < 0) {
+		int err = errno;
+		std::string msg("StorageFile::open() mkstemp error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
+
+	/* We don't want this to persist, so delete it so the data is
+	 * free'd when we close the file descriptor.
+	 */
+	unlink(path_template);
+
+	addSync();
+	addRunStatus(ADARA::RunStatus::STATE);
 }

@@ -42,6 +42,7 @@ private:
 	int m_fd;
 	unsigned int m_fdRefs;
 	onUpdate m_update;
+	bool m_tempFile;
 
 	static off_t m_max_file_size;
 	static off_t m_max_sync_distance;
@@ -56,6 +57,9 @@ private:
 	StorageFile(const StorageContainer &container,
 		    uint32_t number, bool create = false,
 		    ADARA::RunStatus::Enum = ADARA::RunStatus::NO_RUN);
+	StorageFile(const std::string &path, uint32_t runNumber,
+		    uint32_t fileNumber, uint32_t startTime);
+	StorageFile(uint32_t runNumber);
 
 	friend class StorageManager;
 	friend class StorageContainer;

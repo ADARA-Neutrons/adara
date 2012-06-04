@@ -54,6 +54,7 @@ namespace RunStatus {
 		RUN_EOF	= 2,
 		RUN_BOF	= 3,
 		END_RUN	= 4,
+		STATE	= 5,
 	};
 }
 
