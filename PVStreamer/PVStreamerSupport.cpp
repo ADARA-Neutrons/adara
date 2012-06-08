@@ -1,3 +1,10 @@
+/**
+ * \file PVStreamerSupport.h
+ * \brief Source file for classes defined in PVStreamerSupport.h.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #include "stdafx.h"
 #include "PVStreamerSupport.h"
 
@@ -5,6 +12,11 @@ using namespace std;
 
 namespace SNS { namespace PVS {
 
+/**
+ * \brief Converts alarm value(s) to human readable text
+ * \param a_arams - Alarms to convert
+ * \return Text representation of alram state
+ */
 string
 alarmText( unsigned short a_alarms )
 {
@@ -22,12 +34,21 @@ alarmText( unsigned short a_alarms )
     return alarm;
 }
 
-
+/**
+ * \brief Constructor for Enum class.
+ * \param a_id - Identifier of new enum instance
+ * \param a_values - Enum key-value pairs
+ */
 Enum::Enum( unsigned long a_id, const map<int,string> &a_values )
 : m_id(a_id), m_values(a_values)
 {
 }
 
+/**
+ * \brief Determines if value is defined in enum.
+ * \param a_value - Value to test for validity
+ * \return True if value is valid; false otherwise
+ */
 bool
 Enum::isValid( int a_value ) const
 {
@@ -37,6 +58,11 @@ Enum::isValid( int a_value ) const
         return false;
 }
 
+/**
+ * \brief Gets the name associated with a specified enum value (int)
+ * \param a_value - Value to look-up
+ * \return Name of specified value (throws if not defined)
+ */
 const string &
 Enum::getName( int a_value ) const
 {
@@ -47,6 +73,11 @@ Enum::getName( int a_value ) const
     throw -1;
 }
 
+/**
+ * \brief Gets the value associated with a specified enum name
+ * \param a_name - The enum name to look-up
+ * \return Value of specified name (throws if not defined)
+ */
 int
 Enum::getValue( const std::string & a_name ) const
 {
@@ -59,12 +90,21 @@ Enum::getValue( const std::string & a_name ) const
     throw -1;
 }
 
+/**
+ * \brief Gets the key-value pairs of the enum
+ * \return All key-value pairs associated with this enum.
+ */
 const std::map<int,const std::string> &
 Enum::getMap() const
 {
     return (const std::map<int,const std::string> &) m_values;
 }
 
+/**
+ * \brief Determines if an enum matches a specified map of key-value pairs
+ * \param a_values - A map of key-value pairs to compair
+ * \return True if specified key-value pairs match those defined in this enum
+ */
 bool
 Enum::operator==(const std::map<int,std::string> &a_values) const
 {

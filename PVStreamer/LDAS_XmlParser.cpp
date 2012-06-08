@@ -1,22 +1,13 @@
-/*
- *  File: StringParser.cpp
- *
- *  Rick Riedel, March 8, 2006
- *
- *  To Do:
- *
- *  Modifications:
- *  
+/**
+ * \file LDAS_XmlParser.cpp
+ * \brief Source file for CStringParser class.
+ * \author Rick Riedel
+ * \date March 8, 2006
  */
 
 #include "stdafx.h"
 #include "LDAS_XmlParser.h"
 
-#ifdef _DEBUG
-#undef THIS_FILE
-static char THIS_FILE[]=__FILE__;
-#define new DEBUG_NEW
-#endif
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction

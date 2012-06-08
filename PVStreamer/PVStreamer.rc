@@ -105,13 +105,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "TODO: <Company name>"
-            VALUE "FileDescription", "TODO: <File description>"
+            VALUE "CompanyName", "Oak Ridge National Laboratory"
+            VALUE "FileDescription", "SNS Process Variable Streamer"
             VALUE "FileVersion", "1.0.0.1"
             VALUE "InternalName", "PVStreamer.exe"
-            VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
+            VALUE "LegalCopyright", "(c) 2012 Oak Ridg National Laboratory.  All rights reserved."
             VALUE "OriginalFilename", "PVStreamer.exe"
-            VALUE "ProductName", "TODO: <Product name>"
+            VALUE "ProductName", "SNS Next Gen DAS"
             VALUE "ProductVersion", "1.0.0.1"
         END
     END

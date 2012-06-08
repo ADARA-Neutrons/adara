@@ -1,3 +1,10 @@
+/**
+ * \file LDAS_PVConfigAgent.h
+ * \brief Header file for LDAS_PVConfigAgent class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #ifndef LDAS_PVCONFIGAGENT
 #define LDAS_PVCONFIGAGENT
 
@@ -19,16 +26,35 @@ namespace LDAS {
 
 class LDAS_PVConfigMgr;
 
+/**
+ * @class LDAS_PVConfigAgent
+ * @brief Provides host configuration loading using legacy DAS protocol.
+ *
+ * The LDAS_PVConfigAgent provides legacy DAS configuration loading for an associated
+ * satellite computer (host). The configuration loading process is initiated by
+ * connecting to a "filename socket" (via NI DataSockets) on the host. A configuration
+ * filename, an options filename, and a units filename are received over this
+ * connection, and are subsequently openned and parsed. (These file must be accessible
+ * from the machine that PVStreamer is runnng on.) Loading these files results in
+ * devices and process variables being defined in the PVStreamer object where they
+ * can be access by other interested classes. This class uses legacy XML parsing
+ * code extracted from the ListenerLib library.
+ *
+ * Currently device and process variable as assigned numeric identifers on a first-com
+ * first-serve basis. This approach will yeild varying identifiers in downstream
+ * work products from run-to-run and may need to be changed to static allocation of
+ * device identifiers.
+ */
 class LDAS_PVConfigAgent : public PVConfig
 {
 public:
+
     LDAS_PVConfigAgent( PVStreamer &a_streamer, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname );
     ~LDAS_PVConfigAgent();
 
-
 private:
-    void        fileSocketData( NI::CNiDataSocketData &a_data );
 
+    void        fileSocketData( NI::CNiDataSocketData &a_data );
     void        parseConfigFile( const std::string &a_filename );
     void        parseOptionsFile( const std::string &a_filename );
     void        parseUnitsFile( const std::string &a_filename );
@@ -41,28 +67,14 @@ private:
     DataType    GetDataType(PELE_STRUCT pStruct);
     Access      GetDataAccess(PELE_STRUCT pStruct);
 
-    enum LoadState
-    {
-        LS_INITIAL,
-        LS_WAITING_FILENAMES,
-        LS_LOADING_FILES,
-        LS_DONE
-    };
+    std::string         m_hostname;         ///< Hostname that will provide configuration information
+    std::string         m_config_file;      ///< Name of main DAS configuration file
+    std::string         m_options_file;     ///< Name of options file
+    std::string         m_units_file;       ///< Name of units file
+    NI::CNiDataSocket   m_file_socket;      ///< DataSocket that receives filename information
 
-    LoadState           m_state;
-    std::string         m_hostname;
-    std::string         m_config_file;
-    std::string         m_options_file;
-    std::string         m_units_file;
-    NI::CNiDataSocket   m_file_socket;
-    NI::CNiDataSocket   m_notify_socket;
-
-    //std::string     m_device_file;
-    //std::string     m_pv_file;
-
-    static Identifier   m_next_dev_id; //TODO HACK
-    //static Identifier   m_next_pv_id; //TODO HACK
-    static std::map<Identifier,Identifier> m_next_pv_id;
+    static Identifier                       m_next_dev_id;  ///< Next auto-assigned device ID
+    static std::map<Identifier,Identifier>  m_next_pv_id;   ///< Next auto-assigned pv ID for each device
 };
 
 }}}

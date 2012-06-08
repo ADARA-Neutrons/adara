@@ -1,3 +1,10 @@
+/**
+ * \file ADARA_PVWriter.h
+ * \brief Header file for ADARA_PVWriter class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #ifndef ADARA_PVWRITER
 #define ADARA_PVWRITER
 
@@ -6,6 +13,7 @@
 #include <string>
 
 #include <boost/thread.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "PVWriter.h"
@@ -15,58 +23,70 @@
 
 namespace SNS { namespace PVS { namespace ADARA {
 
+/// Defines the difference between EPICS and Posix timestamp values
 #define EPICS_TIME_OFFSET -631152000
 
+/// Interface for listeners that want to receive writer state notifications.
 class IADARAWriterListener
 {
 public:
     virtual void    listening( const std::string & a_address, unsigned short a_port ) = 0;
-    virtual void    connected() = 0; // const std::string & a_client_address );
-    virtual void    disconnected() = 0; // const std::string & a_client_address );
+    virtual void    connected( std::string &a_address ) = 0;
+    virtual void    disconnected( std::string &a_address ) = 0;
 };
 
+/**
+ * \class ADARA_PVWriter
+ * \brief Process variable stream translator / server for output to ADARA protocol on tcp.
+ *
+ * The ADARA_PVWriter class provides process variable translation and streaming
+ * over tcp for ADARA pv stream clients. Up to five concurrent clients are supported;
+ * however, only the SMS process is expected to connect to this service currently
+ * (stream debuggers/loggers are potential additional clients). The port number can be
+ * specified in the constructor (31416 is the default). A simple connection status API
+ * is provided through the IADARAWriterListener interface.
+ */
 class ADARA_PVWriter : public PVWriter
 {
 public:
-    ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port = 999, size_t a_adara_buffer_size = 100 );
+    ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port = 31416 );
     ~ADARA_PVWriter();
 
-    void            attachListener( IADARAWriterListener &a_listener );
-    void            detachListener( IADARAWriterListener &a_listener );
+    void                    attachListener( IADARAWriterListener &a_listener );
+    void                    detachListener( IADARAWriterListener &a_listener );
 
 private:
-    bool            connected();
-    bool            translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt );
-    void            buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp a_time );
-    void            sendActiveDeviceInfo( SOCKET a_socket = INVALID_SOCKET );
-    void            sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket = INVALID_SOCKET );
 
-    const char *    getTypeDescriptor( DataType a_type ) const;
-    void            socketListenThreadFunc();
-    void            packetSendThreadFunc();
+    bool                    connected();
+    bool                    translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt );
+    void                    buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp a_time );
+    bool                    sendActiveDeviceInfo( SOCKET a_socket = INVALID_SOCKET );
+    void                    sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket = INVALID_SOCKET );
+    const char *            getTypeDescriptor( DataType a_type ) const;
+    void                    socketListenThreadFunc();
+    void                    packetSendThreadFunc();
+    void                    notifyConnect( std::string &a_address );
+    void                    notifyDisconnect( std::string &a_address );
+    bool                    initWinSocket();
 
-    void            notifyConnect();
-    void            notifyDisconnect();
+    /// Structure containing ADARA client connection data
+    struct ClientInfo
+    {
+        ClientInfo() : sock(INVALID_SOCKET),ddp(false) {}
+        SOCKET      sock;
+        std::string addr;
+        bool        ddp;
+    };
 
-    boost::thread*                      m_socket_listen_thread;
-    boost::thread*                      m_pkt_send_thread;
-
-    std::vector<ADARAPacket*>           m_adara_packets;
-    SyncDeque<ADARAPacket*>             m_free_pkt;
-    SyncDeque<ADARAPacket*>             m_ready_pkt;
-
-    std::string                         m_addr;
-    unsigned short                      m_port;
-    boost::mutex                        m_list_mutex;
-    std::vector<IADARAWriterListener*>  m_listeners;
-
-    // ---------- WINDOWS-Specific Sockets ------------------------------------
-
-    bool                            initWinSocket();
-
-    SOCKET                          m_listen_socket;
-    boost::mutex                    m_conn_mutex;
-    std::list<SOCKET>               m_client_sockets;
+    boost::thread*                      m_socket_listen_thread;     ///< Tcp socket listener thread
+    boost::thread*                      m_pkt_send_thread;          ///< Tcp packet send thread
+    std::string                         m_addr;                     ///< Tcp address of ADARA service
+    unsigned short                      m_port;                     ///< Tcp port number of ADARA service
+    boost::mutex                        m_list_mutex;               ///< Mutex to protect listener container
+    std::vector<IADARAWriterListener*>  m_listeners;                ///< Container of ADARA writer listeners
+    SOCKET                              m_listen_socket;            ///< WinSock listener socket
+    boost::recursive_mutex              m_conn_mutex;               ///< Mutex to protect client connection container
+    std::list<ClientInfo>               m_client_info;              ///< Container of active client connections
 };
 
 }}}

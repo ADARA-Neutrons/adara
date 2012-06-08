@@ -1,9 +1,16 @@
+/**
+ * \file LDAS_DeviceMonitor.h
+ * \brief Header file for LDAS_DeviceMonitor class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #ifndef LDAS_DEVICEMONITOR
 #define LDAS_DEVICEMONITOR
 
 #include <string>
 
-
+#include "LegacyDAS.h"
 #include "NiCommonComponent.h"
 #include "NiDataSocketComponent.h"
 
@@ -15,15 +22,28 @@ namespace LDAS {
 
 class LDAS_IDevMonitorMgr;
 
+/**
+ * \class LDAS_IDevMonitorMgr
+ * \brief Legacy DAS device/application monitor.
+ *
+ * The LDAS_DeviceMonitor class provides monitoring of IOC devices (applications)
+ * via a National Instruments DataSockets interface. Application activities (running
+ * and stopped) are received and decoded, then sent to the owning LDAS_IDevMonitorMgr
+ * instance for further processing and distribution. Each LDAS_DeviceMonitor instance
+ * monitors one satellite computer for application activity. The DataSockets API used
+ * for monitoring is a legacy SNS DAS protocol and was extracted from the ListenerLib
+ * code base.
+ */
 class LDAS_DeviceMonitor
 {
 public:
+
     LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_reader, PVStreamer &a_streamer, const std::string &a_hostname );
     ~LDAS_DeviceMonitor();
 
-
 private:
-    void        notifySocketData( NI::CNiDataSocketData &a_data );
+
+    void                    notifySocketData( NI::CNiDataSocketData &a_data );
 
     LDAS_IDevMonitorMgr    &m_mgr;
     PVStreamer             &m_streamer;

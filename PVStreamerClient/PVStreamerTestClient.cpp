@@ -3,11 +3,14 @@
 
 #include "stdafx.h"
 
+#include "math.h"
+#include "float.h"
 #include <iostream>
+
+#include "../PVStreamer/ADARA.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include "../PVStreamer/ADARA.h"
 
 using namespace std;
 
@@ -55,7 +58,6 @@ initWinSocket( char *a_address, unsigned short a_port, SOCKET &a_socket )
     }
     catch( int e)
     {
-        // TODO Log error
         cout << e << endl;
 
         if ( result )
@@ -73,6 +75,7 @@ int _tmain(int argc, _TCHAR* argv[])
     char            *address = "localhost";
     unsigned short  port = 31416;
     unsigned long   pkt_count = 0;
+    bool            test = false;
 
     for ( int i = 1; i < argc; ++i )
     {
@@ -80,9 +83,11 @@ int _tmain(int argc, _TCHAR* argv[])
             port = atoi( &argv[i][6] );
         if ( _strnicmp( argv[i], "-addr=",6) == 0 )
             address = &argv[i][6];
+        if ( _stricmp( argv[i], "-test") == 0 )
+            test = true;
     }
 
-    cout << "PVStreamer test client" << endl;
+    cout << "PVStreamer test client " << (test?"[Test Mode]":"[Monitor Mode]" )<< endl;
     cout << "connecting to " << address << ":" << port;
 
     SOCKET  pvs_socket = INVALID_SOCKET;
@@ -95,8 +100,12 @@ int _tmain(int argc, _TCHAR* argv[])
     else
         cout << " success." << endl;
 
+
     SNS::PVS::ADARA::ADARAPacket pkt;
     int rc;
+    int test_state = 0;
+    unsigned long test_pkt_count = 0;
+    double next_val;
 
     while (1)
     {
@@ -105,6 +114,11 @@ int _tmain(int argc, _TCHAR* argv[])
         rc = recv(pvs_socket, (char*)&pkt, 16,0);
         if ( rc == 16 )
         {
+            ++pkt_count;
+            // Get payload len from header
+            if ( !test )
+                cout << "Pkt # " << pkt_count << " [" << hex << pkt.format << dec << "] l=" << pkt.payload_len << " ts=" << pkt.sec << "." << pkt.nsec << endl;
+
             // Get payload len from header
             cout << "Pkt: " << ++pkt_count << endl;
             cout << "  format: " << hex << pkt.format << dec << endl;
@@ -114,26 +128,72 @@ int _tmain(int argc, _TCHAR* argv[])
             rc = recv(pvs_socket, (char*)&pkt.dev_id, pkt.payload_len, 0 );
             if ( rc == pkt.payload_len )
             {
-                cout << "  dev_id: " << pkt.dev_id << endl;
-
-                if ( pkt.format == 0x800000 )
+                if ( !test )
                 {
-                    cout << "  xml len: " << pkt.ddp.xml_len << endl;
-                    cout << "  xml: " << pkt.ddp.xml << endl;
-                }
-                else if ( pkt.format == 0x800100 )
-                {
-                    cout << "  pv id: " << pkt.vvp.var_id << endl;
-                    cout << "  pv value: " << pkt.vvp.uval << endl;
-                }
-                else if ( pkt.format == 0x800200 )
-                {
-                    cout << "  pv id: " << pkt.vvp.var_id << endl;
-                    cout << "  pv value: " << pkt.vvp.dval << endl;
+                    if ( pkt.format == 0x800000 )
+                    {
+                        cout << "  dev_id: " << pkt.dev_id << endl;
+                        cout << "  xml len: " << pkt.ddp.xml_len << endl;
+                        cout << "  xml: " << pkt.ddp.xml << endl;
+                    }
+                    else if ( pkt.format == 0x800100 )
+                    {
+                        cout << "  pv id: " << pkt.dev_id << "." << pkt.vvp.var_id << endl;
+                        cout << "  pv value: " << pkt.vvp.uval << endl;
+                        cout << "  pv alarm: " << pkt.vvp.status << " [" << pkt.vvp.severity << "]" << endl;
+                    }
+                    else if ( pkt.format == 0x800200 )
+                    {
+                        cout << "  pv id: " << pkt.dev_id << "." << pkt.vvp.var_id << endl;
+                        cout << "  pv value: " << pkt.vvp.dval << endl;
+                        cout << "  pv alarm: " << pkt.vvp.status << " [" << pkt.vvp.severity << "]" << endl;
+                    }
+                    else
+                    {
+                        cout << "  unknown pkt type!" << endl;
+                    }
                 }
                 else
                 {
-                    cout << "  unknown pkt type!" << endl;
+                    // Verify value update on PV 1.1 (huber)
+                    if ( pkt.format == 0x800200 && pkt.dev_id == 1 && pkt.vvp.var_id == 1 )
+                    {
+                        switch ( test_state )
+                        {
+                        case 0:
+                            if ( fabs(-180.0 - pkt.vvp.dval) <= DBL_EPSILON )
+                            {
+                                cout << "Test stream detected." << endl;
+                                test_state = 1;
+                                next_val = -179.9;
+                                test_pkt_count = 1;
+                            }
+                            break;
+                        case 1:
+                            if ( fabs(next_val - pkt.vvp.dval) > DBL_EPSILON )
+                            {
+                                cout << "Bad value at pkt # " << test_pkt_count << endl;
+                                cout << "Got: " << pkt.vvp.dval <<", expected: " << next_val << endl;
+                                test_state = 0;
+                            }
+                            else
+                            {
+                                if ( test_pkt_count == 3600 )
+                                {
+                                    cout << "Test completed successfully!" << endl;
+                                    test_state = 3;
+                                }
+                                else
+                                {
+                                    test_pkt_count++;
+                                    next_val = -180 + test_pkt_count*0.1;
+                                }
+                            }
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                 }
             }
             else if ( rc == 0 )

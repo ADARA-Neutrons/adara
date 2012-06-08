@@ -1,4 +1,9 @@
-// LDAS_SocketReader.cpp
+/**
+ * \file LDAS_PVReaderAgent.cpp
+ * \brief Source file for LDAS_PVReaderAgent class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
 
 #include "stdafx.h"
 
@@ -9,21 +14,29 @@
 using namespace std;
 using namespace NI;
 
-//#define EPSILON 1e-18
-
 namespace SNS { namespace PVS { namespace LDAS {
 
-LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices *a_reader_services, PVInfo *a_pv_info )
-:m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_array_idx(-1), m_cache_array_info(false), m_array_size(0) //, m_array_using_time(false)
-
+/**
+ * \brief Constructor for LDAS_PVReaderAgent class.
+ * \param a_mgr - Owning LDAS_IPVReaderAgentMgr instance
+ * \param a_reader_services - PVStreamer reader services interface
+ * \param a_pv_info - PVInfo instance for variable to be associated with this reader agent (optional)
+ */
+LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services, PVInfo *a_pv_info )
+: m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_array_idx(-1), m_cache_array_info(false), m_array_size(0)
 {
     if ( a_pv_info )
         connect( *a_pv_info);
+
+    //m_val_history.reserve(10000);
 }
 
+/**
+ * \brief Destructor for LDAS_PVReaderAgent class.
+ */
 LDAS_PVReaderAgent::~LDAS_PVReaderAgent()
 {
-    boost::lock_guard<boost::mutex> lock(m_sock_mutex);
+    boost::lock_guard<boost::mutex> lock(m_mutex);
     if ( m_pv_info )
     {
         // Do NOT call disconnect as it triggers synchronous callbacks
@@ -33,10 +46,14 @@ LDAS_PVReaderAgent::~LDAS_PVReaderAgent()
     }
 }
 
+/**
+ * \brief Attempts to connect this agent to a new process variable.
+ * \param a_pv_info - PVInfo instance for variable to be associated with this reader agent
+ */
 void
 LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
 {
-    boost::lock_guard<boost::mutex> lock(m_sock_mutex);
+    boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( m_pv_info )
         throw -1;
@@ -52,7 +69,6 @@ LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
       if ( j != string::npos && i < j )
       {
           string idx_str = m_pv_info->m_connection.substr( i + 1, j-i-1 );
-          // TODO Should add error checking here (why isn't this already in the lang???)
           m_array_idx = atol( idx_str.c_str());
           m_cache_array_info = true;
       }
@@ -63,10 +79,13 @@ LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
     m_socket.Connect( a_pv_info.m_connection.c_str(), CNiDataSocket::ReadAutoUpdate ); // will trigger callbacks
 }
 
+/**
+ * \brief Attempts to disconnect this agent from the current process variable.
+ */
 void
 LDAS_PVReaderAgent::disconnect()
 {
-    boost::lock_guard<boost::mutex> lock(m_sock_mutex);
+    boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( m_pv_info )
     {
@@ -77,10 +96,19 @@ LDAS_PVReaderAgent::disconnect()
         m_array_idx = -1;
         m_cache_array_info = false;
         m_array_size = 0;
-        //m_array_using_time = false;
     }
 }
 
+/**
+ * \brief Processes incomming data on the NI DataSocket connection
+ * \param a_data - The received DataSocket data object
+ *
+ * This method parses incomming process variable data that is in a legacy SNS DAS
+ * format. The approach used here was extracted from the ListenerLib code base.
+ * The legacy DAS protocol is not very efficient as it tends to use arrays of
+ * process variables and transmits the entire array when only a single value in that
+ * array has changed.
+ */
 void
 LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
 {
@@ -92,15 +120,13 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
 
     if ( m_cache_array_info )
     {
-        // TODO Handle errors (missing attributes)
         if ( a_data.HasAttribute("ArraySize"))
             m_array_size = a_data.GetAttribute("ArraySize").Value.ulVal;
+        else
+            LOG_ERROR( "DS data is missing ArraySize attribute (PV " << m_pv_info->m_name << ")" );
 
         // Don't care about timestamps on individual array elements - just compare the value
         // and if it's different from te last, send it
-
-        //if ( a_data.HasAttribute("UsingTimes"))
-        //    m_array_using_time = a_data.GetAttribute("UsingTimes").Value.lVal == 1;
 
         m_cache_array_info = false;
     }
@@ -159,48 +185,56 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
 
     if ( send_pkt )
     {
-        PVStreamPacket *pkt = m_reader_services->getFreePacket();
-
-        pkt->time.sec = 0;
-        pkt->time.nsec = 0;
-
-        // Is it an error if no timestamp is present?
-	    if ( a_data.HasAttribute("SocketTimeStamp"))
-            pkt->time.sec = a_data.GetAttribute("SocketTimeStamp").Value.lVal;
-        else
+        PVStreamPacket *pkt = m_reader_services.getFreePacket();
+        if ( pkt )
         {
-            // This must be the initial update from the Data Socket Server after we connected
-            // Use current time for timestamp
-            pkt->time.sec = (unsigned long)time(0);
+            pkt->time.sec = 0;
+            pkt->time.nsec = 0;
+
+            // Is it an error if no timestamp is present?
+	        if ( a_data.HasAttribute("SocketTimeStamp"))
+                pkt->time.sec = a_data.GetAttribute("SocketTimeStamp").Value.lVal;
+            else
+            {
+                // This must be the initial update from the Data Socket Server after we connected
+                // Use current time for timestamp
+                pkt->time.sec = (unsigned long)time(0);
+            }
+
+            pkt->pkt_type = VarUpdate;
+            pkt->device_id = m_pv_info->m_device_id;
+            pkt->pv_info = m_pv_info;
+            pkt->alarms = m_pv_info->m_alarms;
+
+            switch ( m_pv_info->m_type )
+            {
+            case PV_ENUM:
+            case PV_INT:
+                pkt->ival = m_pv_info->m_ival;
+                //m_val_history.push_back(m_pv_info->m_ival);
+                break;
+
+            case PV_UINT:
+                pkt->uval = m_pv_info->m_uval;
+                //m_val_history.push_back(m_pv_info->m_uval);
+                break;
+
+            case PV_DOUBLE:
+                pkt->dval = m_pv_info->m_dval;
+                //m_val_history.push_back(m_pv_info->m_dval);
+                break;
+            }
+
+            m_reader_services.putFilledPacket(pkt);
         }
-
-        pkt->pkt_type = VarValueUpdate;
-        pkt->device_id = m_pv_info->m_device_id;
-        pkt->pv_info = m_pv_info;
-        pkt->alarms = m_pv_info->m_alarms;
-
-        switch ( m_pv_info->m_type )
-        {
-        case PV_ENUM:
-        case PV_INT:
-            pkt->ival = m_pv_info->m_ival;
-            break;
-
-        case PV_UINT:
-            pkt->uval = m_pv_info->m_uval;
-            break;
-
-        case PV_DOUBLE:
-            pkt->dval = m_pv_info->m_dval;
-            break;
-        }
-
-        m_reader_services->putFilledPacket(pkt);
     }
 }
 
-
-
+/**
+ * \brief This is a generic method that tests PVs for changes and updates the PVInfo object if it has.
+ * \param a_val - The current PV value (as a ref)
+ * \param a_new_val - The new PV value
+ */
 template<class T>
 bool
 LDAS_PVReaderAgent::testAndSet(  T &a_val, T a_new_val )
@@ -214,7 +248,6 @@ LDAS_PVReaderAgent::testAndSet(  T &a_val, T a_new_val )
 
     if (differs)
     {
-        //m_pv_info->m_dval = a_new_val;
         a_val = a_new_val;
 
         m_pv_info->m_alarms = PV_NO_ALARM;
@@ -243,30 +276,40 @@ LDAS_PVReaderAgent::testAndSet(  T &a_val, T a_new_val )
     return false;
 }
 
+/**
+ * \brief Processes incomming status on the NI DataSocket connection
+ * \param a_status - Status code
+ * \param a_error - Error code
+ * \param a_message - Not used
+ *
+ * There is insufficient documentation from NI concerning the exact meaning and
+ * use of the error and message paramateres of this callback. The error code is
+ * passed up to the reader agent manager where is is simply logged.
+ */
 void
-LDAS_PVReaderAgent::socketStatus( long status, long error, const CString& message )
+LDAS_PVReaderAgent::socketStatus( long a_status, long a_error, const CString& a_message )
 {
     // Just in case an odd cb comes-in when we're not officially connected
     if ( !m_pv_info )
         return;
 
-    if ( status == CNiDataSocket::ConnectionActive )
+    if ( a_status == CNiDataSocket::ConnectionActive )
     {
         m_pv_info->m_active = true;
         m_mgr.socketConnected( *this );
     }
-    else if ( status == CNiDataSocket::Unconnected )
+    else if ( a_status == CNiDataSocket::Unconnected )
     {
         m_pv_info->m_active = false;
         m_mgr.socketDisconnected( *this );
     }
-    else if ( status == CNiDataSocket::ConnectionError )
+    else if ( a_status == CNiDataSocket::ConnectionError )
     {
-        m_mgr.socketConnectionError( *this, error );
+        m_mgr.socketConnectionError( *this, a_error );
     }
-    else if ( error != 0 )
+    else if ( a_error != 0 )
     {
-        m_mgr.socketError( *this, error );
+        m_mgr.socketError( *this, a_error );
     }
 }
 

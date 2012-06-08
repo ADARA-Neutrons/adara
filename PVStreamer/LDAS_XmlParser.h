@@ -1,12 +1,8 @@
-/*
- *  File: StringParser.h
- *
- *  Rick Riedel, March 8, 2006
- *
- *  To Do:
- *
- *  Modifications:
- *  
+/**
+ * \file LDAS_XmlParser.h
+ * \brief Header file for CStringParser class.
+ * \author Rick Riedel
+ * \date March 8, 2006
  */
 
 #if !defined(AFX_STRINGPARSER_H__BC8671C0_E75D_11D5_8447_0002E315824B__INCLUDED_)

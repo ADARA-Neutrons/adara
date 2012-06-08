@@ -1,3 +1,10 @@
+/**
+ * \file LDAS_DeviceMonitor.cpp
+ * \brief Source file for LDAS_DeviceMonitor class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #include "stdafx.h"
 #include "PVStreamer.h"
 #include "LDAS_DeviceMonitor.h"
@@ -9,28 +16,41 @@ using namespace NI;
 
 namespace SNS { namespace PVS { namespace LDAS {
 
-
-
+/**
+ * \brief Constructor for LDAS_DeviceMonitor class.
+ * \param a_mgr - The owning LDAS_IDevMonitorMgr instance.
+ * \param a_streamer - The associate PVStreamer instance.
+ * \param a_hostname - The name of the system that hosts devices to be monitored.
+ */
 LDAS_DeviceMonitor::LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_mgr, PVStreamer &a_streamer, const std::string &a_hostname )
 : m_mgr(a_mgr), m_streamer(a_streamer), m_hostname(a_hostname)
 {
+    // Install DataSocket event handlers
     m_notify_socket.InstallEventHandler( *this, &LDAS_DeviceMonitor::notifySocketData );
 
+    // Connect to the "notifymsg" variable on the specified host
     string uri = string("dstp://") + m_hostname + "/notifymsg";
     m_notify_socket.Connect( uri.c_str(), CNiDataSocket::ReadAutoUpdate );
 }
 
+/**
+ * \brief Destructor for LDAS_DeviceMonitor class.
+ */
 LDAS_DeviceMonitor::~LDAS_DeviceMonitor()
 {
 }
 
-
+/**
+ * \brief This is the callback method that receives data from the notify DataSocket.
+ * \param a_data - The NI DataSocket data packet.
+ */
 void
 LDAS_DeviceMonitor::notifySocketData( CNiDataSocketData &a_data )
 {
     /*
-    This code is a hack to access only app started and app stopped notification messages.
-    Any changes made to the DAS datasocket notify protocol will probably break this code.
+    This code is a quick-fix to access only app started and app stopped
+    notification messages. Any changes made to the DAS datasocket notify
+    protocol in ListenerLib will need to be reflected here.
     */
 
     CString         xml = CNiString(a_data);
@@ -80,26 +100,7 @@ LDAS_DeviceMonitor::notifySocketData( CNiDataSocketData &a_data )
             }
         }
     }
-
-
 }
-
-/*
-<localhost>
-<Notify Type="200" TimeStamp="1337807790" FromProcessID="1580" ToProcessID="0">
-1031
-</Notify>
-</localhost>
-
-<localhost>
-<Notify Type="201" TimeStamp="1337814870" FromProcessID="1580" ToProcessID="0">
-1031
-</Notify>
-</localhost>
-*/
-
-
-
 
 
 }}}

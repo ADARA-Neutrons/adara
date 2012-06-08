@@ -1,3 +1,10 @@
+/**
+ * \file PVStreamer.cpp
+ * \brief Source file for PVStreamer class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #include "stdafx.h"
 
 #include <boost/thread/locks.hpp>
@@ -17,35 +24,80 @@ Identifier PVStreamer::m_next_enum_id = 1;
 
 // ---------- Constructors & Destructors --------------------------------------
 
+/**
+ * \brief Constructor for PVStreamer class.
+ * \param a_pkt_buffer_size - Internal stream buffer size
+ * \param a_max_notify_pkts - Max stream listener queue length (0 for default)
+ */
 PVStreamer::PVStreamer( size_t a_pkt_buffer_size, size_t a_max_notify_pkts )
 : m_writer(0), m_pkt_buffer_size(a_pkt_buffer_size), m_max_notify_pkts(a_max_notify_pkts),m_stream_listeners_thread(0)
 {
+    // Make sure buffer sizes are sane
     if ( m_pkt_buffer_size < 2 || m_max_notify_pkts > m_pkt_buffer_size )
         throw -1;
 
     if ( !m_max_notify_pkts )
         m_max_notify_pkts = a_pkt_buffer_size >> 1;
 
-    // Fill free queue;
+    // Create stream packets and fill free queue;
     for ( size_t i = 0; i < a_pkt_buffer_size; ++i )
-        m_free_que.put( new PVStreamPacket());
+    {
+        m_stream_pkts.push_back(new PVStreamPacket());
+        m_free_que.put( m_stream_pkts.back() );
+    }
 
     // Start stream listener notify thread
     m_stream_listeners_thread = new boost::thread( boost::bind(&PVStreamer::streamListenersNotifyThreadFunc, this));
 }
 
+/**
+ * \brief Destructor for PVStreamer class.
+ */
 PVStreamer::~PVStreamer()
 {
+    // Delete stream listener thread
     if ( m_stream_listeners_thread )
         delete m_stream_listeners_thread;
+
+    // Delete PVConfig instances
+    for ( map<Protocol,PVConfig*>::iterator ic = m_config.begin(); ic != m_config.end(); ++ic )
+        delete ic->second;
+
+    // Delete PVReader instances
+    for ( map<Protocol,PVReader*>::iterator ir = m_readers.begin(); ir != m_readers.end(); ++ir )
+        delete ir->second;
+
+    // Delete PVWriter instance
+    if ( m_writer )
+        delete m_writer;
+
+    // Delete stream packets
+    for ( vector<PVStreamPacket*>::iterator ip = m_stream_pkts.begin(); ip != m_stream_pkts.end(); ++ip )
+        delete *ip;
 
     // Delete enums
     for ( map<unsigned long,Enum*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
         delete e->second;
+
+    // Delete PV Info
+    for ( map<PVKey,PVInfo*>::iterator ipv = m_pv_info.begin(); ipv != m_pv_info.end(); ++ipv )
+        delete ipv->second;
+
+    // Delete Device Info
+    for ( map<Identifier,DeviceInfo*>::iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
+        delete idev->second;
+
+    // Delete App info
+    for ( map<Identifier,AppInfo*>::iterator iapp = m_apps.begin(); iapp != m_apps.end(); ++iapp )
+        delete iapp->second;
 }
 
 // ---------- General public methods ------------------------------------------
 
+/**
+ * \brief Attaches a configuration listener.
+ * \param a_listener - Listener instance
+ */
 void
 PVStreamer::attachConfigListener( IPVConfigListener &a_listener )
 {
@@ -56,6 +108,10 @@ PVStreamer::attachConfigListener( IPVConfigListener &a_listener )
     }
 }
 
+/**
+ * \brief Detaches a configuration listener.
+ * \param a_listener - Listener instance
+ */
 void
 PVStreamer::detachConfigListener( IPVConfigListener &a_listener )
 {
@@ -67,6 +123,10 @@ PVStreamer::detachConfigListener( IPVConfigListener &a_listener )
     }
 }
 
+/**
+ * \brief Attaches a stream listener.
+ * \param a_listener - Listener instance
+ */
 void
 PVStreamer::attachStreamListener( IPVStreamListener &a_listener )
 {
@@ -77,6 +137,10 @@ PVStreamer::attachStreamListener( IPVStreamListener &a_listener )
     }
 }
 
+/**
+ * \brief Detaches a stream listener.
+ * \param a_listener - Listener instance
+ */
 void
 PVStreamer::detachStreamListener( IPVStreamListener &a_listener )
 {
@@ -88,7 +152,11 @@ PVStreamer::detachStreamListener( IPVStreamListener &a_listener )
     }
 }
 
-
+/**
+ * \brief Attaches a new configuration provider (takes ownership of PVConfig instance).
+ * \param a_config - PVConfig instance
+ * \return IPVConfigServices interface pointer
+ */
 IPVConfigServices*
 PVStreamer::attach( PVConfig &a_config )
 {
@@ -103,6 +171,11 @@ PVStreamer::attach( PVConfig &a_config )
     throw -1;
 }
 
+/**
+ * \brief Attaches a new reader (takes ownership of PVReader instance).
+ * \param a_reader - PVReader instance
+ * \return IPVReaderServices interface pointer
+ */
 IPVReaderServices*
 PVStreamer::attach( PVReader &a_reader )
 {
@@ -117,6 +190,11 @@ PVStreamer::attach( PVReader &a_reader )
     throw -1;
 }
 
+/**
+ * \brief Attaches a new writer (takes ownership of PVWriter instance).
+ * \param a_writer - PVWriter instance
+ * \return IPVWriterServices interface pointer
+ */
 IPVWriterServices*
 PVStreamer::attach( PVWriter &a_writer )
 {
@@ -131,28 +209,15 @@ PVStreamer::attach( PVWriter &a_writer )
     throw -1;
 }
 
+
 // ---------- Device & PV access methods --------------------------------------
 
-/*
+/**
+ * \brief Gets a list of active devices by ID
+ * \param a_devs - Ref to vector of device IDs (output)
+ */
 void
-PVStreamer::getActivePVs( map<Identifier,vector<const PVInfo*> > &a_pvs ) const
-{
-    a_pvs.clear();
-
-    boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
-
-    for (map<PVKey,PVInfo*>::const_iterator ipv = m_pv_info.begin(); ipv != m_pv_info.end(); ++ipv )
-    {
-        if ( ipv->second->m_active )
-        {
-            a_pvs[ipv->second->m_device_id].push_back( ipv->second );
-        }
-    }
-}
-*/
-
-void
-PVStreamer::getActiveDevices( std::vector<Identifier> &a_devs ) const
+PVStreamer::getActiveDevices( vector<Identifier> &a_devs ) const
 {
     a_devs.clear();
 
@@ -168,6 +233,12 @@ PVStreamer::getActiveDevices( std::vector<Identifier> &a_devs ) const
     }
 }
 
+/**
+ * \brief Determines if a process variable is defined by ID
+ * \param a_dev_id - ID of device that variable is associated with
+ * \param a_pv_id - ID of process variable to test
+ * \return True if variable is defined; false otherwise.
+ */
 bool
 PVStreamer::isPVDefined( Identifier a_dev_id, Identifier a_pv_id ) const
 {
@@ -182,6 +253,12 @@ PVStreamer::isPVDefined( Identifier a_dev_id, Identifier a_pv_id ) const
         return false;
 }
 
+/**
+ * \brief Gets a process variable by ID
+ * \param a_dev_id - ID of device that variable is associated with
+ * \param a_pv_id - ID of process variable to get
+ * \return Pointer to relevant PVInfo object (throws if not defined)
+ */
 const PVInfo*
 PVStreamer::getPV( Identifier a_dev_id, Identifier a_pv_id ) const
 {
@@ -196,18 +273,32 @@ PVStreamer::getPV( Identifier a_dev_id, Identifier a_pv_id ) const
     throw -1;
 }
 
+/**
+ * \brief Gets a map of all defined enums
+ * \return Const ref to internal map of defined enums
+ */
 const map<Identifier,const Enum*> &
 PVStreamer::getEnums() const
 {
     return (const map<Identifier,const Enum*>&)m_enums;
 }
 
+/**
+ * \brief Gets all process variables associated with a device
+ * \param a_dev_id - ID of device
+ * \return Const ref to internal vector of PVInfo objects
+ */
 const vector<const PVInfo*>&
 PVStreamer::getDevicePVs( Identifier a_dev_id ) const
 {
     return (const vector<const PVInfo*>&) getWriteableDevicePVs( a_dev_id );
 }
 
+/**
+ * \brief Determines if a specific device is defined
+ * \param a_dev_id - ID of device to test
+ * \return True if device is defined; false otherwise
+ */
 bool
 PVStreamer::isDeviceDefined( Identifier a_dev_id ) const
 {
@@ -220,6 +311,11 @@ PVStreamer::isDeviceDefined( Identifier a_dev_id ) const
         return false;
 }
 
+/**
+ * \brief Gets the name of a specific device
+ * \param a_dev_id - ID of device
+ * \return Name of device (throws if not defined)
+ */
 std::string
 PVStreamer::getDeviceName( Identifier a_dev_id ) const
 {
@@ -232,6 +328,11 @@ PVStreamer::getDeviceName( Identifier a_dev_id ) const
     throw -1;
 }
 
+/**
+ * \brief Determines if a specific application is defined
+ * \param a_app_id - ID of application to test
+ * \return True if application is defined; false otherwise
+ */
 bool
 PVStreamer::isAppDefined( Identifier a_app_id ) const
 {
@@ -240,6 +341,11 @@ PVStreamer::isAppDefined( Identifier a_app_id ) const
     return m_apps.find(a_app_id) != m_apps.end();
 }
 
+/**
+ * \brief Gets all configured devices associated with an application
+ * \param a_app_id - ID of application
+ * \return Const ref to internal vector of device IDs
+ */
 const vector<Identifier>&
 PVStreamer::getAppDevices( Identifier a_app_id ) const
 {
@@ -256,6 +362,12 @@ PVStreamer::getAppDevices( Identifier a_app_id ) const
 
 // ---------- IPVConfigServices methods ---------------------------------------
 
+/**
+ * \brief Defines a new application
+ * \param a_protocol - Protocol of new application
+ * \param a_app_id - ID of new application
+ * \param a_source - Source (host) of new application
+ */
 void
 PVStreamer::defineApp( Protocol a_protocol, Identifier a_app_id, const std::string &a_source )
 {
@@ -278,9 +390,17 @@ PVStreamer::defineApp( Protocol a_protocol, Identifier a_app_id, const std::stri
 void
 PVStreamer::undefineApp( Identifier a_app_id )
 {
-    // TODO Implement Me!!!
+    // TODO Not currently needed
 }
 
+/**
+ * \brief Defines a new device
+ * \param a_protocol - Protocol of new device
+ * \param a_dev_id - ID of new device
+ * \param a_name - Name of new device
+ * \param a_source - Source (host) of new device
+ * \param a_app_id - Application ID associated with new device
+ */
 void
 PVStreamer::defineDevice( Protocol a_protocol, Identifier a_dev_id, const string &a_name, const string &a_source, Identifier a_app_id )
 {
@@ -317,9 +437,13 @@ PVStreamer::defineDevice( Protocol a_protocol, Identifier a_dev_id, const string
 void
 PVStreamer::undefineDevice( Identifier a_dev_id )
 {
-    //TODO Implement Me!!!
+    //TODO Not currently needed
 }
 
+/**
+ * \breif Undefines a device if there are no variable associated with it
+ * \param a_dev_id - ID of device
+ */
 void
 PVStreamer::undefineDeviceIfNoPVs( Identifier a_dev_id )
 {
@@ -345,26 +469,29 @@ PVStreamer::undefineDeviceIfNoPVs( Identifier a_dev_id )
     }
 }
 
-
+/**
+ * \brief Defines a new process variable
+ * \param a_info - Ref to new PVInfo object (PVSteamer takes ownership)
+ */
 void
-PVStreamer::definePV( PVInfo & info )
+PVStreamer::definePV( PVInfo & a_info )
 {
-    PVKey key(info.m_device_id,info.m_id);
+    PVKey key(a_info.m_device_id,a_info.m_id);
 
     boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
 
-    map<Identifier,DeviceInfo*>::iterator idev = m_devices.find(info.m_device_id);
+    map<Identifier,DeviceInfo*>::iterator idev = m_devices.find(a_info.m_device_id);
 
     if ( idev == m_devices.end())
         throw -1;
 
     if ( m_pv_info.find(key) == m_pv_info.end())
     {
-        if ( info.m_protocol != idev->second->protocol || info.m_source != idev->second->source )
+        if ( a_info.m_protocol != idev->second->protocol || a_info.m_source != idev->second->source )
             throw -1;
 
-        idev->second->pvs.push_back(&info);
-        m_pv_info[key] = &info;
+        idev->second->pvs.push_back(&a_info);
+        m_pv_info[key] = &a_info;
     }
     else
         throw -1;
@@ -373,9 +500,14 @@ PVStreamer::definePV( PVInfo & info )
 void
 PVStreamer::undefinePV( Identifier a_dev_id, Identifier a_pv_id )
 {
-    //TODO Implement Me!!!
+    //TODO INot currently needed
 }
 
+/**
+ * \brief Gets an enum by ID
+ * \param a_id - ID of enum to get
+ * \return Const pointer to Enum (Null if not defined)
+ */
 const Enum*
 PVStreamer::getEnum( Identifier a_id ) const
 {
@@ -388,6 +520,11 @@ PVStreamer::getEnum( Identifier a_id ) const
         return 0;
 }
 
+/**
+ * \brief Defines a new Enum
+ * \param a_values - Map of enum key-value pairs
+ * \return Const pointer to newly created Enum
+ */
 const Enum*
 PVStreamer::defineEnum( const map<int,string> &a_values )
 {
@@ -405,6 +542,11 @@ PVStreamer::defineEnum( const map<int,string> &a_values )
     return new_enum;
 }
 
+/**
+ * \brief Callback to receive and distribute configuration loaded events.
+ * \param a_protocol - Protocol associated with configuration
+ * \param a_source - Source (host) of configuration event
+ */
 void
 PVStreamer::configurationLoaded( Protocol a_protocol, const string &a_source )
 {
@@ -413,16 +555,30 @@ PVStreamer::configurationLoaded( Protocol a_protocol, const string &a_source )
 
     for ( vector<IPVConfigListener*>::iterator il = m_config_listeners.begin(); il != m_config_listeners.end(); ++il )
         (*il)->configurationLoaded( a_protocol, a_source );
-
 }
 
 /**
- * This method finds a PV entry by "friendly name". This method is used when loading
- * configuration files and only a PV name is available. Use sparingly as it is a
- * linear string-value based search.
+ * \brief Callback to receive and distribute invalid configuration events.
+ * \param a_protocol - Protocol associated with configuration
+ * \param a_source - Source (host) of configuration event
+ */
+void
+PVStreamer::configurationInvalid( Protocol a_protocol, const string &a_source )
+{
+    // Notify config listeners
+    boost::lock_guard<boost::mutex> lock(m_cfglist_mutex);
+
+    for ( vector<IPVConfigListener*>::iterator il = m_config_listeners.begin(); il != m_config_listeners.end(); ++il )
+        (*il)->configurationInvalid( a_protocol, a_source );
+}
+
+/**
+ * \brief Gets a writable PVInfo object by "friendly name".
+ * \param a_name - Name of process variable
+ * \return Writable PVInfo object (Null if not found)
  */
 PVInfo*
-PVStreamer::getWriteablePV( const std::string & a_name ) const
+PVStreamer::getWriteablePV( const string & a_name ) const
 {
     for ( map<PVKey,PVInfo*>::const_iterator ipv = m_pv_info.begin(); ipv != m_pv_info.end(); ++ipv )
     {
@@ -433,27 +589,47 @@ PVStreamer::getWriteablePV( const std::string & a_name ) const
     return 0;
 }
 
+// ---------- IPVReaderServices methods ---------------------------------------
 
-// ---------- IPVReaderServices methods ----------
-
+/**
+ * \brief Gets a stream packet from the free queue (blocks until available)
+ * \return PVStreamPacket pointer on success; null on failure
+ */
 PVStreamPacket*
 PVStreamer::getFreePacket()
 {
-    return m_free_que.get();
+    PVStreamPacket* pkt = 0;
+    m_free_que.get( pkt );
+    return pkt;
 }
 
+/**
+ * \brief Puts a stream packet on the filled queue
+ * \param a_pkt - PVStreamPacket object to put on queue
+ */
 void
 PVStreamer::putFilledPacket( PVStreamPacket *a_pkt )
 {
     m_fill_que.put(a_pkt);
 }
 
+/**
+ * \brief Gets a writable process variable by ID
+ * \param a_dev_id - ID of device that variable is associated with
+ * \param a_pv_id - ID of process variable to get
+ * \return Pointer to relevant PVInfo object (throws if not defined)
+ */
 PVInfo*
 PVStreamer::getWriteablePV( Identifier a_dev_id, Identifier a_pv_id ) const
 {
     return (PVInfo*)getPV( a_dev_id, a_pv_id );
 }
 
+/**
+ * \brief Gets all process variables (writable) associated with a device
+ * \param a_dev_id - ID of device
+ * \return Ref to internal vector of PVInfo objects
+ */
 vector<PVInfo*>&
 PVStreamer::getWriteableDevicePVs( Identifier a_dev_id ) const
 {
@@ -466,27 +642,19 @@ PVStreamer::getWriteableDevicePVs( Identifier a_dev_id ) const
         throw -1;
 }
 
-void
-PVStreamer::getSourceInfo( Protocol a_protocol, const string &a_source, map<Identifier,vector<PVInfo*> > &a_info ) const
-{
-    boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
 
-    a_info.clear();
-    for ( map<Identifier,DeviceInfo*>::const_iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
-    {
-        if ( idev->second->protocol == a_protocol && idev->second->source == a_source )
-        {
-            a_info[idev->first] = idev->second->pvs;
-        }
-    }
-}
+// ---------- IPVWriterServices methods ---------------------------------------
 
-// ---------- IPVWriterServices methods ----------
-
+/**
+ * \brief Gets a filled stream packet (blocks until available)
+ * \return PVStreamPacket pointer on success; null on failure
+ */
 PVStreamPacket*
 PVStreamer::getFilledPacket()
 {
-    return m_fill_que.get();
+    PVStreamPacket* pkt = 0;
+    m_fill_que.get( pkt );
+    return pkt;
 }
 
 void
@@ -502,8 +670,11 @@ PVStreamer::putFreePacket( PVStreamPacket *a_pkt )
         m_free_que.put(a_pkt);
 }
 
-// ---------- IPVStreamListener support methods ----------
+// ---------- IPVStreamListener support methods -------------------------------
 
+/**
+ * \brief Stream listener notification thread function.
+ */
 void
 PVStreamer::streamListenersNotifyThreadFunc()
 {
@@ -511,12 +682,18 @@ PVStreamer::streamListenersNotifyThreadFunc()
 
     while(1)
     {
-        pkt = m_notify_que.get();
+        if ( !m_notify_que.get( pkt ))
+            break;
+
         notifyStreamListeners(pkt);
         m_free_que.put(pkt);
     }
 }
 
+/**
+ * \brief Notifies all stream listeners of new stream event
+ * \param a_pkt - Stream packet describing event.
+ */
 void
 PVStreamer::notifyStreamListeners( PVStreamPacket *a_pkt )
 {
@@ -554,12 +731,7 @@ PVStreamer::notifyStreamListeners( PVStreamPacket *a_pkt )
                     (*il)->pvInactive( a_pkt->time, *(a_pkt->pv_info) );
                 break;
 
-            case VarStatusUpdate:
-                for ( vector<IPVStreamListener*>::iterator il = m_stream_listeners.begin(); il != m_stream_listeners.end(); ++il )
-                    (*il)->pvStatusUpdated( a_pkt->time, *(a_pkt->pv_info), a_pkt->alarms );
-                break;
-
-            case VarValueUpdate:
+            case VarUpdate:
                 switch ( a_pkt->pv_info->m_type )
                 {
                 case PV_INT:
@@ -594,5 +766,6 @@ PVStreamer::notifyStreamListeners( PVStreamPacket *a_pkt )
         }
     }
 }
+
 
 }}

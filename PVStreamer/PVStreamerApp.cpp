@@ -13,10 +13,6 @@
 #include "LDAS_PVReader.h"
 #include "ADARA_PVWriter.h"
 
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#endif
-
 
 using namespace SNS::PVS::LDAS;
 using namespace SNS::PVS::ADARA;
@@ -65,6 +61,31 @@ CPVStreamerApp::InitApplication()
     BOOL ret = CWinApp::InitApplication();
 
     // Prevent multiple instances from running on one machine
+    if ( CreateSemaphore( 0, 0, 1, "PVStreamerSemaphore" ) != 0 )
+    {
+        if ( GetLastError() == ERROR_ALREADY_EXISTS )
+        {
+            ret = false;
+            CWnd *pWndPrev, *pWndChild;
+
+            // Determine if a window with the class name exists...
+            if (pWndPrev = CWnd::FindWindow(0,"SNS-SMS Process Variable Streamer"))
+            {
+                // If so, does it have any popups?
+                pWndChild = pWndPrev->GetLastActivePopup();
+
+                // If iconic, restore the main window
+                if (pWndPrev->IsIconic())
+                    pWndPrev->ShowWindow(SW_RESTORE);
+
+                // Bring the main window or its popup to the foreground
+                pWndChild->SetForegroundWindow();
+
+                // and you are done activating the other application
+                return FALSE;
+            }
+        }
+    }
 
     return ret;
 }
@@ -82,22 +103,16 @@ CPVStreamerApp::InitInstance()
         AfxMessageBox(IDP_SOCKETS_INIT_FAILED);
         return FALSE;
     }
+    
+    //_crtBreakAlloc = 326;
 
     // Create main window
-    // TODO How do we NOT have a window?
     CPVStreamerDlg dlg;
     m_pMainWnd = &dlg;
-
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
-    // MFC provides command-line arguments concatenatied into a single string
-    // Bust this string back into an array of strings so we can parse them
-
-    // Create PVStreamer facilities and start them
-
-    // Init Legacy DAS classes
-
-    PVStreamer pvs;
+    // Initialize PVStreamer objects
+    PVStreamer pvs(5000,4000);
 
     pvs.attachConfigListener( dlg );
     pvs.attachStreamListener( dlg );
@@ -106,18 +121,18 @@ CPVStreamerApp::InitInstance()
     pvs.attachConfigListener( logger );
     pvs.attachStreamListener( logger );
 
-    ADARA_PVWriter      adara_writer(pvs,cmdline.m_port);
-    adara_writer.attachListener( dlg );
+    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(pvs,cmdline.m_port);
+    adara_writer->attachListener( dlg );
+    adara_writer->attachListener( logger );
 
-    LDAS_PVReader       ldas_reader(pvs);
+    LDAS_PVReader*      ldas_reader = new LDAS_PVReader(pvs);
     LDAS_PVConfigMgr    ldas_cfg(pvs);
 
-
+    // Loading a LDAS satellite configuration file will initiate internal streaming
+    // External streaming will commence when the SMS client connects to the ADARA port
     ldas_cfg.connectSatCompFile(cmdline.m_sat_config_file);
 
     // Show and run main window (this runs message loop, doesn't return until window closes)
-    //dlg.DoModal();
-
     dlg.ShowWindow(SW_SHOW);
     MSG msg;
     while( GetMessage( &msg, 0, 0, 0 ) > 0 )
@@ -125,8 +140,7 @@ CPVStreamerApp::InitInstance()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
-
+//_CrtDumpMemoryLeaks();
     // Return false to prevent CWinApp::Run() from being called
     return FALSE;
 }

@@ -11,25 +11,29 @@ class SyncDeque
 {
 public:
     SyncDeque()
+        : m_active(true)
     {}
 
     ~SyncDeque()
-    {}
+    {
+        m_active = false;
+        m_cvar.notify_all();
+    }
 
     inline size_t size() const { return m_que.size(); }
 
-    T get()
+    bool get( T& a_item )
     {
-        T  ret;
+        //T  ret;
 
         boost::unique_lock<boost::mutex> lock(m_mutex);
-        while(1)
+        while( m_active )
         {
             if ( m_que.size() )
             {
-                ret = m_que.front();
+                a_item = m_que.front();
                 m_que.pop_front();
-                break;
+                return true;
             }
             else
             {
@@ -37,7 +41,7 @@ public:
             }
         }
 
-        return ret;
+        return false;
     }
 
     void put(T val)
@@ -53,6 +57,7 @@ private:
     boost::mutex                m_mutex;
     boost::condition_variable   m_cvar;
     std::deque<T>               m_que;
+    bool                        m_active;
 };
 
 #endif

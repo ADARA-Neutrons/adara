@@ -1,4 +1,9 @@
-// PVStreamer.h
+/**
+ * \file PVStreamer.h
+ * \brief Header file for PVStreamer class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
 
 #ifndef PVSTREAMER
 #define PVSTREAMER
@@ -9,8 +14,8 @@
 
 #include <boost/thread/mutex.hpp>
 
-#include "PVStreamerSupport.h"
 #include "SyncDeque.h"
+#include "PVStreamerSupport.h"
 
 
 namespace SNS { namespace PVS {
@@ -19,139 +24,84 @@ class PVConfig;
 class PVReader;
 class PVWriter;
 
-// ---------- Interfaces used by PVStreamer and clients -----------------------
-
 /**
- * The IPVStreamListener interface is used by non-critical stream listeners
- * to access the PV event stream (prior to protocol serialization). Under heavy
- * loading it is possible for packets to be dropped.
+ * \class PVStreamer
+ * \brief Primary sream and configuration management class of the PVStreamer process.
+ *
+ * The PVStreamer class provides two primary services: 1) configuration management
+ * and access, and 2) stream management and access. The PVStreamer class is the
+ * central class for the PVStreamer application - instances of PVConfig, PVReader,
+ * and PVWriter subclasses (that each handle specific protocols) are associated with
+ * a PVStreamer instance to create an end-to-end stream translation process. Downstream
+ * clients (i.e. the SMS process) connect to a particular PVWriter instance in a
+ * protocol specific manner. Currently, PVStreamer only allows on PVWriter object to
+ * be associated with it due to limitations of the inernal buffering scheme; however,
+ * multiple PVReader and PVConfig may be attached as needed.
+ *
+ * Configuration management and access is provided by the IPVConfigServices and
+ * IPVConfigListener interfaces as well as the public interface of PVSTreamer class itself.
+ * PVStreamer does not acquire configuration data; rather instances of associated
+ * PVConfig objects gather configuration data and use PVStreamer to store and
+ * disseminate this data. PVStreamer also does not monitor which devices and/or 
+ * process variables are actually active (as opposed to simply defined) - this is
+ * defered to PVReader classes as it require protocol-specific implementation.
+ *
+ * PVStreamer provides buffering and access to an internal protocol-independent process
+ * variable stream. PVReader objects acquire, fill, then emit PVStreamPacket objects
+ * into the internal stream. PVWriter objects receive internal stream packets, then
+ * translate and emit them into protocol-specific extrernal streams. This stream path
+ * is "high performance" and requires minimal latency due to buffering and translation.
+ * Clients with less-critical and higher-latency processing (GUIs and loggers) can
+ * access the internal stream via the IPVStreamListener interface. This interface
+ * tracks the internal stream unless the buffering backs-up to a specified level, at
+ * which point incoming stream packets bypass the stream listener queue.
  */
-class IPVStreamListener
-{
-public:
-    virtual void                deviceActive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name ) = 0;
-    virtual void                deviceInactive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name ) = 0;
-    virtual void                pvActive( Timestamp &a_time, const PVInfo &a_pv_info ) = 0;
-    virtual void                pvInactive( Timestamp &a_time, const PVInfo &a_pv_info ) = 0;
-    virtual void                pvStatusUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned short a_alarms ) = 0;
-    virtual void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value ) = 0;
-    virtual void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value, const Enum *a_enum ) = 0;
-    virtual void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned long a_value ) = 0;
-    virtual void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, double a_value ) = 0;
-    //virtual void                pvValueUpdated( const PVInfo &a_pv_info, std::string a_value ) = 0;
-};
-
-class IPVConfigListener
-{
-public:
-    virtual void                configurationLoaded( Protocol a_protocol, const std::string &a_source ) = 0;
-
-    //virtual void                deviceRunning( unsigned long a_dev_id, unsigned long a_protocol_id ) = 0;
-    //virtual void                deviceStopped( unsigned long a_dev_id, unsigned long a_protocol_id ) = 0;
-
-    // TODO Need API for reconnecting or configuration changes? (CfgMgr can just stop and restart all running devices)
-};
-
-/**
- * The IPVConfigServices interface is used by PVConfig instances to add and
- * remove pvs and enums to/from the central pv repository. Only PVConfig
- * instances have the ability to define and undefine pvs.
- */
-class IPVConfigServices
-{
-public:
-    
-    virtual void                defineApp( Protocol a_protocol, Identifier a_app_id, const std::string &a_source ) = 0;
-    virtual void                undefineApp( Identifier a_app_id ) = 0;
-    virtual void                defineDevice( Protocol a_protocol, Identifier a_dev_id, const std::string &a_name, const std::string &a_source,  Identifier a_app_id = 0 ) = 0;
-    virtual void                undefineDevice( Identifier a_dev_id ) = 0;
-    virtual void                undefineDeviceIfNoPVs( Identifier a_dev_id ) = 0;
-    virtual void                definePV( PVInfo & info ) = 0;
-    virtual void                undefinePV( Identifier a_dev_id, Identifier a_pv_id ) = 0;
-    virtual const Enum*         getEnum( Identifier a_id ) const = 0;
-    virtual const Enum*         defineEnum( const std::map<int,std::string> &a_values ) = 0;
-    virtual void                configurationLoaded( Protocol a_protocol, const std::string &a_source ) = 0;
-    virtual PVInfo*             getWriteablePV( const std::string & a_name ) const = 0;
-};
-
-/**
- * The IPVReaderServices interface is used to grant access to reader-specific
- * services (buffers and writeable PVInfo objects).
- */
-class IPVReaderServices
-{
-public:
-    virtual PVStreamPacket*     getFreePacket() = 0;
-    virtual void                putFilledPacket( PVStreamPacket *a_pkt ) = 0;
-    virtual PVInfo*             getWriteablePV( Identifier a_dev_id, Identifier a_pv_id ) const = 0;
-    virtual std::vector<PVInfo*> &  getWriteableDevicePVs( Identifier a_dev_id ) const = 0;
-    virtual void                getSourceInfo( Protocol a_protocol, const std::string &a_source, std::map<Identifier,std::vector<PVInfo*> > &a_info ) const = 0;
-};
-
-/**
- * The IPVWriterServices interface is used to grant access to writer-specific
- * services (buffers). Only one writer may be attached to the streamer at a
- * given time. (a future revision may provide multiple writers, but will require
- * substantial changes to the writer interface.)
- */
-class IPVWriterServices
-{
-public:
-    virtual PVStreamPacket*     getFilledPacket() = 0;
-    virtual void                putFreePacket( PVStreamPacket *a_pkt ) = 0;
-};
-
-
-// ---------- PVStreamer class ------------------------------------------------
-
 class PVStreamer : private IPVConfigServices, private IPVReaderServices, private IPVWriterServices
 {
 public:
     PVStreamer( size_t a_pkt_buffer_size = 100, size_t a_max_notify_pkts = 0 );
     ~PVStreamer();
 
-//    void                                getActivePVs( std::map<Identifier,std::vector<const PVInfo*> > &a_pvs ) const;
-    bool                                isPVDefined( Identifier a_dev_id, Identifier a_pv_id ) const;
-    const PVInfo*                       getPV( Identifier a_dev_id, Identifier a_pv_id ) const;
+    bool                            isPVDefined( Identifier a_dev_id, Identifier a_pv_id ) const;
+    const PVInfo*                   getPV( Identifier a_dev_id, Identifier a_pv_id ) const;
     const std::map<Identifier,const Enum*> &getEnums() const;
-    const std::vector<const PVInfo*>&   getDevicePVs( Identifier a_dev_id ) const;
-    void                                getActiveDevices( std::vector<Identifier> &a_devs ) const;
-    bool                                isDeviceDefined( Identifier a_dev_id ) const;
-    std::string                         getDeviceName( Identifier a_dev_id ) const;
-    bool                                isAppDefined( Identifier a_app_id ) const;
-    const std::vector<Identifier>&      getAppDevices( Identifier a_app_id ) const;
+    const std::vector<const PVInfo*>& getDevicePVs( Identifier a_dev_id ) const;
+    void                            getActiveDevices( std::vector<Identifier> &a_devs ) const;
+    bool                            isDeviceDefined( Identifier a_dev_id ) const;
+    std::string                     getDeviceName( Identifier a_dev_id ) const;
+    bool                            isAppDefined( Identifier a_app_id ) const;
+    const std::vector<Identifier>&  getAppDevices( Identifier a_app_id ) const;
 
-    void                        attachConfigListener( IPVConfigListener &a_listener );
-    void                        detachConfigListener( IPVConfigListener &a_listener );
-
-    void                        attachStreamListener( IPVStreamListener &a_listener );
-    void                        detachStreamListener( IPVStreamListener &a_listener );
-
-    IPVConfigServices*          attach( PVConfig &a_config );
-    IPVReaderServices*          attach( PVReader &a_reader );
-    IPVWriterServices*          attach( PVWriter &a_writer );
-
-    //TODO Need to think about reader/writer/config detachment - is it even needed?
+    void                            attachConfigListener( IPVConfigListener &a_listener );
+    void                            detachConfigListener( IPVConfigListener &a_listener );
+    void                            attachStreamListener( IPVStreamListener &a_listener );
+    void                            detachStreamListener( IPVStreamListener &a_listener );
+    IPVConfigServices*              attach( PVConfig &a_config );
+    IPVReaderServices*              attach( PVReader &a_reader );
+    IPVWriterServices*              attach( PVWriter &a_writer );
 
 private:
+    /// Defines a global process variable key by associating with device ID
     typedef std::pair<Identifier,Identifier> PVKey;
 
+    /// IOC Application information structure
     struct AppInfo
     {
-        Identifier                  app_id;
-        Protocol                    protocol;
-        std::string                 source;
-        std::vector<Identifier>     devices;
+        Identifier                  app_id;     /// Application ID
+        Protocol                    protocol;   /// Protocol
+        std::string                 source;     /// Source (i.e. hostname)
+        std::vector<Identifier>     devices;    /// Configured devices associated with app
     };
 
+    /// Device information structure
     struct DeviceInfo
     {
-        Identifier              device_id;
-        Identifier              app_id;
-        std::string             name;
-        Protocol                protocol;
-        std::string             source;
-        std::vector<PVInfo*>    pvs;
+        Identifier                  device_id;  /// Device ID
+        Identifier                  app_id;     /// Owning application ID
+        std::string                 name;       /// Name of device
+        Protocol                    protocol;   /// Protocol
+        std::string                 source;     /// Source (i.e. hostname)
+        std::vector<PVInfo*>        pvs;        /// Configured process variables associated with device
     };
 
     // ---------- IPVConfigServices methods ----------
@@ -166,6 +116,7 @@ private:
     const Enum*                 getEnum( Identifier a_id ) const;
     const Enum*                 defineEnum( const std::map<int,std::string> &a_values );
     void                        configurationLoaded( Protocol a_protocol, const std::string &a_source );
+    void                        configurationInvalid( Protocol a_protocol, const std::string &a_source );
     PVInfo*                     getWriteablePV( const std::string & a_name ) const;
 
     // ---------- IPVReaderServices methods ----------
@@ -174,7 +125,6 @@ private:
     void                        putFilledPacket( PVStreamPacket *a_pkt );
     PVInfo*                     getWriteablePV( Identifier a_dev_id, Identifier a_pv_id ) const;
     std::vector<PVInfo*> &      getWriteableDevicePVs( Identifier a_dev_id ) const;
-    void                        getSourceInfo( Protocol a_protocol, const std::string &a_source, std::map<Identifier,std::vector<PVInfo*> > &a_info ) const;
 
     // ---------- IPVWriterServices methods ----------
 
@@ -188,32 +138,28 @@ private:
 
     // ---------- Private Attributes ----------
  
-    size_t                                      m_pkt_buffer_size;
-    size_t                                      m_max_notify_pkts;
+    size_t                                      m_pkt_buffer_size;          ///< Stream packet buffer size
+    size_t                                      m_max_notify_pkts;          ///< Max stream packets to queue to notify service
+    std::map<Protocol,PVConfig*>                m_config;                   ///< Active configuration objects
+    std::map<Protocol,PVReader*>                m_readers;                  ///< Active reader objects
+    PVWriter*                                   m_writer;                   ///< Active writer
+    std::vector<PVStreamPacket*>                m_stream_pkts;              ///< Stream packets
+    SyncDeque<PVStreamPacket*>                  m_free_que;                 ///< Free stream packet buffer
+    SyncDeque<PVStreamPacket*>                  m_fill_que;                 ///< Filled stream packet buffer
+    SyncDeque<PVStreamPacket*>                  m_notify_que;               ///< Stream listener notification packet buffer
+    mutable boost::mutex                        m_api_mutex;                ///< Synchronizes PVStreamer API
+    mutable boost::mutex                        m_strlist_mutex;            ///< Protects stream listener container
+    mutable boost::mutex                        m_cfglist_mutex;            ///< Protects config listener container
+    mutable boost::mutex                        m_cfg_mutex;                ///< Protects access to pv and device containers
+    boost::thread*                              m_stream_listeners_thread;  ///< Thread to send notifications to stream listeners
+    std::vector<IPVStreamListener*>             m_stream_listeners;         ///< Registered stream listener container
+    std::vector<IPVConfigListener*>             m_config_listeners;         ///< Registered config listener container
+    std::map<PVKey,PVInfo*>                     m_pv_info;                  ///< All defined (configured) process variables
+    std::map<Identifier,DeviceInfo*>            m_devices;                  ///< All defined (configured) devices
+    std::map<Identifier,AppInfo*>               m_apps;                     ///< All defined (configured) applications
+    std::map<Identifier,Enum*>                  m_enums;                    ///< All defined (configured) enumerations
 
-    std::map<Protocol,PVConfig*>                m_config;
-    std::map<Protocol,PVReader*>                m_readers;
-    PVWriter*                                   m_writer;
-
-    SyncDeque<PVStreamPacket*>                  m_free_que;
-    SyncDeque<PVStreamPacket*>                  m_fill_que;
-    SyncDeque<PVStreamPacket*>                  m_notify_que;
-
-    mutable boost::mutex                        m_api_mutex;
-    mutable boost::mutex                        m_strlist_mutex;    //< Used to protect stream listener container
-    mutable boost::mutex                        m_cfglist_mutex;    //< Used to protect config listener container
-    mutable boost::mutex                        m_cfg_mutex;        //< Used for access to pv and device containers
-
-    boost::thread*                              m_stream_listeners_thread;
-    std::vector<IPVStreamListener*>             m_stream_listeners;
-    std::vector<IPVConfigListener*>             m_config_listeners;
-
-    std::map<PVKey,PVInfo*>                     m_pv_info;
-    std::map<Identifier,DeviceInfo*>            m_devices;
-    std::map<Identifier,AppInfo*>               m_apps;
-    std::map<Identifier,Enum*>                  m_enums;
-
-    static Identifier m_next_enum_id;
+    static Identifier m_next_enum_id;                                       ///< HACK to define IDs for enumerations
 };
 
 }}

@@ -109,15 +109,19 @@ CPVStreamerDlg::listening( const std::string & a_address, unsigned short a_port 
 }
 
 void
-CPVStreamerDlg::connected()
+CPVStreamerDlg::connected( string &a_address )
 {
-    m_status_edit.SetWindowText( "ADARA: SMS Connected" );
+    stringstream   sstr;
+    sstr << "ADARA: Client connected from " << a_address;
+    m_status_edit.SetWindowText( sstr.str().c_str() );
 }
 
 void
-CPVStreamerDlg::disconnected()
+CPVStreamerDlg::disconnected( string &a_address )
 {
-    m_status_edit.SetWindowText( "ADARA: SMS Disonnected" );
+    stringstream   sstr;
+    sstr << "ADARA: Client disconnected from " << a_address;
+    m_status_edit.SetWindowText( sstr.str().c_str() );
 }
 
 void
@@ -129,10 +133,18 @@ CPVStreamerDlg::configurationLoaded( Protocol a_protocol, const std::string &a_s
 }
 
 void
+CPVStreamerDlg::configurationInvalid( Protocol a_protocol, const std::string &a_source )
+{
+    stringstream   sstr;
+    sstr << "ERROR: Invalid Configuration. source = " << a_source << ", protocol = " << a_protocol;
+    addLogEntry( 0, sstr.str() );
+}
+
+void
 CPVStreamerDlg::deviceActive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name )
 {
     stringstream   sstr;
-    sstr << "Active Device: " << a_name << " (ID " << a_dev_id << ")";
+    sstr << "Device " << a_name << " (ID " << a_dev_id << ") ACTIVE";
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -140,7 +152,7 @@ void
 CPVStreamerDlg::deviceInactive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name )
 {
     stringstream   sstr;
-    sstr << "Inactive Device: " << a_name << " (ID " << a_dev_id << ")";
+    sstr << "Device " << a_name << " (ID " << a_dev_id << ") INACTIVE";
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -148,7 +160,7 @@ void
 CPVStreamerDlg::pvActive( Timestamp &a_time, const PVInfo &a_pv_info )
 {
     stringstream   sstr;
-    sstr << "Active PV: " << a_pv_info.m_name <<  " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ")";
+    sstr << "PV " << a_pv_info.m_name <<  " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") ACTIVE";
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -156,15 +168,7 @@ void
 CPVStreamerDlg::pvInactive( Timestamp &a_time, const PVInfo &a_pv_info )
 {
     stringstream   sstr;
-    sstr << "Inactive PV: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ")";
-    addLogEntry( &a_time, sstr.str() );
-}
-
-void
-CPVStreamerDlg::pvStatusUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned short a_alarms )
-{
-    stringstream   sstr;
-    sstr << "PV Status: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") = " << alarmText(a_pv_info.m_alarms);
+    sstr << "PV " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") INACTIVE";
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -172,7 +176,7 @@ void
 CPVStreamerDlg::pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value )
 {
     stringstream   sstr;
-    sstr << "PV Value: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") = " << a_value << alarmText(a_pv_info.m_alarms);
+    sstr << "PV " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") VALUE = " << a_value << alarmText(a_pv_info.m_alarms);
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -180,7 +184,10 @@ void
 CPVStreamerDlg::pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value, const Enum *a_enum )
 {
     stringstream   sstr;
-    sstr << "PV Value: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") = " << a_value << alarmText(a_pv_info.m_alarms);
+    sstr << "PV " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") VALUE = ";
+    if ( a_enum )
+        sstr << a_enum->getName(a_value) << " ";
+    sstr << "{"<< a_value << "}" << alarmText(a_pv_info.m_alarms);
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -188,7 +195,7 @@ void
 CPVStreamerDlg::pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned long a_value )
 {
     stringstream   sstr;
-    sstr << "PV Value: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") = " << a_value << alarmText(a_pv_info.m_alarms);
+    sstr << "PV " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") VALUE = " << a_value << alarmText(a_pv_info.m_alarms);
     addLogEntry( &a_time, sstr.str() );
 }
 
@@ -196,7 +203,7 @@ void
 CPVStreamerDlg::pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, double a_value )
 {
     stringstream   sstr;
-    sstr << "PV Value: " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") = " << a_value << alarmText(a_pv_info.m_alarms);
+    sstr << "PV " << a_pv_info.m_name << " (ID " << a_pv_info.m_device_id << "." << a_pv_info.m_id << ") VALUE = " << a_value << alarmText(a_pv_info.m_alarms);
     addLogEntry( &a_time, sstr.str() );
 }
 

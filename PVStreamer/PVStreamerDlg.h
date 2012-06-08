@@ -32,19 +32,19 @@ protected:
 
 
     void                configurationLoaded( Protocol a_protocol, const std::string &a_source );
+    void                configurationInvalid( Protocol a_protocol, const std::string &a_source );
     void                deviceActive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name );
     void                deviceInactive( Timestamp &a_time, Identifier a_dev_id, const std::string & a_name );
     void                pvActive( Timestamp &a_time, const PVInfo &a_pv_info );
     void                pvInactive( Timestamp &a_time, const PVInfo &a_pv_info );
-    void                pvStatusUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned short a_alarms );
     void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value );
     void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, long a_value, const Enum *a_enum );
     void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, unsigned long a_value );
     void                pvValueUpdated( Timestamp &a_time, const PVInfo &a_pv_info, double a_value );
 
     void                listening( const std::string & a_address, unsigned short a_port );
-    void                connected(); // const std::string & a_client_address );
-    void                disconnected(); // const std::string & a_client_address );
+    void                connected( std::string &a_address );
+    void                disconnected( std::string &a_address );
 
     std::string         timeString( Timestamp *ts ) const;
     void                addLogEntry( Timestamp *ts, std::string &entry );

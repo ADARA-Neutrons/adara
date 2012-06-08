@@ -1,6 +1,8 @@
 /**
- * @file ADARA.h
- * @brief ADARA protocol definitions
+ * \file ADARA.h
+ * \brief Header file for ADARA definitions.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
  */
 
 #ifndef ADARA_H
@@ -10,9 +12,10 @@
 
 namespace SNS { namespace PVS { namespace ADARA {
 
-#define MAX_XML_LEN     32744 // 32K - overhead of DDP packet
+#define MAX_XML_LEN     32744 // 32K minus overhead of DDP packet
 #define MAX_STR_LEN     4000
 
+/// ADARA process variable status codes (alarms/errors)
 enum ADARA_Status
 {
     None    = 0,
@@ -39,6 +42,7 @@ enum ADARA_Status
     WriteAccess
 };
 
+/// ADARA process variable alarm severity codes
 enum ADARA_Severity
 {
     NoAlarm = 0,
@@ -47,15 +51,17 @@ enum ADARA_Severity
     Invalid
 };
 
+// Force visual studio to pack on 4 byte boundaries instead of default 8
 #pragma pack(push,4)
 
+/// This struct is used to build and transmit ADARA protocol DDP and VVP packets.
 struct ADARAPacket
 {
     unsigned long   payload_len;
     unsigned long   format;
     unsigned long   sec;
     unsigned long   nsec;
-    unsigned long   dev_id; // Common to all PV ADARA packets
+    unsigned long   dev_id; // Common to both DDP and VVP ADARA packets
     union
     {
         struct // Device Descriptor payload
@@ -72,13 +78,6 @@ struct ADARAPacket
             {
                 unsigned long   uval;   // unsigned long value
                 double          dval;   // double value
-/*
-                struct          sval    // string value & length
-                {
-                    unsigned long   str_len;
-                    char            str[MAX_STR_LEN];
-                };
-*/
             };
         } vvp;
     };

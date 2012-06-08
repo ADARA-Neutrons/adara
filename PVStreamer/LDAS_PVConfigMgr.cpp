@@ -1,3 +1,10 @@
+/**
+ * \file LDAS_PVConfigMgr.h
+ * \brief Header file for LDAS_PVConfigMgr class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #include "stdafx.h"
 
 #include <algorithm>
@@ -11,15 +18,27 @@ namespace SNS { namespace PVS { namespace LDAS {
 
 using namespace std;
 
+/**
+ * \brief Constructor for LDAS_PVConfigMgr class.
+ * \param a_streamer - Owning PVStreamer insatnce.
+ */
 LDAS_PVConfigMgr::LDAS_PVConfigMgr( PVStreamer & a_streamer )
 : m_streamer(a_streamer)
 {
 }
 
+/**
+ * \brief Destructor for LDAS_PVConfigMgr class.
+ */
 LDAS_PVConfigMgr::~LDAS_PVConfigMgr()
 {
+    // Note: Agents are deleted by PVStreamer
 }
 
+/**
+ * \brief Requests that configuration loading be initiated from specified satellite computer file (legacy).
+ * \param a_file - Filename of satellite computer file.
+ */
 void
 LDAS_PVConfigMgr::connectSatCompFile( const string & a_file )
 {
@@ -30,6 +49,10 @@ LDAS_PVConfigMgr::connectSatCompFile( const string & a_file )
         connectHost(*ih);
 }
 
+/**
+ * \brief Requests that configuration loading proceed from a given host (satellite omputer).
+ * \param a_hostname - Hostname of satellite computer.
+ */
 void
 LDAS_PVConfigMgr::connectHost( const string & a_hostname )
 {
@@ -44,95 +67,91 @@ LDAS_PVConfigMgr::connectHost( const string & a_hostname )
         m_agents[hostname] = new LDAS_PVConfigAgent(m_streamer, *this, hostname);
     }
     else
-        throw -1;
+    {
+        LOG_ERROR( "Already connected to and monitoring host " << hostname );
+    }
 }
 
+/**
+ * \brief Parses legacy DAS satellite computer xml file.
+ * \param a_file - Filename of satellite computer file (input).
+ * \param a_hostnames - Vector of hostnames found in satellite computer file (output).
+ */
 void
 LDAS_PVConfigMgr::parseSatCompFile( const string & a_file, vector<string> &a_hostnames )
 {
-    string          str;
-
-    // ===== Begin Imported Code ==============================================
-    // ----- Copied and modified from ListenerLib -----------------------------
-
-    CStringParser myParser;
-	ELE_STRUCT eStruct;
-	ELE_STRUCT eSubStruct;
-	CString csElement;
-    CString csTemp;
     char *buffer = 0;
 
-	TRY
-	{
-		CFile f(a_file.c_str(), CFile::modeRead);
+    try
+    {
+        string          str;
+
+        // ===== Begin Imported Code ==============================================
+        // ----- Copied and modified from ListenerLib -----------------------------
+
+        CStringParser myParser;
+	    ELE_STRUCT eStruct;
+	    ELE_STRUCT eSubStruct;
+	    CString csElement;
+        CString csTemp;
+
+	    CFile f(a_file.c_str(), CFile::modeRead);
         UINT len = (UINT)f.GetLength();
         if ( len > 0 )
         {
             buffer = new char[len+1];
-		    f.Read(buffer,len);
-		    buffer[len]=0;
+	        f.Read(buffer,len);
+	        buffer[len]=0;
             csTemp = buffer;
             delete[] buffer;
+            buffer = 0;
         }
-		f.Close();
-	
-	}
-	CATCH( CFileException, e )
-	{
-        if ( buffer )
-            delete[] buffer;
-		throw -1;
-	}
-	END_CATCH
+	    f.Close();
+    	
 
-	if (!myParser.CheckValidHeader(csTemp))
-    {
-		//GLB_pLogHelper->PopMsg("Invalid header in satellite computer file");
-		throw -2;
-	}
+	    if (!myParser.CheckValidHeader(csTemp))
+            throw -1;
 
-	if (myParser.GetRootName(csTemp) != "Satellite")
-    {
-		//GLB_pLogHelper->PopMsg("Invalid root in satellite file");
-		throw -5;
-	}
-	csTemp=myParser.StripHeader(csTemp); 	
-	csTemp=myParser.StripFirstTag(csTemp);
-	csTemp=myParser.StripLastTag(csTemp);
+	    if (myParser.GetRootName(csTemp) != "Satellite")
+            throw -1;
 
-    int k = 1;
-	while(1)
-	{
-		csElement=myParser.GetElement(csTemp,k++);
-		if (csElement.IsEmpty())
-		{
-            break;
-		}
-		eStruct=myParser.GetElementStructure(csElement);
-	
-		if (eStruct.csName != "computer")
-		{
-			throw -4;
-		}
-		else
-		{    
-			eStruct=myParser.GetElementStructure(csElement);
-			for (unsigned int i=0;i<eStruct.uiNumberOfAttributes;i++)
-			{
-				if (eStruct.sAttribute[i].csName=="Name")
-				{
-                    //CT2CA tmp(eStruct.sAttribute[i].csValue);
-                    //str = tmp;
+	    csTemp=myParser.StripHeader(csTemp); 	
+	    csTemp=myParser.StripFirstTag(csTemp);
+	    csTemp=myParser.StripLastTag(csTemp);
+
+        int k = 1;
+	    while(1)
+	    {
+		    csElement=myParser.GetElement(csTemp,k++);
+		    if (csElement.IsEmpty())
+                break;
+
+            eStruct=myParser.GetElementStructure(csElement);
+    	
+		    if (eStruct.csName != "computer")
+			    throw -1;
+
+            eStruct=myParser.GetElementStructure(csElement);
+		    for (unsigned int i=0;i<eStruct.uiNumberOfAttributes;i++)
+		    {
+			    if (eStruct.sAttribute[i].csName=="Name")
+			    {
                     str = CT2CA(eStruct.sAttribute[i].csValue);
                     a_hostnames.push_back( str );
-				}
-			}
-		}
-	}
+			    }
+		    }
+	    }
 
-    // ===== End Imported Code ================================================
+        // ===== End Imported Code ================================================
+    }
+    catch(...)
+    {
+        if ( buffer )
+            delete[] buffer;
+
+        LOG_ERROR( "Failed parsing satellite computers file: " << a_file );
+        throw;
+    }
 }
-
-
 
 }}}

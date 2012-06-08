@@ -1,3 +1,10 @@
+/**
+ * \file ADARA_PVWriter.cpp
+ * \brief Source file for ADARA_PVWriter class.
+ * \author Dale V. Stansberry
+ * \date June 6, 2012
+ */
+
 #include "stdafx.h"
 
 #include <sstream>
@@ -8,9 +15,13 @@ using namespace std;
 
 namespace SNS { namespace PVS { namespace ADARA {
 
-// TODO Need a way to configure port nuber
 
-ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port, size_t a_adara_buffer_size )
+/**
+ * \brief Constructor for ADARA_PVWriter class.
+ * \param a_streamer - The associate PVStreamer instance.
+ * \param a_port - The tcp port thet the ADARA writer will listen on.
+ */
+ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port )
     : PVWriter(a_streamer, ADARA_PROTOCOL ), m_port(a_port), m_listen_socket(INVALID_SOCKET)
 {
     initWinSocket();
@@ -19,19 +30,31 @@ ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port, s
     m_pkt_send_thread = new boost::thread( boost::bind(&ADARA_PVWriter::packetSendThreadFunc, this));
 }
 
+/**
+ * \brief Destructor for ADARA_PVWriter class.
+ */
 ADARA_PVWriter::~ADARA_PVWriter()
 {
-    //TODO Wait for listen and send threads to exit?
+    boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
 
-    // TODO need to protect connections list
+    // Dsconnect clients
     if ( connected())
-        for ( list<SOCKET>::iterator isock = m_client_sockets.begin(); isock != m_client_sockets.end(); isock++ )
-            shutdown( *isock, SD_SEND );
+    {
+        for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ic++ )
+            shutdown( ic->sock, SD_SEND );
+    }
+
+    // Delete threads
+    delete m_socket_listen_thread;
+    delete m_pkt_send_thread;
 
     WSACleanup();
 }
 
-
+/**
+ * \brief Attaches a listener to an ADARA_PVWriter instance.
+ * \param a_listener - The IADARAWriterListener instance to attach.
+ */
 void
 ADARA_PVWriter::attachListener( IADARAWriterListener &a_listener )
 {
@@ -43,7 +66,10 @@ ADARA_PVWriter::attachListener( IADARAWriterListener &a_listener )
     }
 }
 
-
+/**
+ * \brief Detaches a listener from an ADARA_PVWriter instance.
+ * \param a_listener - The IADARAWriterListener instance to detach.
+ */
 void
 ADARA_PVWriter::detachListener( IADARAWriterListener &a_listener )
 {
@@ -55,27 +81,37 @@ ADARA_PVWriter::detachListener( IADARAWriterListener &a_listener )
     }
 }
 
-
+/**
+ * \brief Broadcasts a client connection notification to all listeners.
+ * \param a_address - Tcp address of the connected client.
+ */
 void
-ADARA_PVWriter::notifyConnect()
+ADARA_PVWriter::notifyConnect( string &a_address )
 {
     boost::lock_guard<boost::mutex> lock(m_list_mutex);
     for ( vector<IADARAWriterListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l)
     {
-        (*l)->connected();
+        (*l)->connected( a_address );
     }
 }
 
+/**
+ * \brief Broadcasts a client disconnection notification to all listeners.
+ * \param a_address - Tcp address of the disconnected client.
+ */
 void
-ADARA_PVWriter::notifyDisconnect()
+ADARA_PVWriter::notifyDisconnect( string &a_address )
 {
     boost::lock_guard<boost::mutex> lock(m_list_mutex);
     for ( vector<IADARAWriterListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l)
     {
-        (*l)->disconnected();
+        (*l)->disconnected( a_address );
     }
 }
 
+/**
+ * \brief Thread method for ADARA packet translation and transmission.
+ */
 void
 ADARA_PVWriter::packetSendThreadFunc()
 {
@@ -85,6 +121,8 @@ ADARA_PVWriter::packetSendThreadFunc()
     while(1)
     {
         pvs_pkt = m_writer_services->getFilledPacket();
+        if ( !pvs_pkt )
+            break;
 
         // If connected, translate and send packet
         if ( connected())
@@ -99,12 +137,20 @@ ADARA_PVWriter::packetSendThreadFunc()
     }
 }
 
+/**
+ * \brief Method to (quickly) determine if any clients are currently connected.
+ */
 bool
 ADARA_PVWriter::connected()
 {
-    return m_client_sockets.size() != 0;
+    return m_client_info.size() != 0;
 }
 
+/**
+ * \brief Translates a PV stream packet into an ADARA packet.
+ * \param a_pv_pkt - PV stream packet to translate (input).
+ * \param a_adara_pkt - ADARA packet to receive translation (output).
+ */
 bool
 ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
 {
@@ -115,13 +161,64 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
     {
     // ADARA does not currently handle devices going inactive, nor individial PVs going active/inactive
     case DeviceActive:
+        {
+            boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
+
+            // This code is need to handle the case when a client connects before configuration
+            // data is finished loading. This code ensures that the "virtual device" DDP is sent 
+            // to the client(s) before the just arraived real DDP. This is done only once.
+            for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
+            {
+                if ( !ic->ddp )
+                {
+                    ADARAPacket adara_pkt;
+                    Timestamp ts;
+
+                    // Use current time for DDP packets
+                    ts.sec = (unsigned long)time(0);
+
+                    // Virtual device
+                    buildDDP( adara_pkt, 0, ts );
+                    sendPacket( adara_pkt, ic->sock );
+                }
+            }
+        }
+
         buildDDP( a_adara_pkt, a_pv_pkt.device_id, a_pv_pkt.time );
         return true;
 
-    case VarStatusUpdate:
-        return false;
+    case VarInactive:
+        // A var inactive will be translated to a value update with alarm condition for the affected pv
+        a_adara_pkt.dev_id          = a_pv_pkt.device_id;
+        a_adara_pkt.vvp.var_id      = a_pv_pkt.pv_info->m_id;
 
-    case VarValueUpdate:
+        a_adara_pkt.vvp.status      = Comm; // Send a communication error code
+        a_adara_pkt.vvp.severity    = Major;
+
+        switch ( a_pv_pkt.pv_info->m_type )
+        {
+        case PV_ENUM:
+        case PV_INT:
+            a_adara_pkt.format      = 0x800100;
+            a_adara_pkt.payload_len = 16;
+            a_adara_pkt.vvp.uval    = a_pv_pkt.pv_info->m_ival; // Use last-known value
+            break;
+
+        case PV_UINT:
+            a_adara_pkt.format      = 0x800100;
+            a_adara_pkt.payload_len = 16;
+            a_adara_pkt.vvp.uval    = a_pv_pkt.pv_info->m_uval; // Use last-known value
+            break;
+
+        case PV_DOUBLE:
+            a_adara_pkt.format      = 0x800200;
+            a_adara_pkt.payload_len = 20;
+            a_adara_pkt.vvp.dval    = a_pv_pkt.pv_info->m_dval; // Use last-known value
+            break;
+        }
+        return true;
+
+    case VarUpdate:
         a_adara_pkt.dev_id          = a_pv_pkt.device_id;
         a_adara_pkt.vvp.var_id      = a_pv_pkt.pv_info->m_id;
 
@@ -178,22 +275,17 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
     return false;
 }
 
+/**
+ * \brief Builds an ADARA device descriptor packet
+ * \param a_adara_pkt - ADARA packet to receive DDP data.
+ * \param a_dev_id - ID of device to be described.
+ * \param a_time - Timestamp of device description (activation).
+ */
 void
-ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp a_time )
+ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timestamp a_time )
 {
-    /* For debugging MS padding - Yay!!!
-    int sz1 = sizeof(ADARAPacket);
-    int off1 = offsetof(ADARAPacket,payload_len);
-    int off2 = offsetof(ADARAPacket,format);
-    int off3 = offsetof(ADARAPacket,sec);
-    int off4 = offsetof(ADARAPacket,nsec);
-    int off5 = offsetof(ADARAPacket,dev_id);
-    int off6 = offsetof(ADARAPacket,ddp.xml_len);
-    int off7 = offsetof(ADARAPacket,ddp.xml);
-    */
-
     a_adara_pkt.format  = 0x800000;
-    a_adara_pkt.dev_id  = dev_id;
+    a_adara_pkt.dev_id  = a_dev_id;
     a_adara_pkt.sec     = a_time.sec;
     a_adara_pkt.nsec    = a_time.nsec;
 
@@ -206,11 +298,11 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp
             << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl
             << "  xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd\">" << endl;
 
-    sstr << "  <device_name>" << (dev_id?m_streamer.getDeviceName( dev_id ):"VirtualDevice0") << "</device_name>" << endl;
+    sstr << "  <device_name>" << (a_dev_id?m_streamer.getDeviceName( a_dev_id ):"VirtualDevice0") << "</device_name>" << endl;
 
-    if ( dev_id )
+    if ( a_dev_id )
     {
-        const vector<const PVInfo*> & pvs = m_streamer.getDevicePVs( dev_id );
+        const vector<const PVInfo*> & pvs = m_streamer.getDevicePVs( a_dev_id );
         sstr << "  <process_variables>" << endl;
 
         for ( vector<const PVInfo*>::const_iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
@@ -218,7 +310,10 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp
             sstr << "    <process_variable>" << endl;
             sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
             sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
-            sstr << "      <pv_type>" << getTypeDescriptor((*ipv)->m_type) << "</pv_type>" << endl;
+            if ( (*ipv)->m_type == PV_ENUM )
+                sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->getID() << "</pv_type>" << endl;
+            else
+                sstr << "      <pv_type>" << getTypeDescriptor((*ipv)->m_type) << "</pv_type>" << endl;
             if ( (*ipv)->m_units.size() )
                 sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
             sstr << "    </process_variable>" << endl;
@@ -263,34 +358,52 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp
     a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len + 1; // Add 1 for terminating null
 }
 
-void
+/**
+ * \brief Attempts to send DDPs for all active devices to the specified client.
+ * \param a_socket - Socket of client to receive DDPs.
+ * \return True on success; false otherwise.
+ */
+bool
 ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
 {
-    ADARAPacket adara_pkt;
     vector<Identifier> devs;
-    list<SOCKET>::iterator isock;
-    Timestamp ts;
-
-    ts.sec = (unsigned long)time(0);
-
-    // Virtual device
-    buildDDP( adara_pkt, 0, ts );
-    sendPacket( adara_pkt, a_socket );
 
     m_streamer.getActiveDevices( devs );
 
-    for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
+    if ( devs.size() )
     {
-        buildDDP( adara_pkt, *idev, ts );
+        ADARAPacket adara_pkt;
+        Timestamp ts;
+
+        // Use current time for DDP packets
+        ts.sec = (unsigned long)time(0);
+
+        // Virtual device
+        buildDDP( adara_pkt, 0, ts );
         sendPacket( adara_pkt, a_socket );
+
+        // Real devices
+        for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
+        {
+            buildDDP( adara_pkt, *idev, ts );
+            sendPacket( adara_pkt, a_socket );
+        }
+
+        return true;
     }
+
+    return false;
 }
 
-
+/**
+ * \brief Attempts to send an ADARA packet to the specified client.
+ * \param a_adara_pkt - ADARA packet to send
+ * \param a_socket - Socket of client to receive packet.
+ */
 void
 ADARA_PVWriter::sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket )
 {
-    list<SOCKET>::iterator isock;
+    list<ClientInfo>::iterator ic;
     int rc;
 
     if ( a_socket != INVALID_SOCKET )
@@ -299,40 +412,52 @@ ADARA_PVWriter::sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket )
         rc = send( a_socket, (char*)&a_adara_pkt, a_adara_pkt.payload_len + 16, 0 );
         if ( rc == SOCKET_ERROR )
         {
-            // TODO Log error
-            boost::lock_guard<boost::mutex> lock(m_conn_mutex);
+            LOG_ERROR( "Socket send() failed. rc: " << rc );
+
+            boost::lock_guard<boost::recursive_mutex> lock(m_conn_mutex);
 
             // Disconnect from client
             closesocket( a_socket );
 
-            isock = find(m_client_sockets.begin(),m_client_sockets.end(),a_socket);
-            if ( isock != m_client_sockets.end())
-                m_client_sockets.erase(isock);
-
-            notifyDisconnect();
+            for ( ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
+            {
+                if ( ic->sock == a_socket )
+                {
+                    notifyDisconnect( ic->addr );
+                    m_client_info.erase(ic);
+                    break;
+                }
+            }
         }
     }
     else
     {
         // Send to ALL clients
-        boost::lock_guard<boost::mutex> lock(m_conn_mutex);
+        boost::lock_guard<boost::recursive_mutex> lock(m_conn_mutex);
 
-        for ( isock = m_client_sockets.begin(); isock != m_client_sockets.end(); )
+        for ( ic = m_client_info.begin(); ic != m_client_info.end(); )
         {
-            rc = send( *isock, (char*)&a_adara_pkt, a_adara_pkt.payload_len + 16, 0 );
+            rc = send( ic->sock, (char*)&a_adara_pkt, a_adara_pkt.payload_len + 16, 0 );
             if ( rc == SOCKET_ERROR )
             {
+                LOG_ERROR( "Socket send() failed. rc: " << rc );
+
                 // Disconnect from client
-                closesocket( *isock );
-                isock = m_client_sockets.erase(isock);
-                notifyDisconnect();
+                closesocket( ic->sock );
+                notifyDisconnect( ic->addr );
+                ic = m_client_info.erase(ic);
             }
             else
-                isock++;
+                ic++;
         }
     }
 }
 
+/**
+ * \brief Converts a DataType value into an ADARA DDP variable type (xml).
+ * \param a_type - Data type to convert.
+ * \return Text (const char*) of data type.
+ */
 const char *
 ADARA_PVWriter::getTypeDescriptor( DataType a_type ) const
 {
@@ -349,8 +474,45 @@ ADARA_PVWriter::getTypeDescriptor( DataType a_type ) const
     return "unknown";
 }
 
-// ---------- WINDOWS-Specific Sockets ----------------------------------------
+/**
+ * \brief Socket listener thread for ADARA service.
+ */
+void
+ADARA_PVWriter::socketListenThreadFunc()
+{
+    struct sockaddr client_addr;
+    int             client_addr_len = sizeof(struct sockaddr);
+    ClientInfo      info;
 
+    while(1)
+    {
+        info.sock = accept( m_listen_socket, &client_addr, &client_addr_len );
+        if ( info.sock == INVALID_SOCKET )
+        {
+            LOG_ERROR( "accept() failed. rc: " << WSAGetLastError() );
+        }
+        else
+        {
+            info.ddp = false;
+            info.addr = inet_ntoa( ((struct sockaddr_in &)client_addr).sin_addr );
+            LOG_INFO( "ADARA client connected from " << info.addr );
+
+            boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
+            m_client_info.push_back( info );
+            lock.unlock();
+
+            notifyConnect( info.addr );
+
+            // New client - need to send it all currently active devies (if any)
+            info.ddp = sendActiveDeviceInfo( info.sock );
+        }
+    }
+}
+
+/**
+ * \brief Initialized Windows sockets library and configures listener socket.
+ * \return True on success; false otherwise.
+ */
 bool
 ADARA_PVWriter::initWinSocket()
 {
@@ -377,20 +539,30 @@ ADARA_PVWriter::initWinSocket()
         // Resolve the local address and port to be used by the server
         rc = getaddrinfo( 0, port_str, &hints, &result );
         if ( rc )
-            throw -2;
+        {
+            LOG_ERROR( "getaddrinfo() failed. rc: " << rc );
+            throw -1;
+        }
 
         m_listen_socket = socket( result->ai_family, result->ai_socktype, result->ai_protocol );
         if ( m_listen_socket == INVALID_SOCKET )
-            throw -3;
+        {
+            LOG_ERROR( "socket() failed. rc: " << WSAGetLastError() );
+            throw -1;
+        }
 
         rc = bind( m_listen_socket, result->ai_addr, (int)result->ai_addrlen );
         if ( rc == SOCKET_ERROR )
-            throw -4;
+        {
+            LOG_ERROR( "bind() failed. rc: " << WSAGetLastError() );
+            throw -1;
+        }
 
         if ( listen( m_listen_socket, 5 /*max connections*/ ) == SOCKET_ERROR )
         {
+            LOG_ERROR( "bind() failed. rc: " << WSAGetLastError() );
             closesocket( m_listen_socket );
-            throw -5;
+            throw -1;
         }
 
         // Get Server IP address (not sure why the above does not set it correctly in result
@@ -405,13 +577,13 @@ ADARA_PVWriter::initWinSocket()
             }
         }
 
+        LOG_INFO( "ADARA pv streaming service listening at " << m_addr << ":" << m_port );
+
         freeaddrinfo( result );
         result = 0;
     }
     catch(...)
     {
-        // TODO Log error
-
         if ( result )
             freeaddrinfo( result );
 
@@ -419,34 +591,6 @@ ADARA_PVWriter::initWinSocket()
     }
 
     return true;
-}
-
-
-void
-ADARA_PVWriter::socketListenThreadFunc()
-{
-    SOCKET  client_socket;
-    while(1)
-    {
-        // TODO should get client address and log it
-        client_socket = accept( m_listen_socket, 0, 0 );
-        if ( client_socket == INVALID_SOCKET )
-        {
-            // TODO Log error
-            // TODO exit thread if really bad error?
-        }
-        else
-        {
-            // New client - need to send it all currently active devies
-            sendActiveDeviceInfo( client_socket );
-
-            boost::unique_lock<boost::mutex> lock(m_conn_mutex);
-            m_client_sockets.push_back( client_socket );
-            lock.unlock();
-
-            notifyConnect();
-        }
-    }
 }
 
 
