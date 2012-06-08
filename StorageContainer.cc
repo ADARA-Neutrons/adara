@@ -72,8 +72,12 @@ StorageContainer::StorageContainer(const std::string &name)
 
 void StorageContainer::terminateFile(void)
 {
-	m_cur_file->terminate(m_runNumber ?  ADARA::RunStatus::END_RUN :
-					     ADARA::RunStatus::NO_RUN);
+	ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+	if (m_runNumber) {
+		status = m_active ? ADARA::RunStatus::RUN_EOF :
+				    ADARA::RunStatus::END_RUN;
+	}
+	m_cur_file->terminate(status);
 	StorageManager::addBaseStorage(m_cur_file->size());
 	m_cur_file.reset();
 }
