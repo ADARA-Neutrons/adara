@@ -104,15 +104,13 @@ CPVStreamerApp::InitInstance()
         return FALSE;
     }
     
-    //_crtBreakAlloc = 326;
-
     // Create main window
     CPVStreamerDlg dlg;
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
     // Initialize PVStreamer objects
-    PVStreamer pvs(5000,4000);
+    PVStreamer pvs(200,100);
 
     pvs.attachConfigListener( dlg );
     pvs.attachStreamListener( dlg );
@@ -140,7 +138,7 @@ CPVStreamerApp::InitInstance()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-//_CrtDumpMemoryLeaks();
+
     // Return false to prevent CWinApp::Run() from being called
     return FALSE;
 }

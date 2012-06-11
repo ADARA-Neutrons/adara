@@ -119,12 +119,6 @@ int _tmain(int argc, _TCHAR* argv[])
             if ( !test )
                 cout << "Pkt # " << pkt_count << " [" << hex << pkt.format << dec << "] l=" << pkt.payload_len << " ts=" << pkt.sec << "." << pkt.nsec << endl;
 
-            // Get payload len from header
-            cout << "Pkt: " << ++pkt_count << endl;
-            cout << "  format: " << hex << pkt.format << dec << endl;
-            cout << "  payload len: " << pkt.payload_len << endl;
-            cout << "  time: " << pkt.sec << "." << pkt.nsec << endl;
-
             rc = recv(pvs_socket, (char*)&pkt.dev_id, pkt.payload_len, 0 );
             if ( rc == pkt.payload_len )
             {
@@ -178,14 +172,14 @@ int _tmain(int argc, _TCHAR* argv[])
                             }
                             else
                             {
-                                if ( test_pkt_count == 3600 )
+                                test_pkt_count++;
+                                if ( test_pkt_count == 3601 )
                                 {
                                     cout << "Test completed successfully!" << endl;
                                     test_state = 3;
                                 }
                                 else
                                 {
-                                    test_pkt_count++;
                                     next_val = -180 + test_pkt_count*0.1;
                                 }
                             }
