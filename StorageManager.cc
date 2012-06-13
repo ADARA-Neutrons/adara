@@ -155,6 +155,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		/* We're not in a run, as we'd already have a container. */
 		struct header *hdr = (struct header *) iovec[0].iov_base;
 		struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
+		ts.tv_sec += ADARA::EPICS_EPOCH_OFFSET;
 		m_cur_container = boost::shared_ptr<StorageContainer>(
 					new StorageContainer(ts, 0));
 		m_contChange(m_cur_container, true);
