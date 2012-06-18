@@ -17,6 +17,7 @@ public:
 private:
 	enum State { IDLE, CONNECTING, ACTIVE };
 
+	std::string m_uri;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;

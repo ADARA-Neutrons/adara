@@ -19,7 +19,7 @@ double DataSource::m_data_timeout = 5.0;
 unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
 
 DataSource::DataSource(const std::string &uri, uint32_t id) :
-	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
+	m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(IDLE), m_sourceId(id), m_fd(-1), m_newPulse(false),
 	m_lastPulseId(0), m_dupCount(0), m_expectedPktSeq(0), m_pulseEOP(false)
 {
@@ -75,7 +75,7 @@ DataSource::~DataSource()
 
 void DataSource::connectionFailed(void)
 {
-fprintf(stderr, "%s\n", __func__);
+fprintf(stderr, "%s for %s\n", __func__, m_uri.c_str());
 	m_timer->cancel();
 
 	if (m_fdreg) {
