@@ -372,24 +372,24 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
-	// TODO
+	SMSControl::getInstance()->updateDescriptor(pkt, m_sourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
-	// TODO
+	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
-	// TODO
+	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
-	// TODO
+	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
 	return false;
 }

@@ -19,6 +19,7 @@ class Geometry;
 class DataSource;
 class PixelMap;
 class BeamlineInfo;
+class MetaDataMgr;
 
 class SMSControl : public caServer {
 public:
@@ -49,6 +50,14 @@ public:
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t sourceId);
+
+	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
+			      uint32_t sourceId);
+	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
+	void updateValue(const ADARA::VariableDoublePkt &pkt,
+			 uint32_t sourceId);
+	void updateValue(const ADARA::VariableStringPkt &pkt,
+			 uint32_t sourceId);
 
 private:
 	typedef std::bitset<32> SourceSet;
@@ -102,6 +111,7 @@ private:
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
+	boost::shared_ptr<MetaDataMgr> m_meta;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;

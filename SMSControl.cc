@@ -7,6 +7,7 @@
 #include "Geometry.h"
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
+#include "MetaDataMgr.h"
 
 #include <math.h>
 
@@ -33,7 +34,7 @@ SMSControl::SMSControl(const std::string &beamlineId,
 		       const std::string &beamlineShortName,
 		       const std::string &beamlineLongName) :
 	m_nextRunNumber(1), m_recording(false), m_nextSrcId(0),
-	m_lastRingPeriod(0), m_bankReserve(4096)
+	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr)
 {
 	if (m_singleton)
 		throw std::runtime_error("SMSControl is a singleton");
@@ -200,6 +201,8 @@ void SMSControl::sourceDown(uint32_t id)
 	}
 
 	m_activeSources.reset(id);
+
+	m_meta->dropTag(id);
 }
 
 void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
@@ -391,4 +394,28 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 	/* TODO update history of bank event counts and size m_bankReserve
 	 * accordingly to try to avoid reallocation events.
 	 */
+}
+
+void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
+				  uint32_t sourceId)
+{
+	m_meta->updateDescriptor(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::VariableU32Pkt &pkt,
+			     uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::VariableDoublePkt &pkt,
+			     uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::VariableStringPkt &pkt,
+			     uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
 }
