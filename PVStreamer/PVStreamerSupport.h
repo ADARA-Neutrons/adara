@@ -266,6 +266,7 @@ class IPVReaderServices
 {
 public:
     virtual PVStreamPacket*     getFreePacket() = 0;
+    virtual PVStreamPacket*     getFreePacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual void                putFilledPacket( PVStreamPacket *a_pkt ) = 0;
     virtual PVInfo*             getWriteablePV( Identifier a_dev_id, Identifier a_pv_id ) const = 0;
     virtual std::vector<PVInfo*> &  getWriteableDevicePVs( Identifier a_dev_id ) const = 0;
@@ -284,6 +285,7 @@ class IPVWriterServices
 {
 public:
     virtual PVStreamPacket*     getFilledPacket() = 0;
+    virtual PVStreamPacket*     getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual void                putFreePacket( PVStreamPacket *a_pkt ) = 0;
 };
 

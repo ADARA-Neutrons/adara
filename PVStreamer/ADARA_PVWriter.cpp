@@ -22,7 +22,7 @@ namespace SNS { namespace PVS { namespace ADARA {
  * \param a_port - The tcp port thet the ADARA writer will listen on.
  */
 ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port )
-    : PVWriter(a_streamer, ADARA_PROTOCOL ), m_port(a_port), m_listen_socket(INVALID_SOCKET)
+    : PVWriter(a_streamer, ADARA_PROTOCOL ), m_active(true), m_port(a_port), m_listen_socket(INVALID_SOCKET)
 {
     initWinSocket();
 
@@ -35,6 +35,9 @@ ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port )
  */
 ADARA_PVWriter::~ADARA_PVWriter()
 {
+    m_active = false;
+    closesocket( m_listen_socket );
+
     boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
 
     // Dsconnect clients
@@ -43,6 +46,12 @@ ADARA_PVWriter::~ADARA_PVWriter()
         for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ic++ )
             shutdown( ic->sock, SD_SEND );
     }
+
+    lock.unlock();
+
+    // Wait on threads to exit
+    m_socket_listen_thread->join();
+    m_pkt_send_thread->join();
 
     // Delete threads
     delete m_socket_listen_thread;
@@ -117,23 +126,42 @@ ADARA_PVWriter::packetSendThreadFunc()
 {
     PVStreamPacket *pvs_pkt;
     ADARAPacket     adara_pkt;
+    ADARAPacket     heartbeat_pkt;
+    bool            timeout_flag = false;
+
+    heartbeat_pkt.payload_len = 0;
+    heartbeat_pkt.format = 0x00400900;
+    heartbeat_pkt.nsec = 0;
 
     while(1)
     {
-        pvs_pkt = m_writer_services->getFilledPacket();
+        pvs_pkt = m_writer_services->getFilledPacket( HEARTBEAT_PERIOD, timeout_flag );
+//        pvs_pkt = m_writer_services->getFilledPacket();
         if ( !pvs_pkt )
-            break;
-
-        // If connected, translate and send packet
-        if ( connected())
+        {
+            if ( timeout_flag )
+            {
+                // Send a heartbeat packet
+                if ( connected())
+                {
+                    heartbeat_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+                    sendPacket( heartbeat_pkt );
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        else if ( connected()) // If connected, translate and send packet
         {
             if ( translate( *pvs_pkt, adara_pkt ))
             {
                 sendPacket( adara_pkt );
             }
-        }
 
-        m_writer_services->putFreePacket(pvs_pkt);
+            m_writer_services->putFreePacket(pvs_pkt);
+        }
     }
 }
 
@@ -164,7 +192,7 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
         {
             boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
 
-            // This code is need to handle the case when a client connects before configuration
+            // This code is needed to handle the case when a client connects before configuration
             // data is finished loading. This code ensures that the "virtual device" DDP is sent 
             // to the client(s) before the just arraived real DDP. This is done only once.
             for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
@@ -175,7 +203,7 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
                     Timestamp ts;
 
                     // Use current time for DDP packets
-                    ts.sec = (unsigned long)time(0);
+                    ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
 
                     // Virtual device
                     buildDDP( adara_pkt, 0, ts );
@@ -201,74 +229,25 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
         case PV_INT:
             a_adara_pkt.format      = 0x800100;
             a_adara_pkt.payload_len = 16;
-            a_adara_pkt.vvp.uval    = a_pv_pkt.pv_info->m_ival; // Use last-known value
+            a_adara_pkt.vvp.uval    = 0;
             break;
 
         case PV_UINT:
             a_adara_pkt.format      = 0x800100;
             a_adara_pkt.payload_len = 16;
-            a_adara_pkt.vvp.uval    = a_pv_pkt.pv_info->m_uval; // Use last-known value
+            a_adara_pkt.vvp.uval    = 0;
             break;
 
         case PV_DOUBLE:
             a_adara_pkt.format      = 0x800200;
             a_adara_pkt.payload_len = 20;
-            a_adara_pkt.vvp.dval    = a_pv_pkt.pv_info->m_dval; // Use last-known value
+            a_adara_pkt.vvp.dval    = 0.0;
             break;
         }
         return true;
 
     case VarUpdate:
-        a_adara_pkt.dev_id          = a_pv_pkt.device_id;
-        a_adara_pkt.vvp.var_id      = a_pv_pkt.pv_info->m_id;
-
-        if ( a_pv_pkt.pv_info->m_alarms )
-        {
-            // TODO Need to revist these alarm and status mappings
-
-            if ( a_pv_pkt.pv_info->m_alarms & ( PV_HW_LIMIT_HI | PV_HW_LIMIT_LO ))
-            {
-                a_adara_pkt.vvp.status      = HwLimit;
-                a_adara_pkt.vvp.severity    = Major;
-            }
-            else if ( a_pv_pkt.pv_info->m_alarms & PV_HW_ALARM_HI )
-            {
-                a_adara_pkt.vvp.status      = High;
-                a_adara_pkt.vvp.severity    = Minor;
-            }
-            else if ( a_pv_pkt.pv_info->m_alarms & PV_HW_ALARM_LO )
-            {
-                a_adara_pkt.vvp.status      = Low;
-                a_adara_pkt.vvp.severity    = Minor;
-            }
-        }
-        else
-        {
-            a_adara_pkt.vvp.status      = None;
-            a_adara_pkt.vvp.severity    = NoAlarm;
-        }
-
-        switch ( a_pv_pkt.pv_info->m_type )
-        {
-        case PV_ENUM:
-        case PV_INT:
-            a_adara_pkt.format      = 0x800100;
-            a_adara_pkt.payload_len = 16;
-            a_adara_pkt.vvp.uval    = (unsigned long)a_pv_pkt.ival;
-            break;
-
-        case PV_UINT:
-            a_adara_pkt.format      = 0x800100;
-            a_adara_pkt.payload_len = 16;
-            a_adara_pkt.vvp.uval    = a_pv_pkt.uval;
-            break;
-
-        case PV_DOUBLE:
-            a_adara_pkt.format      = 0x800200;
-            a_adara_pkt.payload_len = 20;
-            a_adara_pkt.vvp.dval    = a_pv_pkt.dval;
-            break;
-        }
+        buildVVP( a_adara_pkt, *a_pv_pkt.pv_info, &a_pv_pkt, 0 );
         return true;
     }
 
@@ -279,7 +258,7 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
  * \brief Builds an ADARA device descriptor packet
  * \param a_adara_pkt - ADARA packet to receive DDP data.
  * \param a_dev_id - ID of device to be described.
- * \param a_time - Timestamp of device description (activation).
+ * \param a_time - EPICS timestamp of device description (activation).
  */
 void
 ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timestamp a_time )
@@ -353,9 +332,112 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timesta
     // Copy xml into packet (will truncate if too long)
     a_adara_pkt.ddp.xml_len = (unsigned long) sstr.str().size();
     memcpy( a_adara_pkt.ddp.xml, sstr.str().c_str(), min(a_adara_pkt.ddp.xml_len,MAX_XML_LEN) );
-    a_adara_pkt.ddp.xml[min(a_adara_pkt.ddp.xml_len,MAX_XML_LEN-1)] = 0;
 
-    a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len + 1; // Add 1 for terminating null
+    a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len;
+
+    // Round payload length up to nearsest 4 bytes
+    int rem = a_adara_pkt.payload_len % 4;
+    if ( rem )
+    {
+        // Pad buffer with nulls
+        memset( ((char*)&a_adara_pkt) + 16 + a_adara_pkt.payload_len, 0, rem );
+        // Adjust payload len field
+        a_adara_pkt.payload_len += (4 - rem);
+    }
+}
+
+/**
+ * \brief Builds an ADARA variable value packet using either received or last known value
+ * \param a_adara_pkt - ADARA packet to receive VVP data.
+ * \param a_pv_info - The PVInfo instance of the associated variable.
+ * \param a_pv_pkt - The PVStreamPacket to use (optional)
+ * \param a_time - EPICS timestamp to use (if a_pv_pkt is not used).
+ *
+ * This method build a VVP packet for the PV specified by the PVInfo parameter. If
+ * a_pv_pkt is provided, is is used for timestamp and variable values; otherwise
+ * the a_tim parameter is used and the last known values are extracted from the
+ * PVInfo instance.
+ */
+void
+ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt, Timestamp *a_time )
+{
+    unsigned short alarms = 0;
+
+    a_adara_pkt.dev_id      = a_pv_info.m_device_id;
+    a_adara_pkt.vvp.var_id  = a_pv_info.m_id;
+
+    if ( !a_pv_pkt && ! a_time )
+        throw exception("Invalid arguments.");
+
+    if ( a_pv_pkt )
+    {
+        a_adara_pkt.sec     = a_pv_pkt->time.sec + EPICS_TIME_OFFSET;
+        a_adara_pkt.nsec    = a_pv_pkt->time.nsec;
+        alarms              = a_pv_pkt->alarms;
+    }
+    else
+    {
+        a_adara_pkt.sec     = a_time->sec + EPICS_TIME_OFFSET;
+        a_adara_pkt.nsec    = a_time->nsec;
+        alarms              = a_pv_info.m_alarms;
+    }
+
+
+    if ( alarms )
+    {
+        // TODO Need to revist/verify these alarm and status mappings
+        if ( alarms & ( PV_HW_LIMIT_HI | PV_HW_LIMIT_LO ))
+        {
+            a_adara_pkt.vvp.status      = HwLimit;
+            a_adara_pkt.vvp.severity    = Major;
+        }
+        else if ( a_pv_info.m_alarms & PV_HW_ALARM_HI )
+        {
+            a_adara_pkt.vvp.status      = High;
+            a_adara_pkt.vvp.severity    = Minor;
+        }
+        else if ( a_pv_info.m_alarms & PV_HW_ALARM_LO )
+        {
+            a_adara_pkt.vvp.status      = Low;
+            a_adara_pkt.vvp.severity    = Minor;
+        }
+    }
+    else
+    {
+        a_adara_pkt.vvp.status      = None;
+        a_adara_pkt.vvp.severity    = NoAlarm;
+    }
+
+    switch ( a_pv_info.m_type )
+    {
+    case PV_ENUM:
+    case PV_INT:
+        a_adara_pkt.format          = 0x800100;
+        a_adara_pkt.payload_len     = 16;
+        if ( a_pv_pkt )
+            a_adara_pkt.vvp.uval    = (unsigned long)a_pv_pkt->ival;
+        else
+            a_adara_pkt.vvp.uval    = (unsigned long)a_pv_info.m_ival;
+        break;
+
+    case PV_UINT:
+        a_adara_pkt.format          = 0x800100;
+        a_adara_pkt.payload_len     = 16;
+        if ( a_pv_pkt )
+            a_adara_pkt.vvp.uval    = a_pv_pkt->uval;
+        else
+            a_adara_pkt.vvp.uval    = a_pv_info.m_uval;
+        break;
+
+    case PV_DOUBLE:
+        a_adara_pkt.format          = 0x800200;
+        a_adara_pkt.payload_len     = 20;
+        if ( a_pv_pkt )
+            a_adara_pkt.vvp.dval    = a_pv_pkt->dval;
+        else
+            a_adara_pkt.vvp.dval    = a_pv_info.m_dval;
+        break;
+    }
 }
 
 /**
@@ -376,17 +458,37 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
         Timestamp ts;
 
         // Use current time for DDP packets
-        ts.sec = (unsigned long)time(0);
+        ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
 
-        // Virtual device
+        // Send DDP for "Virtual Device 0"
         buildDDP( adara_pkt, 0, ts );
         sendPacket( adara_pkt, a_socket );
 
-        // Real devices
+        // Send DDPs for real devices
         for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
         {
             buildDDP( adara_pkt, *idev, ts );
             sendPacket( adara_pkt, a_socket );
+        }
+
+        vector<const PVInfo*>::const_iterator iv;
+
+        // Send value updates for real devices
+        for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
+        {
+            try
+            {
+                const vector<const PVInfo*> &vars = m_streamer.getDevicePVs( *idev );
+                for ( iv = vars.begin(); iv != vars.end(); ++iv )
+                {
+                    buildVVP( adara_pkt, **iv, 0, &ts );
+                    sendPacket( adara_pkt, a_socket );
+                }
+            }
+            catch(...)
+            {
+                // Device was undfined... just go to next
+            }
         }
 
         return true;
@@ -489,7 +591,12 @@ ADARA_PVWriter::socketListenThreadFunc()
         info.sock = accept( m_listen_socket, &client_addr, &client_addr_len );
         if ( info.sock == INVALID_SOCKET )
         {
-            LOG_ERROR( "accept() failed. rc: " << WSAGetLastError() );
+            if ( m_active )
+            {
+                LOG_ERROR( "accept() failed. rc: " << WSAGetLastError() );
+            }
+            else
+                break;
         }
         else
         {

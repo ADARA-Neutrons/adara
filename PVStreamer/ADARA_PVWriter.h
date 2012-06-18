@@ -60,6 +60,7 @@ private:
     bool                    connected();
     bool                    translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt );
     void                    buildDDP( ADARAPacket &a_adara_pkt, Identifier dev_id, Timestamp a_time );
+    void                    buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt, Timestamp *a_time );
     bool                    sendActiveDeviceInfo( SOCKET a_socket = INVALID_SOCKET );
     void                    sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket = INVALID_SOCKET );
     const char *            getTypeDescriptor( DataType a_type ) const;
@@ -78,6 +79,7 @@ private:
         bool        ddp;
     };
 
+    bool                                m_active;                   ///< Indicates this instances is active or being destroyed
     boost::thread*                      m_socket_listen_thread;     ///< Tcp socket listener thread
     boost::thread*                      m_pkt_send_thread;          ///< Tcp packet send thread
     std::string                         m_addr;                     ///< Tcp address of ADARA service

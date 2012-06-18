@@ -99,7 +99,7 @@ void
 PVStreamLogger::listening( const std::string & a_address, unsigned short a_port )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_out << "ADARA: Listening on " << a_address << ":" << a_port;
+    m_out << "ADARA: Listening on " << a_address << ":" << a_port << endl;
 }
 
 /**
@@ -110,7 +110,7 @@ void
 PVStreamLogger::connected( string &a_address )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_out << "ADARA: Client connected from " << a_address;
+    m_out << "ADARA: Client connected from " << a_address << endl;
 }
 
 /**
@@ -121,7 +121,7 @@ void
 PVStreamLogger::disconnected( string &a_address )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_out << "ADARA: Client disconnected from " << a_address;
+    m_out << "ADARA: Client disconnected from " << a_address << endl;
 }
 
 // ---------- IPVStreamListener Methods -----------------------------------

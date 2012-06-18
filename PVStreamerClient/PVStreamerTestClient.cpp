@@ -107,11 +107,14 @@ int _tmain(int argc, _TCHAR* argv[])
     unsigned long test_pkt_count = 0;
     double next_val;
 
+    //char buf[10000];
+
     while (1)
     {
         //rc = recv(pvs_socket, (char*)&pkt, sizeof(SNS::PVS::ADARA::ADARAPacket),0);
         // Rcv ADARA header ONLY
         rc = recv(pvs_socket, (char*)&pkt, 16,0);
+//        rc = recv(pvs_socket, buf, 16,0);
         if ( rc == 16 )
         {
             ++pkt_count;
@@ -141,6 +144,10 @@ int _tmain(int argc, _TCHAR* argv[])
                         cout << "  pv id: " << pkt.dev_id << "." << pkt.vvp.var_id << endl;
                         cout << "  pv value: " << pkt.vvp.dval << endl;
                         cout << "  pv alarm: " << pkt.vvp.status << " [" << pkt.vvp.severity << "]" << endl;
+                    }
+                    else if ( pkt.format == 0x400900 )
+                    {
+                        cout << "  heartbeat." << endl;
                     }
                     else
                     {

@@ -55,6 +55,14 @@ PVStreamer::PVStreamer( size_t a_pkt_buffer_size, size_t a_max_notify_pkts )
  */
 PVStreamer::~PVStreamer()
 {
+    // Deactivate all queues - will force waiting threads to wake
+    m_free_que.deactivate();
+    m_fill_que.deactivate();
+    m_notify_que.deactivate();
+
+    // Wait for listerner thread to exit
+    m_stream_listeners_thread->join();
+
     // Delete stream listener thread
     if ( m_stream_listeners_thread )
         delete m_stream_listeners_thread;
@@ -604,6 +612,21 @@ PVStreamer::getFreePacket()
 }
 
 /**
+ * \brief Gets a filled stream packet (blocks until available)
+ * \param a_timeout - Timeout period in msec
+ * \param a_timeout_flag - (output) Indicates if a timeout occurred
+ * \return PVStreamPacket pointer on success; null on failure
+ */
+PVStreamPacket*
+PVStreamer::getFreePacket( unsigned long a_timeout, bool & a_timeout_flag )
+{
+    PVStreamPacket* pkt = 0;
+    m_free_que.get_timed( pkt, a_timeout, a_timeout_flag );
+
+    return pkt;
+}
+
+/**
  * \brief Puts a stream packet on the filled queue
  * \param a_pkt - PVStreamPacket object to put on queue
  */
@@ -654,6 +677,22 @@ PVStreamer::getFilledPacket()
 {
     PVStreamPacket* pkt = 0;
     m_fill_que.get( pkt );
+
+    return pkt;
+}
+
+/**
+ * \brief Gets a filled stream packet (blocks until available)
+ * \param a_timeout - Timeout period in msec
+ * \param a_timeout_flag - (output) Indicates if a timeout occurred
+ * \return PVStreamPacket pointer on success; null on failure
+ */
+PVStreamPacket*
+PVStreamer::getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag )
+{
+    PVStreamPacket* pkt = 0;
+    m_fill_que.get_timed( pkt, a_timeout, a_timeout_flag );
+
     return pkt;
 }
 

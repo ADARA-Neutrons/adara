@@ -110,21 +110,21 @@ CPVStreamerApp::InitInstance()
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
     // Initialize PVStreamer objects
-    PVStreamer pvs(200,100);
+    PVStreamer* pvs = new PVStreamer(200,100);
 
-    pvs.attachConfigListener( dlg );
-    pvs.attachStreamListener( dlg );
+    pvs->attachConfigListener( dlg );
+    pvs->attachStreamListener( dlg );
 
-    PVStreamLogger      logger(cmdline.m_log_file);
-    pvs.attachConfigListener( logger );
-    pvs.attachStreamListener( logger );
+    PVStreamLogger*     logger = new PVStreamLogger(cmdline.m_log_file);
+    pvs->attachConfigListener( *logger );
+    pvs->attachStreamListener( *logger );
 
-    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(pvs,cmdline.m_port);
+    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port);
     adara_writer->attachListener( dlg );
-    adara_writer->attachListener( logger );
+    adara_writer->attachListener( *logger );
 
-    LDAS_PVReader*      ldas_reader = new LDAS_PVReader(pvs);
-    LDAS_PVConfigMgr    ldas_cfg(pvs);
+    LDAS_PVReader*      ldas_reader = new LDAS_PVReader(*pvs);
+    LDAS_PVConfigMgr    ldas_cfg(*pvs);
 
     // Loading a LDAS satellite configuration file will initiate internal streaming
     // External streaming will commence when the SMS client connects to the ADARA port
@@ -138,6 +138,9 @@ CPVStreamerApp::InitInstance()
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    delete pvs;
+    delete logger;
 
     // Return false to prevent CWinApp::Run() from being called
     return FALSE;

@@ -392,8 +392,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
     if ( !m_streamer.isAppDefined( app_id ))
         m_cfg_service->defineApp( LDAS_PROTOCOL, app_id, m_hostname );
 
-
-    //TODO This is a HACK b/c we have no device ID input
+    // Device IDs are dynamically assigned as configuration is loaded
     dev_id = m_next_dev_id++;
 
     // If this is the first encounter with this device, define it and load PVs

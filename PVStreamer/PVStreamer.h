@@ -122,6 +122,7 @@ private:
     // ---------- IPVReaderServices methods ----------
 
     PVStreamPacket*             getFreePacket();
+    PVStreamPacket*             getFreePacket( unsigned long a_timeout, bool & a_timeout_flag );
     void                        putFilledPacket( PVStreamPacket *a_pkt );
     PVInfo*                     getWriteablePV( Identifier a_dev_id, Identifier a_pv_id ) const;
     std::vector<PVInfo*> &      getWriteableDevicePVs( Identifier a_dev_id ) const;
@@ -129,6 +130,7 @@ private:
     // ---------- IPVWriterServices methods ----------
 
     PVStreamPacket*             getFilledPacket();
+    PVStreamPacket*             getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag );
     void                        putFreePacket( PVStreamPacket *a_pkt );
 
     // ---------- IPVStreamListener support methods ----------
