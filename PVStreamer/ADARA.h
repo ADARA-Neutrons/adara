@@ -15,7 +15,6 @@ namespace SNS { namespace PVS { namespace ADARA {
 #define MAX_XML_LEN     32744 // 32K minus overhead of DDP packet
 #define MAX_STR_LEN     4000
 
-#define HEARTBEAT_PERIOD    5000 // ADARA heartbeat in msec
 
 /// ADARA process variable status codes (alarms/errors)
 enum ADARA_Status

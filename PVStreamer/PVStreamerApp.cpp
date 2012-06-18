@@ -21,11 +21,12 @@ using namespace std;
 class CmdLinParser : public CCommandLineInfo
 {
 public:
-    CmdLinParser() : m_port(31416),m_sat_config_file("c:/SatelliteComputer.xml"), m_log_file("c:/pvslog.txt") {}
+    CmdLinParser() : m_port(31416),m_sat_config_file("c:/SatelliteComputer.xml"), m_log_file("c:/pvslog.txt"), m_heartbeat(2000) {}
     
     unsigned short  m_port;
     string          m_sat_config_file;
     string          m_log_file;
+    unsigned long   m_heartbeat;
 
     void ParseParam(const TCHAR* pszParam,BOOL bFlag,BOOL bLast)
     {
@@ -37,6 +38,8 @@ public:
                 m_sat_config_file = &pszParam[4];
             else if ( _strnicmp( pszParam, "log=",4) == 0 )
                 m_log_file = &pszParam[4];
+            else if ( _strnicmp( pszParam, "hb=",3) == 0 )
+                m_heartbeat = atoi( &pszParam[3] );
         }
     }
 };
@@ -109,6 +112,24 @@ CPVStreamerApp::InitInstance()
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
+    dlg.print( "PVStreamer starting." );
+
+    stringstream   sstr;
+    sstr << "  config file = " << cmdline.m_sat_config_file << " (use -cfg=x to change)";
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  port no. = " << cmdline.m_port << " (use -port=x to change)";
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  log file = " << cmdline.m_log_file << " (use -log=x to change)";
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  heartbeat = " << cmdline.m_heartbeat << " msec (use -hb=x to change)";
+    dlg.print( sstr.str());
+
     // Initialize PVStreamer objects
     PVStreamer* pvs = new PVStreamer(200,100);
 
@@ -119,7 +140,7 @@ CPVStreamerApp::InitInstance()
     pvs->attachConfigListener( *logger );
     pvs->attachStreamListener( *logger );
 
-    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port);
+    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port,cmdline.m_heartbeat);
     adara_writer->attachListener( dlg );
     adara_writer->attachListener( *logger );
 

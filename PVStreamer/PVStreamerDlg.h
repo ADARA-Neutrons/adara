@@ -19,10 +19,12 @@ class CPVStreamerDlg : public CDialog, public SNS::PVS::IPVConfigListener, publi
 public:
 	CPVStreamerDlg(CWnd* pParent = NULL);	// standard constructor
 
+    void                print( const std::string & a_msg );
+
 // Dialog Data
 	enum { IDD = IDD_PVSTREAMER_DIALOG };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
 

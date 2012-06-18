@@ -49,7 +49,7 @@ public:
 class ADARA_PVWriter : public PVWriter
 {
 public:
-    ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port = 31416 );
+    ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port = 31416, unsigned long a_heartbeat = 2000 );
     ~ADARA_PVWriter();
 
     void                    attachListener( IADARAWriterListener &a_listener );
@@ -84,6 +84,7 @@ private:
     boost::thread*                      m_pkt_send_thread;          ///< Tcp packet send thread
     std::string                         m_addr;                     ///< Tcp address of ADARA service
     unsigned short                      m_port;                     ///< Tcp port number of ADARA service
+    unsigned long                       m_heartbeat;                ///< Heartbeat packet period
     boost::mutex                        m_list_mutex;               ///< Mutex to protect listener container
     std::vector<IADARAWriterListener*>  m_listeners;                ///< Container of ADARA writer listeners
     SOCKET                              m_listen_socket;            ///< WinSock listener socket

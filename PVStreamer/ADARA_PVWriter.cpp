@@ -21,8 +21,8 @@ namespace SNS { namespace PVS { namespace ADARA {
  * \param a_streamer - The associate PVStreamer instance.
  * \param a_port - The tcp port thet the ADARA writer will listen on.
  */
-ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port )
-    : PVWriter(a_streamer, ADARA_PROTOCOL ), m_active(true), m_port(a_port), m_listen_socket(INVALID_SOCKET)
+ADARA_PVWriter::ADARA_PVWriter( PVStreamer &a_streamer, unsigned short a_port, unsigned long a_heartbeat )
+    : PVWriter(a_streamer, ADARA_PROTOCOL ), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(INVALID_SOCKET)
 {
     initWinSocket();
 
@@ -135,7 +135,7 @@ ADARA_PVWriter::packetSendThreadFunc()
 
     while(1)
     {
-        pvs_pkt = m_writer_services->getFilledPacket( HEARTBEAT_PERIOD, timeout_flag );
+        pvs_pkt = m_writer_services->getFilledPacket( m_heartbeat, timeout_flag );
 //        pvs_pkt = m_writer_services->getFilledPacket();
         if ( !pvs_pkt )
         {
@@ -153,13 +153,15 @@ ADARA_PVWriter::packetSendThreadFunc()
                 break;
             }
         }
-        else if ( connected()) // If connected, translate and send packet
+        else
         {
-            if ( translate( *pvs_pkt, adara_pkt ))
+            if ( connected()) // If connected, translate and send packet
             {
-                sendPacket( adara_pkt );
+                if ( translate( *pvs_pkt, adara_pkt ))
+                {
+                    sendPacket( adara_pkt );
+                }
             }
-
             m_writer_services->putFreePacket(pvs_pkt);
         }
     }

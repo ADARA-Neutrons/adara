@@ -101,6 +101,26 @@ HCURSOR CPVStreamerDlg::OnQueryDragIcon()
 }
 
 void
+CPVStreamerDlg::print( const std::string & a_msg )
+{
+    if ( m_log_entries.size() > 500 )
+        m_log_entries.pop_front();
+
+    m_log_entries.push_back( a_msg );
+    m_log_text.clear();
+
+    for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
+    {
+        m_log_text += *e + "\r\n";
+    }
+
+    int visline = m_log_edit.GetFirstVisibleLine();
+    m_log_edit.SetWindowText( m_log_text.c_str() );
+    if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
+        m_log_edit.LineScroll((visline + 1));
+}
+
+void
 CPVStreamerDlg::listening( const std::string & a_address, unsigned short a_port )
 {
     stringstream   sstr;
