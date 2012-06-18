@@ -34,7 +34,7 @@ namespace SNS { namespace PVS {
 class PVStreamLogger : public IPVStreamListener, public IPVConfigListener, public SNS::PVS::ADARA::IADARAWriterListener, public ILogger
 {
 public:
-    PVStreamLogger( const std::string & a_filename );
+    PVStreamLogger( const std::string & a_logfilepath );
     ~PVStreamLogger();
 
 private:

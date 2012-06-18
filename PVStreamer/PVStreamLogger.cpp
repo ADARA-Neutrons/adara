@@ -19,14 +19,21 @@ ILogger * ILogger::g_inst = 0;
 
 /**
  * \brief Constructor for PVStreamLogger class.
- * \param a_filename - Filename of logfile to open for append.
+ * \param a_logfilepath - Path for logfile to create.
  */
-PVStreamLogger::PVStreamLogger( const std::string & a_filename )
+PVStreamLogger::PVStreamLogger( const std::string & a_logfilepath )
 {
     if ( ILogger::g_inst )
         throw -1;
 
-    m_out.open( a_filename.c_str(), ios_base::app );
+    char buf[50];
+    time_t t = time(0);
+
+    strftime(buf,50,"%Y%m%d_%H%M%S", localtime(&t));
+
+    string filename = a_logfilepath + "\\pvslog_" + buf + ".txt";
+
+    m_out.open( filename.c_str(), ios_base::app );
     m_out << timeString() << " PVStreamer started" << endl;
 
     ILogger::g_inst = this;

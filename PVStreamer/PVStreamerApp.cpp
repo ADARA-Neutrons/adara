@@ -21,11 +21,11 @@ using namespace std;
 class CmdLinParser : public CCommandLineInfo
 {
 public:
-    CmdLinParser() : m_port(31416),m_sat_config_file("c:/SatelliteComputer.xml"), m_log_file("c:/pvslog.txt"), m_heartbeat(2000) {}
+    CmdLinParser() : m_port(31416),m_sat_config_file("c:\\SatelliteComputer.xml"), m_log_path("c:\\"), m_heartbeat(2000) {}
     
     unsigned short  m_port;
     string          m_sat_config_file;
-    string          m_log_file;
+    string          m_log_path;
     unsigned long   m_heartbeat;
 
     void ParseParam(const TCHAR* pszParam,BOOL bFlag,BOOL bLast)
@@ -37,7 +37,7 @@ public:
             else if ( _strnicmp( pszParam, "cfg=",4) == 0 )
                 m_sat_config_file = &pszParam[4];
             else if ( _strnicmp( pszParam, "log=",4) == 0 )
-                m_log_file = &pszParam[4];
+                m_log_path = &pszParam[4];
             else if ( _strnicmp( pszParam, "hb=",3) == 0 )
                 m_heartbeat = atoi( &pszParam[3] );
         }
@@ -123,7 +123,7 @@ CPVStreamerApp::InitInstance()
     dlg.print( sstr.str());
 
     sstr.str("");
-    sstr << "  log file = " << cmdline.m_log_file << " (use -log=x to change)";
+    sstr << "  log path = " << cmdline.m_log_path << " (use -log=x to change)";
     dlg.print( sstr.str());
 
     sstr.str("");
@@ -136,7 +136,7 @@ CPVStreamerApp::InitInstance()
     pvs->attachConfigListener( dlg );
     pvs->attachStreamListener( dlg );
 
-    PVStreamLogger*     logger = new PVStreamLogger(cmdline.m_log_file);
+    PVStreamLogger*     logger = new PVStreamLogger(cmdline.m_log_path);
     pvs->attachConfigListener( *logger );
     pvs->attachStreamListener( *logger );
 
