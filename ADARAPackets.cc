@@ -1,6 +1,8 @@
-#include "ADARAPackets.h"
+#include <boost/lexical_cast.hpp>
 
 #include <string.h>
+
+#include "ADARAPackets.h"
 
 using namespace ADARA;
 
@@ -346,15 +348,24 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt) :
 VariableU32Pkt::VariableU32Pkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((uint32_t *)payload())
 {
-	if (m_payload_len != (4 * sizeof(uint32_t)))
-		throw invalid_packet("VariableValue (U32) packet is "
-				     "incorrect length");
-	if (validate_status(status()))
-		throw invalid_packet("VariableValue (U32) packet has "
-				     "invalid status");
-	if (validate_severity(severity()))
-		throw invalid_packet("VariableValue (U32) packet has "
-				     "invalid severity");
+	if (m_payload_len != (4 * sizeof(uint32_t))) {
+		std::string msg("VariableValue (U32) packet is incorrect "
+				"length: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	if (validate_status(status())) {
+		std::string msg("VariableValue (U32) packet has invalid "
+				"status: ");
+		msg += boost::lexical_cast<std::string>(status());
+		throw invalid_packet(msg);
+	}
+	if (validate_severity(severity())) {
+		std::string msg("VariableValue (U32) packet has invalid "
+				"severity: ");
+		msg += boost::lexical_cast<std::string>(severity());
+		throw invalid_packet(msg);
+	}
 }
 
 VariableU32Pkt::VariableU32Pkt(const VariableU32Pkt &pkt) :
@@ -366,15 +377,24 @@ VariableU32Pkt::VariableU32Pkt(const VariableU32Pkt &pkt) :
 VariableDoublePkt::VariableDoublePkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((uint32_t *)payload())
 {
-	if (m_payload_len != (sizeof(double) + (3 * sizeof(uint32_t))))
-		throw invalid_packet("VariableValue (double) packet is "
-				     "incorrect length");
-	if (validate_status(status()))
-		throw invalid_packet("VariableValue (double) packet has "
-				     "invalid status");
-	if (validate_severity(severity()))
-		throw invalid_packet("VariableValue (double) packet has "
-				     "invalid severity");
+	if (m_payload_len != (sizeof(double) + (3 * sizeof(uint32_t)))) {
+		std::string msg("VariableValue (double) packet is incorrect "
+				"length: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	if (validate_status(status())) {
+		std::string msg("VariableValue (double) packet has invalid "
+				"status: ");
+		msg += boost::lexical_cast<std::string>(status());
+		throw invalid_packet(msg);
+	}
+	if (validate_severity(severity())) {
+		std::string msg("VariableValue (double) packet has invalid "
+				"severity: ");
+		msg += boost::lexical_cast<std::string>(severity());
+		throw invalid_packet(msg);
+	}
 }
 
 VariableDoublePkt::VariableDoublePkt(const VariableDoublePkt &pkt) :
@@ -388,20 +408,33 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 {
 	uint32_t size;
 
-	if (m_payload_len < (4 * sizeof(uint32_t)))
-		throw invalid_packet("VariableValue (string) packet is "
-				     "too short");
+	if (m_payload_len < (4 * sizeof(uint32_t))) {
+		std::string msg("VariableValue (string) packet is too short ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
 	size = m_fields[3];
-	if (m_payload_len < (size + (2 * sizeof(uint32_t))))
-		throw invalid_packet("DeviceDescriptor packet has oversize "
-				     "string");
+	if (m_payload_len < (size + (2 * sizeof(uint32_t)))) {
+		std::string msg("VariableValue (string) packet has oversize "
+				"string: ");
+		msg += boost::lexical_cast<std::string>(size);
+		msg += " vs payload ";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
 
-	if (validate_status(status()))
-		throw invalid_packet("VariableValue (string) packet has "
-				     "invalid status");
-	if (validate_severity(severity()))
-		throw invalid_packet("VariableValue (string) packet has "
-				     "invalid severity");
+	if (validate_status(status())) {
+		std::string msg("VariableValue (string) packet has invalid "
+				"status: ");
+		msg += boost::lexical_cast<std::string>(status());
+		throw invalid_packet(msg);
+	}
+	if (validate_severity(severity())) {
+		std::string msg("VariableValue (string) packet has invalid "
+				"severity: ");
+		msg += boost::lexical_cast<std::string>(severity());
+		throw invalid_packet(msg);
+	}
 
 	/* TODO it would be better to create the string on access
 	 * rather than object construction; the user may not care.
