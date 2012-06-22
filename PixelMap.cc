@@ -121,71 +121,82 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 					      uint32_t &packetSize)
 {
 	std::queue<uint16_t> sections;
-	TempMap::iterator it, end = map->end();
-	uint32_t payload, expected;
+	TempMap inverted;
+	TempMap::iterator it, end;
+	uint32_t phys, logical, payload, expected, bank_count;
 	struct timespec now;
 	uint32_t *u32;
-	uint16_t *u16, entries, i;
+	uint16_t i, entries, bank;
+
+	/* A physical->logical map is better for parsing and for building
+	 * the lookup table used for normal operations, but going logical
+	 * to physical is better for generating the pixel map packet.
+	 * Since we guarantee a one-to-one mapping  during load, we don't
+	 * have to worry about duplicate keys here.
+	 */
+	for (it = map->begin(), end = map->end(); it != end; ++it) {
+		phys = it->first;
+		logical = it->second.first;
+		bank = it->second.second;
+		inverted.insert(make_pair(logical, std::make_pair(phys, bank)));
+	}
 
 	/* We're always going to have at least one section, with the first
-	 * physical pixel in it.
+	 * logical pixel in it.
 	 */
-	it = map->begin();
+	it = inverted.begin();
 	expected = it->first + 1;
 	entries = 1;
+	bank = it->second.second;
 
-	for (++it; it != end; ++it) {
-		if (it->first != expected) {
+	for (++it, end = inverted.end(); it != end; ++it) {
+		/* If we've found a discontinuity in the logical pixels,
+		 * or we changed banks, then we have to start a new section.
+		 */
+		if (it->first != expected || it->second.second != bank) {
 			sections.push(entries);
 			entries = 0;
+			bank = it->second.second;
 		}
 		entries++;
 		expected = it->first + 1;
 	}
 
+	/* Push the last section we were working on. */
 	sections.push(entries);
 
-	payload = sections.size() + map->size();
-	payload *= sizeof(uint32_t) + sizeof(uint16_t);
-	payload += 3;
-	payload &= ~3;
+	/* Now, build the packet; we have enough information to calculate
+	 * its size.
+	 */
+	payload = sections.size() * (sizeof(uint32_t) + 2 * sizeof(uint16_t));
+	payload += inverted.size() * sizeof(uint32_t);
 	packetSize = payload + sizeof(ADARA::Header);
 
 	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
 
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	/* First, zero out the last 4 bytes of the packet to avoid leaving
-	 * garbage if we're not a mulitple of 4, then build up the
-	 * packet a section at a time.
-	 */
 	u32 = (uint32_t *) pkt.get();
-	u32[(packetSize / 4) - 1] = 0;
-
 	*u32++ = payload;
 	*u32++ = ADARA::PacketType::PIXEL_MAPPING_V0;
 	*u32++ = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	*u32++ = now.tv_nsec;
 
-	it = map->begin();
+	it = inverted.begin();
 	while (!sections.empty()) {
 		entries = sections.front();
 		sections.pop();
 
-		/* First the six byte header (base phys ID + count) */
+		/* First the header (base logical ID, bankid, count) */
+		bank_count = (uint32_t) it->second.second << 16;
+		bank_count |= entries;
+
 		*u32++ = it->first;
-		u16 = (uint16_t *) u32;
-		*u16++ = entries;
+		*u32++ = bank_count;
 
-		/* Then the entries (logical id + bank id) */
-		for (i = 0; i < entries; ++it, ++i) {
-			u32 = (uint32_t *) u16;
+		/* Then the entries (physical id) */
+		for (i = 0; i < entries; ++it, ++i)
 			*u32++ = it->second.first;
-			u16 = (uint16_t *) u32;
-			*u16++ = it->second.second;
-		}
-
-		u32 = (uint32_t *) u16;
 	}
 
 	return pkt;
