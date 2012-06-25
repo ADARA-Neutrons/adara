@@ -130,7 +130,7 @@ LDAS_PVConfigAgent::parseConfigFile( const std::string &a_filename )
 	    int returnValue=0;
         CString csTemp;
 
-	    CFile f(a_filename.c_str(), CFile::modeRead);
+        CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
         UINT len = (UINT)f.GetLength();
         if ( len > 0 )
         {
@@ -202,7 +202,7 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
 	    int i,j;
         CString csTemp;
 
-		CFile f(a_filename.c_str(), CFile::modeRead);
+		CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
         UINT len = (UINT)f.GetLength();
         if ( len > 0 )
         {
@@ -306,7 +306,7 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
 	    int i;
         CString csTemp;
 
-		CFile f(a_filename.c_str(), CFile::modeRead);
+		CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
         UINT len = (UINT)f.GetLength();
         if ( len > 0 )
         {

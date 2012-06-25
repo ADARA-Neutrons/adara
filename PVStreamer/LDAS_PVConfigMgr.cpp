@@ -95,7 +95,7 @@ LDAS_PVConfigMgr::parseSatCompFile( const string & a_file, vector<string> &a_hos
 	    CString csElement;
         CString csTemp;
 
-	    CFile f(a_file.c_str(), CFile::modeRead);
+	    CFile f(a_file.c_str(), CFile::modeRead | CFile::shareDenyWrite );
         UINT len = (UINT)f.GetLength();
         if ( len > 0 )
         {
