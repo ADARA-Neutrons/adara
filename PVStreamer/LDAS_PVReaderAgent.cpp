@@ -23,7 +23,7 @@ namespace SNS { namespace PVS { namespace LDAS {
  * \param a_pv_info - PVInfo instance for variable to be associated with this reader agent (optional)
  */
 LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services, PVInfo *a_pv_info )
-: m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_array_idx(-1), m_cache_array_info(false), m_array_size(0)
+: m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_array_idx(-1), m_first_send(false), m_cache_array_info(false), m_array_size(0)
 {
     if ( a_pv_info )
         connect( *a_pv_info);
@@ -56,7 +56,7 @@ LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( m_pv_info )
-        throw -1;
+        EXC( EC_INVALID_OPERATION, "Already connected to a process variable" );
 
     m_pv_info = &a_pv_info;
 
@@ -71,6 +71,7 @@ LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
           string idx_str = m_pv_info->m_connection.substr( i + 1, j-i-1 );
           m_array_idx = atol( idx_str.c_str());
           m_cache_array_info = true;
+          m_first_send = true;
       }
     }
 
@@ -123,7 +124,11 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
         if ( a_data.HasAttribute("ArraySize"))
             m_array_size = a_data.GetAttribute("ArraySize").Value.ulVal;
         else
-            LOG_ERROR( "DS data is missing ArraySize attribute (PV " << m_pv_info->m_name << ")" );
+        {
+            // No array size when it was expected, reset m_array_idx to -1 for limp-mode
+            m_array_idx = -1;
+            LOG_ERROR( "Configuration incorrect - missing ArraySize attribute (PV " << m_pv_info->m_name << ", <" << m_pv_info->m_connection << ">)" );
+        }
 
         // Don't care about timestamps on individual array elements - just compare the value
         // and if it's different from te last, send it
@@ -170,20 +175,20 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
         {
         case PV_ENUM:
         case PV_INT:
-            send_pkt = testAndSet<long>( m_pv_info->m_ival, a_data.Value.lVal );
+            send_pkt = testAndSet<long>( m_pv_info->m_ival, (long)a_data.Value );
             break;
 
         case PV_UINT:
-            send_pkt = testAndSet<unsigned long>( m_pv_info->m_uval, a_data.Value.ulVal );
+            send_pkt = testAndSet<unsigned long>( m_pv_info->m_uval, (long)a_data.Value );
             break;
 
         case PV_DOUBLE:
-            send_pkt = testAndSet<double>( m_pv_info->m_dval, a_data.Value.dblVal );
+            send_pkt = testAndSet<double>( m_pv_info->m_dval, (double)a_data.Value );
             break;
         }
     }
 
-    if ( send_pkt )
+    if ( send_pkt || m_first_send )
     {
         PVStreamPacket *pkt = m_reader_services.getFreePacket();
         if ( pkt )
@@ -226,6 +231,9 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
             }
 
             m_reader_services.putFilledPacket(pkt);
+
+            // reset initial send
+            m_first_send = false;
         }
     }
 }
@@ -239,14 +247,25 @@ template<class T>
 bool
 LDAS_PVReaderAgent::testAndSet(  T &a_val, T a_new_val )
 {
+    /*
     bool differs;
 
     if ( typeid(a_new_val) == typeid(double))
+    {
         differs = (fabs((double)(a_new_val - a_val)) > DBL_EPSILON );
+    }
     else
         differs = (a_new_val != a_val);
 
+    // DVS - The above code was commented out b/c this process should nt make any decisions
+    // about how close or accurate something is - only that it has changed. For doubles,
+    // this means the simple == operator will work fine.
+
+
     if (differs)
+    */
+
+    if ( a_new_val != a_val )
     {
         a_val = a_new_val;
 

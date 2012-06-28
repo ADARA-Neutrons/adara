@@ -68,7 +68,7 @@ private:
     void                    packetSendThreadFunc();
     void                    notifyConnect( std::string &a_address );
     void                    notifyDisconnect( std::string &a_address );
-    bool                    initWinSocket();
+    void                    initWinSocket();
 
     /// Structure containing ADARA client connection data
     struct ClientInfo

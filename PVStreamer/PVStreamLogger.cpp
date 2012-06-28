@@ -24,7 +24,7 @@ ILogger * ILogger::g_inst = 0;
 PVStreamLogger::PVStreamLogger( const std::string & a_logfilepath )
 {
     if ( ILogger::g_inst )
-        throw -1;
+        EXC(EC_INVALID_OPERATION,"Global logger instance already defined");
 
     char buf[50];
     time_t t = time(0);

@@ -45,11 +45,11 @@ class LDAS_PVConfigMgr;
  * work products from run-to-run and may need to be changed to static allocation of
  * device identifiers.
  */
-class LDAS_PVConfigAgent : public PVConfig
+class LDAS_PVConfigAgent
 {
 public:
 
-    LDAS_PVConfigAgent( PVStreamer &a_streamer, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname );
+    LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname );
     ~LDAS_PVConfigAgent();
 
 private:
@@ -67,6 +67,8 @@ private:
     DataType    GetDataType(PELE_STRUCT pStruct);
     Access      GetDataAccess(PELE_STRUCT pStruct);
 
+    PVStreamer         &m_streamer;         ///< PVStreamer instance
+    IPVConfigServices  &m_cfg_service;      ///< PVStreamer configuration interface
     std::string         m_hostname;         ///< Hostname that will provide configuration information
     std::string         m_config_file;      ///< Name of main DAS configuration file
     std::string         m_options_file;     ///< Name of options file

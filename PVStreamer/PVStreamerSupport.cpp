@@ -70,7 +70,7 @@ Enum::getName( int a_value ) const
     if ( e != m_values.end() )
         return e->second;
 
-    throw -1;
+    EXCP( EC_INVALID_PARAM, "Enum value " << a_value << " not defined" );
 }
 
 /**
@@ -87,7 +87,7 @@ Enum::getValue( const std::string & a_name ) const
             return e->first;
     }
 
-    throw -1;
+    EXCP( EC_INVALID_PARAM, "Enum name " << a_name << " not defined" );
 }
 
 /**

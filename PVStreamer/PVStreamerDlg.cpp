@@ -266,8 +266,15 @@ CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
         m_log_edit.LineScroll((visline + 1));
 }
 
+void
+CPVStreamerDlg::unhandledException( const TraceException &e )
+{
+    AfxMessageBox( e.toString().c_str(), MB_OK | MB_ICONEXCLAMATION, 0 );
+    PostQuitMessage(0);
+}
 
-void CPVStreamerDlg::OnCancel()
+void
+CPVStreamerDlg::OnCancel()
 {
     if ( MessageBox( "PVStreamer is a required component of the SNS beamline data acquisition system.\n"
         "Are you sure you want to close this application?", "SNS Process Variable Streamer", MB_YESNO | MB_ICONWARNING ) == IDYES )

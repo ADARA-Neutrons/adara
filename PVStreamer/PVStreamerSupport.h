@@ -9,6 +9,7 @@
 #define PVSTREAMERSUPPORT
 
 #include <string>
+#include <sstream>
 #include <vector>
 #include <map>
 
@@ -23,6 +24,7 @@ class PVConfigProvider;
 class PVReader;
 class PVWriter;
 class PVStreamer;
+class TraceException;
 
 /// Streaming protocol identifier typedef
 typedef unsigned long Protocol;
@@ -195,6 +197,18 @@ struct PVStreamPacket
 // ---------- Interfaces used by PVStreamer and clients -----------------------
 
 /**
+ * \class IPVStreamerStatusListener
+ *
+ * The IPVStreamerStatusListener interface is used by clients that wish to be notified
+ * of PVStreamer status.
+ */
+class IPVStreamerStatusListener
+{
+public:
+    virtual void                unhandledException( const TraceException &e ) = 0;
+};
+
+/**
  * \class IPVStreamListener
  *
  * The IPVStreamListener interface is used by non-critical stream listeners
@@ -230,6 +244,12 @@ public:
     // TODO Need API for reconnecting or configuration changes? (CfgMgr can just stop and restart all running devices)
 };
 
+class IPVCommonServices
+{
+public:
+    virtual void                unhandledException( TraceException &e ) = 0;
+};
+
 /**
  * \class IPVConfigServices
  *
@@ -237,10 +257,10 @@ public:
  * remove pvs and enums to/from the central pv repository. Only PVConfig
  * instances have the ability to define and undefine pvs.
  */
-class IPVConfigServices
+class IPVConfigServices : public IPVCommonServices
 {
 public:
-    
+
     virtual void                defineApp( Protocol a_protocol, Identifier a_app_id, const std::string &a_source ) = 0;
     virtual void                undefineApp( Identifier a_app_id ) = 0;
     virtual void                defineDevice( Protocol a_protocol, Identifier a_dev_id, const std::string &a_name, const std::string &a_source,  Identifier a_app_id = 0 ) = 0;
@@ -262,7 +282,7 @@ public:
  * The IPVReaderServices interface is used to grant access to reader-specific
  * services (buffers and writeable PVInfo objects).
  */
-class IPVReaderServices
+class IPVReaderServices : public IPVCommonServices
 {
 public:
     virtual PVStreamPacket*     getFreePacket() = 0;
@@ -281,7 +301,7 @@ public:
  * given time. (a future revision may provide multiple writers, but will require
  * substantial changes to the writer interface.)
  */
-class IPVWriterServices
+class IPVWriterServices : public IPVCommonServices
 {
 public:
     virtual PVStreamPacket*     getFilledPacket() = 0;
@@ -325,6 +345,80 @@ if ( ILogger::g_inst )                  \
 #define LOG_INFO(x) LOG(ILogger::RT_INFO, x )
 #define LOG_WARNING(x) LOG(ILogger::RT_WARNING, x )
 #define LOG_ERROR(x) LOG(ILogger::RT_ERROR, "{" << __FUNCTION__ << ":" << __LINE__ << "} " << x)
+
+// Exception classes & macros
+
+class TraceException
+{
+public:
+    TraceException( const char *a_file, unsigned long a_line, unsigned long a_error_code, const std::string & a_context )
+        : m_file(a_file), m_line(a_line), m_error_code(a_error_code), m_context(a_context)
+    {}
+
+    virtual ~TraceException() {}
+
+    void addContext( const std::string & a_context )
+    {
+        if ( a_context.size() )
+        {
+            m_context = a_context + "\n" + m_context;
+        }
+    }
+
+    std::string toString( bool debug = false ) const
+    {
+        if ( debug )
+        {
+            std::stringstream sstr;
+            sstr << m_context << std::endl;
+            sstr << "(source: " << m_file << ":" << m_line << " code:" << m_error_code << ")" << std::endl;
+        
+            return sstr.str();
+        }
+        else
+            return m_context;
+    }
+
+    /*
+    friend std::ostream & operator<<( std::ostream &os, const TraceException & e )
+    {
+        os << e.m_context << std::endl << "(source: " << e.m_file << ":" << e.m_line << " code:" << e.m_error_code << ")" << std::endl;
+    }
+    */
+
+private:
+    const char         *m_file;
+    unsigned long       m_line;
+    unsigned long       m_error_code;
+    //std::stringstream   m_context;
+    std::string         m_context;
+};
+
+
+#define EXC(err_code,msg) throw TraceException( __FUNCTION__, __LINE__, err_code, msg )
+
+#define EXCP(err_code,msg) \
+{ \
+    std::stringstream s; \
+    s << msg; \
+    throw TraceException( __FUNCTION__, __LINE__, err_code, s.str()); \
+}
+
+#define EXC_ADD(e,msg) \
+{ \
+    std::stringstream s; \
+    s << msg; \
+    e.addContext( s.str()); \
+}
+
+enum
+{
+    EC_INVALID_OPERATION = 1,
+    EC_INVALID_PARAM,
+    EC_INVALID_CONFIG_DATA,
+    EC_UNKOWN_ERROR,
+    EC_WINDOWS_ERROR = 0x1000
+};
 
 }}
 

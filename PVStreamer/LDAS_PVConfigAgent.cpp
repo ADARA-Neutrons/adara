@@ -20,12 +20,12 @@ map<Identifier,Identifier> LDAS_PVConfigAgent::m_next_pv_id;
 
 /**
  * \brief Constructor for LDAS_PVConfigAgent class.
- * \param a_streamer - The associate PVStreamer instance.
+ * \param a_cfg_service - The associated PVStreamer configuration service interface.
  * \param a_owner - The owning LDAS_PVConfigMgr instance.
  * \param a_hostname - The hostname to connect to.
  */
-LDAS_PVConfigAgent::LDAS_PVConfigAgent( PVStreamer &a_streamer, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname )
-:PVConfig(a_streamer, LDAS_PROTOCOL), m_hostname(a_hostname)
+LDAS_PVConfigAgent::LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname )
+ : m_streamer(a_streamer), m_cfg_service(a_cfg_service), m_hostname(a_hostname)
 {
     m_file_socket.InstallEventHandler( *this, &LDAS_PVConfigAgent::fileSocketData );
     string uri = string("dstp://") + m_hostname + "/filenames";
@@ -59,7 +59,7 @@ LDAS_PVConfigAgent::fileSocketData( NI::CNiDataSocketData &a_data )
 	    i=csTemp.Find('\"',i+1);
 	    j=csTemp.Find('\"',i+1);
 	    if (j<0)
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid configuration filename" );
 
         m_config_file = CT2CA(csTemp.Mid(i+1,j-i-1));
 
@@ -70,7 +70,7 @@ LDAS_PVConfigAgent::fileSocketData( NI::CNiDataSocketData &a_data )
 		    i=csTemp.Find('\"',i+1);
 		    j=csTemp.Find('\"',i+1);
 		    if (j<0)
-                throw -1;
+                EXC( EC_INVALID_CONFIG_DATA, "Invalid options filename" );
 
             m_options_file = CT2CA(csTemp.Mid(i+1,j-i-1));
 	    }
@@ -82,12 +82,14 @@ LDAS_PVConfigAgent::fileSocketData( NI::CNiDataSocketData &a_data )
 		    i=csTemp.Find('\"',i+1);
 		    j=csTemp.Find('\"',i+1);
 		    if (j<0)
-                throw -1;
+                EXC( EC_INVALID_CONFIG_DATA, "Invalid units filename." );
 
             m_units_file = csTemp.Mid(i+1,j-i-1).GetBuffer();
 	    }
 
         // ===== End Imported Code ================================================
+
+        LOG_INFO( "Host: " << m_hostname << ", cfg file = [" << m_config_file << "], opt file = [" << m_options_file << "], units file = [" << m_units_file << "]" );
 
         parseConfigFile(m_config_file);
 
@@ -98,14 +100,24 @@ LDAS_PVConfigAgent::fileSocketData( NI::CNiDataSocketData &a_data )
             parseUnitsFile(m_units_file);
 
         // Notify config service that this source is now loaded
-        m_cfg_service->configurationLoaded( LDAS_PROTOCOL, m_hostname );
+        m_cfg_service.configurationLoaded( LDAS_PROTOCOL, m_hostname );
+    }
+    catch( TraceException &e )
+    {
+        LOG_ERROR( "Failed loading configuration data from " << m_hostname );
+
+        // Notify config service that this source is invalid
+        m_cfg_service.configurationInvalid( LDAS_PROTOCOL, m_hostname );
+
+        EXC_ADD( e, "Failed loading configuration data from " << m_hostname );
+        m_cfg_service.unhandledException( e );
     }
     catch(...)
     {
-        LOG_ERROR( "Failed processing filename data." );
+        LOG_ERROR( "Failed loading configuration data from " << m_hostname );
 
         // Notify config service that this source is invalid
-        m_cfg_service->configurationInvalid( LDAS_PROTOCOL, m_hostname );
+        m_cfg_service.configurationInvalid( LDAS_PROTOCOL, m_hostname );
     }
 }
 
@@ -130,24 +142,36 @@ LDAS_PVConfigAgent::parseConfigFile( const std::string &a_filename )
 	    int returnValue=0;
         CString csTemp;
 
-        CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
-        UINT len = (UINT)f.GetLength();
-        if ( len > 0 )
+        try
         {
-            buffer = new char[len+1];
-	        f.Read(buffer,len);
-	        buffer[len]=0;
-            csTemp = buffer;
-            delete[] buffer;
-            buffer = 0;
+            CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
+            UINT len = (UINT)f.GetLength();
+            if ( len > 0 )
+            {
+                buffer = new char[len+1];
+	            f.Read(buffer,len);
+	            buffer[len]=0;
+                csTemp = buffer;
+                delete[] buffer;
+                buffer = 0;
+            }
+	        f.Close();
+    	}
+        catch(...)
+        {
+            if ( buffer )
+            {
+                delete[] buffer;
+                buffer = 0;
+            }
+            EXC( EC_UNKOWN_ERROR, "Could not open file" );
         }
-	    f.Close();
-    	
+
         if (!myParser.CheckValidHeader(csTemp))
-		    throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid header." );
 
         if (myParser.GetRootName(csTemp) != m_hostname.c_str() )
-		    throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid hostname." );
 
         csTemp=myParser.StripHeader(csTemp); 	
 	    csTemp=myParser.StripFirstTag(csTemp);
@@ -167,12 +191,22 @@ LDAS_PVConfigAgent::parseConfigFile( const std::string &a_filename )
 	        }
         }
     }
+    catch( TraceException &e )
+    {
+        if ( buffer )
+            delete[] buffer;
+
+        LOG_ERROR( "Failed processing configuration file: " << a_filename );
+
+        EXC_ADD(e, "Failed processing configuration file " << a_filename );
+        throw;
+    }
     catch(...)
     {
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed parsing configuration file: " << a_filename );
+        LOG_ERROR( "Failed processing configuration file: " << a_filename );
         throw;
     }
 }
@@ -202,26 +236,38 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
 	    int i,j;
         CString csTemp;
 
-		CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
-        UINT len = (UINT)f.GetLength();
-        if ( len > 0 )
+        try
         {
-            buffer = new char[len+1];
-		    f.Read(buffer,len);
-		    buffer[len]=0;
-            csTemp = buffer;
-            delete[] buffer;
-            buffer = 0;
+		    CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
+            UINT len = (UINT)f.GetLength();
+            if ( len > 0 )
+            {
+                buffer = new char[len+1];
+		        f.Read(buffer,len);
+		        buffer[len]=0;
+                csTemp = buffer;
+                delete[] buffer;
+                buffer = 0;
+            }
+		    f.Close();
+    	}
+        catch(...)
+        {
+            if ( buffer )
+            {
+                delete[] buffer;
+                buffer = 0;
+            }
+            EXC( EC_UNKOWN_ERROR, "Could not open file" );
         }
-		f.Close();
 	
     
 	    //AfxMessageBox(csTemp); //prints out entire config file
 	    if (!myParser.CheckValidHeader(csTemp))
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid header." );
 
 	    if (myParser.GetRootName(csTemp) != m_hostname.c_str())
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid hostname." );
 
         //strip first and last tags, for the SNS DAS format this is extraneous
 	    csTemp=myParser.StripHeader(csTemp);  
@@ -246,9 +292,9 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
 			    {
 				    j=csLimits.Find(",");
 				    if (j<0)
-                        throw -1;
+                        EXC( EC_INVALID_CONFIG_DATA, "Invalid hardware alarm in options file." );
 
-                    pv_info = m_cfg_service->getWriteablePV( friendlyname );
+                    pv_info = m_cfg_service.getWriteablePV( friendlyname );
                     if ( pv_info )
                     {
                         pv_info->m_hw_alarms.m_min = atof(csLimits.Left(j));
@@ -260,9 +306,9 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
 			    {
 				    j=csLimits.Find(",");
 				    if (j<0)
-                        throw -1;
+                        EXC( EC_INVALID_CONFIG_DATA, "Invalid hardware limits in options file." );
 
-                    pv_info = m_cfg_service->getWriteablePV( friendlyname );
+                    pv_info = m_cfg_service.getWriteablePV( friendlyname );
                     if ( pv_info )
                     {
                         pv_info->m_hw_limits.m_min = atof(csLimits.Left(j));
@@ -276,12 +322,22 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
 		    csElement1=myParser.GetElement(csTemp,i);
 	    }
     }
+    catch( TraceException &e )
+    {
+        if ( buffer )
+            delete[] buffer;
+
+        LOG_ERROR( "Failed processing options file: " << a_filename );
+
+        EXC_ADD(e, "Failed processing options file " << a_filename );
+        throw;
+    }
     catch(...)
     {
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed parsing options file: " << a_filename );
+        LOG_ERROR( "Failed processing options file: " << a_filename );
         throw;
     }
 }
@@ -306,25 +362,37 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
 	    int i;
         CString csTemp;
 
-		CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
-        UINT len = (UINT)f.GetLength();
-        if ( len > 0 )
+        try
         {
-            buffer = new char[len+1];
-		    f.Read(buffer,len);
-		    buffer[len]=0;
-            csTemp = buffer;
-            delete[] buffer;
-            buffer = 0;
+		    CFile f(a_filename.c_str(), CFile::modeRead | CFile::shareDenyWrite );
+            UINT len = (UINT)f.GetLength();
+            if ( len > 0 )
+            {
+                buffer = new char[len+1];
+		        f.Read(buffer,len);
+		        buffer[len]=0;
+                csTemp = buffer;
+                delete[] buffer;
+                buffer = 0;
+            }
+		    f.Close();
+	    }
+        catch(...)
+        {
+            if ( buffer )
+            {
+                delete[] buffer;
+                buffer = 0;
+            }
+            EXC( EC_UNKOWN_ERROR, "Could not open file" );
         }
-		f.Close();
-	
+
 
 	    if (!myParser.CheckValidHeader(csTemp))
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid header." );
 
 	    if (myParser.GetRootName(csTemp) != m_hostname.c_str() )
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid hostname." );
 
         //strip first and last tags, for the SNS DAS format this is extraneous
 	    csTemp=myParser.StripHeader(csTemp);  
@@ -345,7 +413,7 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
 			    csElement1=myParser.GetElementTag(csElement1);
 			    friendlyname = myParser.GetAttributeValue(csElement1,"Name");
 
-                pv_info = m_cfg_service->getWriteablePV( friendlyname );
+                pv_info = m_cfg_service.getWriteablePV( friendlyname );
                 if ( pv_info )
                 {
                     pv_info->m_units = myParser.GetAttributeValue(csElement1,"Neumonic"); // Did they mean mnemonic? :)
@@ -360,12 +428,22 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
 		    csElement1=myParser.GetElement(csTemp,i);
 	    }
     }
+    catch( TraceException &e )
+    {
+        if ( buffer )
+            delete[] buffer;
+
+        LOG_ERROR( "Failed processing units file: " << a_filename );
+
+        EXC_ADD(e, "Failed processing units file " << a_filename );
+        throw;
+    }
     catch(...)
     {
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed parsing units file: " << a_filename );
+        LOG_ERROR( "Failed processing units file: " << a_filename );
         throw;
     }
 }
@@ -390,7 +468,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
 
     // If this is the first encounter with this application, define it
     if ( !m_streamer.isAppDefined( app_id ))
-        m_cfg_service->defineApp( LDAS_PROTOCOL, app_id, m_hostname );
+        m_cfg_service.defineApp( LDAS_PROTOCOL, app_id, m_hostname );
 
     // Device IDs are dynamically assigned as configuration is loaded
     dev_id = m_next_dev_id++;
@@ -401,7 +479,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
         PVInfo* info = 0;
         map<int,string> enum_vals;
 
-        m_cfg_service->defineDevice( LDAS_PROTOCOL, dev_id, devicename, m_hostname, app_id );
+        m_cfg_service.defineDevice( LDAS_PROTOCOL, dev_id, devicename, m_hostname, app_id );
 
         // Source and protocol will be the same for all following PVs
 
@@ -424,14 +502,14 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
                         parseVarMapValue( eSubStruct.csValue, info->m_connection, info->m_name, enum_vals );
 
                         if ( enum_vals.size())
-                            info->m_enum = m_cfg_service->defineEnum( enum_vals );
+                            info->m_enum = m_cfg_service.defineEnum( enum_vals );
                         else
                             info->m_enum = 0;
 
                         info->m_type = GetDataType( &eSubStruct );
                         info->m_access = da;
 
-                        // HACK - assign a global pv_id to this variable (no device.xml available yet)
+                        // Assign a global pv_id to this variable (no device.xml available yet)
                         map<Identifier,Identifier>::iterator iid = m_next_pv_id.find( info->m_device_id );
                         if ( iid == m_next_pv_id.end())
                         {
@@ -441,8 +519,15 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
                         else
                             info->m_id = iid->second++;
 
-                        m_cfg_service->definePV( *info );
+                        m_cfg_service.definePV( *info );
                     }
+                }
+                catch( TraceException &e )
+                {
+                    EXC_ADD(e, "Failed parsing process var for device " << devicename );
+                    if ( info )
+                        delete info;
+                    throw;
                 }
                 catch(...)
                 {
@@ -459,7 +544,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
 
         // If no PVs are associated with this device, remove it.
         // This must be done here as there is not an easy way to know if there will be PVs for a device above
-        m_cfg_service->undefineDeviceIfNoPVs( dev_id );
+        m_cfg_service.undefineDeviceIfNoPVs( dev_id );
     }
     else
     {
@@ -500,7 +585,7 @@ LDAS_PVConfigAgent::GetDevInfo( PELE_STRUCT pStruct, string a_rootname, string &
 	}
 
     if ( !name_found || !appid_found )
-        throw -1;
+        EXCP( EC_INVALID_CONFIG_DATA, "Required device attributes missing for " << a_devicename );
 }
 
 /**
@@ -517,7 +602,7 @@ LDAS_PVConfigAgent::parseVarMapValue( CString a_value, string &a_connection, str
 
     size_t i = value.find_first_of(",");
     if ( i == string::npos )
-		throw -1;
+        EXC( EC_INVALID_CONFIG_DATA, "Invalid VarMap syntax" );
 
     size_t j = value.find_first_of(";",i+1);
 
@@ -542,7 +627,7 @@ LDAS_PVConfigAgent::parseVarMapValue( CString a_value, string &a_connection, str
             i = j+1;
             j = value.find(",",i);
             if ( j == string::npos )
-                throw -1;
+                EXC( EC_INVALID_CONFIG_DATA, "Invalid enumeration syntax." );
 
             ename = value.substr(i,j-i);
 
@@ -593,7 +678,7 @@ LDAS_PVConfigAgent::GetDataType(PELE_STRUCT pStruct)
 		}
 	}
 
-    throw -1;
+    EXC( EC_INVALID_CONFIG_DATA, "Invalid data type." );
 }
 
 /**
@@ -620,7 +705,7 @@ LDAS_PVConfigAgent::GetDataAccess(PELE_STRUCT pStruct)
 		}
 	}
 
-    throw -1;
+    EXC( EC_INVALID_CONFIG_DATA, "Invalid access mode." );
 }
 
 }}}

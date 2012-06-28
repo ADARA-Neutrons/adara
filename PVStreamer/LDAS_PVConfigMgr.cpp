@@ -23,7 +23,7 @@ using namespace std;
  * \param a_streamer - Owning PVStreamer insatnce.
  */
 LDAS_PVConfigMgr::LDAS_PVConfigMgr( PVStreamer & a_streamer )
-: m_streamer(a_streamer)
+ : PVConfig(a_streamer, LDAS_PROTOCOL)
 {
 }
 
@@ -32,7 +32,11 @@ LDAS_PVConfigMgr::LDAS_PVConfigMgr( PVStreamer & a_streamer )
  */
 LDAS_PVConfigMgr::~LDAS_PVConfigMgr()
 {
-    // Note: Agents are deleted by PVStreamer
+    // Delete config agents
+    boost::unique_lock<boost::mutex> lock(m_agent_mutex);
+
+    for ( map<string,LDAS_PVConfigAgent*>::iterator ia = m_agents.begin(); ia != m_agents.end(); ++ia )
+        delete ia->second;
 }
 
 /**
@@ -64,7 +68,7 @@ LDAS_PVConfigMgr::connectHost( const string & a_hostname )
     // Make sure we're not already connected or connecting to this host
     if ( m_agents.find(hostname) == m_agents.end())
     {
-        m_agents[hostname] = new LDAS_PVConfigAgent(m_streamer, *this, hostname);
+        m_agents[hostname] = new LDAS_PVConfigAgent( m_streamer, *m_cfg_service, *this, hostname);
     }
     else
     {
@@ -95,25 +99,36 @@ LDAS_PVConfigMgr::parseSatCompFile( const string & a_file, vector<string> &a_hos
 	    CString csElement;
         CString csTemp;
 
-	    CFile f(a_file.c_str(), CFile::modeRead | CFile::shareDenyWrite );
-        UINT len = (UINT)f.GetLength();
-        if ( len > 0 )
+        try
         {
-            buffer = new char[len+1];
-	        f.Read(buffer,len);
-	        buffer[len]=0;
-            csTemp = buffer;
-            delete[] buffer;
-            buffer = 0;
+	        CFile f(a_file.c_str(), CFile::modeRead | CFile::shareDenyWrite );
+            UINT len = (UINT)f.GetLength();
+            if ( len > 0 )
+            {
+                buffer = new char[len+1];
+	            f.Read(buffer,len);
+	            buffer[len]=0;
+                csTemp = buffer;
+                delete[] buffer;
+                buffer = 0;
+            }
+	        f.Close();
         }
-	    f.Close();
-    	
+        catch(...)
+        {
+            if ( buffer )
+            {
+                delete[] buffer;
+                buffer = 0;
+            }
+            EXC( EC_UNKOWN_ERROR, "Could not open file" );
+        }
 
 	    if (!myParser.CheckValidHeader(csTemp))
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid header");
 
 	    if (myParser.GetRootName(csTemp) != "Satellite")
-            throw -1;
+            EXC( EC_INVALID_CONFIG_DATA, "Invalid root name");
 
 	    csTemp=myParser.StripHeader(csTemp); 	
 	    csTemp=myParser.StripFirstTag(csTemp);
@@ -129,7 +144,7 @@ LDAS_PVConfigMgr::parseSatCompFile( const string & a_file, vector<string> &a_hos
             eStruct=myParser.GetElementStructure(csElement);
     	
 		    if (eStruct.csName != "computer")
-			    throw -1;
+                EXC( EC_INVALID_CONFIG_DATA, "Invalid element found");
 
             eStruct=myParser.GetElementStructure(csElement);
 		    for (unsigned int i=0;i<eStruct.uiNumberOfAttributes;i++)
@@ -144,12 +159,21 @@ LDAS_PVConfigMgr::parseSatCompFile( const string & a_file, vector<string> &a_hos
 
         // ===== End Imported Code ================================================
     }
+    catch( TraceException &e )
+    {
+        if ( buffer )
+            delete[] buffer;
+
+        LOG_ERROR( "Failed processing satellite computer file: " << a_file );
+        EXC_ADD(e,"Failed processing satellite computer file " << a_file );
+        throw;
+    }
     catch(...)
     {
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed parsing satellite computers file: " << a_file );
+        LOG_ERROR( "Failed processing satellite computers file: " << a_file );
         throw;
     }
 }

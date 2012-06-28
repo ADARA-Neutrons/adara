@@ -34,7 +34,7 @@ PVStreamer::PVStreamer( size_t a_pkt_buffer_size, size_t a_max_notify_pkts )
 {
     // Make sure buffer sizes are sane
     if ( m_pkt_buffer_size < 2 || m_max_notify_pkts > m_pkt_buffer_size )
-        throw -1;
+        EXC(EC_INVALID_PARAM,"Invalid buffer size parameter(s)");
 
     if ( !m_max_notify_pkts )
         m_max_notify_pkts = a_pkt_buffer_size >> 1;
@@ -160,6 +160,37 @@ PVStreamer::detachStreamListener( IPVStreamListener &a_listener )
     }
 }
 
+
+/**
+ * \brief Attaches a stream listener.
+ * \param a_listener - Listener instance
+ */
+void
+PVStreamer::attachStatusListener( IPVStreamerStatusListener &a_listener )
+{
+    boost::lock_guard<boost::mutex> lock(m_statlist_mutex);
+    if ( find(m_status_listeners.begin(), m_status_listeners.end(), &a_listener) == m_status_listeners.end())
+    {
+        m_status_listeners.push_back( &a_listener );
+    }
+}
+
+/**
+ * \brief Detaches a stream listener.
+ * \param a_listener - Listener instance
+ */
+void
+PVStreamer::detachStatusListener( IPVStreamerStatusListener &a_listener )
+{
+    boost::lock_guard<boost::mutex> lock(m_statlist_mutex);
+    vector<IPVStreamerStatusListener*>::iterator l = find(m_status_listeners.begin(), m_status_listeners.end(), &a_listener);
+    if ( l != m_status_listeners.end())
+    {
+        m_status_listeners.erase(l);
+    }
+}
+
+
 /**
  * \brief Attaches a new configuration provider (takes ownership of PVConfig instance).
  * \param a_config - PVConfig instance
@@ -176,7 +207,7 @@ PVStreamer::attach( PVConfig &a_config )
         return this;
     }
 
-    throw -1;
+    EXC(EC_INVALID_OPERATION,"PVConfig instance already attached");
 }
 
 /**
@@ -195,7 +226,7 @@ PVStreamer::attach( PVReader &a_reader )
         return this;
     }
 
-    throw -1;
+    EXC(EC_INVALID_OPERATION,"PVReader instance already attached");
 }
 
 /**
@@ -214,7 +245,7 @@ PVStreamer::attach( PVWriter &a_writer )
         return this;
     }
 
-    throw -1;
+    EXC(EC_INVALID_OPERATION,"PVWriter instance already attached");
 }
 
 
@@ -278,7 +309,7 @@ PVStreamer::getPV( Identifier a_dev_id, Identifier a_pv_id ) const
     if ( ipv != m_pv_info.end())
         return ipv->second;
 
-    throw -1;
+    EXCP(EC_INVALID_PARAM,"PV not defined (dev id:" << a_dev_id << ", pv id:" << a_pv_id << ")");
 }
 
 /**
@@ -333,7 +364,7 @@ PVStreamer::getDeviceName( Identifier a_dev_id ) const
     if ( idev != m_devices.end() )
         return idev->second->name;
 
-    throw -1;
+    EXCP(EC_INVALID_PARAM,"Device not defined (dev id:" << a_dev_id  << ")");
 }
 
 /**
@@ -365,7 +396,27 @@ PVStreamer::getAppDevices( Identifier a_app_id ) const
         return (const vector<Identifier>&) iapp->second->devices;
     }
     else
-        throw -1;
+        EXCP(EC_INVALID_PARAM,"App not defined (app id:" << a_app_id  << ")");
+}
+
+
+// ---------- IPVCommonServices methods ---------------------------------------
+
+void
+PVStreamer::unhandledException( TraceException &e )
+{
+    boost::lock_guard<boost::mutex> lock(m_statlist_mutex);
+
+    if ( m_status_listeners.size() )
+    {
+        try
+        {
+            for ( vector<IPVStreamerStatusListener*>::iterator il = m_status_listeners.begin(); il != m_status_listeners.end(); ++il )
+                (*il)->unhandledException( e );
+        }
+        catch(...)
+        {}
+    }
 }
 
 // ---------- IPVConfigServices methods ---------------------------------------
@@ -435,11 +486,11 @@ PVStreamer::defineDevice( Protocol a_protocol, Identifier a_dev_id, const string
             if ( ia != m_apps.end())
                 ia->second->devices.push_back(a_dev_id);
             else
-                throw -1;
+                EXCP(EC_INVALID_PARAM,"Application " << a_app_id << " not defined");
         }
     }
     else
-        throw -1;
+        EXCP(EC_INVALID_PARAM,"Device already defined (dev id:" << a_dev_id  << ")");
 }
 
 void
@@ -491,18 +542,18 @@ PVStreamer::definePV( PVInfo & a_info )
     map<Identifier,DeviceInfo*>::iterator idev = m_devices.find(a_info.m_device_id);
 
     if ( idev == m_devices.end())
-        throw -1;
+        EXCP( EC_INVALID_PARAM, "Invalid device ID " << a_info.m_device_id );
 
     if ( m_pv_info.find(key) == m_pv_info.end())
     {
         if ( a_info.m_protocol != idev->second->protocol || a_info.m_source != idev->second->source )
-            throw -1;
+            EXCP( EC_INVALID_PARAM, "Mismatched protocols on PV " << a_info.m_name );
 
         idev->second->pvs.push_back(&a_info);
         m_pv_info[key] = &a_info;
     }
     else
-        throw -1;
+        EXCP( EC_INVALID_PARAM, "PV " << a_info.m_name << " already defined" );
 }
 
 void
@@ -662,7 +713,7 @@ PVStreamer::getWriteableDevicePVs( Identifier a_dev_id ) const
     if ( idev != m_devices.end() )
         return idev->second->pvs;
     else
-        throw -1;
+        EXCP( EC_INVALID_PARAM, "Device " << a_dev_id << " not defined" );
 }
 
 

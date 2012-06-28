@@ -13,7 +13,7 @@
 using namespace SNS::PVS;
 
 // CPVStreamerDlg dialog
-class CPVStreamerDlg : public CDialog, public SNS::PVS::IPVConfigListener, public SNS::PVS::IPVStreamListener, public SNS::PVS::ADARA::IADARAWriterListener
+class CPVStreamerDlg : public CDialog, public SNS::PVS::IPVConfigListener, public SNS::PVS::IPVStreamListener, public SNS::PVS::ADARA::IADARAWriterListener, public SNS::PVS::IPVStreamerStatusListener
 {
 // Construction
 public:
@@ -32,6 +32,7 @@ protected:
 protected:
 	HICON m_hIcon;
 
+    void                unhandledException( const TraceException &e );
 
     void                configurationLoaded( Protocol a_protocol, const std::string &a_source );
     void                configurationInvalid( Protocol a_protocol, const std::string &a_source );

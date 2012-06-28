@@ -136,7 +136,6 @@ ADARA_PVWriter::packetSendThreadFunc()
     while(1)
     {
         pvs_pkt = m_writer_services->getFilledPacket( m_heartbeat, timeout_flag );
-//        pvs_pkt = m_writer_services->getFilledPacket();
         if ( !pvs_pkt )
         {
             if ( timeout_flag )
@@ -369,7 +368,7 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
     a_adara_pkt.vvp.var_id  = a_pv_info.m_id;
 
     if ( !a_pv_pkt && ! a_time )
-        throw exception("Invalid arguments.");
+        EXC( EC_INVALID_PARAM, "Either PV pkt OR a timestamp is required" );
 
     if ( a_pv_pkt )
     {
@@ -622,7 +621,7 @@ ADARA_PVWriter::socketListenThreadFunc()
  * \brief Initialized Windows sockets library and configures listener socket.
  * \return True on success; false otherwise.
  */
-bool
+void
 ADARA_PVWriter::initWinSocket()
 {
     int rc;
@@ -631,7 +630,7 @@ ADARA_PVWriter::initWinSocket()
 
     rc = WSAStartup( 0x101, &wsadata );
     if ( rc )
-        throw -1;
+        EXC( EC_WINDOWS_ERROR, "WSAStartup failed." );
 
 
     memset( &hints, 0, sizeof( hints ));
@@ -650,28 +649,28 @@ ADARA_PVWriter::initWinSocket()
         if ( rc )
         {
             LOG_ERROR( "getaddrinfo() failed. rc: " << rc );
-            throw -1;
+            EXC( EC_WINDOWS_ERROR, "getaddrinfo failed." );
         }
 
         m_listen_socket = socket( result->ai_family, result->ai_socktype, result->ai_protocol );
         if ( m_listen_socket == INVALID_SOCKET )
         {
             LOG_ERROR( "socket() failed. rc: " << WSAGetLastError() );
-            throw -1;
+            EXC( EC_WINDOWS_ERROR, "socket failed." );
         }
 
         rc = bind( m_listen_socket, result->ai_addr, (int)result->ai_addrlen );
         if ( rc == SOCKET_ERROR )
         {
             LOG_ERROR( "bind() failed. rc: " << WSAGetLastError() );
-            throw -1;
+            EXC( EC_WINDOWS_ERROR, "bind failed." );
         }
 
         if ( listen( m_listen_socket, 5 /*max connections*/ ) == SOCKET_ERROR )
         {
-            LOG_ERROR( "bind() failed. rc: " << WSAGetLastError() );
+            LOG_ERROR( "listen() failed. rc: " << WSAGetLastError() );
             closesocket( m_listen_socket );
-            throw -1;
+            EXC( EC_WINDOWS_ERROR, "listen failed." );
         }
 
         // Get Server IP address (not sure why the above does not set it correctly in result
@@ -691,15 +690,22 @@ ADARA_PVWriter::initWinSocket()
         freeaddrinfo( result );
         result = 0;
     }
+    catch( TraceException &e )
+    {
+        if ( result )
+            freeaddrinfo( result );
+
+        e.addContext( "WinSock initialize failed." );
+
+        throw;
+    }
     catch(...)
     {
         if ( result )
             freeaddrinfo( result );
 
-        return false;
+        EXC( EC_UNKOWN_ERROR, "WinSock initialize failed." );
     }
-
-    return true;
 }
 
 

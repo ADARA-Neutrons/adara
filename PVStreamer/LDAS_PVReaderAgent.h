@@ -50,6 +50,7 @@ private:
     IPVReaderServices      &m_reader_services;      ///< PVStreamer reader services interface
     PVInfo                 *m_pv_info;              ///< Associated process variable info struct
     long                    m_array_idx;            ///< PV index for array types
+    bool                    m_first_send;           ///< Flag to force pkt send for first pkt regardless of value diff
     bool                    m_cache_array_info;     ///< Flag to initiate caching of array attributes
     unsigned long           m_array_size;           ///< Array size fo array types
     NI::CNiDataSocket       m_socket;               ///< DataSocket use to read PV values & status

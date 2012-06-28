@@ -76,6 +76,8 @@ public:
     void                            detachConfigListener( IPVConfigListener &a_listener );
     void                            attachStreamListener( IPVStreamListener &a_listener );
     void                            detachStreamListener( IPVStreamListener &a_listener );
+    void                            attachStatusListener( IPVStreamerStatusListener &a_listener );
+    void                            detachStatusListener( IPVStreamerStatusListener &a_listener );
     IPVConfigServices*              attach( PVConfig &a_config );
     IPVReaderServices*              attach( PVReader &a_reader );
     IPVWriterServices*              attach( PVWriter &a_writer );
@@ -103,6 +105,11 @@ private:
         std::string                 source;     /// Source (i.e. hostname)
         std::vector<PVInfo*>        pvs;        /// Configured process variables associated with device
     };
+
+
+    // ---------- IPVCommonServices methods ----------
+
+    void                        unhandledException( TraceException &e );
 
     // ---------- IPVConfigServices methods ----------
 
@@ -153,9 +160,11 @@ private:
     mutable boost::mutex                        m_strlist_mutex;            ///< Protects stream listener container
     mutable boost::mutex                        m_cfglist_mutex;            ///< Protects config listener container
     mutable boost::mutex                        m_cfg_mutex;                ///< Protects access to pv and device containers
+    mutable boost::mutex                        m_statlist_mutex;           ///< Protects status listener container
     boost::thread*                              m_stream_listeners_thread;  ///< Thread to send notifications to stream listeners
     std::vector<IPVStreamListener*>             m_stream_listeners;         ///< Registered stream listener container
     std::vector<IPVConfigListener*>             m_config_listeners;         ///< Registered config listener container
+    std::vector<IPVStreamerStatusListener*>     m_status_listeners;         ///< Registered status listener container
     std::map<PVKey,PVInfo*>                     m_pv_info;                  ///< All defined (configured) process variables
     std::map<Identifier,DeviceInfo*>            m_devices;                  ///< All defined (configured) devices
     std::map<Identifier,AppInfo*>               m_apps;                     ///< All defined (configured) applications

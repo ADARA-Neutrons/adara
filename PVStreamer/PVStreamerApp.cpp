@@ -130,38 +130,55 @@ CPVStreamerApp::InitInstance()
     sstr << "  heartbeat = " << cmdline.m_heartbeat << " msec (use -hb=x to change)";
     dlg.print( sstr.str());
 
-    // Initialize PVStreamer objects
-    PVStreamer* pvs = new PVStreamer(200,100);
+    PVStreamer      *pvs = 0;
+    PVStreamLogger  *logger = 0;
 
-    pvs->attachConfigListener( dlg );
-    pvs->attachStreamListener( dlg );
-
-    PVStreamLogger*     logger = new PVStreamLogger(cmdline.m_log_path);
-    pvs->attachConfigListener( *logger );
-    pvs->attachStreamListener( *logger );
-
-    ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port,cmdline.m_heartbeat);
-    adara_writer->attachListener( dlg );
-    adara_writer->attachListener( *logger );
-
-    LDAS_PVReader*      ldas_reader = new LDAS_PVReader(*pvs);
-    LDAS_PVConfigMgr    ldas_cfg(*pvs);
-
-    // Loading a LDAS satellite configuration file will initiate internal streaming
-    // External streaming will commence when the SMS client connects to the ADARA port
-    ldas_cfg.connectSatCompFile(cmdline.m_sat_config_file);
-
-    // Show and run main window (this runs message loop, doesn't return until window closes)
-    dlg.ShowWindow(SW_SHOW);
-    MSG msg;
-    while( GetMessage( &msg, 0, 0, 0 ) > 0 )
+    try
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
+        // Initialize PVStreamer objects
+        pvs = new PVStreamer(200,100);
 
-    delete pvs;
-    delete logger;
+        pvs->attachConfigListener( dlg );
+        pvs->attachStreamListener( dlg );
+        pvs->attachStatusListener( dlg );
+
+        logger = new PVStreamLogger(cmdline.m_log_path);
+        pvs->attachConfigListener( *logger );
+        pvs->attachStreamListener( *logger );
+
+        ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port,cmdline.m_heartbeat);
+        adara_writer->attachListener( dlg );
+        adara_writer->attachListener( *logger );
+
+        LDAS_PVReader*      ldas_reader = new LDAS_PVReader(*pvs);
+        LDAS_PVConfigMgr*   ldas_cfg = new LDAS_PVConfigMgr(*pvs);
+
+        // Loading a LDAS satellite configuration file will initiate internal streaming
+        // External streaming will commence when the SMS client connects to the ADARA port
+        ldas_cfg->connectSatCompFile(cmdline.m_sat_config_file);
+
+        // Show and run main window (this runs message loop, doesn't return until window closes)
+        dlg.ShowWindow(SW_SHOW);
+        MSG msg;
+        while( GetMessage( &msg, 0, 0, 0 ) > 0 )
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        delete pvs;
+        delete logger;
+    }
+    catch( TraceException &e )
+    {
+        AfxMessageBox( e.toString().c_str(), MB_OK | MB_ICONEXCLAMATION, 0 );
+
+        if ( pvs )
+            delete pvs;
+
+        if ( logger )
+            delete logger;
+    }
 
     // Return false to prevent CWinApp::Run() from being called
     return FALSE;

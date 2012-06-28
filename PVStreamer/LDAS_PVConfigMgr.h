@@ -29,7 +29,7 @@ class LDAS_PVConfigAgent;
  * initiates the configuration process which results in multple LDAS_PVConfigAgent
  * instances being created to load host-specific configuration data.
  */
-class LDAS_PVConfigMgr
+class LDAS_PVConfigMgr : public PVConfig
 {
 public:
 
@@ -43,7 +43,6 @@ private:
 
     void            parseSatCompFile( const std::string & a_file, std::vector<std::string> &a_hostnames );
 
-    PVStreamer                                 &m_streamer;     ///< Owning PVStreamer instance
     boost::mutex                                m_agent_mutex;  ///< Mutex used to protect public API
     std::map<std::string,LDAS_PVConfigAgent*>   m_agents;       ///< Active configuration agents
 };
