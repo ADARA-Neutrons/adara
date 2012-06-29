@@ -10,7 +10,9 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 
-#include <stdio.h>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
 double DataSource::m_connect_retry = 15.0;
 double DataSource::m_connect_timeout = 5.0;
@@ -41,8 +43,6 @@ DataSource::DataSource(const std::string &uri, uint32_t id) :
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
-
-fprintf(stderr, "Looking up %s %s\n", node.c_str(), service.c_str());
 
 	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
@@ -75,7 +75,6 @@ DataSource::~DataSource()
 
 void DataSource::connectionFailed(void)
 {
-fprintf(stderr, "%s for %s\n", __func__, m_uri.c_str());
 	m_timer->cancel();
 
 	if (m_fdreg) {
@@ -104,11 +103,12 @@ bool DataSource::timerExpired(void)
 		startConnect();
 		break;
 	case CONNECTING:
-		/* TODO ratelimited logging of connection failure */
+		/* TODO only send this once until we successfully connect */
+		WARN("Connection request timed out to " << m_uri);
 		connectionFailed();
 		break;
 	case ACTIVE:
-		/* TODO ratelimited logging of conneciton failure */
+		WARN("Timed out waiting for data from " << m_uri);
 		connectionFailed();
 		break;
 	}
@@ -154,12 +154,14 @@ void DataSource::startConnect(void)
 	switch (rc) {
 	case ECONNREFUSED:
 		/* TODO ratelimited logging of refused connection */
+		WARN("Connection refused by " << m_uri);
 		goto error_fd;
 	case EINTR:
 	case EINPROGRESS:
 		m_state = CONNECTING;
 		break;
 	case 0:
+		INFO("Connection established to " << m_uri);
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_sourceId);
 	}
@@ -205,7 +207,7 @@ void DataSource::connectComplete(void)
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_sourceId);
 
-		/* TODO log connection to source */
+		INFO("Connection established to " << m_uri);
 		return;
 	}
 
@@ -218,6 +220,7 @@ void DataSource::connectComplete(void)
 	}
 
 	/* TODO ratelimited logging of connection issue */
+	WARN("Connection request to " << m_uri << " failed: " << strerror(e));
 	connectionFailed();
 }
 
@@ -227,17 +230,19 @@ void DataSource::dataReady(void)
 	m_timer->start(m_data_timeout);
 
 	try {
-		if (!read(m_fd, m_max_read_chunk))
+		if (!read(m_fd, m_max_read_chunk)) {
+			INFO("Connection closed with " << m_uri);
 			connectionFailed();
+		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
+		ERROR("Exception reading from " << m_uri << ": " << e.what());
 		connectionFailed();
 	}
 }
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
-//fprintf(stderr, "%s type 0x%08x len %u\n", __func__, pkt.type(), pkt.packet_length());
 	switch (pkt.type()) {
 	case ADARA::PacketType::HEARTBEAT_V0:
 	case ADARA::PacketType::SYNC_V0:
@@ -258,8 +263,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-fprintf(stderr, "%s\n", __func__);
-	// TODO ratelimited log
+	ERROR("Unknown packet from" << m_uri);
 	connectionFailed();
 	return true;
 }
@@ -268,7 +272,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *chunk, unsigned int chunk_offset,
 			       unsigned int chunk_len)
 {
-	// TODO ratelimited log
+	ERROR("Oversized packet from" << m_uri);
 	connectionFailed();
 	return true;
 }
@@ -283,6 +287,7 @@ void DataSource::endPulse(bool dup)
 
 	if (!m_pulseEOP) {
 		/* TODO rate-limited logging of dropped packets */
+		ERROR("Lost packet from" << m_uri);
 		ctrl->markPartial(m_lastPulseId, m_dupCount);
 	}
 
@@ -293,6 +298,7 @@ void DataSource::endPulse(bool dup)
 	m_pulseEOP = false;
 	if (dup) {
 		/* TODO rate-limited logging of duplicate pulses? */
+		ERROR("Duplicate pulse from" << m_uri);
 		m_dupCount++;
 	} else
 		m_dupCount = 0;

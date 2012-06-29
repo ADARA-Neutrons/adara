@@ -24,9 +24,9 @@ smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
 		STSClient.cc STSClientMgr.cc RunInfo.cc \
 		Geometry.cc PixelMap.cc BeamlineInfo.cc \
 		MetaDataMgr.cc
-smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
-smsd_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
-smsd_LDADD = $(EPICS_LIBS) -lboost_signals -lpthread
+smsd_CPPFLAGS = $(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
+smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
+smsd_LDADD = $(EPICS_LIBS) $(liblog4cxx_LIBS) -lboost_signals -lpthread
 
 # The EPICS headers spew these warnings, but we'd like to keep the
 # ADARA parser clean for sharing with Mantid, so build a throw-away

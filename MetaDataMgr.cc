@@ -1,9 +1,11 @@
 #include <boost/bind.hpp>
 
-#include <stdio.h>
-
 #include "MetaDataMgr.h"
 #include "StorageManager.h"
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
 
 MetaDataMgr::MetaDataMgr()
 {
@@ -48,7 +50,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		if (dev_pkt->packet_length() == in.packet_length() &&
 				!memcmp(dev_pkt->payload(), in.payload(),
 					dev_pkt->payload_length())) {
-			fprintf(stderr, "Inbound descriptor was dup'd\n");
+			DEBUG("Inbound descriptor was indentical");
 			return;
 		}
 
@@ -77,8 +79,10 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		/* XXX ratelimited log that we got a variable update without
 		 * the corresponding device descriptor.
 		 */
-		fprintf(stderr, "Got variable 0x%x:%x:%x without a "
-				"descriptor\n", dev, var, tag);
+		ERROR("Got variable 0x" << std::hex << dev << ":"
+					<< std::hex << var << ":"
+					<< std::hex << tag
+					<< " without a descriptor");
 		return;
 	}
 
@@ -86,8 +90,11 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		/* XXX ratelimited log that we got a variable update with
 		 * an incorrect tag (ie, wrong source)
 		 */
-		fprintf(stderr, "Got variable 0x%x:%x:%x but expected tag %x\n",
-				dev, var, tag, it->second.m_tag);
+		ERROR("Got variable 0x" << std::hex << dev << ":"
+					<< std::hex << var << ":"
+					<< std::hex << tag
+					<< " but expected tag "
+					<< std::hex << it->second.m_tag);
 		return;
 	}
 
