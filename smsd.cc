@@ -1,23 +1,17 @@
 #include <stdio.h>
 
-#include <log4cxx/logger.h>
-#include <log4cxx/consoleappender.h>
-#include <log4cxx/patternlayout.h>
-
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "StorageManager.h"
 #include "LiveServer.h"
 #include "STSClientMgr.h"
+#include "Logging.h"
 
-using namespace log4cxx;
+#include <log4cxx/propertyconfigurator.h>
 
 int main(int argc, char **argv)
 {
-	/* TODO handle this via property file */
-	LayoutPtr layout(new PatternLayout("%d %p %c - %m%n"));
-	AppenderPtr appender(new ConsoleAppender(layout));
-	Logger::getRootLogger()->addAppender(appender);
+	PropertyConfigurator::configure("/adara/conf/logging.conf");
 
 	StorageManager::init("/adara/data");
 	LiveServer liveServer("31415");
