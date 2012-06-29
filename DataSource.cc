@@ -264,7 +264,6 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
 	ERROR("Unknown packet from" << m_uri);
-	connectionFailed();
 	return true;
 }
 
@@ -273,7 +272,6 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       unsigned int chunk_len)
 {
 	ERROR("Oversized packet from" << m_uri);
-	connectionFailed();
 	return true;
 }
 
