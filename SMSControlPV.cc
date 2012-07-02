@@ -4,6 +4,12 @@
 
 #include <gddApps.h>
 
+/* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
+ * initiallize the variable, so it warns. This conflicts with a clean build
+ * using -Werror, but we can quiet the compiler easily.
+ */
+#define uninitialized_var(x) x = 0
+
 /* We need to a specialized destructor to delete enum strings when
  * the gdd holding them drops its last reference.
  */
@@ -145,7 +151,7 @@ caStatus smsRunNumberPV::read(const casCtx &ctx, gdd &prototype)
 
 void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 {
-	aitUint32 v;
+	aitUint32 uninitialized_var(v);
 	gdd *val;
 
 	m_value->get(v);
@@ -229,7 +235,7 @@ caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
 
 caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 {
-	aitUint16 v;
+	aitUint16 uninitialized_var(v);
 
 	if (!val.isScalar())
 		return S_casApp_noSupport;
@@ -249,7 +255,7 @@ caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 
 void smsRecordingPV::update(bool recording, struct timespec *ts)
 {
-	aitUint16 v;
+	aitUint16 uninitialized_var(v);
 	gdd *val;
 
 	m_value->get(v);
@@ -431,7 +437,7 @@ caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
 
 caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
 {
-	aitUint16 v;
+	aitUint16 uninitialized_var(v);
 
 	if (!val.isScalar())
 		return S_casApp_noSupport;
