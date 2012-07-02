@@ -68,7 +68,7 @@ LDAS_PVConfigMgr::connectHost( const string & a_hostname )
     // Make sure we're not already connected or connecting to this host
     if ( m_agents.find(hostname) == m_agents.end())
     {
-        m_agents[hostname] = new LDAS_PVConfigAgent( m_streamer, *m_cfg_service, *this, hostname);
+        m_agents[hostname] = new LDAS_PVConfigAgent( m_streamer, *m_cfg_service, hostname);
     }
     else
     {

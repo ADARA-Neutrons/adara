@@ -49,7 +49,7 @@ class LDAS_PVConfigAgent
 {
 public:
 
-    LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname );
+    LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, const std::string &a_hostname );
     ~LDAS_PVConfigAgent();
 
 private:

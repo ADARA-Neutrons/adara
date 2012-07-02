@@ -780,7 +780,7 @@ ELE_STRUCT CStringParser::GetElementStructure(CString csElement)
 int CStringParser::GetNumberOfAttributes(CString csTag)
 
 {
-	int i=0,j=0,k=0, m=0;
+	int i=0,j=0;
 //	CString csTemp;
 	if (csTag.IsEmpty())                                                                                                                                                                                                                                    
                        

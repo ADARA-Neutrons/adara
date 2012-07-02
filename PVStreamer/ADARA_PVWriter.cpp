@@ -8,6 +8,7 @@
 #include "stdafx.h"
 
 #include <sstream>
+//#include <strstream>
 
 #include "ADARA_PVWriter.h"
 
@@ -128,6 +129,7 @@ ADARA_PVWriter::packetSendThreadFunc()
     ADARAPacket     adara_pkt;
     ADARAPacket     heartbeat_pkt;
     bool            timeout_flag = false;
+    string          payload;
 
     heartbeat_pkt.payload_len = 0;
     heartbeat_pkt.format = 0x00400900;
@@ -156,9 +158,15 @@ ADARA_PVWriter::packetSendThreadFunc()
         {
             if ( connected()) // If connected, translate and send packet
             {
-                if ( translate( *pvs_pkt, adara_pkt ))
+                if ( translate( *pvs_pkt, adara_pkt, payload ))
                 {
-                    sendPacket( adara_pkt );
+                    if ( payload.length() )
+                    {
+                        sendPacket( adara_pkt, &payload );
+                        payload.clear();
+                    }
+                    else
+                        sendPacket( adara_pkt, 0 );
                 }
             }
             m_writer_services->putFreePacket(pvs_pkt);
@@ -181,7 +189,7 @@ ADARA_PVWriter::connected()
  * \param a_adara_pkt - ADARA packet to receive translation (output).
  */
 bool
-ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
+ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, string &a_payload )
 {
     a_adara_pkt.sec = a_pv_pkt.time.sec + EPICS_TIME_OFFSET;
     a_adara_pkt.nsec = a_pv_pkt.time.nsec;
@@ -200,20 +208,20 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
             {
                 if ( !ic->ddp )
                 {
-                    ADARAPacket adara_pkt;
-                    Timestamp ts;
+                    ADARAPacket     adara_pkt;
+                    Timestamp       ts;
 
                     // Use current time for DDP packets
                     ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
 
                     // Virtual device
-                    buildDDP( adara_pkt, 0, ts );
-                    sendPacket( adara_pkt, ic->sock );
+                    buildDDP( adara_pkt, a_payload, 0, ts );
+                    sendPacket( adara_pkt, &a_payload, ic->sock );
                 }
             }
         }
 
-        buildDDP( a_adara_pkt, a_pv_pkt.device_id, a_pv_pkt.time );
+        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device_id, a_pv_pkt.time );
         return true;
 
     case VarInactive:
@@ -262,14 +270,18 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt )
  * \param a_time - EPICS timestamp of device description (activation).
  */
 void
-ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timestamp a_time )
+ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifier a_dev_id, Timestamp a_time )
 {
+    stringstream sstr;
+
     a_adara_pkt.format  = 0x800000;
     a_adara_pkt.dev_id  = a_dev_id;
     a_adara_pkt.sec     = a_time.sec;
     a_adara_pkt.nsec    = a_time.nsec;
 
-    stringstream   sstr;
+    // Reset payload stringstream
+
+    a_payload.clear();
 
     // Encode XML
 
@@ -330,9 +342,11 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timesta
 
     sstr << "</device>" << endl;
 
-    // Copy xml into packet (will truncate if too long)
-    a_adara_pkt.ddp.xml_len = (unsigned long) sstr.str().size();
-    memcpy( a_adara_pkt.ddp.xml, sstr.str().c_str(), min(a_adara_pkt.ddp.xml_len,MAX_XML_LEN) );
+    // Save payload
+    // TODO This copies the buffer twice - once to build a temp string from buffer, then into the payload string provided
+    a_payload = sstr.str();
+    // Copy xml len into packet
+    a_adara_pkt.ddp.xml_len = (unsigned long) a_payload.size();
 
     a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len;
 
@@ -341,7 +355,9 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, Identifier a_dev_id, Timesta
     if ( rem )
     {
         // Pad buffer with nulls
-        memset( ((char*)&a_adara_pkt) + 16 + a_adara_pkt.payload_len, 0, rem );
+        for ( int i = 0; i < (4-rem); ++i )
+            a_payload.push_back('\0');
+
         // Adjust payload len field
         a_adara_pkt.payload_len += (4 - rem);
     }
@@ -456,20 +472,21 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
     if ( devs.size() )
     {
         ADARAPacket adara_pkt;
-        Timestamp ts;
+        Timestamp   ts;
+        string      payload;
 
         // Use current time for DDP packets
         ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
 
         // Send DDP for "Virtual Device 0"
-        buildDDP( adara_pkt, 0, ts );
-        sendPacket( adara_pkt, a_socket );
+        buildDDP( adara_pkt, payload, 0, ts );
+        sendPacket( adara_pkt, &payload, a_socket );
 
         // Send DDPs for real devices
         for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
         {
-            buildDDP( adara_pkt, *idev, ts );
-            sendPacket( adara_pkt, a_socket );
+            buildDDP( adara_pkt, payload, *idev, ts );
+            sendPacket( adara_pkt, &payload, a_socket );
         }
 
         vector<const PVInfo*>::const_iterator iv;
@@ -483,7 +500,7 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
                 for ( iv = vars.begin(); iv != vars.end(); ++iv )
                 {
                     buildVVP( adara_pkt, **iv, 0, &ts );
-                    sendPacket( adara_pkt, a_socket );
+                    sendPacket( adara_pkt, 0, a_socket );
                 }
             }
             catch(...)
@@ -504,15 +521,24 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
  * \param a_socket - Socket of client to receive packet.
  */
 void
-ADARA_PVWriter::sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket )
+ADARA_PVWriter::sendPacket( ADARAPacket & a_adara_pkt, string *a_payload, SOCKET a_socket )
 {
     list<ClientInfo>::iterator ic;
     int rc;
+    int len1 = (int)a_adara_pkt.payload_len + 16;
 
-    if ( a_socket != INVALID_SOCKET )
+    if ( a_payload )
+        len1 -= (int)a_payload->length();
+
+    if ( a_socket != INVALID_SOCKET ) // Send to a specific clients
     {
-        // Send to a specific clients
-        rc = send( a_socket, (char*)&a_adara_pkt, a_adara_pkt.payload_len + 16, 0 );
+        // Send packet structure
+        rc = send( a_socket, (char*)&a_adara_pkt, len1, 0 );
+
+        // Send optional payload
+        if ( a_payload && a_payload->length() && rc != SOCKET_ERROR )
+            rc = send( a_socket, a_payload->c_str(), (int)a_payload->length(), 0 );
+
         if ( rc == SOCKET_ERROR )
         {
             LOG_ERROR( "Socket send() failed. rc: " << rc );
@@ -540,7 +566,12 @@ ADARA_PVWriter::sendPacket( ADARAPacket & a_adara_pkt, SOCKET a_socket )
 
         for ( ic = m_client_info.begin(); ic != m_client_info.end(); )
         {
-            rc = send( ic->sock, (char*)&a_adara_pkt, a_adara_pkt.payload_len + 16, 0 );
+            rc = send( ic->sock, (char*)&a_adara_pkt, len1, 0 );
+
+            // Send optional payload
+            if ( a_payload && a_payload->length() && rc != SOCKET_ERROR )
+                rc = send( ic->sock, a_payload->c_str(), (int)a_payload->length(), 0 );
+
             if ( rc == SOCKET_ERROR )
             {
                 LOG_ERROR( "Socket send() failed. rc: " << rc );
@@ -625,7 +656,7 @@ void
 ADARA_PVWriter::initWinSocket()
 {
     int rc;
-    struct addrinfo *result = 0, *ptr = 0, hints;
+    struct addrinfo *result = 0, hints;
     WSADATA wsadata;
 
     rc = WSAStartup( 0x101, &wsadata );

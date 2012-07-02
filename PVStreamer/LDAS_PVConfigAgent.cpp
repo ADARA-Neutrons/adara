@@ -24,7 +24,7 @@ map<Identifier,Identifier> LDAS_PVConfigAgent::m_next_pv_id;
  * \param a_owner - The owning LDAS_PVConfigMgr instance.
  * \param a_hostname - The hostname to connect to.
  */
-LDAS_PVConfigAgent::LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, LDAS_PVConfigMgr &a_owner, const std::string &a_hostname )
+LDAS_PVConfigAgent::LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, const std::string &a_hostname )
  : m_streamer(a_streamer), m_cfg_service(a_cfg_service), m_hostname(a_hostname)
 {
     m_file_socket.InstallEventHandler( *this, &LDAS_PVConfigAgent::fileSocketData );
@@ -139,7 +139,6 @@ LDAS_PVConfigAgent::parseConfigFile( const std::string &a_filename )
 	    CString csElement1;
 	    CString csTemp2; 
 	    ELE_STRUCT eStruct;
-	    int returnValue=0;
         CString csTemp;
 
         try
@@ -232,7 +231,6 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
         string friendlyname;
 	    CString csLimits;
 	    ELE_STRUCT eStruct;
-	    int returnValue=0;
 	    int i,j;
         CString csTemp;
 
@@ -358,7 +356,6 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
 	    CStringParser myParser;
 	    CString csElement1;
 	    ELE_STRUCT eStruct;
-	    int returnValue=0;
 	    int i;
         CString csTemp;
 

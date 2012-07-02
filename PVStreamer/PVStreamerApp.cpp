@@ -33,7 +33,7 @@ public:
         if ( bFlag )
         {
             if ( _strnicmp( pszParam, "port=",5) == 0 )
-                m_port = atoi( &pszParam[5] );
+                m_port = (unsigned short)atoi( &pszParam[5] );
             else if ( _strnicmp( pszParam, "cfg=",4) == 0 )
                 m_sat_config_file = &pszParam[4];
             else if ( _strnicmp( pszParam, "log=",4) == 0 )
@@ -72,7 +72,7 @@ CPVStreamerApp::InitApplication()
             CWnd *pWndPrev, *pWndChild;
 
             // Determine if a window with the class name exists...
-            if (pWndPrev = CWnd::FindWindow(0,"SNS-SMS Process Variable Streamer"))
+            if (( pWndPrev = CWnd::FindWindow(0,"SNS-SMS Process Variable Streamer")) != 0 )
             {
                 // If so, does it have any popups?
                 pWndChild = pWndPrev->GetLastActivePopup();

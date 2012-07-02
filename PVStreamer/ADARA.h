@@ -12,10 +12,6 @@
 
 namespace SNS { namespace PVS { namespace ADARA {
 
-#define MAX_XML_LEN     32744 // 32K minus overhead of DDP packet
-#define MAX_STR_LEN     4000
-
-
 /// ADARA process variable status codes (alarms/errors)
 enum ADARA_Status
 {
@@ -68,7 +64,7 @@ struct ADARAPacket
         struct // Device Descriptor Packet (DDP)
         {
             unsigned long       xml_len;
-            char                xml[MAX_XML_LEN];
+            char                xml; // Placeholder for start of xml payload
         } ddp;
         struct // Variable Value Packet (VVP)
         {

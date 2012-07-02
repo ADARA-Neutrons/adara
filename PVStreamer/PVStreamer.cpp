@@ -559,7 +559,7 @@ PVStreamer::definePV( PVInfo & a_info )
 void
 PVStreamer::undefinePV( Identifier a_dev_id, Identifier a_pv_id )
 {
-    //TODO INot currently needed
+    //TODO Not currently needed
 }
 
 /**

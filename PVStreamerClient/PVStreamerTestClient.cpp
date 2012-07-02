@@ -101,63 +101,82 @@ int _tmain(int argc, _TCHAR* argv[])
         cout << " success." << endl;
 
 
-    SNS::PVS::ADARA::ADARAPacket pkt;
+    SNS::PVS::ADARA::ADARAPacket hdr;
+    SNS::PVS::ADARA::ADARAPacket *pkt;
+    char *buf = 0;
     int rc;
     int test_state = 0;
     unsigned long test_pkt_count = 0;
     double next_val;
-
-    //char buf[10000];
+    unsigned long buf_len = 0;
+    int rcount = 0;
 
     while (1)
     {
-        //rc = recv(pvs_socket, (char*)&pkt, sizeof(SNS::PVS::ADARA::ADARAPacket),0);
         // Rcv ADARA header ONLY
-        rc = recv(pvs_socket, (char*)&pkt, 16,0);
-//        rc = recv(pvs_socket, buf, 16,0);
+        rc = recv(pvs_socket, (char*)&hdr, 16,0);
         if ( rc == 16 )
         {
             ++pkt_count;
             // Get payload len from header
             if ( !test )
-                cout << "Pkt # " << pkt_count << " [" << hex << pkt.format << dec << "] l=" << pkt.payload_len << " ts=" << pkt.sec << "." << pkt.nsec << endl;
+                cout << "Pkt # " << pkt_count << " [" << hex << hdr.format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.sec << "." << hdr.nsec << endl;
 
-            if ( pkt.payload_len )
+            if ( hdr.payload_len )
             {
-                rc = recv(pvs_socket, (char*)&pkt.dev_id, pkt.payload_len, 0 );
-                if ( rc == 0 )
+                if ( !buf || buf_len < hdr.payload_len )
                 {
-                    cout << "  connection closed." << endl;
-                    break;
-                }
-                else if ( rc < 0 )
-                    cout << "  recv error: " << rc << endl;
+                    if ( buf )
+                        delete[] buf;
 
-                if ( rc != pkt.payload_len )
-                    continue;
+                    buf = new char[16+hdr.payload_len + 1];
+                    buf_len = hdr.payload_len;
+                }
+
+                rcount = 0;
+                while ( rcount < hdr.payload_len )
+                {
+                    rc = recv(pvs_socket, buf+16+rcount, hdr.payload_len - rcount, 0 );
+                    if ( rc == 0 )
+                    {
+                        cout << "  connection closed." << endl;
+                        break;
+                    }
+                    else if ( rc < 0 )
+                        cout << "  recv error: " << rc << endl;
+
+                    rcount += rc;
+                }
+
+                buf[16+hdr.payload_len] = 0;
             }
+
+            if ( rc <= 0 )
+                break;
+
+            pkt = (SNS::PVS::ADARA::ADARAPacket*)buf;
 
             if ( !test )
             {
-                if ( pkt.format == 0x800000 )
+                if ( hdr.format == 0x800000 )
                 {
-                    cout << "  dev_id: " << pkt.dev_id << endl;
-                    cout << "  xml len: " << pkt.ddp.xml_len << endl;
-                    cout << "  xml: " << pkt.ddp.xml << endl;
+                    cout << "  dev_id: " << pkt->dev_id << endl;
+                    cout << "  xml len: " << pkt->ddp.xml_len << endl;
+                    cout << "  xml: " << &pkt->ddp.xml << endl;
                 }
-                else if ( pkt.format == 0x800100 )
+                else if ( hdr.format == 0x800100 )
                 {
-                    cout << "  pv id: " << pkt.dev_id << "." << pkt.vvp.var_id << endl;
-                    cout << "  pv value: " << pkt.vvp.uval << endl;
-                    cout << "  pv alarm: " << pkt.vvp.status << " [" << pkt.vvp.severity << "]" << endl;
+                    cout << "  pv id: " << pkt->dev_id << "." << pkt->vvp.var_id << endl;
+                    cout << "  pv value: " << pkt->vvp.uval << endl;
+                    cout << "  pv alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
                 }
-                else if ( pkt.format == 0x800200 )
+                else if ( hdr.format == 0x800200 )
                 {
-                    cout << "  pv id: " << pkt.dev_id << "." << pkt.vvp.var_id << endl;
-                    cout << "  pv value: " << pkt.vvp.dval << endl;
-                    cout << "  pv alarm: " << pkt.vvp.status << " [" << pkt.vvp.severity << "]" << endl;
+                    cout << "  pv id: " << pkt->dev_id << "." << pkt->vvp.var_id << endl;
+                    cout << "  pv value: " << pkt->vvp.dval << endl;
+                    cout << "  pv alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
                 }
-                else if ( pkt.format == 0x400900 )
+                else if ( hdr.format == 0x400900 )
                 {
                     cout << "  heartbeat." << endl;
                 }
@@ -169,12 +188,12 @@ int _tmain(int argc, _TCHAR* argv[])
             else
             {
                 // Verify value update on PV 1.1 (huber)
-                if ( pkt.format == 0x800200 && pkt.dev_id == 1 && pkt.vvp.var_id == 1 )
+                if ( hdr.format == 0x800200 && pkt->dev_id == 1 && pkt->vvp.var_id == 1 )
                 {
                     switch ( test_state )
                     {
                     case 0:
-                        if ( fabs(-180.0 - pkt.vvp.dval) <= DBL_EPSILON )
+                        if ( fabs(-180.0 - pkt->vvp.dval) <= DBL_EPSILON )
                         {
                             cout << "Test stream detected." << endl;
                             test_state = 1;
@@ -183,10 +202,10 @@ int _tmain(int argc, _TCHAR* argv[])
                         }
                         break;
                     case 1:
-                        if ( fabs(next_val - pkt.vvp.dval) > DBL_EPSILON )
+                        if ( fabs(next_val - pkt->vvp.dval) > DBL_EPSILON )
                         {
                             cout << "Bad value at pkt # " << test_pkt_count << endl;
-                            cout << "Got: " << pkt.vvp.dval <<", expected: " << next_val << endl;
+                            cout << "Got: " << pkt->vvp.dval <<", expected: " << next_val << endl;
                             test_state = 0;
                         }
                         else
