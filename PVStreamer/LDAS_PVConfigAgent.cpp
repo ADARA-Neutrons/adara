@@ -6,6 +6,9 @@
  */
 
 #include "stdafx.h"
+
+#include <fstream>
+
 #include "LDAS_PVConfigAgent.h"
 #include "LDAS_PVConfigMgr.h"
 #include "PVConfig.h"
@@ -15,8 +18,10 @@ using namespace std;
 
 namespace SNS { namespace PVS { namespace LDAS {
 
-Identifier   LDAS_PVConfigAgent::m_next_dev_id = 1;
-map<Identifier,Identifier> LDAS_PVConfigAgent::m_next_pv_id;
+// Static initialization
+set<string>                 LDAS_PVConfigAgent::m_disabled_pvs;
+Identifier                  LDAS_PVConfigAgent::m_next_dev_id = 1;
+map<Identifier,Identifier>  LDAS_PVConfigAgent::m_next_pv_id;
 
 /**
  * \brief Constructor for LDAS_PVConfigAgent class.
@@ -39,6 +44,29 @@ LDAS_PVConfigAgent::LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigService
 LDAS_PVConfigAgent::~LDAS_PVConfigAgent()
 {
 }
+
+
+void
+LDAS_PVConfigAgent::loadDisabledPVList( const string &a_filename )
+{
+    ifstream inf( a_filename.c_str() );
+    if ( inf.is_open())
+    {
+        m_disabled_pvs.clear();
+
+        string name;
+
+        while ( !inf.eof() )
+        {
+            inf >> name;
+            m_disabled_pvs.insert( name );
+        }
+        inf.close();
+    }
+    else
+        EXCP( EC_INVALID_CONFIG_DATA, "Could not open \"disabled pvs\" file: " << a_filename );
+}
+
 
 /**
  * \brief Callback method that receives and parses filename socket data.
@@ -506,17 +534,21 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
                         info->m_type = GetDataType( &eSubStruct );
                         info->m_access = da;
 
-                        // Assign a global pv_id to this variable (no device.xml available yet)
-                        map<Identifier,Identifier>::iterator iid = m_next_pv_id.find( info->m_device_id );
-                        if ( iid == m_next_pv_id.end())
+                        // If PV is not in disabled list, define it
+                        if ( m_disabled_pvs.find( info->m_name ) == m_disabled_pvs.end() )
                         {
-                            m_next_pv_id[info->m_device_id] = 2;
-                            info->m_id = 1;
-                        }
-                        else
-                            info->m_id = iid->second++;
+                            // Assign a global pv_id to this variable (no device.xml available yet)
+                            map<Identifier,Identifier>::iterator iid = m_next_pv_id.find( info->m_device_id );
+                            if ( iid == m_next_pv_id.end())
+                            {
+                                m_next_pv_id[info->m_device_id] = 2;
+                                info->m_id = 1;
+                            }
+                            else
+                                info->m_id = iid->second++;
 
-                        m_cfg_service.definePV( *info );
+                            m_cfg_service.definePV( *info );
+                        }
                     }
                 }
                 catch( TraceException &e )
@@ -540,7 +572,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
 	    }
 
         // If no PVs are associated with this device, remove it.
-        // This must be done here as there is not an easy way to know if there will be PVs for a device above
+        // This must be done here as there is not an easy way to know if there will be PVs defined for a device above
         m_cfg_service.undefineDeviceIfNoPVs( dev_id );
     }
     else

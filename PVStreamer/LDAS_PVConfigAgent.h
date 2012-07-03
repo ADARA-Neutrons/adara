@@ -9,6 +9,7 @@
 #define LDAS_PVCONFIGAGENT
 
 #include <string>
+#include <set>
 
 #include "LegacyDAS.h"
 #include "PVConfig.h"
@@ -52,6 +53,8 @@ public:
     LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, const std::string &a_hostname );
     ~LDAS_PVConfigAgent();
 
+    static void loadDisabledPVList( const std::string &a_filename );
+
 private:
 
     void        fileSocketData( NI::CNiDataSocketData &a_data );
@@ -75,6 +78,7 @@ private:
     std::string         m_units_file;       ///< Name of units file
     NI::CNiDataSocket   m_file_socket;      ///< DataSocket that receives filename information
 
+    static std::set<std::string>            m_disabled_pvs; ///< List of "globally" disabled process vars (by name)
     static Identifier                       m_next_dev_id;  ///< Next auto-assigned device ID
     static std::map<Identifier,Identifier>  m_next_pv_id;   ///< Next auto-assigned pv ID for each device
 };

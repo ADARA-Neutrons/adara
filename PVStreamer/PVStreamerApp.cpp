@@ -10,6 +10,7 @@
 #include "PVStreamLogger.h"
 #include "LegacyDAS.h"
 #include "LDAS_PVConfigMgr.h"
+#include "LDAS_PVConfigAgent.h"
 #include "LDAS_PVReader.h"
 #include "ADARA_PVWriter.h"
 
@@ -27,6 +28,7 @@ public:
     string          m_sat_config_file;
     string          m_log_path;
     unsigned long   m_heartbeat;
+    string          m_disabled_pvs_file;
 
     void ParseParam(const TCHAR* pszParam,BOOL bFlag,BOOL bLast)
     {
@@ -40,6 +42,8 @@ public:
                 m_log_path = &pszParam[4];
             else if ( _strnicmp( pszParam, "hb=",3) == 0 )
                 m_heartbeat = atoi( &pszParam[3] );
+            else if ( _strnicmp( pszParam, "dis=",4) == 0 )
+                m_disabled_pvs_file = &pszParam[4];
         }
     }
 };
@@ -130,6 +134,10 @@ CPVStreamerApp::InitInstance()
     sstr << "  heartbeat = " << cmdline.m_heartbeat << " msec (use -hb=x to change)";
     dlg.print( sstr.str());
 
+    sstr.str("");
+    sstr << "  disabled pv file = " << (cmdline.m_disabled_pvs_file.size()?cmdline.m_disabled_pvs_file: "n/a") << " (use -dis=x to change)";
+    dlg.print( sstr.str());
+
     PVStreamer      *pvs = 0;
     PVStreamLogger  *logger = 0;
 
@@ -152,6 +160,10 @@ CPVStreamerApp::InitInstance()
 
         LDAS_PVReader*      ldas_reader = new LDAS_PVReader(*pvs);
         LDAS_PVConfigMgr*   ldas_cfg = new LDAS_PVConfigMgr(*pvs);
+
+        // Load the list of disabled process variables, if specified
+        if ( cmdline.m_disabled_pvs_file.size())
+            LDAS_PVConfigAgent::loadDisabledPVList( cmdline.m_disabled_pvs_file );
 
         // Loading a LDAS satellite configuration file will initiate internal streaming
         // External streaming will commence when the SMS client connects to the ADARA port

@@ -81,13 +81,6 @@ enum Access
     PV_READWRITE    = 0x03
 };
 
-// TODO Criticality is not currently defined or used - is it needed?
-/// Process variable criticality
-enum Criticality
-{
-    PV_NONESSENTIAL = 0,    // Stream if available, log if missing
-    PV_ESSENTIAL            // Must be present, log & warn if missing/disconnected via control system
-};
 
 /**
  * \class Enum
@@ -120,7 +113,7 @@ class PVInfo
 public:
     PVInfo() :
         m_id(0), m_device_id(0), m_protocol(PROT_UNDEFINED), m_type(PV_INT), m_enum(0), m_access(PV_READ),
-        m_criticality(PV_NONESSENTIAL), m_offset(0), m_active(false), m_alarms(PV_NO_ALARM), m_dval(0)
+        m_active(false), m_alarms(PV_NO_ALARM), m_dval(0)
     {}
 
     // ---------- Static PV config members ------------------------------------
@@ -134,11 +127,7 @@ public:
     DataType            m_type;         ///< Data type (int,double,enum,etc)
     const Enum*         m_enum;         ///< PVEnum instance if type is PV_ENUM
     Access              m_access;       ///< Read / Write access
-    std::string         m_units_class;  // TODO Units need to be centrally managed
     std::string         m_units;        ///< Units
-    Criticality         m_criticality;  // TODO This concept is not yet defined in config files
-    // TODO offset is not supported in PV loading
-    double              m_offset;       ///< Value offset (optional)
     Range               m_hw_limits;    ///< Hardware limits (optional)
     Range               m_hw_alarms;    ///< Hardware alarms (optional)
     Range               m_sw_limits;    ///< Software limits (optional)

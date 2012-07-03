@@ -109,7 +109,7 @@ int _tmain(int argc, _TCHAR* argv[])
     unsigned long test_pkt_count = 0;
     double next_val;
     unsigned long buf_len = 0;
-    int rcount = 0;
+    unsigned long rcount = 0;
 
     while (1)
     {
