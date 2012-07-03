@@ -11,6 +11,10 @@
 #include "STSClient.h"
 #include "SignalEvents.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
+
 double STSClientMgr::m_connect_timeout = 15.0;
 double STSClientMgr::m_reconnect_timeout = 15.0;
 unsigned int STSClientMgr::m_max_connections = 3;
@@ -50,6 +54,8 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_mgrConnection = StorageManager::onContainerChange(
 				boost::bind(&STSClientMgr::containerChange,
 					    this, _1, _2));
+
+	INFO("Remote is " << uri);
 }
 
 STSClientMgr::~STSClientMgr()
@@ -134,6 +140,11 @@ void STSClientMgr::startConnect(void)
 	struct gaicb *gai = &m_gai;
 	int rc;
 
+	DEBUG("Checking for pending work ("
+		<< (m_connecting ? "connecting, " : "idle, ")
+		<< m_connections << " of " << m_max_connections << " active, "
+		<< m_pendingRuns.size() << " pending runs");
+
 	if (m_connecting || m_connections >= m_max_connections ||
 					m_pendingRuns.empty())
 		return;
@@ -167,12 +178,32 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 
 	rc = gai_error(&m_gai);
 	if (rc) {
-		/* TODO log lookup error (ratelimited?) */
+		if (rc == EAI_MEMORY || rc == EAI_SYSTEM) {
+			ERROR("GAI unexpectedly returned " << rc);
+		} else {
+			/* TODO ratelimit lookup error (or just once per
+			 * failure type?
+			 */
+			INFO("Lookup failed for " << m_node
+				<< ":" << m_service <<
+				": " << gai_strerror(rc));
+		}
 		connectFailed();
 		return;
 	}
 
 	ai = m_gai.ar_result;
+
+	if (logger->isDebugEnabled()) {
+		char host[NI_MAXHOST], service[NI_MAXSERV];
+		if (!getnameinfo(ai->ai_addr, ai->ai_addrlen,
+					host, sizeof(host),
+					service, sizeof(service),
+					NI_NUMERICHOST | NI_NUMERICSERV)) {
+			DEBUG("Connecting to " << host << ":" << service);
+		} else
+			DEBUG("Connecting to STS, getnameinfo failed");
+	}
 
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0)
@@ -191,6 +222,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	switch (rc) {
 	case ECONNREFUSED:
 		/* TODO ratelimited logging of refused connection */
+		INFO("Connection refused");
 		goto error;
 	case EINTR:
 	case EINPROGRESS:
@@ -198,6 +230,10 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	case 0:
 		connectComplete();
 		return;
+	default:
+		/* TODO other errors! */
+		ERROR("Unexpected error " << rc << " from connect");
+		goto error;
 	}
 
 	try {
@@ -212,6 +248,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 
 error:
 	/* TODO ratelimited error message? */
+	WARN("Failed to initiate connection");
 	connectFailed();
 }
 
@@ -222,6 +259,8 @@ void STSClientMgr::connectComplete(void)
 
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
+		DEBUG("Connected to STS");
+
 		m_fdreg.reset();
 		m_connect_timer->cancel();
 
@@ -237,7 +276,7 @@ void STSClientMgr::connectComplete(void)
 			throw;
 		}
 
-		/* TODO log connection to STS? */
+		INFO("Sending run " << run->runNumber());
 		m_connecting = false;
 		startConnect();
 		return;
@@ -252,6 +291,7 @@ void STSClientMgr::connectComplete(void)
 	}
 
 	/* TODO ratelimited logging of connection issue */
+	WARN("Connection to STS failed: " << strerror(e));
 	connectFailed();
 }
 
@@ -293,16 +333,19 @@ void STSClientMgr::clientComplete(StorageManager::ContainerSharedPtr &c,
 	case SUCCESS:
 		/* TODO mark as purgable */
 		// c->markPurgable();
+		INFO("Run " << c->runNumber() << " sent succesfully");
 		break;
 	case TRANSIENT_FAIL:
 		/* TODO need to limit the number of tries for this run before
 		 * we make it a permament failure case
 		 */
+		WARN("Run " << c->runNumber() << " had a transient error");
 		requeueRun(c);
 		break;
 	case PERMAMENT_FAIL:
 		/* TODO mark as manual handling required */
 		// c->markInError();
+		ERROR("Run " << c->runNumber() << " had a permament error");
 		break;
 	}
 
