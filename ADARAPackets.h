@@ -71,7 +71,7 @@ public:
 	RawDataPkt(const RawDataPkt &pkt);
 
 	uint32_t sourceID(void) const { return m_fields[0]; }
-	bool endOfPulse(void) const { return !!(m_fields[1] & 0x8000000); }
+	bool endOfPulse(void) const { return !!(m_fields[1] & 0x80000000); }
 	uint16_t pktSeq(void) const { return (m_fields[1] >> 16) & 0x7fff; }
 	uint16_t dspSeq(void) const { return m_fields[1] & 0x7fff; }
 	PulseFlavor::Enum flavor(void) const {
