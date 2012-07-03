@@ -46,6 +46,15 @@ LDAS_PVConfigAgent::~LDAS_PVConfigAgent()
 }
 
 
+/**
+ * \brief Loads a list of PVs to be disabled from the specified file.
+ * \param a_filename - Filename of text file continaing PVs to disable
+ *
+ * This static method allows the application to filter-out PVs that are not needed
+ * in the output stream. A post-configuration filter mechanism is used because the
+ * legacy configuration files can not be changed. PVs are filtered-out based on the
+ * "friendly name" associated with the VarMpa entry.
+ */
 void
 LDAS_PVConfigAgent::loadDisabledPVList( const string &a_filename )
 {
