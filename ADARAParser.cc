@@ -96,7 +96,7 @@ bool Parser::parseBuffer(void)
 		p += chunk_len;
 	}
 
-	while (!stopped && m_len > PacketHeader::header_length()) {
+	while (!stopped && m_len >= PacketHeader::header_length()) {
 		PacketHeader hdr(p);
 
 		if (hdr.payload_length() % 4)
@@ -122,7 +122,7 @@ bool Parser::parseBuffer(void)
 			 * resized, return to our caller as we obviously
 			 * don't have the full packet yet.
 			 */
-			unsigned int new_size = m_size * 2;
+			unsigned int new_size = m_size;
 			uint8_t *new_buffer;
 
 			do {

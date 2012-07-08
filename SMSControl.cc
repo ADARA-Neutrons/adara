@@ -100,6 +100,11 @@ pvAttachReturn SMSControl::pvAttach(const casCtx &ctx, const char *pv_name)
 
 void SMSControl::addPV(PVSharedPtr pv)
 {
+	if (m_pv_map.count(pv->getName())) {
+		std::string msg("Adding duplicate PV: ");
+		msg += pv->getName();
+		throw std::logic_error(msg);
+	}
 	m_pv_map[pv->getName()] = pv;
 }
 
@@ -107,8 +112,11 @@ bool SMSControl::setRecording(bool v)
 {
 	struct timespec now;
 
-	/* If we didn't change state, only give an error if someone
-	 * tried to start a new recording.
+	/* We return true if we accepted the setting, and false if not.
+	 * It is not an error for a caller to try to stop recording if
+	 * we aren't actually recording (so return true), but it is an
+	 * error to try to start recording when we already are -- return
+	 * false for that case.
 	 *
 	 * TODO don't allow recording to start unless we have all required
 	 * fields from RunInfo.
