@@ -28,8 +28,6 @@ private:
 
 	static void check_init(void);
 	static void signaled(void);
-
-	friend class ReadyAdapter;
 };
 
 #endif /* __SIGNAL_EVENTS_H */

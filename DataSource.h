@@ -69,7 +69,6 @@ private:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
-	friend class ReadyAdapter;
 	friend class TimerAdapter<DataSource>;
 
 	using ADARA::Parser::rxPacket;

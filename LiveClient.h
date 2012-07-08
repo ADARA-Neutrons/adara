@@ -51,7 +51,6 @@ private:
 	static unsigned int m_max_send_chunk;
 	static double m_hello_timeout;
 
-	friend class ReadyAdapter;
 	friend class TimerAdapter<LiveClient>;
 
 	using ADARA::Parser::rxPacket;

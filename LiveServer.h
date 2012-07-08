@@ -13,8 +13,6 @@ private:
 	int m_fd;
 
 	void newConnection(void);
-
-	friend class ReadyAdapter;
 };
 
 #endif /* __LIVE_SERVER_H */
