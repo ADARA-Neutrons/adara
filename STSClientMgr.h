@@ -16,7 +16,8 @@ public:
 	STSClientMgr(const std::string &uri);
 	~STSClientMgr();
 
-	enum Disposition { SUCCESS, TRANSIENT_FAIL, PERMAMENT_FAIL };
+	enum Disposition { SUCCESS, TRANSIENT_FAIL, PERMAMENT_FAIL,
+				CONNECTION_LOSS };
 	enum QueueMode { BALANCE, OLDEST, NEWEST };
 
 private:

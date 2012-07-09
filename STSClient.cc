@@ -9,6 +9,10 @@
 #include "STSClientMgr.h"
 #include "ReadyAdapter.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
+
 #define INITIAL_BUFFER_SIZE	4096
 #define MAX_PACKET_SIZE		(128 * 1024)
 
@@ -24,7 +28,7 @@ STSClient::STSClient(int fd, StorageManager::ContainerSharedPtr &run,
 	m_write(new ReadyAdapter(fd, fdrWrite,
 				 boost::bind(&STSClient::writable, this))),
 	m_timer(new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat)),
-	m_disp(STSClientMgr::TRANSIENT_FAIL)
+	m_disp(STSClientMgr::CONNECTION_LOSS)
 {
 	run->getFiles(m_files);
 	if (run->active()) {
@@ -170,8 +174,15 @@ void STSClient::readable(void)
 		 * so kill outselves off. We cannot do this from the handlers,
 		 * as ADARA::Parser::read() will modify member variables
 		 * after calling them.
+		 *
+		 * We log the reason for closing the connection elsewhere,
+		 * except for the default case of an unexpected connection loss.
+		 * Take care of that case here.
 		 */
-		/* TODO tell manager about our disposition. */
+		if (m_disp == STSClientMgr::CONNECTION_LOSS) {
+			WARN("Lost connection to STS for run "
+				<< m_run->runNumber());
+		}
 		m_mgr.clientComplete(m_run, m_disp);
 		delete this;
 	}
@@ -185,9 +196,8 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 	if (pkt.type() == ADARA::PacketType::TRANS_COMPLETE_V0)
 		return ADARA::Parser::rxPacket(pkt);
 
-	/* TODO log unexpected packet */
-	/* TODO setup to notify manager of connection failure */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	WARN("Received unexpected packet type 0x" << std::hex << pkt.type());
 	return true;
 }
 
@@ -199,15 +209,51 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
-	/* TODO log oversize packet */
-	/* TODO setup to notify manager of connection failure */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	if (hdr) {
+		WARN("Received unexpected oversize packet of length "
+			<< hdr->packet_length());
+	}
 	return true;
 }
 
 bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 {
-	/* TODO parse packet and inform manager of disposition */
-	m_disp = STSClientMgr::SUCCESS;
+	if (!pkt.status()) {
+		m_disp = STSClientMgr::SUCCESS;
+		if (pkt.reason().length()) {
+			INFO("Run " << m_run->runNumber() << " successfully "
+				"translated with status message \'"
+				<< pkt.reason() << "'");
+		} else {
+			INFO("Run " << m_run->runNumber() << " successfully "
+				"translated");
+		}
+	} else if (pkt.status() < 0x8000) {
+		/* TODO remove magic numbers */
+		m_disp = STSClientMgr::TRANSIENT_FAIL;
+		if (pkt.reason().length()) {
+			WARN("Run " << m_run->runNumber() << " had a transient "
+				"failure, status 0x" << std::hex
+				<< pkt.status() << ", message \'"
+				<< pkt.reason() << "'");
+		} else {
+			WARN("Run " << m_run->runNumber() << " had a transient "
+				"failure, status 0x" << std::hex
+				<< pkt.status());
+		}
+	} else {
+		m_disp = STSClientMgr::PERMAMENT_FAIL;
+		if (pkt.reason().length()) {
+			ERROR("Run " << m_run->runNumber() << " had a "
+				"permament failure, status 0x" << std::hex
+				<< pkt.status() << ", message \'"
+				<< pkt.reason() << "'");
+		} else {
+			ERROR("Run " << m_run->runNumber() << " had a "
+				"permament failure, status 0x" << std::hex
+				<< pkt.status());
+		}
+	}
 	return true;
 }

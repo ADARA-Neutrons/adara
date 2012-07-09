@@ -335,17 +335,16 @@ void STSClientMgr::clientComplete(StorageManager::ContainerSharedPtr &c,
 		// c->markPurgable();
 		INFO("Run " << c->runNumber() << " sent succesfully");
 		break;
+	case CONNECTION_LOSS:
 	case TRANSIENT_FAIL:
 		/* TODO need to limit the number of tries for this run before
 		 * we make it a permament failure case
 		 */
-		WARN("Run " << c->runNumber() << " had a transient error");
 		requeueRun(c);
 		break;
 	case PERMAMENT_FAIL:
 		/* TODO mark as manual handling required */
 		// c->markInError();
-		ERROR("Run " << c->runNumber() << " had a permament error");
 		break;
 	}
 
