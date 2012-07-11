@@ -1,0 +1,372 @@
+#include <stdint.h>
+#include <stdio.h>
+
+#include "ADARA.h"
+#include "ADARAPackets.h"
+#include "ADARAParser.h"
+
+static const char *statusString(ADARA::VariableStatus::Enum status)
+{
+	switch (status) {
+	case ADARA::VariableStatus::OK:
+		return "OK";
+	case ADARA::VariableStatus::READ_ERROR:
+		return "ReadErr";
+	case ADARA::VariableStatus::WRITE_ERROR:
+		return "WriteErr";
+	case ADARA::VariableStatus::HIHI_LIMIT:
+		return "HiHi";
+	case ADARA::VariableStatus::HIGH_LIMIT:
+		return "High";
+	case ADARA::VariableStatus::LOLO_LIMIT:
+		return "LoLo";
+	case ADARA::VariableStatus::LOW_LIMIT:
+		return "Low";
+	case ADARA::VariableStatus::BAD_STATE:
+		return "BadState";
+	case ADARA::VariableStatus::CHANGED_STATE:
+		return "ChangedState";
+	case ADARA::VariableStatus::NO_COMMUNICATION:
+		return "NoComm";
+	case ADARA::VariableStatus::COMMUNICATION_TIMEOUT:
+		return "CommTimeout";
+	case ADARA::VariableStatus::HARDWARE_LIMIT:
+		return "HwLimit";
+	case ADARA::VariableStatus::BAD_CALCULATION:
+		return "BadCalc";
+	case ADARA::VariableStatus::INVALID_SCAN:
+		return "InvalidScan";
+	case ADARA::VariableStatus::LINK_FAILED:
+		return "LinkFail";
+	case ADARA::VariableStatus::INVALID_STATE:
+		return "InvalidState";
+	case ADARA::VariableStatus::BAD_SUBROUTINE:
+		return "BadSub";
+	case ADARA::VariableStatus::UNDEFINED_ALARM:
+		return "Undef";
+	case ADARA::VariableStatus::DISABLED:
+		return "Disabled";
+	case ADARA::VariableStatus::SIMULATED:
+		return "Simulated";
+	case ADARA::VariableStatus::READ_PERMISSION:
+		return "ReadPerm";
+	case ADARA::VariableStatus::WRITE_PERMISSION:
+		return "WritePerm";
+	case ADARA::VariableStatus::NOT_REPORTED:
+		return "NotReported";
+	}
+
+	return "UndefinedStatus";
+}
+
+static const char *severityString(ADARA::VariableSeverity::Enum severity)
+{
+	switch (severity) {
+	case ADARA::VariableSeverity::OK:
+		return "OK";
+	case ADARA::VariableSeverity::MINOR_ALARM:
+		return "Minor";
+	case ADARA::VariableSeverity::MAJOR_ALARM:
+		return "Major";
+	case ADARA::VariableSeverity::INVALID:
+		return "Invalid";
+	case ADARA::VariableSeverity::NOT_REPORTED:
+		return "NotReported";
+	}
+
+	return "UndefinedSeverity";
+}
+
+class Parser : public ADARA::Parser {
+public:
+	bool rxUnknownPkt(const ADARA::Packet &pkt);
+	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
+			   const uint8_t *chunk,
+			   unsigned int chunk_offset,
+			   unsigned int chunk_len);
+
+	bool rxPacket(const ADARA::RawDataPkt &pkt);
+	bool rxPacket(const ADARA::RTDLPkt &pkt);
+	bool rxPacket(const ADARA::BankedEventPkt &pkt);
+	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
+	bool rxPacket(const ADARA::PixelMappingPkt &pkt);
+	bool rxPacket(const ADARA::RunStatusPkt &pkt);
+	bool rxPacket(const ADARA::RunInfoPkt &pkt);
+	bool rxPacket(const ADARA::TransCompletePkt &pkt);
+	bool rxPacket(const ADARA::ClientHelloPkt &pkt);
+	bool rxPacket(const ADARA::StatsResetPkt &pkt);
+	bool rxPacket(const ADARA::SyncPkt &pkt);
+	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
+	bool rxPacket(const ADARA::GeometryPkt &pkt);
+	bool rxPacket(const ADARA::BeamlineInfoPkt &pkt);
+	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
+	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
+	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
+	bool rxPacket(const ADARA::VariableStringPkt &pkt);
+
+	using ADARA::Parser::rxPacket;
+};
+
+bool Parser::rxUnknownPkt(const ADARA::Packet &pkt)
+{
+	printf("%u.%09u Unknown Packet\n", (uint32_t) (pkt.pulseId() >> 32),
+		(uint32_t) pkt.pulseId());
+	printf("    type %08x len %u\n", pkt.type(), pkt.packet_length());
+
+	return false;
+}
+
+bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
+			   const uint8_t *chunk,
+			   unsigned int chunk_offset,
+			   unsigned int chunk_len)
+{
+	if (hdr) {
+		printf("%u.%09u Oversize Packet\n",
+		       (uint32_t) (hdr->pulseId() >> 32),
+		       (uint32_t) hdr->pulseId());
+		printf("    type %08x len %u\n", hdr->type(),
+		       hdr->packet_length());
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
+{
+	printf("%u.%09u RAW EVENT DATA\n    pktSeq 0x%x dspSeq 0x%x%s\n"
+	       "    cycle %u%s flavor %d veto 0x%x%s timing 0x%x\n"
+	       "    intrapulse %uns tofOffset %uns%s\n"
+	       "    charge %upC, %u events\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.pktSeq(), pkt.dspSeq(), pkt.endOfPulse() ? "EOP" : "",
+	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
+	       (int) pkt.flavor(), pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
+	       pkt.timingStatus(), pkt.intraPulseTime() * 100,
+	       pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       pkt.pulseCharge() * 10, pkt.num_events());
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
+{
+	// TODO display more fields
+	printf("%u.%09u RTDL\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
+{
+	printf("%u.%09u BANKED EVENT DATA\n"
+	       "    cycle %u charge %upC energy %ueV\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.cycle(), pkt.pulseCharge() * 10, pkt.pulseEnergy());
+	if (pkt.flags()) {
+		printf("    flags");
+		if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			printf(" ERROR");
+		if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			printf(" PARTIAL");
+		if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			printf(" VETO");
+		if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			printf(" NO_RTDL");
+		if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			printf(" MAPPING");
+		if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			printf(" DUP_PULSE");
+		printf("\n");
+	}
+
+	// TODO display banks, events?
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
+{
+	// TODO display more fields
+	printf("%u.%09u BEAM MONITOR DATA\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
+{
+	// TODO display more fields (check that the table doesn't change)
+	printf("%u.%09u PIXEL MAP TABLE\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
+{
+	printf("%u.%09u RUN STATUS\n",(uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	switch (pkt.status()) {
+	case ADARA::RunStatus::NO_RUN:
+		printf("    No current run\n");
+		break;
+	case ADARA::RunStatus::STATE:
+		printf("    State snapshot\n");
+		break;
+	case ADARA::RunStatus::NEW_RUN:
+		printf("    New run\n");
+		break;
+	case ADARA::RunStatus::RUN_EOF:
+		printf("    End of file (run continues)\n");
+		break;
+	case ADARA::RunStatus::RUN_BOF:
+		printf("    Beginning of file (continuing run)\n");
+		break;
+	case ADARA::RunStatus::END_RUN:
+		printf("    End of run\n");
+		break;
+	}
+
+	if (pkt.runNumber()) {
+		printf("    Run %u started at epoch %u\n",
+		       pkt.runNumber(), pkt.runStart());
+		if (pkt.status() != ADARA::RunStatus::STATE)
+			printf("    File index %u\n", pkt.fileNumber());
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::RunInfoPkt &pkt)
+{
+	// TODO display more fields (check that the contents do not change)
+	printf("%u.%09u RUN INFO\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::TransCompletePkt &pkt)
+{
+	printf("%u.%09u TRANSLATION COMPLETE\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	if (!pkt.status())
+		printf("    Success");
+	else if (pkt.status() < 0x8000)
+		printf("    Transient failure");
+	else
+		printf("    Permament failure");
+	if (pkt.reason().length())
+		printf(", msg '%s'", pkt.reason().c_str());
+	printf("\n");
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::ClientHelloPkt &pkt)
+{
+	printf("%u.%09u CLIENT HELLO\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	if (pkt.requestedStartTime()) {
+		if (pkt.requestedStartTime() == 1)
+			printf("    Request data from last run transition\n");
+		else
+			printf("    Request data from timestamp %u\n",
+			       pkt.requestedStartTime());
+	} else
+		printf("     Request data from current position\n");
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::StatsResetPkt &pkt)
+{
+	printf("%u.%09u STATS RESET\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::SyncPkt &pkt)
+{
+	// TODO display more fields
+	printf("%u.%09u SYNC\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::HeartbeatPkt &pkt)
+{
+	printf("%u.%09u HEARTBEAT\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::GeometryPkt &pkt)
+{
+	// TODO display more fields (check that the contents do not change)
+	printf("%u.%09u GEOMETRY\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
+{
+	printf("%u.%09u BEAMLINE INFO\n"
+	       "    id '%s' short '%s' long '%s'\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.id().c_str(), pkt.shortName().c_str(),
+	       pkt.longName().c_str());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
+{
+	// TODO display more fields (check that the contents don't change)
+	printf("%u.%09u DEVICE DESCRIPTOR\n"
+	       "    Device %d\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.devId());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
+{
+	printf("%u.%09u U32 VARIABLE\n"
+	       "    Device %d Variable %d\n"
+	       "    Status %s Severity %s\n"
+	       "    Value %u\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+	       severityString(pkt.severity()), pkt.value());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
+{
+	printf("%u.%09u DOUBLE VARIABLE\n"
+	       "    Device %d Variable %d\n"
+	       "    Status %s Severity %s\n"
+	       "    Value %f\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+	       severityString(pkt.severity()), pkt.value());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
+{
+	printf("%u.%09u String VARIABLE\n"
+	       "    Device %d Variable %d\n"
+	       "    Status %s Severity %s\n"
+	       "    Value '%s'\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+	       severityString(pkt.severity()), pkt.value().c_str());
+	return false;
+}
+
+int main(int, char **)
+{
+	Parser parser;
+
+	parser.read(0);
+	return 0;
+}
