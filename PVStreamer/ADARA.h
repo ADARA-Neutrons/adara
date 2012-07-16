@@ -69,8 +69,8 @@ struct ADARAPacket
         struct // Variable Value Packet (VVP)
         {
             unsigned long       var_id;
-            unsigned short      status;
             unsigned short      severity;
+            unsigned short      status;
             union
             {
                 unsigned long   uval;   // unsigned long value
