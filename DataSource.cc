@@ -263,7 +263,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-	ERROR("Unknown packet from" << m_uri);
+	ERROR("Unknown packet from " << m_uri);
 	return true;
 }
 
@@ -271,7 +271,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *chunk, unsigned int chunk_offset,
 			       unsigned int chunk_len)
 {
-	ERROR("Oversized packet from" << m_uri);
+	ERROR("Oversized packet from " << m_uri);
 	return true;
 }
 
@@ -285,7 +285,7 @@ void DataSource::endPulse(bool dup)
 
 	if (!m_pulseEOP) {
 		/* TODO rate-limited logging of dropped packets */
-		ERROR("Lost packet from" << m_uri);
+		ERROR("Lost packet from " << m_uri);
 		ctrl->markPartial(m_lastPulseId, m_dupCount);
 	}
 
@@ -296,7 +296,7 @@ void DataSource::endPulse(bool dup)
 	m_pulseEOP = false;
 	if (dup) {
 		/* TODO rate-limited logging of duplicate pulses? */
-		ERROR("Duplicate pulse from" << m_uri);
+		ERROR("Duplicate pulse from " << m_uri);
 		m_dupCount++;
 	} else
 		m_dupCount = 0;
