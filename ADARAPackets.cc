@@ -98,7 +98,7 @@ RawDataPkt::RawDataPkt(const RawDataPkt &pkt) :
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((uint32_t *)payload())
 {
-	if (m_payload_len != 128)
+	if (m_payload_len != 120)
 		throw invalid_packet("RTDL Packet is incorrect length");
 }
 

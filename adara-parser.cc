@@ -77,6 +77,30 @@ static const char *severityString(ADARA::VariableSeverity::Enum severity)
 	return "UndefinedSeverity";
 }
 
+static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
+{
+	switch (flavor) {
+	case ADARA::PulseFlavor::NO_BEAM:
+		return "No Beam";
+	case ADARA::PulseFlavor::NORMAL_TGT_1:
+		return "Target 1 Normal";
+	case ADARA::PulseFlavor::NORMAL_TGT_2:
+		return "Target 2 Normal";
+	case ADARA::PulseFlavor::DIAG_10us:
+		return "10us Diagnostic";
+	case ADARA::PulseFlavor::DIAG_50us:
+		return "50us Diagnostic";
+	case ADARA::PulseFlavor::DIAG_100us:
+		return "100us Diagnostic";
+	case ADARA::PulseFlavor::SPECIAL_PHYSICS_1:
+		return "Special Physics 1";
+	case ADARA::PulseFlavor::SPECIAL_PHYSICS_2:
+		return "Special Physics 2";
+	}
+
+	return "UndefinedFlavor";
+}
+
 class Parser : public ADARA::Parser {
 public:
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
@@ -135,14 +159,15 @@ bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 {
 	printf("%u.%09u RAW EVENT DATA\n    pktSeq 0x%x dspSeq 0x%x%s\n"
-	       "    cycle %u%s flavor %d veto 0x%x%s timing 0x%x\n"
+	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
 	       "    intrapulse %uns tofOffset %uns%s\n"
 	       "    charge %upC, %u events\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.pktSeq(), pkt.dspSeq(), pkt.endOfPulse() ? "EOP" : "",
 	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
-	       (int) pkt.flavor(), pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
-	       pkt.timingStatus(), pkt.intraPulseTime() * 100,
+	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
+	       pkt.timingStatus(), (int) pkt.flavor(),
+	       pulseFlavor(pkt.flavor()), pkt.intraPulseTime() * 100,
 	       pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
 	       pkt.pulseCharge() * 10, pkt.num_events());
 
@@ -151,9 +176,18 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
-	// TODO display more fields
-	printf("%u.%09u RTDL\n", (uint32_t) (pkt.pulseId() >> 32),
-	       (uint32_t) pkt.pulseId());
+	// TODO display FNA X fields
+	printf("%u.%09u RTDL\n"
+	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
+	       "    intrapulse %uns tofOffset %uns%s\n"
+	       "    charge %upC, period %ups\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
+	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
+	       pkt.timingStatus(), (int) pkt.flavor(),
+	       pulseFlavor(pkt.flavor()), pkt.intraPulseTime() * 100,
+	       pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       pkt.pulseCharge() * 10, pkt.ringPeriod());
 	return false;
 }
 
