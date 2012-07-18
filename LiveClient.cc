@@ -127,8 +127,7 @@ more:
 				boost::bind(&LiveClient::writable, this));
 }
 
-void LiveClient::containerChange(StorageManager::ContainerSharedPtr &c,
-				 bool starting)
+void LiveClient::containerChange(StorageContainer::SharedPtr &c, bool starting)
 {
 	if (starting)
 		m_contConnection = c->connect(
@@ -137,14 +136,14 @@ void LiveClient::containerChange(StorageManager::ContainerSharedPtr &c,
 		m_contConnection.disconnect();
 }
 
-void LiveClient::historicalFile(StorageContainer::FileSharedPtr &f, off_t start)
+void LiveClient::historicalFile(StorageFile::SharedPtr &f, off_t start)
 {
 	/* This is an old file, so just put it on the list to be sent.
 	 */
 	m_files.push_back(std::make_pair(f, start));
 }
 
-void LiveClient::fileAdded(StorageContainer::FileSharedPtr &f)
+void LiveClient::fileAdded(StorageFile::SharedPtr &f)
 {
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
@@ -206,8 +205,8 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 
 bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 {
-	StorageManager::ContainerSharedPtr cur_cont;
-	StorageContainer::FileSharedPtr cur_file;
+	StorageContainer::SharedPtr cur_cont;
+	StorageFile::SharedPtr cur_file;
 
 	m_timer->cancel();
 	m_hello_received = true;

@@ -22,7 +22,7 @@ public:
 
 private:
 	typedef boost::signals::connection connection;
-	typedef std::map<uint32_t, StorageManager::ContainerSharedPtr> RunMap;
+	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_connect_timer;
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_reconnect_timer;
@@ -48,11 +48,11 @@ private:
 	static double m_reconnect_timeout;
 	static unsigned int m_max_connections;
 
-	void containerChange(StorageManager::ContainerSharedPtr &, bool);
+	void containerChange(StorageContainer::SharedPtr &, bool);
 
-	void queueRun(StorageManager::ContainerSharedPtr &c);
-	void requeueRun(StorageManager::ContainerSharedPtr &c);
-	StorageManager::ContainerSharedPtr &nextRun(void);
+	void queueRun(StorageContainer::SharedPtr &c);
+	void requeueRun(StorageContainer::SharedPtr &c);
+	StorageContainer::SharedPtr &nextRun(void);
 
 	void startConnect(void);
 	void lookupComplete(const struct signalfd_siginfo &info);
@@ -62,7 +62,7 @@ private:
 
 	bool reconnectTimeout(void);
 
-	void clientComplete(StorageManager::ContainerSharedPtr &c,
+	void clientComplete(StorageContainer::SharedPtr &c,
 			    Disposition disp);
 
 	friend class STSClient;

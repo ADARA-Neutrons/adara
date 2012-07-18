@@ -18,7 +18,7 @@ public:
 
 private:
 	typedef boost::signals::connection connection;
-	typedef std::pair<StorageContainer::FileSharedPtr, off_t> FileEntry;
+	typedef std::pair<StorageFile::SharedPtr, off_t> FileEntry;
 	typedef std::list<FileEntry> FileList;
 
 	FileList m_files;
@@ -32,9 +32,9 @@ private:
 	connection m_contConnection;
 	connection m_fileConnection;
 
-	void containerChange(StorageManager::ContainerSharedPtr &, bool);
-	void historicalFile(StorageContainer::FileSharedPtr &f, off_t start);
-	void fileAdded(StorageContainer::FileSharedPtr &f);
+	void containerChange(StorageContainer::SharedPtr &, bool);
+	void historicalFile(StorageFile::SharedPtr &f, off_t start);
+	void fileAdded(StorageFile::SharedPtr &f);
 	void fileUpdated(const StorageFile &f);
 
 	void writable(void);

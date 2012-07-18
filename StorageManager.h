@@ -12,16 +12,15 @@
 #include "ADARA.h"
 #include "Storage.h"
 #include "StorageContainer.h"
-
-class StorageFile;
+#include "StorageFile.h"
 
 class StorageManager {
 public:
-	typedef boost::shared_ptr<StorageContainer> ContainerSharedPtr;
-	typedef boost::signal<void (ContainerSharedPtr &, bool)> ContainerSignal;
+	typedef boost::signal<void (StorageContainer::SharedPtr &, bool)>
+								ContainerSignal;
 	typedef boost::signal<void (void)> PrologueSignal;
-	typedef boost::function<void (StorageContainer::FileSharedPtr &,
-				      off_t)> FileOffSetFunc;
+	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
+								FileOffSetFunc;
 
 	static void init(const std::string &baseDir);
 	static void stop(void);
@@ -60,7 +59,9 @@ public:
 		return m_prologue.connect(s);
 	}
 
-	static ContainerSharedPtr &container (void) { return m_cur_container; }
+	static StorageContainer::SharedPtr &container (void) {
+		return m_cur_container;
+	}
 
 private:
 	typedef boost::signals::connection connection;
@@ -71,15 +72,15 @@ private:
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
 
-	static boost::shared_ptr<StorageContainer> m_cur_container;
-	static StorageContainer::FileSharedPtr m_prologueFile;
+	static StorageContainer::SharedPtr m_cur_container;
+	static StorageFile::SharedPtr m_prologueFile;
 
 	static ContainerSignal m_contChange;
 	static PrologueSignal m_prologue;
 
 	static void addBaseStorage(off_t size);
 	static void endCurrentContainer(void);
-	static void fileCreated(StorageContainer::FileSharedPtr &f);
+	static void fileCreated(StorageFile::SharedPtr &f);
 	static uint32_t validatePacket(const IoVector &iovec);
 
 	friend class StorageContainer;

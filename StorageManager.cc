@@ -21,8 +21,8 @@ struct header {
 
 int StorageManager::m_base_fd = -1;
 
-boost::shared_ptr<StorageContainer> StorageManager::m_cur_container;
-StorageContainer::FileSharedPtr StorageManager::m_prologueFile;
+StorageContainer::SharedPtr StorageManager::m_cur_container;
+StorageFile::SharedPtr StorageManager::m_prologueFile;
 
 StorageManager::ContainerSignal StorageManager::m_contChange;
 StorageManager::PrologueSignal StorageManager::m_prologue;
@@ -82,7 +82,7 @@ void StorageManager::endCurrentContainer(void)
 	m_cur_container.reset();
 }
 
-void StorageManager::fileCreated(StorageContainer::FileSharedPtr &f)
+void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 {
 	if (m_prologueFile)
 		throw std::runtime_error("Recursive use of prologue files");
@@ -107,8 +107,8 @@ void StorageManager::startRecording(uint32_t run)
 	}
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_cur_container = boost::shared_ptr<StorageContainer>(
-				new StorageContainer(now, run));
+	m_cur_container = StorageContainer::SharedPtr(
+					new StorageContainer(now, run));
 
 	m_contChange(m_cur_container, true);
 }
@@ -133,14 +133,14 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 	/* Create a file for the current state, and call the prologue
 	 * handlers to populate it.
 	 */
-	StorageContainer::FileSharedPtr state(new StorageFile(run));
+	StorageFile::SharedPtr state(new StorageFile(run));
 	fileCreated(state);
 	cb(state, 0);
 
 	/* Now, tell the callback about the current file we're working on.
 	 */
 	if (m_cur_container) {
-		StorageContainer::FileSharedPtr &f = m_cur_container->file();
+		StorageFile::SharedPtr &f = m_cur_container->file();
 		if (f)
 			cb(f, f->size());
 	}
@@ -156,7 +156,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		struct header *hdr = (struct header *) iovec[0].iov_base;
 		struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
 		ts.tv_sec += ADARA::EPICS_EPOCH_OFFSET;
-		m_cur_container = boost::shared_ptr<StorageContainer>(
+		m_cur_container = StorageContainer::SharedPtr(
 					new StorageContainer(ts, 0));
 		m_contChange(m_cur_container, true);
 	}

@@ -19,7 +19,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 double STSClient::m_heartbeat_interval = 5.0;
 unsigned int STSClient::m_max_send_chunk = 2 * 1024 * 1024;
 
-STSClient::STSClient(int fd, StorageManager::ContainerSharedPtr &run,
+STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 		     STSClientMgr &mgr) :
 	ADARA::Parser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
 	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
@@ -59,7 +59,7 @@ bool STSClient::sendHeartbeat(void)
 
 void STSClient::writable(void)
 {
-	std::list<boost::shared_ptr<StorageFile> >::iterator it;
+	std::list<StorageFile::SharedPtr>::iterator it;
 	StorageFile *f;
 	ssize_t len, rc;
 
@@ -143,7 +143,7 @@ more:
 				boost::bind(&STSClient::writable, this)));
 }
 
-void STSClient::fileAdded(StorageContainer::FileSharedPtr &f)
+void STSClient::fileAdded(StorageFile::SharedPtr &f)
 {
         /* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update

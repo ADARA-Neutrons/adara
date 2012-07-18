@@ -9,13 +9,12 @@
 #include <string>
 
 #include "Storage.h"
-
-class StorageFile;
+#include "StorageFile.h"
 
 class StorageContainer : boost::noncopyable {
 public:
-	typedef boost::shared_ptr<StorageFile> FileSharedPtr;
-	typedef boost::signal<void (FileSharedPtr &)> onNewFile;
+	typedef boost::shared_ptr<StorageContainer> SharedPtr;
+	typedef boost::signal<void (StorageFile::SharedPtr &)> onNewFile;
 
 	const struct timespec &startTime(void) const { return m_startTime; }
 	uint32_t runNumber (void) const { return m_runNumber; }
@@ -28,20 +27,20 @@ public:
 		return m_newFile.connect(slot);
 	}
 
-	FileSharedPtr &file(void) { return m_cur_file; }
+	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 
-	void getFiles(std::list<FileSharedPtr> &list);
+	void getFiles(std::list<StorageFile::SharedPtr> &list);
 
 private:
 	struct timespec m_startTime;
 	uint32_t m_runNumber;
 	uint32_t m_numFiles;
 	std::string m_name;
-	FileSharedPtr m_cur_file;
+	StorageFile::SharedPtr m_cur_file;
 	onNewFile m_newFile;
 	bool m_active;
 
-	std::list<FileSharedPtr> m_files;
+	std::list<StorageFile::SharedPtr> m_files;
 
 	StorageContainer(const struct timespec &start, uint32_t run);
 	StorageContainer(const std::string &name);

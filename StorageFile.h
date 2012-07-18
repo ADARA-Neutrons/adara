@@ -12,6 +12,7 @@ class StorageContainer;
 
 class StorageFile : boost::noncopyable {
 public:
+	typedef boost::shared_ptr<StorageFile> SharedPtr;
 	typedef boost::signal<void (const StorageFile &)> onUpdate;
 
 	/* TODO can we convert this to a shared_ptr/weak_ptr setup

@@ -15,7 +15,7 @@ class ReadyAdapter;
 
 class STSClient : public ADARA::Parser {
 public:
-	STSClient(int fd, StorageManager::ContainerSharedPtr &run,
+	STSClient(int fd, StorageContainer::SharedPtr &run,
 		  STSClientMgr &mgr);
 	~STSClient();
 
@@ -26,7 +26,7 @@ private:
 	int m_sts_fd;
 	int m_file_fd;
 	off_t m_cur_offset;
-	StorageManager::ContainerSharedPtr m_run;
+	StorageContainer::SharedPtr m_run;
 	std::auto_ptr<ReadyAdapter> m_read;
 	std::auto_ptr<ReadyAdapter> m_write;
 	std::auto_ptr<TimerAdapter<STSClient> > m_timer;
@@ -34,13 +34,13 @@ private:
 	connection m_fileConnection;
 	STSClientMgr::Disposition m_disp;
 
-	std::list<StorageContainer::FileSharedPtr> m_files;
+	std::list<StorageFile::SharedPtr> m_files;
 
 	void readable(void);
 	void writable(void);
 	bool sendHeartbeat(void);
 
-	void fileAdded(StorageContainer::FileSharedPtr &f);
+	void fileAdded(StorageFile::SharedPtr &f);
 	void fileUpdated(const StorageFile &f);
 
 	bool rxPacket(const ADARA::Packet &pkt);

@@ -65,7 +65,7 @@ STSClientMgr::~STSClientMgr()
 		close(m_fd);
 }
 
-void STSClientMgr::containerChange(StorageManager::ContainerSharedPtr &c,
+void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
 				   bool starting)
 {
 	if (!c->runNumber())
@@ -78,7 +78,7 @@ void STSClientMgr::containerChange(StorageManager::ContainerSharedPtr &c,
 		m_currentRun = 0;
 }
 
-void STSClientMgr::queueRun(StorageManager::ContainerSharedPtr &c)
+void STSClientMgr::queueRun(StorageContainer::SharedPtr &c)
 {
 	std::pair<RunMap::iterator, bool> ret;
 
@@ -90,7 +90,7 @@ void STSClientMgr::queueRun(StorageManager::ContainerSharedPtr &c)
 		m_currentRun = c->runNumber();
 }
 
-void STSClientMgr::requeueRun(StorageManager::ContainerSharedPtr &c)
+void STSClientMgr::requeueRun(StorageContainer::SharedPtr &c)
 {
 	RunMap::iterator it;
 
@@ -101,7 +101,7 @@ void STSClientMgr::requeueRun(StorageManager::ContainerSharedPtr &c)
 	queueRun(c);
 }
 
-StorageManager::ContainerSharedPtr &STSClientMgr::nextRun(void)
+StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 {
 	RunMap::iterator run;
 	QueueMode next;
@@ -264,7 +264,7 @@ void STSClientMgr::connectComplete(void)
 		m_fdreg.reset();
 		m_connect_timer->cancel();
 
-		StorageManager::ContainerSharedPtr &run = nextRun();
+		StorageContainer::SharedPtr &run = nextRun();
 
 		try {
 			new STSClient(m_fd, run, *this);
@@ -319,7 +319,7 @@ bool STSClientMgr::reconnectTimeout(void)
 	return false;
 }
 
-void STSClientMgr::clientComplete(StorageManager::ContainerSharedPtr &c,
+void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 				  Disposition disp)
 {
 	/* TODO this shares code with requeueRun, find a beter place? */

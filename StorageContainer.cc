@@ -122,7 +122,7 @@ void StorageContainer::terminate(void)
 		terminateFile();
 }
 
-void StorageContainer::getFiles(std::list<FileSharedPtr> &list)
+void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
 {
 	if (m_active || !m_files.empty()) {
 		/* We've already loaded the list of files from disk, or
