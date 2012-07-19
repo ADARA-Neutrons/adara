@@ -158,18 +158,20 @@ bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 
 bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	printf("%u.%09u RAW EVENT DATA\n    pktSeq 0x%x dspSeq 0x%x%s\n"
+	printf("%u.%09u RAW EVENT DATA\n"
+	       "    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
 	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
-	       "    intrapulse %uns tofOffset %uns%s\n"
-	       "    charge %upC, %u events\n",
+	       "    intrapulse %luns tofOffset %luns%s\n"
+	       "    charge %lupC, %u events\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-	       pkt.pktSeq(), pkt.dspSeq(), pkt.endOfPulse() ? "EOP" : "",
+	       pkt.sourceID(), pkt.pktSeq(), pkt.dspSeq(),
+	       pkt.endOfPulse() ? " EOP" : "",
 	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
 	       pkt.timingStatus(), (int) pkt.flavor(),
-	       pulseFlavor(pkt.flavor()), pkt.intraPulseTime() * 100,
-	       pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
-	       pkt.pulseCharge() * 10, pkt.num_events());
+	       pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
+	       (uint64_t) pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       (uint64_t) pkt.pulseCharge() * 10, pkt.num_events());
 
 	return false;
 }
@@ -179,24 +181,26 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 	// TODO display FNA X fields
 	printf("%u.%09u RTDL\n"
 	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
-	       "    intrapulse %uns tofOffset %uns%s\n"
-	       "    charge %upC, period %ups\n",
+	       "    intrapulse %luns tofOffset %luns%s\n"
+	       "    charge %lupC, period %ups\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
 	       pkt.timingStatus(), (int) pkt.flavor(),
-	       pulseFlavor(pkt.flavor()), pkt.intraPulseTime() * 100,
-	       pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
-	       pkt.pulseCharge() * 10, pkt.ringPeriod());
+	       pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
+	       (uint64_t) pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       (uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod());
+
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 {
 	printf("%u.%09u BANKED EVENT DATA\n"
-	       "    cycle %u charge %upC energy %ueV\n",
+	       "    cycle %u charge %lupC energy %ueV\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-	       pkt.cycle(), pkt.pulseCharge() * 10, pkt.pulseEnergy());
+	       pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+	       pkt.pulseEnergy());
 	if (pkt.flags()) {
 		printf("    flags");
 		if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
