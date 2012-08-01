@@ -237,9 +237,9 @@ developers will fill them in at a later date.}
     \bitbox{8}{TSTAT} &
     \bitbox{12}{Veto} &
     \bitbox{10}{Cycle} \\
-    \wordbox{1}{Intra-pulse time (units of 100 ns)} \\
-    \bitbox{1}{\tiny R \\ A \\ W} &
-    \bitbox{31}{TOF Offset (units of 100 ns)} \\
+    \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
+    \bitbox{1}{\tiny C \\ O \\ R} &
+    \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
     \wordbox{2}{Event 1} \\
     \wordbox{2}{$\cdots$} \\
     \wordbox{2}{Event $N$} \\
@@ -271,7 +271,7 @@ reset for each pulse.
 \item{\bf Flavor} contains the accelerator pulse flavor as defined by
 the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
-number must be multiplied by 10 to get the charge in nanoColumbs. This
+unsigned number must be multiplied by 10 to get the charge in nanoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
 \item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
 Real Time Data Link.
@@ -287,10 +287,10 @@ packet due to frame skew.
 \item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
 The intra-pulse time is the time between the previous $T_{SYNC}$ and the
 current $T_{SYNC}$.
-\item{\bf RAW} indicates that the time of flight values in this packet are
-not corrected for frame skew.
-\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf RAW}
-is set) added to these events to correct for frame skew.
+\item{\bf COR} indicates that the time of flight values in this packet are
+have been corrected for frame skew.
+\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf COR}
+is not set) added to these events to correct for frame skew.
 \item{\bf Event(s)} give the time of flight and location of the detected
 neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
 Pixel ID is the physical pixel associated with this neutron event.
@@ -442,9 +442,9 @@ fast metadata pixel ID formats.}
     \bitbox{8}{TSTAT} &
     \bitbox{12}{Veto} &
     \bitbox{10}{Cycle} \\
-    \wordbox{1}{Intra-pulse time (units of 100 ns)} \\
-    \bitbox{1}{\tiny R \\ A \\ W} &
-    \bitbox{31}{TOF Offset (units of 100 ns)} \\
+    \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
+    \bitbox{1}{\tiny C \\ O \\ R} &
+    \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
     \wordbox{1}{Ring Period (picoseconds, u32)} \\
     \bitbox{8}{FNA 0} &
     \bitbox{24}{Frame Data 0} \\
@@ -467,7 +467,7 @@ accelerator.
 \item{\bf Flavor} contains the accelerator pulse flavor as defined by
 the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the previous pulse. This
-number must be multiplied by 10 to get the charge in nanoColumbs.
+unsigned number must be multiplied by 10 to get the charge in nanoColumbs.
 \item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
 Real Time Data Link.
 \item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
@@ -481,10 +481,10 @@ recent pulse.
 \item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
 The intra-pulse time is the time between the previous $T_{SYNC}$ and the
 current $T_{SYNC}$.
-\item{\bf RAW} indicates that the time of flight values in this packet are
-not corrected for frame skew.
-\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf RAW}
-is set) added to these events to correct for frame skew.
+\item{\bf COR} indicates that the time of flight values in this packet have
+been corrected for frame skew.
+\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf COR}
+is not set) added to these events to correct for frame skew.
 \item{\bf Ring Period} indicates the number of picoseconds the proton beam
 takes to travel the circumference of the accumulator ring. This is used
 to calculate beam energy.
@@ -600,20 +600,19 @@ stream and discard previous data upon reception.
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{Length 20 + Section Lengths} \\
+    \wordbox{1}{Length 16 + Section Lengths} \\
     \wordbox{1}{0x00400000} \\
     \wordbox{1}{Pulse ID (seconds)} \\
     \wordbox{1}{Pulse ID (nanoseconds)} \\
 
-    \bitheader{31,16,15,0} \\
+    \bitheader{31,0} \\
     \wordbox{1}{Pulse Charge (units of 10 nC, u32)} \\
     \wordbox{1}{Pulse Energy (eV, u32)} \\
-    \wordbox{1}{Ring Period (picoseconds, u32)} \\
     \wordbox{1}{Accelerator Cycle} \\
     \wordbox{1}{Flags} \\
-    \wordbox{2}{Banked Event Section 1} \\
+    \wordbox{2}{Source Section 1} \\
     \wordbox{1}{$\cdots$} \\
-    \wordbox{2}{Banked Event Section $N$} \\
+    \wordbox{2}{Source Section $N$} \\
   \end{bytefield}
   \caption{Packet Type 0x4000.0: Banked Event Data}
   \label{fig:protocol_packet_banked_event_data}
@@ -627,6 +626,9 @@ stream and discard previous data upon reception.
 	0 & Pulse had errors \\
 	1 & Partial event data \\
 	2 & Pulse was veto'd \\
+	3 & Pulse did not have an RTDL packet \\
+	4 & Pulse had events without a map entry \\
+	5 & Pulse ID was duplicated
     \end{tabular}
   \end{center}
   \caption {Banked Event Flag Definitions}
@@ -639,8 +641,8 @@ Stream Management Service and is used to convey time-of-flight and logical
 location information for detected neutrons. It contains the following fields:
 \begin{itemize}
 \item{\bf Length} is defined by the number of events in the packet. There
-are 20 bytes of pulse and packet information followed by 8 bytes of data
-for each event.
+are 16 bytes of pulse and packet information followed by sections for each
+hardware event source.
 \item{\bf Pulse ID} identifies the most recent pulse generated by the
 accelerator. This ID may not be orginating pulse for the events in this packet
 due to frame skew.
@@ -655,18 +657,14 @@ packet due to frame skew.
 given in electron volts. This value is calculated from the {\bf Ring Period}
 field and depends on the accumulator ring geometry. This value may not be the
 voltage for the events in this packet due to frame skew.
-\item{\bf Ring Period} indicates the number of picoseconds the proton beam
-takes to travel the circumference of the accumulator ring. This is used
-to calculate beam energy.
 \item{\bf Flags} is a bit-field indicating pulse properties, such as errors or
 missing event data as defined in
 Table~\ref{table:protocol_packet_banked_event_flags}.
-\item{\bf Banked Event Section(s)} contains the Bank ID and events for each
-bank. There will be one section for each bank with events for this pulse. The
-format of the section is given in
-Figure~\ref{fig:protocol_banked_event_section}.
+\item{\bf Source Section(s)} contains information from each source of event
+data. There will be one section for each source, which will contain timing
+information and one or more {\bf Banked Event Section(s)}. The format of the
+Source Section is given in Figure~\ref{fig:protocol_source_section}.
 \end{itemize}
-
 
 While the ``Raw Event Data'' packet described in
 section~\ref{section:protocol_raw_event_packet} is defined for primary use over
@@ -690,9 +688,57 @@ a single ``Banked Event Data'' packet will be sent by the SMS for each pulse.
 \begin{figure}
   \centering
   \begin{bytefield}{32}
+    \bitheader{31,30,0} \\
+    \wordbox{1}{Source ID} \\
+    \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
+    \bitbox{1}{\tiny C \\ O \\ R} &
+    \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
+    \wordbox{1}{Bank Count (u32)} \\
+    \wordbox{2}{Banked Section 1} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{2}{Banked Section $N$} \\
+  \end{bytefield}
+  \caption{Source Section}
+  \label{fig:protocol_source_section}
+\end{figure}
+
+Instruments may have multiple hardware sources for their event data, due to the
+placement of detectors, simplification of routing, or due to different frame
+skew offsets depending upon instrument geometry and neutron wavelength. As each
+of these sources has its own, independent free-running clock to generate a
+relative time-of-flight, the obvserved length of the pulse may vary slightly
+from source to source. These small variations, as well as the time offsets used
+to center events in the temporal detection window and correct for frame skew,
+must be recorded per-source for full experiment fidelity. Each ``Banked Event
+Data'' packet contains one ``Source Section'' for each hardware source in the
+system. As defined in Figure~\ref{fig:protocol_source_section}, the source
+section provides timing information for the source, and defines which banks are
+associated with the source:
+
+\begin{itemize}
+\item{\bf Source ID} indicates the hardware identifier of the device that
+recorded these events.
+\item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
+The intra-pulse time is the time between the previous $T_{SYNC}$ and the
+current $T_{SYNC}$.
+\item{\bf COR}, if set, indicates that the time of flight values in this
+section have been corrected for frame skew.
+\item{\bf TOF Offset} is the total offset that was (or should be, if {\bf COR}
+is not set) added to events in this section to correct for frame skew.
+\item{\bf Bank Count} describes the number of {\bf Banked Event Sections}
+that follow.
+\item{\bf Banked Event Section(s)} contains the Bank ID and events for each
+bank provided by this source. There will be one section for each bank with
+events for this pulse. The format of the section is given in
+Figure~\ref{fig:protocol_banked_event_section}.
+\end{itemize}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{Bank ID} \\
-    \wordbox{1}{Event Count} \\
+    \wordbox{1}{Bank ID (u32)} \\
+    \wordbox{1}{Event Count (u32)} \\
     \wordbox{2}{Banked Event 1} \\
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Banked Event $N$} \\
@@ -701,13 +747,15 @@ a single ``Banked Event Data'' packet will be sent by the SMS for each pulse.
   \label{fig:protocol_banked_event_section}
 \end{figure}
 
-Each ``Banked Event Data'' packet contains one ``Banked Event Section'' for
-each detector bank with events in this pulse. As defined in
-Figure~\ref{fig:protocol_banked_event_section}, each section contains
+Each ``Source Section'' contains one ``Banked Event Section'' for
+each detector bank from that source with events in this pulse. As defined in
+Figure~\ref{fig:protocol_banked_event_section}, the section contains
 the following fields:
 \begin{itemize}
 \item{\bf Bank ID} indicates which detector bank is the source of the
-events in this section.
+events in this section. Bank ID 0xffffffff is used to transmit pixels
+that were not in the mapping table. Bank ID 0xfffffffe is used to transmit
+pixels that had their error bit set from the detector.
 \item{\bf Event Count} indicates the number of events in this section. This
 may be zero if there were no events for this pulse from this detector bank.
 \item{\bf Event(s)} give the time of flight and location of the detected
@@ -715,21 +763,6 @@ neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
 Pixel ID is the logical pixel ID, translated from the raw ID given by the
 detector.
 \end{itemize}
-
-\detail{Define Banked Event Data Flags field}{%
-We need a flag to indicate that we may be missing data from this frame.
-We may need a veto flag, and perhaps some of this space should be used
-to indicate polarization state, though I believe that should be handled
-via a variable update packet.
-We have space here, are there other flags that make sense in this context?}
-\detail{Use additional information from RTDL}{%
-We now have the intra-pulse time and other fields we will want to record
-in this packet. However, can different pixels in the same detector bank
-get different TOF offsets? If so, that will cause a problem when mixing
-those. The intra-pulse time will be OK, but what about $T_{DELAY}$? If
-$T_{DELAY}$ is in the reported TOF, but not in the intra-pulse time, then
-we should be OK, as we the intra-pulse time is the same for all events.
-Resolve this for implementation.}
 
 \newpage
 \subsubsection{Beam Monitor Event Data}
@@ -739,7 +772,7 @@ Resolve this for implementation.}
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{Length 20 + Section Lengths} \\
+    \wordbox{1}{Length 16 + Section Lengths} \\
     \wordbox{1}{0x00400100} \\
     \wordbox{1}{Pulse ID (seconds)} \\
     \wordbox{1}{Pulse ID (nanoseconds)} \\
@@ -747,7 +780,6 @@ Resolve this for implementation.}
     \bitheader{31,16,15,0} \\
     \wordbox{1}{Pulse Charge (units of 10 nC, u32)} \\
     \wordbox{1}{Pulse Energy (eV, u32)} \\
-    \wordbox{1}{Ring Period (picoseconds, u32)} \\
     \wordbox{1}{Accelerator Cycle} \\
     \wordbox{1}{Flags} \\
     \wordbox{2}{Beam Monitor Section 1} \\
@@ -789,7 +821,7 @@ Stream Management Service and is used to convey neutron time-of-flight
 information originating from beam monitors. It contains the following fields:
 \begin{itemize}
 \item{\bf Length} is defined by the number of events in the packet. There
-are 20 bytes of pulse and packet information followed by 4 bytes of data
+are 16 bytes of pulse and packet information followed by 4 bytes of data
 for each event.
 \item{\bf Pulse ID} identifies the most recent pulse generated by the
 accelerator. This ID may not be originating pulse for the events in this packet
@@ -805,9 +837,6 @@ packet due to frame skew.
 given in electron volts. This value is calculated from the {\bf Ring Period}
 field and depends on the accumulator ring geometry. This value may not be the
 voltage for the events in this packet due to frame skew.
-\item{\bf Ring Period} indicates the number of picoseconds the proton beam
-takes to travel the circumference of the accumulator ring. This is used
-to calculate beam energy.
 \item{\bf Flags} is a bit-field indicating pulse properties, such as errors or
 missing event data as defined in
 Table~\ref{table:protocol_packet_banked_event_flags}.
@@ -848,13 +877,6 @@ low detection efficiency.
 
 It is expected that a single ``Beam Monitor Event Data'' packet will be sent
 by the SMS for each pulse.
-
-\detail{Define Beam Monitor Event Data Flags field}{%
-We need a flag to indicate that we may be missing data from this frame.
-We may need a veto flag, and perhaps some of this space should be used
-to indicate polarization state, though I believe that should be handled
-via a variable update packet.
-We have space here, are there flags that make sense in this context?}
 
 \newpage
 \subsubsection{Pixel Mapping Table Packet}
