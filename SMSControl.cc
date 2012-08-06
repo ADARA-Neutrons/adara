@@ -58,6 +58,8 @@ SMSControl::SMSControl(const std::string &beamlineId,
 	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
 	m_pixelMap.reset(new PixelMap("/adara/conf/pixelmap"));
 
+	m_maxBanks = m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET;
+
 	m_singleton = this;
 }
 
@@ -155,30 +157,24 @@ void SMSControl::addSource(const std::string &uri)
 	/* TODO check against the max number of sources? */
 }
 
-SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
+uint32_t SMSControl::registerEventSource(uint32_t hwId)
 {
-	PulseIdentifier pid(id, dup);
-	PulseMap::iterator it;
+	/* We're called when a data source discovers a new hardware
+	 * source id and needs to allocate a bit position for completing
+	 * pulses. We don't have to be terribly fast here.
+	 */
+	size_t i, max = m_eventSources.size();
+	for (i = 0; i < max; i++) {
+		if (!m_eventSources[i]) {
+			m_eventSources.set(i);
+			return i;
+		}
+	}
 
-	it = m_pulses.find(pid);
-	if (it != m_pulses.end())
-		return it;
-
-	PulsePtr new_pulse(new Pulse(pid, m_activeSources,
-			   m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET));
-
-	if (dup)
-		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
-
-	return m_pulses.insert(make_pair(pid, new_pulse)).first;
+	throw std::runtime_error("No more event sources available");
 }
 
-void SMSControl::sourceUp(uint32_t id)
-{
-	m_activeSources.set(id);
-}
-
-void SMSControl::sourceDown(uint32_t id)
+void SMSControl::unregisterEventSource(uint32_t smsId)
 {
 	PulseMap::iterator it, last;;
 
@@ -188,9 +184,9 @@ void SMSControl::sourceDown(uint32_t id)
 	 */
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-		if (it->second->m_pending[id]) {
+		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-			it->second->m_pending.reset(id);
+			it->second->m_pending.reset(smsId);
 			if (it->second->m_pending.none())
 				last = it;
 		}
@@ -208,12 +204,41 @@ void SMSControl::sourceDown(uint32_t id)
 		m_pulses.erase(m_pulses.begin(), ++last);
 	}
 
-	m_activeSources.reset(id);
+	/* Mark this id for re-use. */
+	m_eventSources.reset(smsId);
+}
 
+SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
+{
+	PulseIdentifier pid(id, dup);
+	PulseMap::iterator it;
+
+	it = m_pulses.find(pid);
+	if (it != m_pulses.end())
+		return it;
+
+	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
+
+	if (dup)
+		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
+
+	return m_pulses.insert(make_pair(pid, new_pulse)).first;
+}
+
+void SMSControl::sourceUp(uint32_t id)
+{
+	// XXX still needed?
+	m_activeSources.set(id);
+}
+
+void SMSControl::sourceDown(uint32_t id)
+{
+	// XXX only really needed to reset the metadata
+	m_activeSources.reset(id);
 	m_meta->dropTag(id);
 }
 
-void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
+void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			     uint32_t dup)
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
@@ -228,8 +253,23 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
 		/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
 	}
 
+	/* Find this source in the current pulse; if it doesn't exist
+	 * yet, we'll need to save the intrapulse time and TOF Offset fields.
+	 */
+	SourceMap::iterator src = pulse->m_sources.find(hwId);
+	if (src == pulse->m_sources.end()) {
+		/* One hopes that an optimizing compiler would remove
+		 * the unneeded constructions and copies...
+		 */
+		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
+				    m_maxBanks);
+		SourceMap::value_type val(hwId, new_src);
+		src = pulse->m_sources.insert(val).first;
+	}
+
 	/* We'll save this time and time again, but we can't use the one
 	 * from the RTDL packet -- that was for the previous pulse.
+	 * XXX validate that assertion when we have beam again
 	 */
 	pulse->m_charge = pkt.pulseCharge();
 
@@ -266,23 +306,28 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
 			pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
 		}
 
-		if (pulse->m_banks[bank].empty()) {
-			pulse->m_activeBanks++;
-			pulse->m_banks[bank].reserve(m_bankReserve);
+		if (src->second.m_banks[bank].empty()) {
+			/* pulse->m_numBanks will double count banks if
+			 * their events arrive via two different HW sources.
+			 * This is good, as we'll need the room in the packet
+			 * for a bank section header in each source section.
+			 */
+			pulse->m_numBanks++;
+			src->second.m_activeBanks++;
+			src->second.m_banks[bank].reserve(m_bankReserve);
 		}
 
 		translated.pixel = logical;
 		translated.tof = events[i].tof;
-		pulse->m_banks[bank].push_back(translated);
+		src->second.m_banks[bank].push_back(translated);
 	}
 
 	pulse->m_numEvents += count;
 }
 
-void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t sourceId,
-			   uint32_t dup)
+void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt)
 {
-	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
+	PulsePtr &pulse = getPulse(pkt.pulseId(), 0)->second;
 
 	/* We don't log about an existing RTDL packet: we'll always have
 	 * one if there is more than one pre-processor on the beam line.
@@ -312,12 +357,12 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 }
 
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
-			      uint32_t sourceId)
+			      uint32_t smsId)
 {
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulsePtr &pulse = current->second;
 
-	pulse->m_pending.reset(sourceId);
+	pulse->m_pending.reset(smsId);
 	if (pulse->m_pending.any())
 		return;
 
@@ -344,6 +389,8 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 	/* Send the RTDL packet, followed by the banked event packet */
 	/* TODO send fast metadata packets as well, perhaps before events */
 
+	// XXX avoid sending the RTDL for a pulse twice (if duplicated)
+
 	if (pulse->m_rtdl) {
 		/* Don't notify clients; we want to keep the banked event
 		 * packet with the RTDL packet.
@@ -354,50 +401,79 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 	} else
 		pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 
-	IoVector iovec(1 + (2 * pulse->m_activeBanks));
-	uint32_t *data = new uint32_t[9 + (3 * pulse->m_activeBanks)];
-	uint32_t *section_hdr;
-	uint32_t i, ioidx;
-	std::vector<EventVector> &banks = pulse->m_banks;
+	m_iovec.clear();
+	m_hdrs.clear();
 
-	data[0] = 5 + (2 * pulse->m_activeBanks) + (2 * pulse->m_numEvents);
-	data[0] *= sizeof(uint32_t);
+	uint32_t size = 1 + pulse->m_numBanks * 2;
+	size += pulse->m_sources.size() * 4;
+	m_iovec.reserve(size);
 
-	data[1] = ADARA::PacketType::BANKED_EVENT_V0;
-	data[2] = pulse->m_id.first >> 32;
-	data[3] = pulse->m_id.first;
+	/* IMPORTANT: m_hdrs must be correctly sized, as we use pointers
+	 * into the vector in the iovec(s) we submit to
+	 * StorageManager::addPacket(). No reallocation is allowed after
+	 * we've reserved the proper size.
+	 */
+	size = 8 + pulse->m_sources.size() * 4;
+	size += pulse->m_numBanks * 2;
+	m_hdrs.reserve(size);
 
-	data[4] = pulse->m_charge;
-	data[5] = pulseEnergy(pulse->m_ringPeriod);
-	data[6] = pulse->m_ringPeriod;
-	data[7] = pulse->m_cycle;
-	data[8] = pulse->m_flags;
+	/* Common ADARA packet header */
+	size *= sizeof(uint32_t);
+	size += pulse->m_numEvents * sizeof(ADARA::Event);
+	size -= sizeof(ADARA::Header);
+	m_hdrs.push_back(size);
+	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V0);
+	m_hdrs.push_back(pulse->m_id.first >> 32);
+	m_hdrs.push_back(pulse->m_id.first);
 
-	ioidx = 0;
-	iovec[ioidx].iov_base = data;
-	iovec[ioidx++].iov_len = 9 * sizeof(uint32_t);
+	/* Banked event header */
+	m_hdrs.push_back(pulse->m_charge);
+	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
+	m_hdrs.push_back(pulse->m_cycle);
+	m_hdrs.push_back(pulse->m_flags);
 
-	section_hdr = &data[9];
-	for (i = 0; i < banks.size(); i++) {
-		if (banks[i].empty())
-			continue;
+	struct iovec iov;
+	iov.iov_base = &m_hdrs.front();
+	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
+	m_iovec.push_back(iov);
 
-		iovec[ioidx].iov_base = section_hdr;
-		iovec[ioidx++].iov_len = 2 * sizeof(uint32_t);
+	SourceMap::iterator sIt, sEnd = pulse->m_sources.end();
+	for (sIt = pulse->m_sources.begin(); sIt != sEnd; sIt++) {
+		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
+		iov.iov_len = 4 * sizeof(uint32_t);
+		m_iovec.push_back(iov);
 
-		/* Because we're using unsigned integers, we'll translate
-		 * the error pixels to bank -2 (0xfffffffe), and the
-		 * unmapped pixels to bank -1 (0xffffffff). All other
-		 * bank ids will get their real number.
-		 */
-		*section_hdr++ = i - Pulse::REAL_BANK_OFFSET;
-		*section_hdr++ = banks[i].size();
+		EventSource &src = sIt->second;
+		m_hdrs.push_back(sIt->first);
+		m_hdrs.push_back(src.m_intraPulseTime);
+		m_hdrs.push_back(src.m_tofField);
+		m_hdrs.push_back(src.m_activeBanks);
 
-		iovec[ioidx].iov_base = &banks[i].front();
-		iovec[ioidx++].iov_len = banks[i].size() * sizeof(ADARA::Event);
+		for (uint32_t i = 0; i < src.m_banks.size(); i++) {
+			if (src.m_banks[i].empty())
+				continue;
+
+			iov.iov_base = &m_hdrs.front() + m_hdrs.size();
+			iov.iov_len = 2 * sizeof(uint32_t);
+			m_iovec.push_back(iov);
+
+			/* Because we're using unsigned integers,
+			 * we'll translate the error pixels to bank
+			 * -2 (0xfffffffe), and the unmapped pixels
+			 * to bank -1 (0xffffffff). All other bank
+			 * ids will get their real number.
+			 */
+			m_hdrs.push_back(i - Pulse::REAL_BANK_OFFSET);
+			m_hdrs.push_back(src.m_banks[i].size());
+
+			iov.iov_base = &src.m_banks[i].front();
+			iov.iov_len = src.m_banks[i].size();
+			iov.iov_len *= sizeof(ADARA::Event);
+			m_iovec.push_back(iov);
+		}
 	}
 
-	StorageManager::addPacket(iovec);
+	StorageManager::addPacket(m_iovec);
 
 	/* TODO update history of bank event counts and size m_bankReserve
 	 * accordingly to try to avoid reallocation events.

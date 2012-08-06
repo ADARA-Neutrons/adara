@@ -87,8 +87,9 @@ public:
 	uint16_t veto(void) const { return (m_fields[3] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[3] &0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[4]; }
-	bool rawTOF(void) const { return !!(m_fields[5] & 0x80000000); }
+	bool tofCorrected(void) const { return !!(m_fields[5] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
+	uint32_t tofField(void) const { return m_fields[5]; }
 
 	const Event *events(void) const { return (Event *) &m_fields[6]; }
 	uint32_t num_events(void) const {
@@ -120,7 +121,7 @@ public:
 	uint16_t veto(void) const { return (m_fields[1] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[1] &0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
-	bool rawTOF(void) const { return !!(m_fields[3] & 0x80000000); }
+	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
 	uint32_t ringPeriod(void) const { return m_fields[4]; }
 
@@ -149,9 +150,8 @@ public:
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
-	uint32_t ringPeriod(void) const { return m_fields[2]; }
-	uint32_t cycle(void) const { return m_fields[3]; }
-	uint32_t flags(void) const { return m_fields[4]; }
+	uint32_t cycle(void) const { return m_fields[2]; }
+	uint32_t flags(void) const { return m_fields[3]; }
 
 	// TODO implment bank/event accessors
 
@@ -169,9 +169,8 @@ public:
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
-	uint32_t ringPeriod(void) const { return m_fields[2]; }
-	uint32_t cycle(void) const { return m_fields[3]; }
-	uint32_t flags(void) const { return m_fields[4]; }
+	uint32_t cycle(void) const { return m_fields[2]; }
+	uint32_t flags(void) const { return m_fields[3]; }
 
 	// TODO implment monitor/event accessors
 

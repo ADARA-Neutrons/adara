@@ -170,8 +170,30 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
 	       pkt.timingStatus(), (int) pkt.flavor(),
 	       pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
-	       (uint64_t) pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       (uint64_t) pkt.tofOffset() * 100,
+	       pkt.tofCorrected() ? "" : " (raw)",
 	       (uint64_t) pkt.pulseCharge() * 10, pkt.num_events());
+
+	if (1) {
+		uint32_t len = pkt.payload_length();
+		uint32_t *p = (uint32_t *) pkt.payload();
+		uint32_t i = 0;
+
+		/* Skip the header we handled above */
+		p += 6;
+		len -= 6 * sizeof(uint32_t);
+
+		while (len) {
+			if (len < 8) {
+				fprintf(stderr, "Raw event packet too short\n");
+				return true;
+			}
+
+			printf("\t  %u: %08x %08x\n", i++, p[0], p[1]);
+			p += 2;
+			len -= 8;
+		}
+	}
 
 	return false;
 }
@@ -182,13 +204,14 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 	printf("%u.%09u RTDL\n"
 	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
 	       "    intrapulse %luns tofOffset %luns%s\n"
-	       "    charge %lupC, period %ups\n",
+	       "    charge %lu pC period %u\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
 	       pkt.timingStatus(), (int) pkt.flavor(),
 	       pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
-	       (uint64_t) pkt.tofOffset() * 100, pkt.rawTOF() ? " (raw)" : "",
+	       (uint64_t) pkt.tofOffset() * 100,
+	       pkt.tofCorrected() ? "" : " (raw)",
 	       (uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod());
 
 	return false;
@@ -218,7 +241,59 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 		printf("\n");
 	}
 
-	// TODO display banks, events?
+	if (1) {
+		uint32_t len = pkt.payload_length();
+		uint32_t *p = (uint32_t *) pkt.payload();
+		uint32_t nBanks, nEvents;
+
+		/* Skip the header we handled above */
+		p += 4;
+		len -= 4 * sizeof(uint32_t);
+
+		while (len) {
+			if (len < 16) {
+				fprintf(stderr, "Banked event packet too short "
+						"(source section header)\n");
+				return true;
+			}
+
+			printf("    Source %08x intrapulse %luns "
+			       "tofOffset %luns%s\n", p[0],
+			       (uint64_t) p[1] * 100,
+			       ((uint64_t) p[2] & 0x7fffffff) * 100,
+			       (p[2] & 0x80000000) ? "" : " (raw)");
+			nBanks = p[3];
+			p += 4;
+			len -= 16;
+
+			for (uint32_t i = 0; i < nBanks; i++) {
+				if (len < 8) {
+					fprintf(stderr, "Banked event packet "
+						"too short (bank section "
+						"header)\n");
+					return true;
+				}
+
+				printf("\tBank 0x%x (%u events)\n", p[0], p[1]);
+				nEvents = p[1];
+				p += 2;
+				len -= 8;
+
+				if (len < (nEvents * 2 * sizeof(uint32_t))) {
+					fprintf(stderr, "Banked event packet "
+						"too short (events)\n");
+					return true;
+				}
+
+				for (uint32_t j = 0; j < nEvents; j++) {
+					printf("\t  %u: %08x %08x\n", j,
+					       p[0], p[1]);
+					p += 2;
+					len -= 8;
+				}
+			}
+		}
+	}
 
 	return false;
 }

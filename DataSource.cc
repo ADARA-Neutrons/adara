@@ -20,10 +20,112 @@ double DataSource::m_data_timeout = 5.0;
 
 unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
 
+class HWSource {
+public:
+	HWSource(const std::string &uri, uint32_t hwId, uint32_t smsId) :
+		m_uri(uri), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
+		m_lastPulse(0), m_dupCount(0)
+	{ }
+
+	uint64_t pulse(void) const { return m_activePulse; }
+	uint64_t lastPulse(void) const { return m_lastPulse; }
+	uint32_t dupCount(void) const { return m_dupCount; }
+	uint32_t hwId(void) const { return m_hwId; }
+	uint32_t smsId(void) const { return m_smsId; }
+
+	void endPulse(bool eop = true) {
+		if (!m_activePulse)
+			return;
+
+		SMSControl *ctrl = SMSControl::getInstance();
+		if (!eop) {
+			/* TODO rate-limited logging of dropped packets */
+			ERROR("Lost packet from " << m_uri << " src 0x"
+				<< std::hex << m_hwId);
+			ctrl->markPartial(m_activePulse, m_dupCount);
+		}
+
+		ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
+
+		m_lastPulse = m_activePulse;
+		m_activePulse = 0;
+	}
+
+	void newPulse(const ADARA::RawDataPkt &pkt) {
+		if (m_activePulse) {
+			/* We didn't see an end-of-packet, so clear out
+			 * the previous pulse here.
+			 */
+			endPulse(false);
+			m_lastPulse = m_activePulse;
+		}
+
+		m_activePulse = pkt.pulseId();
+		if (m_lastPulse == m_activePulse) {
+			/* TODO rate-limited logging of duplicate pulses? */
+			ERROR("Duplicate pulse from " << m_uri << " src 0x"
+				<< std::hex << m_hwId);
+			m_dupCount++;
+		} else
+			m_dupCount = 0;
+
+		m_flavor = pkt.flavor();
+		m_intraPulse = pkt.intraPulseTime();
+		m_tofOffset = pkt.tofOffset();
+		m_charge = pkt.pulseCharge();
+		m_cycle = pkt.cycle();
+		m_veto = pkt.veto();
+		m_timingStatus = pkt.timingStatus();
+		m_pktSeq = 0;
+	}
+
+	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt) {
+		/* These fields should not change for any packet in
+		 * the current pulse. If they do, then this is a
+		 * duplicate pulse id (or a new pulse alltogether.)
+		 */
+		return !(pkt.pulseId() == m_activePulse &&
+			 pkt.flavor() == m_flavor &&
+			 pkt.pulseCharge() == m_charge &&
+			 pkt.veto() == m_veto &&
+			 pkt.cycle() == m_cycle &&
+			 pkt.timingStatus() == m_timingStatus &&
+			 pkt.intraPulseTime() == m_intraPulse &&
+			 pkt.tofOffset() == m_tofOffset);
+	}
+
+	bool checkSeq(const ADARA::RawDataPkt &pkt) {
+		bool ok = (pkt.pktSeq() == m_pktSeq);
+		m_pktSeq++;
+		return !ok;
+	}
+
+private:
+	const std::string &	m_uri;
+
+	uint32_t	m_hwId;
+	uint32_t	m_smsId;
+	uint64_t	m_activePulse;
+	uint64_t	m_lastPulse;
+	uint32_t	m_dupCount;
+	uint16_t	m_pktSeq;
+
+	/* Pulse invariants -- these should not change between raw event
+	 * packets for a given pulse, so we can use them to help detect
+	 * duplicate pulse IDs
+	 */
+	ADARA::PulseFlavor::Enum m_flavor;
+	uint32_t	m_intraPulse;
+	uint32_t	m_tofOffset;
+	uint32_t	m_charge;
+	uint16_t	m_cycle;
+	uint16_t	m_veto;
+	uint8_t		m_timingStatus;
+};
+
 DataSource::DataSource(const std::string &uri, uint32_t id) :
 	m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
-	m_state(IDLE), m_sourceId(id), m_fd(-1), m_newPulse(false),
-	m_lastPulseId(0), m_dupCount(0), m_expectedPktSeq(0), m_pulseEOP(false)
+	m_state(IDLE), m_smsSourceId(id), m_fd(-1)
 {
 	std::string node;
 	std::string service("31416");
@@ -91,9 +193,16 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	endPulse(false);
-	m_lastPulseId = 0;
-	SMSControl::getInstance()->sourceDown(m_sourceId);
+	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it, end = m_hwSources.end();
+
+	for (it = m_hwSources.begin(); it != end; it++) {
+		it->second->endPulse(false);
+		ctrl->unregisterEventSource(it->second->smsId());
+	}
+
+	m_hwSources.clear();
+	ctrl->sourceDown(m_smsSourceId);
 }
 
 bool DataSource::timerExpired(void)
@@ -163,7 +272,7 @@ void DataSource::startConnect(void)
 	case 0:
 		INFO("Connection established to " << m_uri);
 		m_state = ACTIVE;
-		SMSControl::getInstance()->sourceUp(m_sourceId);
+		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 	}
 
 	/* TODO handle any other error here */
@@ -205,7 +314,7 @@ void DataSource::connectComplete(void)
 		m_timer->cancel();
 		m_timer->start(m_data_timeout);
 		m_state = ACTIVE;
-		SMSControl::getInstance()->sourceUp(m_sourceId);
+		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
 		INFO("Connection established to " << m_uri);
 		return;
@@ -254,6 +363,13 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	case ADARA::PacketType::VAR_VALUE_U32_V0:
 	case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
 	case ADARA::PacketType::VAR_VALUE_STRING_V0:
+		/* We use a 0 pulse id to indicate that we don't have an
+		 * active pulse, and nothing should ever send one to us.
+		 */
+		if (!pkt.pulseId()) {
+			WARN("Received pulse id 0 from " << m_uri);
+			return false;
+		}
 		return Parser::rxPacket(pkt);
 	default:
 		/* We don't expect to see any other packet types here. */
@@ -275,125 +391,77 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	return true;
 }
 
-void DataSource::endPulse(bool dup)
+HWSource &DataSource::getHWSource(uint32_t hwId)
 {
-	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it;
 
-	/* Do we even have a pulse to close out? */
-	if (!m_lastPulseId)
-		return;
-
-	if (!m_pulseEOP) {
-		/* TODO rate-limited logging of dropped packets */
-		ERROR("Lost packet from " << m_uri);
-		ctrl->markPartial(m_lastPulseId, m_dupCount);
+	it = m_hwSources.find(hwId);
+	if (it == m_hwSources.end()) {
+		/* XXX Error handling? */
+		SMSControl *ctrl = SMSControl::getInstance();
+		uint32_t smsId = ctrl->registerEventSource(hwId);
+		HWSrcPtr src(new HWSource(m_uri, hwId, smsId));
+		it = m_hwSources.insert(HWSrcMap::value_type(hwId, src)).first;
 	}
 
-	ctrl->markComplete(m_lastPulseId, m_dupCount, m_sourceId);
-
-	m_newPulse = true;
-	m_expectedPktSeq = 0;
-	m_pulseEOP = false;
-	if (dup) {
-		/* TODO rate-limited logging of duplicate pulses? */
-		ERROR("Duplicate pulse from " << m_uri);
-		m_dupCount++;
-	} else
-		m_dupCount = 0;
-}
-
-bool DataSource::checkPulseInvariants(const ADARA::RawDataPkt &pkt)
-{
-	/* These fields should be the same for every Raw Data Event
-	 * in this pulse. If not, then we have a duplicate pulse on
-	 * our hands.
-	 */
-	return pkt.flavor() == m_pulseFlavor &&
-	       pkt.pulseCharge() == m_pulseCharge &&
-	       pkt.veto() == m_pulseVeto &&
-	       pkt.cycle() == m_pulseCycle &&
-	       pkt.timingStatus() == m_pulseTimingStatus &&
-	       pkt.intraPulseTime() == m_pulseIntraTime &&
-	       pkt.tofOffset() == m_pulseTofOffset;
+	return *(it->second);
 }
 
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	SMSControl *ctrl = SMSControl::getInstance();
+	HWSource &hw_src = getHWSource(pkt.sourceID());
 
-	/* We check for the end of pulses here as well as the RTDL handler,
-	 * as it is not clear that they cannot be lost by the preprocessor.
-	 * If we already know we're in a new pulse, there's no reason to
-	 * perform these checks.
+	/* Check that the fields are consistent with the pulse we are
+	 * currently processing. If not, then we've started a new pulse.
+	 * The HWSource class will take care of missing end-of-pulse
+	 * markers and duplicate pulse ids.
 	 */
-	if (!m_newPulse) {
-		if (pkt.pulseId() != m_lastPulseId)
-			endPulse(false);
-		else if (m_pulseEOP || pkt.pktSeq() < m_expectedPktSeq ||
-			 !checkPulseInvariants(pkt))
-			endPulse(true);
-	}
+	if (hw_src.checkPulseInvariants(pkt))
+		hw_src.newPulse(pkt);
 
-	if (m_newPulse) {
-		m_newPulse = false;
-		m_lastPulseId = pkt.pulseId();
-		m_pulseFlavor = pkt.flavor();
-		m_pulseCharge = pkt.pulseCharge();
-		m_pulseVeto = pkt.veto();
-		m_pulseCycle = pkt.cycle();
-		m_pulseTimingStatus = pkt.timingStatus();
-		m_pulseIntraTime = pkt.intraPulseTime();
-		m_pulseTofOffset = pkt.tofOffset();
-	}
+	SMSControl *ctrl = SMSControl::getInstance();
+	ctrl->pulseEvents(pkt, hw_src.hwId(), hw_src.dupCount());
 
-	if (pkt.pktSeq() != m_expectedPktSeq)
-		ctrl->markPartial(pkt.pulseId(), m_dupCount);
+	if (hw_src.checkSeq(pkt))
+		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
 
-	m_expectedPktSeq = pkt.pktSeq() + 1;
 	if (pkt.endOfPulse())
-		m_pulseEOP = true;
-
-	ctrl->pulseEvents(pkt, m_sourceId, m_dupCount);
+		hw_src.endPulse();
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 {
-	SMSControl *ctrl = SMSControl::getInstance();
-
-	/* Getting an RTDL packet means the last pulse is complete, we
-	 * just need to know if the new one is a duplicate or not.
-	 *
-	 * If we don't get an RTDL for some reason, we'll detect duplicate
-	 * pulses from the Raw Event packets.
+	/* RTDL packets come in as the pulse occurs, but the events for
+	 * them may not show up for some time. Just forward them to
+	 * SMSControl.
 	 */
-	endPulse(pkt.pulseId() == m_lastPulseId);
-	m_lastPulseId = pkt.pulseId();
-
-	ctrl->pulseRTDL(pkt, m_sourceId, m_dupCount);
+	// XXX do duplicate checking on a per-datasource basis?
+	SMSControl *ctrl = SMSControl::getInstance();
+	ctrl->pulseRTDL(pkt);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
-	SMSControl::getInstance()->updateDescriptor(pkt, m_sourceId);
+	SMSControl::getInstance()->updateDescriptor(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
-	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
+	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
-	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
+	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
-	SMSControl::getInstance()->updateValue(pkt, m_sourceId);
+	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }

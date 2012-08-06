@@ -11,6 +11,7 @@
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
+#include "Storage.h"
 
 class smsRunNumberPV;
 class smsRecordingPV;
@@ -40,16 +41,18 @@ public:
 	static SMSControl *getInstance(void) { return m_singleton; }
 
 	void addSource(const std::string &uri);
-	void sourceUp(uint32_t id);
-	void sourceDown(uint32_t id);
+	void sourceUp(uint32_t smsId);
+	void sourceDown(uint32_t smsId);
 
-	void pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t sourceId,
+	uint32_t registerEventSource(uint32_t hwId);
+	void unregisterEventSource(uint32_t smsId);
+
+	void pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			 uint32_t dup);
-	void pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t sourceId,
-		       uint32_t dup);
+	void pulseRTDL(const ADARA::RTDLPkt &pkt);
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
-	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t sourceId);
+	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			      uint32_t sourceId);
@@ -60,26 +63,41 @@ public:
 			 uint32_t sourceId);
 
 private:
-	typedef std::bitset<32> SourceSet;
+	typedef std::bitset<256> SourceSet;
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
 
 	typedef std::vector<ADARA::Event> EventVector;
 
+	struct EventSource {
+		EventSource(uint32_t intraPulse, uint32_t tofField,
+			    uint32_t nBanks) :
+				m_intraPulseTime(intraPulse),
+				m_tofField(tofField),
+				m_activeBanks(0),
+				m_banks(nBanks, EventVector())
+		{ }
+
+		uint32_t			m_intraPulseTime;
+		uint32_t			m_tofField;
+		uint32_t			m_activeBanks;
+		std::vector<EventVector>	m_banks;
+	};
+
+	typedef std::map<uint32_t, EventSource> SourceMap;
+
 	struct Pulse {
-		Pulse(const PulseIdentifier &id, const SourceSet &srcs,
-			uint32_t nBanks) :
-				m_id(id), m_pending(srcs),
-				m_banks(nBanks, EventVector()),
-				m_activeBanks(0), m_numEvents(0), m_charge(0),
-				m_cycle(0), m_ringPeriod(0), m_flags(0)
+		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
+				m_id(id), m_pending(srcs), m_numEvents(0),
+				m_numBanks(0), m_charge(0), m_cycle(0),
+				m_ringPeriod(0), m_flags(0)
 		{ }
 
 		PulseIdentifier				m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
-		std::vector<EventVector>		m_banks;
-		uint32_t				m_activeBanks;
+		SourceMap				m_sources;
 		uint32_t				m_numEvents;
+		uint32_t				m_numBanks;
 		uint32_t				m_charge;
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
@@ -104,6 +122,7 @@ private:
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	std::vector<boost::shared_ptr<DataSource> > m_sources;
 	SourceSet m_activeSources;
+	SourceSet m_eventSources;
 	PulseMap m_pulses;
 	uint32_t m_lastRingPeriod;
 	uint32_t m_bankReserve;
@@ -112,6 +131,10 @@ private:
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
 	boost::shared_ptr<MetaDataMgr> m_meta;
+
+	uint32_t m_maxBanks;
+	IoVector m_iovec;
+	std::vector<uint32_t> m_hdrs;
 
 	static SMSControl *m_singleton;
 	static uint32_t m_ringPeriod;
