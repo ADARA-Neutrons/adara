@@ -12,14 +12,16 @@
 #include "LDAS_PVConfigAgent.h"
 #include "LDAS_PVConfigMgr.h"
 #include "PVConfig.h"
+#include <boost/tokenizer.hpp>
 
 using namespace NI;
 using namespace std;
+using namespace boost;
 
 namespace SNS { namespace PVS { namespace LDAS {
 
 // Static initialization
-set<string>                 LDAS_PVConfigAgent::m_disabled_pvs;
+map<string,map<string,LDAS_PVConfigAgent::PVConfigLocal> >  LDAS_PVConfigAgent::m_pv_config_local;
 Identifier                  LDAS_PVConfigAgent::m_next_dev_id = 1;
 map<Identifier,Identifier>  LDAS_PVConfigAgent::m_next_pv_id;
 
@@ -46,6 +48,7 @@ LDAS_PVConfigAgent::~LDAS_PVConfigAgent()
 }
 
 
+#if 0
 /**
  * \brief Loads a list of PVs to be disabled from the specified file.
  * \param a_filename - Filename of text file continaing PVs to disable
@@ -74,6 +77,120 @@ LDAS_PVConfigAgent::loadDisabledPVList( const string &a_filename )
     }
     else
         EXCP( EC_INVALID_CONFIG_DATA, "Could not open \"disabled pvs\" file: " << a_filename );
+}
+#endif
+
+/**
+ * \brief Loads a list of PVs to be disabled from the specified file.
+ * \param a_filename - Filename of text file continaing PVs to disable
+ *
+ * This static method allows the application to filter-out PVs that are not needed
+ * in the output stream. A post-configuration filter mechanism is used because the
+ * legacy configuration files can not be changed. PVs are filtered-out based on the
+ * "friendly name" associated with the VarMpa entry.
+ */
+void
+LDAS_PVConfigAgent::loadPVConfigLocal( const string &a_filename, bool a_default )
+{
+    ifstream inf( a_filename.c_str() );
+    if ( inf.is_open())
+    {
+        m_pv_config_local.clear();
+
+        int             line_no = 0;
+        string          line;
+        string          device;
+        string          pv;
+        PVConfigLocal   cfg;
+        int             state = 0;
+        char_separator<char> sep(" \n\t");
+
+        while ( !inf.eof() )
+        {
+            ++line_no;
+            line.clear();
+            getline( inf, line );
+
+            tokenizer<char_separator<char>> tok(line,sep);
+
+            state = 0;
+            for ( tokenizer<char_separator<char>>::iterator t = tok.begin(); t != tok.end(); ++t )
+            {
+                if ( (*t)[0] == '#' )
+                    break;
+
+                if ( state == 0x30 )
+                    EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no );
+
+                switch (state)
+                {
+                case 0:
+                    if ( *t == "device" )
+                        state = 0x10;
+                    else if ( *t == "pv" )
+                        state = 0x20;
+                    else
+                        EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no  );
+                    break;
+
+                case 0x10: // Device
+                    device = *t;
+                    state = 0x30;
+                    break;
+
+                case 0x20: // PV name
+                    pv = *t;
+                    ++state;
+                    break;
+
+                case 0x21: // PV enabled
+                    if ( *t == "1" )
+                        cfg.enabled = true;
+                    else if ( *t == "0" )
+                        cfg.enabled = false;
+                    else
+                        EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no  );
+                    ++state;
+                    break;
+
+                case 0x22: // PV hints
+                    if ( !device.length())
+                        EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no  );
+
+                    cfg.hints = *t;
+                    m_pv_config_local[device][pv] = cfg;
+                    state = 0x30;
+                    break;
+                }
+            }
+
+            // Hints are optional
+            if ( state == 0x22 )
+            {
+                if ( !device.length())
+                    EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no  );
+
+                cfg.hints.clear();
+                m_pv_config_local[device][pv] = cfg;
+            }
+            else if ( state != 0 && state != 0x30 )
+                EXCP( EC_INVALID_CONFIG_DATA, "Syntax error in local pv config file: " << a_filename << ", line " << line_no  );
+        }
+        inf.close();
+    }
+    else
+    {
+        // If config file is default, just print a message; otherwise throw an exception
+        if ( a_default )
+        {
+            LOG_WARNING( "Default local PV config file (" << a_filename << ") not found.")
+        }
+        else
+        {
+            EXCP( EC_INVALID_CONFIG_DATA, "Could not open local pv config file: " << a_filename );
+        }
+    }
+
 }
 
 
@@ -510,6 +627,7 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
     // If this is the first encounter with this device, define it and load PVs
     if ( !m_streamer.isDeviceDefined( dev_id ))
     {
+        const PVConfigLocal* cfg;
         PVInfo* info = 0;
         map<int,string> enum_vals;
 
@@ -544,8 +662,12 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
                         info->m_access = da;
 
                         // If PV is not in disabled list, define it
-                        if ( m_disabled_pvs.find( info->m_name ) == m_disabled_pvs.end() )
+                        cfg = getPVConfigLocal( devicename, info->m_name );
+                        if ( !cfg || cfg->enabled )
                         {
+                            if ( cfg )
+                                info->m_hints = cfg->hints;
+
                             // Assign a global pv_id to this variable (no device.xml available yet)
                             map<Identifier,Identifier>::iterator iid = m_next_pv_id.find( info->m_device_id );
                             if ( iid == m_next_pv_id.end())
@@ -589,6 +711,22 @@ LDAS_PVConfigAgent::ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myPar
         // We've already seen this device. Why?
         // TODO In the future, this would be an error I think. Probabaly should abort loading this config file.
     }
+}
+
+const LDAS_PVConfigAgent::PVConfigLocal*
+LDAS_PVConfigAgent::getPVConfigLocal( const string &a_devicename, const string &a_pvname )
+{
+    const PVConfigLocal* cfg = 0;
+    map<string,map<string,PVConfigLocal> >::const_iterator iDev = m_pv_config_local.find( a_devicename );
+    if ( iDev != m_pv_config_local.end())
+    {
+        map<string,PVConfigLocal>::const_iterator iPV = iDev->second.find( a_pvname );
+        if ( iPV != iDev->second.end())
+        {
+            cfg = &iPV->second;
+        }
+    }
+    return cfg;
 }
 
 /**

@@ -132,6 +132,7 @@ public:
     Range               m_hw_alarms;    ///< Hardware alarms (optional)
     Range               m_sw_limits;    ///< Software limits (optional)
     Range               m_sw_alarms;    ///< Software alarms (optional)
+    std::string         m_hints;        ///< Protocol specific hints (xml)
 
     // ---------- Dynamic PV values -------------------------------------------
 
@@ -329,7 +330,7 @@ if ( ILogger::g_inst )                  \
 {                                       \
     ILogger::g_inst->write(t) << x;     \
     ILogger::g_inst->done();            \
-}
+};
 
 #define LOG_INFO(x) LOG(ILogger::RT_INFO, x )
 #define LOG_WARNING(x) LOG(ILogger::RT_WARNING, x )

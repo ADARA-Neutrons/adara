@@ -53,22 +53,29 @@ public:
     LDAS_PVConfigAgent( PVStreamer &a_streamer, IPVConfigServices &a_cfg_service, const std::string &a_hostname );
     ~LDAS_PVConfigAgent();
 
-    static void loadDisabledPVList( const std::string &a_filename );
+    //static void loadDisabledPVList( const std::string &a_filename );
+    static void loadPVConfigLocal( const std::string &a_filename, bool a_default = false );
 
 private:
+    struct PVConfigLocal
+    {
+        bool            enabled;
+        std::string     hints;
+    };
 
-    void        fileSocketData( NI::CNiDataSocketData &a_data );
-    void        parseConfigFile( const std::string &a_filename );
-    void        parseOptionsFile( const std::string &a_filename );
-    void        parseUnitsFile( const std::string &a_filename );
+    void            fileSocketData( NI::CNiDataSocketData &a_data );
+    void            parseConfigFile( const std::string &a_filename );
+    void            parseOptionsFile( const std::string &a_filename );
+    void            parseUnitsFile( const std::string &a_filename );
+    const PVConfigLocal*  getPVConfigLocal( const std::string &a_devicename, const std::string &a_pvname );
 
     // ----- Methods extracted from ListenerLib -------------------------------
 
-    void        ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myParser, std::string a_rootdevice );
-    void        GetDevInfo( PELE_STRUCT pStruct, std::string a_rootname, std::string & a_devicename, Identifier & a_app_id );
-    void        parseVarMapValue( CString value, std::string &a_connection, std::string &a_name, std::map<int,std::string> &a_enum );
-    DataType    GetDataType(PELE_STRUCT pStruct);
-    Access      GetDataAccess(PELE_STRUCT pStruct);
+    void            ExtractDeviceInfo( PELE_STRUCT pStruct, CStringParser *myParser, std::string a_rootdevice );
+    void            GetDevInfo( PELE_STRUCT pStruct, std::string a_rootname, std::string & a_devicename, Identifier & a_app_id );
+    void            parseVarMapValue( CString value, std::string &a_connection, std::string &a_name, std::map<int,std::string> &a_enum );
+    DataType        GetDataType(PELE_STRUCT pStruct);
+    Access          GetDataAccess(PELE_STRUCT pStruct);
 
     PVStreamer         &m_streamer;         ///< PVStreamer instance
     IPVConfigServices  &m_cfg_service;      ///< PVStreamer configuration interface
@@ -78,7 +85,8 @@ private:
     std::string         m_units_file;       ///< Name of units file
     NI::CNiDataSocket   m_file_socket;      ///< DataSocket that receives filename information
 
-    static std::set<std::string>            m_disabled_pvs; ///< List of "globally" disabled process vars (by name)
+    //static std::set<std::string>            m_disabled_pvs; ///< List of "globally" disabled process vars (by name)
+    static std::map<std::string,std::map<std::string,PVConfigLocal> > m_pv_config_local;
     static Identifier                       m_next_dev_id;  ///< Next auto-assigned device ID
     static std::map<Identifier,Identifier>  m_next_pv_id;   ///< Next auto-assigned pv ID for each device
 };

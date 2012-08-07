@@ -308,6 +308,14 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifie
                 sstr << "      <pv_type>" << getTypeDescriptor((*ipv)->m_type) << "</pv_type>" << endl;
             if ( (*ipv)->m_units.size() )
                 sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
+
+            if ( (*ipv)->m_hints.length())
+            {
+                sstr << "      <pv_hint>" << endl;
+                sstr << "        " << (*ipv)->m_hints << endl;
+                sstr << "      </pv_hint>" << endl;
+            }
+
             sstr << "    </process_variable>" << endl;
         }
 
