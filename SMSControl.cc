@@ -238,6 +238,29 @@ void SMSControl::sourceDown(uint32_t id)
 	m_meta->dropTag(id);
 }
 
+void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
+				 uint32_t pixel, uint32_t tof)
+{
+	uint32_t trailing = (pixel & 1) << 31;
+	tof |= trailing;
+
+	pixel >>= 16;
+	pixel &= 0xff;
+
+	MonitorMap::iterator mon = pulse->m_monitors.find(pixel);
+	if (mon == pulse->m_monitors.end()) {
+		/* One hopes that an optimizing compiler would remove
+		 * the unneeded constructions and copies...
+		 */
+		BeamMonitor new_mon(pkt.sourceID(), pkt.intraPulseTime(),
+				    pkt.tofField());
+		MonitorMap::value_type val(pixel, new_mon);
+		mon = pulse->m_monitors.insert(val).first;
+	}
+
+	mon->second.m_eventTof.push_back(tof);
+}
+
 void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			     uint32_t dup)
 {
@@ -282,7 +305,15 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 	for (i = 0; i < count; i++) {
 		phys = events[i].pixel;
 
-		switch (phys >> 24) {
+		switch (phys >> 28) {
+		case 4:
+			/* Add this event to our monitors, and go on to the
+			 * next raw event -- it doesn't go in the banked
+			 * events section.
+			 */
+			addMonitorEvent(pkt, pulse, phys, events[i].tof);
+			pulse->m_numMonEvents++;
+			continue;
 		case 0:
 			if (m_pixelMap->mapEvent(phys, logical, bank))
 				pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
@@ -290,8 +321,6 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			break;
 		case 7:
 			/* TODO handle chopper events */
-		case 4:
-			/* TODO handle beam monitor */
 		case 5: case 6:
 			/* TODO handle fast metadata */
 		case 1: case 2: case 3:
@@ -320,9 +349,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 		translated.pixel = logical;
 		translated.tof = events[i].tof;
 		src->second.m_banks[bank].push_back(translated);
+		pulse->m_numEvents++;
 	}
-
-	pulse->m_numEvents += count;
 }
 
 void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt)
@@ -401,6 +429,73 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 	} else
 		pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 
+	buildMonitorPacket(pulse);
+	buildBankedPacket(pulse);
+}
+
+void SMSControl::buildMonitorPacket(PulsePtr &pulse)
+{
+	m_iovec.clear();
+	m_hdrs.clear();
+
+	m_iovec.reserve(1 + pulse->m_monitors.size() * 2);
+
+	/* IMPORTANT: m_hdrs must be correctly sized, as we use pointers
+	 * into the vector in the iovec(s) we submit to
+	 * StorageManager::addPacket(). No reallocation is allowed after
+	 * we've reserved the proper size.
+	 */
+	uint32_t size = 8 + pulse->m_monitors.size() * 3;
+	m_hdrs.reserve(size);
+
+	/* Common ADARA packet header */
+	size += pulse->m_numMonEvents;
+	size *= sizeof(uint32_t);
+	size -= sizeof(ADARA::Header);
+	m_hdrs.push_back(size);
+	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V0);
+	m_hdrs.push_back(pulse->m_id.first >> 32);
+	m_hdrs.push_back(pulse->m_id.first);
+
+	/* Beam monitor event header */
+	m_hdrs.push_back(pulse->m_charge);
+	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
+	m_hdrs.push_back(pulse->m_cycle);
+	m_hdrs.push_back(pulse->m_flags);
+
+	struct iovec iov;
+	iov.iov_base = &m_hdrs.front();
+	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
+	m_iovec.push_back(iov);
+
+	MonitorMap::iterator mIt, mEnd = pulse->m_monitors.end();
+	for (mIt = pulse->m_monitors.begin(); mIt != mEnd; mIt++) {
+		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
+		iov.iov_len = 3 * sizeof(uint32_t);
+		m_iovec.push_back(iov);
+
+		BeamMonitor &mon = mIt->second;
+		uint32_t id_cnt = mIt->first << 22;
+		id_cnt |= mon.m_eventTof.size();
+		m_hdrs.push_back(id_cnt);
+		m_hdrs.push_back(mon.m_intraPulseTime);
+		m_hdrs.push_back(mon.m_tofField);
+
+		iov.iov_base = &mon.m_eventTof.front();
+		iov.iov_len = mon.m_eventTof.size();
+		iov.iov_len *= sizeof(uint32_t);
+		m_iovec.push_back(iov);
+	}
+
+	StorageManager::addPacket(m_iovec);
+
+	/* TODO update history of monitor event counts and preallocate
+	 * accordingly to try to avoid reallocation events
+	 */
+}
+
+void SMSControl::buildBankedPacket(PulsePtr &pulse)
+{
 	m_iovec.clear();
 	m_hdrs.clear();
 

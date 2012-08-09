@@ -85,19 +85,37 @@ private:
 
 	typedef std::map<uint32_t, EventSource> SourceMap;
 
+	struct BeamMonitor {
+		/* TODO preallocate m_eventTof to avoid resizing */
+		BeamMonitor(uint32_t srcId, uint32_t intraPulse,
+			    uint32_t tofField) :
+				m_sourceId(srcId), m_intraPulseTime(intraPulse),
+				m_tofField(tofField)
+		{ }
+
+		uint32_t			m_sourceId;
+		uint32_t			m_intraPulseTime;
+		uint32_t			m_tofField;
+		std::vector<uint32_t>		m_eventTof;
+	};
+
+	typedef std::map<uint32_t, BeamMonitor> MonitorMap;
+
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
 				m_id(id), m_pending(srcs), m_numEvents(0),
-				m_numBanks(0), m_charge(0), m_cycle(0),
-				m_ringPeriod(0), m_flags(0)
+				m_numBanks(0), m_numMonEvents(0), m_charge(0),
+				m_cycle(0), m_ringPeriod(0), m_flags(0)
 		{ }
 
 		PulseIdentifier				m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
 		SourceMap				m_sources;
+		MonitorMap				m_monitors;
 		uint32_t				m_numEvents;
 		uint32_t				m_numBanks;
+		uint32_t				m_numMonEvents;
 		uint32_t				m_charge;
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
@@ -146,6 +164,11 @@ private:
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void recordPulse(PulsePtr &pulse);
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
+	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
+			     uint32_t id, uint32_t tof);
+
+	void buildBankedPacket(PulsePtr &pulse);
+	void buildMonitorPacket(PulsePtr &pulse);
 
 	friend class smsRecordingPV;
 };
