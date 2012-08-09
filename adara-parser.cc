@@ -350,9 +350,8 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 				return true;
 			}
 
-			printf("    Monitor %u intrapulse %luns "
-			       "tofOffset %luns%s\n", p[0] >> 22,
-			       (uint64_t) p[1] * 100,
+			printf("    Monitor %u source %08x "
+			       "tofOffset %luns%s\n", p[0] >> 22, p[1],
 			       ((uint64_t) p[2] & 0x7fffffff) * 100,
 			       (p[2] & 0x80000000) ? "" : " (raw)");
 			nEvents = p[0] & ((1 << 22) - 1);
