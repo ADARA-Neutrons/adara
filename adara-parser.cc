@@ -312,9 +312,69 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 {
-	// TODO display more fields
-	printf("%u.%09u BEAM MONITOR DATA\n", (uint32_t) (pkt.pulseId() >> 32),
-	       (uint32_t) pkt.pulseId());
+	printf("%u.%09u BEAM MONITOR DATA\n"
+	       "    cycle %u charge %lupC energy %ueV\n",
+	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+	       pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+	       pkt.pulseEnergy());
+	if (pkt.flags()) {
+		printf("    flags");
+		if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			printf(" ERROR");
+		if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			printf(" PARTIAL");
+		if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			printf(" VETO");
+		if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			printf(" NO_RTDL");
+		if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			printf(" MAPPING");
+		if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			printf(" DUP_PULSE");
+		printf("\n");
+	}
+
+	if (1) {
+		uint32_t len = pkt.payload_length();
+		uint32_t *p = (uint32_t *) pkt.payload();
+		uint32_t nEvents;
+
+		/* Skip the header we handled above */
+		p += 4;
+		len -= 4 * sizeof(uint32_t);
+
+		while (len) {
+			if (len < 12) {
+				fprintf(stderr, "Beam monitor event packet "
+						"too short (monitor header)\n");
+				return true;
+			}
+
+			printf("    Monitor %u intrapulse %luns "
+			       "tofOffset %luns%s\n", p[0] >> 22,
+			       (uint64_t) p[1] * 100,
+			       ((uint64_t) p[2] & 0x7fffffff) * 100,
+			       (p[2] & 0x80000000) ? "" : " (raw)");
+			nEvents = p[0] & ((1 << 22) - 1);
+			p += 3;
+			len -= 12;
+
+			if (len < (nEvents * sizeof(uint32_t))) {
+				fprintf(stderr, "Beam monitor event packet "
+						"too short (events)\n");
+				return true;
+			}
+
+			for (uint32_t i = 0; i < nEvents; p++, i++) {
+				printf("\t  %u: %0.7f seconds%s\n", i,
+				       1e-9 * 100 * (*p & ~(1U << 31)),
+				       (*p & (1U << 31)) ? " (trailing)" : "");
+			}
+
+			len -= nEvents * sizeof(uint32_t);
+		}
+	}
+
 	return false;
 }
 
