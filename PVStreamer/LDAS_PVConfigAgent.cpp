@@ -567,7 +567,7 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
                 pv_info = m_cfg_service.getWriteablePV( friendlyname );
                 if ( pv_info )
                 {
-                    pv_info->m_units = myParser.GetAttributeValue(csElement1,"Neumonic"); // Did they mean mnemonic? :)
+                    pv_info->m_units = standardizeUnits( myParser.GetAttributeValue(csElement1,"Class"), myParser.GetAttributeValue(csElement1,"Neumonic")); // Did they mean mnemonic? :)
                 }
                 
                 //strcpy(units.unitsclass,myParser.GetAttributeValue(csElement1,"Class"));
@@ -882,6 +882,83 @@ LDAS_PVConfigAgent::GetDataAccess(PELE_STRUCT pStruct)
 	}
 
     EXC( EC_INVALID_CONFIG_DATA, "Invalid access mode." );
+}
+
+/**
+ * Utility function for converting DAS units into NeXus units.
+ *
+ * @param units The DAS units to be converted.
+ * @return The NeXus units.
+ */
+const char*
+LDAS_PVConfigAgent::standardizeUnits( const CString & a_units_class, const CString & a_units ) const
+{
+    if ( a_units.IsEmpty())
+        return "";
+
+    CString units = a_units;
+    CString units_class = a_units_class;
+
+    units_class.MakeLower();
+    units.MakeLower();
+
+    if ( units_class.IsEmpty())
+    {
+        if ( units == "pc" )
+            return "picoCoulomb";
+    }
+    else if ( units_class == "temperature" )
+    {
+        if ( units == "k" )
+            return "Kelvin";
+    }
+    else if ( units_class == "time" )
+    {
+        if ( units == "s" )
+            return "second";
+        else if ( units == "us" )
+            return "microsecond";
+        else if ( units == "m" )
+            return "minute";
+    }
+    else if ( units_class == "e_m" )
+    {
+        if ( units == "pc" )
+            return "picoCoulomb";
+    }
+    else if ( units_class == "em" )
+    {
+        if ( units == "mev" )
+            return "meV";
+    }
+    else if ( units_class == "linear" )
+    {
+        if ( units == "mm" )
+            return "millimetre";
+        else if ( units == "a" )
+            return "Angstrom";
+    }
+    else if ( units_class == "angular" )
+    {
+        if ( units == "d" || units == "degrees" )
+            return "degree";
+    }
+    else if ( units_class == "phase" )
+    {
+        if ( units == "h" )
+            return "Hz";
+        else if ( units == "d" )
+            return "degree";
+        else if ( units == "us" )
+            return "microsecond";
+    }
+    else if ( units_class == "degrees" )
+    {
+        if ( units == "degrees" )
+            return "degree";
+    }
+
+    return units;
 }
 
 }}}

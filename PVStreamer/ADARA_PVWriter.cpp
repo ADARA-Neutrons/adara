@@ -198,29 +198,6 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, s
     {
     // ADARA does not currently handle devices going inactive, nor individial PVs going active/inactive
     case DeviceActive:
-        {
-            boost::unique_lock<boost::recursive_mutex> lock(m_conn_mutex);
-
-            // This code is needed to handle the case when a client connects before configuration
-            // data is finished loading. This code ensures that the "virtual device" DDP is sent 
-            // to the client(s) before the just arraived real DDP. This is done only once.
-            for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
-            {
-                if ( !ic->ddp )
-                {
-                    ADARAPacket     adara_pkt;
-                    Timestamp       ts;
-
-                    // Use current time for DDP packets
-                    ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
-
-                    // Virtual device
-                    buildDDP( adara_pkt, a_payload, 0, ts );
-                    sendPacket( adara_pkt, &a_payload, ic->sock );
-                }
-            }
-        }
-
         buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device_id, a_pv_pkt.time );
         return true;
 
@@ -290,64 +267,74 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifie
             << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl
             << "  xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd\">" << endl;
 
-    sstr << "  <device_name>" << (a_dev_id?m_streamer.getDeviceName( a_dev_id ):"VirtualDevice0") << "</device_name>" << endl;
+    sstr << "  <device_name>" << m_streamer.getDeviceName( a_dev_id ) << "</device_name>" << endl;
 
-    if ( a_dev_id )
+    const vector<const PVInfo*> & pvs = m_streamer.getDevicePVs( a_dev_id );
+
+    // Generate enumeration definitions for enums used by this device only
+
+    vector<const Enum*> enums_in_use;
+    enums_in_use.reserve(pvs.size());
+
+    for ( vector<const PVInfo*>::const_iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
     {
-        const vector<const PVInfo*> & pvs = m_streamer.getDevicePVs( a_dev_id );
-        sstr << "  <process_variables>" << endl;
-
-        for ( vector<const PVInfo*>::const_iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+        if ( (*ipv)->m_enum )
         {
-            sstr << "    <process_variable>" << endl;
-            sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
-            sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
-            if ( (*ipv)->m_type == PV_ENUM )
-                sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->getID() << "</pv_type>" << endl;
-            else
-                sstr << "      <pv_type>" << getTypeDescriptor((*ipv)->m_type) << "</pv_type>" << endl;
-            if ( (*ipv)->m_units.size() )
-                sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
-
-            if ( (*ipv)->m_hints.length())
-            {
-                sstr << "      <pv_hint>" << endl;
-                sstr << "        " << (*ipv)->m_hints << endl;
-                sstr << "      </pv_hint>" << endl;
-            }
-
-            sstr << "    </process_variable>" << endl;
+            if ( find( enums_in_use.begin(), enums_in_use.end(), (*ipv)->m_enum ) == enums_in_use.end())
+                enums_in_use.push_back( (*ipv)->m_enum );
         }
-
-        sstr << "  </process_variables>" << endl;
     }
-    else
+
+    if ( enums_in_use.size())
     {
-        sstr << "  <device_description>Virtual device for sharing enumerations accross all devices.</device_description>" << endl;
         const map<Identifier,const Enum*> &enums = m_streamer.getEnums();
-        
-        if ( enums.size())
-        {
-            sstr << "  <enumerations>" << endl;
-            for ( map<Identifier,const Enum*>::const_iterator ie = enums.begin(); ie != enums.end(); ++ie )
-            {
-                const map<int,const string> &elems = ie->second->getMap();
 
-                sstr << "    <enumeration>" << endl;
-                sstr << "      <enum_name>enum_" << setw(2) << setfill('0') << ie->second->getID() << "</enum_name>" << endl;
-                for ( map<int,const string>::const_iterator iel = elems.begin(); iel != elems.end(); ++iel )
-                {
-                    sstr << "      <enum_element>" << endl;
-                    sstr << "        <enum_element_name>" << iel->second << "</enum_element_name>" << endl;
-                    sstr << "        <enum_element_value>" << iel->first << "</enum_element_value>" << endl;
-                    sstr << "      </enum_element>" << endl;
-                }
-                sstr << "    </enumeration>" << endl;
+        sstr << "  <enumerations>" << endl;
+        for ( vector<const Enum*>::const_iterator e = enums_in_use.begin(); e != enums_in_use.end(); ++e )
+        {
+            const map<int,const string> &elems = (*e)->getMap();
+
+            sstr << "    <enumeration>" << endl;
+            sstr << "      <enum_name>enum_" << setw(2) << setfill('0') << (*e)->getID() << "</enum_name>" << endl;
+            for ( map<int,const string>::const_iterator iel = elems.begin(); iel != elems.end(); ++iel )
+            {
+                sstr << "        <enum_element>" << endl;
+                sstr << "          <enum_element_name>" << iel->second << "</enum_element_name>" << endl;
+                sstr << "          <enum_element_value>" << iel->first << "</enum_element_value>" << endl;
+                sstr << "        </enum_element>" << endl;
             }
-            sstr << "  </enumerations>" << endl;
+            sstr << "    </enumeration>" << endl;
         }
+        sstr << "  </enumerations>" << endl;
     }
 
+    // Generate process variable definitions
+
+    sstr << "  <process_variables>" << endl;
+
+    for ( vector<const PVInfo*>::const_iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+    {
+        sstr << "    <process_variable>" << endl;
+        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
+        sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
+        if ( (*ipv)->m_type == PV_ENUM )
+            sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->getID() << "</pv_type>" << endl;
+        else
+            sstr << "      <pv_type>" << getTypeDescriptor((*ipv)->m_type) << "</pv_type>" << endl;
+        if ( (*ipv)->m_units.size() )
+            sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
+
+        if ( (*ipv)->m_hints.length())
+        {
+            sstr << "      <pv_hint>" << endl;
+            sstr << "        " << (*ipv)->m_hints << endl;
+            sstr << "      </pv_hint>" << endl;
+        }
+
+        sstr << "    </process_variable>" << endl;
+    }
+
+    sstr << "  </process_variables>" << endl;
     sstr << "</device>" << endl;
 
     // Save payload
@@ -485,10 +472,6 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
 
         // Use current time for DDP packets
         ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
-
-        // Send DDP for "Virtual Device 0"
-        buildDDP( adara_pkt, payload, 0, ts );
-        sendPacket( adara_pkt, &payload, a_socket );
 
         // Send DDPs for real devices
         for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
