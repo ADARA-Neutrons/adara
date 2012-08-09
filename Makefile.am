@@ -15,7 +15,7 @@ EPICS_LDFLAGS = @EPICS_LDFLAGS@
 EPICS_CPPFLAGS = @EPICS_CPPFLAGS@
 
 bin_PROGRAMS = smsd
-noinst_PROGRAMS = storage-test parser-test adara-parser
+noinst_PROGRAMS = storage-test parser-test adara-parser adara-gen
 
 smsd_SOURCES = smsd.cc StorageManager.cc StorageContainer.cc StorageFile.cc \
 		DataSource.cc ADARAPackets.cc ADARAParser.cc \
@@ -42,3 +42,8 @@ storage_test_SOURCES = storage-test.cc StorageManager.cc \
 storage_test_LDADD = -lboost_signals
 
 adara_parser_SOURCES = adara-parser.cc ADARAPackets.cc ADARAParser.cc
+
+adara_gen_SOURCES = adara-gen.cc
+adara_gen_CPPFLAGS = $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
+adara_gen_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
+adara_gen_LDADD = $(EPICS_LIBS) -lboost_program_options -lpthread
