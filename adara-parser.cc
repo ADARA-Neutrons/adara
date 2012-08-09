@@ -177,7 +177,8 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 	if (1) {
 		uint32_t len = pkt.payload_length();
 		uint32_t *p = (uint32_t *) pkt.payload();
-		uint32_t i = 0;
+		uint32_t tof, i = 0;
+		double s;
 
 		/* Skip the header we handled above */
 		p += 6;
@@ -189,7 +190,16 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 				return true;
 			}
 
-			printf("\t  %u: %08x %08x\n", i++, p[0], p[1]);
+			/* Metadata TOF values have a cycle indicator in
+			 * the upper 11 bits (really 10, but there is
+			 * currently an unused bit at 31).
+			 */
+			tof = p[0];
+			if (p[1] & 0x70000000)
+				tof &= ~0xffc00000;
+			s = 1e-9 * 100 * tof;
+			printf("\t  %u: %08x %08x    (%0.7f seconds)\n",
+				i++, p[0], p[1], s);
 			p += 2;
 			len -= 8;
 		}
@@ -204,7 +214,7 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 	printf("%u.%09u RTDL\n"
 	       "    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
 	       "    intrapulse %luns tofOffset %luns%s\n"
-	       "    charge %lu pC period %u\n",
+	       "    charge %lupC period %ups\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 	       pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
@@ -286,8 +296,10 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 				}
 
 				for (uint32_t j = 0; j < nEvents; j++) {
-					printf("\t  %u: %08x %08x\n", j,
-					       p[0], p[1]);
+					printf("\t  %u: %08x %08x"
+					       "    (%0.7f seconds)\n",
+					       j, p[0], p[1],
+					       1e-9 * 100 * p[0]);
 					p += 2;
 					len -= 8;
 				}
