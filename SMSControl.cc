@@ -252,8 +252,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
-		BeamMonitor new_mon(pkt.sourceID(), pkt.intraPulseTime(),
-				    pkt.tofField());
+		BeamMonitor new_mon(pkt.sourceID(), pkt.tofField());
 		MonitorMap::value_type val(pixel, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
 	}
@@ -478,7 +477,7 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 		uint32_t id_cnt = mIt->first << 22;
 		id_cnt |= mon.m_eventTof.size();
 		m_hdrs.push_back(id_cnt);
-		m_hdrs.push_back(mon.m_intraPulseTime);
+		m_hdrs.push_back(mon.m_sourceId);
 		m_hdrs.push_back(mon.m_tofField);
 
 		iov.iov_base = &mon.m_eventTof.front();

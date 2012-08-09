@@ -87,14 +87,11 @@ private:
 
 	struct BeamMonitor {
 		/* TODO preallocate m_eventTof to avoid resizing */
-		BeamMonitor(uint32_t srcId, uint32_t intraPulse,
-			    uint32_t tofField) :
-				m_sourceId(srcId), m_intraPulseTime(intraPulse),
-				m_tofField(tofField)
+		BeamMonitor(uint32_t srcId, uint32_t tofField) :
+				m_sourceId(srcId), m_tofField(tofField)
 		{ }
 
 		uint32_t			m_sourceId;
-		uint32_t			m_intraPulseTime;
 		uint32_t			m_tofField;
 		std::vector<uint32_t>		m_eventTof;
 	};
