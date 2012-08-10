@@ -177,9 +177,9 @@ int _tmain(int argc, _TCHAR* argv[])
                     cout << "  pv alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
                 }
                 else if ( hdr.format == 0x400900 )
-                {
                     cout << "  heartbeat." << endl;
-                }
+                else if ( hdr.format == 0x200 )
+                    cout << "  source list pkt." << endl;
                 else
                 {
                     cout << "  unknown pkt type!" << endl;

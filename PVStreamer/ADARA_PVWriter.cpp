@@ -453,6 +453,25 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
 }
 
 /**
+ * \brief Sends a source list packet to client socket (paket is empty for PVStreamer)
+ * \param a_socket Client socket to send paket over. 
+ */
+void
+ADARA_PVWriter::sendSourceInfo( SOCKET a_socket )
+{
+    ADARAPacket adara_pkt;
+
+    // Use current time for DDP packets
+
+    adara_pkt.payload_len = 0;
+    adara_pkt.format = 0x200;
+    adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+    adara_pkt.nsec = 0;
+
+    sendPacket( adara_pkt, 0, a_socket );
+}
+
+/**
  * \brief Attempts to send DDPs for all active devices to the specified client.
  * \param a_socket - Socket of client to receive DDPs.
  * \return True on success; false otherwise.
@@ -623,6 +642,8 @@ ADARA_PVWriter::socketListenThreadFunc()
         }
         else
         {
+            // New client processing
+
             info.ddp = false;
             info.addr = inet_ntoa( ((struct sockaddr_in &)client_addr).sin_addr );
             LOG_INFO( "ADARA client connected from " << info.addr );
@@ -633,7 +654,10 @@ ADARA_PVWriter::socketListenThreadFunc()
 
             notifyConnect( info.addr );
 
-            // New client - need to send it all currently active devies (if any)
+            // Send source information packet first
+            sendSourceInfo( info.sock );
+
+            // need to send it all currently active devies (if any)
             info.ddp = sendActiveDeviceInfo( info.sock );
         }
     }
