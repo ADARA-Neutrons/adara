@@ -121,7 +121,7 @@ SourceListPkt::SourceListPkt(const SourceListPkt &pkt) :
 BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((uint32_t *)payload())
 {
-	if (m_payload_len < (5 * sizeof(uint32_t)))
+	if (m_payload_len < (4 * sizeof(uint32_t)))
 		throw invalid_packet("BankedEvent packet is too short");
 }
 
