@@ -56,6 +56,7 @@ private:
 
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
+	bool rxPacket(const ADARA::SourceListPkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);

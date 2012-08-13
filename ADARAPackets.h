@@ -135,6 +135,21 @@ private:
 	friend class Parser;
 };
 
+class SourceListPkt : public Packet {
+public:
+	SourceListPkt(const SourceListPkt &pkt);
+
+	const uint32_t *ids(void) const { return (uint32_t *) payload(); }
+	uint32_t num_ids(void) const {
+		return payload_length() / sizeof (uint32_t);
+	}
+
+private:
+	SourceListPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
 class BankedEventPkt : public Packet {
 public:
 	BankedEventPkt(const BankedEventPkt &pkt);

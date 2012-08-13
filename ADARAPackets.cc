@@ -108,6 +108,16 @@ RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
 
 /* ------------------------------------------------------------------------ */
 
+SourceListPkt::SourceListPkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len)
+{}
+
+SourceListPkt::SourceListPkt(const SourceListPkt &pkt) :
+	Packet(pkt)
+{}
+
+/* ------------------------------------------------------------------------ */
+
 BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((uint32_t *)payload())
 {

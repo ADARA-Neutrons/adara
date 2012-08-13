@@ -61,6 +61,7 @@ protected:
 	 */
 	virtual bool rxPacket(const RawDataPkt &pkt);
 	virtual bool rxPacket(const RTDLPkt &pkt);
+	virtual bool rxPacket(const SourceListPkt &pkt);
 	virtual bool rxPacket(const BankedEventPkt &pkt);
 	virtual bool rxPacket(const BeamMonitorPkt &pkt);
 	virtual bool rxPacket(const PixelMappingPkt &pkt);

@@ -175,6 +175,7 @@ bool Parser::rxPacket(const Packet &pkt)
 	switch (pkt.type()) {
 		MAP_TYPE(PacketType::RAW_EVENT_V0, RawDataPkt);
 		MAP_TYPE(PacketType::RTDL_V0, RTDLPkt);
+		MAP_TYPE(PacketType::SOURCE_LIST_V0, SourceListPkt);
 		MAP_TYPE(PacketType::BANKED_EVENT_V0, BankedEventPkt);
 		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_V0, BeamMonitorPkt);
 		MAP_TYPE(PacketType::PIXEL_MAPPING_V0, PixelMappingPkt);
@@ -219,6 +220,7 @@ bool Parser::rxPacket(const type &) { return false; }
 
 EXPAND_HANDLER(RawDataPkt)
 EXPAND_HANDLER(RTDLPkt)
+EXPAND_HANDLER(SourceListPkt)
 EXPAND_HANDLER(BankedEventPkt)
 EXPAND_HANDLER(BeamMonitorPkt)
 EXPAND_HANDLER(PixelMappingPkt)

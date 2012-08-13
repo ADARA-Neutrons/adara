@@ -359,6 +359,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		return false;
 	case ADARA::PacketType::RAW_EVENT_V0:
 	case ADARA::PacketType::RTDL_V0:
+	case ADARA::PacketType::SOURCE_LIST_V0:
 	case ADARA::PacketType::DEVICE_DESC_V0:
 	case ADARA::PacketType::VAR_VALUE_U32_V0:
 	case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
@@ -439,6 +440,17 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// XXX do duplicate checking on a per-datasource basis?
 	SMSControl *ctrl = SMSControl::getInstance();
 	ctrl->pulseRTDL(pkt);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::SourceListPkt &pkt)
+{
+	const uint32_t *ids = pkt.ids();
+
+	/* TODO note undeclared ids when we get raw event packets */
+	for (uint32_t i = 0; i < pkt.num_ids(); i++) {
+		getHWSource(ids[i]);
+	}
 	return false;
 }
 
