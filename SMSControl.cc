@@ -39,7 +39,7 @@ SMSControl::SMSControl(const std::string &beamlineId,
 	if (m_singleton)
 		throw std::runtime_error("SMSControl is a singleton");
 
-	std::string prefix(beamlineShortName);
+	std::string prefix(beamlineId);
 	prefix += ":SMS";
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
@@ -54,7 +54,7 @@ SMSControl::SMSControl(const std::string &beamlineId,
 
 	m_beamlineInfo.reset(new BeamlineInfo(beamlineId, beamlineShortName,
 					      beamlineLongName));
-	m_runInfo.reset(new RunInfo(beamlineShortName, this));
+	m_runInfo.reset(new RunInfo(beamlineId, this));
 	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
 	m_pixelMap.reset(new PixelMap("/adara/conf/pixelmap"));
 

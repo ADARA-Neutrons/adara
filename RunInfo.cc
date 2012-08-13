@@ -9,7 +9,7 @@
 class RunInfoResetPV : public smsTriggerPV {
 public:
 	RunInfoResetPV(const std::string &prefix, RunInfo *master) :
-		smsTriggerPV(prefix + "reset"), m_master(master) {}
+		smsTriggerPV(prefix + "Reset"), m_master(master) {}
 
 private:
 	RunInfo *m_master;
@@ -80,21 +80,19 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	sms->addPV(m_resetPV);
 
 	/* These fields are required */
-	addPV(prefix, "proposal_id", m_required, sms);
-	addPV(prefix, "collection_number", m_required, sms);
+	addPV(prefix, "ProposalId", m_required, sms);
 
 	/* These fields are optional */
-	addPV(prefix, "proposal_title", m_optional, sms);
-	addPV(prefix, "collection_title", m_optional, sms);
-	addPV(prefix, "run_title", m_optional, sms);
+	addPV(prefix, "ProposalTitle", m_optional, sms);
+	addPV(prefix, "RunTitle", m_optional, sms);
 
 	/* These fields describe the sample, and are optional */
-	prefix += "sample:";
-	addPV(prefix, "id", m_sample, sms);
-	addPV(prefix, "name", m_sample, sms);
-	addPV(prefix, "nature", m_sample, sms);
-	addPV(prefix, "formula", m_sample, sms);
-	addPV(prefix, "environment", m_sample, sms);
+	prefix += "Sample:";
+	addPV(prefix, "Id", m_sample, sms);
+	addPV(prefix, "Name", m_sample, sms);
+	addPV(prefix, "Nature", m_sample, sms);
+	addPV(prefix, "Formula", m_sample, sms);
+	addPV(prefix, "Environment", m_sample, sms);
 
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.

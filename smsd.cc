@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 
 	StorageManager::init("/adara/data");
 	LiveServer liveServer("31415");
-	SMSControl control("1", "CNCS", "TestBeam");
+	SMSControl control("BL14B", "HYSPEC", "HYSPEC");
 	STSClientMgr stsclient("localhost:31417");
 
 	control.addSource("localhost:31416");

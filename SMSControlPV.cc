@@ -121,7 +121,7 @@ smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 
 	m_read_table.installReadFunc ("value", &smsRunNumberPV::getValue);
 
-	m_pv_name = prefix + ":run_number";
+	m_pv_name = prefix + ":RunNumber";
 }
 
 casChannel *smsRunNumberPV::createChannel(const casCtx &ctx,
@@ -187,7 +187,7 @@ smsRecordingPV::smsRecordingPV(const std::string &prefix, SMSControl *sms) :
 	m_read_table.installReadFunc ("value", &smsRecordingPV::getValue);
 	m_read_table.installReadFunc ("enums", &smsRecordingPV::getEnums);
 
-	m_pv_name = prefix + ":recording";
+	m_pv_name = prefix + ":Recording";
 }
 
 aitEnum smsRecordingPV::bestExternalType(void) const
