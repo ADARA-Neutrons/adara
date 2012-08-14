@@ -353,9 +353,14 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	if (start || nelem > MAX_LENGTH)
 		return S_casApp_outOfBounds;
 
-	/* TODO need to be able to conditionally deny this change request;
-	 * ie, we don't want to change RunInfo during a run
-	 */
+	if (!allowUpdate(val)) {
+		/* We don't want to update the PV at this time; still
+		 * send a notification to any watchers, and just return
+		 * success.
+		 */
+		notify();
+		return S_casApp_success;
+	}
 
 	/* We ensure we have room for MAX_LENGTH characters, plus a
 	 * trailing nul to make live easier when converting to a std::string.
@@ -379,6 +384,11 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	changed();
 
 	return S_casApp_success;
+}
+
+bool smsStringPV::allowUpdate(const gdd &)
+{
+	return true;
 }
 
 void smsStringPV::unset(void)

@@ -130,6 +130,7 @@ bool SMSControl::setRecording(bool v)
 	if (v) {
 		/* Starting a new recording */
 		/* TODO persist the run number */
+		m_runInfo->lock();
 		m_runInfo->setRunNumber(m_nextRunNumber);
 		StorageManager::startRecording(m_nextRunNumber);
 		m_pvRunNumber->update(m_nextRunNumber++, &now);
@@ -137,6 +138,7 @@ bool SMSControl::setRecording(bool v)
 	} else {
 		/* Stop the current recording */
 		m_runInfo->setRunNumber(0);
+		m_runInfo->unlock();
 		StorageManager::stopRecording();
 		m_pvRunNumber->update(0, &now);
 		m_pvRecording->update(v, &now);

@@ -9,21 +9,33 @@
 class RunInfoResetPV : public smsTriggerPV {
 public:
 	RunInfoResetPV(const std::string &prefix, RunInfo *master) :
-		smsTriggerPV(prefix + "Reset"), m_master(master) {}
+		smsTriggerPV(prefix + "Reset"), m_master(master),
+		m_unlocked(true) {}
+
+	void lock(void) { m_unlocked = false; }
+	void unlock(void) { m_unlocked = true; }
 
 private:
 	RunInfo *m_master;
+	bool m_unlocked;
+
+	bool allowUpdate(const gdd &) { return m_unlocked; }
 	void triggered(void) { m_master->reset(); }
 };
 
 class RunInfoPV : public smsStringPV {
 public:
 	RunInfoPV(const std::string &name, RunInfo *ri) :
-		smsStringPV(name), m_runInfo(ri) {}
+		smsStringPV(name), m_runInfo(ri), m_unlocked(true) {}
+
+	void lock(void) { m_unlocked = false; }
+	void unlock(void) { m_unlocked = true; }
 
 private:
 	RunInfo *m_runInfo;
+	bool m_unlocked;
 
+	bool allowUpdate(const gdd &) { return m_unlocked; }
 	void changed(void) { m_runInfo->invalidateCache(); }
 };
 
@@ -114,6 +126,32 @@ void RunInfo::addPV(const std::string &prefix, const char *name,
 	std::string pvName = prefix + name;
 	map[name].reset(new RunInfoPV(pvName, this));
 	sms->addPV(map[name]);
+}
+
+void RunInfo::lock(void)
+{
+	RunInfoMap::iterator it;
+
+	for (it = m_required.begin(); it != m_required.end(); it++)
+		it->second->lock();
+	for (it = m_optional.begin(); it != m_optional.end(); it++)
+		it->second->lock();
+	for (it = m_sample.begin(); it != m_sample.end(); it++)
+		it->second->lock();
+	m_resetPV->lock();
+}
+
+void RunInfo::unlock(void)
+{
+	RunInfoMap::iterator it;
+
+	for (it = m_required.begin(); it != m_required.end(); it++)
+		it->second->unlock();
+	for (it = m_optional.begin(); it != m_optional.end(); it++)
+		it->second->unlock();
+	for (it = m_sample.begin(); it != m_sample.end(); it++)
+		it->second->unlock();
+	m_resetPV->unlock();
 }
 
 void RunInfo::reset(void)

@@ -110,6 +110,7 @@ public:
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
 
+	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
 };
 

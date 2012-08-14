@@ -13,11 +13,15 @@ class RunInfoPV;
 
 class RunInfo : boost::noncopyable {
 public:
+	typedef boost::shared_ptr<RunInfoResetPV> RunInfoResetPVSharedPtr;
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
 	RunInfo(const std::string &beamline, SMSControl *sms);
 	~RunInfo();
+
+	void lock(void);
+	void unlock(void);
 
 	bool valid(void);
 	void reset(void);
@@ -34,7 +38,7 @@ private:
 	RunInfoMap m_required;
 	RunInfoMap m_optional;
 	RunInfoMap m_sample;
-	SMSControl::PVSharedPtr m_resetPV;
+	RunInfoResetPVSharedPtr m_resetPV;
 
 	uint32_t m_runNumber;
 	bool m_packetValid;
