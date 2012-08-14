@@ -88,16 +88,20 @@ private:
 
 class smsStringPV : public smsPV {
 public:
+	enum { MAX_LENGTH = 1024 };
+
 	smsStringPV(const std::string &name);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
 
+	virtual unsigned int maxDimension(void) const;
+	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
 
 	void unset(void);
 	bool valid(void);
-	const std::string value(void);
+	std::string value(void);
 
 public:
 	gddAppFuncTable<smsStringPV>	m_read_table;

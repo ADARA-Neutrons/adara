@@ -10,18 +10,22 @@
  */
 #define uninitialized_var(x) x = 0
 
-/* We need to a specialized destructor to delete enum strings when
+/* We need to a specialized destructor to delete allocated data when
  * the gdd holding them drops its last reference.
  */
 class fixedStringDestructor : public gddDestructor {
-	virtual void run(void *);
+	virtual void run(void *p) {
+		aitFixedString *s = (aitFixedString *)p;
+		delete [] s;
+	}
 };
 
-void fixedStringDestructor::run(void *p)
-{
-	aitFixedString *s = (aitFixedString *)p;
-	delete [] s;
-}
+class charArrayDestructor : public gddDestructor {
+	virtual void run(void *p) {
+		char *s = (char *)p;
+		delete [] s;
+	}
+};
 
 /* ----------------------------------------------------------------------- */
 
@@ -283,9 +287,19 @@ smsStringPV::smsStringPV(const std::string &name) : smsPV(name)
 	unset();
 }
 
+unsigned int smsStringPV::maxDimension(void) const
+{
+	return 1;
+}
+
+aitIndex smsStringPV::maxBound(unsigned int dim) const
+{
+	return dim ? 0 : MAX_LENGTH;
+}
+
 aitEnum smsStringPV::bestExternalType(void) const
 {
-	return aitEnumString;
+	return aitEnumUint8;
 }
 
 gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
@@ -303,32 +317,42 @@ caStatus smsStringPV::read(const casCtx &ctx, gdd &prototype)
 
 caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 {
-	aitString old_str, new_str;
+	unsigned int start, nelem;
 
-	if (!val.isScalar())
+	if (!val.isAtomic())
 		return S_casApp_noSupport;
+
+	if (val.dimension() != 1)
+		return S_casApp_outOfBounds;
+
+	val.getBound(0, start, nelem);
+	if (start || nelem > MAX_LENGTH)
+		return S_casApp_outOfBounds;
 
 	/* TODO need to be able to conditionally deny this change request;
 	 * ie, we don't want to change RunInfo during a run
 	 */
 
-	m_value->get(old_str);
-	val.get(new_str);
-	if (strcmp(old_str.string(), new_str.string())) {
-		struct timespec ts;
-		val.getTimeStamp(&ts);
+	/* We ensure we have room for MAX_LENGTH characters, plus a
+	 * trailing nul to make live easier when converting to a std::string.
+	 */
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	memcpy(new_str, val.dataPointer(), nelem);
 
-		/* One would think nv->copy(&val) would work, but no. It
-		 * cauaes nv to become a container, which won't convert
-		 * back to string.
-		 */
-		gdd *nv = new gddScalar(gddAppType_value, aitEnumString);
-		nv->put(new_str);
-		nv->setTimeStamp(&ts);
-		m_value = nv;
-		notify();
-		changed();
-	}
+	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
+				      MAX_LENGTH);
+	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
+
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+	nv->setTimeStamp(&ts);
+	nv->setStat(epicsAlarmNone);
+	nv->setSevr(epicsSevNone);
+
+	m_value = nv;
+	notify();
+	changed();
 
 	return S_casApp_success;
 }
@@ -341,11 +365,18 @@ void smsStringPV::unset(void)
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 
-	m_value = new gddScalar(gddAppType_value, aitEnumString);
-	m_value->put(aitString("(unset)"));
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	strcpy(new_str, "(unset)");
+
+	m_value = new gddAtomic(gddAppType_value, aitEnumUint8, 1, MAX_LENGTH);
+	m_value->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 	m_value->setStat(epicsAlarmUDF);
 	m_value->setSevr(epicsSevNone);
 	m_value->setTimeStamp(&ts);
+
+	unsigned int start, nelem;
+	m_value->getBound(0, start, nelem);
 
 	notify();
 	changed();
@@ -356,17 +387,9 @@ bool smsStringPV::valid(void)
 	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
 }
 
-const std::string smsStringPV::value(void)
+std::string smsStringPV::value(void)
 {
-	std::string val;
-
-	if (m_value.valid()) {
-		aitString str;
-		m_value->get(str);
-		val = str.string();
-	}
-
-	return val;
+	return std::string((char *) m_value->dataPointer());
 }
 
 void smsStringPV::changed(void)
