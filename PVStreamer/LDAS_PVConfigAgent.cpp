@@ -272,6 +272,12 @@ LDAS_PVConfigAgent::fileSocketData( NI::CNiDataSocketData &a_data )
 
         // Notify config service that this source is invalid
         m_cfg_service.configurationInvalid( LDAS_PROTOCOL, m_hostname );
+
+        // Notify config service of unhandled exception
+        stringstream s;
+        s << "Failed loading configuration data from " << m_hostname;
+        TraceException e( __FILE__, __LINE__, EC_UNKOWN_ERROR, s.str() );
+        m_cfg_service.unhandledException( e );
     }
 }
 
@@ -359,8 +365,8 @@ LDAS_PVConfigAgent::parseConfigFile( const std::string &a_filename )
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed processing configuration file: " << a_filename );
-        throw;
+        LOG_ERROR( "Unkown error processing configuration file: " << a_filename );
+        EXCP( EC_UNKOWN_ERROR, "Unknown error processing configuration file: " << a_filename );
     }
 }
 
@@ -480,7 +486,6 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
             delete[] buffer;
 
         LOG_ERROR( "Failed processing options file: " << a_filename );
-
         EXC_ADD(e, "Failed processing options file " << a_filename );
         throw;
     }
@@ -489,8 +494,8 @@ LDAS_PVConfigAgent::parseOptionsFile( const std::string &a_filename )
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed processing options file: " << a_filename );
-        throw;
+        LOG_ERROR( "Unknown error processing options file: " << a_filename );
+        EXCP( EC_UNKOWN_ERROR, "Unknown error processing options file: " << a_filename );
     }
 }
 
@@ -594,8 +599,8 @@ LDAS_PVConfigAgent::parseUnitsFile( const std::string &a_filename )
         if ( buffer )
             delete[] buffer;
 
-        LOG_ERROR( "Failed processing units file: " << a_filename );
-        throw;
+        LOG_ERROR( "Unkown error processing units file: " << a_filename );
+        EXCP( EC_UNKOWN_ERROR, "Unknown error processing units file: " << a_filename );
     }
 }
 
