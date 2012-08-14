@@ -37,6 +37,13 @@ protected:
 	std::string m_pv_name;
 	bool m_interested;
 
+	gddAppFuncTable<smsPV>	m_read_table;
+
+	virtual gddAppFuncTableStatus getValue(gdd &value) = 0;
+	virtual gddAppFuncTableStatus getEnums(gdd &value);
+	gddAppFuncTableStatus unusedType(gdd &in);
+
+	void initReadTable(void);
 	void notify(void);
 };
 
@@ -58,8 +65,6 @@ public:
 				  const char * const host);
 
 private:
-	gddAppFuncTable<smsRunNumberPV>	m_read_table;
-
 	gddAppFuncTableStatus getValue(gdd &value);
 
 	void update(uint32_t run, struct timespec *ts);
@@ -80,7 +85,6 @@ public:
 
 private:
 	SMSControl *m_sms;
-	gddAppFuncTable<smsRecordingPV>	m_read_table;
 
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
@@ -104,8 +108,6 @@ public:
 	std::string value(void);
 
 public:
-	gddAppFuncTable<smsStringPV>	m_read_table;
-
 	gddAppFuncTableStatus getValue(gdd &value);
 
 	virtual void changed(void);
@@ -121,8 +123,6 @@ public:
 	virtual aitEnum bestExternalType(void) const;
 
 public:
-	gddAppFuncTable<smsTriggerPV>	m_read_table;
-
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
 

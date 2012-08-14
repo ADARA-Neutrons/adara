@@ -31,15 +31,35 @@ class charArrayDestructor : public gddDestructor {
 
 smsPV::smsPV() : m_interested(false)
 {
+	initReadTable();
 }
 
 smsPV::smsPV(const std::string &name) :
 	m_pv_name(name), m_interested(false)
 {
+	initReadTable();
 }
 
 smsPV::~smsPV()
 {
+}
+
+void smsPV::initReadTable(void)
+{
+	m_read_table.installReadFunc("value", &smsPV::getValue);
+	m_read_table.installReadFunc("enums", &smsPV::getEnums);
+
+	/* These are not currently used by any child classes */
+	m_read_table.installReadFunc("alarmHigh", &smsPV::unusedType);
+	m_read_table.installReadFunc("alarmLow", &smsPV::unusedType);
+	m_read_table.installReadFunc("alarmHighWarning", &smsPV::unusedType);
+	m_read_table.installReadFunc("alarmLowWarning", &smsPV::unusedType);
+	m_read_table.installReadFunc("controlHigh", &smsPV::unusedType);
+	m_read_table.installReadFunc("controlLow", &smsPV::unusedType);
+	m_read_table.installReadFunc("graphicHigh", &smsPV::unusedType);
+	m_read_table.installReadFunc("graphicLow", &smsPV::unusedType);
+	m_read_table.installReadFunc("precision", &smsPV::unusedType);
+	m_read_table.installReadFunc("units", &smsPV::unusedType);
 }
 
 const char *smsPV::getName(void) const
@@ -99,6 +119,16 @@ void smsPV::destroy(void)
 	/* PVs are pre-allocated; SMControl will clean us up */
 }
 
+gddAppFuncTableStatus smsPV::getEnums(gdd &)
+{
+	return S_gddAppFuncTable_badType;
+}
+
+gddAppFuncTableStatus smsPV::unusedType(gdd &)
+{
+	return S_gddAppFuncTable_badType;
+}
+
 /* ----------------------------------------------------------------------- */
 
 smsReadOnlyChannel::smsReadOnlyChannel(const casCtx &cas) : casChannel(cas)
@@ -122,8 +152,6 @@ smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 
 	clock_gettime(CLOCK_REALTIME, &ts);
 	m_value->setTimeStamp(&ts);
-
-	m_read_table.installReadFunc ("value", &smsRunNumberPV::getValue);
 
 	m_pv_name = prefix + ":RunNumber";
 }
@@ -187,9 +215,6 @@ smsRecordingPV::smsRecordingPV(const std::string &prefix, SMSControl *sms) :
 
 	clock_gettime(CLOCK_REALTIME, &ts);
 	m_value->setTimeStamp(&ts);
-
-	m_read_table.installReadFunc ("value", &smsRecordingPV::getValue);
-	m_read_table.installReadFunc ("enums", &smsRecordingPV::getEnums);
 
 	m_pv_name = prefix + ":Recording";
 }
@@ -283,7 +308,6 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 smsStringPV::smsStringPV(const std::string &name) : smsPV(name)
 {
 	m_pv_name = name;
-	m_read_table.installReadFunc ("value", &smsStringPV::getValue);
 	unset();
 }
 
@@ -408,9 +432,6 @@ smsTriggerPV::smsTriggerPV(const std::string &name)
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_read_table.installReadFunc ("value", &smsTriggerPV::getValue);
-	m_read_table.installReadFunc ("enums", &smsTriggerPV::getEnums);
 
 	m_pv_name = name;
 }
