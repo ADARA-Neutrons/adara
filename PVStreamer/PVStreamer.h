@@ -13,6 +13,7 @@
 #include <string>
 
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 
 #include "SyncDeque.h"
 #include "PVStreamerSupport.h"
