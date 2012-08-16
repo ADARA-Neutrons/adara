@@ -145,6 +145,8 @@ system.
 		\ref{section:protocol_raw_event_packet} \\
 	0x0001.0 & Real Time Data Link Info &
 		\ref{section:protocol_rtdl_packet} \\
+	0x0002.0 & Event Source List &
+		\ref{section:protocol_source_list_packet} \\
 	0x4000.0 & Banked Event Data &
 		\ref{section:protocol_banked_events} \\
 	0x4001.0 & Beam Monitor Event Data &
@@ -494,6 +496,46 @@ the corresponding frame data field.
 \item{\bf Frame Data $X$} contains the data for the RTDL Frame given by
 {\bf FNA $X$}.
 \end{itemize}
+
+
+\newpage
+\subsubsection{Detector System: Event Source List}
+\label{section:protocol_source_list_packet}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{$4N$} \\
+    \wordbox{1}{0x00000200} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Source ID 1} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{1}{Source ID $N$} \\
+  \end{bytefield}
+  \caption{Packet Type 0x2.0: Event Source List}
+  \label{fig:protocol_packet_source_list}
+\end{figure}
+
+The ``Event Source List'' packet described in
+Figure~\ref{fig:protocol_packet_source_list} is used to communicate the
+universe of source IDs for a given connection. This allows the prepocessor (or
+other data source) to inform the stream management server of all event sources
+known to the preprocessor, allowing the SMS to better detect missing packets.
+It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is 4 times the number of sourcs provided.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Source ID $N$} contains identifies a source of neutron events for
+this stream.
+\end{itemize}
+
+The data source should send this packet before sending any Banked Event or RTDL
+packets to the SMS. If the data source will not be sending event data, it
+should send this packet without any source IDs and a payload length of 0.
 
 
 \newpage
