@@ -343,6 +343,14 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 {
 	unsigned int start, nelem;
 
+	/* caput sends a null string as a scalar, so interpret that
+	 * as an unset request.
+	 */
+	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
+		unset();
+		return S_cas_success;
+	}
+
 	if (!val.isAtomic())
 		return S_casApp_noSupport;
 
@@ -352,6 +360,13 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	val.getBound(0, start, nelem);
 	if (start || nelem > MAX_LENGTH)
 		return S_casApp_outOfBounds;
+
+	/* Writing no elements will be considered an unset request.
+	 */
+	if (!nelem) {
+		unset();
+		return S_cas_success;
+	}
 
 	if (!allowUpdate(val)) {
 		/* We don't want to update the PV at this time; still
