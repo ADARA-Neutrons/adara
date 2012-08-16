@@ -39,10 +39,93 @@ private:
 	void changed(void) { m_runInfo->invalidateCache(); }
 };
 
-static void xmlEncodeTo(const std::string &in, std::string &out)
+class RunUserInfoPV : public smsStringPV {
+public:
+	RunUserInfoPV(const std::string &prefix, RunInfo *ri) :
+		smsStringPV(prefix + "UserInfo"), m_runInfo(ri),
+		m_unlocked(true) {}
+
+	void lock(void) { m_unlocked = false; }
+	void unlock(void) { m_unlocked = true; }
+
+private:
+	RunInfo *m_runInfo;
+	bool m_unlocked;
+
+	bool validateUser(const std::string &val) {
+		size_t sep, next;
+
+		/* Make sure there is a separator for the name,
+		 * and it isn't at the beginning of the string.
+		 */
+		sep = val.find_first_of(':');
+		if (sep == 0 || sep == std::string::npos)
+			return false;
+
+		/* Make sure there is a separator for the uid,
+		 * and it isn't directly following the name
+		 * separator.
+		 */
+		next = sep + 1;
+		sep = val.find_first_of(':', next);
+		if (sep == next || sep == std::string::npos)
+			return false;
+
+		/* Make sure that role is non-empty, and there
+		 * is no additional separator after it.
+		 */
+		sep++;
+		if (sep >= val.length())
+			return false;
+
+		sep = val.find_first_of(':', sep);
+		return sep == std::string::npos;
+	}
+
+	bool allowUpdate(const gdd &in) {
+		if (!m_unlocked)
+			return false;
+
+		unsigned int start, nelem;
+		in.getBound(0, start, nelem);
+
+		/* Some clients will send the trailing nul, other
+		 * don't. Normalize the length to not include it.
+		 */
+		if (!((char *) in.dataPointer())[nelem - 1])
+			nelem--;
+
+		std::string val((char *) in.dataPointer(), nelem);
+		size_t begin, end;
+
+		begin = 0;
+		end = val.find_first_of(';');
+		while (end != std::string::npos) {
+			if (!validateUser(val.substr(begin, end - begin)))
+				return false;
+
+			begin = end + 1;
+			end = val.find_first_of(';', begin);
+		}
+
+		/* Now get the last one */
+		return validateUser(val.substr(begin, end - begin));
+	}
+
+	void changed(void) { m_runInfo->invalidateCache(); }
+};
+
+static void xmlEncodeTo(std::string &out, const std::string &in,
+			size_t pos = 0, size_t end = std::string::npos);
+
+static void xmlEncodeTo(std::string &out, const std::string &in,
+			size_t pos, size_t end)
 {
+	if (end == std::string::npos)
+		end = in.size();
+
 	/* From stackoverflow.com */
-	for(size_t pos = 0; pos != in.size(); pos++) {
+	for( ; pos != end; pos++) {
 		switch(in[pos]) {
 		case '&':	out.append("&amp;");	break;
 		case '\"':	out.append("&quot;");	break;
@@ -52,6 +135,32 @@ static void xmlEncodeTo(const std::string &in, std::string &out)
 		default:	out.append(1, in[pos]);break;
 		}
 	}
+}
+
+static void addUserInfo(std::string &out, const std::string &info)
+{
+	size_t begin, end;
+
+	out += "<users>";
+
+	for (begin = end = 0; end != std::string::npos; begin = end + 1) {
+		end = info.find_first_of(':', begin);
+		out += "<user><user_name>";
+		xmlEncodeTo(out, info, begin, end);
+		out += "</user_name>";
+		begin = end + 1;
+		end = info.find_first_of(':', begin);
+		out += "<user_id>";
+		xmlEncodeTo(out, info, begin, end);
+		out += "</user_id>";
+		begin = end + 1;
+		end = info.find_first_of(';', begin);
+		out += "<user_role>";
+		xmlEncodeTo(out, info, begin, end);
+		out += "</user_role></user>";
+	}
+
+	out += "</users>";
 }
 
 static void addElements(std::string &out, RunInfo::RunInfoMap &map,
@@ -71,7 +180,7 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 			}
 
 			out += "<"; out += it->first; out += ">";
-			xmlEncodeTo(it->second->value(), out);
+			xmlEncodeTo(out, it->second->value());
 			out += "</"; out += it->first; out += ">";
 		}
 	}
@@ -91,6 +200,9 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	m_resetPV.reset(new RunInfoResetPV(prefix, this));
 	sms->addPV(m_resetPV);
 
+	m_userPV.reset(new RunUserInfoPV(prefix, this));
+	sms->addPV(m_userPV);
+
 	/* These fields are required */
 	addPV(prefix, "ProposalId", m_required, sms);
 
@@ -109,7 +221,6 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
 	 */
-	// TODO handle "user" element
 
 	m_connection = StorageManager::onPrologue(boost::bind(&RunInfo::onPrologue, this));
 }
@@ -198,6 +309,8 @@ void RunInfo::generatePacket(void)
 	xml += "<run_number>";
 	xml += boost::lexical_cast<std::string>(m_runNumber);
 	xml += "</run_number>";
+
+	addUserInfo(xml, m_userPV->value());
 
 	addElements(xml, m_required);
 	addElements(xml, m_optional);

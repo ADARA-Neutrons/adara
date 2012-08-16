@@ -8,11 +8,13 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
+class RunUserInfoPV;
 class RunInfoResetPV;
 class RunInfoPV;
 
 class RunInfo : boost::noncopyable {
 public:
+	typedef boost::shared_ptr<RunUserInfoPV> RunUserInfoPVSharedPtr;
 	typedef boost::shared_ptr<RunInfoResetPV> RunInfoResetPVSharedPtr;
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
@@ -39,6 +41,7 @@ private:
 	RunInfoMap m_optional;
 	RunInfoMap m_sample;
 	RunInfoResetPVSharedPtr m_resetPV;
+	RunUserInfoPVSharedPtr m_userPV;
 
 	uint32_t m_runNumber;
 	bool m_packetValid;
