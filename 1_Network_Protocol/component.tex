@@ -1020,7 +1020,7 @@ each event data file to tag it with the run data it contains.
 field is 0 if we are not currently recording an experimental run.
 \item{\bf Run Start} contains the seconds portion of the time that we began
 the current experiment run. This field is 0 if we are not currently recording
-data.
+data. This field is relative to the EPICS epoch.
 \item{\bf Status} is defined in Table~\ref{table:protocol_run_status_values}.
 \item{\bf File Number} indentifies which file this data is stored in. This
 field is undefined if we are not currently recording an experimental run.
