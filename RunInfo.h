@@ -50,8 +50,8 @@ private:
 
 	boost::signals::connection m_connection;
 
-	void addPV(const std::string &prefix, const char *name,
-		   RunInfoMap &map, SMSControl *sms);
+	void addPV(const std::string &prefix, const char *pv_name,
+		   const char *xml_name, RunInfoMap &map, SMSControl *sms);
 	void generatePacket(void);
 	void onPrologue(void);
 };

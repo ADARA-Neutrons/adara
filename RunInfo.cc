@@ -204,19 +204,19 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	sms->addPV(m_userPV);
 
 	/* These fields are required */
-	addPV(prefix, "ProposalId", m_required, sms);
+	addPV(prefix, "ProposalId", "proposal_id", m_required, sms);
 
 	/* These fields are optional */
-	addPV(prefix, "ProposalTitle", m_optional, sms);
-	addPV(prefix, "RunTitle", m_optional, sms);
+	addPV(prefix, "ProposalTitle", "proposal_title", m_optional, sms);
+	addPV(prefix, "RunTitle", "run_title", m_optional, sms);
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
-	addPV(prefix, "Id", m_sample, sms);
-	addPV(prefix, "Name", m_sample, sms);
-	addPV(prefix, "Nature", m_sample, sms);
-	addPV(prefix, "Formula", m_sample, sms);
-	addPV(prefix, "Environment", m_sample, sms);
+	addPV(prefix, "Id", "id", m_sample, sms);
+	addPV(prefix, "Name", "name", m_sample, sms);
+	addPV(prefix, "Nature", "nature", m_sample, sms);
+	addPV(prefix, "Formula", "chemical_formula", m_sample, sms);
+	addPV(prefix, "Environment", "environment", m_sample, sms);
 
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
@@ -231,12 +231,12 @@ RunInfo::~RunInfo()
 	delete [] m_packet;
 }
 
-void RunInfo::addPV(const std::string &prefix, const char *name,
-		    RunInfoMap &map, SMSControl *sms)
+void RunInfo::addPV(const std::string &prefix, const char *pv_name,
+		    const char *xml_name, RunInfoMap &map, SMSControl *sms)
 {
-	std::string pvName = prefix + name;
-	map[name].reset(new RunInfoPV(pvName, this));
-	sms->addPV(map[name]);
+	std::string pvName = prefix + pv_name;
+	map[xml_name].reset(new RunInfoPV(pvName, this));
+	sms->addPV(map[xml_name]);
 }
 
 void RunInfo::lock(void)
