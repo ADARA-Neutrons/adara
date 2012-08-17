@@ -231,7 +231,7 @@ public:
 			p.pkt_seq = 0;
 		}
 
-		if (!p.nevents)
+		if (!p.nevents && p.src_index == source_ids.size())
 			pulses.pop_front();
 	}
 
