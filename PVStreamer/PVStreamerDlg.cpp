@@ -238,7 +238,10 @@ CPVStreamerDlg::timeString( Timestamp *ts ) const
     else
         t = time(0);
 
-    strftime(buf,50,"%Y.%m.%d %H:%M.%S ", localtime(&t));
+	struct tm loctime;
+	localtime_s( &loctime, &t );
+    strftime(buf,50,"%Y.%m.%d %H:%M.%S ", &loctime);
+
     return string(buf);
 }
 

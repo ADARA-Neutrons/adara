@@ -383,13 +383,13 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
 
     if ( a_pv_pkt )
     {
-        a_adara_pkt.sec     = a_pv_pkt->time.sec + EPICS_TIME_OFFSET;
+        a_adara_pkt.sec     = a_pv_pkt->time.sec;
         a_adara_pkt.nsec    = a_pv_pkt->time.nsec;
         alarms              = a_pv_pkt->alarms;
     }
     else
     {
-        a_adara_pkt.sec     = a_time->sec + EPICS_TIME_OFFSET;
+        a_adara_pkt.sec     = a_time->sec;
         a_adara_pkt.nsec    = a_time->nsec;
         alarms              = a_pv_info.m_alarms;
     }

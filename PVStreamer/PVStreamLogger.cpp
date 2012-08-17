@@ -28,8 +28,9 @@ PVStreamLogger::PVStreamLogger( const std::string & a_logfilepath )
 
     char buf[50];
     time_t t = time(0);
-
-    strftime(buf,50,"%Y%m%d_%H%M%S", localtime(&t));
+	struct tm loctime;
+	localtime_s( &loctime, &t );
+    strftime(buf,50,"%Y%m%d_%H%M%S", &loctime);
 
     string filename = a_logfilepath + "\\pvslog_" + buf + ".txt";
 
@@ -64,7 +65,10 @@ PVStreamLogger::timeString( Timestamp *a_ts )
     else
         t = time(0);
 
-    strftime(buf,50,"%Y.%m.%d %H:%M.%S", localtime(&t));
+	struct tm loctime;
+	localtime_s( &loctime, &t );
+    strftime(buf,50,"%Y.%m.%d %H:%M.%S", &loctime);
+
     return string(buf);
 }
 
