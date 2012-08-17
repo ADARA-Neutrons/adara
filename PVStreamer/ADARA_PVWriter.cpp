@@ -198,7 +198,7 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, s
     {
     // ADARA does not currently handle devices going inactive, nor individial PVs going active/inactive
     case DeviceActive:
-        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device_id, a_pv_pkt.time );
+        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device_id );
         return true;
 
     case VarInactive:
@@ -233,7 +233,7 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, s
         return true;
 
     case VarUpdate:
-        buildVVP( a_adara_pkt, *a_pv_pkt.pv_info, &a_pv_pkt, 0 );
+        buildVVP( a_adara_pkt, *a_pv_pkt.pv_info, &a_pv_pkt );
         return true;
     }
 
@@ -247,14 +247,12 @@ ADARA_PVWriter::translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, s
  * \param a_time - EPICS timestamp of device description (activation).
  */
 void
-ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifier a_dev_id, Timestamp a_time )
+ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifier a_dev_id )
 {
     stringstream sstr;
 
     a_adara_pkt.format  = 0x800000;
     a_adara_pkt.dev_id  = a_dev_id;
-    a_adara_pkt.sec     = a_time.sec;
-    a_adara_pkt.nsec    = a_time.nsec;
 
     // Reset payload stringstream
 
@@ -371,28 +369,17 @@ ADARA_PVWriter::buildDDP( ADARAPacket &a_adara_pkt, string &a_payload, Identifie
  * PVInfo instance.
  */
 void
-ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt, Timestamp *a_time )
+ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt )
 {
     unsigned short alarms = 0;
 
     a_adara_pkt.dev_id      = a_pv_info.m_device_id;
     a_adara_pkt.vvp.var_id  = a_pv_info.m_id;
 
-    if ( !a_pv_pkt && ! a_time )
-        EXC( EC_INVALID_PARAM, "Either PV pkt OR a timestamp is required" );
-
     if ( a_pv_pkt )
-    {
-        a_adara_pkt.sec     = a_pv_pkt->time.sec;
-        a_adara_pkt.nsec    = a_pv_pkt->time.nsec;
         alarms              = a_pv_pkt->alarms;
-    }
     else
-    {
-        a_adara_pkt.sec     = a_time->sec;
-        a_adara_pkt.nsec    = a_time->nsec;
         alarms              = a_pv_info.m_alarms;
-    }
 
 
     if ( alarms )
@@ -486,16 +473,16 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
     if ( devs.size() )
     {
         ADARAPacket adara_pkt;
-        Timestamp   ts;
         string      payload;
 
         // Use current time for DDP packets
-        ts.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+        adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+        adara_pkt.nsec = 0;
 
         // Send DDPs for real devices
         for ( vector<Identifier>::iterator idev = devs.begin(); idev != devs.end(); ++idev )
         {
-            buildDDP( adara_pkt, payload, *idev, ts );
+            buildDDP( adara_pkt, payload, *idev );
             sendPacket( adara_pkt, &payload, a_socket );
         }
 
@@ -509,7 +496,7 @@ ADARA_PVWriter::sendActiveDeviceInfo( SOCKET a_socket )
                 const vector<const PVInfo*> &vars = m_streamer.getDevicePVs( *idev );
                 for ( iv = vars.begin(); iv != vars.end(); ++iv )
                 {
-                    buildVVP( adara_pkt, **iv, 0, &ts );
+                    buildVVP( adara_pkt, **iv, 0 );
                     sendPacket( adara_pkt, 0, a_socket );
                 }
             }

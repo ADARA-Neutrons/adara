@@ -59,8 +59,8 @@ private:
 
     bool                    connected();
     bool                    translate( PVStreamPacket &a_pv_pkt, ADARAPacket &a_adara_pkt, std::string &a_payload );
-    void                    buildDDP( ADARAPacket &a_adara_pkt, std::string &a_payload, Identifier dev_id, Timestamp a_time );
-    void                    buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt, Timestamp *a_time );
+    void                    buildDDP( ADARAPacket &a_adara_pkt, std::string &a_payload, Identifier dev_id );
+    void                    buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVStreamPacket *a_pv_pkt );
     void                    sendSourceInfo( SOCKET a_socket );
     bool                    sendActiveDeviceInfo( SOCKET a_socket = INVALID_SOCKET );
     void                    sendPacket( ADARAPacket & a_adara_pkt, std::string *a_payload = 0, SOCKET a_socket = INVALID_SOCKET );
