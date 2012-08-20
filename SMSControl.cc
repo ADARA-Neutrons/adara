@@ -17,10 +17,6 @@ static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
 SMSControl *SMSControl::m_singleton = NULL;
 
-// TODO get from config file; this changes very infrequently, but will
-// change after accelerator maintance and power upgrades.
-uint32_t SMSControl::m_ringPeriod = 123456;
-
 static uint32_t pulseEnergy(uint32_t ringPeriod)
 {
 	double ring_circumference = 248; // meters

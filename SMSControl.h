@@ -153,7 +153,6 @@ private:
 	std::vector<uint32_t> m_hdrs;
 
 	static SMSControl *m_singleton;
-	static uint32_t m_ringPeriod;
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
