@@ -1,15 +1,21 @@
 #include <errno.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <ctype.h>
 
 #include <string>
 #include <stdexcept>
+
+#include <boost/lexical_cast.hpp>
 
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ADARA.h"
+
+#include "Logging.h"
 
 /* TODO better, common place for this */
 struct header {
@@ -18,6 +24,8 @@ struct header {
 	uint32_t ts_sec;
 	uint32_t ts_nsec;
 };
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 int StorageManager::m_base_fd = -1;
 
@@ -30,6 +38,11 @@ StorageManager::PrologueSignal StorageManager::m_prologue;
 uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
+
+#define RUN_STORAGE_MODE 0660
+
+const char *StorageManager::m_run_filename = "next_run";
+const char *StorageManager::m_run_tempname = "next_run.temp";
 
 void StorageManager::init(const std::string &baseDir)
 {
@@ -51,6 +64,9 @@ void StorageManager::init(const std::string &baseDir)
 		throw std::runtime_error(msg);
 	}
 
+	if (cleanupRunFiles())
+		throw std::runtime_error("Unable to obtain initial run number");
+
 	/* TODO kick off background scan */
 }
 
@@ -58,6 +74,188 @@ void StorageManager::stop(void)
 {
 	endCurrentContainer();
 	close(m_base_fd);
+}
+
+uint32_t StorageManager::readRunFile(const char *name, bool notify)
+{
+	long run;
+	char *p, buffer[16];
+	ssize_t len;
+	int fd, e;
+
+	fd = openat(m_base_fd, name, O_RDONLY);
+	if (fd < 0) {
+		if (notify) {
+			e = errno;
+			ERROR("Unable to open run number storage: "
+			      << strerror(e));
+		}
+		return 0;
+	}
+
+	len = read(fd, buffer, sizeof(buffer));
+	e = errno;
+	close(fd);
+
+	if (len < 0) {
+		if (notify) {
+			ERROR("Unable to read run number storage: "
+			      << strerror(e));
+		}
+		return 0;
+	}
+
+	if (len < 1 || len == sizeof(buffer)) {
+		if (notify)
+			ERROR("Run storage has invalid size " << len);
+		return 0;
+	}
+
+	errno = 0;
+	buffer[len] = 0;
+	run = strtol(buffer, &p, 0);
+
+	/* It's OK to have a newline, even if we won't write one ourselves. */
+	if (isspace(*p))
+		*p = 0;
+	if (*p || errno || run <= 0 || run >= (1L << 32)) {
+		if (notify) {
+			ERROR("Run storage has invalid data '"
+			      << buffer << "'");
+		}
+		return 0;
+	}
+
+	return (uint32_t) run;
+}
+
+uint32_t StorageManager::getNextRun(void)
+{
+	return readRunFile(m_run_filename, true);
+}
+
+bool StorageManager::updateNextRun(uint32_t run)
+{
+	std::string text = boost::lexical_cast<std::string>(run);
+	int fd, rc, write_errno = 0, fsync_errno = 0, close_errno = 0;
+
+	fd = openat(m_base_fd, m_run_tempname, O_CREAT|O_TRUNC|O_WRONLY,
+		    RUN_STORAGE_MODE);
+	if (fd < 0) {
+		int e = errno;
+		ERROR("Unable to open run number temporary: " << strerror(e));
+		return true;
+	}
+
+	/* Write the new run number to temporary storage, and ensure it
+	 * makes it to disk.
+	 */
+	rc = write(fd, text.c_str(), text.length());
+	if (rc < 0)
+		write_errno = errno;
+	if (fsync(fd))
+		fsync_errno = errno;
+	if (close(fd))
+		close_errno = errno;
+
+	if (write_errno) {
+		ERROR("Unable to write run number temporary: "
+		      << strerror(write_errno));
+		return true;
+	}
+
+	if (rc != (int) text.length()) {
+		ERROR("Short write for run number temporary");
+		return true;
+	}
+
+	if (fsync_errno) {
+		ERROR("Unable to fsync run number temporary: "
+		      << strerror(fsync_errno));
+		return true;
+	}
+
+	if (close_errno) {
+		ERROR("Close error for run number temporary: "
+		      << strerror(close_errno));
+		return true;
+	}
+
+	/* Ok, atomically rename the temporary storage to the final place
+	 * to advance to the new number.
+	 */
+	if (renameat(m_base_fd, m_run_tempname, m_base_fd, m_run_filename)) {
+		int e = errno;
+		ERROR("Renaming run storage failed: " << strerror(e));
+		unlinkat(m_base_fd, m_run_tempname, 0);
+		return true;
+	}
+
+	/* We aren't guaranteed the new file names are safe on disk until
+	 * we sync the directory that contains them.
+	 */
+	if (fsync(m_base_fd)) {
+		int e = errno;
+		ERROR("fsync on base dir for run storage failed: "
+		      << strerror(e));
+		return true;
+	}
+
+	return false;
+}
+
+bool StorageManager::cleanupRunFiles(void)
+{
+	uint32_t nextrun = readRunFile(m_run_filename, true);
+	uint32_t temprun = readRunFile(m_run_tempname, false);
+
+	/* We should always have a valid next run file */
+	if (!nextrun) {
+		ERROR("Missing next run information");
+		return true;
+	}
+
+	/* If we had a corrupt temporary file, we can just delete it
+	 * and move on. Similarly if it isn't monotonically increasing
+	 * from the last value.
+	 */
+	if (temprun <= nextrun) {
+		if (temprun) {
+			WARN("Stored run number tried to go backwards ("
+			     << nextrun << " vs " << temprun << ")");
+		}
+
+		if (unlinkat(m_base_fd, m_run_tempname, 0) && errno != ENOENT) {
+			int e = errno;
+			ERROR("Unable to clean up temp run storage: "
+			      << strerror(e));
+			return true;
+		}
+
+		return false;
+	}
+
+	/* Ok, we want the temporary storage to be the new run number, so
+	 * complete the move as for a normal update. Just keep things around
+	 * if the rename fails.
+	 */
+	if (renameat(m_base_fd, m_run_tempname, m_base_fd, m_run_filename)) {
+		int e = errno;
+		ERROR("Renaming run storage failed: " << strerror(e));
+		return true;
+	}
+
+	/* We aren't guaranteed the new file names are safe on disk until
+	 * we sync the directory that contains them.
+	 */
+	if (fsync(m_base_fd)) {
+		int e = errno;
+		ERROR("fsync on base dir for run storage failed: "
+		      << strerror(e));
+		return true;
+	}
+
+	return false;
 }
 
 void StorageManager::addBaseStorage(off_t size)

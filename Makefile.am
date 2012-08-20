@@ -39,7 +39,9 @@ parser_test_CXXFLAGS = $(AM_CXXFLAGS) -Wunused-parameter \
 
 storage_test_SOURCES = storage-test.cc StorageManager.cc \
 		StorageContainer.cc StorageFile.cc
-storage_test_LDADD = -lboost_signals
+storage_test_CPPFLAGS = $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
+storage_test_LDFLAGS = $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
+storage_test_LDADD = $(liblog4cxx_LIBS)-lboost_signals
 
 adara_parser_SOURCES = adara-parser.cc ADARAPackets.cc ADARAParser.cc
 

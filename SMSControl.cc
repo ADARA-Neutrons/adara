@@ -9,7 +9,11 @@
 #include "BeamlineInfo.h"
 #include "MetaDataMgr.h"
 
+#include "Logging.h"
+
 #include <math.h>
+
+static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
 SMSControl *SMSControl::m_singleton = NULL;
 
@@ -33,7 +37,7 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 SMSControl::SMSControl(const std::string &beamlineId,
 		       const std::string &beamlineShortName,
 		       const std::string &beamlineLongName) :
-	m_nextRunNumber(1), m_recording(false), m_nextSrcId(0),
+	m_currentRunNumber(0), m_recording(false), m_nextSrcId(0),
 	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr)
 {
 	if (m_singleton)
@@ -50,7 +54,9 @@ SMSControl::SMSControl(const std::string &beamlineId,
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 
-	/* TODO get old run number information from StorageManager */
+	m_nextRunNumber = StorageManager::getNextRun();
+	if (!m_nextRunNumber)
+		throw std::runtime_error("Unable to get next run number");
 
 	m_beamlineInfo.reset(new BeamlineInfo(beamlineId, beamlineShortName,
 					      beamlineLongName));
@@ -129,14 +135,24 @@ bool SMSControl::setRecording(bool v)
 	clock_gettime(CLOCK_REALTIME, &now);
 	if (v) {
 		/* Starting a new recording */
-		/* TODO persist the run number */
+		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
+			ERROR("Unable to increment run number, not starting");
+			return false;
+		}
+
+		/* We've updated the run on disk, so if we fail now, we need
+		 * to fail big.
+		 */
+		m_currentRunNumber = m_nextRunNumber++;
+		INFO("Starting run " << m_currentRunNumber);
 		m_runInfo->lock();
-		m_runInfo->setRunNumber(m_nextRunNumber);
-		StorageManager::startRecording(m_nextRunNumber);
-		m_pvRunNumber->update(m_nextRunNumber++, &now);
+		m_runInfo->setRunNumber(m_currentRunNumber);
+		StorageManager::startRecording(m_currentRunNumber);
+		m_pvRunNumber->update(m_currentRunNumber, &now);
 		m_pvRecording->update(v, &now);
 	} else {
 		/* Stop the current recording */
+		INFO("Stopping run " << m_currentRunNumber);
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
 		StorageManager::stopRecording();

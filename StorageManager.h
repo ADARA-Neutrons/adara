@@ -63,6 +63,9 @@ public:
 		return m_cur_container;
 	}
 
+	static uint32_t getNextRun(void);
+	static bool updateNextRun(uint32_t run);
+
 private:
 	typedef boost::signals::connection connection;
 
@@ -77,6 +80,12 @@ private:
 
 	static ContainerSignal m_contChange;
 	static PrologueSignal m_prologue;
+
+	static const char *m_run_filename;
+	static const char *m_run_tempname;
+
+	static uint32_t readRunFile(const char *path, bool notify);
+	static bool cleanupRunFiles(void);
 
 	static void addBaseStorage(off_t size);
 	static void endCurrentContainer(void);

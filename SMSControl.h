@@ -131,6 +131,7 @@ private:
 
 	std::map<std::string, PVSharedPtr> m_pv_map;
 	uint32_t m_nextRunNumber;
+	uint32_t m_currentRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
