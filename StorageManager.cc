@@ -68,6 +68,9 @@ void StorageManager::init(const std::string &baseDir)
 		throw std::runtime_error("Unable to obtain initial run number");
 
 	/* TODO kick off background scan */
+
+	/* Start the initial container */
+	startContainer();
 }
 
 void StorageManager::stop(void)
@@ -270,10 +273,24 @@ void StorageManager::addBaseStorage(off_t size)
 	m_blocks_used += blocks;
 }
 
+void StorageManager::startContainer(uint32_t run)
+{
+	struct timespec now;
+
+	if (m_cur_container)
+		throw std::runtime_error("Already have a container");
+
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_cur_container = StorageContainer::SharedPtr(
+					new StorageContainer(now, run));
+
+	m_contChange(m_cur_container, true);
+}
+
 void StorageManager::endCurrentContainer(void)
 {
 	if (!m_cur_container)
-		return;
+		throw std::runtime_error("No container to end");
 
 	m_cur_container->terminate();
 	m_contChange(m_cur_container, false);
@@ -292,28 +309,20 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 
 void StorageManager::startRecording(uint32_t run)
 {
-	struct timespec now;
-
 	if (!run)
 		throw std::runtime_error("Invalid run number");
 
-	if (m_cur_container) {
-		if (m_cur_container->runNumber())
-			throw std::runtime_error("Already recording");
+	if (m_cur_container->runNumber())
+		throw std::runtime_error("Already recording");
 
-		endCurrentContainer();
-	}
-
-	clock_gettime(CLOCK_REALTIME, &now);
-	m_cur_container = StorageContainer::SharedPtr(
-					new StorageContainer(now, run));
-
-	m_contChange(m_cur_container, true);
+	endCurrentContainer();
+	startContainer(run);
 }
 
 void StorageManager::stopRecording(void)
 {
 	endCurrentContainer();
+	startContainer();
 }
 
 void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
@@ -324,9 +333,7 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 	 * transient file to hold the current state information.
 	 */
 
-	uint32_t run = 0;
-	if (m_cur_container)
-		run = m_cur_container->runNumber();
+	uint32_t run = m_cur_container->runNumber();
 
 	/* Create a file for the current state, and call the prologue
 	 * handlers to populate it.
@@ -337,11 +344,9 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 
 	/* Now, tell the callback about the current file we're working on.
 	 */
-	if (m_cur_container) {
-		StorageFile::SharedPtr &f = m_cur_container->file();
-		if (f)
-			cb(f, f->size());
-	}
+	StorageFile::SharedPtr &f = m_cur_container->file();
+	if (f)
+		cb(f, f->size());
 }
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
@@ -349,15 +354,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	uint32_t len = validatePacket(iovec);
 	off_t size, blocks;
 
-	if (!m_cur_container) {
-		/* We're not in a run, as we'd already have a container. */
-		struct header *hdr = (struct header *) iovec[0].iov_base;
-		struct timespec ts = { hdr->ts_sec, hdr->ts_nsec };
-		ts.tv_sec += ADARA::EPICS_EPOCH_OFFSET;
-		m_cur_container = StorageContainer::SharedPtr(
-					new StorageContainer(ts, 0));
-		m_contChange(m_cur_container, true);
-	}
+	if (!m_cur_container)
+		throw std::runtime_error("No container!");
 
 	size = m_cur_container->write(iovec, len, notify);
 

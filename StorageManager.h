@@ -88,6 +88,7 @@ private:
 	static bool cleanupRunFiles(void);
 
 	static void addBaseStorage(off_t size);
+	static void startContainer(uint32_t run = 0);
 	static void endCurrentContainer(void);
 	static void fileCreated(StorageFile::SharedPtr &f);
 	static uint32_t validatePacket(const IoVector &iovec);
