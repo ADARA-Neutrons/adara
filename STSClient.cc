@@ -172,23 +172,31 @@ void STSClient::fileUpdated(const StorageFile &f)
 
 void STSClient::readable(void)
 {
-	/* TODO deal with exceptions (ie, invalid packet format) */
-	if (!read(m_sts_fd, MAX_PACKET_SIZE)) {
-		/* Hit an EOF, or our handlers indicated it was time to stop,
-		 * so kill outselves off. We cannot do this from the handlers,
-		 * as ADARA::Parser::read() will modify member variables
-		 * after calling them.
-		 *
-		 * We log the reason for closing the connection elsewhere,
-		 * except for the default case of an unexpected connection loss.
-		 * Take care of that case here.
-		 */
-		if (m_disp == STSClientMgr::CONNECTION_LOSS) {
+	bool ok = false;
+
+	try {
+		ok = read(m_sts_fd, MAX_PACKET_SIZE);
+		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
+			/* We log the reason for closing the connection
+			 * elsewhere, except for the default case of an
+			 * unexpected connection loss.
+			 * Take care of that case here.
+			 */
 			WARN("Lost connection to STS for run "
-				<< m_run->runNumber());
+			     << m_run->runNumber());
 		}
-		delete this;
+	} catch (ADARA::invalid_packet e) {
+		WARN("Got invalid packet from STS: " << e.what());
+		ok = false;
 	}
+
+	/* Hit an EOF, or our handlers indicated it was time to stop, so
+	 * kill outselves off. We cannot do this from the handlers, as
+	 * ADARA::Parser::read() will modify member variables after
+	 * calling them.
+	 */
+	if (!ok)
+		delete this;
 }
 
 bool STSClient::rxPacket(const ADARA::Packet &pkt)
