@@ -49,6 +49,9 @@ STSClient::~STSClient()
 	close(m_sts_fd);
 	if (m_file_fd != -1)
 		m_files.front()->put_fd();
+
+	/* Inform the manager of our final status */
+	m_mgr.clientComplete(m_run, m_disp);
 }
 
 bool STSClient::sendHeartbeat(void)
@@ -84,7 +87,8 @@ void STSClient::writable(void)
 
 			if (errno == EPIPE || errno == ECONNRESET) {
 				/* Client went away, just clean up */
-				/* TODO notify manager of our state! */
+				WARN("Lost connection to STS for run "
+				     << m_run->runNumber());
 				delete this;
 				return;
 			}
@@ -183,7 +187,6 @@ void STSClient::readable(void)
 			WARN("Lost connection to STS for run "
 				<< m_run->runNumber());
 		}
-		m_mgr.clientComplete(m_run, m_disp);
 		delete this;
 	}
 }
