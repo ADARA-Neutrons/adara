@@ -123,7 +123,7 @@ public:
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
 	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
-	uint32_t ringPeriod(void) const { return m_fields[4]; }
+	uint32_t ringPeriod(void) const { return m_fields[4] & 0xffffff; }
 
 	// TODO implement accessor for optional fields
 

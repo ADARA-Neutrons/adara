@@ -100,6 +100,9 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 {
 	if (m_payload_len != 120)
 		throw invalid_packet("RTDL Packet is incorrect length");
+
+	if ((m_fields[4] >> 24) != 4)
+		throw invalid_packet("Missing ping period");
 }
 
 RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
