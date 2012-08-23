@@ -5,9 +5,9 @@
 
 using namespace log4cxx;
 
-#define DEBUG(...)	LOG4CXX_DEBUG(logger, __VA_ARGS__)
-#define INFO(...)	LOG4CXX_INFO(logger, __VA_ARGS__)
-#define WARN(...)	LOG4CXX_WARN(logger, __VA_ARGS__)
-#define ERROR(...)	LOG4CXX_ERROR(logger, __VA_ARGS__)
+#define DEBUG(...)	do { LOG4CXX_DEBUG(logger, __VA_ARGS__); } while(0)
+#define INFO(...)	do { LOG4CXX_INFO(logger, __VA_ARGS__); } while(0)
+#define WARN(...)	do { LOG4CXX_WARN(logger, __VA_ARGS__); } while(0)
+#define ERROR(...)	do { LOG4CXX_ERROR(logger, __VA_ARGS__); } while(0)
 
 #endif /* __LOGGING_H */
