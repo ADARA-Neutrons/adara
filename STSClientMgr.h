@@ -17,7 +17,7 @@ public:
 	~STSClientMgr();
 
 	enum Disposition { SUCCESS, TRANSIENT_FAIL, PERMAMENT_FAIL,
-				CONNECTION_LOSS };
+				CONNECTION_LOSS, INVALID_PROTOCOL };
 	enum QueueMode { BALANCE, OLDEST, NEWEST };
 
 private:
@@ -26,11 +26,13 @@ private:
 
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_connect_timer;
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_reconnect_timer;
+	std::auto_ptr<TimerAdapter<STSClientMgr> > m_transient_timer;
 	std::string m_node;
 	std::string m_service;
 	int m_fd;
 	std::auto_ptr<ReadyAdapter> m_fdreg;
 	bool m_connecting;
+	bool m_backoff;
 	unsigned int m_connections;
 	connection m_mgrConnection;
 	QueueMode m_queueMode;
@@ -46,6 +48,7 @@ private:
 
 	static double m_connect_timeout;
 	static double m_reconnect_timeout;
+	static double m_transient_timeout;
 	static unsigned int m_max_connections;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
@@ -61,6 +64,7 @@ private:
 	bool connectTimeout(void);
 
 	bool reconnectTimeout(void);
+	bool transientTimeout(void);
 
 	void clientComplete(StorageContainer::SharedPtr &c,
 			    Disposition disp);

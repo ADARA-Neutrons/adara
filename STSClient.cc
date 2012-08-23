@@ -187,6 +187,7 @@ void STSClient::readable(void)
 		}
 	} catch (ADARA::invalid_packet e) {
 		WARN("Got invalid packet from STS: " << e.what());
+		m_disp = STSClientMgr::INVALID_PROTOCOL;
 		ok = false;
 	}
 

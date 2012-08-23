@@ -17,6 +17,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
 
 double STSClientMgr::m_connect_timeout = 15.0;
 double STSClientMgr::m_reconnect_timeout = 15.0;
+double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
 
 STSClientMgr::STSClientMgr(const std::string &uri) :
@@ -24,8 +25,10 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 					&STSClientMgr::connectTimeout)),
 	m_reconnect_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::reconnectTimeout)),
-	m_fd(-1), m_fdreg(NULL), m_connecting(false), m_connections(0),
-	m_queueMode(BALANCE), m_sendNext(OLDEST)
+	m_transient_timer(new TimerAdapter<STSClientMgr>(this,
+					&STSClientMgr::transientTimeout)),
+	m_fd(-1), m_fdreg(NULL), m_connecting(false), m_backoff(false),
+	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST)
 {
 	const char *default_service = "31417";
 	size_t pos = uri.find_first_of(':');
@@ -138,14 +141,20 @@ StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 void STSClientMgr::startConnect(void)
 {
 	struct gaicb *gai = &m_gai;
+	const char *state;
 	int rc;
 
-	DEBUG("Checking for pending work ("
-		<< (m_connecting ? "connecting, " : "idle, ")
-		<< m_connections << " of " << m_max_connections << " active, "
-		<< m_pendingRuns.size() << " pending runs");
+	state = "idle, ";
+	if (m_backoff)
+		state = "backoff, ";
+	if (m_connecting)
+		state = "connecting, ";
 
-	if (m_connecting || m_connections >= m_max_connections ||
+	DEBUG("Checking for pending work (" << state
+		<< m_connections << " of " << m_max_connections << " active, "
+		<< m_pendingRuns.size() << " pending runs)");
+
+	if (m_backoff || m_connecting || m_connections >= m_max_connections ||
 					m_pendingRuns.empty())
 		return;
 
@@ -319,6 +328,13 @@ bool STSClientMgr::reconnectTimeout(void)
 	return false;
 }
 
+bool STSClientMgr::transientTimeout(void)
+{
+	m_backoff = false;
+	startConnect();
+	return false;
+}
+
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 				  Disposition disp)
 {
@@ -337,9 +353,17 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		break;
 	case CONNECTION_LOSS:
 	case TRANSIENT_FAIL:
+	case INVALID_PROTOCOL:
 		/* TODO need to limit the number of tries for this run before
 		 * we make it a permament failure case
 		 */
+		/* We shouldn't pound on the STS if we keep hitting problems,
+		 * back off and give it time to breathe.
+		 */
+		if (!m_backoff) {
+			m_backoff = true;
+			m_transient_timer->start(m_transient_timeout);
+		}
 		requeueRun(c);
 		break;
 	case PERMAMENT_FAIL:
