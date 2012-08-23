@@ -145,19 +145,19 @@ static void addUserInfo(std::string &out, const std::string &info)
 
 	for (begin = end = 0; end != std::string::npos; begin = end + 1) {
 		end = info.find_first_of(':', begin);
-		out += "<user><user_name>";
+		out += "<user><name>";
 		xmlEncodeTo(out, info, begin, end);
-		out += "</user_name>";
+		out += "</name>";
 		begin = end + 1;
 		end = info.find_first_of(':', begin);
-		out += "<user_id>";
+		out += "<id>";
 		xmlEncodeTo(out, info, begin, end);
-		out += "</user_id>";
+		out += "</id>";
 		begin = end + 1;
 		end = info.find_first_of(';', begin);
-		out += "<user_role>";
+		out += "<role>";
 		xmlEncodeTo(out, info, begin, end);
-		out += "</user_role></user>";
+		out += "</role></user>";
 	}
 
 	out += "</users>";
