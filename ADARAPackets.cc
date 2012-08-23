@@ -199,6 +199,7 @@ TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 	uint32_t size = *(uint32_t *) payload();
 	const char *reason = (const char *) payload() + sizeof(uint32_t);
 
+	m_status = (uint16_t) (size >> 16);
 	size &= 0xffff;
 	if (m_payload_len < sizeof(uint32_t))
 		throw invalid_packet("TransComplete packet is too short");
