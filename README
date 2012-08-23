@@ -15,9 +15,9 @@ Building
 3. ./bootstrap (only need to do once)
 4. ./configure --with-epics=/path/to/epics/
 5. make (-jX)
-6. Make /adara writable by yourself (once)
-7. Make /adara/data, writable by yourself (once)
-8. Copy the configuration in sms-repo to /adara/conf (once)
+6. Make /SNSlocal/sms writable by yourself (once)
+7. Make /SNSlocal/sms/data, writable by yourself (once)
+8. Copy the configuration in sms-repo to /SNSlocal/sms/conf (once)
 9. Run as ./smsd
 
 If you need to change the configuration (paths, ports, etc), edit smsd.cc and SMSControl.cc; a proper configuration system is on the the TODO list.
@@ -25,21 +25,20 @@ If you need to change the configuration (paths, ports, etc), edit smsd.cc and SM
 You can use caput, caget, and camonitor from EPICS to control recording.
 
 PVs currently supported:
-CNCS:SMS:recording
-CNCS:SMS:run_number
-CNCS:SMS:RunInfo:reset
-CNCS:SMS:RunInfo:proposal_id
-CNCS:SMS:RunInfo:collection_number
-CNCS:SMS:RunInfo:proposal_title
-CNCS:SMS:RunInfo:collection_title
-CNCS:SMS:RunInfo:run_title
-CNCS:SMS:RunInfo:sample:id
-CNCS:SMS:RunInfo:sample:name
-CNCS:SMS:RunInfo:sample:nature
-CNCS:SMS:RunInfo:sample:formula
-CNCS:SMS:RunInfo:sample:environment
+BL14BS:SMS:Recording
+BL14BS:SMS:RunNumber
+BL14BS:SMS:RunInfo:Reset
+BL14BS:SMS:RunInfo:ProposalId
+BL14BS:SMS:RunInfo:ProposalTitle
+BL14BS:SMS:RunInfo:RunTitle
+BL14BS:SMS:RunInfo:UserInfo
+BL14BS:SMS:RunInfo:Sample:Id
+BL14BS:SMS:RunInfo:Sample:Name
+BL14BS:SMS:RunInfo:Sample:Nature
+BL14BS:SMS:RunInfo:Sample:Formula
+BL14BS:SMS:RunInfo:Sample:Environment
 
 
-I've used CNCS here as that matches the configuration files in the repo;
-you can change the CNCS in the PVs to be a string of your choosing by editing
+I've used BL14BS here as that matches the configuration files in the repo;
+you can change the BL14BS in the PVs to be a string of your choosing by editing
 the values given to the SMSControl constructor in smsd.cc.

@@ -61,8 +61,8 @@ SMSControl::SMSControl(const std::string &beamlineId,
 	m_beamlineInfo.reset(new BeamlineInfo(beamlineId, beamlineShortName,
 					      beamlineLongName));
 	m_runInfo.reset(new RunInfo(beamlineId, this));
-	m_geometry.reset(new Geometry("/adara/conf/geometry.xml"));
-	m_pixelMap.reset(new PixelMap("/adara/conf/pixelmap"));
+	m_geometry.reset(new Geometry("/SNSlocal/sms/conf/geometry.xml"));
+	m_pixelMap.reset(new PixelMap("/SNSlocal/sms/conf/pixelmap"));
 
 	m_maxBanks = m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET;
 

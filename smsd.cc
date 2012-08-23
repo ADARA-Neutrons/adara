@@ -12,7 +12,7 @@
 
 namespace po = boost::program_options;
 
-static std::string log_conf("/adara/conf/logging.conf");
+static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
 
 static void parse_options(int argc, char **argv)
 {
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
 	PropertyConfigurator::configure(log_conf);
 
-	StorageManager::init("/adara/data");
+	StorageManager::init("/SNSlocal/sms/data");
 	LiveServer liveServer("31415");
 	SMSControl control("BL14BS", "HYSA", "HYSPECA");
 	STSClientMgr stsclient("localhost:31417");

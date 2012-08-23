@@ -36,10 +36,8 @@ struct run_status_packet {
 	uint32_t	status_number;
 } __attribute__((packed));
 
-//off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
-//off_t StorageFile::m_max_file_size = 100 * 1024 * 1024;
-off_t StorageFile::m_max_sync_distance = 256 * 1024;
-off_t StorageFile::m_max_file_size = 1024 * 1024;
+off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
+off_t StorageFile::m_max_file_size = 200 * 1024 * 1024;
 
 StorageFile::~StorageFile()
 {
