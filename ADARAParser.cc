@@ -126,7 +126,7 @@ bool Parser::parseBuffer(void)
 			uint8_t *new_buffer;
 
 			do {
-				new_size = m_size * 2;
+				new_size *= 2;
 			} while (new_size < hdr.packet_length());
 
 			if (new_size > m_max_size)
