@@ -1,0 +1,182 @@
+#ifndef NXGEN_H
+#define NXGEN_H
+
+#include <string>
+#include <vector>
+#include "h5nx.hpp"
+#include "stsdefs.h"
+#include "StreamParser.h"
+#include "Utils.h"
+#include <boost/lexical_cast.hpp>
+#include <glog/logging.h>
+
+
+class NxGen : public STS::StreamParser
+{
+private:
+
+    class NxBankInfo : public STS::BankInfo
+    {
+    public:
+        NxBankInfo( uint32_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
+          : BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve), m_event_slab_size(0), m_index_slab_size(0)
+        {
+            m_name = std::string("bank") + boost::lexical_cast<std::string>(a_id);
+            m_eventname = m_name + "_events";
+            m_tof_slab_path = "entry/instrument/" + m_name + "/event_time_offset";
+            m_pid_slab_path = "entry/instrument/" + m_name + "/event_id";
+            m_index_slab_path = "entry/instrument/" + m_name + "/event_index";
+        }
+
+        std::string             m_name;
+        std::string             m_eventname;
+        std::string             m_tof_slab_path;
+        std::string             m_pid_slab_path;
+        std::string             m_index_slab_path;
+        uint64_t                m_event_slab_size;
+        uint64_t                m_index_slab_size;
+    };
+
+    class NxMonitorInfo : public STS::MonitorInfo
+    {
+    public:
+        NxMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve )
+          : MonitorInfo( a_id, a_buf_reserve ), m_index_slab_size(0), m_event_slab_size(0)
+        {
+            m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
+            m_index_slab_path = "entry/" + m_name + "/event_index";
+            m_tof_slab_path = "entry/" + m_name + "/event_time_offset";
+        }
+
+        std::string             m_name;
+        std::string             m_index_slab_path;
+        std::string             m_tof_slab_path;
+        uint64_t                m_index_slab_size;
+        uint64_t                m_event_slab_size;
+    };
+
+    template<class T>
+    class NxPVInfo : public STS::PVInfo<T>
+    {
+    public:
+        NxPVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units, NxGen & a_nxgen  )
+            : STS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ), m_nxgen(a_nxgen), m_slab_size(0)
+        {
+            m_log_path = std::string("entry/DASlogs/") + a_name;
+        }
+
+        ~NxPVInfo() {}
+
+        void flushBuffers( bool lastWrite )
+        {
+            if ( m_nxgen.m_gen_nexus )
+            {
+                // Create log if no data has been written yet
+                if ( !m_slab_size )
+                {
+                    m_nxgen.makeGroup( m_log_path, "NXlog" );
+                    m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
+                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, "seconds" );
+                }
+
+                m_nxgen.writeSlab( m_log_path + "/value", this->m_value_buffer, m_slab_size );
+                m_nxgen.writeSlab( m_log_path + "/time", this->m_time_buffer, m_slab_size );
+
+                m_slab_size += this->m_value_buffer.size();
+
+                if ( lastWrite && m_slab_size )
+                {
+                    // Data has been writen, so also write statistics
+                    m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), "seconds" );
+                    m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), "seconds" );
+                    m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), "seconds" );
+                    m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), "seconds" );
+                }
+            }
+
+            this->m_value_buffer.clear();
+            this->m_time_buffer.clear();
+        }
+
+        NxGen&          m_nxgen;
+        std::string     m_log_path;
+        uint64_t        m_slab_size;
+    };
+
+public:
+
+    NxGen( int a_fd_in, int a_fd_out, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_buf_chunk_count = 20, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
+    ~NxGen();
+
+protected:
+
+    void                initialize();
+    void                finalize();
+    STS::PVInfoBase*    makePVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
+    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve );
+    void                processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname );
+    void                processRunInfo( const std::string & a_xml );
+    void                processGeometry( const std::string & a_xml );
+    void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
+    void                pulseFinalize( STS::PulseInfo &a_pulse_info );
+    void                bankBuffersReady( STS::BankInfo &a_bank );
+    void                bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count );
+    void                bankFinalize( STS::BankInfo &a_bank );
+    void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
+    void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
+    void                monitorFinalize( STS::MonitorInfo &a_monitor );
+
+private:
+    NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
+    void                makeGroup( const std::string &a_path, const std::string &a_type );
+    void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, int nxdatatype, const std::string units = "" );
+    void                makeLink( const std::string &source_path, const std::string &dest_name );
+    void                writeString( const std::string &a_path, const std::string &a_dataset, const std::string &a_value );
+    void                writeStringAttribute( const std::string &a_path, const std::string &a_attrib, const std::string &a_value );
+    template<class T>
+    void                writeSlab( const std::string & a_path, std::vector<T> & a_buffer, uint64_t a_slab_size  )
+                        {
+                            if ( m_h5nx.H5NXwrite_slab( a_path, a_buffer, a_slab_size ) != SUCCEED )
+                            {
+                                LOG(ERROR) <<  "H5NXwrite_slab FAILED for " << a_path << std::endl;
+                                throw std::runtime_error("H5NXwrite_slab FAILED");
+                            }
+                        }
+    template<class T>
+    void                fillSlab( const std::string & a_path, T & a_value, uint64_t a_count, uint64_t a_slab_size  )
+                        {
+                            std::vector<T> buf;
+                            uint64_t slab_size = a_slab_size;
+                            uint64_t count = 0;
+
+                            if ( a_count >= m_chunk_size )
+                            {
+                                buf.resize( m_chunk_size, a_value );
+
+                                while( count <= ( a_count - m_chunk_size ))
+                                {
+                                    writeSlab( a_path, buf, slab_size );
+                                    count += m_chunk_size;
+                                    slab_size += m_chunk_size;
+                                }
+                            }
+
+                            if ( count < a_count )
+                            {
+                                buf.resize( a_count - count, a_value );
+                                writeSlab( a_path, buf, slab_size );
+                            }
+                        }
+
+    template<typename T>
+    void                writeScalar( const std::string & a_path, const std::string & a_name, T a_value, const std::string & a_units );
+
+    bool                            m_gen_nexus;
+    std::string                     m_nexus_filename;
+    unsigned long                   m_chunk_size;
+    H5nx                            m_h5nx;
+    uint64_t                        m_pulse_info_slab_size;
+};
+
+#endif // NXGEN_H

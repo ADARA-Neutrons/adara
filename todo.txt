@@ -1,0 +1,18 @@
+STS code issues
+
+* Both monitor and bank event index are missing values somewhere...
+* Beam mon tof values look wrong
+* start/end times not in iso 8601 format
+* add google logging in appropriate locations
+* Get rid of m_chunk size within StreamParser class (it's nexus specific)
+* Document source code! :)
+
+Longer-term issues
+
+* Determine what to do with enumeration definitions in nexus
+
+Suggestions / Chnages for ADARA protocol
+
+* Eliminate xml from protocol where possible (run info, beam line info, device descriptor)
+* Combine run info with beam line info (what's the distinction?)
+* Add better coverage for POD types in process variable packets (i.e. signed ints, shorts, etc.)
