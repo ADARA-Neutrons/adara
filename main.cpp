@@ -27,7 +27,8 @@ bool            move_files = false;
 bool            strict = false;
 std::string     work_path;
 unsigned long   chunk_size = 2048;
-unsigned short  buf_size = 20;
+unsigned short  evt_buf_size = 20;
+unsigned short  anc_buf_size = 2;
 unsigned long   cache_size = 1024;
 unsigned short  compression_level = 0;
 const char*     in_file = 0;
@@ -35,7 +36,7 @@ const char*     in_file = 0;
 void
 showUsage()
 {
-    cout << "Usage: sts [options]" << endl;
+    cout << "Usage: SFS [options]" << endl;
     cout << "Options:" << endl;
     cout << "  --help: show help" << endl;
     cout << "  +i: interactive mode" << endl;
@@ -49,7 +50,8 @@ showUsage()
     cout << "  work=path: working directory" << endl;
     cout << "  chunk=n: set hdf5 chunk size to 'n' bytes" << endl;
     cout << "  cache=n: set hdf5 cache to 'n' KB" << endl;
-    cout << "  buf=n: set event buffers to 'n' chunks" << endl;
+    cout << "  ebuf=n: set event buffers to 'n' chunks" << endl;
+    cout << "  abuf=n: set ancillary buffers to 'n' chunks" << endl;
     cout << "  comp=n: set nexus compression leve to 'n' (0=off)" << endl;
 }
 
@@ -76,8 +78,10 @@ parseCmdLine( int argc, char** argv )
             chunk_size = atol(&argv[i][6]);
         else if ( !strncmp(argv[i],"cache=",6))
             cache_size = atol(&argv[i][6]) * 1024;
-        else if ( !strncmp(argv[i],"buf=",4))
-            buf_size = atoi(&argv[i][4]);
+        else if ( !strncmp(argv[i],"ebuf=",5))
+            evt_buf_size = atoi(&argv[i][5]);
+        else if ( !strncmp(argv[i],"abuf=",5))
+            anc_buf_size = atoi(&argv[i][5]);
         else if ( !strncmp(argv[i],"file=",5))
             in_file = &argv[i][5];
         else if ( !strncmp(argv[i],"work=",5))
@@ -113,7 +117,7 @@ int main(int argc, char** argv)
 {
     int ifd = fileno(stdin);
     int ofd = fileno(stdout);
-    STS::TranslationStatusCode sms_code = STS::TS_SUCCESS;
+    SFS::TranslationStatusCode sms_code = SFS::TS_SUCCESS;
     string sms_reason;
 
     try
@@ -132,7 +136,7 @@ int main(int argc, char** argv)
             gather_stats = false;
 
         google::InitGoogleLogging(argv[0]);
-        //google::SetLogDestination( google::INFO, "/tmp/sts.log." );
+        //google::SetLogDestination( google::INFO, "/tmp/SFS.log." );
 
         string          nexus_outfile;
         string          adara_outfile;
@@ -161,7 +165,8 @@ int main(int argc, char** argv)
             cout << "  cat. prep    : " << (move_files?"true":"false") << endl;
             cout << "  chunk size   : " << chunk_size << " (bytes)" << endl;
             cout << "  cache size   : " << cache_size << " (bytes)" << endl;
-            cout << "  buf size     : " << buf_size << " (chunks)" << endl;
+            cout << "  evt buf size : " << evt_buf_size << " (chunks)" << endl;
+            cout << "  anc buf size : " << anc_buf_size << " (chunks)" << endl;
             cout << "  comp lev     : " << compression_level <<  endl;
             cout << "  gather stats : " << (gather_stats?"yes":"no") << endl;
         }
@@ -176,7 +181,7 @@ int main(int argc, char** argv)
 
         if ( ifd >= 0 )
         {
-            NxGen    nxgen( ifd, fileno(stdout), adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, buf_size, cache_size, compression_level );
+            NxGen    nxgen( ifd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size, anc_buf_size, cache_size, compression_level );
 
             nxgen.processStream();
 
@@ -193,37 +198,37 @@ int main(int argc, char** argv)
                 nxgen.printStats( cout );
         }
     }
-    catch( STS::TranslationException &e )
+    catch( SFS::TranslationException &e )
     {
         sms_code = e.getStatusCode();
         sms_reason = e.what();
     }
     catch( boost::filesystem::filesystem_error &e )
     {
-        sms_code = STS::TS_TRANSIENT_ERROR;
+        sms_code = SFS::TS_TRANSIENT_ERROR;
         sms_reason = e.what();
     }
     catch( exception &e )
     {
-        sms_code = STS::TS_PERM_ERROR;
+        sms_code = SFS::TS_PERM_ERROR;
         sms_reason = e.what();
     }
     catch( ... )
     {
-        sms_code = STS::TS_PERM_ERROR;
+        sms_code = SFS::TS_PERM_ERROR;
         sms_reason = "Unknown error";
     }
 
     if ( !interact )
     {
-        STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
+        SFS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( ofd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
     }
-    else if ( sms_code != STS::TS_SUCCESS )
+    else if ( sms_code != SFS::TS_SUCCESS )
     {
         cout << "Error: " << sms_reason << endl;
     }
 
-    return sms_code != STS::TS_SUCCESS;
+    return sms_code != SFS::TS_SUCCESS;
 }
 

@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace STS {
+namespace SFS {
 
 class TransCompletePkt
 {
@@ -52,7 +52,7 @@ private:
     void
     buildSendBuffer()
     {
-        uint32_t len = m_reason.length() + 17;
+        uint32_t len = m_reason.length() + sizeof(ADARA::Header) + sizeof(uint32_t);
         uint16_t pad = len % 4;
 
         if ( pad )
@@ -60,8 +60,7 @@ private:
 
         if ( len + pad > m_buffer_capacity )
         {
-            if ( m_buffer )
-                delete[] m_buffer;
+            delete[] m_buffer;
 
             m_buffer_capacity = (len + pad)*2;
             m_buffer = new char[m_buffer_capacity];
@@ -71,8 +70,8 @@ private:
 
         uint32_t *p = (uint32_t *)m_buffer;
 
-        *p++ = len + pad - 16;
-        *p++ = 0x400500;
+        *p++ = len + pad - sizeof(ADARA::Header);
+        *p++ = ADARA::PacketType::TRANS_COMPLETE_V0;
         *p++ = time(0) + ADARA::EPICS_EPOCH_OFFSET;
         *p++ = 0;
         *p++ = (m_status << 16) | (m_reason.length() & 0xFFFF);

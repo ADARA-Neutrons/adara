@@ -6,8 +6,8 @@
 using namespace std;
 
 
-NxGen::NxGen( int a_fd_in, int a_fd_out, string & a_adara_out_file, string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size, unsigned short a_buf_chunk_count, unsigned long a_cache_size, unsigned short a_compression_level )
- : StreamParser( a_fd_in, a_fd_out, a_adara_out_file, a_strict, a_gather_stats, a_chunk_size, a_buf_chunk_count ),
+NxGen::NxGen( int a_fd_in, string & a_adara_out_file, string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size, unsigned short a_event_buf_chunk_count, unsigned short a_ancillary_buf_chunk_count, unsigned long a_cache_size, unsigned short a_compression_level )
+ : StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats, a_chunk_size*a_event_buf_chunk_count, a_chunk_size*a_ancillary_buf_chunk_count ),
    m_gen_nexus(false), m_nexus_filename(a_nexus_out_file), m_chunk_size(a_chunk_size), m_h5nx(a_compression_level), m_pulse_info_slab_size(0)
 {
     if ( !a_nexus_out_file.empty() )
@@ -23,17 +23,17 @@ NxGen::~NxGen()
 }
 
 
-STS::PVInfoBase*
-NxGen::makePVInfo( const string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units )
+SFS::PVInfoBase*
+NxGen::makePVInfo( const string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units )
 {
     switch ( a_type )
     {
-    case STS::PVT_INT:  // TODO ADARA only supports uint32_t currently
-    case STS::PVT_ENUM:
-    case STS::PVT_UINT:
+    case SFS::PVT_INT:  // TODO ADARA only supports uint32_t currently
+    case SFS::PVT_ENUM:
+    case SFS::PVT_UINT:
         return new NxPVInfo<uint32_t>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
-    case STS::PVT_FLOAT: // TOSO ADARA only supports double currently
-    case STS::PVT_DOUBLE:
+    case SFS::PVT_FLOAT: // TOSO ADARA only supports double currently
+    case SFS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
     }
 
@@ -41,7 +41,7 @@ NxGen::makePVInfo( const string & a_name, STS::Identifier a_device_id, STS::Iden
     throw runtime_error("makePVInfo failed.");
 }
 
-STS::BankInfo*
+SFS::BankInfo*
 NxGen::makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
 {
     NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve );
@@ -71,7 +71,7 @@ NxGen::makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reser
 }
 
 
-STS::MonitorInfo*
+SFS::MonitorInfo*
 NxGen::makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve )
 {
     NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve );
@@ -130,10 +130,10 @@ NxGen::finalize()
     writeScalar( "entry/", "total_uncounted_counts", m_events_uncounted, "" );
     writeScalar( "entry/", "proton_charge", m_total_charge, "picoCoulomb" );
 
-    string time = epicsTimeToISO8601( start );
+    string time = timeToISO8601( start );
     m_h5nx.H5NXmake_dataset_string( "entry/", "start_time", time );
 
-    time = epicsTimeToISO8601( end );
+    time = timeToISO8601( end );
     m_h5nx.H5NXmake_dataset_string( "entry/", "end_time", time );
 
     m_h5nx.H5NXclose_file();
@@ -266,7 +266,7 @@ NxGen::processGeometry( const std::string & a_xml )
 }
 
 void
-NxGen::pulseBuffersReady( STS::PulseInfo &a_pulse_info )
+NxGen::pulseBuffersReady( SFS::PulseInfo &a_pulse_info )
 {
     if (!m_gen_nexus)
         return;
@@ -280,7 +280,7 @@ NxGen::pulseBuffersReady( STS::PulseInfo &a_pulse_info )
 
 
 void
-NxGen::pulseFinalize( STS::PulseInfo &a_pulse_info )
+NxGen::pulseFinalize( SFS::PulseInfo &a_pulse_info )
 {
     if (!m_gen_nexus)
         return;
@@ -298,7 +298,7 @@ NxGen::pulseFinalize( STS::PulseInfo &a_pulse_info )
 
 
 void
-NxGen::bankBuffersReady( STS::BankInfo &a_bank )
+NxGen::bankBuffersReady( SFS::BankInfo &a_bank )
 {
     if (!m_gen_nexus)
         return;
@@ -319,7 +319,7 @@ NxGen::bankBuffersReady( STS::BankInfo &a_bank )
 }
 
 void
-NxGen::bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count )
+NxGen::bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count )
 {
     if (!m_gen_nexus)
         return;
@@ -334,7 +334,7 @@ NxGen::bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count )
 }
 
 void
-NxGen::bankFinalize( STS::BankInfo &a_bank )
+NxGen::bankFinalize( SFS::BankInfo &a_bank )
 {
     if (!m_gen_nexus)
         return;
@@ -351,7 +351,7 @@ NxGen::bankFinalize( STS::BankInfo &a_bank )
 
 
 void
-NxGen::monitorBuffersReady( STS::MonitorInfo &a_monitor )
+NxGen::monitorBuffersReady( SFS::MonitorInfo &a_monitor )
 {
     if (!m_gen_nexus)
         return;
@@ -369,7 +369,7 @@ NxGen::monitorBuffersReady( STS::MonitorInfo &a_monitor )
 }
 
 void
-NxGen::monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count )
+NxGen::monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count )
 {
     if (!m_gen_nexus)
         return;
@@ -384,7 +384,7 @@ NxGen::monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count )
 }
 
 void
-NxGen::monitorFinalize( STS::MonitorInfo &a_monitor )
+NxGen::monitorFinalize( SFS::MonitorInfo &a_monitor )
 {
     if (!m_gen_nexus)
         return;
@@ -398,16 +398,16 @@ NxGen::monitorFinalize( STS::MonitorInfo &a_monitor )
 }
 
 NeXus::NXnumtype
-NxGen::toNxType( STS::PVType a_type ) const
+NxGen::toNxType( SFS::PVType a_type ) const
 {
     switch( a_type )
     {
-    case STS::PVT_INT:
-    case STS::PVT_ENUM:
+    case SFS::PVT_INT:
+    case SFS::PVT_ENUM:
         return NeXus::INT32;
-    case STS::PVT_UINT: return NeXus::UINT32;
-    case STS::PVT_FLOAT: return NeXus::FLOAT32;
-    case STS::PVT_DOUBLE: return NeXus::FLOAT64;
+    case SFS::PVT_UINT: return NeXus::UINT32;
+    case SFS::PVT_FLOAT: return NeXus::FLOAT32;
+    case SFS::PVT_DOUBLE: return NeXus::FLOAT64;
     }
 
     LOG(ERROR) << "Invalid PV type: " << a_type << endl;

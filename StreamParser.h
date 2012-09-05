@@ -15,15 +15,17 @@
 #include <string.h>
 #include <vector>
 #include <boost/lexical_cast.hpp>
+//#include "../SMS/ADARA.h"
 #include "../SMS/ADARAParser.h"
 #include "Utils.h"
-//#include "NxGen.h"
-#include "stsdefs.h"
+#include "sfsdefs.h"
 
-namespace STS {
-
+namespace SFS {
 
 
+/*! \brief Exception class used to communicate translation failures within STS code
+ *
+ */
 class TranslationException : public std::runtime_error
 {
 public:
@@ -39,10 +41,19 @@ private:
 
 
 
+/*! \brief Base class that provides ADARA-specific parsing and translation
+ *
+ * The StreamParser class provides ADARA-specific parsing of an incoming data
+ * stream and serves as a base class for format-specific adapter classes that
+ * output the extracted data. The StreamParser class communicates with a sub-
+ * class via the methods defined on the IStreamAdapter interface. The Stream-
+ * Parser class operates on posix file descriptors (for stream input and
+ * also output of a filtered adara file).
+ */
 class StreamParser : public ADARA::Parser, public IStreamAdapter
 {
 public:
-    StreamParser( int a_fd, int a_fd_out, std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false, uint32_t a_chunk_size = 2048, uint16_t a_buf_chunk_size = 20 );
+    StreamParser( int a_fd, std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false, uint32_t a_event_buf_write_thresh = 40960, uint32_t a_ancillary_buf_write_thresh = 4096 );
     virtual ~StreamParser();
 
     void    processStream();
@@ -70,6 +81,7 @@ protected:
     PulseInfo               m_pulse_info;
 
 private:
+    /// Defines internal stream processing states of StreamParser class
     enum ProcessingState
     {
         WAITING_FOR_RUN_START = 0x0001,
@@ -78,6 +90,7 @@ private:
         DONE_PROCESSING       = 0x0008
     };
 
+    /// Defines packet statistics that can be gathers and displayed
     struct PktStats
     {
         PktStats() : count(0), min_pkt_size(0), max_pkt_size(0), total_size(0) {}
@@ -99,22 +112,41 @@ private:
     bool    rxPacket( const ADARA::DeviceDescriptorPkt &pkt );
     bool    rxPacket( const ADARA::VariableU32Pkt &pkt );
     bool    rxPacket( const ADARA::VariableDoublePkt &pkt );
-    
-    inline void writePacket( const ADARA::Packet &pkt )
+
+    /*! \brief Writes an ADARA packet to an output file
+     *  \param pkt - An ADARA packet to write
+     *
+     * If adara stream output file generation is enabled, this method writes the
+     * specified packet to the output file stream object in binary format.
+     */
+    inline void writePacket( const ADARA::Packet &a_pkt )
     {
         if ( m_gen_adara )
         {
-            m_ofs_adara.write( (char *)pkt.packet(), pkt.packet_length());
+            m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length());
         }
     }
 
-    void    processPixelMappingPkt( const ADARA::PixelMappingPkt &pkt );
     void    processPulseInfo( const ADARA::BankedEventPkt &pkt );
     void    processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
     void    handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
     void    processMonitorEvents( uint16_t monitor_id, uint32_t event_count, const uint32_t *rpos );
     void    handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
-    void    processDeviceDescriptor( Identifier a_device_id, const std::string & a_xml );
+
+    /*! \brief Processes a process variable value update from the input stream.
+     *  \param a_device_id - Device ID of process variable
+     *  \param a_pv_id - Process variable ID
+     *  \param a_value - Value of process variable
+     *  \param a_timestamp - Timestamp of value update from stream
+     *
+     * This method processes value updates for process variables (PVs) from the
+     * input ADARA stream. If the PV has been defined by a device descriptor
+     * packet (DDP), then an entry will be present in the StreamParser PV
+     * container - allowing the specified value to be stored in the associated
+     * value buffer of the PV. This buffer will be flushed to the stream
+     * adapter when full. Statistics for the PV are also updated when this
+     * method is called.
+     */
     template<class T>
     void    pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp )
             {
@@ -146,7 +178,7 @@ private:
                         pvinfo->m_stats.push(a_value);
 
                         // Check for buffer write
-                        if ( pvinfo->m_value_buffer.size() >= m_chunk_size )
+                        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
                             pvinfo->flushBuffers();
                     }
                     else
@@ -165,7 +197,13 @@ private:
     void    finalizeStreamProcessing();
     PVType  toPVType( const char *a_source ) const;
 
-
+    /*! \brief Gathers statistics from the specified ADARA packet.
+     *  \param pkt - An ADARA packet to analyze
+     *
+     * If stream statistics gathering is enabled, this method collects a number
+     * of metrics for the stream and each packet type (total packet count, min/
+     * max packet size with payload, total byte count for each packet type.
+     */
     inline void gatherStats( const ADARA::Packet &pkt ) const
     {
         PktStats &stats = m_stats[pkt.type()];
@@ -177,29 +215,25 @@ private:
         stats.total_size += pkt.packet_length();
     }
 
-    const char*     getPktName( uint32_t a_pkt_id ) const;
+    const char*     getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
 
-    bool                                    m_initialized;
-    int                                     m_fd;
-    int                                     m_fd_out;
-    ProcessingState                         m_processing_state;
-    uint32_t                                m_pkt_recvd;
-    std::ofstream                           m_ofs_adara;
+    bool                                    m_initialized;              ///< Flag indicating if instance has been initialized
+    int                                     m_fd;                       ///< Input ADARA stream file descriptor
+    ProcessingState                         m_processing_state;         ///< Current (internal) processing state
+    uint32_t                                m_pkt_recvd;                ///< Packet received-status bit mask
+    std::ofstream                           m_ofs_adara;                ///< ADARA output file stream
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::vector<MonitorInfo*>               m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs;                      ///< Container of process variable information
-    uint32_t                                m_chunk_size;
-    uint16_t                                m_event_buf_chunk_count;
-    uint16_t                                m_event_buf_write_thresh;
-    uint16_t                                m_ancillary_buf_chunk_count;
-    uint16_t                                m_ancillary_buf_write_thresh;
-    bool                                    m_strict;
-    bool                                    m_gen_adara;
-    bool                                    m_gather_stats;
-    mutable std::map<uint32_t,PktStats>     m_stats;
-    uint64_t                                m_skipped_pkt_count;
+    uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banked detectors and monitors)
+    uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
+    bool                                    m_strict;                   ///< Controls strict ADARA processing option
+    bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
+    bool                                    m_gather_stats;             ///< Controls gathering of stream statistics
+    mutable std::map<uint32_t,PktStats>     m_stats;                    ///< Continer for per-packet-type statistics
+    uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
 };
 
 } // End namespace STS

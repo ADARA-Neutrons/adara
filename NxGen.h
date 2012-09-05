@@ -4,18 +4,18 @@
 #include <string>
 #include <vector>
 #include "h5nx.hpp"
-#include "stsdefs.h"
+#include "sfsdefs.h"
 #include "StreamParser.h"
 #include "Utils.h"
 #include <boost/lexical_cast.hpp>
 #include <glog/logging.h>
 
 
-class NxGen : public STS::StreamParser
+class NxGen : public SFS::StreamParser
 {
 private:
 
-    class NxBankInfo : public STS::BankInfo
+    class NxBankInfo : public SFS::BankInfo
     {
     public:
         NxBankInfo( uint32_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
@@ -37,7 +37,7 @@ private:
         uint64_t                m_index_slab_size;
     };
 
-    class NxMonitorInfo : public STS::MonitorInfo
+    class NxMonitorInfo : public SFS::MonitorInfo
     {
     public:
         NxMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve )
@@ -56,11 +56,11 @@ private:
     };
 
     template<class T>
-    class NxPVInfo : public STS::PVInfo<T>
+    class NxPVInfo : public SFS::PVInfo<T>
     {
     public:
-        NxPVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units, NxGen & a_nxgen  )
-            : STS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ), m_nxgen(a_nxgen), m_slab_size(0)
+        NxPVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units, NxGen & a_nxgen  )
+            : SFS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ), m_nxgen(a_nxgen), m_slab_size(0)
         {
             m_log_path = std::string("entry/DASlogs/") + a_name;
         }
@@ -105,30 +105,30 @@ private:
 
 public:
 
-    NxGen( int a_fd_in, int a_fd_out, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_buf_chunk_count = 20, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
+    NxGen( int a_fd_in, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_event_buf_chunk_count = 20, unsigned short a_ancillary_buf_chunk_count = 5, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
     ~NxGen();
 
 protected:
 
     void                initialize();
     void                finalize();
-    STS::PVInfoBase*    makePVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve );
+    SFS::PVInfoBase*    makePVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units );
+    SFS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    SFS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve );
     void                processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname );
     void                processRunInfo( const std::string & a_xml );
     void                processGeometry( const std::string & a_xml );
-    void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
-    void                pulseFinalize( STS::PulseInfo &a_pulse_info );
-    void                bankBuffersReady( STS::BankInfo &a_bank );
-    void                bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count );
-    void                bankFinalize( STS::BankInfo &a_bank );
-    void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
-    void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
-    void                monitorFinalize( STS::MonitorInfo &a_monitor );
+    void                pulseBuffersReady( SFS::PulseInfo &a_pulse_info );
+    void                pulseFinalize( SFS::PulseInfo &a_pulse_info );
+    void                bankBuffersReady( SFS::BankInfo &a_bank );
+    void                bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count );
+    void                bankFinalize( SFS::BankInfo &a_bank );
+    void                monitorBuffersReady( SFS::MonitorInfo &a_monitor_info );
+    void                monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count );
+    void                monitorFinalize( SFS::MonitorInfo &a_monitor );
 
 private:
-    NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
+    NeXus::NXnumtype    toNxType( SFS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path, const std::string &a_type );
     void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, int nxdatatype, const std::string units = "" );
     void                makeLink( const std::string &source_path, const std::string &dest_name );

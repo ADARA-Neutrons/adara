@@ -1,11 +1,12 @@
 STS code issues
 
-* Both monitor and bank event index are missing values somewhere...
 * Beam mon tof values look wrong
-* start/end times not in iso 8601 format
 * add google logging in appropriate locations
-* Get rid of m_chunk size within StreamParser class (it's nexus specific)
 * Document source code! :)
+* Support fast metadata when SMS generates it
+* Move getPktName() method to ADARA source
+* It was not a good idea to assume monitor IDs will be low-value integers starting at zero... fix to work like banks
+* Processing of RunInfo is incorrectly placed in NxGen - need to refactor to pull this into StreamParser
 
 Longer-term issues
 

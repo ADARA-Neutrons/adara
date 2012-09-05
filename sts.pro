@@ -18,7 +18,7 @@ HEADERS += \
     ../SMS/ADARAPackets.h \
     ../SMS/ADARAParser.h \
     NxGen.h \
-    stsdefs.h
+    sfsdefs.h
 
 INCLUDEPATH += /usr/include/libxml2
 LIBS += -lxml2 -lhdf5 -lglog -lrt -lboost_system -lboost_filesystem

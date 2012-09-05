@@ -8,19 +8,49 @@
 
 using namespace std;
 
-namespace STS {
+namespace SFS {
 
-
+/// This sets the size of the ADARA parser stream buffer in bytes (bigger is faster)
 #define ADARA_IN_BUF_SIZE   0x1000000
-//#define ADARA_OUT_BUF_SIZE  0x40000
 
-StreamParser::StreamParser( int a_fd_in, int a_fd_out, string & a_adara_out_file, bool a_strict, bool a_gather_stats, uint32_t a_chunk_size, uint16_t a_buf_chunk_count )
-  : Parser(ADARA_IN_BUF_SIZE,ADARA_IN_BUF_SIZE),
-    m_total_charge(0.0), m_events_counted(0), m_events_uncounted(0),
-    m_initialized(false), m_fd(a_fd_in), m_fd_out(a_fd_out), m_processing_state(WAITING_FOR_RUN_START), m_pkt_recvd(0), m_pulse_id(0), m_pulse_count(0),
-    m_chunk_size(a_chunk_size), m_event_buf_chunk_count(a_buf_chunk_count), m_event_buf_write_thresh((a_buf_chunk_count-1)*a_chunk_size),
-    m_ancillary_buf_chunk_count(10), m_ancillary_buf_write_thresh(10*a_chunk_size),
-    m_strict(a_strict), m_gen_adara(false), m_gather_stats(a_gather_stats), m_skipped_pkt_count(0)
+
+//---------------------------------------------------------------------------------------------------------------------
+// Public StreamParser methods
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief Constructor for StremParser class.
+ *
+ * This constructor builds a StreamParser instance using the options specified. If the adara filename is empty, then no
+ * adara output stream is produced. The buffer thresholds should be set to sane values based on the specific stream
+ * adapter in use (i.e. multiples of a given chunk size or an hdf5 implementation).
+ */
+StreamParser::StreamParser
+(
+    int         a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    string     &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
+    bool        a_strict,                   ///< [in] Controls strict processing of input stream
+    bool        a_gather_stats,             ///< [in] Controls stream statistics gathering
+    uint32_t    a_event_buf_write_thresh,   ///< [in] Event buffer write threshold
+    uint32_t    a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
+)
+:
+    Parser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
+    m_total_charge(0.0),
+    m_events_counted(0),
+    m_events_uncounted(0),
+    m_initialized(false),
+    m_fd(a_fd_in),
+    m_processing_state(WAITING_FOR_RUN_START),
+    m_pkt_recvd(0),
+    m_pulse_id(0),
+    m_pulse_count(0),
+    m_event_buf_write_thresh(a_event_buf_write_thresh),
+    m_anc_buf_write_thresh(a_anc_buf_write_thresh),
+    m_strict(a_strict),
+    m_gen_adara(false),
+    m_gather_stats(a_gather_stats),
+    m_skipped_pkt_count(0)
 {
     if ( !a_adara_out_file.empty() )
     {
@@ -29,10 +59,14 @@ StreamParser::StreamParser( int a_fd_in, int a_fd_out, string & a_adara_out_file
     }
 
     m_banks.reserve(300);
-    m_pulse_info.times.reserve(m_chunk_size*m_ancillary_buf_chunk_count);
-    m_pulse_info.freqs.reserve(m_chunk_size*m_ancillary_buf_chunk_count);
+    m_pulse_info.times.reserve(m_anc_buf_write_thresh);
+    m_pulse_info.freqs.reserve(m_anc_buf_write_thresh);
 }
 
+
+/*! \brief Destructor for StremParser class.
+ *
+ */
 StreamParser::~StreamParser()
 {
     if ( m_ofs_adara.is_open())
@@ -44,6 +78,12 @@ StreamParser::~StreamParser()
 }
 
 
+/*! \brief This method initiates ADARA stream processing.
+ *
+ * This method initiates ADARA stream processing on the calling thread and does not return until the strem is fuly
+ * translated, or an error occurs (an exception may be thrown). This method can only be called once for a given
+ * StreamParser instance.
+ */
 void
 StreamParser::processStream()
 {
@@ -67,17 +107,26 @@ StreamParser::processStream()
     }
 }
 
+
+/*! \brief This method prints stream statistics.
+ *
+ * This method prints human-readbale stream statistics to the specified output stream if statistics gathering was
+ * enabled. The output statistics may not be accurate if the processStream method exits abnormally.
+ */
 void
-StreamParser::printStats( ostream &a_os ) const
+StreamParser::printStats
+(
+    ostream &a_os   ///< [in] An output stream to write statistics to.
+) const
 {
     if ( m_gather_stats )
     {
         a_os << endl << "Pkt Type\t\t\tCount     \tTotal KB  \tMin Size  \tMax Size  " << endl;
         for ( map<uint32_t,PktStats>::const_iterator i = m_stats.begin(); i != m_stats.end(); ++i )
         {
-            a_os << hex << setw(8) << left << i->first << "\t" << setw(12) << getPktName(i->first) << "\t" << dec << setw(10) << i->second.count << "\t" << setw(10)
-                    << (i->second.total_size >> 10) << "\t" << setw(10) << i->second.min_pkt_size << "\t" << setw(10)
-                    << i->second.max_pkt_size << endl;
+            a_os << hex << setw(8) << left << i->first << "\t" << setw(12) << getPktName((ADARA::PacketType::Enum)i->first)
+                 << "\t" << dec << setw(10) << i->second.count << "\t" << setw(10) << (i->second.total_size >> 10)
+                 << "\t" << setw(10) << i->second.min_pkt_size << "\t" << setw(10) << i->second.max_pkt_size << endl;
         }
         a_os << endl << "Packets skipped: " << m_skipped_pkt_count << endl;
         a_os << "Pulse charge stats: " << m_pulse_info.charge_stats << endl;
@@ -89,59 +138,11 @@ StreamParser::printStats( ostream &a_os ) const
     }
 }
 
-
-const char*
-StreamParser::getPktName( uint32_t a_pkt_id ) const
-{
-    switch ( a_pkt_id )
-    {
-    case 0x0000:
-        return "Raw Event";
-    case 0x0100:
-        return "RTDL";
-    case 0x0200:
-        return "Src List";
-    case 0x400000:
-        return "Bank Event";
-    case 0x400100:
-        return "Beam Mon";
-    case 0x400200:
-        return "Pix Map";
-    case 0x400300:
-        return "Run Stat";
-    case 0x400400:
-        return "Run Info";
-    case 0x400500:
-        return "Tran Comp";
-    case 0x400600:
-        return "Cli Hello";
-    case 0x400700:
-        return "Stat Reset";
-    case 0x400800:
-        return "Sync";
-    case 0x400900:
-        return "Heart";
-    case 0x400A00:
-        return "Geom Info";
-    case 0x400B00:
-        return "Beam Info";
-    case 0x800000:
-        return "DDP";
-    case 0x800100:
-        return "VVP U32";
-    case 0x800200:
-        return "VVP DBL";
-    case 0x800300:
-        return "VVP STR";
-    }
-
-    return "Unknown";
-}
-
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // General ADARA packet processing methods
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+// These bitmasks are used to monitor one-time processing of the associated packet type
 #define PKT_BIT_PIXELMAP    0x0001
 #define PKT_BIT_RUNINFO     0x0002
 #define PKT_BIT_BEAMINFO    0x0004
@@ -150,7 +151,7 @@ StreamParser::getPktName( uint32_t a_pkt_id ) const
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
     {                                   \
-        return Parser::rxPacket(pkt);   \
+        return Parser::rxPacket(a_pkt);   \
     }                                   \
     else                                \
     {                                   \
@@ -163,7 +164,7 @@ StreamParser::getPktName( uint32_t a_pkt_id ) const
     if (( m_processing_state & (s)) && !(m_pkt_recvd & x))    \
     {                                   \
         m_pkt_recvd |= x;               \
-        return Parser::rxPacket(pkt);   \
+        return Parser::rxPacket(a_pkt);   \
     }                                   \
     else                                \
     {                                   \
@@ -172,20 +173,29 @@ StreamParser::getPktName( uint32_t a_pkt_id ) const
         return false;                   \
     }
 
-
+/*! \brief This method controls processing of incoming ADARA stream packets.
+ *
+ * This method is called by the ADARAParser base class to allow a subclass to control which ADARA packet types will be
+ * further processed. If a packet type is to be processed, Parser::rxPacket() is called; otherwise no action is taken.
+ * This method examines the current processing state and a set of macros to determine which packets are processed. This
+ * is also the point at which stream statistics are gathered.
+ */
 bool
-StreamParser::rxPacket( const ADARA::Packet &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::Packet &a_pkt    ///< [in] An ADARA packet
+)
 {
     //cout << "pkt " << hex << pkt.type() << endl;
 
     if ( m_gather_stats )
-        gatherStats( pkt );
+        gatherStats( a_pkt );
 
-    switch (pkt.type())
+    switch (a_pkt.type())
     {
     // These packets shall always be processed
     case ADARA::PacketType::RUN_STATUS_V0:
-        return Parser::rxPacket(pkt);
+        return Parser::rxPacket(a_pkt);
 
     // These packets shall be processed ONCE during header and event processing
     // Note: these should arrive before event processing, but it is no guaranteed.
@@ -220,71 +230,87 @@ StreamParser::rxPacket( const ADARA::Packet &pkt )
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Run Status packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Run Status ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Run Status packets. The first Run Status indicating "NEW_RUN" causes processing to
+ * proceed from the initial state to header processing state. Processing continues until an "END_RUN" status is
+ * received, at which point processing is halted within the StreamParser. Note: if strict processing is enabled and run
+ * status values do not align with current processing states, an exception will be thrown.
+ */
 bool
-StreamParser::rxPacket( const ADARA::RunStatusPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::RunStatusPkt &a_pkt    ///< [in] ADARA RunStatusPkt object to process
+)
 {
     //cout << "Processing RunStatusPkt (stat: " << pkt.status() << ")" << endl;
     
-    writePacket( pkt );
+    writePacket( a_pkt );
 
-    if ( pkt.status() == ADARA::RunStatus::NEW_RUN )
+    bool bad_state = false;
+
+    if ( a_pkt.status() == ADARA::RunStatus::NEW_RUN )
     {
         if ( m_processing_state == WAITING_FOR_RUN_START )
         {
-            m_start_time = pkt.timestamp();
+            m_start_time = a_pkt.timestamp();
             m_processing_state = PROCESSING_RUN_HEADER;
         }
+        else
+            bad_state = true;
     }
-    else if ( pkt.status() == ADARA::RunStatus::END_RUN )
+    else if ( a_pkt.status() == ADARA::RunStatus::END_RUN )
     {
         if ( m_processing_state == PROCESSING_EVENTS )
         {
-            m_end_time = pkt.timestamp();
+            m_end_time = a_pkt.timestamp();
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
         }
         else
-            throw runtime_error("Recvd end run pkt while in wrong state.");
+            bad_state = true;
     }
 
+    if ( m_strict && bad_state )
+        throw runtime_error("Recvd Run Status pkt in wrong state.");
+
     return false;
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Pixel Mapping packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Pixel Mapping ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA PixelMapping packets. Detector source and bank information is extracted from the received
+ * packet and BankInfo instances are created (using the makeBankInfo() virtual factory method) to capture essential bank
+ * parameters need for subsequent bnked event processing. The receipt of a Pixel Mapping packets also triggers
+ * progression to the internal event processing state.
+ */
 bool
-StreamParser::rxPacket( const ADARA::PixelMappingPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
+)
 {
-    //cout << "Processing PixelMappingPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
-
-    processPixelMappingPkt( pkt );
-
-    // The receipt of a pixel mapping packet allows state to progress to event processing
-    m_processing_state = PROCESSING_EVENTS;
-
-    return false;
-}
-
-void
-StreamParser::processPixelMappingPkt( const ADARA::PixelMappingPkt &pkt )
-{
-    const uint32_t *rpos = (const uint32_t*)pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(pkt.payload() + pkt.payload_length());
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
     uint32_t        bank_logical_id;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
     while( rpos < epos )
     {
-        bank_logical_id = *rpos++;
+        bank_logical_id = *rpos++;              // TODO This infomation is not currently processed.
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
@@ -293,33 +319,42 @@ StreamParser::processPixelMappingPkt( const ADARA::PixelMappingPkt &pkt )
             m_banks.resize(bank_id+1,0);
 
         if ( !m_banks[bank_id] )
-        {
-            m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_chunk_count*m_chunk_size, m_ancillary_buf_chunk_count*m_chunk_size );
-        }
+            m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
         rpos += pix_count;
     }
+
+    // The receipt of a pixel mapping packet allows state to progress to event processing
+    m_processing_state = PROCESSING_EVENTS;
+
+    return false;
 }
 
-//-----------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Banked Event packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Banked Event ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by ths method with the
+ * pulse data attached to the received Banked Event packet. The payload of the Banked Event packet is parsed for neutron
+ * events which are then handled by the processBankEvents() method.
+ */
 bool
-StreamParser::rxPacket( const ADARA::BankedEventPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::BankedEventPkt &a_pkt      ///< [in] ADARA BankedEventPkt object to process
+)
 {
-    //cout << "Processing BankedEventPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
+    processPulseID( a_pkt.pulseId() );
+    processPulseInfo( a_pkt );
 
-    processPulseID( pkt.pulseId() );
-
-    const uint32_t *rpos = (const uint32_t*)pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(pkt.payload() + pkt.payload_length());
-
-    //cout << "Bank Event Pkt, size: " << pkt.payload_length() << ", b: " << rpos << ", e: " << epos << endl;
-
-    processPulseInfo( pkt );
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
     rpos += 4; // Skip over pulse info
 
@@ -348,17 +383,27 @@ StreamParser::rxPacket( const ADARA::BankedEventPkt &pkt )
     return false;
 }
 
+
+/*! \brief This method processes the neutron pulse data associated with a Banked Event packet.
+ *
+ * This method accumulates pulse charge, time, and frequency data associated with a Banked Event packet. The various
+ * data are collected in ancillary buffers until ready to be flushed to a subclassed stream adapter via the
+ * pulseBuffersReady() virtual method.
+ */
 void
-StreamParser::processPulseInfo( const ADARA::BankedEventPkt &pkt )
+StreamParser::processPulseInfo
+(
+    const ADARA::BankedEventPkt &a_pkt      ///< [in] ADARA BankedEventPkt object to process
+)
 {
     // accumulate pulse charge
-    m_total_charge += pkt.pulseCharge();
-    m_pulse_info.charges.push_back(pkt.pulseCharge());
-    m_pulse_info.charge_stats.push(pkt.pulseCharge());
+    m_total_charge += a_pkt.pulseCharge();
+    m_pulse_info.charges.push_back(a_pkt.pulseCharge());
+    m_pulse_info.charge_stats.push(a_pkt.pulseCharge());
 
     if ( m_pulse_info.start_time_nsec )
     {
-        uint64_t pulse_time = timespec_to_nsec( pkt.timestamp()) - m_pulse_info.start_time_nsec;
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp()) - m_pulse_info.start_time_nsec;
         m_pulse_info.times.push_back( pulse_time*1.0e-9 );
         m_pulse_info.freqs.push_back(1.0e9/(pulse_time-m_pulse_info.last_time));
         m_pulse_info.freq_stats.push(m_pulse_info.freqs.back()); // Freq stats ignore first point since it can't be calculated
@@ -366,7 +411,7 @@ StreamParser::processPulseInfo( const ADARA::BankedEventPkt &pkt )
     }
     else
     {
-        m_pulse_info.start_time_ts = pkt.timestamp();
+        m_pulse_info.start_time_ts = a_pkt.timestamp();
         m_pulse_info.start_time_nsec = timespec_to_nsec( m_pulse_info.start_time_ts );
         m_pulse_info.last_time = 0;
         m_pulse_info.times.push_back(0);
@@ -374,7 +419,7 @@ StreamParser::processPulseInfo( const ADARA::BankedEventPkt &pkt )
     }
 
     // Is is time to write pulse info?
-    if ( m_pulse_info.times.size() == m_ancillary_buf_write_thresh )
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
     {
         pulseBuffersReady( m_pulse_info );
 
@@ -384,45 +429,55 @@ StreamParser::processPulseInfo( const ADARA::BankedEventPkt &pkt )
     }
 }
 
+
+/*! \brief This method processes the neutron events for a specific detector bank.
+ *
+ * This method processes incoming neutron events for a specified detector bank. The events are read from the packet
+ * and placed into internal event buffers (units are converted for event time of flight). When the event buffers are
+ * full, they are flushed to a subclassed stream adapter via the bankBuffersReady() virtual method. This method also
+ * detects pulse gaps and corrects the event index as required (see handleBankPulseGap() method for more details).
+ */
 void
-StreamParser::processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos )
+StreamParser::processBankEvents
+(
+    uint32_t        a_bank_id,        ///< [in] Bank ID of detector bank to be processed
+    uint32_t        a_event_count,    ///< [in] Number of events contained in stream buffer
+    const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
+)
 {
     //cout << "Bank " << bank_id << ", events: " << event_count << endl;
 
-    if ( bank_id < m_banks.size() )
+    if ( a_bank_id < m_banks.size() )
     {
-        BankInfo *bi = m_banks[bank_id];
-        size_t sz = bi->m_tof_buffer.size();
-
-        bi->m_tof_buffer.resize( sz + event_count );
-        bi->m_pid_buffer.resize( sz + event_count );
-
-        float           *tof_ptr = &bi->m_tof_buffer[sz];
-        uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
-        const uint32_t  *epos = rpos + (event_count<<1);
-
-        while ( rpos != epos )
-        {
-            *tof_ptr++ = *rpos++ * 0.1;
-            *pid_ptr++ = *rpos++;
-        }
+        BankInfo *bi = m_banks[a_bank_id];
 
         // Detect gaps in event data and fill event index if present
         if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-        {
-            uint64_t count = ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data;
+            handleBankPulseGap( *bi, ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
 
-            handleBankPulseGap( *bi, count );
+        size_t sz = bi->m_tof_buffer.size();
+
+        bi->m_tof_buffer.resize( sz + a_event_count );
+        bi->m_pid_buffer.resize( sz + a_event_count );
+
+        float           *tof_ptr = &bi->m_tof_buffer[sz];
+        uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
+        const uint32_t  *epos = a_rpos + (a_event_count<<1);
+
+        while ( a_rpos != epos )
+        {
+            *tof_ptr++ = *a_rpos++ * 0.1;
+            *pid_ptr++ = *a_rpos++;
         }
 
         // Cache event index until large enough to write
         bi->m_index_buffer.push_back( bi->m_event_count );
-        bi->m_event_count += event_count;
+        bi->m_event_count += a_event_count;
 
         bi->m_last_pulse_with_data = m_pulse_count;
 
         // Check to see if buffers are ready to write
-        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh || bi->m_index_buffer.size() >= m_ancillary_buf_write_thresh )
+        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
         {
             bankBuffersReady( *bi );
 
@@ -431,21 +486,34 @@ StreamParser::processBankEvents( uint32_t bank_id, uint32_t event_count, const u
             bi->m_index_buffer.clear();
         }
 
-        m_events_counted += event_count;
+        m_events_counted += a_event_count;
     }
     else
-    {
-        m_events_uncounted += event_count;
-    }
+        m_events_uncounted += a_event_count;
 }
 
+/*! \brief This method handles pulse gaps for a specified detector bank
+ *
+ * This method handles pulse gaps in the event stream for the specified detectpr bank. When a gap is detected, the event
+ * index for the bank must be corrected for the missing pulses to keep in synchronized with the event stream. If a small
+ * gap is detected, values are inserted directly into the internal index buffer; otherwise, gap processing is deferred
+ * to the stream adatapter subclass via the bankPulseGap() virtual method. (It is expected that the virtual method
+ * should write index values directly into the destination format to prevent excessive memory consumption that would
+ * be caused by buffering the corrected index.)
+ */
 void
-StreamParser::handleBankPulseGap( BankInfo &a_bi, uint64_t a_count )
+StreamParser::handleBankPulseGap
+(
+    BankInfo &a_bi,     ///< [in] A BankInfo instance with a pulse gap
+    uint64_t a_count    ///< [in] The size of the pulse gap
+)
 {
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_bi.m_index_buffer.size() + a_count < m_ancillary_buf_write_thresh )
-        a_bi.m_index_buffer.insert( a_bi.m_index_buffer.end(), a_count, a_bi.m_event_count );
+    if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    {
+        a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count, a_bi.m_event_count );
+    }
     else
     {
         // Otherwise, if the gap is too large - flush buffers & fill gap
@@ -458,23 +526,30 @@ StreamParser::handleBankPulseGap( BankInfo &a_bi, uint64_t a_count )
     }
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Beam Monitor packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Monitor Event ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Monitor Event packets. The payload of the Monitor Event packet is parsed for neutron
+ * events which are then handled by the processMonitorEvents() method.
+ */
 bool
-StreamParser::rxPacket( const ADARA::BeamMonitorPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
+)
 {
     //cout << "Processing BeamMonitorPkt" << endl;
 
-    writePacket( pkt );
+    writePacket( a_pkt );
 
-    processPulseID( pkt.pulseId() );
+    processPulseID( a_pkt.pulseId() );
 
-    const uint32_t *rpos = (const uint32_t*)pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(pkt.payload() + pkt.payload_length());
-
-    //cout << "Beam Monitor Pkt, size: " << pkt.payload_length() << ", b: " << rpos << ", e: " << epos << endl;
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
     // TODO What do we do with the pulse info from beam monitor packets?
     rpos += 4; // Skip over pulse info
@@ -498,48 +573,59 @@ StreamParser::rxPacket( const ADARA::BeamMonitorPkt &pkt )
     return false;
 }
 
-void
-StreamParser::processMonitorEvents( uint16_t monitor_id, uint32_t event_count, const uint32_t *rpos )
-{
-    if ( monitor_id >= m_monitors.size())
-        m_monitors.resize(monitor_id+1,0);
 
-    MonitorInfo *mi = m_monitors[monitor_id];
+/*! \brief This method processes the neutron events for a specific monitor.
+ *
+ * This method processes incoming neutron events for a specified monitor. The events are read from the packet
+ * and placed into internal event buffers (units are converted for event time of flight). When the event buffers are
+ * full, they are flushed to a subclassed stream adapter via the monitorBuffersReady() virtual method. This method also
+ * detects pulse gaps and corrects the event index as required (see handleMonitorPulseGap() method for more details).
+ * Note that unlike banked events, monitors events do not contain a pixel ID field (pid) as all events originate from
+ * one source (i.e. the monitor).
+ */
+void
+StreamParser::processMonitorEvents
+(
+    uint16_t        a_monitor_id,     ///< [in] Monitor ID of monitor to be processed
+    uint32_t        a_event_count,    ///< [in] Number of events contained in stream buffer
+    const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
+)
+{
+    if ( a_monitor_id >= m_monitors.size())
+        m_monitors.resize(a_monitor_id+1,0);
+
+    MonitorInfo *mi = m_monitors[a_monitor_id];
 
     if ( !mi )
     {
-        mi = makeMonitorInfo( monitor_id, m_event_buf_chunk_count*m_chunk_size );
-        m_monitors[monitor_id] = mi;
-    }
-
-    size_t sz = mi->m_tof_buffer.size();
-
-    mi->m_tof_buffer.resize( sz + event_count );
-
-    float           *tof_ptr = &mi->m_tof_buffer[sz];
-    const uint32_t  *epos = rpos + event_count;
-
-    while ( rpos != epos )
-    {
-        // TODO What to do with bit 31?
-        *tof_ptr++ = ((*rpos++)&0x1fffff) * 0.1; //TODO Revisit mask used here
+        mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh );
+        m_monitors[a_monitor_id] = mi;
     }
 
     // Detect gaps in event data and fill event index if present
     if ( mi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-    {
-        uint64_t count = ( m_pulse_count - 1 ) - mi->m_last_pulse_with_data;
+        handleMonitorPulseGap( *mi, ( m_pulse_count - 1 ) - mi->m_last_pulse_with_data );
 
-        handleMonitorPulseGap( *mi, count );
+    size_t sz = mi->m_tof_buffer.size();
+
+    mi->m_tof_buffer.resize( sz + a_event_count );
+
+    float           *tof_ptr = &mi->m_tof_buffer[sz];
+    const uint32_t  *epos = a_rpos + a_event_count;
+
+    while ( a_rpos != epos )
+    {
+        // TODO What to do with bit 31?
+        *tof_ptr++ = ((*a_rpos++)&0x1fffff) * 0.1; //TODO Revisit mask used here
     }
 
     // Cache event index until large enough to write
     mi->m_index_buffer.push_back( mi->m_event_count );
-    mi->m_event_count += event_count;
+    mi->m_event_count += a_event_count;
     mi->m_last_pulse_with_data = m_pulse_count;
 
     // Check to see if buffers are ready to write
-    if ( mi->m_tof_buffer.size() >= m_event_buf_write_thresh || mi->m_index_buffer.size() >= m_ancillary_buf_write_thresh )
+    if ( mi->m_tof_buffer.size() >= m_event_buf_write_thresh || mi->m_index_buffer.size() >= m_anc_buf_write_thresh )
     {
         monitorBuffersReady( *mi );
 
@@ -548,13 +634,29 @@ StreamParser::processMonitorEvents( uint16_t monitor_id, uint32_t event_count, c
     }
 }
 
+
+/*! \brief This method handles pulse gaps for a specified monitor
+ *
+ * This method handles pulse gaps in the event stream for the specified monitor. When a gap is detected, the event
+ * index for the monitor must be corrected for the missing pulses to keep in synchronized with the event stream. If a
+ * small gap is detected, values are inserted directly into the internal index buffer; otherwise, gap processing is
+ * deferred to the stream adatapter subclass via the monitorPulseGap() virtual method. (It is expected that the virtual
+ * method should write index values directly into the destination format to prevent excessive memory consumption that
+ * would be caused by buffering the corrected index.)
+ */
 void
-StreamParser::handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count )
+StreamParser::handleMonitorPulseGap
+(
+    MonitorInfo    &a_mi,       ///< [in] A MonitorInfo instance with a pulse gap
+    uint64_t        a_count     ///< [in] The size of the pulse gap
+)
 {
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_mi.m_index_buffer.size() + a_count < m_ancillary_buf_write_thresh )
-        a_mi.m_index_buffer.insert( a_mi.m_index_buffer.end(), a_count, a_mi.m_event_count );
+    if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    {
+        a_mi.m_index_buffer.resize( a_mi.m_index_buffer.size() + a_count, a_mi.m_event_count );
+    }
     else
     {
         // Otherwise, if the gap is too large - flush current buffered data & fill index directly
@@ -566,19 +668,26 @@ StreamParser::handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count )
     }
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Run Info packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes Run Info ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Run Info packets. The processRunInfo() virtual method is used to communicate
+ * run info data to the stream adapter subclass.
+ */
 bool
-StreamParser::rxPacket( const ADARA::RunInfoPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::RunInfoPkt &a_pkt  ///< [in] The ADARA Run Info Packet to process
+)
 {
-    //cout << "Processing RunInfoPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
-
-    processRunInfo( pkt.info() );
-
+    processRunInfo( a_pkt.info() );
 
     if ( m_strict )
     {
@@ -600,62 +709,80 @@ StreamParser::rxPacket( const ADARA::RunInfoPkt &pkt )
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Geometry packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes Geometry ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Geometry packets. The processGeometry() virtual method is used to communicate
+ * geometry data to the stream adapter subclass.
+ */
 bool
-StreamParser::rxPacket( const ADARA::GeometryPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::GeometryPkt &a_pkt     ///< [in] The ADARA Geometry Packet to process
+)
 {
-    //cout << "Processing GeometryPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
-
-    processGeometry( pkt.info() );
+    processGeometry( a_pkt.info() );
 
     return false;
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Beam Line Info packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes Beamline Info ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Beamline Info packets. The processBeamLineInfo() virtual method is used to communicate
+ * beamline data to the stream adapter subclass.
+ */
 bool
-StreamParser::rxPacket( const ADARA::BeamlineInfoPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
+)
 {
-    //cout << "Processing BeamlineInfoPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
+    m_short_name =  a_pkt.shortName();
 
-    m_short_name =  pkt.shortName();
-
-    processBeamLineInfo( pkt.id(), pkt.shortName(), pkt.longName() );
+    processBeamLineInfo( a_pkt.id(), a_pkt.shortName(), a_pkt.longName() );
 
     return false;
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Device Descriptor packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes Device Descriptor ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Device Descriptor packets. Process variable information is extracted from the XML payload
+ * of the packet and used to create type-specific PVInfo instances via the makePVInfo() virtual factory method. (A
+ * stream adapter subclass should perform all required format-specific initialization within this factory method.)
+ */
 bool
-StreamParser::rxPacket( const ADARA::DeviceDescriptorPkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::DeviceDescriptorPkt &a_pkt     ///< [in] The ADARA Device Descriptor Packet to process
+)
 {
-    //cout << "Processing DeviceDescriptorPkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
+    const string &xml =  a_pkt.description();
 
-    processDeviceDescriptor( pkt.devId(), pkt.description());
-
-    return false;
-}
-
-
-void
-StreamParser::processDeviceDescriptor( Identifier a_device_id, const std::string & a_xml )
-{
-    xmlDocPtr doc = xmlReadMemory( a_xml.c_str(), a_xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
+    xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
     if ( doc )
     {
         Identifier  pv_id = 0;
@@ -664,23 +791,16 @@ StreamParser::processDeviceDescriptor( Identifier a_device_id, const std::string
         PVType      pv_type = PVT_INT;
         short       found;
 
-        //const char *name;
-
         xmlNode *root = xmlDocGetRootElement( doc );
 
         for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
         {
-            //name = (const char*)lev1->name;
-            //cout << name << endl;
-
             if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
             {
                 xmlNode *pvnode;
 
                 for ( xmlNode *pvsnode = lev1->children; pvsnode; pvsnode = pvsnode->next )
                 {
-                    //name = (const char*)pvsnode->name;
-                    //cout << name << endl;
                     if ( xmlStrcmp( pvsnode->name, (const xmlChar*)"process_variable" ) == 0)
                     {
                         pv_units = "";
@@ -711,17 +831,16 @@ StreamParser::processDeviceDescriptor( Identifier a_device_id, const std::string
 
                         if ( found == 7 )
                         {
-                            PVKey   key(a_device_id,pv_id);
+                            PVKey   key(a_pkt.devId(),pv_id);
 
                             if ( m_pvs.find(key) == m_pvs.end() )
                             {
-                                m_pvs[key] = makePVInfo( pv_name, a_device_id, pv_id, pv_type, pv_units );
-                                //cout << "Defining PV " << a_device_id << "." << pv_id << endl;
+                                m_pvs[key] = makePVInfo( pv_name, a_pkt.devId(), pv_id, pv_type, pv_units );
                             }
                         }
                         else
                         {
-                           cout << "Skipping PV " << a_device_id << "." << pv_id << endl;
+                           //TODO Log this: "Skipping PV " << a_pkt.devId() << "." << pv_id << endl;
                         }
                     }
                 }
@@ -733,48 +852,76 @@ StreamParser::processDeviceDescriptor( Identifier a_device_id, const std::string
         }
         xmlFreeDoc( doc );
     }
+
+    return false;
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Variable (uint32) packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes unsigned integer Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA unsigned integer Variable Update packets. See the pvValueUpdate() template
+ * method in StreamParser.h for more details.
+ */
 bool
-StreamParser::rxPacket( const ADARA::VariableU32Pkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::VariableU32Pkt &a_pkt  ///< [in] The ADARA Variable Update packet to process
+)
 {
-    //cout << "Processing VariableU32Pkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
-
-    pvValueUpdate<uint32_t>( pkt.devId(), pkt.varId(), pkt.value(), pkt.timestamp() );
+    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Variable (double) packet processing
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method processes double-prec floating point Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA double-precision floating point Variable Update packets. See the pvValueUpdate() template
+ * method in StreamParser.h for more details.
+ */
 bool
-StreamParser::rxPacket( const ADARA::VariableDoublePkt &pkt )
+StreamParser::rxPacket
+(
+    const ADARA::VariableDoublePkt &a_pkt ///< [in] The ADARA Variable Update packet to process
+)
 {
-    //cout << "Processing VariableDoublePkt" << endl;
+    writePacket( a_pkt );
 
-    writePacket( pkt );
-
-    pvValueUpdate<double>( pkt.devId(), pkt.varId(), pkt.value(), pkt.timestamp() );
+    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
 
 
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA support methods
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
+
+/*! \brief This method handles pules ID processing.
+ *
+ * This method examines a received pulse ID (parameter) and determines if it represents a new pulse (ID differs from
+ * current pulse ID). If so, the pulse count is incremented and the new pulse ID retained. This method is needed to
+ * decouple packet ordering dependencies between banked event packets and monitor packets.
+ */
 void
-StreamParser::processPulseID( uint64_t a_pulse_id )
+StreamParser::processPulseID
+(
+    uint64_t a_pulse_id     ///< [in] Pulse ID extracted from ADARA packet header
+)
 {
     if ( a_pulse_id != m_pulse_id || !m_pulse_count )
     {
@@ -783,11 +930,13 @@ StreamParser::processPulseID( uint64_t a_pulse_id )
     }
 }
 
-//-----------------------------------------------------------------------------
-// Nexus/HDF5 support methods
-//-----------------------------------------------------------------------------
 
-
+/*! \brief This method performs final stream processing.
+ *
+ * This method is called after the internal processing state progreses to "DONE_PROCESSING" and permits a variety of
+ * final processing tasks to be performed (primarily flushing data buffers). This method also calls the virtual
+ * finalize() method to allow the stream adapter to also perform final output operations.
+ */
 void
 StreamParser::finalizeStreamProcessing()
 {
@@ -798,17 +947,13 @@ StreamParser::finalizeStreamProcessing()
         if ( !*ibi )
             continue;
 
+        // Detect gaps in bank data and fill event index if present
+        if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
+            handleBankPulseGap( **ibi, m_pulse_count - (*ibi)->m_last_pulse_with_data );
+
         // Flush bank buffers
         if ( (*ibi)->m_tof_buffer.size() || (*ibi)->m_index_buffer.size() )
             bankBuffersReady( **ibi );
-
-        // Detect gaps in bank data and fill event index if present
-        if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
-        {
-            uint64_t count = m_pulse_count - (*ibi)->m_last_pulse_with_data;
-
-            handleBankPulseGap( **ibi, count );
-        }
 
         bankFinalize( **ibi );
     }
@@ -820,17 +965,13 @@ StreamParser::finalizeStreamProcessing()
         if ( !*imi )
             continue;
 
+        // Detect gaps in monitor data and fill event index if present
+        if ( (*imi)->m_last_pulse_with_data < m_pulse_count )
+            handleMonitorPulseGap( **imi, m_pulse_count - (*imi)->m_last_pulse_with_data );
+
         // Flush monitor buffers
         if ( (*imi)->m_tof_buffer.size() || (*imi)->m_index_buffer.size() )
             monitorBuffersReady( **imi );
-
-        // Detect gaps in monitor data and fill event index if present
-        if ( (*imi)->m_last_pulse_with_data < m_pulse_count )
-        {
-            uint64_t count = m_pulse_count - (*imi)->m_last_pulse_with_data;
-
-            handleMonitorPulseGap( **imi, count );
-        }
 
         monitorFinalize( **imi );
     }
@@ -855,11 +996,75 @@ StreamParser::finalizeStreamProcessing()
     finalize();
 }
 
-PVType
-StreamParser::toPVType( const char *a_source ) const
-{
-    // Note: only integer, enum_xxx, and double are officially defined
 
+/*! \brief This method retrieves tha human-readable name of an ADARA packet type.
+ *
+ * This method retrieves tha human-readable name of an ADARA packet type.
+ */
+const char*
+StreamParser::getPktName(
+    ADARA::PacketType::Enum a_pkt_type   ///< [in] An ADARA packet type (defined in ADARA.h)
+) const
+{
+    // Mask out packet version number
+    switch ( a_pkt_type & 0xFFFFFF00 )
+    {
+    case ADARA::PacketType::RAW_EVENT_V0:
+        return "Raw Event";
+    case ADARA::PacketType::RTDL_V0:
+        return "RTDL";
+    case ADARA::PacketType::SOURCE_LIST_V0:
+        return "Src List";
+    case ADARA::PacketType::BANKED_EVENT_V0:
+        return "Bank Event";
+    case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+        return "Beam Mon";
+    case ADARA::PacketType::PIXEL_MAPPING_V0:
+        return "Pix Map";
+    case ADARA::PacketType::RUN_STATUS_V0:
+        return "Run Stat";
+    case ADARA::PacketType::RUN_INFO_V0:
+        return "Run Info";
+    case ADARA::PacketType::TRANS_COMPLETE_V0:
+        return "Tran Comp";
+    case ADARA::PacketType::CLIENT_HELLO_V0:
+        return "Cli Hello";
+    case ADARA::PacketType::STATS_RESET_V0:
+        return "Stat Reset";
+    case ADARA::PacketType::SYNC_V0:
+        return "Sync";
+    case ADARA::PacketType::HEARTBEAT_V0:
+        return "Heart";
+    case ADARA::PacketType::GEOMETRY_V0:
+        return "Geom Info";
+    case ADARA::PacketType::BEAMLINE_INFO_V0:
+        return "Beam Info";
+    case ADARA::PacketType::DEVICE_DESC_V0:
+        return "DDP";
+    case ADARA::PacketType::VAR_VALUE_U32_V0:
+        return "VVP U32";
+    case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
+        return "VVP DBL";
+    case ADARA::PacketType::VAR_VALUE_STRING_V0:
+        return "VVP STR";
+    }
+
+    return "Unknown";
+}
+
+
+/*! \brief This method converts a text-based variable type to a PVType
+ *  \return PVType based on input text
+ *
+ * This method converts a text-based process variable type (from a device descriptor) to a PVType. If the conversion is
+ * not possible, an expcetion is thrown.
+ */
+PVType
+StreamParser::toPVType
+(
+    const char *a_source    ///< [in] Text-based variable type to convert
+) const
+{
     if ( boost::iequals( a_source, "integer" ))
         return PVT_INT;
     else if ( boost::iequals( a_source, "unsigned" ))
@@ -871,9 +1076,8 @@ StreamParser::toPVType( const char *a_source ) const
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 
-    LOG(ERROR) << "Invalid PV type: " << a_source << endl;
     throw runtime_error("Invalid PV type.");
 }
 
 
-} // End namespace STS
+} // End namespace SFS

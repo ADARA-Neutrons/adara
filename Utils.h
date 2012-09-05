@@ -111,12 +111,15 @@ calcDiffSeconds( const struct timespec &ts1, const struct timespec &ts2 )
 }
 
 inline std::string
-epicsTimeToISO8601( const struct timespec &ts )
+timeToISO8601( const struct timespec &ts )
 {
-    time_t time = ts.tv_sec + ADARA::EPICS_EPOCH_OFFSET;
+    time_t time = ts.tv_sec;
+    struct tm *timeinfo = localtime(&time);
 
-    // TODO This does not return ISO 8601 format
-    return asctime(gmtime(&time));
+    char date[100];
+    strftime(date, sizeof(date), "%Y-%m-%dT%X%z", timeinfo);
+
+    return std::string(date);
 }
 
 

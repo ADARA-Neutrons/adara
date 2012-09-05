@@ -1,10 +1,10 @@
-#ifndef STSDEFS_H
-#define STSDEFS_H
+#ifndef SFSDEFS_H
+#define SFSDEFS_H
 
 #include <vector>
 #include "Utils.h"
 
-namespace STS {
+namespace SFS {
 
 
 // TODO These should be defined in ADARA.h
@@ -149,16 +149,16 @@ public:
     virtual void            processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname ) = 0;
     virtual void            processRunInfo( const std::string & a_xml ) = 0;
     virtual void            processGeometry( const std::string & a_xml ) = 0;
-    virtual void            pulseBuffersReady( STS::PulseInfo &a_pulse_info ) = 0;
-    virtual void            pulseFinalize( STS::PulseInfo &a_pulse_info ) = 0;
-    virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
-    virtual void            bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count ) = 0;
-    virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady( STS::MonitorInfo &a_monitor_info ) = 0;
-    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
-    virtual void            monitorFinalize( STS::MonitorInfo &a_monitor ) = 0;
+    virtual void            pulseBuffersReady( SFS::PulseInfo &a_pulse_info ) = 0;
+    virtual void            pulseFinalize( SFS::PulseInfo &a_pulse_info ) = 0;
+    virtual void            bankBuffersReady( SFS::BankInfo &a_bank ) = 0;
+    virtual void            bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count ) = 0;
+    virtual void            bankFinalize( SFS::BankInfo &a_bank ) = 0;
+    virtual void            monitorBuffersReady( SFS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
+    virtual void            monitorFinalize( SFS::MonitorInfo &a_monitor ) = 0;
 };
 
-} // End STS Namespace
+} // End SFS Namespace
 
-#endif // STSDEFS_H
+#endif // SFSDEFS_H
