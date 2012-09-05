@@ -11,6 +11,11 @@
 #include <glog/logging.h>
 
 
+/*! \brief ADARA Stream Adapter class that provides NeXus file generation
+ *
+ * The NxGen class is a stream adapter subclass that specializes the ADARA StreamParser class for creating NeXus output
+ * files.
+ */
 class NxGen : public SFS::StreamParser
 {
 private:
@@ -40,8 +45,8 @@ private:
     class NxMonitorInfo : public SFS::MonitorInfo
     {
     public:
-        NxMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve )
-          : MonitorInfo( a_id, a_buf_reserve ), m_index_slab_size(0), m_event_slab_size(0)
+        NxMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
+          : MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve ), m_index_slab_size(0), m_event_slab_size(0)
         {
             m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
             m_index_slab_path = "entry/" + m_name + "/event_index";
@@ -114,7 +119,7 @@ protected:
     void                finalize();
     SFS::PVInfoBase*    makePVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units );
     SFS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    SFS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve );
+    SFS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
     void                processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname );
     void                processRunInfo( const std::string & a_xml );
     void                processGeometry( const std::string & a_xml );

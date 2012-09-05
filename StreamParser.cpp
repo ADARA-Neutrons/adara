@@ -39,9 +39,8 @@ StreamParser::StreamParser
     m_total_charge(0.0),
     m_events_counted(0),
     m_events_uncounted(0),
-    m_initialized(false),
     m_fd(a_fd_in),
-    m_processing_state(WAITING_FOR_RUN_START),
+    m_processing_state(PROCESSING_NOT_STARTED),
     m_pkt_recvd(0),
     m_pulse_id(0),
     m_pulse_count(0),
@@ -89,17 +88,11 @@ StreamParser::processStream()
 {
     // If anything goes wrong with translation, an exception will be thrown to caller of this method
 
-    if ( m_initialized )
+    if ( m_processing_state != PROCESSING_NOT_STARTED )
         throw std::runtime_error("StreamParser::processStream() can not be called more than once.");
 
     initialize();
-    m_initialized = true;
-
-    m_pulse_info.start_time_nsec = 0;
-    m_pulse_info.charge_stats.reset();
-    m_pulse_info.freq_stats.reset();
-    m_pkt_recvd             = 0;
-    m_processing_state      = WAITING_FOR_RUN_START;
+    m_processing_state = WAITING_FOR_RUN_START;
 
     while( m_processing_state < DONE_PROCESSING )
     {
@@ -401,9 +394,9 @@ StreamParser::processPulseInfo
     m_pulse_info.charges.push_back(a_pkt.pulseCharge());
     m_pulse_info.charge_stats.push(a_pkt.pulseCharge());
 
-    if ( m_pulse_info.start_time_nsec )
+    if ( m_pulse_info.start_time )
     {
-        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp()) - m_pulse_info.start_time_nsec;
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp()) - m_pulse_info.start_time;
         m_pulse_info.times.push_back( pulse_time*1.0e-9 );
         m_pulse_info.freqs.push_back(1.0e9/(pulse_time-m_pulse_info.last_time));
         m_pulse_info.freq_stats.push(m_pulse_info.freqs.back()); // Freq stats ignore first point since it can't be calculated
@@ -411,8 +404,8 @@ StreamParser::processPulseInfo
     }
     else
     {
-        m_pulse_info.start_time_ts = a_pkt.timestamp();
-        m_pulse_info.start_time_nsec = timespec_to_nsec( m_pulse_info.start_time_ts );
+        //m_pulse_info.start_time_ts = a_pkt.timestamp();
+        m_pulse_info.start_time = timespec_to_nsec(  a_pkt.timestamp() /*m_pulse_info.start_time_ts*/ );
         m_pulse_info.last_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
@@ -598,7 +591,7 @@ StreamParser::processMonitorEvents
 
     if ( !mi )
     {
-        mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh );
+        mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh );
         m_monitors[a_monitor_id] = mi;
     }
 

@@ -72,9 +72,9 @@ NxGen::makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reser
 
 
 SFS::MonitorInfo*
-NxGen::makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve )
+NxGen::makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
 {
-    NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve );
+    NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve );
 
     if ( m_gen_nexus)
     {

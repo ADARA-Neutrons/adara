@@ -84,10 +84,11 @@ private:
     /// Defines internal stream processing states of StreamParser class
     enum ProcessingState
     {
-        WAITING_FOR_RUN_START = 0x0001,
-        PROCESSING_RUN_HEADER = 0x0002,
-        PROCESSING_EVENTS     = 0x0004,
-        DONE_PROCESSING       = 0x0008
+        PROCESSING_NOT_STARTED  = 0x0000,
+        WAITING_FOR_RUN_START   = 0x0001,
+        PROCESSING_RUN_HEADER   = 0x0002,
+        PROCESSING_EVENTS       = 0x0004,
+        DONE_PROCESSING         = 0x0008
     };
 
     /// Defines packet statistics that can be gathers and displayed
@@ -161,9 +162,9 @@ private:
                         float t = 0;
 
                         // Note: if first pulse has not arrived, truncate all PV times to 0
-                        if ( m_pulse_info.start_time_nsec )
+                        if ( m_pulse_info.start_time )
                         {
-                            t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time_nsec)*1.0e-9;
+                            t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time)*1.0e-9;
                         }
                         else if ( pvinfo->m_value_buffer.size() )
                         {
@@ -217,7 +218,6 @@ private:
 
     const char*     getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
 
-    bool                                    m_initialized;              ///< Flag indicating if instance has been initialized
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
     uint32_t                                m_pkt_recvd;                ///< Packet received-status bit mask
