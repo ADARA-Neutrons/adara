@@ -20,11 +20,22 @@ class NxGen : public SFS::StreamParser
 {
 private:
 
+    /// BankInfo subclass that adds Nexus-required attributes
     class NxBankInfo : public SFS::BankInfo
     {
     public:
-        NxBankInfo( uint32_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
-          : BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve), m_event_slab_size(0), m_index_slab_size(0)
+        /// NxBankInfo constructor
+        NxBankInfo
+        (
+            uint16_t a_id,              ///< [in] ID of detector bank
+            uint16_t a_pixel_count,     ///< [in] Pixel count of bank
+            uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+        )
+        :
+            BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve),
+            m_event_slab_size(0),
+            m_index_slab_size(0)
         {
             m_name = std::string("bank") + boost::lexical_cast<std::string>(a_id);
             m_eventname = m_name + "_events";
@@ -33,46 +44,74 @@ private:
             m_index_slab_path = "entry/instrument/" + m_name + "/event_index";
         }
 
-        std::string             m_name;
-        std::string             m_eventname;
-        std::string             m_tof_slab_path;
-        std::string             m_pid_slab_path;
-        std::string             m_index_slab_path;
-        uint64_t                m_event_slab_size;
-        uint64_t                m_index_slab_size;
+        std::string             m_name;             ///< Name of bank in Nexus file
+        std::string             m_eventname;        ///< Name of bank events entry in Nexus file
+        std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
+        std::string             m_pid_slab_path;    ///< Nexus path to PID slab
+        std::string             m_index_slab_path;  ///< Nexus path to event index slab
+        uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
+        uint64_t                m_index_slab_size;  ///< Running size of event index slab
     };
 
+    /// MonitorInfo subclass that adds Nexus-required attributes
     class NxMonitorInfo : public SFS::MonitorInfo
     {
     public:
-        NxMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
-          : MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve ), m_index_slab_size(0), m_event_slab_size(0)
+        /// NxMonitorInfo constructor
+        NxMonitorInfo
+        (
+            uint16_t a_id,              ///< [in] ID of detector bank
+            uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+        )
+        :
+            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve ),
+            m_index_slab_size(0),
+            m_event_slab_size(0)
         {
             m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
             m_index_slab_path = "entry/" + m_name + "/event_index";
             m_tof_slab_path = "entry/" + m_name + "/event_time_offset";
         }
 
-        std::string             m_name;
-        std::string             m_index_slab_path;
-        std::string             m_tof_slab_path;
-        uint64_t                m_index_slab_size;
-        uint64_t                m_event_slab_size;
+        std::string             m_name;             ///< Name of monitor in Nexus file
+        std::string             m_index_slab_path;  ///< Nexus path to event index slab
+        std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
+        uint64_t                m_index_slab_size;  ///< Running size of event index slab
+        uint64_t                m_event_slab_size;  ///< Running size of TOF slab
     };
 
+    /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
     template<class T>
     class NxPVInfo : public SFS::PVInfo<T>
     {
     public:
-        NxPVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units, NxGen & a_nxgen  )
-            : SFS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ), m_nxgen(a_nxgen), m_slab_size(0)
+        /// NxPVInfo constructor
+        NxPVInfo
+        (
+            const std::string  &a_name,         ///< [in] Name of PV
+            SFS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
+            SFS::Identifier     a_pv_id,        ///< [in] ID of the PV
+            SFS::PVType         a_type,         ///< [in] Type of PV
+            const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
+            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus ouput
+        )
+        :
+            SFS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ),
+            m_nxgen(a_nxgen),
+            m_slab_size(0)
         {
             m_log_path = std::string("entry/DASlogs/") + a_name;
         }
 
+        /// NxPVInfo destructor
         ~NxPVInfo() {}
 
-        void flushBuffers( bool lastWrite )
+        /// Writes buffered PV values and time axis to Nexus file and performs finalization
+        void flushBuffers
+        (
+            bool lastWrite      ///< If true, indicates finalization code should be executed for this PV
+        )
         {
             if ( m_nxgen.m_gen_nexus )
             {
@@ -103,9 +142,9 @@ private:
             this->m_time_buffer.clear();
         }
 
-        NxGen&          m_nxgen;
-        std::string     m_log_path;
-        uint64_t        m_slab_size;
+        NxGen&          m_nxgen;        ///< NxGen instance used for Nexus ouput
+        std::string     m_log_path;     ///< Nexus path to log entry for PV
+        uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
     };
 
 public:
@@ -116,15 +155,13 @@ public:
 protected:
 
     void                initialize();
-    void                finalize();
+    void                finalize( const SFS::RunMetrics &a_run_metrics );
     SFS::PVInfoBase*    makePVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units );
     SFS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
     SFS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    void                processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname );
-    void                processRunInfo( const std::string & a_xml );
+    void                processRunInfo( const SFS::RunInfo & a_run_info );
     void                processGeometry( const std::string & a_xml );
     void                pulseBuffersReady( SFS::PulseInfo &a_pulse_info );
-    void                pulseFinalize( SFS::PulseInfo &a_pulse_info );
     void                bankBuffersReady( SFS::BankInfo &a_bank );
     void                bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count );
     void                bankFinalize( SFS::BankInfo &a_bank );
@@ -135,12 +172,20 @@ protected:
 private:
     NeXus::NXnumtype    toNxType( SFS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path, const std::string &a_type );
-    void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, int nxdatatype, const std::string units = "" );
+    void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
     void                makeLink( const std::string &source_path, const std::string &dest_name );
     void                writeString( const std::string &a_path, const std::string &a_dataset, const std::string &a_value );
+    void                writeStringEx( const std::string &a_path, const std::string &a_dataset, const std::string &a_value, const std::string &a_default = "" );
     void                writeStringAttribute( const std::string &a_path, const std::string &a_attrib, const std::string &a_value );
+
+    /// Writes data values to a Nexus (HDF5) one-dimension slab
     template<class T>
-    void                writeSlab( const std::string & a_path, std::vector<T> & a_buffer, uint64_t a_slab_size  )
+    void                writeSlab
+                        (
+                            const std::string & a_path, ///< [in] Nexus path to slab
+                            std::vector<T> & a_buffer,  ///< [in] Vector of data to write
+                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes)
+                        )
                         {
                             if ( m_h5nx.H5NXwrite_slab( a_path, a_buffer, a_slab_size ) != SUCCEED )
                             {
@@ -148,8 +193,16 @@ private:
                                 throw std::runtime_error("H5NXwrite_slab FAILED");
                             }
                         }
+
+    /// Fills (appends) a Nexus (HDF5) one-dimension slab with a provided value
     template<class T>
-    void                fillSlab( const std::string & a_path, T & a_value, uint64_t a_count, uint64_t a_slab_size  )
+    void                fillSlab
+                        (
+                            const std::string & a_path, ///< [in] Nexus path to slab
+                            T & a_value,                ///< [in] Value to fill (append) slab with
+                            uint64_t a_count,           ///< [in] Number of values to append
+                            uint64_t a_slab_size        ///< Current slab size (counts not bytes)
+                        )
                         {
                             std::vector<T> buf;
                             uint64_t slab_size = a_slab_size;
@@ -177,11 +230,11 @@ private:
     template<typename T>
     void                writeScalar( const std::string & a_path, const std::string & a_name, T a_value, const std::string & a_units );
 
-    bool                            m_gen_nexus;
-    std::string                     m_nexus_filename;
-    unsigned long                   m_chunk_size;
-    H5nx                            m_h5nx;
-    uint64_t                        m_pulse_info_slab_size;
+    bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
+    std::string         m_nexus_filename;       ///< Name of Nexus file
+    unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
+    H5nx                m_h5nx;                 ///< HDF5 library object
+    uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
 };
 
 #endif // NXGEN_H

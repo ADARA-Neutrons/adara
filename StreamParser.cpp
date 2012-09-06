@@ -36,9 +36,6 @@ StreamParser::StreamParser
 )
 :
     Parser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
-    m_total_charge(0.0),
-    m_events_counted(0),
-    m_events_uncounted(0),
     m_fd(a_fd_in),
     m_processing_state(PROCESSING_NOT_STARTED),
     m_pkt_recvd(0),
@@ -46,6 +43,7 @@ StreamParser::StreamParser
     m_pulse_count(0),
     m_event_buf_write_thresh(a_event_buf_write_thresh),
     m_anc_buf_write_thresh(a_anc_buf_write_thresh),
+    m_info_rcvd(0),
     m_strict(a_strict),
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
@@ -71,9 +69,17 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open())
         m_ofs_adara.close();
 
-    for ( vector<BankInfo*>::iterator ibg = m_banks.begin(); ibg != m_banks.end(); ++ibg )
-        if ( *ibg )
-            delete *ibg;
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
+        if ( *ibi )
+            delete *ibi;
+
+    for ( vector<MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+        if ( *imi )
+            delete *imi;
+
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+        if ( ipv->second )
+            delete ipv->second;
 }
 
 
@@ -122,8 +128,8 @@ StreamParser::printStats
                  << "\t" << setw(10) << i->second.min_pkt_size << "\t" << setw(10) << i->second.max_pkt_size << endl;
         }
         a_os << endl << "Packets skipped: " << m_skipped_pkt_count << endl;
-        a_os << "Pulse charge stats: " << m_pulse_info.charge_stats << endl;
-        a_os << "Pulse freq stats: " << m_pulse_info.freq_stats << endl;
+        a_os << "Pulse charge stats: " << m_run_metrics.charge_stats << endl;
+        a_os << "Pulse freq stats: " << m_run_metrics.freq_stats << endl;
     }
     else
     {
@@ -251,7 +257,7 @@ StreamParser::rxPacket
     {
         if ( m_processing_state == WAITING_FOR_RUN_START )
         {
-            m_start_time = a_pkt.timestamp();
+            m_run_metrics.start_time = a_pkt.timestamp();
             m_processing_state = PROCESSING_RUN_HEADER;
         }
         else
@@ -261,7 +267,7 @@ StreamParser::rxPacket
     {
         if ( m_processing_state == PROCESSING_EVENTS )
         {
-            m_end_time = a_pkt.timestamp();
+            m_run_metrics.end_time = a_pkt.timestamp();
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
         }
@@ -390,16 +396,16 @@ StreamParser::processPulseInfo
 )
 {
     // accumulate pulse charge
-    m_total_charge += a_pkt.pulseCharge();
+    m_run_metrics.total_charge += a_pkt.pulseCharge();
     m_pulse_info.charges.push_back(a_pkt.pulseCharge());
-    m_pulse_info.charge_stats.push(a_pkt.pulseCharge());
+    m_run_metrics.charge_stats.push(a_pkt.pulseCharge());
 
     if ( m_pulse_info.start_time )
     {
         uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp()) - m_pulse_info.start_time;
         m_pulse_info.times.push_back( pulse_time*1.0e-9 );
         m_pulse_info.freqs.push_back(1.0e9/(pulse_time-m_pulse_info.last_time));
-        m_pulse_info.freq_stats.push(m_pulse_info.freqs.back()); // Freq stats ignore first point since it can't be calculated
+        m_run_metrics.freq_stats.push(m_pulse_info.freqs.back()); // Freq stats ignore first point since it can't be calculated
         m_pulse_info.last_time = pulse_time;
     }
     else
@@ -479,10 +485,10 @@ StreamParser::processBankEvents
             bi->m_index_buffer.clear();
         }
 
-        m_events_counted += a_event_count;
+        m_run_metrics.events_counted += a_event_count;
     }
     else
-        m_events_uncounted += a_event_count;
+        m_run_metrics.events_uncounted += a_event_count;
 }
 
 /*! \brief This method handles pulse gaps for a specified detector bank
@@ -680,23 +686,79 @@ StreamParser::rxPacket
 {
     writePacket( a_pkt );
 
-    processRunInfo( a_pkt.info() );
+    xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
+    if ( doc )
+    {
+        for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
+        {
+            if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
+                m_run_info.run_number = boost::lexical_cast<unsigned long>( (char*)node->children->content );
+            else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
+                m_run_info.proposal_id = (char*)node->children->content;
+            else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
+                m_run_info.run_title = (char*)node->children->content;
+            else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
+                m_run_info.facility_name = (char*) node->children->content;
+            else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
+            {
+                for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
+                {
+                    if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
+                        m_run_info.sample_id = (char*)sample_node->children->content;
+                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
+                        m_run_info.sample_name = (char*)sample_node->children->content;
+                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
+                        m_run_info.sample_nature = (char*)sample_node->children->content;
+                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
+                        m_run_info.sample_formula = (char*)sample_node->children->content;
+                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
+                        m_run_info.sample_environment = (char*)sample_node->children->content;
+                }
+            }
+            else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
+            {
+                for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
+                {
+                    if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
+                    {
+                        UserInfo ui;
+
+                        for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
+                        {
+                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
+                                ui.id = (char*)uinfo_node->children->content;
+                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
+                                ui.name = (char*)uinfo_node->children->content;
+                            else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
+                                ui.role = (char*)uinfo_node->children->content;
+                        }
+
+                        m_run_info.users.push_back( ui );
+                    }
+                }
+            }
+        }
+
+        xmlFreeDoc( doc );
+    }
 
     if ( m_strict )
     {
         // Verify we received all required fields in Run Info pkt
 
         string msg;
-        if ( !m_facility_name.size())
+        if ( !m_run_info.facility_name.size())
             msg = "Required facility_name missing from RunInfo.";
-        else if ( !m_proposal_id.size())
+        else if ( !m_run_info.proposal_id.size())
             msg = "Required proposal_id missing from RunInfo.";
-        else if ( m_run_number == 0 )
+        else if ( m_run_info.run_number == 0 )
             msg = "Required run_number missing from RunInfo.";
 
         if ( msg.size())
             throw TranslationException( TS_PERM_ERROR, msg );
     }
+
+    receivedInfo( RUN_INFO_BIT );
 
     return false;
 }
@@ -746,9 +808,11 @@ StreamParser::rxPacket
 {
     writePacket( a_pkt );
 
-    m_short_name =  a_pkt.shortName();
+    m_run_info.instr_id =  a_pkt.id();
+    m_run_info.instr_shortname =  a_pkt.shortName();
+    m_run_info.instr_longname =  a_pkt.longName();
 
-    processBeamLineInfo( a_pkt.id(), a_pkt.shortName(), a_pkt.longName() );
+    receivedInfo( INSTR_INFO_BIT );
 
     return false;
 }
@@ -924,6 +988,23 @@ StreamParser::processPulseID
 }
 
 
+/*! \brief Processes state of received informational packets
+ *
+ * This method tracks which ADARA informational packets have been received and issues a processRunInfo() call once all
+ * packets have been received.
+ */
+void
+StreamParser::receivedInfo( InfoBit a_bit )
+{
+    m_info_rcvd |= a_bit;
+    if ( m_info_rcvd == ALL_INFO_RCVD )
+    {
+        processRunInfo( m_run_info );
+        m_info_rcvd |= INFO_SENT;
+    }
+}
+
+
 /*! \brief This method performs final stream processing.
  *
  * This method is called after the internal processing state progreses to "DONE_PROCESSING" and permits a variety of
@@ -975,7 +1056,7 @@ StreamParser::finalizeStreamProcessing()
     if ( m_pulse_info.times.size())
         pulseBuffersReady( m_pulse_info );
 
-    pulseFinalize( m_pulse_info );
+    //pulseFinalize( m_pulse_info );
 
     // Write any remaining data in PV buffers
 
@@ -986,7 +1067,7 @@ StreamParser::finalizeStreamProcessing()
     }
 
     // Let adapter do anything else it wants to
-    finalize();
+    finalize( m_run_metrics );
 }
 
 

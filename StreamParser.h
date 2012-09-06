@@ -59,26 +59,13 @@ public:
     void    processStream();
     void    printStats( std::ostream &a_os ) const;
 
-    const struct timespec & getStartTime() const { return m_start_time; }
-    const struct timespec & getEndTime() const { return m_end_time; }
-    std::string             getFacilityName() const { return m_facility_name; }
-    std::string             getBeamShortName() const { return m_short_name; }
-    std::string             getProposalID() const { return m_proposal_id; }
-    unsigned long           getRunNumber() const { return m_run_number; }
+    const struct timespec & getStartTime() const { return m_run_metrics.start_time; }
+    const struct timespec & getEndTime() const { return m_run_metrics.end_time; }
+    std::string             getFacilityName() const { return m_run_info.facility_name; }
+    std::string             getBeamShortName() const { return m_run_info.instr_shortname; }
+    std::string             getProposalID() const { return m_run_info.proposal_id; }
+    unsigned long           getRunNumber() const { return m_run_info.run_number; }
 
-protected:
-    // These attributes are accessible by the adapter subclass
-
-    std::string             m_facility_name;
-    std::string             m_short_name;
-    std::string             m_proposal_id;
-    unsigned long           m_run_number;
-    double                  m_total_charge;
-    uint64_t                m_events_counted;
-    uint64_t                m_events_uncounted;
-    struct timespec         m_start_time;
-    struct timespec         m_end_time;
-    PulseInfo               m_pulse_info;
 
 private:
     /// Defines internal stream processing states of StreamParser class
@@ -100,6 +87,15 @@ private:
         uint64_t    min_pkt_size;
         uint64_t    max_pkt_size;
         uint64_t    total_size;
+    };
+
+    /// Used to track reception of informational packets
+    enum InfoBit
+    {
+        RUN_INFO_BIT    = 0x0001,
+        INSTR_INFO_BIT  = 0x0002,
+        ALL_INFO_RCVD   = 0x0003,
+        INFO_SENT       = 0x1000
     };
 
     bool    rxPacket( const ADARA::Packet &pkt );
@@ -195,6 +191,7 @@ private:
             }
 
     void    processPulseID( uint64_t a_pulse_id );
+    void    receivedInfo( InfoBit a_bit );
     void    finalizeStreamProcessing();
     PVType  toPVType( const char *a_source ) const;
 
@@ -224,11 +221,15 @@ private:
     std::ofstream                           m_ofs_adara;                ///< ADARA output file stream
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
+    PulseInfo                               m_pulse_info;
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::vector<MonitorInfo*>               m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs;                      ///< Container of process variable information
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banked detectors and monitors)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
+    unsigned short                          m_info_rcvd;
+    RunInfo                                 m_run_info;
+    RunMetrics                              m_run_metrics;
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics

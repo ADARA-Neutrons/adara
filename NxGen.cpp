@@ -5,10 +5,34 @@
 
 using namespace std;
 
-
-NxGen::NxGen( int a_fd_in, string & a_adara_out_file, string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size, unsigned short a_event_buf_chunk_count, unsigned short a_ancillary_buf_chunk_count, unsigned long a_cache_size, unsigned short a_compression_level )
- : StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats, a_chunk_size*a_event_buf_chunk_count, a_chunk_size*a_ancillary_buf_chunk_count ),
-   m_gen_nexus(false), m_nexus_filename(a_nexus_out_file), m_chunk_size(a_chunk_size), m_h5nx(a_compression_level), m_pulse_info_slab_size(0)
+/*! \brief Constructor for NxGen class.
+ *
+ * This constructor builds an NxGen instance using the options specified. If the nexus filename is empty, then no
+ * nexus output file is produced. The chunk size is passed to the HDF5 library and the ADARA stream buffers are
+ * sized based on integer multiples of the chunk size. The cache size relates tto HDF5 library processing and may affect
+ * compression performance (i.e. when compression level > 0)
+ */
+NxGen::NxGen
+(
+    int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
+    string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
+    bool            a_strict,                   ///< [in] Controls strict processing of input stream
+    bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
+    unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size
+    unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
+    unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
+    unsigned long   a_cache_size,               ///< [in] HDF5 cache size
+    unsigned short  a_compression_level         ///< [in] HDF5 compression level (0 = off to 9 = max)
+)
+:
+    StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats, a_chunk_size*a_event_buf_chunk_count,
+                  a_chunk_size*a_anc_buf_chunk_count ),
+    m_gen_nexus(false),
+    m_nexus_filename(a_nexus_out_file),
+    m_chunk_size(a_chunk_size),
+    m_h5nx(a_compression_level),
+    m_pulse_info_slab_size(0)
 {
     if ( !a_nexus_out_file.empty() )
     {
@@ -17,14 +41,30 @@ NxGen::NxGen( int a_fd_in, string & a_adara_out_file, string &a_nexus_out_file, 
     }
 }
 
+
+/// NxGen destructor
 NxGen::~NxGen()
 {
-    // TODO Delete allocated objects, closeout file if still open
+    // Nothing to do here, for now
 }
 
 
+/*! \brief Factory method for PVInfoBase instances
+ *  \return A new PVInfoBase (derived) instance
+ *
+ * This method constructs Nexus-specific PVInfoBase objects for use by the generalizes process variable hanlders in the
+ * StreamParser class. Due to ADARA protocol limitations, only uint32 and double types are supported (others are
+ * mapped to these).
+ */
 SFS::PVInfoBase*
-NxGen::makePVInfo( const string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units )
+NxGen::makePVInfo
+(
+    const string       &a_name,         ///< [in] Name of PV
+    SFS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
+    SFS::Identifier     a_pv_id,        ///< [in] ID of the PV
+    SFS::PVType         a_type,         ///< [in] Type of PV
+    const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
+)
 {
     switch ( a_type )
     {
@@ -41,8 +81,21 @@ NxGen::makePVInfo( const string & a_name, SFS::Identifier a_device_id, SFS::Iden
     throw runtime_error("makePVInfo failed.");
 }
 
+
+/*! \brief Factory method for BankInfo instances
+ *  \return A new BankInfo derived instance
+ *
+ * This method constructs Nexus-specific BankInfo objects. The Nexus-specific NxBankInfo extends the BankInfo class to
+ * include a number of attributes needed for writing banked event data efficiently to a Nexus file.
+ */
 SFS::BankInfo*
-NxGen::makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
+NxGen::makeBankInfo
+(
+    uint16_t a_id,              ///< [in] ID of detector bank
+    uint16_t a_pixel_count,     ///< [in] Pixel count of bank
+    uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+    uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+)
 {
     NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve );
 
@@ -71,8 +124,19 @@ NxGen::makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reser
 }
 
 
+/*! \brief Factory method for MonitorInfo instances
+ *  \return A new MonitorInfo derived instance
+ *
+ * This method constructs Nexus-specific MonitorInfo objects. The Nexus-specific NxMonitorInfo class extends the
+ * BankInfo class to include a number of attributes needed for writing monito event data efficiently to a Nexus file.
+ */
 SFS::MonitorInfo*
-NxGen::makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve )
+NxGen::makeMonitorInfo
+(
+    uint16_t a_id,              ///< [in] ID of detector bank
+    uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+    uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+)
 {
     NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve );
 
@@ -92,6 +156,10 @@ NxGen::makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_bu
 }
 
 
+/*! \brief Initializes Nexus output file
+ *
+ * This method performs Nexus-specific initialization (creates file and several HDF5 entries).
+ */
 void
 NxGen::initialize()
 {
@@ -114,147 +182,109 @@ NxGen::initialize()
 }
 
 
+/*! \brief Finalizes Nexus output file
+ *
+ * This method performs Nexus-specific finalization (writes various metrics and closes file).
+ */
 void
-NxGen::finalize()
+NxGen::finalize
+(
+    const SFS::RunMetrics &a_run_metrics    ///< [in] Run metrics object
+)
 {
     if (!m_gen_nexus)
         return;
 
-    struct timespec start = getStartTime();
-    struct timespec end = getEndTime();
-    float duration = calcDiffSeconds( end, start );
+    writeScalar( "entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), "seconds" );
+    writeScalar( "entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), "seconds" );
+    writeScalar( "entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), "seconds" );
+    writeScalar( "entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), "seconds" );
+
+    writeScalar( "entry/DASlogs/proton_charge", "minimum_value", a_run_metrics.charge_stats.min(), "picoCoulombs" );
+    writeScalar( "entry/DASlogs/proton_charge", "maximum_value", a_run_metrics.charge_stats.max(), "picoCoulombs" );
+    writeScalar( "entry/DASlogs/proton_charge", "average_value", a_run_metrics.charge_stats.mean(), "picoCoulombs" );
+    writeScalar( "entry/DASlogs/proton_charge", "average_value_error", a_run_metrics.charge_stats.stdDev(), "picoCoulombs" );
+
+    float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
 
     writeScalar( "entry/", "duration", duration, "second" );
-    writeScalar( "entry/", "raw_frames", m_pulse_info.charge_stats.count(), "" );
-    writeScalar( "entry/", "total_counts", m_events_counted, "" );
-    writeScalar( "entry/", "total_uncounted_counts", m_events_uncounted, "" );
-    writeScalar( "entry/", "proton_charge", m_total_charge, "picoCoulomb" );
+    writeScalar( "entry/", "raw_frames", a_run_metrics.charge_stats.count(), "" );
+    writeScalar( "entry/", "total_counts", a_run_metrics.events_counted, "" );
+    writeScalar( "entry/", "total_uncounted_counts", a_run_metrics.events_uncounted, "" );
+    writeScalar( "entry/", "proton_charge", a_run_metrics.total_charge, "picoCoulomb" );
 
-    string time = timeToISO8601( start );
+    string time = timeToISO8601( a_run_metrics.start_time );
     m_h5nx.H5NXmake_dataset_string( "entry/", "start_time", time );
 
-    time = timeToISO8601( end );
+    time = timeToISO8601( a_run_metrics.end_time );
     m_h5nx.H5NXmake_dataset_string( "entry/", "end_time", time );
 
     m_h5nx.H5NXclose_file();
 }
 
 
+/*! \brief Processes run information
+ *
+ * This method translates run information to the output Nexus file.
+ */
 void
-NxGen::processBeamLineInfo( const std::string &a_id, const std::string &a_shortname, const std::string &a_longname )
+NxGen::processRunInfo
+(
+    const SFS::RunInfo & a_run_info     ///< [in] Run information object
+)
 {
     if (!m_gen_nexus)
         return;
 
-    writeString( "entry/instrument", "beamline", a_id );
+    writeString( "entry/instrument", "beamline", a_run_info.instr_id );
 
-    if ( a_longname.size())
+    if ( a_run_info.instr_longname.size())
     {
-        writeString( "entry/instrument", "name", a_longname );
+        writeString( "entry/instrument", "name", a_run_info.instr_longname );
 
-        if ( a_shortname.size())
-            writeStringAttribute( "entry/instrument/name", "short_name", a_shortname );
+        if ( a_run_info.instr_shortname.size())
+            writeStringAttribute( "entry/instrument/name", "short_name", a_run_info.instr_shortname );
+    }
+
+    string group_path = "entry";
+
+    string tmp = boost::lexical_cast<string>(a_run_info.run_number);
+    writeString( group_path, "run_number", tmp );
+    writeString( group_path, "entry_identifier", tmp );
+
+    writeStringEx( group_path, "experiment_identifier", a_run_info.proposal_id, "n/a" );
+    writeStringEx( group_path, "title", a_run_info.run_title, "n/a" );
+
+    makeGroup( "entry/sample", "NXsample" );
+    writeStringEx( "entry/sample", "identifier", a_run_info.sample_id, "n/a" );
+    writeStringEx( "entry/sample", "name", a_run_info.sample_name );
+    writeStringEx( "entry/sample", "nature", a_run_info.sample_nature );
+    writeStringEx( "entry/sample", "chemical_formula", a_run_info.sample_formula );
+    writeStringEx( "entry/sample", "environment", a_run_info.sample_environment );
+
+    size_t user_count = 0;
+    string path;
+    for ( vector<SFS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+    {
+        path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
+        makeGroup( path, "NXuser" );
+
+        writeString( path, "facility_user_id", u->id );
+        writeString( path, "name", u->name );
+        writeString( path, "role", u->role );
     }
 }
 
 
+/*! \brief Processes geometry information
+ *
+ * This method translates instrument geometry information to the output Nexus file.
+ */
 void
-NxGen::processRunInfo( const std::string & a_xml )
-{
-    if (!m_gen_nexus)
-        return;
-
-    xmlDocPtr doc = xmlReadMemory( a_xml.c_str(), a_xml.size(), 0, 0, 0 );
-    if ( doc )
-    {
-        string group_path = "entry";
-
-        for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
-        {
-            if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
-            {
-                m_run_number = boost::lexical_cast<unsigned long>( (char*)node->children->content );
-
-                writeString( group_path, "run_number", (char*)node->children->content );
-                writeString( group_path, "entry_identifier", (char*)node->children->content );
-            }
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
-            {
-                m_proposal_id = (char*)node->children->content;
-                writeString( group_path, "experiment_identifier", (char*)node->children->content );
-            }
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
-            {
-                writeString( group_path, "title", (char*)node->children->content );
-            }
-            //else if (xmlStrcmp( node->name, (const xmlChar*) "instrument_name") == 0)
-            //{
-            //    writeString( "entry/instrument", "beamline", (char*)node->children->content );
-            //}
-            else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
-            {
-                m_facility_name = (char*) node->children->content;
-            }
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
-            {
-                makeGroup( "entry/sample", "NXsample" );
-
-                for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
-                {
-                    if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
-                    {
-                        writeString( "entry/sample", "identifier", (char*)sample_node->children->content );
-                    }
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
-                    {
-                        writeString( "entry/sample", "name", (char*)sample_node->children->content );
-                    }
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
-                    {
-                        writeString( "entry/sample", "nature", (char*)sample_node->children->content );
-                    }
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
-                    {
-                        writeString( "entry/sample", "chemical_formula", (char*)sample_node->children->content );
-                    }
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
-                    {
-                        writeString( "entry/sample", "environment", (char*)sample_node->children->content );
-                    }
-                }
-            }
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
-            {
-                size_t user_count = 0;
-                string path;
-
-                for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
-                {
-                    if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
-                    {
-                        path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
-                        makeGroup( path, "NXuser" );
-
-                        for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
-                        {
-                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
-                                writeString( path, "facility_user_id", (char*)uinfo_node->children->content );
-                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
-                                writeString( path, "name", (char*)uinfo_node->children->content );
-                            else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
-                                writeString( path, "role", (char*)uinfo_node->children->content );
-                        }
-                    }
-                }
-            }
-        }
-
-        xmlFreeDoc( doc );
-    }
-}
-
-void
-NxGen::processGeometry( const std::string & a_xml )
+NxGen::processGeometry
+(
+    const std::string & a_xml   ///< [in] Geometry data in xml format
+)
 {
     if (!m_gen_nexus)
         return;
@@ -265,8 +295,16 @@ NxGen::processGeometry( const std::string & a_xml )
     writeString( "entry/instrument/instrument_xml", "data", a_xml );
 }
 
+
+/*! \brief Writes pulse buffers to Nexus file
+ *
+ * This method writes time, frequency, and charge data in pulse buffers to the Nexus file.
+ */
 void
-NxGen::pulseBuffersReady( SFS::PulseInfo &a_pulse_info )
+NxGen::pulseBuffersReady
+(
+    SFS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
+)
 {
     if (!m_gen_nexus)
         return;
@@ -279,26 +317,15 @@ NxGen::pulseBuffersReady( SFS::PulseInfo &a_pulse_info )
 }
 
 
+/*! \brief Writes bank event buffers to Nexus file
+ *
+ * This method writes time of flight, pixel ID, and index data in bank event buffers to the Nexus file.
+ */
 void
-NxGen::pulseFinalize( SFS::PulseInfo &a_pulse_info )
-{
-    if (!m_gen_nexus)
-        return;
-
-    writeScalar( "entry/DASlogs/frequency", "minimum_value", a_pulse_info.freq_stats.min(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "maximum_value", a_pulse_info.freq_stats.max(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "average_value", a_pulse_info.freq_stats.mean(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "average_value_error", a_pulse_info.freq_stats.stdDev(), "seconds" );
-
-    writeScalar( "entry/DASlogs/proton_charge", "minimum_value", a_pulse_info.charge_stats.min(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "maximum_value", a_pulse_info.charge_stats.max(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "average_value", a_pulse_info.charge_stats.mean(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "average_value_error", a_pulse_info.charge_stats.stdDev(), "picoCoulombs" );
-}
-
-
-void
-NxGen::bankBuffersReady( SFS::BankInfo &a_bank )
+NxGen::bankBuffersReady
+(
+    SFS::BankInfo &a_bank   ///< [in] Detector bank to write
+)
 {
     if (!m_gen_nexus)
         return;
@@ -318,8 +345,17 @@ NxGen::bankBuffersReady( SFS::BankInfo &a_bank )
     }
 }
 
+
+/*! \brief Fills pulse gaps in bank index slab
+ *
+ * This method fills pulse gaps in the index slab for a given bank in the Nexus file.
+ */
 void
-NxGen::bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count )
+NxGen::bankPulseGap
+(
+    SFS::BankInfo  &a_bank,     ///< [in] Detector bank with pulse gap
+    uint64_t        a_count     ///< [in] Number of missing pulses
+)
 {
     if (!m_gen_nexus)
         return;
@@ -333,8 +369,16 @@ NxGen::bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count )
     }
 }
 
+
+/*! \brief Finalizes bank data in Nexus file
+ *
+ * This method writes event counts for the specified bank to the Nexus file.
+ */
 void
-NxGen::bankFinalize( SFS::BankInfo &a_bank )
+NxGen::bankFinalize
+(
+    SFS::BankInfo &a_bank   ///< [in] Detector bank to finalize
+)
 {
     if (!m_gen_nexus)
         return;
@@ -350,8 +394,15 @@ NxGen::bankFinalize( SFS::BankInfo &a_bank )
 }
 
 
+/*! \brief Writes monitor event buffers to Nexus file
+ *
+ * This method writes time of flight and index data in monitor buffers to the Nexus file.
+ */
 void
-NxGen::monitorBuffersReady( SFS::MonitorInfo &a_monitor )
+NxGen::monitorBuffersReady
+(
+    SFS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
+)
 {
     if (!m_gen_nexus)
         return;
@@ -368,8 +419,17 @@ NxGen::monitorBuffersReady( SFS::MonitorInfo &a_monitor )
     }
 }
 
+
+/*! \brief Fills pulse gaps in monitor index slab
+ *
+ * This method fills pulse gaps in the index slab for a given monitor in the Nexus file.
+ */
 void
-NxGen::monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count )
+NxGen::monitorPulseGap
+(
+    SFS::MonitorInfo   &a_monitor,  ///< [in] Monitor with a pulse gap
+    uint64_t            a_count     ///< [in] Number of missing pulses
+)
 {
     if (!m_gen_nexus)
         return;
@@ -383,8 +443,16 @@ NxGen::monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count )
     }
 }
 
+
+/*! \brief Finalizes monitor data in Nexus file
+ *
+ * This method writes event counts for the specified monitor to the Nexus file.
+ */
 void
-NxGen::monitorFinalize( SFS::MonitorInfo &a_monitor )
+NxGen::monitorFinalize
+(
+    SFS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
+)
 {
     if (!m_gen_nexus)
         return;
@@ -397,8 +465,17 @@ NxGen::monitorFinalize( SFS::MonitorInfo &a_monitor )
     }
 }
 
+
+/*! \brief Converts a PVType to a Nexus NXnumtype
+ *  \return The most appropriate Nxnumtype for the provided PVType
+ *
+ * This method converts the provided PVType to a Nexus NXnumtype. Throws an exception for unkown / unsupported inputs.
+ */
 NeXus::NXnumtype
-NxGen::toNxType( SFS::PVType a_type ) const
+NxGen::toNxType
+(
+    SFS::PVType a_type  ///< [in] PVType to be converted
+) const
 {
     switch( a_type )
     {
@@ -414,8 +491,17 @@ NxGen::toNxType( SFS::PVType a_type ) const
     throw runtime_error("Invalid PV type.");
 }
 
+
+/*! \brief Creates a Nexus group
+ *
+ * This method creates a Nexus group of the specified type in the output Nexus file.
+ */
 void
-NxGen::makeGroup( const string &a_path, const string &a_type )
+NxGen::makeGroup
+(
+    const string &a_path,   ///< [in] Nexus path of new group
+    const string &a_type    ///< [in] Nexus type/class of new group
+)
 {
     if ( m_h5nx.H5NXmake_group( a_path, a_type ) != SUCCEED )
     {
@@ -425,27 +511,46 @@ NxGen::makeGroup( const string &a_path, const string &a_type )
 }
 
 
+/*! \brief Creates a Nexus dataset
+ *
+ * This method creates a Nexus dataset with the specified type and (optional) units in the output Nexus file.
+ */
 void
-NxGen::makeDataset( const std::string &dataset_path, const std::string &dataset_name, int nxdatatype, const string a_units )
+NxGen::makeDataset
+(
+    const std::string  &a_path,     ///< [in] Nexus path of new dataset
+    const std::string  &a_name,     ///< [in] Name of new dataset
+    NeXus::NXnumtype    a_type,     ///< [in] Nexus type of new dataset
+    const string        a_units     ///< [in] Optional units of new dataset
+)
 {
-    if ( m_h5nx.H5NXcreate_dataset_extend( dataset_path, dataset_name, nxdatatype, m_chunk_size ) != SUCCEED )
+    if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type, m_chunk_size ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXcreate_dataset_extend FAILED:" << dataset_path << "," << dataset_name << endl;
+        LOG(ERROR) << "H5NXcreate_dataset_extend FAILED:" << a_path << "," << a_name << endl;
         throw runtime_error("H5NXcreate_dataset_extend failed.");
     }
 
     if ( a_units.size() )
     {
-        if ( m_h5nx.H5NXmake_attribute_string( dataset_path + "/" + dataset_name, "units", a_units ) != SUCCEED )
+        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            LOG(ERROR) << "H5NXmake_attribute_string FAILED:" << dataset_path << "," << dataset_name << endl;
+            LOG(ERROR) << "H5NXmake_attribute_string FAILED:" << a_path << "," << a_name << endl;
             throw runtime_error("H5NXmake_attribute_string failed.");
         }
     }
 }
 
+
+/*! \brief Creates a Nexus link
+ *
+ * This method creates a link from the source path to the destination path in the output Nexus file.
+ */
 void
-NxGen::makeLink( const string &source_path, const string &dest_name )
+NxGen::makeLink
+(
+    const string &source_path,  ///< [in] Source path in Nexus file (must already exist)
+    const string &dest_name     ///< [in] Destination path in Nexus file (must NOT exist)
+)
 {
     if ( m_h5nx.H5NXmake_link(source_path, dest_name) != SUCCEED )
     {
@@ -454,19 +559,62 @@ NxGen::makeLink( const string &source_path, const string &dest_name )
     }
 }
 
+
+/*! \brief Writes a string value to a Nexus location
+ *
+ * This method writes a string value to the specified location (path/dataset) in the output Nexus file.
+ */
 void
-NxGen::writeString( const string &a_path, const string &a_dataset, const string &a_value )
+NxGen::writeString
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write string
+    const string &a_dataset,    ///< [in] Name of dataset at specified path to receive string value
+    const string &a_value       ///< [in] String value to write
+)
 {
-    if ( m_h5nx.H5NXmake_dataset_string( a_path, a_dataset, a_value ) != SUCCEED )
+    if ( !a_value.empty() )
     {
-        LOG(ERROR) << "H5NXmake_dataset_string FAILED for " << a_path << "/" << a_dataset << ":" << a_value << endl;
-        throw runtime_error("H5NXmake_dataset_string failed.");
+        if ( m_h5nx.H5NXmake_dataset_string( a_path, a_dataset, a_value ) != SUCCEED )
+        {
+            LOG(ERROR) << "H5NXmake_dataset_string FAILED for " << a_path << "/" << a_dataset << ":" << a_value << endl;
+            throw runtime_error("H5NXmake_dataset_string failed.");
+        }
     }
 }
 
 
+/*! \brief Writes a string value to a Nexus location with an optional default value
+ *
+ * This method writes a string value to the specified location (path/dataset) in the output Nexus file. If the input
+ * value is empty, the default value will be written if the a_write_if_empty parameter is true.
+ */
 void
-NxGen::writeStringAttribute( const string &a_path, const string &a_attrib, const string &a_value )
+NxGen::writeStringEx
+(
+    const string &a_path,           ///< [in] Path in Nexus file to write string
+    const string &a_dataset,        ///< [in] Name of dataset at specified path to receive string value
+    const string &a_value,          ///< [in] String value to write
+    const std::string &a_default    ///< [in] Default value to write if value is to be written and is empty
+)
+{
+    if ( a_value.empty() )
+        writeString( a_path, a_dataset, a_default );
+    else
+        writeString( a_path, a_dataset, a_value );
+}
+
+
+/*! \brief Writes a string attribute to the specified Nexus path
+ *
+ * This method writes a string attribute value to the specified path in the output Nexus file.
+ */
+void
+NxGen::writeStringAttribute
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write attribute
+    const string &a_attrib,     ///< [in] Name of the attribute
+    const string &a_value       ///< [in] Value of the attribute
+)
 {
     if ( m_h5nx.H5NXmake_attribute_string( a_path, a_attrib, a_value ) != SUCCEED )
     {
@@ -476,9 +624,20 @@ NxGen::writeStringAttribute( const string &a_path, const string &a_attrib, const
 }
 
 
+/*! \brief Writes a scalar value to the specified Nexus path
+ *
+ * This method writes a scalar value to the specified path in the output Nexus file. Units are optional (leave empty if
+ * not wanted).
+ */
 template<typename T>
 void
-NxGen::writeScalar( const std::string & a_path, const std::string & a_name, T a_value, const std::string & a_units )
+NxGen::writeScalar
+(
+    const std::string & a_path,     ///< [in] Path in Nexus file to write scalar
+    const std::string & a_name,     ///< [in] Name of scalar
+    T                   a_value,    ///< [in] New value of scalar
+    const std::string & a_units     ///< [in] Units of scalar (optional)
+)
 {
     if ( m_h5nx.H5NXmake_dataset_scalar( a_path, a_name, a_value ) != SUCCEED )
     {

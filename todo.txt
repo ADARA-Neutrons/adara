@@ -2,15 +2,16 @@ STS code issues
 
 * Beam mon tof values look wrong
 * add google logging in appropriate locations
-* Document source code! :)
 * Support fast metadata when SMS generates it
 * Move getPktName() method to ADARA source
 * It was not a good idea to assume monitor IDs will be low-value integers starting at zero... fix to work like banks
-* Processing of RunInfo is incorrectly placed in NxGen - need to refactor to pull this into StreamParser
+* May need to refactor to support multiple concurrent output adapters
+* Improve error handling/reporting within HDF5 routines
 
 Longer-term issues
 
 * Determine what to do with enumeration definitions in nexus
+* h5nx class should be an actual library
 
 Suggestions / Chnages for ADARA protocol
 

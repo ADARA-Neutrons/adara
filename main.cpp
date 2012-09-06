@@ -110,7 +110,7 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
     boost::filesystem::rename( boost::filesystem::path( a_source ), boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
 }
 
-/*
+/*!
  * 
  */
 int main(int argc, char** argv)
