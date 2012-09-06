@@ -119,20 +119,15 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
 
     bool send_pkt = false;
 
-    if ( m_cache_array_info )
+    // Note: The code below was changed due to a bug in DataSockets. When a satellite
+    // application is restarted, DataSockets sends garbage for the first value update.
+    // Because of this, the code below was changed so that bad data will be ignored, -
+    // resulting in no updates being streamed out until a variable value changes. This
+    // is a semi-serious flaw and needs to be addressed 
+
+    if ( m_cache_array_info && a_data.HasAttribute("ArraySize"))
     {
-        if ( a_data.HasAttribute("ArraySize"))
-            m_array_size = a_data.GetAttribute("ArraySize").Value.ulVal;
-        else
-        {
-            // No array size when it was expected, reset m_array_idx to -1 for limp-mode
-            m_array_idx = -1;
-            LOG_ERROR( "Configuration incorrect - missing ArraySize attribute (PV " << m_pv_info->m_name << ", <" << m_pv_info->m_connection << ">)" );
-        }
-
-        // Don't care about timestamps on individual array elements - just compare the value
-        // and if it's different from te last, send it
-
+        m_array_size = a_data.GetAttribute("ArraySize").Value.ulVal;
         m_cache_array_info = false;
     }
 
@@ -143,29 +138,33 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
 
     if ( m_array_idx > -1 )
     {
-        switch ( m_pv_info->m_type )
+        // Data is from an array - only process update if array size attribute has been received
+        if ( !m_cache_array_info )
         {
-        case PV_ENUM:
-        case PV_INT:
+            switch ( m_pv_info->m_type )
             {
-                CNiInt32Vector values(a_data);
-                send_pkt = testAndSet<long>( m_pv_info->m_ival, values[m_array_idx] );
-            }
-            break;
+            case PV_ENUM:
+            case PV_INT:
+                {
+                    CNiInt32Vector values(a_data);
+                    send_pkt = testAndSet<long>( m_pv_info->m_ival, values[m_array_idx] );
+                }
+                break;
 
-        case PV_UINT:
-            {
-                CNiUInt32Vector values(a_data);
-                send_pkt = testAndSet<unsigned long>( m_pv_info->m_uval, values[m_array_idx] );
-            }
-            break;
+            case PV_UINT:
+                {
+                    CNiUInt32Vector values(a_data);
+                    send_pkt = testAndSet<unsigned long>( m_pv_info->m_uval, values[m_array_idx] );
+                }
+                break;
 
-        case PV_DOUBLE:
-            {
-                CNiReal64Vector values(a_data);
-                send_pkt = testAndSet<double>( m_pv_info->m_dval, values[m_array_idx] );
+            case PV_DOUBLE:
+                {
+                    CNiReal64Vector values(a_data);
+                    send_pkt = testAndSet<double>( m_pv_info->m_dval, values[m_array_idx] );
+                }
+                break;
             }
-            break;
         }
     }
     else
@@ -196,15 +195,19 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
             pkt->time.sec = 0;
             pkt->time.nsec = 0;
 
+            // Note: due to time synchronization issues with DataSockets based apps,
+            // this code will ignore the timestamp on the incoming packet and simply use
+            // local receive time.
+
             // Is it an error if no timestamp is present?
-	        if ( a_data.HasAttribute("SocketTimeStamp"))
-                pkt->time.sec = a_data.GetAttribute("SocketTimeStamp").Value.lVal;
-            else
-            {
+	        //if ( a_data.HasAttribute("SocketTimeStamp"))
+            //    pkt->time.sec = a_data.GetAttribute("SocketTimeStamp").Value.lVal;
+            //else
+            //{
                 // This must be the initial update from the Data Socket Server after we connected
                 // Use current time for timestamp
                 pkt->time.sec = (unsigned long)time(0);
-            }
+            //}
 
             pkt->pkt_type = VarUpdate;
             pkt->device_id = m_pv_info->m_device_id;
