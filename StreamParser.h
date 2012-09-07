@@ -127,7 +127,7 @@ private:
     void    processPulseInfo( const ADARA::BankedEventPkt &pkt );
     void    processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
     void    handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
-    void    processMonitorEvents( uint16_t monitor_id, uint32_t event_count, const uint32_t *rpos );
+    void    processMonitorEvents( Identifier monitor_id, uint32_t event_count, const uint32_t *rpos );
     void    handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
 
     /*! \brief Processes a process variable value update from the input stream.
@@ -221,15 +221,15 @@ private:
     std::ofstream                           m_ofs_adara;                ///< ADARA output file stream
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
-    PulseInfo                               m_pulse_info;
+    PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
-    std::vector<MonitorInfo*>               m_monitors;                 ///< Container of monitor information
+    std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs;                      ///< Container of process variable information
-    uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banked detectors and monitors)
+    uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
-    unsigned short                          m_info_rcvd;
-    RunInfo                                 m_run_info;
-    RunMetrics                              m_run_metrics;
+    unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received
+    RunInfo                                 m_run_info;                 ///< Run (and instrument) information
+    RunMetrics                              m_run_metrics;              ///< Run metrics
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics
@@ -237,7 +237,7 @@ private:
     uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
 };
 
-} // End namespace STS
+} // End namespace SFS
 
 #endif	/* STREAMPARSER_H */
 

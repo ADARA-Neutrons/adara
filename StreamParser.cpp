@@ -73,9 +73,8 @@ StreamParser::~StreamParser()
         if ( *ibi )
             delete *ibi;
 
-    for ( vector<MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
-        if ( *imi )
-            delete *imi;
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+        delete imi->second;
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
         if ( ipv->second )
@@ -314,6 +313,12 @@ StreamParser::rxPacket
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
+        // Note: a vector is used for BankInfo instances where the bank_id is the offset into the vector. This is safe
+        // as bank IDs are monotonically increasing integers starting at 0. IF this ever changes, then the bank
+        // container will need to be changed to a map (which would result in a slight performance drop). Also note that
+        // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
+        // over the container.
+
         if ( bank_id >= m_banks.size() )
             m_banks.resize(bank_id+1,0);
 
@@ -444,8 +449,6 @@ StreamParser::processBankEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    //cout << "Bank " << bank_id << ", events: " << event_count << endl;
-
     if ( a_bank_id < m_banks.size() )
     {
         BankInfo *bi = m_banks[a_bank_id];
@@ -541,8 +544,6 @@ StreamParser::rxPacket
     const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
 )
 {
-    //cout << "Processing BeamMonitorPkt" << endl;
-
     writePacket( a_pkt );
 
     processPulseID( a_pkt.pulseId() );
@@ -585,51 +586,46 @@ StreamParser::rxPacket
 void
 StreamParser::processMonitorEvents
 (
-    uint16_t        a_monitor_id,     ///< [in] Monitor ID of monitor to be processed
+    Identifier      a_monitor_id,     ///< [in] Monitor ID of monitor to be processed
     uint32_t        a_event_count,    ///< [in] Number of events contained in stream buffer
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    if ( a_monitor_id >= m_monitors.size())
-        m_monitors.resize(a_monitor_id+1,0);
-
-    MonitorInfo *mi = m_monitors[a_monitor_id];
-
-    if ( !mi )
+    map<Identifier,MonitorInfo*>::iterator imi = m_monitors.find( a_monitor_id );
+    if ( imi == m_monitors.end())
     {
-        mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh );
-        m_monitors[a_monitor_id] = mi;
+        MonitorInfo *mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh );
+        imi = m_monitors.insert( m_monitors.begin(), pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
     }
 
     // Detect gaps in event data and fill event index if present
-    if ( mi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-        handleMonitorPulseGap( *mi, ( m_pulse_count - 1 ) - mi->m_last_pulse_with_data );
+    if ( imi->second->m_last_pulse_with_data < ( m_pulse_count - 1 ))
+        handleMonitorPulseGap( *imi->second, ( m_pulse_count - 1 ) - imi->second->m_last_pulse_with_data );
 
-    size_t sz = mi->m_tof_buffer.size();
+    size_t sz = imi->second->m_tof_buffer.size();
 
-    mi->m_tof_buffer.resize( sz + a_event_count );
+    imi->second->m_tof_buffer.resize( sz + a_event_count );
 
-    float           *tof_ptr = &mi->m_tof_buffer[sz];
+    float           *tof_ptr = &imi->second->m_tof_buffer[sz];
     const uint32_t  *epos = a_rpos + a_event_count;
 
     while ( a_rpos != epos )
     {
-        // TODO What to do with bit 31?
-        *tof_ptr++ = ((*a_rpos++)&0x1fffff) * 0.1; //TODO Revisit mask used here
+        *tof_ptr++ = ((*a_rpos++)&0x1fffff) * 0.1;
     }
 
     // Cache event index until large enough to write
-    mi->m_index_buffer.push_back( mi->m_event_count );
-    mi->m_event_count += a_event_count;
-    mi->m_last_pulse_with_data = m_pulse_count;
+    imi->second->m_index_buffer.push_back( imi->second->m_event_count );
+    imi->second->m_event_count += a_event_count;
+    imi->second->m_last_pulse_with_data = m_pulse_count;
 
     // Check to see if buffers are ready to write
-    if ( mi->m_tof_buffer.size() >= m_event_buf_write_thresh || mi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+    if ( imi->second->m_tof_buffer.size() >= m_event_buf_write_thresh || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
     {
-        monitorBuffersReady( *mi );
+        monitorBuffersReady( *imi->second );
 
-        mi->m_index_buffer.clear();
-        mi->m_tof_buffer.clear();
+        imi->second->m_index_buffer.clear();
+        imi->second->m_tof_buffer.clear();
     }
 }
 
@@ -1034,20 +1030,17 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in monitor buffers
 
-    for ( vector<MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
     {
-        if ( !*imi )
-            continue;
-
         // Detect gaps in monitor data and fill event index if present
-        if ( (*imi)->m_last_pulse_with_data < m_pulse_count )
-            handleMonitorPulseGap( **imi, m_pulse_count - (*imi)->m_last_pulse_with_data );
+        if ( imi->second->m_last_pulse_with_data < m_pulse_count )
+            handleMonitorPulseGap( *imi->second, m_pulse_count - imi->second->m_last_pulse_with_data );
 
         // Flush monitor buffers
-        if ( (*imi)->m_tof_buffer.size() || (*imi)->m_index_buffer.size() )
-            monitorBuffersReady( **imi );
+        if ( imi->second->m_tof_buffer.size() || imi->second->m_index_buffer.size() )
+            monitorBuffersReady( *imi->second );
 
-        monitorFinalize( **imi );
+        monitorFinalize( *imi->second );
     }
     
 
