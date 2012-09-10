@@ -14,8 +14,10 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 
+#define epicsAssertAuthor "Dave Dillow <dillowda@ornl.gov>"
+#define caNetAddrSock
+
 #include "ADARA.h"
-#include "EPICS.h"
 #include "ReadyAdapter.h"
 
 #include <fdManager.h>

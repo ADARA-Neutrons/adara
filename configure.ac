@@ -1,6 +1,6 @@
-AC_INIT([smsd], [0.1], [smsbugs@ornl.gov], [smsd])
+AC_INIT([ADARA], [0.1], [adarabugs@ornl.gov], [ADARA])
 AC_PREREQ([2.59])
-AM_INIT_AUTOMAKE([1.11 -Wall no-define foreign silent-rules])
+AM_INIT_AUTOMAKE([1.11 -Wall no-define foreign silent-rules subdir-objects])
 AM_SILENT_RULES([yes])
 
 dnl AC_PROG_CC
@@ -13,7 +13,6 @@ dnl AM_PROG_CC_C_O
 
 AC_SEARCH_LIBS([clock_gettime], [rt])
 AC_SEARCH_LIBS([getaddrinfo_a], [anl], )
-dnl PKG_CHECK_MODULES([libevent2], [libevent >= 2.0.10])
 PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
 
 tryepicsdir=""

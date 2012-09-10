@@ -1,13 +1,20 @@
 *.o
 .*.swp
-adara-client
-adara-gen
-storage-test
-parser-test
-adara-parser
-smsd
+
+# These could be moved to per-dir .gitignore, but easiest to keep them
+# at the top for now.
+#
+common/test/parser-test
+
+tools/adara-gen
+tools/adara-parser
+
+sms/smsd
+sms/test/storage-test
 
 # All of this crap is from autotools
+#
+.dirstamp
 .deps
 configure
 config.log
