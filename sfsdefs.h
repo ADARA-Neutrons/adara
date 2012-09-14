@@ -4,7 +4,7 @@
 #include <vector>
 #include "Utils.h"
 
-namespace SFS {
+namespace STS {
 
 
 // ============================================================================
@@ -69,7 +69,7 @@ public:
     PVType              m_type;         ///< Type of PV
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
-    std::vector<float>  m_time_buffer;  ///< Buffer that holds time axis of PV values
+    std::vector<float>  m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
 };
 
 /// Intermmediary PV template class that provides typed value buffer
@@ -109,8 +109,8 @@ struct PulseInfo
 
     uint64_t                start_time;         ///< Time in nanoseconds of first pulse
     uint64_t                last_time;          ///< Time in nanoseconds of last received pulse
-    std::vector<double>     times;              ///< Pulse time buffer
-    std::vector<double>     freqs;              ///< Pulse frequency buffer
+    std::vector<double>     times;              ///< Pulse time buffer (seconds)
+    std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
     std::vector<double>     charges;            ///< Pulse charge buffer
 };
 
@@ -146,7 +146,7 @@ public:
     uint64_t                m_event_count;          ///< Running event count
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this bank
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
-    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
+    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
     std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
 };
 
@@ -237,13 +237,28 @@ public:
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
     virtual void            processRunInfo( const RunInfo & a_run_info ) = 0;
     virtual void            processGeometry( const std::string & a_xml ) = 0;
-    virtual void            pulseBuffersReady( SFS::PulseInfo &a_pulse_info ) = 0;
-    virtual void            bankBuffersReady( SFS::BankInfo &a_bank ) = 0;
-    virtual void            bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count ) = 0;
-    virtual void            bankFinalize( SFS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady( SFS::MonitorInfo &a_monitor_info ) = 0;
-    virtual void            monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
-    virtual void            monitorFinalize( SFS::MonitorInfo &a_monitor ) = 0;
+    virtual void            pulseBuffersReady( STS::PulseInfo &a_pulse_info ) = 0;
+    virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
+    virtual void            bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count ) = 0;
+    virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
+    virtual void            monitorBuffersReady( STS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
+    virtual void            monitorFinalize( STS::MonitorInfo &a_monitor ) = 0;
+};
+
+// ============================================================================
+// Error Codes for TraceExceptions
+// ============================================================================
+
+
+enum ErrorCodes
+{
+    ERR_PV_NOT_DEFINED = 1,
+    ERR_CAST_FAILED,
+    ERR_INVALID_OPERATION,
+    ERR_UNEXPECTED_INPUT,
+    ERR_OUTPUT_FAILURE,
+    ERR_LAST
 };
 
 } // End SFS Namespace

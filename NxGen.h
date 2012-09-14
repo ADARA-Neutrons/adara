@@ -8,7 +8,6 @@
 #include "StreamParser.h"
 #include "Utils.h"
 #include <boost/lexical_cast.hpp>
-#include <glog/logging.h>
 
 
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
@@ -16,12 +15,12 @@
  * The NxGen class is a stream adapter subclass that specializes the ADARA StreamParser class for creating NeXus output
  * files.
  */
-class NxGen : public SFS::StreamParser
+class NxGen : public STS::StreamParser
 {
 private:
 
     /// BankInfo subclass that adds Nexus-required attributes
-    class NxBankInfo : public SFS::BankInfo
+    class NxBankInfo : public STS::BankInfo
     {
     public:
         /// NxBankInfo constructor
@@ -54,7 +53,7 @@ private:
     };
 
     /// MonitorInfo subclass that adds Nexus-required attributes
-    class NxMonitorInfo : public SFS::MonitorInfo
+    class NxMonitorInfo : public STS::MonitorInfo
     {
     public:
         /// NxMonitorInfo constructor
@@ -83,21 +82,21 @@ private:
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
     template<class T>
-    class NxPVInfo : public SFS::PVInfo<T>
+    class NxPVInfo : public STS::PVInfo<T>
     {
     public:
         /// NxPVInfo constructor
         NxPVInfo
         (
             const std::string  &a_name,         ///< [in] Name of PV
-            SFS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
-            SFS::Identifier     a_pv_id,        ///< [in] ID of the PV
-            SFS::PVType         a_type,         ///< [in] Type of PV
+            STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
+            STS::Identifier     a_pv_id,        ///< [in] ID of the PV
+            STS::PVType         a_type,         ///< [in] Type of PV
             const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
             NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus ouput
         )
         :
-            SFS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ),
+            STS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ),
             m_nxgen(a_nxgen),
             m_slab_size(0)
         {
@@ -120,7 +119,7 @@ private:
                 {
                     m_nxgen.makeGroup( m_log_path, "NXlog" );
                     m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
-                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, "seconds" );
+                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, "second" );
                 }
 
                 m_nxgen.writeSlab( m_log_path + "/value", this->m_value_buffer, m_slab_size );
@@ -155,22 +154,22 @@ public:
 protected:
 
     void                initialize();
-    void                finalize( const SFS::RunMetrics &a_run_metrics );
-    SFS::PVInfoBase*    makePVInfo( const std::string & a_name, SFS::Identifier a_device_id, SFS::Identifier a_pv_id, SFS::PVType a_type, const std::string & a_units );
-    SFS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    SFS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    void                processRunInfo( const SFS::RunInfo & a_run_info );
+    void                finalize( const STS::RunMetrics &a_run_metrics );
+    STS::PVInfoBase*    makePVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
+    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    void                processRunInfo( const STS::RunInfo & a_run_info );
     void                processGeometry( const std::string & a_xml );
-    void                pulseBuffersReady( SFS::PulseInfo &a_pulse_info );
-    void                bankBuffersReady( SFS::BankInfo &a_bank );
-    void                bankPulseGap( SFS::BankInfo &a_bank, uint64_t a_count );
-    void                bankFinalize( SFS::BankInfo &a_bank );
-    void                monitorBuffersReady( SFS::MonitorInfo &a_monitor_info );
-    void                monitorPulseGap( SFS::MonitorInfo &a_monitor, uint64_t a_count );
-    void                monitorFinalize( SFS::MonitorInfo &a_monitor );
+    void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
+    void                bankBuffersReady( STS::BankInfo &a_bank );
+    void                bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count );
+    void                bankFinalize( STS::BankInfo &a_bank );
+    void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
+    void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
+    void                monitorFinalize( STS::MonitorInfo &a_monitor );
 
 private:
-    NeXus::NXnumtype    toNxType( SFS::PVType a_type ) const;
+    NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path, const std::string &a_type );
     void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
     void                makeLink( const std::string &source_path, const std::string &dest_name );
@@ -187,10 +186,12 @@ private:
                             uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes)
                         )
                         {
-                            if ( m_h5nx.H5NXwrite_slab( a_path, a_buffer, a_slab_size ) != SUCCEED )
+                            if ( a_buffer.size())
                             {
-                                LOG(ERROR) <<  "H5NXwrite_slab FAILED for " << a_path << std::endl;
-                                throw std::runtime_error("H5NXwrite_slab FAILED");
+                                if ( m_h5nx.H5NXwrite_slab( a_path, a_buffer, a_slab_size ) != SUCCEED )
+                                {
+                                    THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXwrite_slab FAILED for path: " << a_path );
+                                }
                             }
                         }
 
@@ -204,26 +205,29 @@ private:
                             uint64_t a_slab_size        ///< Current slab size (counts not bytes)
                         )
                         {
-                            std::vector<T> buf;
-                            uint64_t slab_size = a_slab_size;
-                            uint64_t count = 0;
-
-                            if ( a_count >= m_chunk_size )
+                            if ( a_count )
                             {
-                                buf.resize( m_chunk_size, a_value );
+                                std::vector<T> buf;
+                                uint64_t slab_size = a_slab_size;
+                                uint64_t count = 0;
 
-                                while( count <= ( a_count - m_chunk_size ))
+                                if ( a_count >= m_chunk_size )
                                 {
-                                    writeSlab( a_path, buf, slab_size );
-                                    count += m_chunk_size;
-                                    slab_size += m_chunk_size;
-                                }
-                            }
+                                    buf.resize( m_chunk_size, a_value );
 
-                            if ( count < a_count )
-                            {
-                                buf.resize( a_count - count, a_value );
-                                writeSlab( a_path, buf, slab_size );
+                                    while( count <= ( a_count - m_chunk_size ))
+                                    {
+                                        writeSlab( a_path, buf, slab_size );
+                                        count += m_chunk_size;
+                                        slab_size += m_chunk_size;
+                                    }
+                                }
+
+                                if ( count < a_count )
+                                {
+                                    buf.resize( a_count - count, a_value );
+                                    writeSlab( a_path, buf, slab_size );
+                                }
                             }
                         }
 

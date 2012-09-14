@@ -8,7 +8,6 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-#include <glog/logging.h>
 
 #define H5NX_SANITY_CHECK
 
@@ -232,7 +231,6 @@ hid_t H5nx::nx_to_hdf5_type(int nx_datatype)
     }
     else
     {
-        LOG(INFO) << "ERROR: nx_to_hdf5_type: unknown type" << endl;
         type = -1;
         assert ( 0 );
     }
@@ -745,158 +743,6 @@ int H5nx::H5NXcreate_dataset_extend(const std::string &group_path, const std::st
 // H5NXwrite_slab
 ////////////////////////////////////////////////////////////////////
 
-// Declare instantiations of the types of templated functions needed
-#if 0
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<double> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint16_t> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<int16_t> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint32_t> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<int32_t> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<float> &slab);
-
-template
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint64_t> &slab);
-
-template <typename NumT>
-int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT> &vec)
-{
-    hid_t   did;
-    hid_t   tid;
-    hid_t   fsid;
-    hid_t   msid;
-    hsize_t dims[H5S_MAX_RANK];
-    hsize_t dims_curr[H5S_MAX_RANK];
-    hsize_t count[H5S_MAX_RANK];
-    hsize_t start[H5S_MAX_RANK];
-
-    ///////////////////////////////////////////////////////////////////
-    // FOR 1D DATASET
-    ////////////////////////////////////////////////////////////////////
-
-    hsize_t slab_size = vec.size();
-
-    //open dataset
-    if (( did = H5Dopen2( this->m_fid, dataset_path.c_str(), H5P_DEFAULT)) < 0)
-    {
-        DLOG(INFO)<< "here1" << endl;
-        return FAIL;
-    }
-
-    //get type
-    if ((tid = H5Dget_type(did)) < 0)
-    {
-         DLOG(INFO)<< "here2" << endl;
-        return FAIL;
-    }
-
-    //get file space
-    if ((fsid = H5Dget_space(did)) < 0)
-    {
-        DLOG(INFO)<< "here3" << endl;
-        return FAIL;
-    }
-
-    //get current dimensions
-    if (H5Sget_simple_extent_dims(fsid , dims_curr, NULL) < 0)
-    {
-         DLOG(INFO)<< "here4" << endl;
-        return FAIL;
-    }
-
-    //close file space
-    if (H5Sclose(fsid) < 0)
-    {
-         DLOG(INFO)<< "here5" << endl;
-        return FAIL;
-    }
-    ///////////////////////////////////////////////////////
-    //set the new dimension to current + size to increase
-    ///////////////////////////////////////////////////////
-
-    dims[0] = slab_size + dims_curr[0];
-
-    if (H5Dset_extent(did , dims) < 0)
-    {
-        DLOG(INFO)<< "here6" << endl;
-        return FAIL;
-    }
-
-    //get the new (updated) space
-    if ((fsid = H5Dget_space(did)) < 0)
-    {
-        DLOG(INFO)<< "here7" << endl;
-        return FAIL;
-    }
-
-    count[0] = slab_size;
-    start[0] = dims_curr[0];
-
-    //select space on file
-    if (H5Sselect_hyperslab(fsid, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
-    {
-         DLOG(INFO)<< "here8" << endl;
-        return FAIL;
-    }
-
-    //memory space
-    if ((msid = H5Screate_simple( 1, count, count)) < 0)
-    {
-         DLOG(INFO)<< "here9" << endl;
-        return FAIL;
-    }
-
-    //write
-    if (H5Dwrite(did, tid, msid, fsid, H5P_DEFAULT, &(vec[0])) < 0)
-    {
-         DLOG(INFO)<< "here10" << endl;
-        return FAIL;
-    }
-
-    //close memory space
-    if (H5Sclose(msid) < 0)
-    {
-        DLOG(INFO)<< "here11" << endl;
-        return FAIL;
-    }
-
-    //close file space
-    if (H5Sclose(fsid) < 0)
-    {
-         DLOG(INFO)<< "here12" << endl;
-        return FAIL;
-    }
-
-    //close type
-    if (H5Tclose(tid) < 0)
-    {
-         DLOG(INFO)<< "here13" << endl;
-        return FAIL;
-    }
-
-    //close dataset
-    if ( H5Dclose( did ) < 0 )
-    {
-         DLOG(INFO)<< "here14" << endl;
-        return FAIL;
-    }
-
-
-    return SUCCEED;
-
-}
-#endif
-
 template
 int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<double> &slab, uint64_t cur_size );
 
@@ -936,14 +782,12 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     //open dataset
     if (( did = H5Dopen2( this->m_fid, dataset_path.c_str(), H5P_DEFAULT)) < 0)
     {
-        DLOG(INFO)<< "here1" << endl;
         return FAIL;
     }
 
     //get type
     if ((tid = H5Dget_type(did)) < 0)
     {
-         DLOG(INFO)<< "here2" << endl;
         return FAIL;
     }
 
@@ -951,14 +795,12 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
 
     if (H5Dextend(did , dims) < 0)
     {
-        DLOG(INFO)<< "here6" << endl;
         return FAIL;
     }
 
     //get the new (updated) space
     if ((fsid = H5Dget_space(did)) < 0)
     {
-        DLOG(INFO)<< "here7" << endl;
         return FAIL;
     }
 
@@ -968,49 +810,42 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     //select space on file
     if (H5Sselect_hyperslab(fsid, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
     {
-         DLOG(INFO)<< "here8" << endl;
         return FAIL;
     }
 
     //memory space
     if ((msid = H5Screate_simple( 1, count, count)) < 0)
     {
-         DLOG(INFO)<< "here9" << endl;
         return FAIL;
     }
 
     //write
     if (H5Dwrite(did, tid, msid, fsid, H5P_DEFAULT, &(vec[0])) < 0)
     {
-         DLOG(INFO)<< "here10" << endl;
         return FAIL;
     }
 
     //close memory space
     if (H5Sclose(msid) < 0)
     {
-        DLOG(INFO)<< "here11" << endl;
         return FAIL;
     }
 
     //close file space
     if (H5Sclose(fsid) < 0)
     {
-         DLOG(INFO)<< "here12" << endl;
         return FAIL;
     }
 
     //close type
     if (H5Tclose(tid) < 0)
     {
-         DLOG(INFO)<< "here13" << endl;
         return FAIL;
     }
 
     //close dataset
     if ( H5Dclose( did ) < 0 )
     {
-         DLOG(INFO)<< "here14" << endl;
         return FAIL;
     }
 
@@ -1024,35 +859,30 @@ int  H5nx::H5NXslab_open( H5NXwrite_context &context, const std::string &dataset
     //open dataset
     if (( context.did = H5Dopen2( m_fid, dataset_path.c_str(), H5P_DEFAULT)) < 0)
     {
-        DLOG(INFO)<< "here1" << endl;
         return FAIL;
     }
 
     //get type
     if ((context.tid = H5Dget_type(context.did)) < 0)
     {
-         DLOG(INFO)<< "here2" << endl;
         return FAIL;
     }
 
     //get file space
     if ((context.fsid = H5Dget_space(context.did)) < 0)
     {
-        DLOG(INFO)<< "here3" << endl;
         return FAIL;
     }
 
     //get current dimensions
     if (H5Sget_simple_extent_dims(context.fsid , context.dims_curr, NULL) < 0)
     {
-         DLOG(INFO)<< "here4" << endl;
         return FAIL;
     }
 
     //close file space
     if (H5Sclose(context.fsid) < 0)
     {
-         DLOG(INFO)<< "here5" << endl;
         return FAIL;
     }
     return SUCCEED;
@@ -1077,14 +907,12 @@ int H5nx::H5NXslab_write( H5NXwrite_context &context, const std::vector<T> &data
 
     if (H5Dset_extent(context.did , context.dims) < 0)
     {
-        DLOG(INFO)<< "here6" << endl;
         return FAIL;
     }
 
     //get the new (updated) space
     if ((context.fsid = H5Dget_space(context.did)) < 0)
     {
-        DLOG(INFO)<< "here7" << endl;
         return FAIL;
     }
 
@@ -1094,28 +922,24 @@ int H5nx::H5NXslab_write( H5NXwrite_context &context, const std::vector<T> &data
     //select space on file
     if (H5Sselect_hyperslab( context.fsid, H5S_SELECT_SET, context.start, NULL, context.count, NULL) < 0)
     {
-         DLOG(INFO)<< "here8" << endl;
         return FAIL;
     }
 
     //memory space
     if (( context.msid = H5Screate_simple( 1, context.count, context.count)) < 0)
     {
-         DLOG(INFO)<< "here9" << endl;
         return FAIL;
     }
 
     //write
     if (H5Dwrite( context.did, context.tid, context.msid, context.fsid, H5P_DEFAULT, &(data[0])) < 0)
     {
-         DLOG(INFO)<< "here10" << endl;
         return FAIL;
     }
 
     //close memory space
     if (H5Sclose(context.msid) < 0)
     {
-        DLOG(INFO)<< "here11" << endl;
         return FAIL;
     }
 
@@ -1130,21 +954,18 @@ int H5nx::H5NXslab_close( H5NXwrite_context &context )
     //close file space
     if (H5Sclose(context.fsid) < 0)
     {
-         DLOG(INFO)<< "here12" << endl;
         return FAIL;
     }
 
     //close type
     if (H5Tclose(context.tid) < 0)
     {
-         DLOG(INFO)<< "here13" << endl;
         return FAIL;
     }
 
     //close dataset
     if ( H5Dclose( context.did ) < 0 )
     {
-         DLOG(INFO)<< "here14" << endl;
         return FAIL;
     }
     return SUCCEED;

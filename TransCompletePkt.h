@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace SFS {
+namespace STS {
 
 class TransCompletePkt
 {

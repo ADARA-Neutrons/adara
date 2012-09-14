@@ -15,7 +15,6 @@
 #include "napi.h"
 #include "hdf5.h"
 #include <nexus/NeXusFile.hpp>
-#include <glog/logging.h>
 
 //HDF5 return codes
 #define SUCCEED		0

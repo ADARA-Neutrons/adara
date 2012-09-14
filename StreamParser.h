@@ -1,10 +1,3 @@
-/*
- * File:   StreamParser.h
- * Author: d3s
- *
- * Created on July 12, 2012, 5:57 PM
- */
-
 #ifndef STREAMPARSER_H
 #define	STREAMPARSER_H
 
@@ -15,12 +8,12 @@
 #include <string.h>
 #include <vector>
 #include <boost/lexical_cast.hpp>
-//#include "../SMS/ADARA.h"
 #include "../SMS/ADARAParser.h"
 #include "Utils.h"
 #include "sfsdefs.h"
+#include "TraceException.h"
 
-namespace SFS {
+namespace STS {
 
 
 /*! \brief Exception class used to communicate translation failures within STS code
@@ -53,7 +46,9 @@ private:
 class StreamParser : public ADARA::Parser, public IStreamAdapter
 {
 public:
-    StreamParser( int a_fd, std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false, uint32_t a_event_buf_write_thresh = 40960, uint32_t a_ancillary_buf_write_thresh = 4096 );
+    StreamParser( int a_fd, const std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false,
+                  uint32_t a_event_buf_write_thresh = 40960, uint32_t a_ancillary_buf_write_thresh = 4096 );
+
     virtual ~StreamParser();
 
     void    processStream();
@@ -98,122 +93,30 @@ private:
         INFO_SENT       = 0x1000
     };
 
-    bool    rxPacket( const ADARA::Packet &pkt );
-    bool    rxPacket( const ADARA::RunStatusPkt &pkt );
-    bool    rxPacket( const ADARA::BankedEventPkt &pkt );
-    bool    rxPacket( const ADARA::PixelMappingPkt &pkt );
-    bool    rxPacket( const ADARA::BeamMonitorPkt &pkt );
-    bool    rxPacket( const ADARA::RunInfoPkt &pkt );
-    bool    rxPacket( const ADARA::GeometryPkt &pkt );
-    bool    rxPacket( const ADARA::BeamlineInfoPkt &pkt );
-    bool    rxPacket( const ADARA::DeviceDescriptorPkt &pkt );
-    bool    rxPacket( const ADARA::VariableU32Pkt &pkt );
-    bool    rxPacket( const ADARA::VariableDoublePkt &pkt );
-
-    /*! \brief Writes an ADARA packet to an output file
-     *  \param pkt - An ADARA packet to write
-     *
-     * If adara stream output file generation is enabled, this method writes the
-     * specified packet to the output file stream object in binary format.
-     */
-    inline void writePacket( const ADARA::Packet &a_pkt )
-    {
-        if ( m_gen_adara )
-        {
-            m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length());
-        }
-    }
-
-    void    processPulseInfo( const ADARA::BankedEventPkt &pkt );
-    void    processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
-    void    handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
-    void    processMonitorEvents( Identifier monitor_id, uint32_t event_count, const uint32_t *rpos );
-    void    handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
-
-    /*! \brief Processes a process variable value update from the input stream.
-     *  \param a_device_id - Device ID of process variable
-     *  \param a_pv_id - Process variable ID
-     *  \param a_value - Value of process variable
-     *  \param a_timestamp - Timestamp of value update from stream
-     *
-     * This method processes value updates for process variables (PVs) from the
-     * input ADARA stream. If the PV has been defined by a device descriptor
-     * packet (DDP), then an entry will be present in the StreamParser PV
-     * container - allowing the specified value to be stored in the associated
-     * value buffer of the PV. This buffer will be flushed to the stream
-     * adapter when full. Statistics for the PV are also updated when this
-     * method is called.
-     */
+    bool        rxPacket( const ADARA::Packet &pkt );
+    bool        rxPacket( const ADARA::RunStatusPkt &pkt );
+    bool        rxPacket( const ADARA::BankedEventPkt &pkt );
+    bool        rxPacket( const ADARA::PixelMappingPkt &pkt );
+    bool        rxPacket( const ADARA::BeamMonitorPkt &pkt );
+    bool        rxPacket( const ADARA::RunInfoPkt &pkt );
+    bool        rxPacket( const ADARA::GeometryPkt &pkt );
+    bool        rxPacket( const ADARA::BeamlineInfoPkt &pkt );
+    bool        rxPacket( const ADARA::DeviceDescriptorPkt &pkt );
+    bool        rxPacket( const ADARA::VariableU32Pkt &pkt );
+    bool        rxPacket( const ADARA::VariableDoublePkt &pkt );
+    void        processPulseInfo( const ADARA::BankedEventPkt &pkt );
+    void        processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
+    void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
+    void        processMonitorEvents( Identifier monitor_id, uint32_t event_count, const uint32_t *rpos );
+    void        handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
     template<class T>
-    void    pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp )
-            {
-                PVKey   key(a_device_id,a_pv_id);
-
-                std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
-                if ( ipv != m_pvs.end() )
-                {
-                    PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );
-                    if ( pvinfo )
-                    {
-                        float t = 0;
-
-                        // Note: if first pulse has not arrived, truncate all PV times to 0
-                        if ( m_pulse_info.start_time )
-                        {
-                            t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time)*1.0e-9;
-                        }
-                        else if ( pvinfo->m_value_buffer.size() )
-                        {
-                            // If we recv multiple value updates before first pulse, keep only latest
-                            pvinfo->m_value_buffer.clear();
-                            pvinfo->m_time_buffer.clear();
-                            pvinfo->m_stats.reset();
-                        }
-
-                        pvinfo->m_value_buffer.push_back(a_value);
-                        pvinfo->m_time_buffer.push_back(t);
-                        pvinfo->m_stats.push(a_value);
-
-                        // Check for buffer write
-                        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-                            pvinfo->flushBuffers();
-                    }
-                    else
-                    {
-                        std::cout << "cast failed! " << a_device_id << ":" << a_pv_id << std::endl;
-                    }
-
-                }
-                else
-                {
-                    std::cout << "pvinfo not found! " << a_device_id << "." << a_pv_id << std::endl;
-                }
-            }
-
-    void    processPulseID( uint64_t a_pulse_id );
-    void    receivedInfo( InfoBit a_bit );
-    void    finalizeStreamProcessing();
-    PVType  toPVType( const char *a_source ) const;
-
-    /*! \brief Gathers statistics from the specified ADARA packet.
-     *  \param pkt - An ADARA packet to analyze
-     *
-     * If stream statistics gathering is enabled, this method collects a number
-     * of metrics for the stream and each packet type (total packet count, min/
-     * max packet size with payload, total byte count for each packet type.
-     */
-    inline void gatherStats( const ADARA::Packet &pkt ) const
-    {
-        PktStats &stats = m_stats[pkt.type()];
-        ++stats.count;
-        if ( pkt.packet_length() < stats.min_pkt_size || !stats.min_pkt_size )
-            stats.min_pkt_size = pkt.packet_length();
-        if ( pkt.packet_length() > stats.max_pkt_size )
-            stats.max_pkt_size = pkt.packet_length();
-        stats.total_size += pkt.packet_length();
-    }
-
-    const char*     getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
+    void        processPulseID( uint64_t a_pulse_id );
+    void        receivedInfo( InfoBit a_bit );
+    void        finalizeStreamProcessing();
+    PVType      toPVType( const char *a_source ) const;
+    inline void gatherStats( const ADARA::Packet &pkt ) const;
+    const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
@@ -236,6 +139,89 @@ private:
     mutable std::map<uint32_t,PktStats>     m_stats;                    ///< Continer for per-packet-type statistics
     uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
 };
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// StreamParser Inline / Template Method Implementations
+//---------------------------------------------------------------------------------------------------------------------
+
+/*! \brief Processes a process variable value update from the input stream.
+ *  \param a_device_id - Device ID of process variable
+ *  \param a_pv_id - Process variable ID
+ *  \param a_value - Value of process variable
+ *  \param a_timestamp - Timestamp of value update from stream
+ *
+ * This method processes value updates for process variables (PVs) from the
+ * input ADARA stream. If the PV has been defined by a device descriptor
+ * packet (DDP), then an entry will be present in the StreamParser PV
+ * container - allowing the specified value to be stored in the associated
+ * value buffer of the PV. This buffer will be flushed to the stream
+ * adapter when full. Statistics for the PV are also updated when this
+ * method is called.
+ */
+template<class T>
+void
+StreamParser::pvValueUpdate
+(
+    Identifier      a_device_id,
+    Identifier      a_pv_id,
+    T               a_value,
+    const timespec &a_timestamp
+)
+{
+    PVKey   key(a_device_id,a_pv_id);
+
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
+    if ( ipv == m_pvs.end() )
+        THROW_TRACE( ERR_PV_NOT_DEFINED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not defined." )
+
+    PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );
+    if ( !pvinfo )
+        THROW_TRACE( ERR_CAST_FAILED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not of correct type." )
+
+    float t = 0;
+
+    // Note: if first pulse has not arrived, truncate all PV times to 0
+    if ( m_pulse_info.start_time )
+    {
+        t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time)*1.0e-9;
+    }
+    else if ( pvinfo->m_value_buffer.size() )
+    {
+        // If we recv multiple value updates before first pulse, keep only latest
+        pvinfo->m_value_buffer.clear();
+        pvinfo->m_time_buffer.clear();
+        pvinfo->m_stats.reset();
+    }
+
+    pvinfo->m_value_buffer.push_back(a_value);
+    pvinfo->m_time_buffer.push_back(t);
+    pvinfo->m_stats.push(a_value);
+
+    // Check for buffer write
+    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+        pvinfo->flushBuffers();
+}
+
+/*! \brief Gathers statistics from the specified ADARA packet.
+ *  \param pkt - An ADARA packet to analyze
+ *
+ * If stream statistics gathering is enabled, this method collects a number
+ * of metrics for the stream and each packet type (total packet count, min/
+ * max packet size with payload, total byte count for each packet type.
+ */
+inline void
+StreamParser::gatherStats( const ADARA::Packet &pkt ) const
+{
+    PktStats &stats = m_stats[pkt.type()];
+    ++stats.count;
+    if ( pkt.packet_length() < stats.min_pkt_size || !stats.min_pkt_size )
+        stats.min_pkt_size = pkt.packet_length();
+    if ( pkt.packet_length() > stats.max_pkt_size )
+        stats.max_pkt_size = pkt.packet_length();
+    stats.total_size += pkt.packet_length();
+}
+
 
 } // End namespace SFS
 

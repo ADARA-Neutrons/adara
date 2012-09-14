@@ -8,7 +8,7 @@
 
 using namespace std;
 
-namespace SFS {
+namespace STS {
 
 /// This sets the size of the ADARA parser stream buffer in bytes (bigger is faster)
 #define ADARA_IN_BUF_SIZE   0x1000000
@@ -27,12 +27,12 @@ namespace SFS {
  */
 StreamParser::StreamParser
 (
-    int         a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
-    string     &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
-    bool        a_strict,                   ///< [in] Controls strict processing of input stream
-    bool        a_gather_stats,             ///< [in] Controls stream statistics gathering
-    uint32_t    a_event_buf_write_thresh,   ///< [in] Event buffer write threshold
-    uint32_t    a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
+    int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
+    bool            a_strict,                   ///< [in] Controls strict processing of input stream
+    bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
+    uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold
+    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
 )
 :
     Parser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
@@ -55,7 +55,6 @@ StreamParser::StreamParser
         m_ofs_adara.open( a_adara_out_file.c_str(), ios_base::out | ios_base::binary );
     }
 
-    m_banks.reserve(300);
     m_pulse_info.times.reserve(m_anc_buf_write_thresh);
     m_pulse_info.freqs.reserve(m_anc_buf_write_thresh);
 }
@@ -94,7 +93,7 @@ StreamParser::processStream()
     // If anything goes wrong with translation, an exception will be thrown to caller of this method
 
     if ( m_processing_state != PROCESSING_NOT_STARTED )
-        throw std::runtime_error("StreamParser::processStream() can not be called more than once.");
+        THROW_TRACE( ERR_INVALID_OPERATION, "StreamParser::processStream() can not be called more than once." )
 
     initialize();
     m_processing_state = WAITING_FOR_RUN_START;
@@ -184,10 +183,11 @@ StreamParser::rxPacket
     const ADARA::Packet &a_pkt    ///< [in] An ADARA packet
 )
 {
-    //cout << "pkt " << hex << pkt.type() << endl;
-
     if ( m_gather_stats )
         gatherStats( a_pkt );
+
+    if ( m_gen_adara )
+        m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length());
 
     switch (a_pkt.type())
     {
@@ -220,11 +220,21 @@ StreamParser::rxPacket
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
         PROCESS_IN_STATES(PROCESSING_EVENTS)
 
-    default:
+    // Packet types that are not processes by StreamParser
+    case ADARA::PacketType::RAW_EVENT_V0:
+    case ADARA::PacketType::RTDL_V0:
+    case ADARA::PacketType::SOURCE_LIST_V0:
+    case ADARA::PacketType::TRANS_COMPLETE_V0:
+    case ADARA::PacketType::CLIENT_HELLO_V0:
+    case ADARA::PacketType::STATS_RESET_V0:
+    case ADARA::PacketType::SYNC_V0:
+    case ADARA::PacketType::HEARTBEAT_V0:
+    case ADARA::PacketType::VAR_VALUE_STRING_V0:
       if ( m_gather_stats )
           ++m_skipped_pkt_count;
-        return false;
     }
+
+    return false;
 }
 
 
@@ -248,7 +258,6 @@ StreamParser::rxPacket
 {
     //cout << "Processing RunStatusPkt (stat: " << pkt.status() << ")" << endl;
     
-    writePacket( a_pkt );
 
     bool bad_state = false;
 
@@ -275,7 +284,7 @@ StreamParser::rxPacket
     }
 
     if ( m_strict && bad_state )
-        throw runtime_error("Recvd Run Status pkt in wrong state.");
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Recvd Run Status pkt in wrong state.")
 
     return false;
 }
@@ -298,17 +307,33 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
-    writePacket( a_pkt );
-
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
-    uint32_t        bank_logical_id;
+    //uint32_t        bank_logical_id;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
+    // Count number of banks (largest bank id) in payload and reserve bank container storage
+    uint16_t bank_count = 0;
+    const uint32_t *rpos2 = rpos;
+
+    while( rpos2 < epos )
+    {
+        rpos2++;
+        bank_id = (uint16_t)(*rpos2 >> 16);
+        pix_count = (uint16_t)(*rpos2 & 0xFFFF);
+        rpos2++;
+        if ( bank_id > bank_count )
+            bank_count = bank_id;
+        rpos2 += pix_count;
+    }
+
+    m_banks.resize(bank_count+1);
+
+    // Now build banks and populate bank container
     while( rpos < epos )
     {
-        bank_logical_id = *rpos++;              // TODO This infomation is not currently processed.
+        rpos++;  // TODO This infomation is not currently processed.
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
@@ -319,8 +344,8 @@ StreamParser::rxPacket
         // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
         // over the container.
 
-        if ( bank_id >= m_banks.size() )
-            m_banks.resize(bank_id+1,0);
+//        if ( bank_id >= m_banks.size() )
+//            m_banks.resize(bank_id+1,0);
 
         if ( !m_banks[bank_id] )
             m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_write_thresh, m_anc_buf_write_thresh );
@@ -352,10 +377,17 @@ StreamParser::rxPacket
     const ADARA::BankedEventPkt &a_pkt      ///< [in] ADARA BankedEventPkt object to process
 )
 {
-    writePacket( a_pkt );
-
     processPulseID( a_pkt.pulseId() );
     processPulseInfo( a_pkt );
+
+    /*
+    cout << "BEP " << m_pulse_count << ":" << endl;
+    cout << "  Id: 0x" << hex << a_pkt.pulseId() << endl;
+    cout << "  Cycle: " << dec << a_pkt.cycle() << endl;
+    cout << "  Payload Len: " << a_pkt.payload_length() << endl;
+    cout << "  Charge: " << a_pkt.pulseCharge() << endl;
+    cout << "  Flags: 0x" << hex << a_pkt.flags() << endl;
+    */
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
@@ -402,24 +434,24 @@ StreamParser::processPulseInfo
 {
     // accumulate pulse charge
     m_run_metrics.total_charge += a_pkt.pulseCharge();
-    m_pulse_info.charges.push_back(a_pkt.pulseCharge());
-    m_run_metrics.charge_stats.push(a_pkt.pulseCharge());
+    m_pulse_info.charges.push_back( a_pkt.pulseCharge() );
+    m_run_metrics.charge_stats.push( a_pkt.pulseCharge() );
 
     if ( m_pulse_info.start_time )
     {
-        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp()) - m_pulse_info.start_time;
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time;
         m_pulse_info.times.push_back( pulse_time*1.0e-9 );
-        m_pulse_info.freqs.push_back(1.0e9/(pulse_time-m_pulse_info.last_time));
-        m_run_metrics.freq_stats.push(m_pulse_info.freqs.back()); // Freq stats ignore first point since it can't be calculated
+        m_pulse_info.freqs.push_back( 1.0e9 / ( pulse_time - m_pulse_info.last_time ));
+        m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
     }
     else
     {
-        //m_pulse_info.start_time_ts = a_pkt.timestamp();
-        m_pulse_info.start_time = timespec_to_nsec(  a_pkt.timestamp() /*m_pulse_info.start_time_ts*/ );
+        m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
         m_pulse_info.last_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
+        // Freq stats ignores first point since it can't be calculated
     }
 
     // Is is time to write pulse info?
@@ -468,6 +500,7 @@ StreamParser::processBankEvents
 
         while ( a_rpos != epos )
         {
+            // ADARA TOF values are in units of 100 ns - convert to microseconds
             *tof_ptr++ = *a_rpos++ * 0.1;
             *pid_ptr++ = *a_rpos++;
         }
@@ -519,6 +552,7 @@ StreamParser::handleBankPulseGap
     else
     {
         // Otherwise, if the gap is too large - flush buffers & fill gap
+        // Note: it is acceptable to call bankBuffersReady even if they are empty.
         bankBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
 
@@ -544,8 +578,6 @@ StreamParser::rxPacket
     const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
 )
 {
-    writePacket( a_pkt );
-
     processPulseID( a_pkt.pulseId() );
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
@@ -611,6 +643,8 @@ StreamParser::processMonitorEvents
 
     while ( a_rpos != epos )
     {
+        // ADARA TOF values are in units of 100 ns - convert to microseconds
+        // TOF values is lower 21 bits
         *tof_ptr++ = ((*a_rpos++)&0x1fffff) * 0.1;
     }
 
@@ -655,6 +689,7 @@ StreamParser::handleMonitorPulseGap
     else
     {
         // Otherwise, if the gap is too large - flush current buffered data & fill index directly
+        // Note: it is acceptable to call monitorBuffersReady even if they are empty.
         monitorBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
 
@@ -680,8 +715,6 @@ StreamParser::rxPacket
     const ADARA::RunInfoPkt &a_pkt  ///< [in] The ADARA Run Info Packet to process
 )
 {
-    writePacket( a_pkt );
-
     xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
     if ( doc )
     {
@@ -777,8 +810,6 @@ StreamParser::rxPacket
     const ADARA::GeometryPkt &a_pkt     ///< [in] The ADARA Geometry Packet to process
 )
 {
-    writePacket( a_pkt );
-
     processGeometry( a_pkt.info() );
 
     return false;
@@ -802,8 +833,6 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    writePacket( a_pkt );
-
     m_run_info.instr_id =  a_pkt.id();
     m_run_info.instr_shortname =  a_pkt.shortName();
     m_run_info.instr_longname =  a_pkt.longName();
@@ -831,8 +860,6 @@ StreamParser::rxPacket
     const ADARA::DeviceDescriptorPkt &a_pkt     ///< [in] The ADARA Device Descriptor Packet to process
 )
 {
-    writePacket( a_pkt );
-
     const string &xml =  a_pkt.description();
 
     xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
@@ -927,8 +954,6 @@ StreamParser::rxPacket
     const ADARA::VariableU32Pkt &a_pkt  ///< [in] The ADARA Variable Update packet to process
 )
 {
-    writePacket( a_pkt );
-
     pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
@@ -951,8 +976,6 @@ StreamParser::rxPacket
     const ADARA::VariableDoublePkt &a_pkt ///< [in] The ADARA Variable Update packet to process
 )
 {
-    writePacket( a_pkt );
-
     pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
@@ -1143,7 +1166,7 @@ StreamParser::toPVType
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 
-    throw runtime_error("Invalid PV type.");
+    THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid PV type." )
 }
 
 

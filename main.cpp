@@ -1,15 +1,7 @@
-/*
- * File:   main.cpp
- * Author: d3s
- *
- * Created on July 12, 2012, 5:48 PM
- */
-
 #include <cstdlib>
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#include <glog/logging.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include "../SMS/ADARA.h"
@@ -117,7 +109,7 @@ int main(int argc, char** argv)
 {
     int ifd = fileno(stdin);
     int ofd = fileno(stdout);
-    SFS::TranslationStatusCode sms_code = SFS::TS_SUCCESS;
+    STS::TranslationStatusCode sms_code = STS::TS_SUCCESS;
     string sms_reason;
 
     try
@@ -135,7 +127,7 @@ int main(int argc, char** argv)
         if ( gather_stats && !interact )
             gather_stats = false;
 
-        google::InitGoogleLogging(argv[0]);
+        //google::InitGoogleLogging(argv[0]);
         //google::SetLogDestination( google::INFO, "/tmp/SFS.log." );
 
         string          nexus_outfile;
@@ -198,37 +190,37 @@ int main(int argc, char** argv)
                 nxgen.printStats( cout );
         }
     }
-    catch( SFS::TranslationException &e )
+    catch( STS::TranslationException &e )
     {
         sms_code = e.getStatusCode();
         sms_reason = e.what();
     }
     catch( boost::filesystem::filesystem_error &e )
     {
-        sms_code = SFS::TS_TRANSIENT_ERROR;
+        sms_code = STS::TS_TRANSIENT_ERROR;
         sms_reason = e.what();
     }
     catch( exception &e )
     {
-        sms_code = SFS::TS_PERM_ERROR;
+        sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
     }
     catch( ... )
     {
-        sms_code = SFS::TS_PERM_ERROR;
+        sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unknown error";
     }
 
     if ( !interact )
     {
-        SFS::TransCompletePkt ack_pkt( sms_code, sms_reason );
+        STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( ofd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
     }
-    else if ( sms_code != SFS::TS_SUCCESS )
+    else if ( sms_code != STS::TS_SUCCESS )
     {
         cout << "Error: " << sms_reason << endl;
     }
 
-    return sms_code != SFS::TS_SUCCESS;
+    return sms_code != STS::TS_SUCCESS;
 }
 

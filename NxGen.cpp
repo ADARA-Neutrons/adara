@@ -2,6 +2,7 @@
 #include <string.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
+#include "TraceException.h"
 
 using namespace std;
 
@@ -56,29 +57,28 @@ NxGen::~NxGen()
  * StreamParser class. Due to ADARA protocol limitations, only uint32 and double types are supported (others are
  * mapped to these).
  */
-SFS::PVInfoBase*
+STS::PVInfoBase*
 NxGen::makePVInfo
 (
     const string       &a_name,         ///< [in] Name of PV
-    SFS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
-    SFS::Identifier     a_pv_id,        ///< [in] ID of the PV
-    SFS::PVType         a_type,         ///< [in] Type of PV
+    STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
+    STS::Identifier     a_pv_id,        ///< [in] ID of the PV
+    STS::PVType         a_type,         ///< [in] Type of PV
     const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
     switch ( a_type )
     {
-    case SFS::PVT_INT:  // TODO ADARA only supports uint32_t currently
-    case SFS::PVT_ENUM:
-    case SFS::PVT_UINT:
+    case STS::PVT_INT:  // TODO ADARA only supports uint32_t currently
+    case STS::PVT_ENUM:
+    case STS::PVT_UINT:
         return new NxPVInfo<uint32_t>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
-    case SFS::PVT_FLOAT: // TOSO ADARA only supports double currently
-    case SFS::PVT_DOUBLE:
+    case STS::PVT_FLOAT: // TOSO ADARA only supports double currently
+    case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
     }
 
-    LOG(ERROR) << "makePVInfo invalid PV type: " << a_type << endl;
-    throw runtime_error("makePVInfo failed.");
+    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "makePVInfo() failed - invalid PV type: " << a_type );
 }
 
 
@@ -88,7 +88,7 @@ NxGen::makePVInfo
  * This method constructs Nexus-specific BankInfo objects. The Nexus-specific NxBankInfo extends the BankInfo class to
  * include a number of attributes needed for writing banked event data efficiently to a Nexus file.
  */
-SFS::BankInfo*
+STS::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
@@ -130,7 +130,7 @@ NxGen::makeBankInfo
  * This method constructs Nexus-specific MonitorInfo objects. The Nexus-specific NxMonitorInfo class extends the
  * BankInfo class to include a number of attributes needed for writing monito event data efficiently to a Nexus file.
  */
-SFS::MonitorInfo*
+STS::MonitorInfo*
 NxGen::makeMonitorInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
@@ -189,7 +189,7 @@ NxGen::initialize()
 void
 NxGen::finalize
 (
-    const SFS::RunMetrics &a_run_metrics    ///< [in] Run metrics object
+    const STS::RunMetrics &a_run_metrics    ///< [in] Run metrics object
 )
 {
     if (!m_gen_nexus)
@@ -230,7 +230,7 @@ NxGen::finalize
 void
 NxGen::processRunInfo
 (
-    const SFS::RunInfo & a_run_info     ///< [in] Run information object
+    const STS::RunInfo & a_run_info     ///< [in] Run information object
 )
 {
     if (!m_gen_nexus)
@@ -264,7 +264,7 @@ NxGen::processRunInfo
 
     size_t user_count = 0;
     string path;
-    for ( vector<SFS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+    for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
     {
         path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
         makeGroup( path, "NXuser" );
@@ -303,7 +303,7 @@ NxGen::processGeometry
 void
 NxGen::pulseBuffersReady
 (
-    SFS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
+    STS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
 )
 {
     if (!m_gen_nexus)
@@ -324,25 +324,24 @@ NxGen::pulseBuffersReady
 void
 NxGen::bankBuffersReady
 (
-    SFS::BankInfo &a_bank   ///< [in] Detector bank to write
+    STS::BankInfo &a_bank   ///< [in] Detector bank to write
 )
 {
     if (!m_gen_nexus)
         return;
 
     NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+    if ( !bi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankBuffers()" )
 
-    if ( bi )
-    {
-        writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
-        writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
+    writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
+    writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
 
-        bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+    bi->m_event_slab_size += a_bank.m_tof_buffer.size();
 
-        writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
+    writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
 
-        bi->m_index_slab_size += a_bank.m_index_buffer.size();
-    }
+    bi->m_index_slab_size += a_bank.m_index_buffer.size();
 }
 
 
@@ -353,7 +352,7 @@ NxGen::bankBuffersReady
 void
 NxGen::bankPulseGap
 (
-    SFS::BankInfo  &a_bank,     ///< [in] Detector bank with pulse gap
+    STS::BankInfo  &a_bank,     ///< [in] Detector bank with pulse gap
     uint64_t        a_count     ///< [in] Number of missing pulses
 )
 {
@@ -361,12 +360,11 @@ NxGen::bankPulseGap
         return;
 
     NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+    if ( !bi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankPulseGap()" )
 
-    if ( bi )
-    {
-        fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
-        bi->m_index_slab_size += a_count;
-    }
+    fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
+    bi->m_index_slab_size += a_count;
 }
 
 
@@ -377,20 +375,19 @@ NxGen::bankPulseGap
 void
 NxGen::bankFinalize
 (
-    SFS::BankInfo &a_bank   ///< [in] Detector bank to finalize
+    STS::BankInfo &a_bank   ///< [in] Detector bank to finalize
 )
 {
     if (!m_gen_nexus)
         return;
 
     NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+    if ( !bi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
 
-    if ( bi )
-    {
-        string total_path = "entry/instrument/" + bi->m_name;
-        writeScalar( total_path, "total_counts", bi->m_event_count, "" );
-        makeLink( total_path + "/total_counts", "entry/" + bi->m_eventname + "/total_counts" );
-    }
+    string total_path = "entry/instrument/" + bi->m_name;
+    writeScalar( total_path, "total_counts", bi->m_event_count, "" );
+    makeLink( total_path + "/total_counts", "entry/" + bi->m_eventname + "/total_counts" );
 }
 
 
@@ -401,22 +398,21 @@ NxGen::bankFinalize
 void
 NxGen::monitorBuffersReady
 (
-    SFS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
+    STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
 {
     if (!m_gen_nexus)
         return;
 
     NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+    if ( !mi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorBuffersReady()" )
 
-    if ( mi )
-    {
-        writeSlab( mi->m_tof_slab_path, a_monitor.m_tof_buffer, mi->m_event_slab_size );
-        mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
+    writeSlab( mi->m_tof_slab_path, a_monitor.m_tof_buffer, mi->m_event_slab_size );
+    mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
 
-        writeSlab( mi->m_index_slab_path, a_monitor.m_index_buffer, mi->m_index_slab_size );
-        mi->m_index_slab_size += a_monitor.m_index_buffer.size();
-    }
+    writeSlab( mi->m_index_slab_path, a_monitor.m_index_buffer, mi->m_index_slab_size );
+    mi->m_index_slab_size += a_monitor.m_index_buffer.size();
 }
 
 
@@ -427,7 +423,7 @@ NxGen::monitorBuffersReady
 void
 NxGen::monitorPulseGap
 (
-    SFS::MonitorInfo   &a_monitor,  ///< [in] Monitor with a pulse gap
+    STS::MonitorInfo   &a_monitor,  ///< [in] Monitor with a pulse gap
     uint64_t            a_count     ///< [in] Number of missing pulses
 )
 {
@@ -435,12 +431,11 @@ NxGen::monitorPulseGap
         return;
 
     NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+    if ( !mi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorPulseGap()" )
 
-    if ( mi )
-    {
-        fillSlab( mi->m_index_slab_path, mi->m_event_count, a_count, mi->m_index_slab_size );
-        mi->m_index_slab_size += a_count;
-    }
+    fillSlab( mi->m_index_slab_path, mi->m_event_count, a_count, mi->m_index_slab_size );
+    mi->m_index_slab_size += a_count;
 }
 
 
@@ -451,18 +446,17 @@ NxGen::monitorPulseGap
 void
 NxGen::monitorFinalize
 (
-    SFS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
+    STS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
 )
 {
     if (!m_gen_nexus)
         return;
 
     NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+    if ( !mi )
+        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorFinalize()" )
 
-    if ( mi )
-    {
-        writeScalar( string("entry/") + mi->m_name, "total_counts", mi->m_event_count, "" );
-    }
+    writeScalar( string("entry/") + mi->m_name, "total_counts", mi->m_event_count, "" );
 }
 
 
@@ -474,21 +468,20 @@ NxGen::monitorFinalize
 NeXus::NXnumtype
 NxGen::toNxType
 (
-    SFS::PVType a_type  ///< [in] PVType to be converted
+    STS::PVType a_type  ///< [in] PVType to be converted
 ) const
 {
     switch( a_type )
     {
-    case SFS::PVT_INT:
-    case SFS::PVT_ENUM:
+    case STS::PVT_INT:
+    case STS::PVT_ENUM:
         return NeXus::INT32;
-    case SFS::PVT_UINT: return NeXus::UINT32;
-    case SFS::PVT_FLOAT: return NeXus::FLOAT32;
-    case SFS::PVT_DOUBLE: return NeXus::FLOAT64;
+    case STS::PVT_UINT: return NeXus::UINT32;
+    case STS::PVT_FLOAT: return NeXus::FLOAT32;
+    case STS::PVT_DOUBLE: return NeXus::FLOAT64;
     }
 
-    LOG(ERROR) << "Invalid PV type: " << a_type << endl;
-    throw runtime_error("Invalid PV type.");
+    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )
 }
 
 
@@ -505,8 +498,7 @@ NxGen::makeGroup
 {
     if ( m_h5nx.H5NXmake_group( a_path, a_type ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXmake_group FAILED for " << a_path << endl;
-        throw runtime_error("H5NXmake_group failed.");
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_group() failed for path: " << a_path )
     }
 }
 
@@ -526,16 +518,14 @@ NxGen::makeDataset
 {
     if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type, m_chunk_size ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXcreate_dataset_extend FAILED:" << a_path << "," << a_name << endl;
-        throw runtime_error("H5NXcreate_dataset_extend failed.");
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcreate_dataset_extend() failed for path: " << a_path << ", name: " << a_name )
     }
 
     if ( a_units.size() )
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            LOG(ERROR) << "H5NXmake_attribute_string FAILED:" << a_path << "," << a_name << endl;
-            throw runtime_error("H5NXmake_attribute_string failed.");
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", name: " << a_name )
         }
     }
 }
@@ -548,14 +538,13 @@ NxGen::makeDataset
 void
 NxGen::makeLink
 (
-    const string &source_path,  ///< [in] Source path in Nexus file (must already exist)
-    const string &dest_name     ///< [in] Destination path in Nexus file (must NOT exist)
+    const string &a_source_path,  ///< [in] Source path in Nexus file (must already exist)
+    const string &a_dest_name     ///< [in] Destination path in Nexus file (must NOT exist)
 )
 {
-    if ( m_h5nx.H5NXmake_link(source_path, dest_name) != SUCCEED )
+    if ( m_h5nx.H5NXmake_link( a_source_path, a_dest_name ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXmake_link FAILED:" << source_path << " -> " << dest_name << endl;
-        throw runtime_error("H5NXmake_link failed.");
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_link() failed for source: " << a_source_path << ", dest: " << a_dest_name )
     }
 }
 
@@ -576,8 +565,7 @@ NxGen::writeString
     {
         if ( m_h5nx.H5NXmake_dataset_string( a_path, a_dataset, a_value ) != SUCCEED )
         {
-            LOG(ERROR) << "H5NXmake_dataset_string FAILED for " << a_path << "/" << a_dataset << ":" << a_value << endl;
-            throw runtime_error("H5NXmake_dataset_string failed.");
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: " << a_value )
         }
     }
 }
@@ -618,8 +606,7 @@ NxGen::writeStringAttribute
 {
     if ( m_h5nx.H5NXmake_attribute_string( a_path, a_attrib, a_value ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXmake_attribute_string FAILED for " << a_path << "/" << a_attrib << ":" << a_value << endl;
-        throw runtime_error("H5NXmake_attribute_string failed.");
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: " << a_attrib << ", value: " << a_value )
     }
 }
 
@@ -641,16 +628,14 @@ NxGen::writeScalar
 {
     if ( m_h5nx.H5NXmake_dataset_scalar( a_path, a_name, a_value ) != SUCCEED )
     {
-        LOG(ERROR) << "H5NXmake_dataset_scalar FAILED for " << a_path << "/" << a_name << ":" << a_value << endl;
-        throw runtime_error("H5NXmake_dataset_scalar failed.");
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_scalar() failed for path: " << a_path << ", name: " << a_name << ", value: " << a_value )
     }
 
     if ( a_units.size())
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            LOG(ERROR) << "H5NXmake_attribute_string FAILED for units: " << a_path << "/" << a_name << ":" << a_units << endl;
-            throw runtime_error("H5NXmake_attribute_string failed.");
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", name: " << a_name )
         }
     }
 }
