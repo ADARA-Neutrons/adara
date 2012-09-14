@@ -10,7 +10,7 @@
 #include <boost/lexical_cast.hpp>
 #include "../SMS/ADARAParser.h"
 #include "Utils.h"
-#include "sfsdefs.h"
+#include "stsdefs.h"
 #include "TraceException.h"
 
 namespace STS {
@@ -223,7 +223,7 @@ StreamParser::gatherStats( const ADARA::Packet &pkt ) const
 }
 
 
-} // End namespace SFS
+} // End namespace STS
 
 #endif	/* STREAMPARSER_H */
 

@@ -1170,4 +1170,4 @@ StreamParser::toPVType
 }
 
 
-} // End namespace SFS
+} // End namespace STS

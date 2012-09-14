@@ -28,7 +28,7 @@ const char*     in_file = 0;
 void
 showUsage()
 {
-    cout << "Usage: SFS [options]" << endl;
+    cout << "Usage: sts [options]" << endl;
     cout << "Options:" << endl;
     cout << "  --help: show help" << endl;
     cout << "  +i: interactive mode" << endl;
@@ -128,7 +128,7 @@ int main(int argc, char** argv)
             gather_stats = false;
 
         //google::InitGoogleLogging(argv[0]);
-        //google::SetLogDestination( google::INFO, "/tmp/SFS.log." );
+        //google::SetLogDestination( google::INFO, "/tmp/sts.log." );
 
         string          nexus_outfile;
         string          adara_outfile;

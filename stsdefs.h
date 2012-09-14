@@ -1,5 +1,5 @@
-#ifndef SFSDEFS_H
-#define SFSDEFS_H
+#ifndef STSDEFS_H
+#define STSDEFS_H
 
 #include <vector>
 #include "Utils.h"
@@ -261,6 +261,6 @@ enum ErrorCodes
     ERR_LAST
 };
 
-} // End SFS Namespace
+} // End STS Namespace
 
-#endif // SFSDEFS_H
+#endif // STSDEFS_H

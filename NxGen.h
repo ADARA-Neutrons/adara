@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "h5nx.hpp"
-#include "sfsdefs.h"
+#include "stsdefs.h"
 #include "StreamParser.h"
 #include "Utils.h"
 #include <boost/lexical_cast.hpp>
