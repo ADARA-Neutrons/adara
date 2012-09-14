@@ -4,95 +4,13 @@
 #include <fcntl.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/program_options.hpp>
 #include "../SMS/ADARA.h"
 #include "TransCompletePkt.h"
 #include "NxGen.h"
 
 using namespace std;
 
-bool            interact = false;
-bool            verbose = false;
-bool            gather_stats = false;
-bool            generate_adara = true;
-bool            generate_nexus = true;
-bool            move_files = false;
-bool            strict = false;
-std::string     work_path;
-unsigned long   chunk_size = 2048;
-unsigned short  evt_buf_size = 20;
-unsigned short  anc_buf_size = 2;
-unsigned long   cache_size = 1024;
-unsigned short  compression_level = 0;
-const char*     in_file = 0;
-
-void
-showUsage()
-{
-    cout << "Usage: sts [options]" << endl;
-    cout << "Options:" << endl;
-    cout << "  --help: show help" << endl;
-    cout << "  +i: interactive mode" << endl;
-    cout << "  +v: verbose output (interactive mode only)" << endl;
-    cout << "  +s: enable strict protocol parsing" << endl;
-    cout << "  +c: prep files for cataloging (forces strict parsing)" << endl;
-    cout << "  +r: report stream statistics" << endl;
-    cout << "  -n: suppress nexus output file generation" << endl;
-    cout << "  -a: suppress adara output stream generation" << endl;
-    cout << "  file=name: accept input from file instead of stdin" << endl;
-    cout << "  work=path: working directory" << endl;
-    cout << "  chunk=n: set hdf5 chunk size to 'n' bytes" << endl;
-    cout << "  cache=n: set hdf5 cache to 'n' KB" << endl;
-    cout << "  ebuf=n: set event buffers to 'n' chunks" << endl;
-    cout << "  abuf=n: set ancillary buffers to 'n' chunks" << endl;
-    cout << "  comp=n: set nexus compression leve to 'n' (0=off)" << endl;
-}
-
-void
-parseCmdLine( int argc, char** argv )
-{
-    for ( int i = 1; i < argc; ++i )
-    {
-        if ( !strcmp(argv[i],"+v"))
-            verbose = true;
-        else if ( !strcmp(argv[i],"+i"))
-            interact = true;
-        else if ( !strcmp(argv[i],"+r"))
-            gather_stats = true;
-        else if ( !strcmp(argv[i],"+s"))
-            strict = true;
-        else if ( !strcmp(argv[i],"-a"))
-            generate_adara = false;
-        else if ( !strcmp(argv[i],"-n"))
-            generate_nexus = false;
-        else if ( !strcmp(argv[i],"+c"))
-            move_files = true;
-        else if ( !strncmp(argv[i],"chunk=",6))
-            chunk_size = atol(&argv[i][6]);
-        else if ( !strncmp(argv[i],"cache=",6))
-            cache_size = atol(&argv[i][6]) * 1024;
-        else if ( !strncmp(argv[i],"ebuf=",5))
-            evt_buf_size = atoi(&argv[i][5]);
-        else if ( !strncmp(argv[i],"abuf=",5))
-            anc_buf_size = atoi(&argv[i][5]);
-        else if ( !strncmp(argv[i],"file=",5))
-            in_file = &argv[i][5];
-        else if ( !strncmp(argv[i],"work=",5))
-            work_path = &argv[i][5];
-        else if ( !strncmp(argv[i],"comp=",5))
-            compression_level = atoi(&argv[i][5]);
-        else if ( !strcmp(argv[i],"--help"))
-        {
-            showUsage();
-            exit(0);
-        }
-        else
-        {
-            cout << "Invalid option: " << argv[i] << endl;
-            showUsage();
-            throw std::runtime_error("Invalid command line argument(s)");
-        }
-    }
-}
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
@@ -102,49 +20,85 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
     boost::filesystem::rename( boost::filesystem::path( a_source ), boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
 }
 
-/*!
- * 
- */
+
 int main(int argc, char** argv)
 {
-    int ifd = fileno(stdin);
-    int ofd = fileno(stdout);
-    STS::TranslationStatusCode sms_code = STS::TS_SUCCESS;
-    string sms_reason;
+    int                         ifd = fileno(stdin);
+    int                         ofd = fileno(stdout);
+    STS::TranslationStatusCode  sms_code = STS::TS_SUCCESS;
+    string                      sms_reason;
+    bool                        interact;
+    string                      work_path;
+    unsigned long               chunk_size;
+    unsigned short              evt_buf_size;
+    unsigned short              anc_buf_size;
+    unsigned long               cache_size;
+    unsigned short              compression_level;
 
     try
     {
-        parseCmdLine( argc, argv );
+        bool strict;
+        bool move;
+        bool verbose;
+        bool gather_stats;
+        bool suppress_adara;
+        bool suppress_nexus;
+
+        namespace po = boost::program_options;
+        po::options_description options( "sts program options" );
+        options.add_options()
+                ("help,?", "show help")
+                ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
+                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output (interactive mode only)")
+                ("stict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
+                ("move,m", po::bool_switch( &move )->default_value( false ), "move output nexus file to cataloging location (forces strict parsing)")
+                ("report,r", po::bool_switch( &gather_stats )->default_value( false ), "report stream statistics")
+                ("no-nexus,n", po::bool_switch( &suppress_nexus )->default_value( false ), "suppress nexus output file generation")
+                ("no-adara,a", po::bool_switch( &suppress_adara )->default_value( false ), "suppress adara output stream generation")
+                ("file,f",po::value<string>(),"read input from file instead of stdin")
+                ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
+                ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
+                ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 2048 ),"set hdf5 chunk size (in bytes)")
+                ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
+                ("event-buf-size", po::value<unsigned short>( &evt_buf_size )->default_value( 20 ),"set event buffers to (in chunks)")
+                ("anc-buf-size", po::value<unsigned short>( &anc_buf_size )->default_value( 2 ),"set ancillary buffers (in chunks)")
+                ;
+
+        po::variables_map opt_map;
+        po::store( po::parse_command_line(argc,argv,options), opt_map );
+        po::notify( opt_map );
+
+        if ( opt_map.count( "help" ))
+        {
+            cout << options << endl;
+            return STS::TS_TRANSIENT_ERROR;
+        }
 
         // If user has requested cataloging, force sane options
-        if ( move_files )
+        if ( move )
         {
             strict = true;
-            generate_adara = true;
-            generate_nexus = true;
+            suppress_adara = false;
+            suppress_nexus = false;
         }
 
         if ( gather_stats && !interact )
             gather_stats = false;
 
-        //google::InitGoogleLogging(argv[0]);
-        //google::SetLogDestination( google::INFO, "/tmp/sts.log." );
-
-        string          nexus_outfile;
-        string          adara_outfile;
-
-        if ( work_path.size())
+        if ( work_path.size() )
         {
             if ( work_path[work_path.size()-1] != '/' )
                 work_path += "/";
         }
 
         string tempName = genTempName();
+        string nexus_outfile;
+        string adara_outfile;
 
-        if ( generate_adara )
+        if ( !suppress_adara )
             adara_outfile = work_path + tempName + ".adara";
 
-        if ( generate_nexus )
+        if ( !suppress_nexus )
             nexus_outfile = work_path + tempName + ".nxs";
 
         if ( interact && verbose )
@@ -152,32 +106,32 @@ int main(int argc, char** argv)
             cout << "ADARA Stream Parser" << endl;
             cout << "  nexus file   : " << nexus_outfile << endl;
             cout << "  adara file   : " << adara_outfile << endl;
-            cout << "  strict       : " << strict << endl;
+            cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
             cout << "  work path    : " << work_path << endl;
-            cout << "  cat. prep    : " << (move_files?"true":"false") << endl;
+            cout << "  move nexus   : " << ( move ? "yes" : "no" ) << endl;
             cout << "  chunk size   : " << chunk_size << " (bytes)" << endl;
             cout << "  cache size   : " << cache_size << " (bytes)" << endl;
             cout << "  evt buf size : " << evt_buf_size << " (chunks)" << endl;
             cout << "  anc buf size : " << anc_buf_size << " (chunks)" << endl;
             cout << "  comp lev     : " << compression_level <<  endl;
-            cout << "  gather stats : " << (gather_stats?"yes":"no") << endl;
+            cout << "  gather stats : " << ( gather_stats ? "yes" : "no" ) << endl;
         }
 
-
-        if ( in_file )
+        if ( opt_map.count( "file" ))
         {
-            ifd = open( in_file, O_RDONLY );
+            ifd = open( opt_map["file"].as<string>().c_str(), O_RDONLY );
             if ( ifd < 0 )
                 throw std::runtime_error("Failed to open input file");
         }
 
         if ( ifd >= 0 )
         {
-            NxGen    nxgen( ifd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size, anc_buf_size, cache_size, compression_level );
+            NxGen    nxgen( ifd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
+                            anc_buf_size, cache_size, compression_level );
 
             nxgen.processStream();
 
-            if ( move_files )
+            if ( move )
             {
                 string cat_path = string("/") + nxgen.getFacilityName() + "/" + nxgen.getBeamShortName() + "/" + nxgen.getProposalID() + "/";
                 string cat_name = nxgen.getBeamShortName() + "_" + boost::lexical_cast<string>(nxgen.getRunNumber());

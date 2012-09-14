@@ -22,7 +22,7 @@ HEADERS += \
     stsdefs.h
 
 INCLUDEPATH += /usr/include/libxml2
-LIBS += -lxml2 -lhdf5 -lrt -lboost_system -lboost_filesystem
+LIBS += -lxml2 -lhdf5 -lrt -lboost_system -lboost_filesystem -lboost_program_options
 
 OTHER_FILES += \
     todo.txt \
