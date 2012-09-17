@@ -145,7 +145,7 @@ NxGen::makeMonitorInfo
         // create instrument/bank# group
         string path = "entry/" + mi->m_name;
 
-        makeGroup( path, "NXentry" );
+        makeGroup( path, "NXmonitor" );
         makeDataset( path, "event_time_offset", NeXus::FLOAT32, "microsecond" );
         makeDataset( path, "event_index", NeXus::UINT64 );
 
@@ -173,8 +173,8 @@ NxGen::initialize()
         makeGroup( "entry", "NXentry" );
         makeGroup( "entry/instrument", "NXinstrument" );
         makeGroup( "entry/DASlogs", "NXgroup" );
-        makeGroup( "entry/DASlogs/frequency", "NXgroup" );
-        makeGroup( "entry/DASlogs/proton_charge", "NXgroup" );
+        makeGroup( "entry/DASlogs/frequency", "NXlog" );
+        makeGroup( "entry/DASlogs/proton_charge", "NXlog" );
 
         makeDataset( "entry/DASlogs/frequency", "time", NeXus::FLOAT64, "seconds" );
         makeDataset( "entry/DASlogs/frequency", "value", NeXus::FLOAT64, "Hz" );
@@ -204,10 +204,10 @@ NxGen::finalize
 
     try
     {
-        writeScalar( "entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), "seconds" );
-        writeScalar( "entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), "seconds" );
-        writeScalar( "entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), "seconds" );
-        writeScalar( "entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), "seconds" );
+        writeScalar( "entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), "Hz" );
+        writeScalar( "entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), "Hz" );
+        writeScalar( "entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), "Hz" );
+        writeScalar( "entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), "Hz" );
 
         writeScalar( "entry/DASlogs/proton_charge", "minimum_value", a_run_metrics.charge_stats.min(), "picoCoulombs" );
         writeScalar( "entry/DASlogs/proton_charge", "maximum_value", a_run_metrics.charge_stats.max(), "picoCoulombs" );
@@ -516,11 +516,14 @@ NxGen::toNxType
     switch( a_type )
     {
     case STS::PVT_INT:
-    case STS::PVT_ENUM:
         return NeXus::INT32;
-    case STS::PVT_UINT: return NeXus::UINT32;
-    case STS::PVT_FLOAT: return NeXus::FLOAT32;
-    case STS::PVT_DOUBLE: return NeXus::FLOAT64;
+    case STS::PVT_UINT:
+    case STS::PVT_ENUM:
+        return NeXus::UINT32;
+    case STS::PVT_FLOAT:
+        return NeXus::FLOAT32;
+    case STS::PVT_DOUBLE:
+        return NeXus::FLOAT64;
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )

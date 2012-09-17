@@ -443,8 +443,8 @@ StreamParser::processPulseInfo
     if ( m_pulse_info.start_time )
     {
         uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time;
-        m_pulse_info.times.push_back( pulse_time*1.0e-9 );
-        m_pulse_info.freqs.push_back( 1.0e9 / ( pulse_time - m_pulse_info.last_time ));
+        m_pulse_info.times.push_back( pulse_time/1000000000.0 );
+        m_pulse_info.freqs.push_back( 1000000000.0 / ( pulse_time - m_pulse_info.last_time ));
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
     }
@@ -504,7 +504,7 @@ StreamParser::processBankEvents
         while ( a_rpos != epos )
         {
             // ADARA TOF values are in units of 100 ns - convert to microseconds
-            *tof_ptr++ = *a_rpos++ * 0.1;
+            *tof_ptr++ = *a_rpos++ / 10.0;
             *pid_ptr++ = *a_rpos++;
         }
 
@@ -648,7 +648,7 @@ StreamParser::processMonitorEvents
     {
         // ADARA TOF values are in units of 100 ns - convert to microseconds
         // TOF values is lower 21 bits
-        *tof_ptr++ = ((*a_rpos++)&0x1fffff) * 0.1;
+        *tof_ptr++ = ((*a_rpos++)&0x1fffff) / 10.0;
     }
 
     // Cache event index until large enough to write

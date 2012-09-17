@@ -130,10 +130,10 @@ private:
                 if ( lastWrite && m_slab_size )
                 {
                     // Data has been writen, so also write statistics
-                    m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), "seconds" );
-                    m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), "seconds" );
-                    m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), "seconds" );
-                    m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), "seconds" );
+                    m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), this->m_units );
+                    m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), this->m_units );
+                    m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), this->m_units );
+                    m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
                 }
             }
 
