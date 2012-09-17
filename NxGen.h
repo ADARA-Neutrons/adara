@@ -233,6 +233,8 @@ private:
 
     template<typename T>
     void                writeScalar( const std::string & a_path, const std::string & a_name, T a_value, const std::string & a_units );
+    template<typename T>
+    void                writeScalarAttribute( const std::string & a_path, const std::string & a_attribute, T a_value );
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file

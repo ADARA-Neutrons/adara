@@ -222,11 +222,19 @@ NxGen::finalize
         writeScalar( "entry/", "total_uncounted_counts", a_run_metrics.events_uncounted, "" );
         writeScalar( "entry/", "proton_charge", a_run_metrics.total_charge, "picoCoulomb" );
 
+        // Start time
         string time = timeToISO8601( a_run_metrics.start_time );
         m_h5nx.H5NXmake_dataset_string( "entry/", "start_time", time );
 
+        // Add start time (offset) properties to all time axis in DAS logs
+        writeStringAttribute( "entry/DASlogs/frequency/time", "offset", time );
+        writeScalarAttribute( "entry/DASlogs/frequency/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec );
+        writeScalarAttribute( "entry/DASlogs/frequency/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
+        // End time
         time = timeToISO8601( a_run_metrics.end_time );
         m_h5nx.H5NXmake_dataset_string( "entry/", "end_time", time );
+
 
         m_h5nx.H5NXclose_file();
     }
@@ -563,14 +571,16 @@ NxGen::makeDataset
 {
     if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type, m_chunk_size ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcreate_dataset_extend() failed for path: " << a_path << ", name: " << a_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcreate_dataset_extend() failed for path: " << a_path << ", name: "
+                     << a_name )
     }
 
     if ( a_units.size() )
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", name: " << a_name )
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
+                         << ", name: " << a_name )
         }
     }
 }
@@ -589,7 +599,8 @@ NxGen::makeLink
 {
     if ( m_h5nx.H5NXmake_link( a_source_path, a_dest_name ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_link() failed for source: " << a_source_path << ", dest: " << a_dest_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_link() failed for source: " << a_source_path << ", dest: "
+                     << a_dest_name )
     }
 }
 
@@ -610,7 +621,8 @@ NxGen::writeString
     {
         if ( m_h5nx.H5NXmake_dataset_string( a_path, a_dataset, a_value ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: " << a_value )
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: "
+                         << a_value )
         }
     }
 }
@@ -651,7 +663,8 @@ NxGen::writeStringAttribute
 {
     if ( m_h5nx.H5NXmake_attribute_string( a_path, a_attrib, a_value ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: " << a_attrib << ", value: " << a_value )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: "
+                     << a_attrib << ", value: " << a_value )
     }
 }
 
@@ -673,15 +686,38 @@ NxGen::writeScalar
 {
     if ( m_h5nx.H5NXmake_dataset_scalar( a_path, a_name, a_value ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_scalar() failed for path: " << a_path << ", name: " << a_name << ", value: " << a_value )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_scalar() failed for path: " << a_path << ", name: "
+                     << a_name << ", value: " << a_value )
     }
 
     if ( a_units.size())
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", name: " << a_name )
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
+                         << ", name: " << a_name )
         }
+    }
+}
+
+
+/*! \brief Writes a scalar attribute to the specified Nexus path
+ *
+ * This method writes a scalar attribute to the specified path in the output Nexus file.
+ */
+template<typename T>
+void
+NxGen::writeScalarAttribute
+(
+    const std::string & a_path,     ///< [in] Path in Nexus file to write attribute
+    const std::string & a_attrib,   ///< [in] Name of attribute
+    T                   a_value     ///< [in] New value of attribute
+)
+{
+    if ( m_h5nx.H5NXmake_attribute_scalar( a_path, a_attrib, a_value ) != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_scalar() failed for path: " << a_path << ", attrib: "
+                     << a_attrib << ", value: " << a_value )
     }
 }
 
