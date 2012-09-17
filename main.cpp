@@ -31,8 +31,8 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
 
 int main(int argc, char** argv)
 {
-    int                         ifd = fileno(stdin);
-    int                         ofd = fileno(stdout);
+    int                         infd = 0;
+    int                         outfd = 1;
     STS::TranslationStatusCode  sms_code = STS::TS_SUCCESS;
     string                      sms_reason;
     bool                        interact;
@@ -42,6 +42,12 @@ int main(int argc, char** argv)
     unsigned short              anc_buf_size;
     unsigned long               cache_size;
     unsigned short              compression_level;
+
+    // Hack around chatty HDF5 library: remap stdout and stderr to /dev/null
+    outfd = dup( 1 );
+    int nullfd = open( "/dev/null", O_RDWR );
+    dup2( nullfd, 1 );
+    dup2( nullfd, 2 );
 
     try
     {
@@ -127,14 +133,14 @@ int main(int argc, char** argv)
 
         if ( opt_map.count( "file" ))
         {
-            ifd = open( opt_map["file"].as<string>().c_str(), O_RDONLY );
-            if ( ifd < 0 )
+            infd = open( opt_map["file"].as<string>().c_str(), O_RDONLY );
+            if ( infd < 0 )
                 throw std::runtime_error("Failed to open input file");
         }
 
-        if ( ifd >= 0 )
+        if ( infd >= 0 )
         {
-            NxGen    nxgen( ifd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
+            NxGen    nxgen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
                             anc_buf_size, cache_size, compression_level );
 
             nxgen.processStream();
@@ -177,7 +183,7 @@ int main(int argc, char** argv)
     if ( !interact )
     {
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
-        ::write( ofd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
+        ::write( outfd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
 
         // TODO If code is not success, write reason to a log file somewhere?
     }
