@@ -7,6 +7,7 @@
 #include <boost/program_options.hpp>
 #include "../SMS/ADARA.h"
 #include "TransCompletePkt.h"
+#include "TraceException.h"
 #include "NxGen.h"
 
 using namespace std;
@@ -15,9 +16,16 @@ using namespace std;
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
 {
-    boost::filesystem::create_directories( boost::filesystem::path( a_dest_path ));
-    boost::filesystem::remove( boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
-    boost::filesystem::rename( boost::filesystem::path( a_source ), boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
+    try
+    {
+        boost::filesystem::create_directories( boost::filesystem::path( a_dest_path ));
+        boost::filesystem::remove( boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
+        boost::filesystem::rename( boost::filesystem::path( a_source ), boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
+    }
+    catch( boost::filesystem::filesystem_error &e )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "Move of " << a_source << " to " << a_dest_path << "/" << a_dest_filename << " failed. {" << e.what() << "}" )
+    }
 }
 
 
@@ -103,7 +111,7 @@ int main(int argc, char** argv)
 
         if ( interact && verbose )
         {
-            cout << "ADARA Stream Parser" << endl;
+            cout << "sts settings:" << endl;
             cout << "  nexus file   : " << nexus_outfile << endl;
             cout << "  adara file   : " << adara_outfile << endl;
             cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
@@ -144,35 +152,38 @@ int main(int argc, char** argv)
                 nxgen.printStats( cout );
         }
     }
-    catch( STS::TranslationException &e )
+    catch( TraceException &e )
     {
-        sms_code = e.getStatusCode();
-        sms_reason = e.what();
-    }
-    catch( boost::filesystem::filesystem_error &e )
-    {
-        sms_code = STS::TS_TRANSIENT_ERROR;
-        sms_reason = e.what();
+        // Generally, output errors are transient, others are permanent
+        if ( e.getErrorCode() == STS::ERR_OUTPUT_FAILURE )
+            sms_code = STS::TS_TRANSIENT_ERROR;
+        else
+            sms_code = STS::TS_PERM_ERROR;
+        sms_reason = e.toString( true, true );
     }
     catch( exception &e )
     {
+        // Unexpected exception
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
     }
     catch( ... )
     {
+        // Really unexpected exception
         sms_code = STS::TS_PERM_ERROR;
-        sms_reason = "Unknown error";
+        sms_reason = "Unhandled exception";
     }
 
     if ( !interact )
     {
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( ofd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
+
+        // TODO If code is not success, write reason to a log file somewhere?
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
-        cout << "Error: " << sms_reason << endl;
+        cout << sms_reason << endl;
     }
 
     return sms_code != STS::TS_SUCCESS;

@@ -25,8 +25,9 @@ public:
         const char         *a_file,         ///< [in] Filename (from __FILE__ macro)
         unsigned long       a_line          ///< [in] Linenumber (from __LINE__ macro)
     )
+        : m_error_code(a_error_code)
     {
-        addContext( a_error_code, a_context, a_file, a_line );
+        addContext( a_context, a_file, a_line );
     }
 
     /// Destructor
@@ -35,13 +36,12 @@ public:
     /// Adds error context information to the exception.
     void addContext
     (
-        long                a_error_code,   ///< [in] Generic error value
         const std::string  &a_context,      ///< [in] Human-readble error message
         const char         *a_file = "",    ///< [in] Filename (from __FILE__ macro)
         unsigned long       a_line = 0      ///< [in] Linenumber (from __LINE__ macro)
     )
     {
-        m_context.push_front( ExceptionContext( a_error_code, a_context, a_file, a_line ));
+        m_context.push_front( ExceptionContext( a_context, a_file, a_line ));
     }
 
     /// Generates output string from error context information
@@ -51,7 +51,7 @@ public:
         bool a_debug = true     ///< [in] If true, includes file and linenumber information
     ) const
     {
-        std::string err_string;
+        std::string err_string = std::string("Trace exception (code ") + boost::lexical_cast<std::string>( m_error_code) + ")\n";
 
         if ( a_trace )
         {
@@ -60,7 +60,7 @@ public:
                 if ( ic != m_context.begin())
                     err_string += "\n";
 
-                err_string += std::string("Err ") + boost::lexical_cast<std::string>( ic->error_code) + ": " + ic->context_msg;
+                err_string += ic->context_msg;
                 if ( a_debug )
                     err_string += " {" + ic->context_file + ":" + boost::lexical_cast<std::string>( ic->context_line ) + "}";
             }
@@ -69,7 +69,7 @@ public:
         {
             std::list<ExceptionContext>::const_iterator ic = m_context.begin();
 
-            err_string = std::string("Err ") + boost::lexical_cast<std::string>( ic->error_code) + ": " + ic->context_msg;
+            err_string = ic->context_msg;
             if ( a_debug )
                 err_string += " {" + ic->context_file + ":" + boost::lexical_cast<std::string>( ic->context_line ) + "}";
         }
@@ -80,26 +80,24 @@ public:
     /// Retrieves most recent error code from context stack.
     long getErrorCode()
     {
-        return m_context.front().error_code;
+        return m_error_code;
     }
 
 private:
     /// Structure used to capture context information
     struct ExceptionContext
     {
-        ExceptionContext( long a_error_code, const std::string &a_context_msg, const std::string &a_context_file,
-                          unsigned long a_context_line )
-            : error_code(a_error_code), context_msg(a_context_msg), context_file(a_context_file),
-              context_line(a_context_line)
+        ExceptionContext( const std::string &a_msg, const std::string &a_file, unsigned long a_line )
+            : context_msg(a_msg), context_file(a_file), context_line(a_line)
         {}
 
-        long            error_code;
         std::string     context_msg;
         std::string     context_file;
         unsigned long   context_line;
     };
 
-    std::list<ExceptionContext>     m_context;  ///< Error context "stack"
+    long                            m_error_code;   ///< App defined error code
+    std::list<ExceptionContext>     m_context;      ///< Error context "stack"
 };
 
 
@@ -112,11 +110,11 @@ private:
 }
 
 /// Macro to rethrow a trace exception using stream semantics for error message
-#define RETHROW_TRACE(e,err_code,msg) \
+#define RETHROW_TRACE(e,msg) \
 { \
     std::stringstream s; \
     s << msg; \
-    e.addContext( err_code, s.str(), __FILE__, __LINE__ ); \
+    e.addContext( s.str(), __FILE__, __LINE__ ); \
     throw; \
 }
 

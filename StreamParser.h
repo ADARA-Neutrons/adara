@@ -16,24 +16,6 @@
 namespace STS {
 
 
-/*! \brief Exception class used to communicate translation failures within STS code
- *
- */
-class TranslationException : public std::runtime_error
-{
-public:
-    TranslationException( TranslationStatusCode a_status_code, const std::string &a_reason )
-        : std::runtime_error( a_reason ), m_status_code(a_status_code)
-    {}
-
-    TranslationStatusCode   getStatusCode() { return m_status_code; }
-
-private:
-    TranslationStatusCode   m_status_code;
-};
-
-
-
 /*! \brief Base class that provides ADARA-specific parsing and translation
  *
  * The StreamParser class provides ADARA-specific parsing of an incoming data

@@ -166,19 +166,26 @@ NxGen::initialize()
     if (!m_gen_nexus)
         return;
 
-    m_h5nx.H5NXcreate_file( m_nexus_filename );
+    try
+    {
+        m_h5nx.H5NXcreate_file( m_nexus_filename );
 
-    makeGroup( "entry", "NXentry" );
-    makeGroup( "entry/instrument", "NXinstrument" );
-    makeGroup( "entry/DASlogs", "NXgroup" );
-    makeGroup( "entry/DASlogs/frequency", "NXgroup" );
-    makeGroup( "entry/DASlogs/proton_charge", "NXgroup" );
+        makeGroup( "entry", "NXentry" );
+        makeGroup( "entry/instrument", "NXinstrument" );
+        makeGroup( "entry/DASlogs", "NXgroup" );
+        makeGroup( "entry/DASlogs/frequency", "NXgroup" );
+        makeGroup( "entry/DASlogs/proton_charge", "NXgroup" );
 
-    makeDataset( "entry/DASlogs/frequency", "time", NeXus::FLOAT64, "seconds" );
-    makeDataset( "entry/DASlogs/frequency", "value", NeXus::FLOAT64, "Hz" );
+        makeDataset( "entry/DASlogs/frequency", "time", NeXus::FLOAT64, "seconds" );
+        makeDataset( "entry/DASlogs/frequency", "value", NeXus::FLOAT64, "Hz" );
 
-    makeDataset( "entry/DASlogs/proton_charge", "value", NeXus::FLOAT64, "picoCoulombs" );
-    makeLink( "entry/DASlogs/frequency/time", "entry/DASlogs/proton_charge/time" );
+        makeDataset( "entry/DASlogs/proton_charge", "value", NeXus::FLOAT64, "picoCoulombs" );
+        makeLink( "entry/DASlogs/frequency/time", "entry/DASlogs/proton_charge/time" );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "initialization of nexus file (" << m_nexus_filename << ") failed." )
+    }
 }
 
 
@@ -195,31 +202,38 @@ NxGen::finalize
     if (!m_gen_nexus)
         return;
 
-    writeScalar( "entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), "seconds" );
-    writeScalar( "entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), "seconds" );
+    try
+    {
+        writeScalar( "entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), "seconds" );
+        writeScalar( "entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), "seconds" );
+        writeScalar( "entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), "seconds" );
+        writeScalar( "entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), "seconds" );
 
-    writeScalar( "entry/DASlogs/proton_charge", "minimum_value", a_run_metrics.charge_stats.min(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "maximum_value", a_run_metrics.charge_stats.max(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "average_value", a_run_metrics.charge_stats.mean(), "picoCoulombs" );
-    writeScalar( "entry/DASlogs/proton_charge", "average_value_error", a_run_metrics.charge_stats.stdDev(), "picoCoulombs" );
+        writeScalar( "entry/DASlogs/proton_charge", "minimum_value", a_run_metrics.charge_stats.min(), "picoCoulombs" );
+        writeScalar( "entry/DASlogs/proton_charge", "maximum_value", a_run_metrics.charge_stats.max(), "picoCoulombs" );
+        writeScalar( "entry/DASlogs/proton_charge", "average_value", a_run_metrics.charge_stats.mean(), "picoCoulombs" );
+        writeScalar( "entry/DASlogs/proton_charge", "average_value_error", a_run_metrics.charge_stats.stdDev(), "picoCoulombs" );
 
-    float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
+        float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
 
-    writeScalar( "entry/", "duration", duration, "second" );
-    writeScalar( "entry/", "raw_frames", a_run_metrics.charge_stats.count(), "" );
-    writeScalar( "entry/", "total_counts", a_run_metrics.events_counted, "" );
-    writeScalar( "entry/", "total_uncounted_counts", a_run_metrics.events_uncounted, "" );
-    writeScalar( "entry/", "proton_charge", a_run_metrics.total_charge, "picoCoulomb" );
+        writeScalar( "entry/", "duration", duration, "second" );
+        writeScalar( "entry/", "raw_frames", a_run_metrics.charge_stats.count(), "" );
+        writeScalar( "entry/", "total_counts", a_run_metrics.events_counted, "" );
+        writeScalar( "entry/", "total_uncounted_counts", a_run_metrics.events_uncounted, "" );
+        writeScalar( "entry/", "proton_charge", a_run_metrics.total_charge, "picoCoulomb" );
 
-    string time = timeToISO8601( a_run_metrics.start_time );
-    m_h5nx.H5NXmake_dataset_string( "entry/", "start_time", time );
+        string time = timeToISO8601( a_run_metrics.start_time );
+        m_h5nx.H5NXmake_dataset_string( "entry/", "start_time", time );
 
-    time = timeToISO8601( a_run_metrics.end_time );
-    m_h5nx.H5NXmake_dataset_string( "entry/", "end_time", time );
+        time = timeToISO8601( a_run_metrics.end_time );
+        m_h5nx.H5NXmake_dataset_string( "entry/", "end_time", time );
 
-    m_h5nx.H5NXclose_file();
+        m_h5nx.H5NXclose_file();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "finalization of nexus file failed." )
+    }
 }
 
 
@@ -236,42 +250,49 @@ NxGen::processRunInfo
     if (!m_gen_nexus)
         return;
 
-    writeString( "entry/instrument", "beamline", a_run_info.instr_id );
-
-    if ( a_run_info.instr_longname.size())
+    try
     {
-        writeString( "entry/instrument", "name", a_run_info.instr_longname );
+        writeString( "entry/instrument", "beamline", a_run_info.instr_id );
 
-        if ( a_run_info.instr_shortname.size())
-            writeStringAttribute( "entry/instrument/name", "short_name", a_run_info.instr_shortname );
+        if ( a_run_info.instr_longname.size())
+        {
+            writeString( "entry/instrument", "name", a_run_info.instr_longname );
+
+            if ( a_run_info.instr_shortname.size())
+                writeStringAttribute( "entry/instrument/name", "short_name", a_run_info.instr_shortname );
+        }
+
+        string group_path = "entry";
+
+        string tmp = boost::lexical_cast<string>(a_run_info.run_number);
+        writeString( group_path, "run_number", tmp );
+        writeString( group_path, "entry_identifier", tmp );
+
+        writeStringEx( group_path, "experiment_identifier", a_run_info.proposal_id, "n/a" );
+        writeStringEx( group_path, "title", a_run_info.run_title, "n/a" );
+
+        makeGroup( "entry/sample", "NXsample" );
+        writeStringEx( "entry/sample", "identifier", a_run_info.sample_id, "n/a" );
+        writeStringEx( "entry/sample", "name", a_run_info.sample_name );
+        writeStringEx( "entry/sample", "nature", a_run_info.sample_nature );
+        writeStringEx( "entry/sample", "chemical_formula", a_run_info.sample_formula );
+        writeStringEx( "entry/sample", "environment", a_run_info.sample_environment );
+
+        size_t user_count = 0;
+        string path;
+        for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+        {
+            path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
+            makeGroup( path, "NXuser" );
+
+            writeString( path, "facility_user_id", u->id );
+            writeString( path, "name", u->name );
+            writeString( path, "role", u->role );
+        }
     }
-
-    string group_path = "entry";
-
-    string tmp = boost::lexical_cast<string>(a_run_info.run_number);
-    writeString( group_path, "run_number", tmp );
-    writeString( group_path, "entry_identifier", tmp );
-
-    writeStringEx( group_path, "experiment_identifier", a_run_info.proposal_id, "n/a" );
-    writeStringEx( group_path, "title", a_run_info.run_title, "n/a" );
-
-    makeGroup( "entry/sample", "NXsample" );
-    writeStringEx( "entry/sample", "identifier", a_run_info.sample_id, "n/a" );
-    writeStringEx( "entry/sample", "name", a_run_info.sample_name );
-    writeStringEx( "entry/sample", "nature", a_run_info.sample_nature );
-    writeStringEx( "entry/sample", "chemical_formula", a_run_info.sample_formula );
-    writeStringEx( "entry/sample", "environment", a_run_info.sample_environment );
-
-    size_t user_count = 0;
-    string path;
-    for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+    catch( TraceException &e )
     {
-        path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
-        makeGroup( path, "NXuser" );
-
-        writeString( path, "facility_user_id", u->id );
-        writeString( path, "name", u->name );
-        writeString( path, "role", u->role );
+        RETHROW_TRACE( e, "processRunInfo() failed." )
     }
 }
 
@@ -289,10 +310,17 @@ NxGen::processGeometry
     if (!m_gen_nexus)
         return;
 
-    makeGroup( "entry/instrument/instrument_xml", "NXnote" );
-    writeString( "entry/instrument/instrument_xml", "description", "XML contents of the instrument IDF" );
-    writeString( "entry/instrument/instrument_xml", "type", "text/xml" );
-    writeString( "entry/instrument/instrument_xml", "data", a_xml );
+    try
+    {
+        makeGroup( "entry/instrument/instrument_xml", "NXnote" );
+        writeString( "entry/instrument/instrument_xml", "description", "XML contents of the instrument IDF" );
+        writeString( "entry/instrument/instrument_xml", "type", "text/xml" );
+        writeString( "entry/instrument/instrument_xml", "data", a_xml );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "processGeometry() failed." )
+    }
 }
 
 
@@ -381,13 +409,20 @@ NxGen::bankFinalize
     if (!m_gen_nexus)
         return;
 
-    NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
-    if ( !bi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
+    try
+    {
+        NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+        if ( !bi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
 
-    string total_path = "entry/instrument/" + bi->m_name;
-    writeScalar( total_path, "total_counts", bi->m_event_count, "" );
-    makeLink( total_path + "/total_counts", "entry/" + bi->m_eventname + "/total_counts" );
+        string total_path = "entry/instrument/" + bi->m_name;
+        writeScalar( total_path, "total_counts", bi->m_event_count, "" );
+        makeLink( total_path + "/total_counts", "entry/" + bi->m_eventname + "/total_counts" );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "bankFinalize() failed for bank id: " << a_bank.m_id )
+    }
 }
 
 
@@ -452,11 +487,18 @@ NxGen::monitorFinalize
     if (!m_gen_nexus)
         return;
 
-    NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
-    if ( !mi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorFinalize()" )
+    try
+    {
+        NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+        if ( !mi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorFinalize()" )
 
-    writeScalar( string("entry/") + mi->m_name, "total_counts", mi->m_event_count, "" );
+        writeScalar( string("entry/") + mi->m_name, "total_counts", mi->m_event_count, "" );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "monitorFinalize() failed for monitor id: " << a_monitor.m_id )
+    }
 }
 
 

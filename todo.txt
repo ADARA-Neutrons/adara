@@ -3,13 +3,13 @@ STS code issues
 
 * add logging in appropriate locations (or not?)
 * Support fast metadata when SMS generates it
-* Move getPktName() method to ADARA source
 * Improve error handling/reporting within HDF5 routines
 * Redirect stdout to prevent HDF5 library error codes from being sent to SMS
 * Add DAS log time attributes: offset, offset_secons, offset_nanoseconds
 * Check what units should be on time axis ("seconds" or "second")
 * If no end run packet arrives, sts will block forever - need a timeout?
 * Are default values needed for run & sample info? If so, what are they?
+* Need to define requirements for nexus classes beyond DASlogs & how they will be built
 
 Longer-term issues
 -------------------

@@ -95,12 +95,27 @@ StreamParser::processStream()
     if ( m_processing_state != PROCESSING_NOT_STARTED )
         THROW_TRACE( ERR_INVALID_OPERATION, "StreamParser::processStream() can not be called more than once." )
 
-    initialize();
-    m_processing_state = WAITING_FOR_RUN_START;
-
-    while( m_processing_state < DONE_PROCESSING )
+    try
     {
-        read( m_fd, ADARA_IN_BUF_SIZE );
+        initialize();
+        m_processing_state = WAITING_FOR_RUN_START;
+
+        while( m_processing_state < DONE_PROCESSING )
+        {
+            read( m_fd, ADARA_IN_BUF_SIZE );
+        }
+    }
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "processStream() failed." )
+    }
+    catch ( exception &e )
+    {
+        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() exception {" << e.what() << "}" )
+    }
+    catch ( ... )
+    {
+        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() unexpected exception." )
     }
 }
 
@@ -256,10 +271,7 @@ StreamParser::rxPacket
     const ADARA::RunStatusPkt &a_pkt    ///< [in] ADARA RunStatusPkt object to process
 )
 {
-    //cout << "Processing RunStatusPkt (stat: " << pkt.status() << ")" << endl;
-    
-
-    bool bad_state = false;
+   bool bad_state = false;
 
     if ( a_pkt.status() == ADARA::RunStatus::NEW_RUN )
     {
@@ -379,15 +391,6 @@ StreamParser::rxPacket
 {
     processPulseID( a_pkt.pulseId() );
     processPulseInfo( a_pkt );
-
-    /*
-    cout << "BEP " << m_pulse_count << ":" << endl;
-    cout << "  Id: 0x" << hex << a_pkt.pulseId() << endl;
-    cout << "  Cycle: " << dec << a_pkt.cycle() << endl;
-    cout << "  Payload Len: " << a_pkt.payload_length() << endl;
-    cout << "  Charge: " << a_pkt.pulseCharge() << endl;
-    cout << "  Flags: 0x" << hex << a_pkt.flags() << endl;
-    */
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
@@ -784,7 +787,7 @@ StreamParser::rxPacket
             msg = "Required run_number missing from RunInfo.";
 
         if ( msg.size())
-            throw TranslationException( TS_PERM_ERROR, msg );
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, msg )
     }
 
     receivedInfo( RUN_INFO_BIT );
