@@ -86,6 +86,9 @@ private:
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &pkt );
+
+    using ADARA::Parser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
+
     void        processPulseInfo( const ADARA::BankedEventPkt &pkt );
     void        processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
     void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );

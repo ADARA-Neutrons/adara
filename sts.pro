@@ -23,6 +23,7 @@ HEADERS += \
 
 INCLUDEPATH += /usr/include/libxml2
 LIBS += -lxml2 -lhdf5 -lrt -lboost_system -lboost_filesystem -lboost_program_options
+QMAKE_CXXFLAGS += -Wall -Woverloaded-virtual
 
 OTHER_FILES += \
     todo.txt \
