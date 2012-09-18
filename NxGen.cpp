@@ -176,7 +176,7 @@ NxGen::initialize()
         makeGroup( "entry/DASlogs/frequency", "NXlog" );
         makeGroup( "entry/DASlogs/proton_charge", "NXlog" );
 
-        makeDataset( "entry/DASlogs/frequency", "time", NeXus::FLOAT64, "seconds" );
+        makeDataset( "entry/DASlogs/frequency", "time", NeXus::FLOAT64, "second" );
         makeDataset( "entry/DASlogs/frequency", "value", NeXus::FLOAT64, "Hz" );
 
         makeDataset( "entry/DASlogs/proton_charge", "value", NeXus::FLOAT64, "picoCoulombs" );
@@ -276,15 +276,15 @@ NxGen::processRunInfo
         writeString( group_path, "run_number", tmp );
         writeString( group_path, "entry_identifier", tmp );
 
-        writeStringEx( group_path, "experiment_identifier", a_run_info.proposal_id, "n/a" );
-        writeStringEx( group_path, "title", a_run_info.run_title, "n/a" );
+        writeString( group_path, "experiment_identifier", a_run_info.proposal_id );
+        writeString( group_path, "title", a_run_info.run_title );
 
         makeGroup( "entry/sample", "NXsample" );
-        writeStringEx( "entry/sample", "identifier", a_run_info.sample_id, "n/a" );
-        writeStringEx( "entry/sample", "name", a_run_info.sample_name );
-        writeStringEx( "entry/sample", "nature", a_run_info.sample_nature );
-        writeStringEx( "entry/sample", "chemical_formula", a_run_info.sample_formula );
-        writeStringEx( "entry/sample", "environment", a_run_info.sample_environment );
+        writeString( "entry/sample", "identifier", a_run_info.sample_id );
+        writeString( "entry/sample", "name", a_run_info.sample_name );
+        writeString( "entry/sample", "nature", a_run_info.sample_nature );
+        writeString( "entry/sample", "chemical_formula", a_run_info.sample_formula );
+        writeString( "entry/sample", "environment", a_run_info.sample_environment );
 
         size_t user_count = 0;
         string path;
@@ -625,27 +625,6 @@ NxGen::writeString
                          << a_value )
         }
     }
-}
-
-
-/*! \brief Writes a string value to a Nexus location with an optional default value
- *
- * This method writes a string value to the specified location (path/dataset) in the output Nexus file. If the input
- * value is empty, the default value will be written if the a_write_if_empty parameter is true.
- */
-void
-NxGen::writeStringEx
-(
-    const string &a_path,           ///< [in] Path in Nexus file to write string
-    const string &a_dataset,        ///< [in] Name of dataset at specified path to receive string value
-    const string &a_value,          ///< [in] String value to write
-    const std::string &a_default    ///< [in] Default value to write if value is to be written and is empty
-)
-{
-    if ( a_value.empty() )
-        writeString( a_path, a_dataset, a_default );
-    else
-        writeString( a_path, a_dataset, a_value );
 }
 
 

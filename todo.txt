@@ -3,10 +3,6 @@ STS code issues
 
 * add logging in appropriate locations (or not?)
 * Support fast metadata when SMS generates it
-* Improve error handling/reporting within HDF5 routines
-* Check what units should be on time axis ("seconds" or "second")
-* If no end run packet arrives, sts will block forever - need a timeout?
-* Are default values needed for run & sample info? If so, what are they?
 * Need to define requirements for nexus classes beyond DASlogs & how they will be built
 
 Longer-term issues
@@ -16,10 +12,6 @@ Longer-term issues
 * h5nx class should be an actual library
 * How will logfiles be managed? External tool to sweep log dir, or built-in to SFS? Or none at all?
 * If a translation error occurs, how will the appropriate logfile be identified to support staff/users?
-
-Suggestions / Chnages for ADARA protocol
------------------------------------------
-
 * Eliminate xml from protocol where possible (run info, beam line info, device descriptor)
 * Add better coverage for POD types in process variable packets (i.e. signed ints, shorts, etc.)
 

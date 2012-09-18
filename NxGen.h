@@ -174,7 +174,6 @@ private:
     void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
     void                makeLink( const std::string &source_path, const std::string &dest_name );
     void                writeString( const std::string &a_path, const std::string &a_dataset, const std::string &a_value );
-    void                writeStringEx( const std::string &a_path, const std::string &a_dataset, const std::string &a_value, const std::string &a_default = "" );
     void                writeStringAttribute( const std::string &a_path, const std::string &a_attrib, const std::string &a_value );
 
     /// Writes data values to a Nexus (HDF5) one-dimension slab
