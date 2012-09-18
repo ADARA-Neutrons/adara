@@ -21,3 +21,4 @@ noinst_PROGRAMS =
 include common/Makefile.am
 include tools/Makefile.am
 include sms/Makefile.am
+include sts/Makefile.am

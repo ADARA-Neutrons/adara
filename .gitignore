@@ -12,6 +12,8 @@ tools/adara-parser
 sms/smsd
 sms/test/storage-test
 
+sts/sts
+
 # All of this crap is from autotools
 #
 .dirstamp

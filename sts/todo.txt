@@ -1,0 +1,41 @@
+STS code issues
+----------------
+
+* add logging in appropriate locations (or not?)
+* Support fast metadata when SMS generates it
+* Need to define requirements for nexus classes beyond DASlogs & how they will be built
+
+Longer-term issues
+-------------------
+
+* Determine what to do with enumeration definitions in nexus
+* h5nx class should be an actual library
+* How will logfiles be managed? External tool to sweep log dir, or built-in to SFS? Or none at all?
+* If a translation error occurs, how will the appropriate logfile be identified to support staff/users?
+* Eliminate xml from protocol where possible (run info, beam line info, device descriptor)
+* Add better coverage for POD types in process variable packets (i.e. signed ints, shorts, etc.)
+
+
+Design Notes / Ideas
+----------------------
+
+Log Files
+    Why not get rid of log files all together? All SFS errors could be turned into context-aware
+    exceptions that would generate a human readable message that would then be sent back to the
+    SMS as the payload of the transaction complete packet. This pattern could be used for all
+    SMS clients and allow creation of a central error handler / control system for ADARA. On the
+    other hand, it would also be fairly easy to create a more distributed control system that
+    individual processes could patch into and report status. Big topic, needs discussion.
+
+    Another idea was suggested: place error / warning information in a reserved location within
+    the Nexus file (assuming it can be created). This would allow data quality metrics to be sent
+    along as part of the Nexus file.
+
+SFS Multiple Concurrent Outputs
+    It will be quite easy to support concurrent, in-process stream adapters from a single instance
+    of SFS. The IStreamAdapter abstraction layer can be used directly to plug an output format
+    into the StreamParser class (as current SFS is for NxGen) - OR - one could write a multi-
+    threaded output manager adapter that would plug-in between the StreamParser class and one or
+    more regular stream adapters. It would be essentially a transparent man-inthe-middle adapter
+    to patch the virtual calls from StreamParser into the methods of each adapter (on their own
+    thread).
