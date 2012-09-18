@@ -13,6 +13,7 @@
 #include <time.h>
 
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 
 #include "../SMS/ADARA.h"
@@ -110,6 +111,23 @@ inline uint64_t timespec_to_nsec
 }
 
 
+/*! \brief Converts a time offset in nanoseconds to a timespec struct
+ *  \return Time value as a timespec
+ */
+inline struct timespec nsec_to_timespec
+(
+    uint64_t a_nsec ///< [in] Nanosecond offset value to convert
+)
+{
+    struct timespec ts;
+
+    ts.tv_sec = a_nsec / 1000000000LL;
+    ts.tv_nsec = a_nsec - (ts.tv_sec*1000000000LL);
+
+    return ts;
+}
+
+
 /*! \brief Calcultes T1 - T2
  *  \return Difference in microseconds
  */
@@ -133,13 +151,19 @@ timeToISO8601
     const struct timespec &a_ts
 )
 {
-    time_t time = a_ts.tv_sec;
-    struct tm *timeinfo = localtime(&time);
+    time_t              time = a_ts.tv_sec;
+    struct tm          *timeinfo = localtime(&time);
+    std::stringstream   result;
+    char                date[100];
 
-    char date[100];
-    strftime(date, sizeof(date), "%Y-%m-%dT%X%z", timeinfo);
+    strftime(date, sizeof(date), "%Y-%m-%dT%X", timeinfo);
 
-    return std::string(date);
+    result << date << "." << std::right << std::setw(9) << std::setfill('0') << a_ts.tv_nsec;
+
+    strftime(date, sizeof(date), "%z", timeinfo);
+    result << date;
+
+    return result.str();
 }
 
 

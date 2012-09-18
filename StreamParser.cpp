@@ -276,10 +276,7 @@ StreamParser::rxPacket
     if ( a_pkt.status() == ADARA::RunStatus::NEW_RUN )
     {
         if ( m_processing_state == WAITING_FOR_RUN_START )
-        {
-            m_run_metrics.start_time = a_pkt.timestamp();
             m_processing_state = PROCESSING_RUN_HEADER;
-        }
         else
             bad_state = true;
     }
@@ -287,7 +284,9 @@ StreamParser::rxPacket
     {
         if ( m_processing_state == PROCESSING_EVENTS )
         {
-            m_run_metrics.end_time = a_pkt.timestamp();
+            // Run "end time" is defined as time of last pulse (which is nanoseconds epoch offset)
+            m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
+
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
         }
@@ -455,6 +454,9 @@ StreamParser::processPulseInfo
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
         // Freq stats ignores first point since it can't be calculated
+
+        // Run "start time" is defined as time of first pulse
+        m_run_metrics.start_time = a_pkt.timestamp();
     }
 
     // Is is time to write pulse info?
@@ -1036,6 +1038,11 @@ StreamParser::receivedInfo( InfoBit a_bit )
 void
 StreamParser::finalizeStreamProcessing()
 {
+    // Make sure neutron pulses were received
+
+    if ( !m_run_metrics.charge_stats.count() )
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "No neutron pulses received in stream.")
+
     // Write any remaining data in bank buffers
 
     for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
@@ -1074,8 +1081,6 @@ StreamParser::finalizeStreamProcessing()
 
     if ( m_pulse_info.times.size())
         pulseBuffersReady( m_pulse_info );
-
-    //pulseFinalize( m_pulse_info );
 
     // Write any remaining data in PV buffers
 
