@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PVStreamer", "PVStreamer\PVStreamer.vcproj", "{E3E9E76E-B665-4668-86AE-8B93BBD0CC29}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PVStreamerClient", "PVStreamerClient\PVStreamerClient.vcproj", "{AC5F901D-B082-490C-9AE6-1678327E37CA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E3E9E76E-B665-4668-86AE-8B93BBD0CC29}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E3E9E76E-B665-4668-86AE-8B93BBD0CC29}.Debug|Win32.Build.0 = Debug|Win32
+		{E3E9E76E-B665-4668-86AE-8B93BBD0CC29}.Release|Win32.ActiveCfg = Release|Win32
+		{E3E9E76E-B665-4668-86AE-8B93BBD0CC29}.Release|Win32.Build.0 = Release|Win32
+		{AC5F901D-B082-490C-9AE6-1678327E37CA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AC5F901D-B082-490C-9AE6-1678327E37CA}.Debug|Win32.Build.0 = Debug|Win32
+		{AC5F901D-B082-490C-9AE6-1678327E37CA}.Release|Win32.ActiveCfg = Release|Win32
+		{AC5F901D-B082-490C-9AE6-1678327E37CA}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
