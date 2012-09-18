@@ -324,6 +324,12 @@ StreamParser::rxPacket
     uint16_t        bank_id;
     uint16_t        pix_count;
 
+    // Note: a vector is used for BankInfo instances where the bank_id is the offset into the vector. This is safe
+    // as bank IDs are monotonically increasing integers starting at 0. IF this ever changes, then the bank
+    // container will need to be changed to a map (which would result in a slight performance drop). Also note that
+    // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
+    // over the container.
+
     // Count number of banks (largest bank id) in payload and reserve bank container storage
     uint16_t bank_count = 0;
     const uint32_t *rpos2 = rpos;
@@ -339,7 +345,7 @@ StreamParser::rxPacket
         rpos2 += pix_count;
     }
 
-    m_banks.resize(bank_count+1);
+    m_banks.resize(bank_count+1,0);
 
     // Now build banks and populate bank container
     while( rpos < epos )
@@ -348,15 +354,6 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
-
-        // Note: a vector is used for BankInfo instances where the bank_id is the offset into the vector. This is safe
-        // as bank IDs are monotonically increasing integers starting at 0. IF this ever changes, then the bank
-        // container will need to be changed to a map (which would result in a slight performance drop). Also note that
-        // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
-        // over the container.
-
-//        if ( bank_id >= m_banks.size() )
-//            m_banks.resize(bank_id+1,0);
 
         if ( !m_banks[bank_id] )
             m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_write_thresh, m_anc_buf_write_thresh );
