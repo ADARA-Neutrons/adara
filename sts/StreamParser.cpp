@@ -432,9 +432,10 @@ StreamParser::processPulseInfo
 )
 {
     // accumulate pulse charge
-    m_run_metrics.total_charge += a_pkt.pulseCharge();
-    m_pulse_info.charges.push_back( a_pkt.pulseCharge() );
-    m_run_metrics.charge_stats.push( a_pkt.pulseCharge() );
+    double charge = a_pkt.pulseCharge()*10.0; // ADARA charge is in units of 10 pC
+    m_run_metrics.total_charge += charge;
+    m_pulse_info.charges.push_back( charge );
+    m_run_metrics.charge_stats.push( charge );
 
     if ( m_pulse_info.start_time )
     {
