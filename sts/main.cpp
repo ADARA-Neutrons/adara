@@ -43,11 +43,6 @@ int main(int argc, char** argv)
     unsigned long               cache_size;
     unsigned short              compression_level;
 
-    // Hack around chatty HDF5 library: remap stdout and stderr to /dev/null
-    outfd = dup( 1 );
-    int nullfd = open( "/dev/null", O_RDWR );
-    dup2( nullfd, 1 );
-    dup2( nullfd, 2 );
 
     try
     {
@@ -140,6 +135,15 @@ int main(int argc, char** argv)
 
         if ( infd >= 0 )
         {
+            if ( !interact )
+            {
+                // In non-interactive mode, must hack around chatty HDF5 library: remap stdout and stderr to /dev/null
+                outfd = dup( 1 );
+                int nullfd = open( "/dev/null", O_RDWR );
+                dup2( nullfd, 1 );
+                dup2( nullfd, 2 );
+            }
+
             NxGen    nxgen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
                             anc_buf_size, cache_size, compression_level );
 
