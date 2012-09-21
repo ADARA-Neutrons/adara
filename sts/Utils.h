@@ -9,6 +9,8 @@
 #define	UTILS_H
 
 #include <math.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <vector>
 #include <time.h>
 
