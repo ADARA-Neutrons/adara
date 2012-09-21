@@ -102,7 +102,7 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 		throw invalid_packet("RTDL Packet is incorrect length");
 
 	if ((m_fields[4] >> 24) != 4)
-		throw invalid_packet("Missing ping period");
+		throw invalid_packet("Missing ring period");
 }
 
 RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
