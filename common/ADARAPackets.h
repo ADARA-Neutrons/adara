@@ -139,7 +139,7 @@ class SourceListPkt : public Packet {
 public:
 	SourceListPkt(const SourceListPkt &pkt);
 
-	const uint32_t *ids(void) const { return (uint32_t *) payload(); }
+	const uint32_t *ids(void) const { return (const uint32_t *) payload(); }
 	uint32_t num_ids(void) const {
 		return payload_length() / sizeof (uint32_t);
 	}
