@@ -128,14 +128,21 @@ public:
 		if (p.cycle) {
 			*pkt = (uint32_t) ADARA::PulseFlavor::NORMAL << 24;
 
-			/* 18.47e-6 C => 18.47 uC => 18470000 pC
-			 * charge is in units of 10 pC
-			 */
-			*pkt++ |= 1847000;
 		} else {
 			/* cycle 0 means no beam */
 			*pkt = (uint32_t) ADARA::PulseFlavor::NO_BEAM << 24;
 		}
+
+		if (p.cycle != 1) {
+			/* 18.47e-6 C => 18.47 uC => 18470000 pC
+			 * charge is in units of 10 pC
+			 *
+			 * Charge lags one cycle, so cycle 1 will have
+			 * no charge because cycle 0 had no beam.
+			 */
+			*pkt |= 1847000;
+		}
+		pkt++;
 
 		/* next fields:
 		 * timing info + cycle (TODO actual timing info)
