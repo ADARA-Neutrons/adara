@@ -289,12 +289,14 @@ StreamParser::rxPacket
 
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
+
+            return true; // Must return true to halt stream processing
         }
         else
             bad_state = true;
     }
 
-    if ( m_strict && bad_state )
+    if ( bad_state )
         THROW_TRACE( ERR_UNEXPECTED_INPUT, "Recvd Run Status pkt in wrong state.")
 
     return false;
