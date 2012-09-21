@@ -161,7 +161,7 @@ public:
 		*field++ = p.ts.tv_nsec;
 		memset(field, 0, 120);
 		field = buildCommon(field, p);
-		*field++ = 964728;
+		*field++ = (4 << 24) | 964728;
 		p.rtdl_pending = false;
 		dsp_seq[0]++;
 	}
