@@ -2,7 +2,6 @@
 #include "TransCompletePkt.h"
 #include <iomanip>
 #include <glog/logging.h>
-#include <libxml/tree.h>
 #include <boost/algorithm/string.hpp>
 
 
@@ -198,6 +197,8 @@ StreamParser::rxPacket
     const ADARA::Packet &a_pkt    ///< [in] An ADARA packet
 )
 {
+//    cout << getPktName( a_pkt.type()) << endl;
+
     if ( m_gather_stats )
         gatherStats( a_pkt );
 
@@ -723,54 +724,77 @@ StreamParser::rxPacket
     xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
     if ( doc )
     {
-        for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
+        string tag;
+        string value;
+
+        try
         {
-            if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
-                m_run_info.run_number = boost::lexical_cast<unsigned long>( (char*)node->children->content );
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
-                m_run_info.proposal_id = (char*)node->children->content;
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
-                m_run_info.run_title = (char*)node->children->content;
-            else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
-                m_run_info.facility_name = (char*) node->children->content;
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
+            for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
             {
-                for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
+                tag = (char*)node->name;
+                getXmlNodeValue( node, value );
+
+                if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
+                    m_run_info.run_number = boost::lexical_cast<unsigned long>( value );
+                else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
+                    m_run_info.proposal_id = value;
+                else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
+                    m_run_info.run_title = value;
+                else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
+                    m_run_info.facility_name = value;
+                else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
                 {
-                    if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
-                        m_run_info.sample_id = (char*)sample_node->children->content;
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
-                        m_run_info.sample_name = (char*)sample_node->children->content;
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
-                        m_run_info.sample_nature = (char*)sample_node->children->content;
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
-                        m_run_info.sample_formula = (char*)sample_node->children->content;
-                    else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
-                        m_run_info.sample_environment = (char*)sample_node->children->content;
-                }
-            }
-            else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
-            {
-                for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
-                {
-                    if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
+                    for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
                     {
-                        UserInfo ui;
+                        tag = (char*)sample_node->name;
+                        getXmlNodeValue( sample_node, value );
 
-                        for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
+                        if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
+                            m_run_info.sample_id = value;
+                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
+                            m_run_info.sample_name = value;
+                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
+                            m_run_info.sample_nature = value;
+                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
+                            m_run_info.sample_formula = value;
+                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
+                            m_run_info.sample_environment = value;
+                    }
+                }
+                else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
+                {
+                    for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
+                    {
+                        if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
                         {
-                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
-                                ui.id = (char*)uinfo_node->children->content;
-                            if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
-                                ui.name = (char*)uinfo_node->children->content;
-                            else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
-                                ui.role = (char*)uinfo_node->children->content;
-                        }
+                            UserInfo ui;
 
-                        m_run_info.users.push_back( ui );
+                            for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
+                            {
+                                tag = (char*)uinfo_node->name;
+                                getXmlNodeValue( uinfo_node, value );
+
+                                if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
+                                    ui.id = (char*)uinfo_node->children->content;
+                                if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
+                                    ui.name = (char*)uinfo_node->children->content;
+                                else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
+                                    ui.role = (char*)uinfo_node->children->content;
+                            }
+
+                            m_run_info.users.push_back( ui );
+                        }
                     }
                 }
             }
+        }
+        catch( std::exception &e )
+        {
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+        }
+        catch( ... )
+        {
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value )
         }
 
         xmlFreeDoc( doc );
@@ -875,66 +899,87 @@ StreamParser::rxPacket
         string      pv_units;
         PVType      pv_type = PVT_INT;
         short       found;
+        string      tag;
+        string      value;
 
-        xmlNode *root = xmlDocGetRootElement( doc );
-
-        for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
+        try
         {
-            if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
+            xmlNode *root = xmlDocGetRootElement( doc );
+
+            for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
             {
-                xmlNode *pvnode;
-
-                for ( xmlNode *pvsnode = lev1->children; pvsnode; pvsnode = pvsnode->next )
+                if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
                 {
-                    if ( xmlStrcmp( pvsnode->name, (const xmlChar*)"process_variable" ) == 0)
+                    xmlNode *pvnode;
+
+                    for ( xmlNode *pvsnode = lev1->children; pvsnode; pvsnode = pvsnode->next )
                     {
-                        pv_units = "";
-                        found = 0;
-
-                        for ( pvnode = pvsnode->children; pvnode; pvnode = pvnode->next )
+                        if ( xmlStrcmp( pvsnode->name, (const xmlChar*)"process_variable" ) == 0)
                         {
-                            if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_name" ) == 0)
-                            {
-                                found |= 1;
-                                pv_name = (char*)pvnode->children->content;
-                            }
-                            else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_id" ) == 0)
-                            {
-                                found |= 2;
-                                pv_id = boost::lexical_cast<Identifier>((char*)pvnode->children->content);
-                            }
-                            else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_type" ) == 0)
-                            {
-                                found |= 4;
-                                pv_type = toPVType( (char*)pvnode->children->content );
-                            }
-                            else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_units" ) == 0)
-                            {
-                                pv_units = (char*)pvnode->children->content;
-                            }
-                        }
+                            pv_units = "";
+                            found = 0;
 
-                        if ( found == 7 )
-                        {
-                            PVKey   key(a_pkt.devId(),pv_id);
-
-                            if ( m_pvs.find(key) == m_pvs.end() )
+                            for ( pvnode = pvsnode->children; pvnode; pvnode = pvnode->next )
                             {
-                                m_pvs[key] = makePVInfo( pv_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                tag = (char*)pvnode->name;
+                                getXmlNodeValue( pvnode, value );
+
+                                if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_name" ) == 0)
+                                {
+                                    found |= 1;
+                                    pv_name = value;
+                                }
+                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_id" ) == 0)
+                                {
+                                    found |= 2;
+                                    pv_id = boost::lexical_cast<Identifier>( value );
+                                }
+                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_type" ) == 0)
+                                {
+                                    found |= 4;
+                                    pv_type = toPVType( value.c_str() );
+                                }
+                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_units" ) == 0)
+                                {
+                                    pv_units = value;
+                                }
                             }
-                        }
-                        else
-                        {
-                           //TODO Log this: "Skipping PV " << a_pkt.devId() << "." << pv_id << endl;
+
+                            if ( found == 7 )
+                            {
+                                PVKey   key(a_pkt.devId(),pv_id);
+
+                                if ( m_pvs.find(key) == m_pvs.end() )
+                                {
+                                    m_pvs[key] = makePVInfo( pv_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                }
+                            }
+                            else
+                            {
+                               //TODO Log this: "Skipping PV " << a_pkt.devId() << "." << pv_id << endl;
+                            }
                         }
                     }
                 }
-            }
-            else if ( xmlStrcmp( lev1->name, (const xmlChar*)"enumerations" ) == 0)
-            {
-                // TODO Handle enumeration definitions
+                else if ( xmlStrcmp( lev1->name, (const xmlChar*)"enumerations" ) == 0)
+                {
+                    // TODO Handle enumeration definitions
+                }
             }
         }
+        catch( TraceException &e )
+        {
+            RETHROW_TRACE( e, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value )
+        }
+        catch( std::exception &e )
+        {
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+        }
+        catch( ... )
+        {
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value )
+        }
+
         xmlFreeDoc( doc );
     }
 
@@ -1175,6 +1220,22 @@ StreamParser::toPVType
         return PVT_ENUM;
 
     THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid PV type." )
+}
+
+/*! \brief Method to retrieve an XML node's value with whitespace trimmed
+ *  \param a_node - The xml node containing the value to retrieve
+ *  \param a_value - A string to receive the value (empty if no value defined)
+ */
+void
+StreamParser::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
+{
+    if ( a_node->children && a_node->children->content )
+    {
+        a_value = (char*)a_node->children->content;
+        boost::algorithm::trim( a_value );
+    }
+    else
+        a_value = "";
 }
 
 

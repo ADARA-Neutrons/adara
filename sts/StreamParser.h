@@ -8,6 +8,8 @@
 #include <string.h>
 #include <vector>
 #include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
+#include <libxml/tree.h>
 #include "ADARAParser.h"
 #include "Utils.h"
 #include "stsdefs.h"
@@ -102,6 +104,7 @@ private:
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &pkt ) const;
     const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
+    void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
