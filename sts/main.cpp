@@ -12,6 +12,7 @@
 
 using namespace std;
 
+#define STS_VERSION "0.1.1"
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
@@ -57,6 +58,7 @@ int main(int argc, char** argv)
         po::options_description options( "sts program options" );
         options.add_options()
                 ("help,?", "show help")
+                ("version", "show version number")
                 ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
                 ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output (interactive mode only)")
                 ("stict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
@@ -80,6 +82,11 @@ int main(int argc, char** argv)
         if ( opt_map.count( "help" ))
         {
             cout << options << endl;
+            return STS::TS_TRANSIENT_ERROR;
+        }
+        else if ( opt_map.count( "version" ))
+        {
+            cout << STS_VERSION << endl;
             return STS::TS_TRANSIENT_ERROR;
         }
 
@@ -112,7 +119,8 @@ int main(int argc, char** argv)
 
         if ( interact && verbose )
         {
-            cout << "sts settings:" << endl;
+            cout << "sts information" << endl;
+            cout << "  version      : " << STS_VERSION << endl;
             cout << "  nexus file   : " << nexus_outfile << endl;
             cout << "  adara file   : " << adara_outfile << endl;
             cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
