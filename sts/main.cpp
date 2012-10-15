@@ -57,7 +57,7 @@ int main(int argc, char** argv)
         namespace po = boost::program_options;
         po::options_description options( "sts program options" );
         options.add_options()
-                ("help,?", "show help")
+                ("help,h", "show help")
                 ("version", "show version number")
                 ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
                 ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output (interactive mode only)")

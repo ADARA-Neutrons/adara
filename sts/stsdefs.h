@@ -8,6 +8,136 @@ namespace STS {
 
 
 // ============================================================================
+// Neutron Event Classes and Types
+// ============================================================================
+
+/// Contains neutron pulse data
+struct PulseInfo
+{
+    PulseInfo() : start_time(0), last_time(0)
+    {}
+
+    uint64_t                start_time;         ///< Time in nanoseconds of first pulse
+    uint64_t                last_time;          ///< Time in nanoseconds of last received pulse
+    std::vector<double>     times;              ///< Pulse time buffer (seconds)
+    std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
+    std::vector<double>     charges;            ///< Pulse charge buffer
+};
+
+
+/// Base class for detector bank info
+class BankInfo
+{
+public:
+    /// BankInfo constructor
+    BankInfo
+    (
+        uint16_t a_id,              ///< [in] ID of detector bank
+        uint16_t a_pixel_count,     ///< [in] Pixel count of bank
+        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+    )
+    :
+        m_id(a_id),
+        m_pixel_count(a_pixel_count),
+        m_event_count(0),
+        m_last_pulse_with_data(0)
+    {
+        m_index_buffer.reserve(a_idx_buf_reserve);
+        m_tof_buffer.reserve(a_buf_reserve);
+        m_pid_buffer.reserve(a_buf_reserve);
+    }
+
+    /// BankInfo destructor
+    virtual ~BankInfo()
+    {}
+
+    uint32_t                m_id;                   ///< ID of detector bank
+    uint16_t                m_pixel_count;          ///< Number of pixels in bank
+    uint64_t                m_event_count;          ///< Running event count
+    uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this bank
+    std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
+    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
+    std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
+};
+
+
+/// Base class for monitor info
+class MonitorInfo
+{
+public:
+    ///< MonitorInfo constructor
+    MonitorInfo
+    (
+        uint16_t a_id,              ///< [in] ID of detector bank
+        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
+        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+    )
+    :
+        m_id(a_id),
+        m_event_count(0),
+        m_last_pulse_with_data(0)
+    {
+        m_tof_buffer.reserve(a_buf_reserve);
+        m_index_buffer.reserve(a_idx_buf_reserve);
+    }
+
+    ///< MonitorInfo destructor
+    virtual ~MonitorInfo()
+    {}
+
+    uint16_t                m_id;                   ///< ID of monitor
+    uint64_t                m_event_count;          ///< Running event count
+    uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this monitor
+    std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
+    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
+};
+
+/// User information (part of RunInfo)
+struct UserInfo
+{
+    std::string             id;
+    std::string             name;
+    std::string             role;
+};
+
+/// RunInformation extracted from RunInfo packet xml payload
+struct RunInfo
+{
+    RunInfo() : run_number(0)
+    {}
+
+    std::string             instr_id;
+    std::string             instr_shortname;
+    std::string             instr_longname;
+    unsigned long           run_number;
+    std::string             run_title;
+    std::string             proposal_id;
+    std::string             facility_name;
+    std::string             sample_id;
+    std::string             sample_name;
+    std::string             sample_nature;
+    std::string             sample_formula;
+    std::string             sample_environment;
+    std::vector<UserInfo>   users;
+};
+
+/// Run metrics collected by STS during translation
+struct RunMetrics
+{
+    RunMetrics() : total_charge(0.0), events_counted(0), events_uncounted(0)
+    {}
+
+    double                  total_charge;
+    uint64_t                events_counted;
+    uint64_t                events_uncounted;
+    struct timespec         start_time;
+    struct timespec         end_time;
+    Statistics              charge_stats;       ///< Pulse charge statistics
+    Statistics              freq_stats;         ///< Pulse frequency statistics
+};
+
+// ============================================================================
 // Process Variable Classes and Types
 // ============================================================================
 
@@ -61,7 +191,7 @@ public:
     {}
 
     /// Virtual method to allow subclasses to write buffered PV values and time axis
-    virtual void flushBuffers( bool lastWrite = false ) = 0;
+    virtual void flushBuffers( struct RunMetrics *a_run_metrics = 0 ) = 0;
 
     std::string         m_name;         ///< Name of PV
     Identifier          m_device_id;    ///< ID of device that owns the PV
@@ -96,131 +226,6 @@ public:
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
 };
 
-
-// ============================================================================
-// Neutron Event Classes and Types
-// ============================================================================
-
-/// Contains neutron pulse data
-struct PulseInfo
-{
-    PulseInfo() : start_time(0), last_time(0)
-    {}
-
-    uint64_t                start_time;         ///< Time in nanoseconds of first pulse
-    uint64_t                last_time;          ///< Time in nanoseconds of last received pulse
-    std::vector<double>     times;              ///< Pulse time buffer (seconds)
-    std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
-    std::vector<double>     charges;            ///< Pulse charge buffer
-};
-
-/// Base class for detector bank info
-class BankInfo
-{
-public:
-    /// BankInfo constructor
-    BankInfo
-    (
-        uint16_t a_id,              ///< [in] ID of detector bank
-        uint16_t a_pixel_count,     ///< [in] Pixel count of bank
-        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
-    )
-    :
-        m_id(a_id),
-        m_pixel_count(a_pixel_count),
-        m_event_count(0),
-        m_last_pulse_with_data(0)
-    {
-        m_index_buffer.reserve(a_idx_buf_reserve);
-        m_tof_buffer.reserve(a_buf_reserve);
-        m_pid_buffer.reserve(a_buf_reserve);
-    }
-
-    /// BankInfo destructor
-    virtual ~BankInfo()
-    {}
-
-    uint32_t                m_id;                   ///< ID of detector bank
-    uint16_t                m_pixel_count;          ///< Number of pixels in bank
-    uint64_t                m_event_count;          ///< Running event count
-    uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this bank
-    std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
-    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
-    std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
-};
-
-/// Base class for monitor info
-class MonitorInfo
-{
-public:
-    ///< MonitorInfo constructor
-    MonitorInfo
-    (
-        uint16_t a_id,              ///< [in] ID of detector bank
-        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
-    )
-    :
-        m_id(a_id),
-        m_event_count(0),
-        m_last_pulse_with_data(0)
-    {
-        m_tof_buffer.reserve(a_buf_reserve);
-        m_index_buffer.reserve(a_idx_buf_reserve);
-    }
-
-    ///< MonitorInfo destructor
-    virtual ~MonitorInfo()
-    {}
-
-    uint16_t                m_id;                   ///< ID of monitor
-    uint64_t                m_event_count;          ///< Running event count
-    uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this monitor
-    std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
-    std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
-};
-
-struct UserInfo
-{
-    std::string             id;
-    std::string             name;
-    std::string             role;
-};
-
-struct RunInfo
-{
-    RunInfo() : run_number(0)
-    {}
-
-    std::string             instr_id;
-    std::string             instr_shortname;
-    std::string             instr_longname;
-    unsigned long           run_number;
-    std::string             run_title;
-    std::string             proposal_id;
-    std::string             facility_name;
-    std::string             sample_id;
-    std::string             sample_name;
-    std::string             sample_nature;
-    std::string             sample_formula;
-    std::string             sample_environment;
-    std::vector<UserInfo>   users;
-};
-
-struct RunMetrics
-{
-    RunMetrics() : total_charge(0.0), events_counted(0), events_uncounted(0)
-    {}
-
-    double                  total_charge;
-    uint64_t                events_counted;
-    uint64_t                events_uncounted;
-    struct timespec         start_time;
-    struct timespec         end_time;
-    Statistics              charge_stats;       ///< Pulse charge statistics
-    Statistics              freq_stats;         ///< Pulse frequency statistics
-};
 
 // ============================================================================
 // ADARA Stream Adapter Class Interface

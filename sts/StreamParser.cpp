@@ -1132,7 +1132,7 @@ StreamParser::finalizeStreamProcessing()
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
     {
         if ( ipv->second->m_time_buffer.size() > 0 )
-            ipv->second->flushBuffers( true );
+            ipv->second->flushBuffers( &m_run_metrics );
     }
 
     // Let adapter do anything else it wants to

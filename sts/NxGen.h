@@ -109,7 +109,7 @@ private:
         /// Writes buffered PV values and time axis to Nexus file and performs finalization
         void flushBuffers
         (
-            bool lastWrite      ///< If true, indicates finalization code should be executed for this PV
+            struct STS::RunMetrics *a_run_metrics      ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
             if ( m_nxgen.m_gen_nexus )
@@ -122,18 +122,29 @@ private:
                     m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, "second" );
                 }
 
+                // TODO - This code may need to be optimized when fast metadata is supported
                 m_nxgen.writeSlab( m_log_path + "/value", this->m_value_buffer, m_slab_size );
                 m_nxgen.writeSlab( m_log_path + "/time", this->m_time_buffer, m_slab_size );
 
                 m_slab_size += this->m_value_buffer.size();
 
-                if ( lastWrite && m_slab_size )
+                if ( a_run_metrics )
                 {
-                    // Data has been writen, so also write statistics
-                    m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), this->m_units );
-                    m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), this->m_units );
-                    m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), this->m_units );
-                    m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
+                    // Add start time (offset) properties to all time axis in DAS logs
+                    std::string time = timeToISO8601( a_run_metrics->start_time );
+                    std::string time_path = m_log_path + "/time";
+                    m_nxgen.writeStringAttribute( time_path, "offset", time );
+                    m_nxgen.writeScalarAttribute( time_path, "offset_seconds", (uint32_t)a_run_metrics->start_time.tv_sec );
+                    m_nxgen.writeScalarAttribute( time_path, "offset_nanoseconds", (uint32_t)a_run_metrics->start_time.tv_nsec );
+
+                    if ( m_slab_size )
+                    {
+                        // Data has been writen, so also write statistics
+                        m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), this->m_units );
+                        m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), this->m_units );
+                        m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), this->m_units );
+                        m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
+                    }
                 }
             }
 
