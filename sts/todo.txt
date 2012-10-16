@@ -39,3 +39,9 @@ SFS Multiple Concurrent Outputs
     more regular stream adapters. It would be essentially a transparent man-inthe-middle adapter
     to patch the virtual calls from StreamParser into the methods of each adapter (on their own
     thread).
+
+Version History
+---------------
+0.1.1 - First versioned release
+0.1.2 - Added start time and time offset attributes to DASlog time axes.
+
