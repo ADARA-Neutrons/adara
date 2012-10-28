@@ -16,6 +16,7 @@
 #include "StorageFile.h"
 #include "ADARA.h"
 #include "EventFd.h"
+#include "STSClientMgr.h"
 
 #include "Logging.h"
 
@@ -592,12 +593,19 @@ void StorageManager::ioCompleted(void)
 		DEBUG("ioCompleted initially scanned " << m_scannedBlocks);
 		m_blocks_used += m_scannedBlocks;
 
+		STSClientMgr *sts = STSClientMgr::getInstance();
 		std::list<StorageContainer::SharedPtr>::iterator it;
 		for (it = m_pendingRuns.begin(); it != m_pendingRuns.end();
 									++it) {
-			// XXX add to STSClientMgr's list
-			fprintf(stderr, "Run %u pending\n", (*it)->runNumber());
+			INFO("Queuing pending run " << (*it)->runNumber());
+			sts->queueRun(*it);
 		}
+
+		/* Tell the STS client to start processing the runs we
+		 * just queued.
+		 */
+		if (!m_pendingRuns.empty())
+			sts->startConnect();
 	} else {
 		DEBUG("ioCompleted purged " << m_purgedBlocks << " blocks");
 		m_blocks_used -= m_purgedBlocks;

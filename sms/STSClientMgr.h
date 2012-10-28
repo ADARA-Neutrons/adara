@@ -16,6 +16,10 @@ public:
 	STSClientMgr(const std::string &uri);
 	~STSClientMgr();
 
+        static STSClientMgr *getInstance(void) { return m_singleton; }
+	void queueRun(StorageContainer::SharedPtr &c);
+	void startConnect(void);
+
 	enum Disposition { SUCCESS, TRANSIENT_FAIL, PERMAMENT_FAIL,
 				CONNECTION_LOSS, INVALID_PROTOCOL };
 	enum QueueMode { BALANCE, OLDEST, NEWEST };
@@ -51,13 +55,13 @@ private:
 	static double m_transient_timeout;
 	static unsigned int m_max_connections;
 
+	static STSClientMgr *m_singleton;
+
 	void containerChange(StorageContainer::SharedPtr &, bool);
 
-	void queueRun(StorageContainer::SharedPtr &c);
 	void requeueRun(StorageContainer::SharedPtr &c);
 	StorageContainer::SharedPtr &nextRun(void);
 
-	void startConnect(void);
 	void lookupComplete(const struct signalfd_siginfo &info);
 	void connectComplete(void);
 	void connectFailed(void);

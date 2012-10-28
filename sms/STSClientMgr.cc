@@ -20,6 +20,8 @@ double STSClientMgr::m_reconnect_timeout = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
 
+STSClientMgr *STSClientMgr::m_singleton;
+
 STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_connect_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::connectTimeout)),
@@ -30,6 +32,9 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_fd(-1), m_fdreg(NULL), m_connecting(false), m_backoff(false),
 	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST)
 {
+	if (m_singleton)
+                throw std::runtime_error("STSClientMgr is a singleton");
+
 	const char *default_service = "31417";
 	size_t pos = uri.find_first_of(':');
 
@@ -59,10 +64,12 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 					    this, _1, _2));
 
 	INFO("Remote is " << uri);
+	m_singleton = this;
 }
 
 STSClientMgr::~STSClientMgr()
 {
+	m_singleton = NULL;
 	m_mgrConnection.disconnect();
 	if (m_fd != -1)
 		close(m_fd);
