@@ -4,6 +4,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/signal.hpp>
+#include <boost/thread.hpp>
 #include <stdint.h>
 #include <sys/uio.h>
 #include <string>
@@ -13,6 +14,8 @@
 #include "Storage.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
+
+class EventFd;
 
 class StorageManager {
 public:
@@ -93,11 +96,22 @@ private:
 	static const char *m_run_filename;
 	static const char *m_run_tempname;
 
+	static boost::thread m_ioThread;
+	static bool m_ioActive;
+	static EventFd *m_ioStartEvent;
+	static EventFd *m_ioCompleteEvent;
+	static uint64_t m_purgedBlocks;
+
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
 
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
+
+	static void backgroundIo(void);
+	static void ioCompleted(void);
+	static void requestPurge(uint64_t goal);
+	static uint64_t purgeData(uint64_t goal);
 
 	static void addBaseStorage(off_t size);
 	static void startContainer(uint32_t run = 0);

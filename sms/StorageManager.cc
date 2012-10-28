@@ -15,6 +15,7 @@
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ADARA.h"
+#include "EventFd.h"
 
 #include "Logging.h"
 
@@ -47,10 +48,26 @@ struct timespec StorageManager::m_scanStart;
 uint64_t StorageManager::m_scannedBlocks;
 std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
 
+bool StorageManager::m_ioActive = false;
+EventFd *StorageManager::m_ioStartEvent;
+EventFd *StorageManager::m_ioCompleteEvent;
+uint64_t StorageManager::m_purgedBlocks;
+
+/* These get passed through an eventfd(), and need to be above the
+ * range of blocks possibly up for purge.
+ */
+#define IOCMD_PURGE_MAX	(((uint64_t) 1) << 50)
+#define IOCMD_BASE	(((uint64_t) 1) << 52)
+#define IOCMD_SHUTDOWN	(IOCMD_BASE + 1)
+#define IOCMD_DONE	(IOCMD_BASE + 2)
+#define IOCMD_INITIAL	(IOCMD_BASE + 3)
+
 #define RUN_STORAGE_MODE 0660
 
 const char *StorageManager::m_run_filename = "next_run";
 const char *StorageManager::m_run_tempname = "next_run.temp";
+
+boost::thread StorageManager::m_ioThread;
 
 void StorageManager::init(const std::string &baseDir)
 {
@@ -74,6 +91,19 @@ void StorageManager::init(const std::string &baseDir)
 		throw std::runtime_error(msg);
 	}
 
+	/* m_ioStartEvent will be used by the background IO thread to wait
+	 * for requests (blocking reads). m_ioCompleteEvent will be used
+	 * in the event loop to let us know when the thread has completed
+	 * the current request.
+	 *
+	 * We create these here rather than statically, as they require the
+	 * EPICS fdManager to be instantiated before they can register
+	 * their interest in descriptors.
+	 */
+	m_ioStartEvent = new EventFd();
+	m_ioCompleteEvent = new EventFd(boost::bind(
+					&StorageManager::ioCompleted));
+
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
 
@@ -84,8 +114,13 @@ void StorageManager::init(const std::string &baseDir)
 	 */
         clock_gettime(CLOCK_REALTIME, &m_scanStart);
 
-	/* TODO kick off background scan */
-	scanStorage();
+	boost::thread io(backgroundIo);
+	m_ioThread.swap(io);
+
+	/* The IO thread immediately begins a scan of the store, so consider
+	 * it active.
+	 */
+	m_ioActive = true;
 
 	/* Start the initial container */
 	startContainer();
@@ -95,6 +130,13 @@ void StorageManager::stop(void)
 {
 	endCurrentContainer();
 	close(m_base_fd);
+
+	if (m_ioActive)
+		m_ioCompleteEvent->block();
+
+	m_ioStartEvent->signal(IOCMD_SHUTDOWN);
+	m_ioThread.join();
+	m_ioActive = true;
 }
 
 uint32_t StorageManager::readRunFile(const char *name, bool notify)
@@ -491,4 +533,100 @@ void StorageManager::scanStorage(void)
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
 	      << m_pendingRuns.size() << " runs pending translation.");
+}
+
+void StorageManager::backgroundIo(void)
+{
+	/* This is the background I/O thread. It is responsible for the
+	 * initial scan and verification of the data store, and for purging
+	 * old data once the initial scan is complete.
+	 *
+	 * Communication with the main thread is handled via two EventFd
+	 * objects. This thread will perform a blocking read on one, waiting
+	 * for instructions from the main event loop. Only one active
+	 * instruction is allowed to be outstanding at a time. When that
+	 * instruction is completed, the I/O thread will signal the main
+	 * loop via a second EventFd that will eventually invoke a callback
+	 * function in the proper context.
+	 *
+	 * The main thread uses the state variable m_ioActive to track if
+	 * it has asked the I/O thread to do something. When this variable
+	 * is true, it may must not send additional commands, and it must
+	 * not touch any of the state communication veriables.
+	 *
+	 * State variables:
+	 * m_ioActive		main loop, track IO request is active
+	 * m_ioStartEvent	main loop, signal IO thread of request
+	 * m_ioCompleteEvent	IO thread, signal IO request is complete
+	 * m_purgedBlocks	IO thread, indicate how many blocks were purged
+	 */
+	scanStorage();
+	m_ioCompleteEvent->signal(IOCMD_INITIAL);
+
+	bool alive = true;
+	while (alive) {
+		uint64_t cmd = m_ioStartEvent->block();
+
+		/* We only accept two commands -- shutdown, and the
+		 * minimum number of blocks to purge.
+		 */
+		if (cmd == IOCMD_SHUTDOWN)
+			alive = false;
+		else
+			m_purgedBlocks = purgeData(cmd);
+		m_ioCompleteEvent->signal(IOCMD_DONE);
+	}
+}
+
+void StorageManager::ioCompleted(void)
+{
+	uint64_t val = m_ioCompleteEvent->read();
+
+	if (val == IOCMD_INITIAL) {
+		/* Initial scan is complete, so update the size of the
+		 * data store, and queue any runs needing translation.
+		 *
+		 * We add, as we've been taking data while the initial
+		 * scan progressed.
+		 */
+		DEBUG("ioCompleted initially scanned " << m_scannedBlocks);
+		m_blocks_used += m_scannedBlocks;
+
+		std::list<StorageContainer::SharedPtr>::iterator it;
+		for (it = m_pendingRuns.begin(); it != m_pendingRuns.end();
+									++it) {
+			// XXX add to STSClientMgr's list
+			fprintf(stderr, "Run %u pending\n", (*it)->runNumber());
+		}
+	} else {
+		DEBUG("ioCompleted purged " << m_purgedBlocks << " blocks");
+		m_blocks_used -= m_purgedBlocks;
+	}
+
+	m_ioActive = false;
+}
+
+void StorageManager::requestPurge(uint64_t goal)
+{
+	/* Only one I/O action at a time. */
+	if (m_ioActive)
+		return;
+
+	/* In the unlikely event we're purging enough to get into our
+	 * command range, just clamp the goal -- we'll pick up and
+	 * try again once this purge cycle is complete.
+	 */
+	if (goal >= IOCMD_PURGE_MAX)
+		goal = IOCMD_PURGE_MAX;
+
+	DEBUG("Requesting purge of " << goal << " blocks");
+
+	m_ioActive = true;
+	m_ioStartEvent->signal(goal);
+}
+
+uint64_t StorageManager::purgeData(uint64_t purgeRequested)
+{
+	// XXX implement
+	return 0;
 }
