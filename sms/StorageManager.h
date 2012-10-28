@@ -102,16 +102,22 @@ private:
 	static EventFd *m_ioCompleteEvent;
 	static uint64_t m_purgedBlocks;
 
+	static bool m_dailyExhausted;
+	static std::list<std::string> m_dailyCache;
+
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
 
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
+	static bool isValidDaily(const std::string &dir);
 
 	static void backgroundIo(void);
 	static void ioCompleted(void);
 	static void requestPurge(uint64_t goal);
 	static uint64_t purgeData(uint64_t goal);
+	static uint64_t purgeDaily(const std::string &dir, uint64_t goal);
+	static void populateDailyCache(void);
 
 	static void addBaseStorage(off_t size);
 	static void startContainer(uint32_t run = 0);

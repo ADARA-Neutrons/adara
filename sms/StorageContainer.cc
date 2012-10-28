@@ -241,13 +241,14 @@ static bool order_by_filenumber(StorageFile::SharedPtr &a,
 	return a->fileNumber() < b->fileNumber();
 }
 
-StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
+bool StorageContainer::validatePath(const std::string &in_path,
+				    std::string &out_path, struct timespec &ts,
+				    uint32_t &run)
 {
 	struct tm tm = { 0 };
-	uint32_t ns, run = 0;
-	struct timespec ts;
 	const char *p;
-	fs::path fullpath(path);
+	uint32_t ns;
+	fs::path fullpath(in_path);
 	fs::path cname(fullpath.filename());
 	fs::path cpath(fullpath.parent_path().filename());
 	cpath /= cname;
@@ -263,6 +264,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	/* If p is not NULL, it points to the period; now get the
 	 * nanoseconds and run number, if any.
 	 */
+	run = 0;
 	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run))
 		p = NULL;
 
@@ -281,17 +283,28 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 			p = NULL;
 	}
 
-	if (!p) {
-		WARN("Invalid storage container at '" << path << "'");
-		return StorageContainer::SharedPtr();
-	}
-
 	/* We use the UTC time in the container name, so we cannot use
 	 * mktime() without temporarily setting TZ to UTC. Fortunately,
 	 * we can use timegm() to deal with that.
 	 */
 	ts.tv_sec = timegm(&tm);
 	ts.tv_nsec = ns;
+
+	out_path = cpath.native();
+
+	return p;
+}
+
+StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
+{
+	std::string cpath;
+	struct timespec ts;
+	uint32_t run;
+
+	if (!validatePath(path, cpath, ts, run)) {
+		WARN("Invalid storage container at '" << path << "'");
+		return StorageContainer::SharedPtr();
+	}
 
 	/* If this container was created after we started the scan, it
 	 * will be accounted for via normal operations and should be skipped
@@ -302,12 +315,12 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 						ts.tv_nsec >= start.tv_nsec))
 		return StorageContainer::SharedPtr();
 
-	StorageContainer::SharedPtr c(new StorageContainer(cpath.native()));
+	StorageContainer::SharedPtr c(new StorageContainer(cpath));
 	c->m_weakThis = c;
 	c->m_runNumber = run;
-        c->m_startTime = ts;
+	c->m_startTime = ts;
 
-        fs::directory_iterator end, it(fullpath);
+	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
 	bool had_errors = false;;
 
@@ -372,4 +385,105 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		c->markManual();
 
 	return c;
+}
+
+uint64_t StorageContainer::purge(const std::string &path, uint64_t goal)
+{
+	std::string cpath;
+	struct timespec ts;
+	uint32_t run;
+
+	/* If we're not a valid container, then there's nothing to purge. */
+	if (!validatePath(path, cpath, ts, run))
+		return 0;
+
+	fs::directory_iterator end, it(path);
+	std::list<fs::path> files;
+	bool translated = false;
+	bool manual = false;
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		if (status.type() != fs::regular_file)
+			continue;
+
+		/* Check for flag files that indicate we've been translated
+		 * or require manual processing.
+		 */
+		if (file == m_completed_marker) {
+			translated = true;
+			continue;
+		}
+
+		if (file == m_manual_marker) {
+			manual = true;
+			continue;
+		}
+
+		if (file.extension() != ".adara")
+			continue;
+
+		files.push_back(it->path());
+	}
+
+	if (manual) {
+		DEBUG("Skipping purge of container '" << path << "' (manual)");
+		return 0;
+	}
+
+	if (run && !translated) {
+		DEBUG("Skipping purge of container '" << path
+		      << "' (untranslated)");
+		return 0;
+	}
+
+	/* Filenames are f%05u[-run-%u], and are sortable via the default
+	 * string sort. The run number portion doesn't change, so file number
+	 * will be the key.
+	 */
+	files.sort();
+
+	std::list<fs::path>::iterator fit, fend = files.end();
+	uint64_t size, purged = 0;
+
+	for (fit = files.begin(); purged < goal && fit != fend; ) {
+		try {
+			size = fs::file_size(*fit);
+			remove(*fit);
+
+			size += StorageManager::m_block_size - 1;
+			size /= StorageManager::m_block_size;
+			purged += size;
+
+			fit = files.erase(fit);
+		} catch (fs::filesystem_error err) {
+			WARN("Error purging container: " << err.what());
+			++fit;
+			continue;
+		}
+	}
+
+	DEBUG("Purged " << purged << " blocks from container " << path);
+
+	/* If we removed all of the ADARA files, remove the translation
+	 * complete marker and the container directory.
+	 */
+	if (files.empty()) {
+		fs::path base(path), completed(path);
+		completed /= m_completed_marker;
+
+		try {
+			if (run)
+				remove(completed);
+			remove(base);
+
+			DEBUG("Removed container " << base);
+		} catch(fs::filesystem_error err) {
+			WARN("Error removing container: " << err.what());
+		}
+	}
+
+	return purged;
 }

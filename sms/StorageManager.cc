@@ -53,6 +53,8 @@ bool StorageManager::m_ioActive = false;
 EventFd *StorageManager::m_ioStartEvent;
 EventFd *StorageManager::m_ioCompleteEvent;
 uint64_t StorageManager::m_purgedBlocks;
+bool StorageManager::m_dailyExhausted;
+std::list<std::string> StorageManager::m_dailyCache;
 
 /* These get passed through an eventfd(), and need to be above the
  * range of blocks possibly up for purge.
@@ -427,7 +429,9 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	blocks = size + m_block_size - 1;
 	blocks /= m_block_size;
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		/* TODO start a purge of the storage pool */
+		uint64_t goal = m_blocks_used + blocks;
+		goal -= m_max_blocks_allowed;
+		requestPurge(goal);
 	}
 }
 
@@ -493,6 +497,24 @@ void StorageManager::scanDaily(const std::string &dir)
 	}
 }
 
+bool StorageManager::isValidDaily(const std::string &dir)
+{
+	/* Validate that the directory name is in the proper format
+	 * for a daily directory. strptime() allows leading zeros
+	 * to be omitted, so we convert back to a string to verify.
+	 */
+	struct tm tm;
+	char *p = strptime(dir.c_str(), "%Y%m%d", &tm);
+	if (p && !*p) {
+		char tmp[9];
+		strftime(tmp, sizeof(tmp), "%Y%m%d", &tm);
+		if (strcmp(dir.c_str(), tmp))
+			p = NULL;
+	}
+
+	return p && !*p;
+}
+
 void StorageManager::scanStorage(void)
 {
 	fs::directory_iterator end, it(m_baseDir);
@@ -510,20 +532,7 @@ void StorageManager::scanStorage(void)
 			continue;
 		}
 
-		/* Validate that the directory name is in the proper format
-		 * for a daily directory. strptime() allows leading zeros
-		 * to be omitted, so we convert back to a string to verify.
-		 */
-		struct tm tm;
-		char *p = strptime(file.c_str(), "%Y%m%d", &tm);
-		if (p && !*p) {
-			char tmp[9];
-			strftime(tmp, sizeof(tmp), "%Y%m%d", &tm);
-			if (strcmp(file.c_str(), tmp))
-				p = NULL;
-		}
-
-		if (!p || *p) {
+		if (!isValidDaily(file.native())) {
 			WARN("Daily directory '" << it->path()
 			      << "' has invalid format");
 			continue;
@@ -633,8 +642,106 @@ void StorageManager::requestPurge(uint64_t goal)
 	m_ioStartEvent->signal(goal);
 }
 
+void StorageManager::populateDailyCache(void)
+{
+	fs::directory_iterator end, it(m_baseDir);
+
+	DEBUG("Building cache of daily directories");
+	m_dailyCache.clear();
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		/* Skip over the storage for the next run number */
+		if (file == m_run_filename || file == m_run_tempname)
+			continue;
+
+		if (status.type() != fs::directory_file)
+			continue;
+
+		if (!isValidDaily(file.native()))
+			continue;
+
+		m_dailyCache.push_back(file.native());
+	}
+
+	/* The daily directories have the format YYYYMMDD, so the default
+	 * lexical sort works.
+	 */
+	m_dailyCache.sort();
+}
+
+uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal)
+{
+	/* We could cache the list of containers to avoid rescanning
+	 * each time we wish to purge, but we expect the list to be
+	 * reasonably small, so go for the simple code for now. We
+	 * can revist if CPU usage is too high.
+	 */
+	std::list<fs::path> containers;
+	fs::directory_iterator end, it(dir);
+	for (; it != end; ++it) {
+		fs::file_status status = it->status();
+
+		if (status.type() != fs::directory_file)
+			continue;
+
+		containers.push_back(it->path());
+	}
+
+	/* The container names have the form YYYYMMDD-HHMMSS.nnnnnnnnn, so
+	 * the default lexical sort works.
+	 */
+	containers.sort();
+
+	uint64_t purged = 0;
+	std::list<fs::path>::iterator cit, cend = containers.end();
+	for (cit = containers.begin(); purged < goal && cit != cend; ++cit)
+		purged += StorageContainer::purge(cit->native(), goal - purged);
+
+	/* Try to remove the directory, but expect to fail. */
+	boost::system::error_code ec;
+	fs::remove(fs::path(dir), ec);
+
+	return purged;
+}
+
 uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 {
-	// XXX implement
-	return 0;
+	/* Find oldest container that is purgable, and delete the oldest
+	 * file in it. To keep from wasting too much effort, we scan the
+	 * base directory once to get a list of daily directories, and
+	 * only refresh it when we hit its end without reaching our
+	 * purge goal.
+	 *
+	 * It is worth noting that purgeRequested is in units of the
+	 * file system block size.
+	 */
+	try {
+		if (m_dailyExhausted || m_dailyCache.empty())
+			populateDailyCache();
+	} catch (...) {
+		/* If we cannot populate the cache, then we cannot purge. */
+		return 0;
+	}
+
+	uint64_t purged = 0;
+	std::list<std::string>::iterator it, end = m_dailyCache.end();
+	for (it = m_dailyCache.begin(); purged < purgeRequested &&
+								it != end; ) {
+		fs::path dir(m_baseDir);
+		dir /= *it;
+		if (!fs::exists(dir)) {
+			it = m_dailyCache.erase(it);
+			continue;
+		}
+
+		DEBUG("Purging daily " << *it);
+		purged += purgeDaily(dir.native(), purgeRequested - purged);
+		++it;
+	}
+
+	m_dailyExhausted = (purged < purgeRequested);
+	return purged;
 }

@@ -33,6 +33,7 @@ public:
 
 	static SharedPtr create(const struct timespec &start, uint32_t run);
 	static SharedPtr scan(const std::string &path);
+	static uint64_t purge(const std::string &path, uint64_t goal);
 
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminate(void);
@@ -65,6 +66,10 @@ private:
 
 	bool createMarker(const char *);
 	bool validate(void);
+
+	static bool validatePath(const std::string &in_path,
+				 std::string &out_path, struct timespec &ts,
+				 uint32_t &run);
 
 	static const char *m_completed_marker;
 	static const char *m_manual_marker;
