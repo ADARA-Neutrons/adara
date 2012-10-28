@@ -12,7 +12,15 @@
 #include "StorageFile.h"
 #include "ADARA.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
+
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
+#define MARKER_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
+
+const char *StorageContainer::m_completed_marker = "translation_completed";
+const char *StorageContainer::m_manual_marker = "manual_processing_needed";
 
 
 void StorageContainer::terminateFile(void)
@@ -137,4 +145,42 @@ StorageContainer::SharedPtr StorageContainer::create(
 	}
 
 	return c;
+}
+
+bool StorageContainer::createMarker(const char *file)
+{
+	std::string path(m_name);
+	int fd;
+
+	path += "/";
+	path += file;
+
+	fd = openat(StorageManager::base_fd(), path.c_str(),
+		    O_WRONLY|O_CREAT, MARKER_MODE);
+	if (fd < 0) {
+		int e = errno;
+		ERROR("Unable to creat('" << path << "'): " << strerror(e));
+	} else
+		close(fd);
+
+	return fd < 0;
+}
+
+void StorageContainer::markTranslated(void)
+{
+	/* Mark this container as completed so that we don't resend it to
+	 * STS if we restart before it is purged.
+	 */
+	if (createMarker(m_completed_marker))
+		ERROR("Run " << m_runNumber << " will be resent if SMS "
+		      "restarts. ");
+}
+
+void StorageContainer::markManual(void)
+{
+	/* Mark this container as needing manual processing.
+	 */
+	if (createMarker(m_manual_marker))
+		ERROR("Run " << m_runNumber << " will be resent if SMS "
+		      "restarts. ");
 }

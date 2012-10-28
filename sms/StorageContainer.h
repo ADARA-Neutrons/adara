@@ -37,6 +37,9 @@ public:
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
 
+	void markTranslated(void);
+	void markManual(void);
+
 private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;
@@ -52,6 +55,11 @@ private:
 	StorageContainer(const struct timespec &start, uint32_t run);
 
 	void terminateFile(void);
+
+	bool createMarker(const char *);
+
+	static const char *m_completed_marker;
+	static const char *m_manual_marker;
 };
 
 #endif /* __STORAGE_CONTAINER_H */

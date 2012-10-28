@@ -347,9 +347,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 
 	switch (disp) {
 	case SUCCESS:
-		/* TODO mark as purgable */
-		// c->markPurgable();
-		INFO("Run " << c->runNumber() << " sent succesfully");
+		/* STSClient already logged our success, we just need to
+		 * note that we've completed translation.
+		 */
+		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
 	case TRANSIENT_FAIL:
@@ -367,8 +368,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		requeueRun(c);
 		break;
 	case PERMAMENT_FAIL:
-		/* TODO mark as manual handling required */
-		// c->markInError();
+		/* STSClient already logged the failure, we just need to
+		 * mark it for manual processing.
+		 */
+		c->markManual();
 		break;
 	}
 
