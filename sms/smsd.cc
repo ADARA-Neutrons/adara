@@ -1,4 +1,5 @@
 #include <iostream>
+#include <signal.h>
 
 #include "EPICS.h"
 #include "SMSControl.h"
@@ -41,11 +42,44 @@ static void parse_options(int argc, char **argv)
 		log_conf = vm["logconf"].as<std::string>();
 }
 
+void block_signals(void)
+{
+	/* We don't want any signals to go to a handler; we will
+	 * register callbacks with the SignalEvent class in order to
+	 * integrate signals with the event loop.
+	 */
+	/* We want to block most signals from being delivered via an
+	 * async signal handler -- we'd much rather they came in via the
+	 * SignalEvent class. Block everything but error conditions.
+	 *
+	 * TODO we also leave open some standard "quit" signals until
+	 * we handle them properly.
+	 */
+	sigset_t all;
+	sigfillset(&all);
+	sigdelset(&all, SIGCONT);
+
+	/* Don't block error conditions */
+	sigdelset(&all, SIGILL);
+	sigdelset(&all, SIGABRT);
+	sigdelset(&all, SIGFPE);
+	sigdelset(&all, SIGILL);
+
+	/* TODO clean shutdown through SignalEvent handlers */
+	sigdelset(&all, SIGTERM);
+	sigdelset(&all, SIGINT);
+	sigdelset(&all, SIGHUP);
+
+	pthread_sigmask(SIG_BLOCK, &all, NULL);
+}
+
 int main(int argc, char **argv)
 {
 	parse_options(argc, argv);
 
 	PropertyConfigurator::configure(log_conf);
+
+	block_signals();
 
 	StorageManager::init("/SNSlocal/sms/data");
 	LiveServer liveServer("31415");
