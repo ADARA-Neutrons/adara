@@ -1,7 +1,6 @@
 #include "StreamParser.h"
 #include "TransCompletePkt.h"
 #include <iomanip>
-#include <glog/logging.h>
 #include <boost/algorithm/string.hpp>
 
 
