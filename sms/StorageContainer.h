@@ -27,6 +27,11 @@ public:
 		return m_newFile.connect(slot);
 	}
 
+	static SharedPtr create(const struct timespec &start, uint32_t run);
+
+	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
+	void terminate(void);
+
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
@@ -43,13 +48,8 @@ private:
 	std::list<StorageFile::SharedPtr> m_files;
 
 	StorageContainer(const struct timespec &start, uint32_t run);
-	StorageContainer(const std::string &name);
 
-	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminateFile(void);
-	void terminate(void);
-
-	friend class StorageManager;
 };
 
 #endif /* __STORAGE_CONTAINER_H */

@@ -14,61 +14,6 @@
 
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
 
-StorageContainer::StorageContainer(const struct timespec &start,
-				   uint32_t run) :
-	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true)
-{
-	char path[64];
-	struct tm tm;
-
-	if (!gmtime_r(&m_startTime.tv_sec, &tm))
-		throw std::runtime_error("StorageContainer::StorageContainer()"
-					 " gmtime_r failed");
-
-	if (!strftime(path, sizeof(path), "%Y%m%d", &tm))
-		throw std::runtime_error("StorageContainer::StorageContainer()"
-					 " base strftime failed");
-
-	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE) &&
-							errno != EEXIST) {
-		int err = errno;
-		std::string msg("StorageContainer::StorageContainer(): "
-				"base mkdirat error: ");
-		msg += strerror(err);
-		throw std::runtime_error(msg);
-	}
-
-	if (!strftime(path, sizeof(path), "%Y%m%d/%Y%m%d-%H%M%S", &tm))
-		throw std::runtime_error("StorageContainer::StorageContainer()"
-					 " path strftime failed");
-
-	m_name = path;
-
-	snprintf(path, sizeof(path), ".%09lu", m_startTime.tv_nsec);
-	m_name += path;
-
-	if (m_runNumber) {
-		snprintf(path, sizeof(path), "-run-%u", m_runNumber);
-		m_name += path;
-	}
-
-	if (mkdirat(StorageManager::base_fd(), m_name.c_str(),
-							CONTAINER_MODE)) {
-		int err = errno;
-		std::string msg("StorageContainer::StorageContainer(): "
-				"container mkdirat error: ");
-		msg += strerror(err);
-		throw std::runtime_error(msg);
-	}
-}
-
-StorageContainer::StorageContainer(const std::string &name)
-{
-	/* TODO Parse name string to start time/run number; open the
-	 * directory and count the number of files in it.
-	 */
-	throw std::runtime_error("not implemented");
-}
 
 void StorageContainer::terminateFile(void)
 {
@@ -134,4 +79,60 @@ void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
 
 	/* TODO load files from disk */
 	throw std::runtime_error("not implemented");
+}
+
+StorageContainer::StorageContainer(const struct timespec &start,
+				   uint32_t run) :
+	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true)
+{
+}
+
+StorageContainer::SharedPtr StorageContainer::create(
+				const struct timespec &start, uint32_t run)
+{
+	char path[64];
+	struct tm tm;
+
+	if (!gmtime_r(&start.tv_sec, &tm))
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " gmtime_r failed");
+
+	if (!strftime(path, sizeof(path), "%Y%m%d", &tm))
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " base strftime failed");
+
+	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE) &&
+							errno != EEXIST) {
+		int err = errno;
+		std::string msg("StorageContainer::StorageContainer(): "
+				"base mkdirat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
+
+	if (!strftime(path, sizeof(path), "%Y%m%d/%Y%m%d-%H%M%S", &tm))
+		throw std::runtime_error("StorageContainer::StorageContainer()"
+					 " path strftime failed");
+
+	StorageContainer::SharedPtr c(new StorageContainer(start, run));
+	c->m_name = path;
+
+	snprintf(path, sizeof(path), ".%09lu", start.tv_nsec);
+	c->m_name += path;
+
+	if (run) {
+		snprintf(path, sizeof(path), "-run-%u", run);
+		c->m_name += path;
+	}
+
+	if (mkdirat(StorageManager::base_fd(), c->m_name.c_str(),
+							CONTAINER_MODE)) {
+		int err = errno;
+		std::string msg("StorageContainer::StorageContainer(): "
+				"container mkdirat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
+
+	return c;
 }

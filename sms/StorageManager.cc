@@ -281,8 +281,7 @@ void StorageManager::startContainer(uint32_t run)
 		throw std::runtime_error("Already have a container");
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_cur_container = StorageContainer::SharedPtr(
-					new StorageContainer(now, run));
+	m_cur_container = StorageContainer::create(now, run);
 
 	m_contChange(m_cur_container, true);
 }
