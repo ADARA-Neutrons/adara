@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/filesystem.hpp>
 
 #include "StorageManager.h"
 #include "StorageContainer.h"
@@ -16,6 +17,8 @@
 #include "ADARA.h"
 
 #include "Logging.h"
+
+namespace fs = boost::filesystem;
 
 /* TODO better, common place for this */
 struct header {
@@ -27,6 +30,7 @@ struct header {
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
+std::string StorageManager::m_baseDir;
 int StorageManager::m_base_fd = -1;
 
 StorageContainer::SharedPtr StorageManager::m_cur_container;
@@ -39,6 +43,10 @@ uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
 
+struct timespec StorageManager::m_scanStart;
+uint64_t StorageManager::m_scannedBlocks;
+std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
+
 #define RUN_STORAGE_MODE 0660
 
 const char *StorageManager::m_run_filename = "next_run";
@@ -47,6 +55,8 @@ const char *StorageManager::m_run_tempname = "next_run.temp";
 void StorageManager::init(const std::string &baseDir)
 {
 	struct stat stats;
+
+	m_baseDir = baseDir;
 
 	if (stat(baseDir.c_str(), &stats)) {
 		int err = errno;
@@ -67,7 +77,15 @@ void StorageManager::init(const std::string &baseDir)
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
 
+	/* Set the fencepost for the scan; any containers with a
+	 * date after this time have been generated as part of this
+	 * invocation of SMS, and will already be accounted for; the
+	 * scan process must skip them.
+	 */
+        clock_gettime(CLOCK_REALTIME, &m_scanStart);
+
 	/* TODO kick off background scan */
+	scanStorage();
 
 	/* Start the initial container */
 	startContainer();
@@ -400,4 +418,77 @@ uint32_t StorageManager::validatePacket(const IoVector &iovec)
 		throw std::runtime_error("Packet too small");
 
 	return len;
+}
+
+void StorageManager::scanDaily(const std::string &dir)
+{
+	fs::directory_iterator end, it(dir);
+	StorageContainer::SharedPtr c;
+
+	DEBUG("Scanning daily directory " << dir);
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		if (status.type() != fs::directory_file) {
+			WARN("Ignoring non-directory '" << it->path() << "'");
+			continue;
+		}
+
+		c = StorageContainer::scan(it->path().native());
+		if (c) {
+			m_scannedBlocks += c->blocks();
+
+			/* If this is a (non-manual) run pending translation,
+			 * note it for later.
+			 */
+			if (c->runNumber() && !c->isTranslated() &&
+							!c->isManual())
+				m_pendingRuns.push_back(c);
+		}
+	}
+}
+
+void StorageManager::scanStorage(void)
+{
+	fs::directory_iterator end, it(m_baseDir);
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		/* Skip over the storage for the next run number */
+		if (file == m_run_filename || file == m_run_tempname)
+			continue;
+
+		if (status.type() != fs::directory_file) {
+			WARN("Ignoring non-directory '" << it->path() << "'");
+			continue;
+		}
+
+		/* Validate that the directory name is in the proper format
+		 * for a daily directory. strptime() allows leading zeros
+		 * to be omitted, so we convert back to a string to verify.
+		 */
+		struct tm tm;
+		char *p = strptime(file.c_str(), "%Y%m%d", &tm);
+		if (p && !*p) {
+			char tmp[9];
+			strftime(tmp, sizeof(tmp), "%Y%m%d", &tm);
+			if (strcmp(file.c_str(), tmp))
+				p = NULL;
+		}
+
+		if (!p || *p) {
+			WARN("Daily directory '" << it->path()
+			      << "' has invalid format");
+			continue;
+		}
+
+		scanDaily(it->path().native());
+	}
+
+	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
+	      << m_pendingRuns.size() << " runs pending translation.");
 }

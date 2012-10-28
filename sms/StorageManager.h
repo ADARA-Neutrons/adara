@@ -66,14 +66,23 @@ public:
 	static uint32_t getNextRun(void);
 	static bool updateNextRun(uint32_t run);
 
+	static const struct timespec &scanStart(void) {
+		return m_scanStart;
+	}
+
 private:
 	typedef boost::signals::connection connection;
 
+	static std::string m_baseDir;
 	static int m_base_fd;
 
 	static uint32_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
+
+	static struct timespec m_scanStart;
+	static uint64_t m_scannedBlocks;
+	static std::list<StorageContainer::SharedPtr> m_pendingRuns;
 
 	static StorageContainer::SharedPtr m_cur_container;
 	static StorageFile::SharedPtr m_prologueFile;
@@ -86,6 +95,9 @@ private:
 
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
+
+	static void scanStorage(void);
+	static void scanDaily(const std::string &dir);
 
 	static void addBaseStorage(off_t size);
 	static void startContainer(uint32_t run = 0);

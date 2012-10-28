@@ -7,12 +7,16 @@
 
 #include <stdexcept>
 
+#include <boost/filesystem.hpp>
+
 #include "StorageContainer.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
 #include "ADARA.h"
 
 #include "Logging.h"
+
+namespace fs = boost::filesystem;
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 
@@ -90,9 +94,56 @@ void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
 	throw std::runtime_error("not implemented");
 }
 
+bool StorageContainer::createMarker(const char *file)
+{
+	std::string path(m_name);
+	int fd;
+
+	path += "/";
+	path += file;
+
+	fd = openat(StorageManager::base_fd(), path.c_str(),
+		    O_WRONLY|O_CREAT, MARKER_MODE);
+	if (fd < 0) {
+		int e = errno;
+		ERROR("Unable to creat('" << path << "'): " << strerror(e));
+	} else
+		close(fd);
+
+	return fd < 0;
+}
+
+void StorageContainer::markTranslated(void)
+{
+	/* Mark this container as completed so that we don't resend it to
+	 * STS if we restart before it is purged.
+	 */
+	if (createMarker(m_completed_marker))
+		ERROR("Run " << m_runNumber << " will be resent if SMS "
+		      "restarts. ");
+	m_translated = true;
+}
+
+void StorageContainer::markManual(void)
+{
+	/* Mark this container as needing manual processing.
+	 */
+	if (createMarker(m_manual_marker))
+		ERROR("Run " << m_runNumber << " will be resent if SMS "
+		      "restarts. ");
+	m_manual = true;
+}
+
 StorageContainer::StorageContainer(const struct timespec &start,
 				   uint32_t run) :
-	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true)
+	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true),
+	m_translated(false), m_manual(false)
+{
+}
+
+StorageContainer::StorageContainer(const std::string &name) :
+	m_runNumber(0), m_numFiles(0), m_name(name), m_active(false),
+	m_translated(false), m_manual(false)
 {
 }
 
@@ -147,40 +198,178 @@ StorageContainer::SharedPtr StorageContainer::create(
 	return c;
 }
 
-bool StorageContainer::createMarker(const char *file)
+uint64_t StorageContainer::blocks(void) const
 {
-	std::string path(m_name);
-	int fd;
+	std::list<StorageFile::SharedPtr>::const_iterator it, end;
+	uint64_t total, blocks;
 
-	path += "/";
-	path += file;
+	end = m_files.end();
+	for (total = 0, it = m_files.begin(); it != end; ++it) {
+		blocks = (*it)->size() + StorageManager::m_block_size - 1;
+		blocks /= StorageManager::m_block_size;
+		total += blocks;
+	}
 
-	fd = openat(StorageManager::base_fd(), path.c_str(),
-		    O_WRONLY|O_CREAT, MARKER_MODE);
-	if (fd < 0) {
-		int e = errno;
-		ERROR("Unable to creat('" << path << "'): " << strerror(e));
-	} else
-		close(fd);
-
-	return fd < 0;
+	return total;
 }
 
-void StorageContainer::markTranslated(void)
+bool StorageContainer::validate(void)
 {
-	/* Mark this container as completed so that we don't resend it to
-	 * STS if we restart before it is purged.
-	 */
-	if (createMarker(m_completed_marker))
-		ERROR("Run " << m_runNumber << " will be resent if SMS "
-		      "restarts. ");
+	if (m_files.empty()) {
+		WARN("Container " << m_name << " has no data files");
+		return true;
+	}
+
+	std::list<StorageFile::SharedPtr>::iterator it, end;
+	it = m_files.begin();
+	end = m_files.end();
+	for (uint32_t expected = 1; it != end; ++expected, ++it) {
+		if ((*it)->fileNumber() != expected) {
+			WARN("Container " << m_name << " missing file number "
+			     << expected);
+			return true;
+		}
+	}
+
+	/* TODO validate that the last file has a proper EOF status */
+	return false;
 }
 
-void StorageContainer::markManual(void)
+static bool order_by_filenumber(StorageFile::SharedPtr &a,
+				StorageFile::SharedPtr &b)
 {
-	/* Mark this container as needing manual processing.
+	return a->fileNumber() < b->fileNumber();
+}
+
+StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
+{
+	struct tm tm = { 0 };
+	uint32_t ns, run = 0;
+	struct timespec ts;
+	const char *p;
+	fs::path fullpath(path);
+	fs::path cname(fullpath.filename());
+	fs::path cpath(fullpath.parent_path().filename());
+	cpath /= cname;
+
+	p = strptime(cname.c_str(), "%Y%m%d-%H%M%S", &tm);
+	if (p && *p == '.') {
+		char tmp[16];
+		strftime(tmp, sizeof(tmp), "%Y%m%d-%H%M%S", &tm);
+		if (strncmp(cname.c_str(), tmp, 15))
+			p = NULL;
+	}
+
+	/* If p is not NULL, it points to the period; now get the
+	 * nanoseconds and run number, if any.
 	 */
-	if (createMarker(m_manual_marker))
-		ERROR("Run " << m_runNumber << " will be resent if SMS "
-		      "restarts. ");
+	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run))
+		p = NULL;
+
+	/* We've been able to pull out everything so far, now try to
+	 * build the expected name and make sure it matches.
+	 */
+	if (p) {
+		char expected[64];
+		strftime(expected, sizeof(expected), "%Y%m%d-%H%M%S", &tm);
+		snprintf(expected + 15, sizeof(expected) - 15, ".%09u", ns);
+		if (run) {
+			snprintf(expected + 25, sizeof(expected) - 25,
+				 "-run-%u", run);
+		}
+		if (strcmp(cname.c_str(), expected))
+			p = NULL;
+	}
+
+	if (!p) {
+		WARN("Invalid storage container at '" << path << "'");
+		return StorageContainer::SharedPtr();
+	}
+
+	/* We use the UTC time in the container name, so we cannot use
+	 * mktime() without temporarily setting TZ to UTC. Fortunately,
+	 * we can use timegm() to deal with that.
+	 */
+	ts.tv_sec = timegm(&tm);
+	ts.tv_nsec = ns;
+
+	/* If this container was created after we started the scan, it
+	 * will be accounted for via normal operations and should be skipped
+	 * here.
+	 */
+	const timespec &start = StorageManager::scanStart();
+	if (ts.tv_sec > start.tv_sec || (ts.tv_sec == start.tv_sec &&
+						ts.tv_nsec >= start.tv_nsec))
+		return StorageContainer::SharedPtr();
+
+	StorageContainer::SharedPtr c(new StorageContainer(cpath.native()));
+	c->m_weakThis = c;
+	c->m_runNumber = run;
+        c->m_startTime = ts;
+
+        fs::directory_iterator end, it(fullpath);
+	StorageFile::SharedPtr f;
+	bool had_errors = false;;
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		if (status.type() != fs::regular_file) {
+			WARN("Ignoring non-file '" << it->path() << "'");
+			continue;
+		}
+
+		/* Check for flag files that indicate we've been translated
+		 * or require manual processing.
+		 */
+		if (file == m_completed_marker) {
+			c->m_translated = true;
+			continue;
+		}
+
+		if (file == m_manual_marker) {
+			c->m_manual = true;
+			continue;
+		}
+
+		if (file.extension() != ".adara") {
+			WARN("Ignoring non-ADARA file '" << it->path() << "'");
+			continue;
+		}
+
+		/* file holds the full path, but StorageFile wants the path
+		 * to be relative to the base directory; we know we have
+		 * a structure $BASE/daily/container/file here, so use
+		 * the iterators to work our way back.
+		 */
+		fs::path::iterator rit = it->path().end();
+		fs::path rel_path;
+		--rit; --rit; --rit;
+		rel_path = *rit++;
+		rel_path /= *rit++;
+		rel_path /= *rit;
+
+		f = StorageFile::importFile(c, rel_path.native());
+		if (f)
+			c->m_files.push_back(f);
+		else
+			had_errors = true;
+	}
+
+	c->m_files.sort(order_by_filenumber);
+
+	/* We're a run pending translation -- verify we have all of our
+	 * data.
+	 */
+	if (c->m_runNumber && !c->m_translated)
+		had_errors |= c->validate();
+
+	/* We only need to mark this container for manual processing if
+	 * it is an untranslated run.
+	 */
+	if (had_errors && c->m_runNumber && !c->m_translated && !c->m_manual)
+		c->markManual();
+
+	return c;
 }

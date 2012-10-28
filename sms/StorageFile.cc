@@ -9,9 +9,16 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <boost/filesystem.hpp>
+
 #include "StorageFile.h"
 #include "StorageContainer.h"
 #include "StorageManager.h"
+#include "Logging.h"
+
+namespace fs = boost::filesystem;
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
 
 /* TODO find a better place for these packet structures */
 struct header {
@@ -325,9 +332,23 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 }
 
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-					       const std::string &path,
-					       uint32_t fileNumber)
+					       const std::string &path)
 {
+	fs::path p(path);
+	uint32_t fileNumber, runNumber = 0;
+
+	if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
+				&fileNumber, &runNumber) == 0 || !fileNumber) {
+		WARN("Improperly named ADARA file: " << p);
+		return StorageFile::SharedPtr();
+	}
+
+	StorageContainer::SharedPtr o = owner.lock();
+	if (runNumber != o->runNumber()) {
+		WARN("ADARA run doesn't match container for file " << p);
+		return StorageFile::SharedPtr();
+	}
+
 	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
 	f->m_path = path;
 	f->open(O_RDONLY);

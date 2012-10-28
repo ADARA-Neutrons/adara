@@ -21,6 +21,9 @@ public:
 	uint32_t runNumber (void) const { return m_runNumber; }
 	uint32_t numFiles (void) const { return m_numFiles; }
 	const std::string &name(void) const { return m_name; }
+	bool isTranslated(void) const { return m_translated; }
+	bool isManual(void) const { return m_manual; }
+	uint64_t blocks(void) const;
 
 	bool active(void) const { return m_active; }
 
@@ -29,6 +32,7 @@ public:
 	}
 
 	static SharedPtr create(const struct timespec &start, uint32_t run);
+	static SharedPtr scan(const std::string &path);
 
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminate(void);
@@ -49,14 +53,18 @@ private:
 	StorageFile::SharedPtr m_cur_file;
 	onNewFile m_newFile;
 	bool m_active;
+	bool m_translated;
+	bool m_manual;
 
 	std::list<StorageFile::SharedPtr> m_files;
 
 	StorageContainer(const struct timespec &start, uint32_t run);
+	StorageContainer(const std::string &name);
 
 	void terminateFile(void);
 
 	bool createMarker(const char *);
+	bool validate(void);
 
 	static const char *m_completed_marker;
 	static const char *m_manual_marker;

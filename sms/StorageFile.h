@@ -47,8 +47,7 @@ public:
 
 	/* Create an object to manage an existing file */
 	static SharedPtr importFile(OwnerPtr owner,
-				    const std::string &path,
-				    uint32_t fileNumber);
+				    const std::string &path);
 
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminate(ADARA::RunStatus::Enum status);
