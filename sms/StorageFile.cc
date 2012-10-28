@@ -41,21 +41,15 @@ off_t StorageFile::m_max_file_size = 200 * 1024 * 1024;
 
 StorageFile::~StorageFile()
 {
-	if (m_tempFile)
-		close(m_fd);
-
 	//assert(!m_fd_refs);
 	//assert(m_fd == -1);
+
+	if (!m_persist)
+		unlink(m_path.c_str());
 }
 
 int StorageFile::get_fd(void)
 {
-	/* We don't do reference counting for temporary files; if we close
-	 * the file descriptor, we'll loose the data.
-	 */
-	if (m_tempFile)
-		return m_fd;
-
 	if (m_fdRefs) {
 		m_fdRefs++;
 		return m_fd;
@@ -67,12 +61,6 @@ int StorageFile::get_fd(void)
 
 void StorageFile::put_fd(void)
 {
-	/* We don't do reference counting for temporary files; if we close
-	 * the file descriptor, we'll loose the data.
-	 */
-	if (m_tempFile)
-		return;
-
 	//TODO C++ way for this?
 	//assert(m_fd_refs);
 
@@ -83,11 +71,11 @@ void StorageFile::put_fd(void)
 	}
 }
 
-void StorageFile::makePath(const StorageContainer &c)
+void StorageFile::makePath(const StorageContainer *c)
 {
 	char name[16];
 
-	m_path = c.name();
+	m_path = c->name();
 
 	snprintf(name, sizeof(name), "/f%05u", m_fileNumber);
 	m_path += name;
@@ -264,78 +252,91 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
-StorageFile::StorageFile(const StorageContainer &container,
-			 uint32_t fileNumber, bool create,
-			 ADARA::RunStatus::Enum status) :
-	m_runNumber(container.runNumber()), m_fileNumber(fileNumber),
-	m_startTime(container.startTime().tv_sec), m_oversize(false),
-	m_active(create), m_size(0), m_syncDistance(0), m_fd(-1),
-	m_tempFile(false)
+StorageFile::StorageFile(StorageContainer *owner, uint32_t fileNumber) :
+	m_owner(owner), m_fileNumber(fileNumber), m_persist(true),
+	m_oversize(false), m_active(false), m_size(0), m_syncDistance(0),
+	m_fd(-1), m_fdRefs(0)
 {
-	makePath(container);
-	if (!create) {
-		struct stat statbuf;
-		int rc;
+	m_runNumber = m_owner ? m_owner->runNumber() : 0;
+	m_startTime = m_owner ? m_owner->startTime().tv_sec : 0;
+}
 
-		open(O_RDONLY);
-		rc = fstat(m_fd, &statbuf);
-		if (rc)
-			rc = errno;
-		put_fd();
+StorageFile::SharedPtr StorageFile::newFile(StorageContainer *owner,
+					    uint32_t fileNumber,
+					    ADARA::RunStatus::Enum status)
+{
+	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
+	f->m_active = true;
+	f->makePath(owner);
+	f->open(O_CREAT|O_EXCL|O_RDWR);
+	f->addSync();
+	f->addRunStatus(status);
+	return f;
+}
 
-		if (rc) {
-			int err = errno;
-			std::string msg("StorageFile::StorageFile()"
-					" stat error: ");
-			msg += strerror(err);
-			throw std::runtime_error(msg);
-		}
+StorageFile::SharedPtr StorageFile::stateFile(StorageContainer *runInfo,
+					      const std::string &basePath)
+{
+	StorageFile::SharedPtr f(new StorageFile(runInfo, 0));
+	f->m_path = basePath + "/SMS-State-XXXXXX";
 
-		m_size = statbuf.st_size;
-		return;
+	/* We don't assume C++11 compliance, so we cannot rely on
+	 * string::data() giving us a NULL-terminated string for mkstemp()
+	 * to modify in-place, so we have to make a copy, make our file,
+	 * then copy back in.
+	 */
+	char *path = strdup(f->m_path.c_str());
+	if (!path)
+		throw std::bad_alloc();
+
+	f->m_fd = mkstemp(path);
+	if (f->m_fd < 0) {
+		int err = errno;
+		free(path);
+		std::string msg("StorageFile::stateFile() mkstemp error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+        }
+
+	try {
+		/* We did not increase the string length, but there is no
+		 * guarantee the library won't reallocate and fail here.
+		 * Clean up any resulting mess.
+		 */
+		f->m_path = path;
+		free(path);
+	} catch (...) {
+		free(path);
+		throw;
 	}
 
-	open(O_CREAT|O_EXCL|O_RDWR);
-	addSync();
-	addRunStatus(status);
+	/* mkstemp() did the open for us, so we have a reference to the fd */
+	f->m_fdRefs++;
+	f->addSync();
+	f->addRunStatus(ADARA::RunStatus::STATE);
+	return f;
 }
 
-StorageFile::StorageFile(const std::string &path, uint32_t runNumber,
-			 uint32_t fileNumber, uint32_t startTime) :
-	m_runNumber(runNumber), m_fileNumber(fileNumber),
-	m_startTime(startTime), m_oversize(false),
-	m_active(true), m_size(0), m_syncDistance(0), m_fd(-1),
-	m_tempFile(false)
+StorageFile::SharedPtr StorageFile::importFile(StorageContainer *owner,
+					       const std::string &path,
+					       uint32_t fileNumber)
 {
-	open(O_CREAT|O_EXCL|O_RDWR);
-	addSync();
-	addRunStatus(ADARA::RunStatus::STATE);
-}
+	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
+	f->m_path = path;
+	f->open(O_RDONLY);
 
-StorageFile::StorageFile(uint32_t runNumber) :
-	m_runNumber(runNumber), m_fileNumber(0),
-	m_startTime(0), m_oversize(false),
-	m_active(false), m_size(0), m_syncDistance(0), m_fd(-1), m_fdRefs(1),
-	m_tempFile(true)
-{
-	/* This constructor is used to generate a temporary state file
-	 * for live clients that don't care about historical data.
-	 */
-	char path_template[] = "/tmp/SMS-Storage-State-XXXXXX";
+	struct stat statbuf;
+	int err = fstat(f->m_fd, &statbuf);
+	if (err)
+		err = errno;
+	f->put_fd();
 
-	m_fd = mkstemp(path_template);
-	if (m_fd < 0) {
-		int err = errno;
-		std::string msg("StorageFile::open() mkstemp error: ");
+	if (err) {
+		std::string msg("StorageFile::addFile() stat error: ");
 		msg += strerror(err);
 		throw std::runtime_error(msg);
 	}
 
-	/* We don't want this to persist, so delete it so the data is
-	 * free'd when we close the file descriptor.
-	 */
-	unlink(path_template);
-
-	addSync();
-	addRunStatus(ADARA::RunStatus::STATE);
+	f->m_size = statbuf.st_size;
+	return f;
 }

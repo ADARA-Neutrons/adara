@@ -24,18 +24,38 @@ public:
 	bool oversize(void) const { return m_oversize; }
 	off_t size(void) const { return m_size; }
 	uint32_t fileNumber(void) const { return m_fileNumber; }
+	bool willPersist(void) const { return m_persist; }
+	void persist(bool p = true) { m_persist = p; }
 
 	boost::signals::connection connect(const onUpdate::slot_type &slot) {
 		return m_update.connect(slot);
 	}
 
+	/* Create a new file within a container to store data */
+	static SharedPtr newFile(StorageContainer *owner, uint32_t fileNumber,
+				 ADARA::RunStatus::Enum status);
+
+	/* Create a file to persist experiment state information */
+	static SharedPtr stateFile(StorageContainer *runInfo,
+				   const std::string &basePath);
+
+	/* Create an object to manage an existing file */
+	static SharedPtr importFile(StorageContainer *owner,
+				    const std::string &path,
+				    uint32_t fileNumber);
+
+	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
+	void terminate(ADARA::RunStatus::Enum status);
+
 	~StorageFile();
 
 private:
+	StorageContainer *m_owner;
 	std::string m_path;
 	uint32_t m_runNumber;
 	uint32_t m_fileNumber;
 	uint32_t m_startTime;
+	bool m_persist;
 	bool m_oversize;
 	bool m_active;
 	off_t m_size;
@@ -43,27 +63,16 @@ private:
 	int m_fd;
 	unsigned int m_fdRefs;
 	onUpdate m_update;
-	bool m_tempFile;
 
 	static off_t m_max_file_size;
 	static off_t m_max_sync_distance;
 
-	void makePath(const StorageContainer &c);
+	void makePath(const StorageContainer *c);
 	void open(int flags);
-	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
-	void terminate(ADARA::RunStatus::Enum status);
 
-	StorageFile(const StorageContainer &container,
-		    uint32_t number, bool create = false,
-		    ADARA::RunStatus::Enum = ADARA::RunStatus::NO_RUN);
-	StorageFile(const std::string &path, uint32_t runNumber,
-		    uint32_t fileNumber, uint32_t startTime);
-	StorageFile(uint32_t runNumber);
-
-	friend class StorageManager;
-	friend class StorageContainer;
+	StorageFile(StorageContainer *owner, uint32_t fileNumber);
 };
 
 #endif /* __STORAGE_FILE */

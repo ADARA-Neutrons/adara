@@ -101,8 +101,7 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 				status = ADARA::RunStatus::RUN_BOF;
 		}
 
-		m_cur_file.reset(new StorageFile(*this, ++m_numFiles,
-						 true, status));
+		m_cur_file = StorageFile::newFile(this, ++m_numFiles, status);
 		m_files.push_back(m_cur_file);
 
 		/* Tell the storage manager about the new file so we can

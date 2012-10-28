@@ -333,12 +333,12 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 	 * transient file to hold the current state information.
 	 */
 
-	uint32_t run = m_cur_container->runNumber();
-
 	/* Create a file for the current state, and call the prologue
 	 * handlers to populate it.
 	 */
-	StorageFile::SharedPtr state(new StorageFile(run));
+	StorageFile::SharedPtr state(StorageFile::stateFile(
+					m_cur_container.get(), "/tmp"));
+	state->persist(false);
 	fileCreated(state);
 	cb(state, 0);
 
