@@ -56,11 +56,10 @@ bool LiveClient::timerExpired(void)
 void LiveClient::writable(void)
 {
 	FileList::iterator it;
-	StorageFile *f;
 	ssize_t len, rc;
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
-		f = it->first.get();
+		StorageFile::SharedPtr &f = it->first;
 		if (m_file_fd == -1)
 			m_file_fd = f->get_fd();
 

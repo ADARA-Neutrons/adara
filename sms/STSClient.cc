@@ -63,7 +63,6 @@ bool STSClient::sendHeartbeat(void)
 void STSClient::writable(void)
 {
 	std::list<StorageFile::SharedPtr>::iterator it;
-	StorageFile *f;
 	ssize_t len, rc;
 
 	/* We're trying to send data, so cancel the hearbeat timer. We'll
@@ -72,7 +71,7 @@ void STSClient::writable(void)
 	m_timer->cancel();
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
-		f = it->get();
+		StorageFile::SharedPtr &f = *it;
 		if (m_file_fd == -1)
 			m_file_fd = f->get_fd();
 
