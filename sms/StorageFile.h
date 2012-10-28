@@ -15,6 +15,12 @@ public:
 	typedef boost::shared_ptr<StorageFile> SharedPtr;
 	typedef boost::signal<void (const StorageFile &)> onUpdate;
 
+	/* We cannot use StorageContainer::WeakPtr here due to a circular
+	 * dependency, so open-code a matching type to hold the weak pointer
+	 * to the owning container.
+	 */
+	typedef boost::weak_ptr<StorageContainer> OwnerPtr;
+
 	/* TODO can we convert this to a shared_ptr/weak_ptr setup
 	 * for some fd class?
 	 */
@@ -32,15 +38,15 @@ public:
 	}
 
 	/* Create a new file within a container to store data */
-	static SharedPtr newFile(StorageContainer *owner, uint32_t fileNumber,
+	static SharedPtr newFile(OwnerPtr owner, uint32_t fileNumber,
 				 ADARA::RunStatus::Enum status);
 
 	/* Create a file to persist experiment state information */
-	static SharedPtr stateFile(StorageContainer *runInfo,
+	static SharedPtr stateFile(OwnerPtr runInfo,
 				   const std::string &basePath);
 
 	/* Create an object to manage an existing file */
-	static SharedPtr importFile(StorageContainer *owner,
+	static SharedPtr importFile(OwnerPtr owner,
 				    const std::string &path,
 				    uint32_t fileNumber);
 
@@ -50,7 +56,7 @@ public:
 	~StorageFile();
 
 private:
-	StorageContainer *m_owner;
+	OwnerPtr m_owner;
 	std::string m_path;
 	uint32_t m_runNumber;
 	uint32_t m_fileNumber;
@@ -67,12 +73,12 @@ private:
 	static off_t m_max_file_size;
 	static off_t m_max_sync_distance;
 
-	void makePath(const StorageContainer *c);
+	void makePath(void);
 	void open(int flags);
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
 
-	StorageFile(StorageContainer *owner, uint32_t fileNumber);
+	StorageFile(OwnerPtr &owner, uint32_t fileNumber);
 };
 
 #endif /* __STORAGE_FILE */

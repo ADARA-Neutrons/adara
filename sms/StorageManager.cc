@@ -335,8 +335,8 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 	/* Create a file for the current state, and call the prologue
 	 * handlers to populate it.
 	 */
-	StorageFile::SharedPtr state(StorageFile::stateFile(
-					m_cur_container.get(), "/tmp"));
+	StorageFile::SharedPtr state(StorageFile::stateFile(m_cur_container,
+							    "/tmp"));
 	state->persist(false);
 	fileCreated(state);
 	cb(state, 0);

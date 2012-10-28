@@ -46,7 +46,8 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 				status = ADARA::RunStatus::RUN_BOF;
 		}
 
-		m_cur_file = StorageFile::newFile(this, ++m_numFiles, status);
+		m_cur_file = StorageFile::newFile(m_weakThis, ++m_numFiles,
+						  status);
 		m_files.push_back(m_cur_file);
 
 		/* Tell the storage manager about the new file so we can
@@ -115,6 +116,7 @@ StorageContainer::SharedPtr StorageContainer::create(
 					 " path strftime failed");
 
 	StorageContainer::SharedPtr c(new StorageContainer(start, run));
+	c->m_weakThis = c;
 	c->m_name = path;
 
 	snprintf(path, sizeof(path), ".%09lu", start.tv_nsec);

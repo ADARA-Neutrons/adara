@@ -71,9 +71,13 @@ void StorageFile::put_fd(void)
 	}
 }
 
-void StorageFile::makePath(const StorageContainer *c)
+void StorageFile::makePath(void)
 {
+	StorageContainer::SharedPtr c = m_owner.lock();
 	char name[16];
+
+	if (!c)
+		throw std::runtime_error("StorageFile owner is empty!");
 
 	m_path = c->name();
 
@@ -252,29 +256,32 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
-StorageFile::StorageFile(StorageContainer *owner, uint32_t fileNumber) :
-	m_owner(owner), m_fileNumber(fileNumber), m_persist(true),
-	m_oversize(false), m_active(false), m_size(0), m_syncDistance(0),
-	m_fd(-1), m_fdRefs(0)
+StorageFile::StorageFile(OwnerPtr &owner, uint32_t fileNumber) :
+	m_owner(owner), m_runNumber(0), m_fileNumber(fileNumber),
+	m_startTime(0), m_persist(true), m_oversize(false), m_active(false),
+	m_size(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
-	m_runNumber = m_owner ? m_owner->runNumber() : 0;
-	m_startTime = m_owner ? m_owner->startTime().tv_sec : 0;
+	StorageContainer::SharedPtr c = m_owner.lock();
+	if (c) {
+		m_runNumber = c->runNumber();
+		m_startTime = c->startTime().tv_sec;
+	}
 }
 
-StorageFile::SharedPtr StorageFile::newFile(StorageContainer *owner,
+StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
 					    uint32_t fileNumber,
 					    ADARA::RunStatus::Enum status)
 {
 	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
 	f->m_active = true;
-	f->makePath(owner);
+	f->makePath();
 	f->open(O_CREAT|O_EXCL|O_RDWR);
 	f->addSync();
 	f->addRunStatus(status);
 	return f;
 }
 
-StorageFile::SharedPtr StorageFile::stateFile(StorageContainer *runInfo,
+StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 					      const std::string &basePath)
 {
 	StorageFile::SharedPtr f(new StorageFile(runInfo, 0));
@@ -317,7 +324,7 @@ StorageFile::SharedPtr StorageFile::stateFile(StorageContainer *runInfo,
 	return f;
 }
 
-StorageFile::SharedPtr StorageFile::importFile(StorageContainer *owner,
+StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 					       const std::string &path,
 					       uint32_t fileNumber)
 {

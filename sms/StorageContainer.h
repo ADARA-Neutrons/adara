@@ -14,6 +14,7 @@
 class StorageContainer : boost::noncopyable {
 public:
 	typedef boost::shared_ptr<StorageContainer> SharedPtr;
+	typedef boost::weak_ptr<StorageContainer> WeakPtr;
 	typedef boost::signal<void (StorageFile::SharedPtr &)> onNewFile;
 
 	const struct timespec &startTime(void) const { return m_startTime; }
@@ -37,6 +38,7 @@ public:
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
 
 private:
+	WeakPtr m_weakThis;
 	struct timespec m_startTime;
 	uint32_t m_runNumber;
 	uint32_t m_numFiles;
