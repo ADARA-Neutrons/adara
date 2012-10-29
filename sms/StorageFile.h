@@ -32,6 +32,7 @@ public:
 	uint32_t fileNumber(void) const { return m_fileNumber; }
 	bool willPersist(void) const { return m_persist; }
 	void persist(bool p = true) { m_persist = p; }
+	OwnerPtr owner(void) const { return m_owner; }
 
 	boost::signals::connection connect(const onUpdate::slot_type &slot) {
 		return m_update.connect(slot);
