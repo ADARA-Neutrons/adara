@@ -7,6 +7,9 @@
 #include "EPICS.h"
 #include "LiveClient.h"
 #include "StorageFile.h"
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 
 /* We only need to receive the hello packet, which is very small, so don't
  * allocate huge buffers for us.
@@ -60,8 +63,26 @@ void LiveClient::writable(void)
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
 		StorageFile::SharedPtr &f = it->first;
-		if (m_file_fd == -1)
-			m_file_fd = f->get_fd();
+		if (m_file_fd == -1) {
+			try {
+				m_file_fd = f->get_fd();
+			} catch (std::runtime_error re) {
+				std::string cname;
+				StorageContainer::SharedPtr c;
+
+				c = f->owner().lock();
+				if (c)
+					cname = c->name();
+				else
+					cname = "(unknown)";
+
+				ERROR("Unable to open file " << f->fileNumber()
+					<< " for container " << cname << ": "
+					<< re.what());
+				delete this;
+				return;
+			}
+		}
 
 		off_t &cur_offset = it->second;
 		len = f->size() - cur_offset;
@@ -73,15 +94,16 @@ void LiveClient::writable(void)
 			if (errno == EAGAIN || errno == EINTR)
 				goto more;
 
-			if (errno == EPIPE || errno == ECONNRESET) {
-				/* Client went away, just clean up */
-				delete this;
-				return;
+			/* Only complain if it's not the client going away */
+			if (errno != EPIPE && errno != ECONNRESET) {
+				int e = errno;
+				ERROR("Fatal error during sendfile: "
+				      << strerror(e));
 			}
 
-			std::string msg("Fatal error during sendfile: ");
-			msg += strerror(errno);
-			throw std::runtime_error(msg);
+			/* Nothing further to do, just clean ourselves up. */
+			delete this;
+			return;
 		}
 
 		/* If we get rc == 0, then either the file shrunk or

@@ -72,8 +72,18 @@ void STSClient::writable(void)
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
 		StorageFile::SharedPtr &f = *it;
-		if (m_file_fd == -1)
-			m_file_fd = f->get_fd();
+		if (m_file_fd == -1) {
+			try {
+				m_file_fd = f->get_fd();
+			} catch (std::runtime_error re) {
+				ERROR("Unable to open file " << f->fileNumber()
+					<< " for run " << m_run->runNumber()
+					<< ": " << re.what());
+				m_disp = STSClientMgr::PERMAMENT_FAIL;
+				delete this;
+				return;
+			}
+		}
 
 		len = f->size() - m_cur_offset;
 		if (len > m_max_send_chunk)
@@ -85,16 +95,17 @@ void STSClient::writable(void)
 				goto more;
 
 			if (errno == EPIPE || errno == ECONNRESET) {
-				/* Client went away, just clean up */
 				WARN("Lost connection to STS for run "
 				     << m_run->runNumber());
-				delete this;
-				return;
+			} else {
+				int e = errno;
+				ERROR("Run " << m_run->runNumber()
+					<< " had fatal sendfile error error: "
+					<< strerror(e));
 			}
 
-			std::string msg("Fatal error during sendfile: ");
-			msg += strerror(errno);
-			throw std::runtime_error(msg);
+			delete this;
+			return;
 		}
 
 		/* If we get rc == 0, then either the file shrunk or
