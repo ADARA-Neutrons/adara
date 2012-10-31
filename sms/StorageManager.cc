@@ -483,7 +483,7 @@ void StorageManager::scanDaily(const std::string &dir)
 			continue;
 		}
 
-		c = StorageContainer::scan(it->path().native());
+		c = StorageContainer::scan(it->path().string());
 		if (c) {
 			m_scannedBlocks += c->blocks();
 
@@ -532,13 +532,13 @@ void StorageManager::scanStorage(void)
 			continue;
 		}
 
-		if (!isValidDaily(file.native())) {
+		if (!isValidDaily(file.string())) {
 			WARN("Daily directory '" << it->path()
 			      << "' has invalid format");
 			continue;
 		}
 
-		scanDaily(it->path().native());
+		scanDaily(it->path().string());
 	}
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
@@ -660,10 +660,10 @@ void StorageManager::populateDailyCache(void)
 		if (status.type() != fs::directory_file)
 			continue;
 
-		if (!isValidDaily(file.native()))
+		if (!isValidDaily(file.string()))
 			continue;
 
-		m_dailyCache.push_back(file.native());
+		m_dailyCache.push_back(file.string());
 	}
 
 	/* The daily directories have the format YYYYMMDD, so the default
@@ -698,11 +698,13 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal)
 	uint64_t purged = 0;
 	std::list<fs::path>::iterator cit, cend = containers.end();
 	for (cit = containers.begin(); purged < goal && cit != cend; ++cit)
-		purged += StorageContainer::purge(cit->native(), goal - purged);
+		purged += StorageContainer::purge(cit->string(), goal - purged);
 
 	/* Try to remove the directory, but expect to fail. */
-	boost::system::error_code ec;
-	fs::remove(fs::path(dir), ec);
+	try {
+		fs::remove(fs::path(dir));
+	} catch (fs::filesystem_error e) {
+	}
 
 	return purged;
 }
@@ -738,7 +740,7 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		}
 
 		DEBUG("Purging daily " << *it);
-		purged += purgeDaily(dir.native(), purgeRequested - purged);
+		purged += purgeDaily(dir.string(), purgeRequested - purged);
 		++it;
 	}
 

@@ -253,11 +253,11 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	fs::path cpath(fullpath.parent_path().filename());
 	cpath /= cname;
 
-	p = strptime(cname.c_str(), "%Y%m%d-%H%M%S", &tm);
+	p = strptime(cname.string().c_str(), "%Y%m%d-%H%M%S", &tm);
 	if (p && *p == '.') {
 		char tmp[16];
 		strftime(tmp, sizeof(tmp), "%Y%m%d-%H%M%S", &tm);
-		if (strncmp(cname.c_str(), tmp, 15))
+		if (strncmp(cname.string().c_str(), tmp, 15))
 			p = NULL;
 	}
 
@@ -279,7 +279,7 @@ bool StorageContainer::validatePath(const std::string &in_path,
 			snprintf(expected + 25, sizeof(expected) - 25,
 				 "-run-%u", run);
 		}
-		if (strcmp(cname.c_str(), expected))
+		if (strcmp(cname.string().c_str(), expected))
 			p = NULL;
 	}
 
@@ -290,7 +290,7 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	ts.tv_sec = timegm(&tm);
 	ts.tv_nsec = ns;
 
-	out_path = cpath.native();
+	out_path = cpath.string();
 
 	return p;
 }
@@ -363,7 +363,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		rel_path /= *rit++;
 		rel_path /= *rit;
 
-		f = StorageFile::importFile(c, rel_path.native());
+		f = StorageFile::importFile(c, rel_path.string());
 		if (f)
 			c->m_files.push_back(f);
 		else
