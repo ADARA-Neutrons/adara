@@ -116,7 +116,8 @@ private:
 	static void ioCompleted(void);
 	static void requestPurge(uint64_t goal);
 	static uint64_t purgeData(uint64_t goal);
-	static uint64_t purgeDaily(const std::string &dir, uint64_t goal);
+	static uint64_t purgeDaily(const std::string &dir, uint64_t goal,
+				   bool last);
 	static void populateDailyCache(void);
 
 	static void addBaseStorage(off_t size);

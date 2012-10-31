@@ -387,7 +387,8 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	return c;
 }
 
-uint64_t StorageContainer::purge(const std::string &path, uint64_t goal)
+uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
+				 bool keep)
 {
 	std::string cpath;
 	struct timespec ts;
@@ -467,10 +468,11 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal)
 
 	DEBUG("Purged " << purged << " blocks from container " << path);
 
-	/* If we removed all of the ADARA files, remove the translation
-	 * complete marker and the container directory.
+	/* If we removed all of the ADARA files, and are not being asked to
+	 * keep the container around, remove the translation complete marker
+	 * and the container directory.
 	 */
-	if (files.empty()) {
+	if (!keep && files.empty()) {
 		fs::path base(path), completed(path);
 		completed /= m_completed_marker;
 

@@ -672,7 +672,8 @@ void StorageManager::populateDailyCache(void)
 	m_dailyCache.sort();
 }
 
-uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal)
+uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
+				    bool last)
 {
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
@@ -697,8 +698,19 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal)
 
 	uint64_t purged = 0;
 	std::list<fs::path>::iterator cit, cend = containers.end();
-	for (cit = containers.begin(); purged < goal && cit != cend; ++cit)
-		purged += StorageContainer::purge(cit->string(), goal - purged);
+	for (cit = containers.begin(); purged < goal && cit != cend; ) {
+		fs::path &cpath = *cit;
+
+		/* We do the iterator increment in the loop, as we don't
+		 * want the container purge to delete the container when
+		 * it is the last one in the last daily directory -- ie,
+		 * if it could be the current container.
+		 */
+		++cit;
+		purged += StorageContainer::purge(cpath.string(),
+						  goal - purged,
+						  last && cit == cend);
+	}
 
 	/* Try to remove the directory, but expect to fail. */
 	try {
@@ -740,8 +752,16 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		}
 
 		DEBUG("Purging daily " << *it);
-		purged += purgeDaily(dir.string(), purgeRequested - purged);
+
+		/* We need to do the increment in the loop, as we may delete
+		 * elements from the list as we clean the directories. We
+		 * also need to know when we're working on the last known
+		 * daily directory so we can tell purgeDir(). It will use
+		 * this to avoid erasing the current container.
+		 */
 		++it;
+		purged += purgeDaily(dir.string(), purgeRequested - purged,
+				     it == end);
 	}
 
 	m_dailyExhausted = (purged < purgeRequested);
