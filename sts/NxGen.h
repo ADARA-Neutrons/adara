@@ -10,6 +10,12 @@
 #include <boost/lexical_cast.hpp>
 
 
+#define CHARGE_UNITS "picoCoulombs"
+#define FREQ_UNITS "Hz"
+#define TIME_SEC_UNITS "second"
+#define TIME_USEC_UNITS "microsecond"
+
+
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
  *
  * The NxGen class is a stream adapter subclass that specializes the ADARA StreamParser class for creating NeXus output
@@ -38,9 +44,9 @@ private:
         {
             m_name = std::string("bank") + boost::lexical_cast<std::string>(a_id);
             m_eventname = m_name + "_events";
-            m_tof_slab_path = "entry/instrument/" + m_name + "/event_time_offset";
-            m_pid_slab_path = "entry/instrument/" + m_name + "/event_id";
-            m_index_slab_path = "entry/instrument/" + m_name + "/event_index";
+            m_tof_slab_path = "/entry/instrument/" + m_name + "/event_time_offset";
+            m_pid_slab_path = "/entry/instrument/" + m_name + "/event_id";
+            m_index_slab_path = "/entry/instrument/" + m_name + "/event_index";
         }
 
         std::string             m_name;             ///< Name of bank in Nexus file
@@ -69,8 +75,8 @@ private:
             m_event_slab_size(0)
         {
             m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
-            m_index_slab_path = "entry/" + m_name + "/event_index";
-            m_tof_slab_path = "entry/" + m_name + "/event_time_offset";
+            m_index_slab_path = "/entry/" + m_name + "/event_index";
+            m_tof_slab_path = "/entry/" + m_name + "/event_time_offset";
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
@@ -100,7 +106,7 @@ private:
             m_nxgen(a_nxgen),
             m_slab_size(0)
         {
-            m_log_path = std::string("entry/DASlogs/") + a_name;
+            m_log_path = std::string("/entry/DASlogs/") + a_name;
         }
 
         /// NxPVInfo destructor
@@ -119,7 +125,7 @@ private:
                 {
                     m_nxgen.makeGroup( m_log_path, "NXlog" );
                     m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
-                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, "second" );
+                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, TIME_SEC_UNITS );
                 }
 
                 // TODO - This code may need to be optimized when fast metadata is supported
@@ -133,8 +139,8 @@ private:
                     // Add start time (offset) properties to all time axis in DAS logs
                     std::string time = timeToISO8601( a_run_metrics->start_time );
                     std::string time_path = m_log_path + "/time";
-                    m_nxgen.writeStringAttribute( time_path, "offset", time );
-                    m_nxgen.writeScalarAttribute( time_path, "offset_seconds", (uint32_t)a_run_metrics->start_time.tv_sec );
+                    m_nxgen.writeStringAttribute( time_path, "start", time );
+                    m_nxgen.writeScalarAttribute( time_path, "offset_seconds", (uint32_t)a_run_metrics->start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
                     m_nxgen.writeScalarAttribute( time_path, "offset_nanoseconds", (uint32_t)a_run_metrics->start_time.tv_nsec );
 
                     if ( m_slab_size )
@@ -251,6 +257,8 @@ private:
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
+    std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
+    uint32_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
 };
 
 #endif // NXGEN_H

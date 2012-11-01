@@ -150,9 +150,10 @@ calcDiffSeconds
 inline std::string
 timeToISO8601
 (
-    const struct timespec &a_ts
+    const struct timespec &a_ts    ///< [in] Time value to format into ISO8601
 )
 {
+    // Time must be in Unix epoch for strftime to work
     time_t              time = a_ts.tv_sec;
     struct tm          *timeinfo = localtime(&time);
     std::stringstream   result;
@@ -163,7 +164,21 @@ timeToISO8601
     result << date << "." << std::right << std::setw(9) << std::setfill('0') << a_ts.tv_nsec;
 
     strftime(date, sizeof(date), "%z", timeinfo);
-    result << date;
+
+    unsigned long len = strlen( date );
+
+    if ( len == 5 ) // If no ':' present (i.e. -0100)
+    {
+        result << date[0] << date[1] << date[2] << ":" << date[3] << date[4];
+    }
+    else if ( len == 3 ) // Short version (i.e. -01)
+    {
+        result << date << ":00";
+    }
+    else
+    {
+        result << date;
+    }
 
     return result.str();
 }

@@ -12,7 +12,7 @@
 
 using namespace std;
 
-#define STS_VERSION "0.1.2"
+#define STS_VERSION "0.1.3"
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )

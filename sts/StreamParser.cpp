@@ -439,6 +439,10 @@ StreamParser::processPulseInfo
     m_pulse_info.charges.push_back( charge );
     m_run_metrics.charge_stats.push( charge );
 
+    // Accumulate flags
+    m_pulse_info.flags.push_back( a_pkt.flags() );
+
+    // Handle time and frequency info
     if ( m_pulse_info.start_time )
     {
         uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time;
@@ -466,6 +470,7 @@ StreamParser::processPulseInfo
 
         m_pulse_info.times.clear();
         m_pulse_info.freqs.clear();
+        m_pulse_info.flags.clear();
         m_pulse_info.charges.clear();
     }
 }
@@ -605,6 +610,9 @@ StreamParser::rxPacket
 
         processMonitorEvents( monitor_id, event_count, rpos );
         rpos += event_count;
+
+        // Monitor events are counted as non-events
+        m_run_metrics.non_events_counted += event_count;
     }
 
     return false;

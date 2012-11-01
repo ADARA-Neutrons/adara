@@ -22,6 +22,7 @@ struct PulseInfo
     std::vector<double>     times;              ///< Pulse time buffer (seconds)
     std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
     std::vector<double>     charges;            ///< Pulse charge buffer
+    std::vector<uint32_t>   flags;              ///< Pulse flags (defined in BankedEventPkt class)
 };
 
 
@@ -125,12 +126,13 @@ struct RunInfo
 /// Run metrics collected by STS during translation
 struct RunMetrics
 {
-    RunMetrics() : total_charge(0.0), events_counted(0), events_uncounted(0)
+    RunMetrics() : total_charge(0.0), events_counted(0), events_uncounted(0), non_events_counted(0)
     {}
 
     double                  total_charge;
     uint64_t                events_counted;
     uint64_t                events_uncounted;
+    uint64_t                non_events_counted;
     struct timespec         start_time;
     struct timespec         end_time;
     Statistics              charge_stats;       ///< Pulse charge statistics
