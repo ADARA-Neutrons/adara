@@ -38,6 +38,7 @@ int main(int argc, char** argv)
     string                      sms_reason;
     bool                        interact;
     string                      work_path;
+    string                      base_path;
     unsigned long               chunk_size;
     unsigned short              evt_buf_size;
     unsigned short              anc_buf_size;
@@ -68,6 +69,7 @@ int main(int argc, char** argv)
                 ("no-adara,a", po::bool_switch( &suppress_adara )->default_value( false ), "suppress adara output stream generation")
                 ("file,f",po::value<string>(),"read input from file instead of stdin")
                 ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
+                ("base-path,b",po::value<string>( &base_path ),"set base cataloging path (none by defualt)")
                 ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
                 ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 2048 ),"set hdf5 chunk size (in bytes)")
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
@@ -125,6 +127,7 @@ int main(int argc, char** argv)
             cout << "  adara file   : " << adara_outfile << endl;
             cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
             cout << "  work path    : " << work_path << endl;
+            cout << "  base path    : " << base_path << endl;
             cout << "  move nexus   : " << ( move ? "yes" : "no" ) << endl;
             cout << "  chunk size   : " << chunk_size << " (bytes)" << endl;
             cout << "  cache size   : " << cache_size << " (bytes)" << endl;
@@ -159,7 +162,12 @@ int main(int argc, char** argv)
 
             if ( move )
             {
-                string cat_path = string("/") + nxgen.getFacilityName() + "/" + nxgen.getBeamShortName() + "/" + nxgen.getProposalID() + "/";
+                if ( base_path.empty() )
+                    base_path = "/";
+                else if ( base_path[base_path.length()-1] != '/')
+                    base_path += "/";
+
+                string cat_path = base_path + nxgen.getFacilityName() + "/" + nxgen.getBeamShortName() + "/" + nxgen.getProposalID() + "/";
                 string cat_name = nxgen.getBeamShortName() + "_" + boost::lexical_cast<string>(nxgen.getRunNumber());
 
                 moveFile( adara_outfile, cat_path + "adara", cat_name + ".adara" );
