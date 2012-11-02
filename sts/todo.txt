@@ -60,3 +60,4 @@ Version History
 0.1.3 - Changed time format to include ':' in timezone offset
         Clean-up units strings in MxGen class
         Many small changes based on Maries short diff document (some still outstanding)
+0.1.4 - Added base cataloging path option (for test harness/manual translation)
