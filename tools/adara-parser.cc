@@ -505,7 +505,7 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
 	// TODO display more fields (check that the contents don't change)
 	printf("%u.%09u DEVICE DESCRIPTOR\n"
-	       "    Device %d\n",
+	       "    Device %u\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.devId());
 	return false;
@@ -514,7 +514,7 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
 	printf("%u.%09u U32 VARIABLE\n"
-	       "    Device %d Variable %d\n"
+	       "    Device %u Variable %u\n"
 	       "    Status %s Severity %s\n"
 	       "    Value %u\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
@@ -526,7 +526,7 @@ bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
 	printf("%u.%09u DOUBLE VARIABLE\n"
-	       "    Device %d Variable %d\n"
+	       "    Device %u Variable %u\n"
 	       "    Status %s Severity %s\n"
 	       "    Value %f\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
@@ -538,7 +538,7 @@ bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
 	printf("%u.%09u String VARIABLE\n"
-	       "    Device %d Variable %d\n"
+	       "    Device %u Variable %u\n"
 	       "    Status %s Severity %s\n"
 	       "    Value '%s'\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
