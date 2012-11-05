@@ -12,6 +12,7 @@
 #include "Logging.h"
 
 #include <math.h>
+#include <boost/lexical_cast.hpp>
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
@@ -276,6 +277,98 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	mon->second.m_eventTof.push_back(tof);
 }
 
+void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
+				 uint32_t pixel, uint32_t tof)
+{
+	uint32_t cid = pixel & ~0xf0000000;
+	cid >>= 16;
+
+	if (!m_choppers.count(cid)) {
+		std::string ddp, num;
+
+		num = boost::lexical_cast<std::string>(cid);
+
+		ddp += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+		ddp += "<device "
+		"xmlns=\"http://public.sns.gov/schema/device.xsd\"\n"
+		"    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n"
+		"    xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd "
+		"http://public.sns.gov/schema/device.xsd\">\n";
+
+		ddp += "  <device_name>chopper";
+		ddp += num;
+		ddp += "_TDC</device_name>\n";
+		ddp += "  <process_variables>\n";
+		ddp += "    <process_variable>\n";
+		ddp += "      <pv_name>chopper";
+		ddp += num;
+		ddp += "_TDC_falling</pv_name>\n";
+		ddp += "      <pv_id>1</pv_id>\n";
+		ddp += "      <pv_description>Falling Edge of TDC signal (offset from pulse)</pv_description>\n";
+		ddp += "      <pv_type>unsigned integer</pv_type>\n";
+		ddp += "      <pv_units>nanoseconds</pv_units>\n";
+		ddp += "    </process_variable>\n";
+		ddp += "    <process_variable>\n";
+		ddp += "      <pv_name>chopper";
+		ddp += num;
+		ddp += "_TDC</pv_name>\n";
+		ddp += "      <pv_id>2</pv_id>\n";
+		ddp += "      <pv_description>Rising Edge of TDC signal (offset from pulse)</pv_description>\n";
+		ddp += "      <pv_type>unsigned integer</pv_type>\n";
+		ddp += "      <pv_units>nanoseconds</pv_units>\n";
+		ddp += "    </process_variable>\n";
+		ddp += "  </process_variables>\n";
+		ddp += "</device>";
+
+		uint32_t size = (ddp.size() + 3) & ~3;
+		size += 2 * sizeof(uint32_t) + sizeof(ADARA::Header);
+
+		uint32_t pkt[size / sizeof(uint32_t)];
+
+		memset(pkt, 0, sizeof(pkt));
+		pkt[0] = size - sizeof(ADARA::Header);
+		pkt[1] = ADARA::PacketType::DEVICE_DESC_V0;
+		pkt[2] = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
+
+		/* We currently reserve device IDs 0x80000000 for SMS internal
+		 * use. We put the choppers at the low end.
+		 *
+		 * TODO better allocation policy for IDs.
+		 */
+		pkt[4] = 0x80000000 | cid;
+		pkt[5] = ddp.size();
+		memcpy(pkt + 6, ddp.data(), ddp.size());
+
+		/* The MetaDataMgr wants to copy the DDP packet, but needs
+		 * an ADARA packet. Construct an object around our array.
+		 */
+		ADARA::Packet ddp_pkt((uint8_t *) pkt, sizeof(pkt));
+		m_meta->addFastMetaDDP(ddp_pkt, pkt[4], 0);
+
+		m_choppers.insert(cid);
+	}
+
+	/* The time-of-flight value is in bits 0-20 of the field; mask
+	 * out the frame number and unused high bit. Then we convert from
+	 * a 100ns unit to pure nanoseconds.
+	 *
+	 * We store leading vs trailing edge in the low-order bit; we need
+	 * this when emitting the packets later to generate the right
+	 * variable ID.
+	 *
+	 * TODO we currently expect the preprocessor to frame-correct
+	 * these values; if this is not the case, we will need to handle
+	 * that here.
+	 */
+	tof &= (1U << 21) - 1;
+	tof *= 100;
+	tof <<= 1;
+	if (pixel & 1)
+		tof |= 1;
+
+	pulse->m_chopperEvents[cid].push_back(tof);
+}
+
 void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			     uint32_t dup)
 {
@@ -329,13 +422,18 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			addMonitorEvent(pkt, pulse, phys, events[i].tof);
 			pulse->m_numMonEvents++;
 			continue;
+		case 7:
+			/* Add this event to our choppers, and go on to the
+			 * next raw event -- it doesn't go into the banked
+			 * event section.
+			 */
+			addChopperEvent(pkt, pulse, phys, events[i].tof);
+			continue;
 		case 0:
 			if (m_pixelMap->mapEvent(phys, logical, bank))
 				pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
 			bank += Pulse::REAL_BANK_OFFSET;
 			break;
-		case 7:
-			/* TODO handle chopper events */
 		case 5: case 6:
 			/* TODO handle fast metadata */
 		case 1: case 2: case 3:
@@ -446,6 +544,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 	buildMonitorPacket(pulse);
 	buildBankedPacket(pulse);
+	buildChopperPackets(pulse);
 }
 
 void SMSControl::buildMonitorPacket(PulsePtr &pulse)
@@ -588,6 +687,41 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	/* TODO update history of bank event counts and size m_bankReserve
 	 * accordingly to try to avoid reallocation events.
 	 */
+}
+
+void SMSControl::buildChopperPackets(PulsePtr &pulse)
+{
+	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
+
+	pkt[0] = 4 * sizeof(uint32_t);
+	pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
+	pkt[2] = pulse->m_id.first >> 32;
+	pkt[3] = pulse->m_id.first;
+	pkt[6] = ADARA::VariableStatus::OK << 16;
+	pkt[6] |= ADARA::VariableSeverity::OK;
+
+	ChopperMap::iterator cit, cend = pulse->m_chopperEvents.end();
+	for (cit = pulse->m_chopperEvents.begin(); cit != cend; ++cit) {
+		/* Set the device ID inside SMS's range, using the chopper's
+		 * ID number.
+		 */
+		pkt[4] = 0x80000000 | cit->first;
+
+		ChopperEvents::iterator eit, eend = cit->second.end();
+		for (eit = cit->second.begin(); eit != eend; ++eit) {
+			uint32_t val = *eit;
+
+			/* Set the variable ID and the updated value */
+			pkt[5] = (val & 1) + 1;
+			pkt[7] = val >> 1;
+
+			/* We consider chopper data as fast metadata, so
+			 * we don't keep track of the current value and just
+			 * push it into the stream.
+			 */
+			StorageManager::addPacket(pkt, sizeof(pkt));
+		}
+	}
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,

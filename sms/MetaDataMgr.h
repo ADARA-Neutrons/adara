@@ -29,6 +29,8 @@ public:
 		updateVariable(in.devId(), in.varId(), in, tag);
 	}
 
+	void addFastMetaDDP(const ADARA::Packet &, uint32_t, uint32_t);
+
 private:
 	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
 	typedef std::map<uint32_t, PacketSharedPtr> VariableMap;

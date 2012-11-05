@@ -70,6 +70,26 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	m_devices[in.devId()].m_tag = tag;
 }
 
+void MetaDataMgr::addFastMetaDDP(const ADARA::Packet &ddp, uint32_t devId,
+				 uint32_t tag)
+{
+	DeviceMap::iterator it = m_devices.find(devId);
+
+	if (it != m_devices.end()) {
+		ERROR("addFastMetaDDP() adding existing device 0x"
+			<< std::hex << devId);
+		return;
+	}
+
+	/* Add the descriptor to the stream before we squirrel it away; this
+	 * keeps us from writing it twice in close proximity if we start
+	 * a new file with it.
+	 */
+	StorageManager::addPacket(ddp.packet(), ddp.packet_length());
+	m_devices[devId].m_descriptor.reset(new ADARA::Packet(ddp));
+	m_devices[devId].m_tag = tag;
+}
+
 void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 				 const ADARA::Packet &in, uint32_t tag)
 {
