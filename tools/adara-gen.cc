@@ -32,6 +32,8 @@ static bool verbose = false;
 static unsigned int events_per_pulse = 100;
 static unsigned int num_monitors = 1;
 static unsigned int monitor_events = 1;
+static unsigned int num_choppers = 1;
+static unsigned int chopper_events = 1;
 static double pulse_interval = 1.0 / 60;
 static std::vector<uint32_t> source_ids;
 static double min_tof = 0.010;
@@ -66,9 +68,9 @@ public:
 
 	Pulse(const struct timespec &t, uint32_t intra, uint32_t c) :
 		ts(t), intrapulse(intra), nevents(events_per_pulse),
-		mevents(monitor_events), mon_index(0), src_index(0),
-		src_events(events_per_source), cycle(c), rtdl_pending(true),
-		pkt_seq(0)
+		mevents(monitor_events), cevents(chopper_events), mon_index(0),
+		chopper_index(0), src_index(0), src_events(events_per_source),
+		cycle(c), rtdl_pending(true), pkt_seq(0)
 	{
 		ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
 	}
@@ -77,7 +79,9 @@ public:
 	uint32_t	intrapulse;
 	uint32_t	nevents;
 	uint32_t	mevents;
+	uint32_t	cevents;
 	uint32_t	mon_index;
+	uint32_t	chopper_index;
 	uint32_t	src_index;
 	uint32_t	src_events;
 	uint32_t	cycle;
@@ -190,9 +194,27 @@ public:
 		*field++ = (p.pkt_seq++ << 16) | dsp_seq[p.src_index]++;
 		field = buildCommon(field, p);
 
-		/* All monitors go into the first source, then we'll
-		 * start filling with real (fake) data.
-		*/
+		/* All choppers and monitors go into the first source, then
+		 * we'll start filling with real (fake) data.
+		 */
+		while (p.chopper_index < num_choppers) {
+			while (p.cevents) {
+				p.cevents--;
+				*field++ = 1 + (chopper_events - p.cevents);
+				*field++ = (p.chopper_index << 16) |
+					(7 << 28) | 1;
+				pktlen += 8;
+				*payload_len += 8;
+
+				if (pktlen >= (MAX_PACKET_SIZE - 8))
+					return;
+			}
+
+			/* Finished this chopper, start the next one. */
+			p.cevents = chopper_events;
+			p.chopper_index++;
+		}
+
 		while (p.mon_index < num_monitors) {
 			while (p.mevents) {
 				/* Fake TOF at a quarter of the detectors. */
@@ -479,6 +501,10 @@ static void parse_options(int argc, char **argv)
 				"Number of beam monitors")
 		("mevents,M", po::value<unsigned int>(&monitor_events),
 				"Number of beam monitor events per pulse")
+		("choppers,c", po::value<unsigned int>(&num_choppers),
+				"Number of choppers")
+		("cevents,C", po::value<unsigned int>(&chopper_events),
+				"Number of chopper events per pulse")
 		("port,p", po::value<uint16_t>(&listen_port), "Listening port")
 		("mintof,t", po::value<double>(&min_tof),
 				"Minumum time-of-flight")
