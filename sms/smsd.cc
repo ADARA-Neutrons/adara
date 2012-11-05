@@ -14,6 +14,8 @@
 namespace po = boost::program_options;
 
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
+static std::string source_port("31416");
+static std::string sts_port("31417");
 
 static void parse_options(int argc, char **argv)
 {
@@ -21,7 +23,11 @@ static void parse_options(int argc, char **argv)
 	desc.add_options()
 		("help,h", "Show usage information")
 		("logconf,l", po::value<std::string>(),
-				"Path to log4cxx property file");
+				"Path to log4cxx property file")
+		("source-port", po::value<std::string>(),
+				"Socket port for connecting to DAS control source")
+		("sts-port", po::value<std::string>(),
+				"Socket port for connecting to STS client");
 
 	po::variables_map vm;
 	try {
@@ -40,6 +46,10 @@ static void parse_options(int argc, char **argv)
 
 	if (vm.count("logconf"))
 		log_conf = vm["logconf"].as<std::string>();
+	if (vm.count("source-port"))
+		source_port = vm["source-port"].as<std::string>();
+	if (vm.count("sts-port"))
+		sts_port = vm["sts-port"].as<std::string>();
 }
 
 void block_signals(void)
@@ -84,9 +94,13 @@ int main(int argc, char **argv)
 	StorageManager::init("/SNSlocal/sms/data");
 	LiveServer liveServer("31415");
 	SMSControl control("BL14BS", "HYSA", "HYSPECA");
-	STSClientMgr stsclient("localhost:31417");
+	// STSClientMgr stsclient("localhost:31417");
+	std::string sts_host("localhost");
+	STSClientMgr stsclient(sts_host + ":" + sts_port);
 
-	control.addSource("localhost:31416");
+	// control.addSource("localhost:31416");
+	std::string source_host("localhost");
+	control.addSource(source_host + ":" + source_port);
 
 	for (;;) {
 		fileDescriptorManager.process(1000.0);
