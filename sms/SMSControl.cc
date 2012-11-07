@@ -33,7 +33,7 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 SMSControl::SMSControl(const std::string &beamlineId,
 		       const std::string &beamlineShortName,
 		       const std::string &beamlineLongName) :
-	m_currentRunNumber(0), m_recording(false), m_nextSrcId(0),
+	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
 	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr)
 {
 	if (m_singleton)
@@ -167,6 +167,8 @@ void SMSControl::addSource(const std::string &uri)
 	 */
 	boost::shared_ptr<DataSource> src(new DataSource(uri, m_nextSrcId));
 	m_sources.push_back(src);
+
+	/* We save source ID 0 for internal use. */
 	m_nextSrcId++;
 	/* TODO check against the max number of sources? */
 }
