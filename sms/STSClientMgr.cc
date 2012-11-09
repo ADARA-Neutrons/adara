@@ -30,7 +30,8 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_transient_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::transientTimeout)),
 	m_fd(-1), m_fdreg(NULL), m_connecting(false), m_backoff(false),
-	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST)
+	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST),
+	m_currentRun(0)
 {
 	if (m_singleton)
                 throw std::runtime_error("STSClientMgr is a singleton");
