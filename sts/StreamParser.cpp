@@ -228,6 +228,7 @@ StreamParser::rxPacket
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
     case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
+    // case ADARA::PacketType::MARKER_EVENT:  //TODO Implement when avail
         PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
     // These packets shall only be processed during event processing
@@ -1038,6 +1039,54 @@ StreamParser::rxPacket
     return false;
 }
 
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Stream Marker packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+#if 0
+/*! \brief This method processes Stream Marker ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Stream Marker packets.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::StreamMarkerPkt &a_pkt     ///< [in] The ADARA Stream Marker Packet to process
+)
+{
+    double t = 0;
+
+    // Note: if first pulse has not arrived, truncate all PV times to 0
+    if ( m_pulse_info.start_time )
+    {
+        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)*1.0e-9;
+    }
+
+
+    // Switch on event type
+    switch ( a_pkt.type())
+    {
+    case ADARA::StreamMarkerPkt::PAUSE:
+        markerPause( t );
+        break;
+    case ADARA::StreamMarkerPkt::RESUME:
+        markerResume( t );
+        break;
+    case ADARA::StreamMarkerPkt::SCAN_START:
+        markerScanStart( t, a_pkt.value(), a_pkt.comment() );
+        break;
+    case ADARA::StreamMarkerPkt::SCAN_STOP:
+        markerScanStop( t, a_pkt.value() );
+        break;
+    case ADARA::StreamMarkerPkt::COMMENT:
+        markerRunComment( t, a_pkt.comment() );
+        break;
+    }
+
+    return false;
+}
+#endif
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA support methods

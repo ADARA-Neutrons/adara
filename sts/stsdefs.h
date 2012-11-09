@@ -251,6 +251,11 @@ public:
     virtual void            monitorBuffersReady( STS::MonitorInfo &a_monitor_info ) = 0;
     virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
     virtual void            monitorFinalize( STS::MonitorInfo &a_monitor ) = 0;
+    virtual void            markerPause( double a_time ) = 0;
+    virtual void            markerResume( double a_time ) = 0;
+    virtual void            markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment ) = 0;
+    virtual void            markerScanStop( double a_time, unsigned long a_scan_index ) = 0;
+    virtual void            markerRunComment( double a_time, const std::string &a_comment ) = 0;
 };
 
 // ============================================================================

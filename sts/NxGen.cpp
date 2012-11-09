@@ -35,7 +35,8 @@ NxGen::NxGen
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
-    m_pulse_vetoes_slab_size(0)
+    m_pulse_vetoes_slab_size(0),
+    m_marker_slab_size(0)
 {
     if ( !a_nexus_out_file.empty() )
     {
@@ -175,20 +176,36 @@ NxGen::initialize()
     {
         m_h5nx.H5NXcreate_file( m_nexus_filename );
 
+        // Create general Nexus entries
         makeGroup( "/entry", "NXentry" );
         makeGroup( "/entry/instrument", "NXinstrument" );
         makeGroup( "/entry/DASlogs", "NXcollection" );
-        makeGroup( "/entry/DASlogs/Veto_pulse", "NXlog" );
+
+        // Create pulse frequency log
         makeGroup( "/entry/DASlogs/frequency", "NXlog" );
-        makeGroup( "/entry/DASlogs/proton_charge", "NXlog" );
-
-        makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
-
         makeDataset( "/entry/DASlogs/frequency", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
         makeDataset( "/entry/DASlogs/frequency", "value", NeXus::FLOAT64, FREQ_UNITS );
 
+        // Create proton charge log (time same as pulse frequency)
+        makeGroup( "/entry/DASlogs/proton_charge", "NXlog" );
         makeDataset( "/entry/DASlogs/proton_charge", "value", NeXus::FLOAT64, CHARGE_UNITS );
         makeLink( "/entry/DASlogs/frequency/time", "/entry/DASlogs/proton_charge/time" );
+
+        // Create pulse veto log
+        makeGroup( "/entry/DASlogs/Veto_pulse", "NXlog" );
+        makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
+
+        // Create marker event log (value may have string attribs)
+        m_marker_log_path = "/entry/DASlogs/markers/";
+        makeGroup( "/entry/DASlogs/markers", "NXlog" );
+        makeDataset( "/entry/DASlogs/markers", "time", NeXus::FLOAT32, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/markers", "raw_value", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/markers", "value", NeXus::UINT32 );
+
+        // Create comment log (for markers and/or user comments)
+        makeGroup( "/entry/DASlogs/comments", "NXlog" );
+        makeDataset( "/entry/DASlogs/comments", "time", NeXus::FLOAT32, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/comments", "value", NeXus::CHAR );
     }
     catch( TraceException &e )
     {
@@ -230,6 +247,20 @@ NxGen::finalize
             writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
             m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
+        }
+
+        // Flush any remaining markers
+        if ( m_marker_time.size() )
+        {
+            // Marker events are very low-frequency, no buffering needed
+            writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
+            writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
+            writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
+
+            //if ( a_comment.length())
+            //{
+                // TODO Handle comments
+            //}
         }
 
         float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
@@ -545,6 +576,70 @@ NxGen::monitorFinalize
     }
 }
 
+
+void
+NxGen::markerPause( double a_time )
+{
+    markerWrite( a_time, MT_PAUSE, 0, "" );
+}
+
+
+void
+NxGen::markerResume( double a_time )
+{
+    markerWrite( a_time, MT_RESUME, 0, "" );
+}
+
+
+void
+NxGen::markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment )
+{
+    markerWrite( a_time, MT_SCAN_START, a_scan_index, a_scan_comment );
+}
+
+
+void
+NxGen::markerScanStop( double a_time, unsigned long a_scan_index )
+{
+    markerWrite( a_time, MT_SCAN_STOP, a_scan_index, "" );
+}
+
+
+void
+NxGen::markerRunComment( double a_time, const std::string &a_comment )
+{
+    markerWrite( a_time, MT_COMMENT, 0, a_comment );
+}
+
+
+void
+NxGen::markerWrite( double a_time, MarkerType a_type, unsigned long a_value, const std::string &a_comment )
+{
+    m_marker_time.push_back( a_time );
+    m_marker_type.push_back( a_type );
+    m_marker_value.push_back( a_value );
+    m_marker_comments.push_back( a_comment );
+
+    if ( m_marker_time.size() >= m_chunk_size )
+    {
+        // Marker events are very low-frequency, no buffering needed
+        writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
+        writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
+        writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
+
+        //if ( a_comment.length())
+        //{
+            // TODO Handle comments
+        //}
+
+        m_marker_slab_size += m_marker_time.size();
+
+        m_marker_time.clear();
+        m_marker_type.clear();
+        m_marker_value.clear();
+        m_marker_comments.clear();
+    }
+}
 
 /*! \brief Converts a PVType to a Nexus NXnumtype
  *  \return The most appropriate Nxnumtype for the provided PVType

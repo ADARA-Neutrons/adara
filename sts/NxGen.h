@@ -163,6 +163,15 @@ private:
         uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
     };
 
+    enum MarkerType
+    {
+        MT_PAUSE      = 1,
+        MT_RESUME     = 2,
+        MT_SCAN_START = 3,
+        MT_SCAN_STOP  = 4,
+        MT_COMMENT    = 5
+    };
+
 public:
 
     NxGen( int a_fd_in, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_event_buf_chunk_count = 20, unsigned short a_ancillary_buf_chunk_count = 5, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
@@ -184,6 +193,12 @@ protected:
     void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
     void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
+    void                markerPause( double a_time );
+    void                markerResume( double a_time );
+    void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment );
+    void                markerScanStop( double a_time, unsigned long a_scan_index );
+    void                markerRunComment( double a_time, const std::string &a_comment );
+    void                markerWrite( double a_time, MarkerType a_type, unsigned long a_value, const std::string &a_comment );
 
 private:
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
@@ -258,7 +273,13 @@ private:
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
-    uint32_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
+    uint64_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
+    std::vector<double>         m_marker_time;
+    std::vector<unsigned long>  m_marker_type;
+    std::vector<unsigned long>  m_marker_value;
+    std::vector<std::string>    m_marker_comments;
+    uint64_t                    m_marker_slab_size;
+    std::string                 m_marker_log_path;
 };
 
 #endif // NXGEN_H
