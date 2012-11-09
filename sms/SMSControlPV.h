@@ -114,6 +114,47 @@ public:
 	virtual void changed(void);
 };
 
+class smsBooleanPV : public smsPV {
+public:
+	smsBooleanPV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(bool val, struct timespec *ts);
+	bool valid(void);
+	bool value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
+};
+
+class smsUint32PV : public smsPV {
+public:
+	smsUint32PV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(uint32_t val, struct timespec *ts);
+	bool valid(void);
+	uint32_t value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
+};
+
 class smsTriggerPV : public smsPV {
 public:
 	smsTriggerPV(const std::string &name);
