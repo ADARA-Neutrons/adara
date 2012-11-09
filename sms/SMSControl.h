@@ -22,6 +22,8 @@ class DataSource;
 class PixelMap;
 class BeamlineInfo;
 class MetaDataMgr;
+class MetaDataMgr;
+class Markers;
 
 class SMSControl : public caServer {
 public:
@@ -152,6 +154,7 @@ private:
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
 	boost::shared_ptr<MetaDataMgr> m_meta;
+	boost::shared_ptr<Markers> m_markers;
 	std::set<uint32_t> m_choppers;
 
 	uint32_t m_maxBanks;

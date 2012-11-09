@@ -8,6 +8,7 @@
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
 #include "MetaDataMgr.h"
+#include "Markers.h"
 
 #include "Logging.h"
 
@@ -47,6 +48,7 @@ SMSControl::SMSControl(const std::string &beamlineId,
 						smsRecordingPV(prefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(prefix));
+	m_markers = boost::shared_ptr<Markers>(new Markers(beamlineId, this));
 
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
