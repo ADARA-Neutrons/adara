@@ -100,7 +100,11 @@ StreamParser::processStream()
 
         while( m_processing_state < DONE_PROCESSING )
         {
-            read( m_fd, ADARA_IN_BUF_SIZE );
+            if ( !read( m_fd, ADARA_IN_BUF_SIZE ))
+            {
+              if ( m_processing_state != DONE_PROCESSING )
+                  THROW_TRACE( ERR_GENERAL_ERROR, "ADARA parser stopped unexpectedly." );
+            }
         }
     }
     catch ( TraceException &e )
