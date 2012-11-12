@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
+#include <sys/socket.h>
 
 #include <boost/bind.hpp>
 
@@ -133,9 +134,15 @@ void STSClient::writable(void)
 	}
 
 	if (!m_run->active()) {
-		/* TODO we've sent everything from this file, wait for
-		 * the STS to respond.
+		/* We've sent everything from this file, so shutdown the
+		 * write side of our socket. This will signal an EOF to
+		 * STS, so we'll notice if we're trying to resend a
+		 * corrupted file without a proper ending RunStatus packet.
 		 */
+		if (shutdown(m_sts_fd, SHUT_WR)) {
+			int e = errno;
+			WARN("shutdown() failed: " << strerror(e));
+		}
 	}
 
 idle:
