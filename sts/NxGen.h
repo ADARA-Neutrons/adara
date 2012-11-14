@@ -197,10 +197,11 @@ protected:
     void                markerResume( double a_time );
     void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment );
     void                markerScanStop( double a_time, unsigned long a_scan_index );
-    void                markerRunComment( double a_time, const std::string &a_comment );
+    void                markerComment( double a_time, const std::string &a_comment );
     void                markerWrite( double a_time, MarkerType a_type, unsigned long a_value, const std::string &a_comment );
 
 private:
+    void                flushMarkerData();
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path, const std::string &a_type );
     void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
@@ -275,10 +276,14 @@ private:
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
     uint64_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
     std::vector<double>         m_marker_time;
-    std::vector<unsigned long>  m_marker_type;
-    std::vector<unsigned long>  m_marker_value;
-    std::vector<std::string>    m_marker_comments;
+    std::vector<uint16_t>       m_marker_type;
+    std::vector<uint32_t>       m_marker_value;
+    std::vector<uint32_t>       m_marker_string_offset;
+    unsigned long               m_last_marker_string_offset;
+    std::vector<uint32_t>       m_marker_string_length;
+    std::vector<char>           m_marker_string_data;
     uint64_t                    m_marker_slab_size;
+    uint64_t                    m_marker_string_slab_size;
     std::string                 m_marker_log_path;
 };
 

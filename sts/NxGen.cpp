@@ -36,7 +36,9 @@ NxGen::NxGen
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
     m_pulse_vetoes_slab_size(0),
-    m_marker_slab_size(0)
+    m_last_marker_string_offset(0),
+    m_marker_slab_size(0),
+    m_marker_string_slab_size(0)
 {
     if ( !a_nexus_out_file.empty() )
     {
@@ -198,14 +200,12 @@ NxGen::initialize()
         // Create marker event log (value may have string attribs)
         m_marker_log_path = "/entry/DASlogs/markers/";
         makeGroup( "/entry/DASlogs/markers", "NXlog" );
-        makeDataset( "/entry/DASlogs/markers", "time", NeXus::FLOAT32, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/markers", "raw_value", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/markers", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/markers", "raw_value", NeXus::UINT16 );
         makeDataset( "/entry/DASlogs/markers", "value", NeXus::UINT32 );
-
-        // Create comment log (for markers and/or user comments)
-        makeGroup( "/entry/DASlogs/comments", "NXlog" );
-        makeDataset( "/entry/DASlogs/comments", "time", NeXus::FLOAT32, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/comments", "value", NeXus::CHAR );
+        makeDataset( "/entry/DASlogs/markers", "string_offset", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/markers", "string_length", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/markers", "string_data", NeXus::CHAR );
     }
     catch( TraceException &e )
     {
@@ -251,17 +251,7 @@ NxGen::finalize
 
         // Flush any remaining markers
         if ( m_marker_time.size() )
-        {
-            // Marker events are very low-frequency, no buffering needed
-            writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
-            writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
-            writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
-
-            //if ( a_comment.length())
-            //{
-                // TODO Handle comments
-            //}
-        }
+            flushMarkerData();
 
         float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
 
@@ -606,7 +596,7 @@ NxGen::markerScanStop( double a_time, unsigned long a_scan_index )
 
 
 void
-NxGen::markerRunComment( double a_time, const std::string &a_comment )
+NxGen::markerComment( double a_time, const std::string &a_comment )
 {
     markerWrite( a_time, MT_COMMENT, 0, a_comment );
 }
@@ -618,28 +608,54 @@ NxGen::markerWrite( double a_time, MarkerType a_type, unsigned long a_value, con
     m_marker_time.push_back( a_time );
     m_marker_type.push_back( a_type );
     m_marker_value.push_back( a_value );
-    m_marker_comments.push_back( a_comment );
+
+    if ( a_comment.length())
+    {
+        m_marker_string_offset.push_back( m_last_marker_string_offset );
+        m_last_marker_string_offset += a_comment.length();
+        m_marker_string_length.push_back( a_comment.length() );
+
+        m_marker_string_data.reserve( m_marker_string_data.size() + a_comment.size() );
+        m_marker_string_data.insert( m_marker_string_data.end(), a_comment.begin(), a_comment.end()) ;
+    }
+    else
+    {
+        m_marker_string_offset.push_back(0);
+        m_marker_string_length.push_back(0);
+    }
 
     if ( m_marker_time.size() >= m_chunk_size )
-    {
-        // Marker events are very low-frequency, no buffering needed
-        writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
-        writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
-        writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
-
-        //if ( a_comment.length())
-        //{
-            // TODO Handle comments
-        //}
-
-        m_marker_slab_size += m_marker_time.size();
-
-        m_marker_time.clear();
-        m_marker_type.clear();
-        m_marker_value.clear();
-        m_marker_comments.clear();
-    }
+        flushMarkerData();
 }
+
+
+void
+NxGen::flushMarkerData()
+{
+    // Marker events are very low-frequency, no buffering needed
+    writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
+    writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
+    writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
+    writeSlab( m_marker_log_path + "string_offset", m_marker_string_offset, m_marker_slab_size );
+    writeSlab( m_marker_log_path + "string_length", m_marker_string_length, m_marker_slab_size );
+
+    m_marker_slab_size += m_marker_time.size();
+
+    if ( m_marker_string_data.size())
+    {
+        writeSlab( m_marker_log_path + "string_data", m_marker_string_data, m_marker_string_slab_size );
+        m_marker_string_slab_size += m_marker_string_data.size();
+    }
+
+
+    m_marker_time.clear();
+    m_marker_type.clear();
+    m_marker_value.clear();
+    m_marker_string_offset.clear();
+    m_marker_string_length.clear();
+    m_marker_string_data.clear();
+}
+
 
 /*! \brief Converts a PVType to a Nexus NXnumtype
  *  \return The most appropriate Nxnumtype for the provided PVType

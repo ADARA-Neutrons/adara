@@ -255,7 +255,7 @@ public:
     virtual void            markerResume( double a_time ) = 0;
     virtual void            markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment ) = 0;
     virtual void            markerScanStop( double a_time, unsigned long a_scan_index ) = 0;
-    virtual void            markerRunComment( double a_time, const std::string &a_comment ) = 0;
+    virtual void            markerComment( double a_time, const std::string &a_comment ) = 0;
 };
 
 // ============================================================================

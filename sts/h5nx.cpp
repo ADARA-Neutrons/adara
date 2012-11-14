@@ -750,6 +750,12 @@ template
 int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<float> &slab, uint64_t cur_size );
 
 template
+int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint16_t> &slab, uint64_t cur_size );
+
+template
+int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<int16_t> &slab, uint64_t cur_size );
+
+template
 int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint32_t> &slab, uint64_t cur_size );
 
 template
@@ -760,6 +766,9 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<uint
 
 template
 int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<int64_t> &slab, uint64_t cur_size );
+
+template
+int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<char> &slab, uint64_t cur_size );
 
 template <typename NumT>
 int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT> &vec, uint64_t cur_size )
