@@ -161,8 +161,8 @@ system.
 		\ref{section:protocol_translation_complete} \\
 	0x4006.0 & Client Hello &
 		\ref{section:protocol_client_hello} \\
-	0x4007.0 & Statistics Reset &
-		\ref{section:protocol_stats_reset} \\
+	0x4007.0 & Stream Annotation &
+		\ref{section:protocol_stream_annotation} \\
 	0x4008.0 & Synchronization (File) &
 		\ref{section:protocol_sync} \\
 	0x4009.0 & Heartbeat &
@@ -574,10 +574,10 @@ may also receive Synchronization Packets (Section~\ref{section:protocol_sync})
 and Heartbeat Packets (Section~\ref{section:protocol_heartbeat}), both of
 which it should discard. These may appear prior to the prologue.
 
-The Translation Service may recieve a Statistics Reset Packet
-(Section~\ref{section:protocol_stats_reset}) at any time. It is recommended
-that these packets be logged at minimum, though the Translation Service
-is free to respond to these packets as it deems appropriate.
+The Translation Service may recieve a Stream Annotation packet
+(Section~\ref{section:protocol_stream_annotation}) at any time. It is
+recommended that these packets be logged at minimum, though the Translation
+Service is free to handle to these packets as it deems appropriate.
 
 At the end of an experiment recording, the SMS will send a Run Status Packet
 indicating the end of a run and that all data has been sent. The Translation
@@ -626,12 +626,10 @@ the prologue as defined for communication with the Translation Service, and all
 subsequent data will be associated with that experimental recording until it
 receives another Run Status Packet indicating the completion of the that run.
 
-A live event client  may recieve a Statistics Reset Packet
-(Section~\ref{section:protocol_stats_reset}) at any time. It is recommended
-that the client reset any analysis it may be performing on the live
-stream and discard previous data upon reception.
-
-
+A live event client may recieve a Stream Annotation Packet
+(Section~\ref{section:protocol_stream_annotation}) at any time. It is
+recommended that the client handle the packet appropriately for the type of
+annotation received.
 
 
 \newpage
@@ -1230,42 +1228,98 @@ a currently active run, the {\bf Requested Start Timestamp} could simply
 be set to ``1'' to indicate the oldest possible timestamp greater than 0.
 
 \newpage
-\subsubsection{Statistics Reset Packet}
-\label{section:protocol_stats_reset}
+\subsubsection{Stream Annotation Packet}
+\label{section:protocol_stream_annotation}
 
 \begin{figure}[h]
   \centering
   \begin{bytefield}{32}
     \bitheader{31,0} \\
-    \wordbox{1}{0} \\
+    \wordbox{1}{8 + roundup($N$, 4)} \\
     \wordbox{1}{0x00400700} \\
     \wordbox{1}{Timestamp (seconds)} \\
-    \wordbox{1}{Timestamp (nanoseconds)}
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,30,16,15,0} \\
+    \bitbox{1}{\tiny R \\ S \\ T } &
+    \bitbox{15}{Type (u11)} &
+    \bitbox{16}{Comment Length (u16)} \\
+    \wordbox{1}{Scan Index (u32)} \\
+    \wordbox{2}{Comment ($N$ byte string, optional)} \\
   \end{bytefield}
-  \caption{Packet Type 0x4007.0: Statistics Reset Packet}
-  \label{fig:protocol_packet_stats_reset}
+  \caption{Packet Type 0x4007.0: Stream Annotation Packet}
+  \label{fig:protocol_packet_stream_annotation}
 \end{figure}
 
-During manual operation of a beamline such as performing sample alignment, the
-scientist/user may not be recording neutron event data for translation. In
-these situations, the user may wish to reset the live histogram generation and
-any other temporary or partial analysis result between each phase of the
-process. To allow ease of use and manipulation, the live tools should be able
-to receive this request via the same data stream as the experiment data. This
-allows precise, common boundaries between data sets to be aligned among all of
-the live tools, and avoids the need to have the user manipulate multiple tools
-to perform the reset.
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0 & Generic Marker \\
+	1 & Scan Start \\
+	2 & Scan Stop \\
+	3 & Pause \\
+	4 & Resume \\
+	5 & Overall (Run) Comment \\
+    \end{tabular}
+  \end{center}
+  \caption {Annotation Type Definitions}
+  \label{table:protocol_stream_annotation_values}
+\end{table}
 
-When non-translation clients receive a ``Statistics Reset Packet'' (defined in
-Figure~\ref{fig:protocol_packet_stats_reset}) in the data stream, they should
-discard previous neutron data. The Translation Service may note the occurance
-of these packets in the appropriate place.
+When recording experiment data, it is often useful to place markers to indicate
+significant features of the results. The ``Stream Annotation Packet'' allows
+the identification of the boundaries of each step in a scan as well as the
+inclusion of time-stamped comments to highlight data features. Each packet
+includes a flag to indicate that clients should reset their accumulated data
+and begin a fresh analysis as data continues to be streamed. This allows
+multiple clients to be synchronized to the same pulse for their period of
+interest.
+
+When non-translation clients receive a ``Stream Annotation Packer'' (defined in
+Figure~\ref{fig:protocol_packet_stream_annotation}) in the data stream, they
+may wish to make note of the temporal location of the marker, and optionally
+discard previous neutron data or transition to a new workspace, as appropriate.
+The Translation Service may note the occurance of these packets in the
+appropriate place.
 
 The contents of the packet field are as follows:
 \begin{itemize}
-\item{\bf Length} is 0 bytes.
+\item{\bf Length} is 8 bytes plus the length of the optional comment field,
+rounded up to the nearest multiple of 4 bytes.
 \item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf RST} if set, signals a hint that a live stream client should reset
+its accumulated statistics. This hint is intended to help clients that may not
+kknow about the marker type indicated by this packet, and the client is not
+required to honor it.
+\item{\bf Type} describes the type of annotation as given by
+Table~\ref{table:protocol_stream_annotation_values}.
+\item{\bf Scan Index} indentifies a step in a scan series, if non-zero.
+\item{\bf Comment Length} is the length of the comment that follows, not
+including padding.
+\item{\bf Comment} is an optional UTF-8 encoded comment.  This field is padded
+by zeros to the nearest multiple of 4.
 \end{itemize}
+
+The values from Table~\ref{table:protocol_stream_annotation_values} carry
+the following semantics:
+\begin{itemize}
+\item{\bf Generic Marker} indicates a general-purpose marker. It may simply be
+a comment at a given timestamp, and/or may indicate an appropriate place to
+reset statistics.
+\item{\bf Scan Start} indicates the beginning of a step in a scan. It is likely
+that {\bf RST} will be set for these markers. {\bf Scan Index} must be non-zero
+for these markers.
+\item{\bf Scan Stop} indicates the end of a step in a scan.  {\bf Scan Index}
+must be non-zero for these markers.
+\item{\bf Pause} indicates that event data should be ignored until a {\bf Resume} marker is received.
+\item{\bf Resume} indicates that event data should considered valid.
+\item{\bf Overall (Run) Comment} is a generic comment that should apply to the
+entire run. Live clients will likely ignore this marker, but translation
+clients may use this to populate the appropriate field in their output file.
+\end{itemize}
+
 
 
 \newpage
