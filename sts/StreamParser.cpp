@@ -245,7 +245,7 @@ StreamParser::rxPacket
     case ADARA::PacketType::SOURCE_LIST_V0:
     case ADARA::PacketType::TRANS_COMPLETE_V0:
     case ADARA::PacketType::CLIENT_HELLO_V0:
-    case ADARA::PacketType::STATS_RESET_V0:
+    case ADARA::PacketType::STREAM_ANNOTATION_V0:
     case ADARA::PacketType::SYNC_V0:
     case ADARA::PacketType::HEARTBEAT_V0:
     case ADARA::PacketType::VAR_VALUE_STRING_V0:
@@ -1183,8 +1183,8 @@ StreamParser::getPktName(
         return "Tran Comp";
     case ADARA::PacketType::CLIENT_HELLO_V0:
         return "Cli Hello";
-    case ADARA::PacketType::STATS_RESET_V0:
-        return "Stat Reset";
+    case ADARA::PacketType::STREAM_ANNOTATION_V0:
+        return "Annotation";
     case ADARA::PacketType::SYNC_V0:
         return "Sync";
     case ADARA::PacketType::HEARTBEAT_V0:

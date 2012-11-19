@@ -101,6 +101,26 @@ static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
 	return "UndefinedFlavor";
 }
 
+static const char *markerType(ADARA::MarkerType::Enum type)
+{
+	switch (type) {
+	case ADARA::MarkerType::GENERIC:
+		return "Generic";
+	case ADARA::MarkerType::SCAN_START:
+		return "Scan Start";
+	case ADARA::MarkerType::SCAN_STOP:
+		return "Scan Stop";
+	case ADARA::MarkerType::PAUSE:
+		return "Pause";
+	case ADARA::MarkerType::RESUME:
+		return "Resume";
+	case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+		return "Overall Comment";
+	}
+
+	return "UndefinedType";
+}
+
 class Parser : public ADARA::Parser {
 public:
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
@@ -118,7 +138,7 @@ public:
 	bool rxPacket(const ADARA::RunInfoPkt &pkt);
 	bool rxPacket(const ADARA::TransCompletePkt &pkt);
 	bool rxPacket(const ADARA::ClientHelloPkt &pkt);
-	bool rxPacket(const ADARA::StatsResetPkt &pkt);
+	bool rxPacket(const ADARA::AnnotationPkt &pkt);
 	bool rxPacket(const ADARA::SyncPkt &pkt);
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 	bool rxPacket(const ADARA::GeometryPkt &pkt);
@@ -461,10 +481,18 @@ bool Parser::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	return false;
 }
 
-bool Parser::rxPacket(const ADARA::StatsResetPkt &pkt)
+bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 {
-	printf("%u.%09u STATS RESET\n", (uint32_t) (pkt.pulseId() >> 32),
+	printf("%u.%09u STREAM ANNOTATION\n", (uint32_t) (pkt.pulseId() >> 32),
 	       (uint32_t) pkt.pulseId());
+	printf("    Type %u (%s%s)\n", pkt.type(), markerType(pkt.type()),
+	       pkt.resetHint() ? ", Reset Hint" : "");
+	if (pkt.scanIndex())
+		printf("    Scan Index %u\n", pkt.scanIndex());
+	const std::string &comment = pkt.comment();
+	if (comment.length())
+		printf("    Comment '%s'\n", comment.c_str());
+
 	return false;
 }
 
