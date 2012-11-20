@@ -163,13 +163,16 @@ private:
         uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
     };
 
+    // Nexus Marker types should correspond to ADARA marker types, but we want to
+    // keep them as separate definitions to insulate Nexus from any changes made to
+    // the ADARA protocol (and vice versa).
     enum MarkerType
     {
-        MT_PAUSE      = 1,
-        MT_RESUME     = 2,
-        MT_SCAN_START = 3,
-        MT_SCAN_STOP  = 4,
-        MT_COMMENT    = 5
+        MT_COMMENT    = 0,
+        MT_SCAN_START = 1,
+        MT_SCAN_STOP  = 2,
+        MT_PAUSE      = 3,
+        MT_RESUME     = 4
     };
 
 public:
@@ -193,6 +196,7 @@ protected:
     void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
     void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
+    void                runComment( const std::string &a_comment );
     void                markerPause( double a_time );
     void                markerResume( double a_time );
     void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment );
@@ -284,7 +288,8 @@ private:
     std::vector<char>           m_marker_string_data;
     uint64_t                    m_marker_slab_size;
     uint64_t                    m_marker_string_slab_size;
-    std::string                 m_marker_log_path;
+    std::string                 m_marker_type_log_path;
+    std::string                 m_marker_value_log_path;
 };
 
 #endif // NXGEN_H

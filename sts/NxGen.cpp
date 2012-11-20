@@ -81,7 +81,7 @@ NxGen::makePVInfo
     case STS::PVT_ENUM:
     case STS::PVT_UINT:
         return new NxPVInfo<uint32_t>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
-    case STS::PVT_FLOAT: // TOSO ADARA only supports double currently
+    case STS::PVT_FLOAT: // TODO ADARA only supports double currently
     case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
     }
@@ -198,14 +198,20 @@ NxGen::initialize()
         makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
 
         // Create marker event log (value may have string attribs)
-        m_marker_log_path = "/entry/DASlogs/markers/";
-        makeGroup( "/entry/DASlogs/markers", "NXlog" );
-        makeDataset( "/entry/DASlogs/markers", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/markers", "raw_value", NeXus::UINT16 );
-        makeDataset( "/entry/DASlogs/markers", "value", NeXus::UINT32 );
-        makeDataset( "/entry/DASlogs/markers", "string_offset", NeXus::UINT32 );
-        makeDataset( "/entry/DASlogs/markers", "string_length", NeXus::UINT32 );
-        makeDataset( "/entry/DASlogs/markers", "string_data", NeXus::CHAR );
+        m_marker_type_log_path = "/entry/DASlogs/marker_type";
+        makeGroup( m_marker_type_log_path, "NXlog" );
+        makeDataset( m_marker_type_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_marker_type_log_path, "value", NeXus::UINT16 );
+        m_marker_type_log_path += "/";
+
+        m_marker_value_log_path = "/entry/DASlogs/marker_value";
+        makeGroup( m_marker_value_log_path, "NXlog" );
+        makeLink( m_marker_type_log_path + "/time", m_marker_value_log_path + "/time" );
+        makeDataset( m_marker_value_log_path, "value", NeXus::UINT32 );
+        makeDataset( m_marker_value_log_path, "string_offset", NeXus::UINT32 );
+        makeDataset( m_marker_value_log_path, "string_length", NeXus::UINT32 );
+        makeDataset( m_marker_value_log_path, "string_data", NeXus::CHAR );
+        m_marker_value_log_path += "/";
     }
     catch( TraceException &e )
     {
@@ -567,43 +573,107 @@ NxGen::monitorFinalize
 }
 
 
+/*! \brief Sets the overall run comments in Nexus file
+ *
+ * This method writes the overall run comments to the Nexus file.
+ */
 void
-NxGen::markerPause( double a_time )
+NxGen::runComment
+(
+    const std::string &a_comment    ///< [in] Overall run comments
+)
+{
+    writeString( "/entry", "notes", a_comment );
+}
+
+
+/*! \brief Inserts a pause marker into Nexus file
+ *
+ * This method inserts a pause marker into the marker logs of the Nexus file.
+ */
+void
+NxGen::markerPause
+(
+    double a_time   ///< [in] Time associated with marker
+)
 {
     markerWrite( a_time, MT_PAUSE, 0, "" );
 }
 
 
+/*! \brief Inserts a resume marker into Nexus file
+ *
+ * This method inserts a resume marker into the marker logs of the Nexus file.
+ */
 void
-NxGen::markerResume( double a_time )
+NxGen::markerResume
+(
+    double a_time   ///< [in] Time associated with marker
+)
 {
     markerWrite( a_time, MT_RESUME, 0, "" );
 }
 
 
+/*! \brief Inserts a scan start marker into Nexus file
+ *
+ * This method inserts a scan start marker into the marker logs of the Nexus file.
+ */
 void
-NxGen::markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment )
+NxGen::markerScanStart
+(
+    double a_time,                      ///< [in] Time associated with marker
+    unsigned long a_scan_index,         ///< [in] Scan index associated with scan
+    const std::string &a_scan_comment   ///< [in] Comment associated with scan
+)
 {
     markerWrite( a_time, MT_SCAN_START, a_scan_index, a_scan_comment );
 }
 
 
+/*! \brief Inserts a scan stop marker into Nexus file
+ *
+ * This method inserts a scan stop marker into the marker logs of the Nexus file.
+ */
 void
-NxGen::markerScanStop( double a_time, unsigned long a_scan_index )
+NxGen::markerScanStop
+(
+    double a_time,                      ///< [in] Time associated with marker
+    unsigned long a_scan_index          ///< [in] Scan index associated with scan
+)
 {
     markerWrite( a_time, MT_SCAN_STOP, a_scan_index, "" );
 }
 
 
+/*! \brief Inserts a comment marker into Nexus file
+ *
+ * This method inserts a comment marker into the marker logs of the Nexus file.
+ */
 void
-NxGen::markerComment( double a_time, const std::string &a_comment )
+NxGen::markerComment
+(
+    double a_time,                      ///< [in] Time associated with marker
+    const std::string &a_comment        ///< [in] Comment to insert
+)
 {
     markerWrite( a_time, MT_COMMENT, 0, a_comment );
 }
 
 
+/*! \brief Buffers/writes marker data into Nexus file
+ *
+ * This method buffers marker data for eventual writing into the marker logs of the Nexus file. Writing is
+ * triggered when buffers reach the defined chunk size.
+ */
 void
-NxGen::markerWrite( double a_time, MarkerType a_type, unsigned long a_value, const std::string &a_comment )
+NxGen::markerWrite
+(
+    double a_time,                      ///< [in] Time associated with marker
+    MarkerType a_type,                  ///< [in] Marker type (required)
+    unsigned long a_value,              ///< [in] Marker value (0 if not needed)
+    const std::string &a_comment        ///< [in] Marker comment (optional)
+)
 {
     m_marker_time.push_back( a_time );
     m_marker_type.push_back( a_type );
@@ -629,24 +699,27 @@ NxGen::markerWrite( double a_time, MarkerType a_type, unsigned long a_value, con
 }
 
 
+/*! \brief Writes buffered marker data into Nexus file
+ *
+ * This method flushes buffered marker data to the marker logs of the Nexus file.
+ */
 void
 NxGen::flushMarkerData()
 {
     // Marker events are very low-frequency, no buffering needed
-    writeSlab( m_marker_log_path + "time", m_marker_time, m_marker_slab_size );
-    writeSlab( m_marker_log_path + "raw_value", m_marker_type, m_marker_slab_size );
-    writeSlab( m_marker_log_path + "value", m_marker_value, m_marker_slab_size );
-    writeSlab( m_marker_log_path + "string_offset", m_marker_string_offset, m_marker_slab_size );
-    writeSlab( m_marker_log_path + "string_length", m_marker_string_length, m_marker_slab_size );
+    writeSlab( m_marker_type_log_path + "time", m_marker_time, m_marker_slab_size );
+    writeSlab( m_marker_type_log_path + "value", m_marker_type, m_marker_slab_size );
+    writeSlab( m_marker_value_log_path + "value", m_marker_value, m_marker_slab_size );
+    writeSlab( m_marker_value_log_path + "string_offset", m_marker_string_offset, m_marker_slab_size );
+    writeSlab( m_marker_value_log_path + "string_length", m_marker_string_length, m_marker_slab_size );
 
     m_marker_slab_size += m_marker_time.size();
 
     if ( m_marker_string_data.size())
     {
-        writeSlab( m_marker_log_path + "string_data", m_marker_string_data, m_marker_string_slab_size );
+        writeSlab( m_marker_value_log_path + "string_data", m_marker_string_data, m_marker_string_slab_size );
         m_marker_string_slab_size += m_marker_string_data.size();
     }
-
 
     m_marker_time.clear();
     m_marker_type.clear();

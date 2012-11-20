@@ -77,24 +77,25 @@ private:
         INFO_SENT       = 0x1000
     };
 
-    bool        rxPacket( const ADARA::Packet &pkt );
-    bool        rxPacket( const ADARA::RunStatusPkt &pkt );
-    bool        rxPacket( const ADARA::BankedEventPkt &pkt );
-    bool        rxPacket( const ADARA::PixelMappingPkt &pkt );
-    bool        rxPacket( const ADARA::BeamMonitorPkt &pkt );
-    bool        rxPacket( const ADARA::RunInfoPkt &pkt );
-    bool        rxPacket( const ADARA::GeometryPkt &pkt );
-    bool        rxPacket( const ADARA::BeamlineInfoPkt &pkt );
-    bool        rxPacket( const ADARA::DeviceDescriptorPkt &pkt );
-    bool        rxPacket( const ADARA::VariableU32Pkt &pkt );
-    bool        rxPacket( const ADARA::VariableDoublePkt &pkt );
+    bool        rxPacket( const ADARA::Packet &a_pkt );
+    bool        rxPacket( const ADARA::RunStatusPkt &a_pkt );
+    bool        rxPacket( const ADARA::BankedEventPkt &a_pkt );
+    bool        rxPacket( const ADARA::PixelMappingPkt &a_pkt );
+    bool        rxPacket( const ADARA::BeamMonitorPkt &a_pkt );
+    bool        rxPacket( const ADARA::RunInfoPkt &a_pkt );
+    bool        rxPacket( const ADARA::GeometryPkt &a_pkt );
+    bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
+    bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
+    bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
     using ADARA::Parser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
-    void        processPulseInfo( const ADARA::BankedEventPkt &pkt );
-    void        processBankEvents( uint32_t bank_id, uint32_t event_count, const uint32_t *rpos );
+    void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
+    void        processBankEvents( uint32_t a_bank_id, uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
-    void        processMonitorEvents( Identifier monitor_id, uint32_t event_count, const uint32_t *rpos );
+    void        processMonitorEvents( Identifier a_monitor_id, uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
@@ -102,7 +103,7 @@ private:
     void        receivedInfo( InfoBit a_bit );
     void        finalizeStreamProcessing();
     PVType      toPVType( const char *a_source ) const;
-    inline void gatherStats( const ADARA::Packet &pkt ) const;
+    inline void gatherStats( const ADARA::Packet &a_pkt ) const;
     const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
     void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
 
@@ -192,22 +193,22 @@ StreamParser::pvValueUpdate
 }
 
 /*! \brief Gathers statistics from the specified ADARA packet.
- *  \param pkt - An ADARA packet to analyze
+ *  \param a_pkt - An ADARA packet to analyze
  *
  * If stream statistics gathering is enabled, this method collects a number
  * of metrics for the stream and each packet type (total packet count, min/
  * max packet size with payload, total byte count for each packet type.
  */
 inline void
-StreamParser::gatherStats( const ADARA::Packet &pkt ) const
+StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
 {
-    PktStats &stats = m_stats[pkt.type()];
+    PktStats &stats = m_stats[a_pkt.type()];
     ++stats.count;
-    if ( pkt.packet_length() < stats.min_pkt_size || !stats.min_pkt_size )
-        stats.min_pkt_size = pkt.packet_length();
-    if ( pkt.packet_length() > stats.max_pkt_size )
-        stats.max_pkt_size = pkt.packet_length();
-    stats.total_size += pkt.packet_length();
+    if ( a_pkt.packet_length() < stats.min_pkt_size || !stats.min_pkt_size )
+        stats.min_pkt_size = a_pkt.packet_length();
+    if ( a_pkt.packet_length() > stats.max_pkt_size )
+        stats.max_pkt_size = a_pkt.packet_length();
+    stats.total_size += a_pkt.packet_length();
 }
 
 
