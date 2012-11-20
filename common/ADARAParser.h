@@ -3,7 +3,6 @@
 
 #include <string>
 #include <stdint.h>
-#include <time.h>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
