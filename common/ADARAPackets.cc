@@ -83,20 +83,20 @@ Packet::~Packet()
 /* ------------------------------------------------------------------------ */
 
 RawDataPkt::RawDataPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len < (6 * sizeof(uint32_t)))
 		throw invalid_packet("RawDataPacket is too short");
 }
 
 RawDataPkt::RawDataPkt(const RawDataPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
 
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len != 120)
 		throw invalid_packet("RTDL Packet is incorrect length");
@@ -106,7 +106,7 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 }
 
 RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
@@ -122,27 +122,27 @@ SourceListPkt::SourceListPkt(const SourceListPkt &pkt) :
 /* ------------------------------------------------------------------------ */
 
 BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len < (4 * sizeof(uint32_t)))
 		throw invalid_packet("BankedEvent packet is too short");
 }
 
 BankedEventPkt::BankedEventPkt(const BankedEventPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
 
 BeamMonitorPkt::BeamMonitorPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len < (4 * sizeof(uint32_t)))
 		throw invalid_packet("BeamMonitor packet is too short");
 }
 
 BeamMonitorPkt::BeamMonitorPkt(const BeamMonitorPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
@@ -158,14 +158,14 @@ PixelMappingPkt::PixelMappingPkt(const PixelMappingPkt &pkt) :
 /* ------------------------------------------------------------------------ */
 
 RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len != (3 * sizeof(uint32_t)))
 		throw invalid_packet("RunStatus packet is incorrect size");
 }
 
 RunStatusPkt::RunStatusPkt(const RunStatusPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
@@ -173,7 +173,7 @@ RunStatusPkt::RunStatusPkt(const RunStatusPkt &pkt) :
 RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	uint32_t size = *(uint32_t *) payload();
+	uint32_t size = *(const uint32_t *) payload();
 	const char *xml = (const char *) payload() + sizeof(uint32_t);
 
 	if (m_payload_len < sizeof(uint32_t))
@@ -196,7 +196,7 @@ RunInfoPkt::RunInfoPkt(const RunInfoPkt &pkt) :
 TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	uint32_t size = *(uint32_t *) payload();
+	uint32_t size = *(const uint32_t *) payload();
 	const char *reason = (const char *) payload() + sizeof(uint32_t);
 
 	m_status = (uint16_t) (size >> 16);
@@ -225,7 +225,7 @@ ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 	if (m_payload_len != sizeof(uint32_t))
 		throw invalid_packet("ClientHello packet is incorrect size");
 
-	m_reqStart = *(uint32_t *) payload();
+	m_reqStart = *(const uint32_t *) payload();
 }
 
 ClientHelloPkt::ClientHelloPkt(const ClientHelloPkt &pkt) :
@@ -235,7 +235,7 @@ ClientHelloPkt::ClientHelloPkt(const ClientHelloPkt &pkt) :
 /* ------------------------------------------------------------------------ */
 
 AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len < (2 * sizeof(uint32_t)))
 		throw invalid_packet("AnnotationPkt packet is incorrect size");
@@ -247,7 +247,7 @@ AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 }
 
 AnnotationPkt::AnnotationPkt(const AnnotationPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
@@ -255,11 +255,11 @@ AnnotationPkt::AnnotationPkt(const AnnotationPkt &pkt) :
 SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	uint32_t *size = (uint32_t *)(payload() + 24);
+	uint32_t size = *(const uint32_t *)(payload() + 24);
 
 	if (m_payload_len < 28)
 		throw invalid_packet("Sync packet is too small");
-	if (m_payload_len < (*size + 28))
+	if (m_payload_len < (size + 28))
 		throw invalid_packet("Sync packet has oversize string");
 }
 
@@ -285,7 +285,7 @@ HeartbeatPkt::HeartbeatPkt(const HeartbeatPkt &pkt) :
 GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	uint32_t size = *(uint32_t *) payload();
+	uint32_t size = *(const uint32_t *) payload();
 	const char *xml = (const char *) payload() + sizeof(uint32_t);
 
 	if (m_payload_len < sizeof(uint32_t))
@@ -309,7 +309,7 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
 	const char *info = (const char *) payload() + sizeof(uint32_t);
-	uint32_t sizes = *(uint32_t *) payload();
+	uint32_t sizes = *(const uint32_t *) payload();
 	uint32_t id_len, shortName_len, longName_len, info_len;
 
 	if (m_payload_len < sizeof(uint32_t))
@@ -341,7 +341,7 @@ BeamlineInfoPkt::BeamlineInfoPkt(const BeamlineInfoPkt &pkt) :
 DeviceDescriptorPkt::DeviceDescriptorPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	uint32_t *fields = (uint32_t *) payload();
+	const uint32_t *fields = (const uint32_t *) payload();
 	uint32_t size;
 
 	if (m_payload_len < (2 * sizeof(uint32_t)))
@@ -365,7 +365,7 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt) :
 /* ------------------------------------------------------------------------ */
 
 VariableU32Pkt::VariableU32Pkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len != (4 * sizeof(uint32_t))) {
 		std::string msg("VariableValue (U32) packet is incorrect "
@@ -388,13 +388,13 @@ VariableU32Pkt::VariableU32Pkt(const uint8_t *data, uint32_t len) :
 }
 
 VariableU32Pkt::VariableU32Pkt(const VariableU32Pkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
 
 VariableDoublePkt::VariableDoublePkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_payload_len != (sizeof(double) + (3 * sizeof(uint32_t)))) {
 		std::string msg("VariableValue (double) packet is incorrect "
@@ -417,13 +417,13 @@ VariableDoublePkt::VariableDoublePkt(const uint8_t *data, uint32_t len) :
 }
 
 VariableDoublePkt::VariableDoublePkt(const VariableDoublePkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
 
 VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	uint32_t size;
 
@@ -462,5 +462,5 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 }
 
 VariableStringPkt::VariableStringPkt(const VariableStringPkt &pkt) :
-	Packet(pkt), m_fields((uint32_t *)payload()), m_val(pkt.m_val)
+	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
 {}

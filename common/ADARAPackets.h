@@ -91,13 +91,13 @@ public:
 	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
 	uint32_t tofField(void) const { return m_fields[5]; }
 
-	const Event *events(void) const { return (Event *) &m_fields[6]; }
+	const Event *events(void) const { return (const Event *) &m_fields[6]; }
 	uint32_t num_events(void) const {
 		return (m_payload_len - 24) / (2 * sizeof (uint32_t));
 	}
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	RawDataPkt(const uint8_t *data, uint32_t len);
 
@@ -128,7 +128,7 @@ public:
 	// TODO implement accessor for optional fields
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	RTDLPkt(const uint8_t *data, uint32_t len);
 
@@ -171,7 +171,7 @@ public:
 	// TODO implment bank/event accessors
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	BankedEventPkt(const uint8_t *data, uint32_t len);
 
@@ -190,7 +190,7 @@ public:
 	// TODO implment monitor/event accessors
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	BeamMonitorPkt(const uint8_t *data, uint32_t len);
 
@@ -220,7 +220,7 @@ public:
 	}
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	RunStatusPkt(const uint8_t *data, uint32_t len);
 
@@ -283,7 +283,7 @@ public:
 	uint32_t scanIndex(void) const { return m_fields[1]; }
 	const std::string &comment(void) const {
 		if (!m_comment.length() && (m_fields[1] & 0xffff)) {
-			m_comment.assign((char *) &m_fields[2],
+			m_comment.assign((const char *) &m_fields[2],
 					 m_fields[1] * 0xffff);
 		}
 
@@ -291,7 +291,7 @@ public:
 	}
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 	mutable std::string m_comment;
 
 	AnnotationPkt(const uint8_t *data, uint32_t len);
@@ -384,7 +384,7 @@ public:
 	uint32_t value(void) const { return m_fields[3]; }
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	VariableU32Pkt(const uint8_t *data, uint32_t len);
 
@@ -404,10 +404,10 @@ public:
 		return static_cast<VariableSeverity::Enum>
 							(m_fields[2] & 0xffff);
 	}
-	double value(void) const { return *(double *) &m_fields[3]; }
+	double value(void) const { return *(const double *) &m_fields[3]; }
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 
 	VariableDoublePkt(const uint8_t *data, uint32_t len);
 
@@ -430,7 +430,7 @@ public:
 	const std::string &value(void) const { return m_val; }
 
 private:
-	uint32_t *m_fields;
+	const uint32_t *m_fields;
 	std::string m_val;
 
 	VariableStringPkt(const uint8_t *data, uint32_t len);
