@@ -34,3 +34,4 @@ Version History
         Clean-up units strings in MxGen class
         Many small changes based on Maries short diff document (some still outstanding)
 0.1.4 - Added base cataloging path option (for test harness/manual translation)
+0.1.5 - Added stream marker support
