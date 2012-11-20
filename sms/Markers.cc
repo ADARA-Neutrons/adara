@@ -133,6 +133,9 @@ void Markers::emitPacket(ADARA::MarkerType::Enum markerType)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	emitPacket(now, markerType);
+
+	/* Comments are one-shot, and reset once the packet is inserted. */
+	m_commentPV->unset();
 }
 
 void Markers::emitPacket(const struct timespec &ts,
