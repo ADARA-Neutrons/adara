@@ -271,12 +271,30 @@ private:
 	friend class Parser;
 };
 
-class StatsResetPkt : public Packet {
+class AnnotationPkt : public Packet {
 public:
-	StatsResetPkt(const StatsResetPkt &pkt);
+	AnnotationPkt(const AnnotationPkt &pkt);
+
+	bool resetHint(void) const { return !!(m_fields[0] & 0x80000000); }
+	MarkerType::Enum type(void) const {
+		uint16_t type = (m_fields[0] >> 16) & 0x7fff;
+		return static_cast<MarkerType::Enum>(type);
+	}
+	uint32_t scanIndex(void) const { return m_fields[1]; }
+	const std::string &comment(void) const {
+		if (!m_comment.length() && (m_fields[1] & 0xffff)) {
+			m_comment.assign((char *) &m_fields[2],
+					 m_fields[1] * 0xffff);
+		}
+
+		return m_comment;
+	}
 
 private:
-	StatsResetPkt(const uint8_t *data, uint32_t len);
+	uint32_t *m_fields;
+	mutable std::string m_comment;
+
+	AnnotationPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };

@@ -7,7 +7,8 @@ sms_smsd_SOURCES = sms/smsd.cc sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/LiveServer.cc sms/SMSControl.cc sms/SMSControlPV.cc \
 		sms/SignalEvents.cc sms/STSClient.cc sms/STSClientMgr.cc \
 		sms/RunInfo.cc sms/Geometry.cc sms/PixelMap.cc \
-		sms/BeamlineInfo.cc \ sms/MetaDataMgr.cc $(COMMON_PARSER)
+		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/Markers.cc \
+		$(COMMON_PARSER)
 sms_smsd_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
 		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
 sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)

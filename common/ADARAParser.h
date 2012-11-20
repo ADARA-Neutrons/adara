@@ -69,7 +69,7 @@ protected:
 	virtual bool rxPacket(const RunInfoPkt &pkt);
 	virtual bool rxPacket(const TransCompletePkt &pkt);
 	virtual bool rxPacket(const ClientHelloPkt &pkt);
-	virtual bool rxPacket(const StatsResetPkt &pkt);
+	virtual bool rxPacket(const AnnotationPkt &pkt);
 	virtual bool rxPacket(const SyncPkt &pkt);
 	virtual bool rxPacket(const HeartbeatPkt &pkt);
 	virtual bool rxPacket(const GeometryPkt &pkt);

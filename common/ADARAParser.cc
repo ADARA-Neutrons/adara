@@ -183,7 +183,7 @@ bool Parser::rxPacket(const Packet &pkt)
 		MAP_TYPE(PacketType::RUN_INFO_V0, RunInfoPkt);
 		MAP_TYPE(PacketType::TRANS_COMPLETE_V0, TransCompletePkt);
 		MAP_TYPE(PacketType::CLIENT_HELLO_V0, ClientHelloPkt);
-		MAP_TYPE(PacketType::STATS_RESET_V0, StatsResetPkt);
+		MAP_TYPE(PacketType::STREAM_ANNOTATION_V0, AnnotationPkt);
 		MAP_TYPE(PacketType::SYNC_V0, SyncPkt);
 		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
 		MAP_TYPE(PacketType::GEOMETRY_V0, GeometryPkt);
@@ -228,7 +228,7 @@ EXPAND_HANDLER(RunStatusPkt)
 EXPAND_HANDLER(RunInfoPkt)
 EXPAND_HANDLER(TransCompletePkt)
 EXPAND_HANDLER(ClientHelloPkt)
-EXPAND_HANDLER(StatsResetPkt)
+EXPAND_HANDLER(AnnotationPkt)
 EXPAND_HANDLER(SyncPkt)
 EXPAND_HANDLER(HeartbeatPkt)
 EXPAND_HANDLER(GeometryPkt)

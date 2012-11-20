@@ -29,6 +29,33 @@ class charArrayDestructor : public gddDestructor {
 
 /* ----------------------------------------------------------------------- */
 
+static gddAppFuncTableStatus getBooleanEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[2];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+
+	strncpy(str[0].fixed_string, "false", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "true", sizeof(str[1].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 2);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
+
+/* ----------------------------------------------------------------------- */
+
 smsPV::smsPV() : m_interested(false)
 {
 	initReadTable();
@@ -234,27 +261,7 @@ gddAppFuncTableStatus smsRecordingPV::getValue(gdd &in)
 
 gddAppFuncTableStatus smsRecordingPV::getEnums(gdd &in)
 {
-	aitFixedString *str;
-	fixedStringDestructor *des;
-
-	str = new aitFixedString[2];
-	if (!str)
-		return S_casApp_noMemory;
-
-	des = new fixedStringDestructor;
-	if (!des) {
-		delete [] str;
-		return S_casApp_noMemory;
-	}
-
-	strncpy(str[0].fixed_string, "false", sizeof(str[0].fixed_string));
-	strncpy(str[1].fixed_string, "true", sizeof(str[1].fixed_string));
-
-	in.setDimension(1);
-	in.setBound(0, 0, 2);
-	in.putRef(str, des);
-
-	return S_cas_success;
+	return getBooleanEnums(in);
 }
 
 caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
@@ -447,6 +454,208 @@ void smsStringPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
+smsBooleanPV::smsBooleanPV(const std::string &name) : smsPV(name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+
+	m_pv_name = name;
+}
+
+aitEnum smsBooleanPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
+}
+
+gddAppFuncTableStatus smsBooleanPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsBooleanPV::getEnums(gdd &in)
+{
+	return getBooleanEnums(in);
+}
+
+caStatus smsBooleanPV::read(const casCtx &ctx, gdd &prototype)
+{
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsBooleanPV::write(const casCtx &ctx, const gdd &val)
+{
+	aitUint16 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+	struct timespec ts;
+
+	if (!val.isScalar())
+		return S_casApp_noSupport;
+
+	val.get(v);
+	if (v > 1)
+		return S_casApp_noSupport;
+
+	m_value->get(cur);
+	if (v == cur)
+		return S_casApp_success;
+
+	val.getTimeStamp(&ts);
+	update(v, &ts);
+	changed();
+
+	return S_casApp_success;
+}
+
+bool smsBooleanPV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsBooleanPV::update(bool val, struct timespec *ts)
+{
+	aitUint32 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+bool smsBooleanPV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+bool smsBooleanPV::value(void)
+{
+	aitUint16 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsBooleanPV::changed(void)
+{
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsUint32PV::smsUint32PV(const std::string &name) : smsPV(name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	m_value = new gddScalar(gddAppType_value, aitEnumUint32);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+
+	m_pv_name = name;
+}
+
+aitEnum smsUint32PV::bestExternalType(void) const
+{
+	return aitEnumUint32;
+}
+
+gddAppFuncTableStatus smsUint32PV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+caStatus smsUint32PV::read(const casCtx &ctx, gdd &prototype)
+{
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsUint32PV::write(const casCtx &ctx, const gdd &val)
+{
+	aitUint32 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+	struct timespec ts;
+
+	if (!val.isScalar())
+		return S_casApp_noSupport;
+
+	val.get(v);
+	m_value->get(cur);
+	if (v == cur)
+		return S_casApp_success;
+
+	val.getTimeStamp(&ts);
+	update(v, &ts);
+	changed();
+
+	return S_casApp_success;
+}
+
+bool smsUint32PV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsUint32PV::update(uint32_t val, struct timespec *ts)
+{
+	aitUint32 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumUint32);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+bool smsUint32PV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+uint32_t smsUint32PV::value(void)
+{
+	aitUint32 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsUint32PV::changed(void)
+{
+}
+
+/* ----------------------------------------------------------------------- */
+
 smsTriggerPV::smsTriggerPV(const std::string &name)
 {
 	struct timespec ts;
@@ -476,27 +685,7 @@ gddAppFuncTableStatus smsTriggerPV::getValue(gdd &in)
 
 gddAppFuncTableStatus smsTriggerPV::getEnums(gdd &in)
 {
-	aitFixedString *str;
-	fixedStringDestructor *des;
-
-	str = new aitFixedString[2];
-	if (!str)
-		return S_casApp_noMemory;
-
-	des = new fixedStringDestructor;
-	if (!des) {
-		delete [] str;
-		return S_casApp_noMemory;
-	}
-
-	strncpy(str[0].fixed_string, "false", sizeof(str[0].fixed_string));
-	strncpy(str[1].fixed_string, "true", sizeof(str[1].fixed_string));
-
-	in.setDimension(1);
-	in.setBound(0, 0, 2);
-	in.putRef(str, des);
-
-	return S_cas_success;
+	return getBooleanEnums(in);
 }
 
 caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)

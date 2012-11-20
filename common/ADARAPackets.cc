@@ -234,15 +234,20 @@ ClientHelloPkt::ClientHelloPkt(const ClientHelloPkt &pkt) :
 
 /* ------------------------------------------------------------------------ */
 
-StatsResetPkt::StatsResetPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len)
+AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((uint32_t *)payload())
 {
-	if (m_payload_len)
-		throw invalid_packet("StatsReset packet is incorrect size");
+	if (m_payload_len < (2 * sizeof(uint32_t)))
+		throw invalid_packet("AnnotationPkt packet is incorrect size");
+
+	uint16_t size = m_fields[0] & 0xffff;
+	if (m_payload_len < (size + (2 * sizeof(uint32_t))))
+		throw invalid_packet("AnnotationPkt packet has oversize "
+				     "string");
 }
 
-StatsResetPkt::StatsResetPkt(const StatsResetPkt &pkt) :
-	Packet(pkt)
+AnnotationPkt::AnnotationPkt(const AnnotationPkt &pkt) :
+	Packet(pkt), m_fields((uint32_t *)payload())
 {}
 
 /* ------------------------------------------------------------------------ */
