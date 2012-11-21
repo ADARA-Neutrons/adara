@@ -1058,14 +1058,12 @@ StreamParser::rxPacket
     const ADARA::AnnotationPkt &a_pkt     ///< [in] The ADARA Annotation Packet to process
 )
 {
-    //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Got an annotation pckt! state = " << m_processing_state );
-
     double t = 0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
     {
-        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)*1.0e-9;
+        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)/1000000000.0;
     }
 
     // Switch on event type
