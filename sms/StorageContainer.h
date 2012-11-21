@@ -64,6 +64,7 @@ private:
 	StorageContainer(const std::string &name);
 
 	void terminateFile(void);
+	void newFile(void);
 
 	bool createMarker(const char *);
 	bool validate(void);

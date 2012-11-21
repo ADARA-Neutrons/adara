@@ -39,6 +39,26 @@ void StorageContainer::terminateFile(void)
 	m_cur_file.reset();
 }
 
+void StorageContainer::newFile(void)
+{
+	ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+
+	if (m_runNumber) {
+		status = ADARA::RunStatus::NEW_RUN;
+		if (m_numFiles)
+			status = ADARA::RunStatus::RUN_BOF;
+	}
+
+	m_cur_file = StorageFile::newFile(m_weakThis, ++m_numFiles, status);
+	m_files.push_back(m_cur_file);
+
+	/* Tell the storage manager about the new file so we can
+	 * add the prologue before anyone else sees it.
+	 */
+	StorageManager::fileCreated(m_cur_file);
+	m_newFile(m_cur_file);
+}
+
 off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 {
 	/* We don't immediately close a file when we exceed the size limit
@@ -49,25 +69,8 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 	if (m_cur_file && m_cur_file->oversize())
 		terminateFile();
 
-	if (!m_cur_file) {
-		ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
-
-		if (m_runNumber) {
-			status = ADARA::RunStatus::NEW_RUN;
-			if (m_numFiles)
-				status = ADARA::RunStatus::RUN_BOF;
-		}
-
-		m_cur_file = StorageFile::newFile(m_weakThis, ++m_numFiles,
-						  status);
-		m_files.push_back(m_cur_file);
-
-		/* Tell the storage manager about the new file so we can
-		 * add the prologue before anyone else sees it.
-		 */
-		StorageManager::fileCreated(m_cur_file);
-		m_newFile(m_cur_file);
-	}
+	if (!m_cur_file)
+		newFile();
 
 	return m_cur_file->write(iovec, len, notify);
 }
@@ -194,6 +197,10 @@ StorageContainer::SharedPtr StorageContainer::create(
 		msg += strerror(err);
 		throw std::runtime_error(msg);
 	}
+
+	/* Run containers should always have a file */
+	if (run)
+		c->newFile();
 
 	return c;
 }
