@@ -583,7 +583,7 @@ NxGen::runComment
     const std::string &a_comment    ///< [in] Overall run comments
 )
 {
-    writeString( "/entry", "notes", a_comment );
+    writeString( "/entry/", "notes", a_comment );
 }
 
 
@@ -679,11 +679,11 @@ NxGen::markerWrite
     m_marker_type.push_back( a_type );
     m_marker_value.push_back( a_value );
 
-    if ( a_comment.length())
+    if ( a_comment.size())
     {
         m_marker_string_offset.push_back( m_last_marker_string_offset );
-        m_last_marker_string_offset += a_comment.length();
-        m_marker_string_length.push_back( a_comment.length() );
+        m_last_marker_string_offset += a_comment.size();
+        m_marker_string_length.push_back( a_comment.size() );
 
         m_marker_string_data.reserve( m_marker_string_data.size() + a_comment.size() );
         m_marker_string_data.insert( m_marker_string_data.end(), a_comment.begin(), a_comment.end()) ;
