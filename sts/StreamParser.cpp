@@ -217,23 +217,23 @@ StreamParser::rxPacket
     // These packets shall be processed ONCE during header and event processing
     // Note: these should arrive before event processing, but it is no guaranteed.
     case ADARA::PacketType::PIXEL_MAPPING_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_PIXELMAP)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_PIXELMAP)
 
     case ADARA::PacketType::RUN_INFO_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_RUNINFO)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_RUNINFO)
 
     case ADARA::PacketType::GEOMETRY_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_GEOMETRY)
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_BEAMINFO)
 
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
     case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
     case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
+        PROCESS_IN_STATES((PROCESSING_RUN_HEADER|PROCESSING_EVENTS))
 
     // These packets shall only be processed during event processing
     case ADARA::PacketType::BANKED_EVENT_V0:
@@ -1058,6 +1058,8 @@ StreamParser::rxPacket
     const ADARA::AnnotationPkt &a_pkt     ///< [in] The ADARA Annotation Packet to process
 )
 {
+    //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Got an annotation pckt! state = " << m_processing_state );
+
     double t = 0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
