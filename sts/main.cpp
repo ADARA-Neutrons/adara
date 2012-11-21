@@ -44,7 +44,7 @@ int main(int argc, char** argv)
     unsigned short              anc_buf_size;
     unsigned long               cache_size;
     unsigned short              compression_level;
-
+    unsigned long               run_no = 0;
 
     try
     {
@@ -160,6 +160,8 @@ int main(int argc, char** argv)
 
             nxgen.processStream();
 
+            run_no = nxgen.getRunNumber();
+
             if ( move )
             {
                 if ( base_path.empty() )
@@ -206,6 +208,18 @@ int main(int argc, char** argv)
         ::write( outfd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
 
         // TODO If code is not success, write reason to a log file somewhere?
+        ofstream outf("/tmp/sts.log", ios_base::app );
+        if (outf.good())
+        {
+            if ( sms_code == STS::TS_SUCCESS )
+                outf << "Run " << run_no << " OK" << endl;
+            else
+            {
+                outf << "Run " << run_no << " error:" << endl;
+                outf << sms_reason << endl;
+            }
+            outf.close();
+        }
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
