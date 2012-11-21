@@ -1275,6 +1275,8 @@ StreamParser::toPVType
         return PVT_INT;
     else if ( boost::iequals( a_source, "unsigned" ))
         return PVT_UINT;
+    else if ( boost::iequals( a_source, "unsigned integer" ))
+        return PVT_UINT;
     else if ( boost::iequals( a_source, "double" ))
         return PVT_DOUBLE;
     else if ( boost::iequals( a_source, "float" ))
