@@ -282,9 +282,9 @@ public:
 	}
 	uint32_t scanIndex(void) const { return m_fields[1]; }
 	const std::string &comment(void) const {
-		if (!m_comment.length() && (m_fields[1] & 0xffff)) {
+		if (!m_comment.length() && (m_fields[0] & 0xffff)) {
 			m_comment.assign((const char *) &m_fields[2],
-					 m_fields[1] * 0xffff);
+					 m_fields[0] & 0xffff);
 		}
 
 		return m_comment;
