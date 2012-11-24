@@ -173,7 +173,7 @@ StreamParser::pvValueUpdate
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
     {
-        t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time)*1.0e-9;
+        t = (timespec_to_nsec( a_timestamp ) - m_pulse_info.start_time)/1000000000.0;
     }
     else if ( pvinfo->m_value_buffer.size() )
     {

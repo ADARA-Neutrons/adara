@@ -217,23 +217,23 @@ StreamParser::rxPacket
     // These packets shall be processed ONCE during header and event processing
     // Note: these should arrive before event processing, but it is no guaranteed.
     case ADARA::PacketType::PIXEL_MAPPING_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_PIXELMAP)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_PIXELMAP)
 
     case ADARA::PacketType::RUN_INFO_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_RUNINFO)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_RUNINFO)
 
     case ADARA::PacketType::GEOMETRY_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_GEOMETRY)
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
+        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_BEAMINFO)
 
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
     case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
     case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
+        PROCESS_IN_STATES((PROCESSING_RUN_HEADER|PROCESSING_EVENTS))
 
     // These packets shall only be processed during event processing
     case ADARA::PacketType::BANKED_EVENT_V0:
@@ -1063,7 +1063,7 @@ StreamParser::rxPacket
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
     {
-        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)*1.0e-9;
+        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)/1000000000.0;
     }
 
     // Switch on event type
@@ -1272,6 +1272,8 @@ StreamParser::toPVType
     if ( boost::iequals( a_source, "integer" ))
         return PVT_INT;
     else if ( boost::iequals( a_source, "unsigned" ))
+        return PVT_UINT;
+    else if ( boost::iequals( a_source, "unsigned integer" ))
         return PVT_UINT;
     else if ( boost::iequals( a_source, "double" ))
         return PVT_DOUBLE;
