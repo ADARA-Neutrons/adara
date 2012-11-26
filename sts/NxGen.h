@@ -197,15 +197,16 @@ protected:
     void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment );
-    void                markerPause( double a_time );
-    void                markerResume( double a_time );
-    void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment );
-    void                markerScanStop( double a_time, unsigned long a_scan_index );
+    void                markerPause( double a_time, const std::string &a_comment  );
+    void                markerResume( double a_time, const std::string &a_comment  );
+    void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_comment );
+    void                markerScanStop( double a_time, unsigned long a_scan_index, const std::string &a_comment  );
     void                markerComment( double a_time, const std::string &a_comment );
-    void                markerWrite( double a_time, MarkerType a_type, unsigned long a_value, const std::string &a_comment );
 
 private:
-    void                flushMarkerData();
+    void                flushPauseData();
+    void                flushScanData();
+    void                flushCommentData();
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path, const std::string &a_type );
     void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
@@ -279,17 +280,21 @@ private:
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
     uint64_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
-    std::vector<double>         m_marker_time;
-    std::vector<uint16_t>       m_marker_type;
-    std::vector<uint32_t>       m_marker_value;
-    std::vector<uint32_t>       m_marker_string_offset;
-    unsigned long               m_last_marker_string_offset;
-    std::vector<uint32_t>       m_marker_string_length;
-    std::vector<char>           m_marker_string_data;
-    uint64_t                    m_marker_slab_size;
-    uint64_t                    m_marker_string_slab_size;
-    std::string                 m_marker_type_log_path;
-    std::string                 m_marker_value_log_path;
+
+    // Pause/resume data
+    std::vector<double>         m_pause_time;
+    std::vector<uint16_t>       m_pause_value;
+
+    // Scan start/stop/index data
+    std::vector<double>         m_scan_time;
+    std::vector<uint32_t>       m_scan_value;
+
+    // Stream annotation data
+    std::vector<double>         m_comment_time;
+    std::vector<uint32_t>       m_comment_offset;
+    std::vector<uint32_t>       m_comment_length;
+    std::vector<char>           m_comment_data;
+    unsigned long               m_comment_last_offset;
 };
 
 #endif // NXGEN_H

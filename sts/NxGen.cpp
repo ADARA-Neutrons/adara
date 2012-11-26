@@ -36,9 +36,7 @@ NxGen::NxGen
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
     m_pulse_vetoes_slab_size(0),
-    m_last_marker_string_offset(0),
-    m_marker_slab_size(0),
-    m_marker_string_slab_size(0)
+    m_comment_last_offset(0)
 {
     if ( !a_nexus_out_file.empty() )
     {
@@ -197,21 +195,22 @@ NxGen::initialize()
         makeGroup( "/entry/DASlogs/Veto_pulse", "NXlog" );
         makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
 
-        // Create marker event log (value may have string attribs)
-        m_marker_type_log_path = "/entry/DASlogs/marker_type";
-        makeGroup( m_marker_type_log_path, "NXlog" );
-        makeDataset( m_marker_type_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_marker_type_log_path, "value", NeXus::UINT16 );
-        m_marker_type_log_path += "/";
+        // Create pause event log
+        makeGroup( "/entry/DASlogs/pause", "NXlog" );
+        makeDataset( "/entry/DASlogs/pause/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/pause/", "value", NeXus::UINT16 );
 
-        m_marker_value_log_path = "/entry/DASlogs/marker_value";
-        makeGroup( m_marker_value_log_path, "NXlog" );
-        makeLink( m_marker_type_log_path + "/time", m_marker_value_log_path + "/time" );
-        makeDataset( m_marker_value_log_path, "value", NeXus::UINT32 );
-        makeDataset( m_marker_value_log_path, "string_offset", NeXus::UINT32 );
-        makeDataset( m_marker_value_log_path, "string_length", NeXus::UINT32 );
-        makeDataset( m_marker_value_log_path, "string_data", NeXus::CHAR );
-        m_marker_value_log_path += "/";
+        // Create scan event log
+        makeGroup( "/entry/DASlogs/scan_index", "NXlog" );
+        makeDataset( "/entry/DASlogs/scan_index/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/scan_index/", "value", NeXus::UINT32 );
+
+        // Creare comment event log
+        makeGroup( "/entry/DASlogs/comments", "NXlog" );
+        makeDataset( "/entry/DASlogs/comments/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/comments/", "offset", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/comments/", "length", NeXus::UINT32 );
+        makeDataset( "/entry/DASlogs/comments/", "data", NeXus::CHAR );
     }
     catch( TraceException &e )
     {
@@ -255,9 +254,10 @@ NxGen::finalize
             m_pulse_vetoes.clear();
         }
 
-        // Flush any remaining markers
-        if ( m_marker_time.size() )
-            flushMarkerData();
+        // Flush stream marker data
+        flushPauseData();
+        flushScanData();
+        flushCommentData();
 
         float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
 
@@ -594,10 +594,15 @@ NxGen::runComment
 void
 NxGen::markerPause
 (
-    double a_time   ///< [in] Time associated with marker
+    double a_time,              ///< [in] Time associated with marker
+    const string &a_comment     ///< [in] Comment associated with marker
 )
 {
-    markerWrite( a_time, MT_PAUSE, 0, "" );
+    m_pause_time.push_back( a_time );
+    m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
+
+    if ( a_comment.size())
+        markerComment( a_time, a_comment );
 }
 
 
@@ -608,10 +613,15 @@ NxGen::markerPause
 void
 NxGen::markerResume
 (
-    double a_time   ///< [in] Time associated with marker
+    double a_time,              ///< [in] Time associated with marker
+    const string &a_comment     ///< [in] Comment associated with marker
 )
 {
-    markerWrite( a_time, MT_RESUME, 0, "" );
+    m_pause_time.push_back( a_time );
+    m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
+
+    if ( a_comment.size())
+        markerComment( a_time, a_comment );
 }
 
 
@@ -624,10 +634,14 @@ NxGen::markerScanStart
 (
     double a_time,                      ///< [in] Time associated with marker
     unsigned long a_scan_index,         ///< [in] Scan index associated with scan
-    const std::string &a_scan_comment   ///< [in] Comment associated with scan
+    const string &a_comment             ///< [in] Comment associated with scan
 )
 {
-    markerWrite( a_time, MT_SCAN_START, a_scan_index, a_scan_comment );
+    m_scan_time.push_back( a_time );
+    m_scan_value.push_back( a_scan_index );
+
+    if ( a_comment.size())
+        markerComment( a_time, a_comment );
 }
 
 
@@ -639,10 +653,15 @@ void
 NxGen::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
-    unsigned long a_scan_index          ///< [in] Scan index associated with scan
+    unsigned long a_scan_index,         ///< [in] Scan index associated with scan
+    const string &a_comment             ///< [in] Comment associated with scan
 )
 {
-    markerWrite( a_time, MT_SCAN_STOP, a_scan_index, "" );
+    m_scan_time.push_back( a_time );
+    m_scan_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for all scan stops
+
+    if ( a_comment.size())
+        markerComment( a_time, a_comment );
 }
 
 
@@ -657,76 +676,68 @@ NxGen::markerComment
     const std::string &a_comment        ///< [in] Comment to insert
 )
 {
-    markerWrite( a_time, MT_COMMENT, 0, a_comment );
-}
-
-
-/*! \brief Buffers/writes marker data into Nexus file
- *
- * This method buffers marker data for eventual writing into the marker logs of the Nexus file. Writing is
- * triggered when buffers reach the defined chunk size.
- */
-void
-NxGen::markerWrite
-(
-    double a_time,                      ///< [in] Time associated with marker
-    MarkerType a_type,                  ///< [in] Marker type (required)
-    unsigned long a_value,              ///< [in] Marker value (0 if not needed)
-    const std::string &a_comment        ///< [in] Marker comment (optional)
-)
-{
-    m_marker_time.push_back( a_time );
-    m_marker_type.push_back( a_type );
-    m_marker_value.push_back( a_value );
-
     if ( a_comment.size())
     {
-        m_marker_string_offset.push_back( m_last_marker_string_offset );
-        m_last_marker_string_offset += a_comment.size();
-        m_marker_string_length.push_back( a_comment.size() );
+        m_comment_time.push_back( a_time );
 
-        m_marker_string_data.reserve( m_marker_string_data.size() + a_comment.size() );
-        m_marker_string_data.insert( m_marker_string_data.end(), a_comment.begin(), a_comment.end()) ;
-    }
-    else
-    {
-        m_marker_string_offset.push_back(0);
-        m_marker_string_length.push_back(0);
-    }
+        m_comment_offset.push_back( m_comment_last_offset );
+        m_comment_last_offset += a_comment.size();
+        m_comment_length.push_back( a_comment.size() );
 
-    if ( m_marker_time.size() >= m_chunk_size )
-        flushMarkerData();
+        m_comment_data.reserve( m_comment_data.size() + a_comment.size() );
+        m_comment_data.insert( m_comment_data.end(), a_comment.begin(), a_comment.end()) ;
+    }
 }
 
 
-/*! \brief Writes buffered marker data into Nexus file
+/*! \brief Writes buffered pause data into Nexus file
  *
- * This method flushes buffered marker data to the marker logs of the Nexus file.
+ * This method flushes buffered pause data to the logs of the Nexus file.
  */
 void
-NxGen::flushMarkerData()
+NxGen::flushPauseData()
 {
-    // Marker events are very low-frequency, no buffering needed
-    writeSlab( m_marker_type_log_path + "time", m_marker_time, m_marker_slab_size );
-    writeSlab( m_marker_type_log_path + "value", m_marker_type, m_marker_slab_size );
-    writeSlab( m_marker_value_log_path + "value", m_marker_value, m_marker_slab_size );
-    writeSlab( m_marker_value_log_path + "string_offset", m_marker_string_offset, m_marker_slab_size );
-    writeSlab( m_marker_value_log_path + "string_length", m_marker_string_length, m_marker_slab_size );
+    writeSlab( "/entry/DASlogs/pause/time", m_pause_time, 0 );
+    writeSlab( "/entry/DASlogs/pause/value", m_pause_value, 0 );
 
-    m_marker_slab_size += m_marker_time.size();
+    m_pause_time.clear();
+    m_pause_value.clear();
+}
 
-    if ( m_marker_string_data.size())
-    {
-        writeSlab( m_marker_value_log_path + "string_data", m_marker_string_data, m_marker_string_slab_size );
-        m_marker_string_slab_size += m_marker_string_data.size();
-    }
 
-    m_marker_time.clear();
-    m_marker_type.clear();
-    m_marker_value.clear();
-    m_marker_string_offset.clear();
-    m_marker_string_length.clear();
-    m_marker_string_data.clear();
+/*! \brief Writes buffered pause data into Nexus file
+ *
+ * This method flushes buffered pause data to the logs of the Nexus file.
+ */
+void
+NxGen::flushScanData()
+{
+    writeSlab( "/entry/DASlogs/scan_index/time", m_scan_time, 0 );
+    writeSlab( "/entry/DASlogs/scan_index/value", m_scan_value, 0 );
+
+    m_scan_time.clear();
+    m_scan_value.clear();
+}
+
+
+/*! \brief Writes buffered comment data into Nexus file
+ *
+ * This method flushes buffered comment data to the logs of the Nexus file.
+ */
+void
+NxGen::flushCommentData()
+{
+    writeSlab( "/entry/DASlogs/comments/time", m_comment_time, 0 );
+    writeSlab( "/entry/DASlogs/comments/offset", m_comment_offset, 0 );
+    writeSlab( "/entry/DASlogs/comments/length", m_comment_length, 0 );
+
+    if ( m_comment_data.size())
+        writeSlab( "/entry/DASlogs/comments/data", m_comment_data, 0 );
+
+    m_comment_time.clear();
+    m_comment_offset.clear();
+    m_comment_length.clear();
+    m_comment_data.clear();
 }
 
 
