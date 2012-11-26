@@ -109,7 +109,7 @@ void Markers::startScan(void)
 
 void Markers::stopScan(void)
 {
-	emitPacket(ADARA::MarkerType::SCAN_START);
+	emitPacket(ADARA::MarkerType::SCAN_STOP);
 }
 
 void Markers::annotate(void)
