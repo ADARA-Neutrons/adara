@@ -15,6 +15,8 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
 
+std::string STSClientMgr::m_node;
+std::string STSClientMgr::m_service;
 double STSClientMgr::m_connect_timeout = 15.0;
 double STSClientMgr::m_reconnect_timeout = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
@@ -22,7 +24,7 @@ unsigned int STSClientMgr::m_max_connections = 3;
 
 STSClientMgr *STSClientMgr::m_singleton;
 
-STSClientMgr::STSClientMgr(const std::string &uri) :
+STSClientMgr::STSClientMgr() :
 	m_connect_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::connectTimeout)),
 	m_reconnect_timer(new TimerAdapter<STSClientMgr>(this,
@@ -33,23 +35,6 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST),
 	m_currentRun(0)
 {
-	if (m_singleton)
-                throw std::logic_error("STSClientMgr is a singleton");
-
-	const char *default_service = "31417";
-	size_t pos = uri.find_first_of(':');
-
-	if (pos != std::string::npos) {
-		m_node = uri.substr(0, pos);
-		if (pos != uri.length())
-			m_service = uri.substr(pos + 1);
-		else
-			m_service = default_service;
-	} else {
-		m_node = uri;
-		m_service = default_service;
-	}
-
 	m_sigevent.sigev_notify = SIGEV_SIGNAL;
 	m_sigevent.sigev_signo = SignalEvents::allocateRTsig(
 			boost::bind(&STSClientMgr::lookupComplete, this, _1));
@@ -64,8 +49,7 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 				boost::bind(&STSClientMgr::containerChange,
 					    this, _1, _2));
 
-	INFO("Remote is " << uri);
-	m_singleton = this;
+	INFO("Remote is " << m_node << ":" << m_service);
 }
 
 STSClientMgr::~STSClientMgr()
@@ -385,4 +369,36 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 
 	m_connections--;
 	startConnect();
+}
+
+void STSClientMgr::config(const boost::property_tree::ptree &conf)
+{
+	m_connect_timeout =
+			conf.get<double>("stsclient.connect_timeout", 15.0);
+	m_reconnect_timeout =
+			conf.get<double>("stsclient.reconnect_timeout", 15.0);
+	m_transient_timeout =
+			conf.get<double>("stsclient.transient_timeout", 60.0);
+	m_max_connections =
+			conf.get<unsigned int>("stsclient.max_connections", 3);
+
+	std::string uri = conf.get<std::string>("stsclient.uri", "localhost");
+	const char *default_service = "31417";
+	size_t pos = uri.find_first_of(':');
+
+	if (pos != std::string::npos) {
+		m_node = uri.substr(0, pos);
+		if (pos != uri.length())
+			m_service = uri.substr(pos + 1);
+		else
+			m_service = default_service;
+	} else {
+		m_node = uri;
+		m_service = default_service;
+	}
+}
+
+void STSClientMgr::init(void)
+{
+	m_singleton = new STSClientMgr();
 }

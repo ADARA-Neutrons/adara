@@ -9,8 +9,8 @@
 #include "STSClient.h"
 #include "STSClientMgr.h"
 #include "ReadyAdapter.h"
-
 #include "Logging.h"
+#include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 
@@ -19,6 +19,19 @@ static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 
 double STSClient::m_heartbeat_interval = 5.0;
 unsigned int STSClient::m_max_send_chunk = 2 * 1024 * 1024;
+
+void STSClient::config(const boost::property_tree::ptree &conf)
+{
+	m_heartbeat_interval = conf.get<double>("stsclient.heartbeat", 5.0);
+	std::string chunk = conf.get<std::string>("stsclient.maxsend", "2M");
+	try {
+		m_max_send_chunk = parse_size(chunk);
+	} catch (std::runtime_error e) {
+		std::string msg("Unable to parse STS max send: ");
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
+}
 
 STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 		     STSClientMgr &mgr) :

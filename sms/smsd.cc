@@ -19,7 +19,6 @@ namespace ptree = boost::property_tree;
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
 static std::string source_port("31416");
-static std::string sts_port("31417");
 
 static void parse_options(int argc, char **argv)
 {
@@ -31,9 +30,7 @@ static void parse_options(int argc, char **argv)
 		("logconf,l", po::value<std::string>(),
 				"Path to log4cxx property file")
 		("source-port", po::value<std::string>(),
-				"Socket port for connecting to DAS control source")
-		("sts-port", po::value<std::string>(),
-				"Socket port for connecting to STS client");
+				"Socket port for connecting to DAS control source");
 
 	po::variables_map vm;
 	try {
@@ -56,8 +53,6 @@ static void parse_options(int argc, char **argv)
 		log_conf = vm["logconf"].as<std::string>();
 	if (vm.count("source-port"))
 		source_port = vm["source-port"].as<std::string>();
-	if (vm.count("sts-port"))
-		sts_port = vm["sts-port"].as<std::string>();
 }
 
 void load_config(const char *pname)
@@ -78,6 +73,7 @@ void load_config(const char *pname)
 		conf.put("sms.basedir", "/SNSlocal/sms");
 
 	StorageManager::config(conf);
+	STSClientMgr::config(conf);
 }
 
 void block_signals(void)
@@ -125,9 +121,8 @@ int main(int argc, char **argv)
 	StorageManager::init();
 	LiveServer liveServer("31415");
 	SMSControl control("BL14BS", "HYSA", "HYSPECA");
-	// STSClientMgr stsclient("localhost:31417");
-	std::string sts_host("localhost");
-	STSClientMgr stsclient(sts_host + ":" + sts_port);
+
+	STSClientMgr::init();
 
 	// control.addSource("localhost:31416");
 	std::string source_host("localhost");

@@ -1,6 +1,7 @@
 #ifndef __STS_CLIENT_MGR_H
 #define __STS_CLIENT_MGR_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <string>
 #include <map>
 
@@ -13,8 +14,8 @@ class STSClient;
 
 class STSClientMgr {
 public:
-	STSClientMgr(const std::string &uri);
-	~STSClientMgr();
+	static void config(const boost::property_tree::ptree &conf);
+	static void init(void);
 
         static STSClientMgr *getInstance(void) { return m_singleton; }
 	void queueRun(StorageContainer::SharedPtr &c);
@@ -25,14 +26,15 @@ public:
 	enum QueueMode { BALANCE, OLDEST, NEWEST };
 
 private:
+	STSClientMgr();
+	~STSClientMgr();
+
 	typedef boost::signals::connection connection;
 	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_connect_timer;
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_reconnect_timer;
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_transient_timer;
-	std::string m_node;
-	std::string m_service;
 	int m_fd;
 	std::auto_ptr<ReadyAdapter> m_fdreg;
 	bool m_connecting;
@@ -50,6 +52,8 @@ private:
 	struct sigevent m_sigevent;
 	struct addrinfo m_gai_hints;
 
+	static std::string m_node;
+	static std::string m_service;
 	static double m_connect_timeout;
 	static double m_reconnect_timeout;
 	static double m_transient_timeout;

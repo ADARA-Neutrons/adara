@@ -1,6 +1,7 @@
 #ifndef __STS_CLIENT_H
 #define __STS_CLIENT_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <memory>
 
@@ -18,6 +19,8 @@ public:
 	STSClient(int fd, StorageContainer::SharedPtr &run,
 		  STSClientMgr &mgr);
 	~STSClient();
+
+	static void config(const boost::property_tree::ptree &conf);
 
 private:
 	typedef boost::signals::connection connection;
