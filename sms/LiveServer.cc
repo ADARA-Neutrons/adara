@@ -10,7 +10,21 @@
 #include "LiveServer.h"
 #include "LiveClient.h"
 
-LiveServer::LiveServer(const std::string &service)
+std::string LiveServer::m_service;
+LiveServer *LiveServer::m_singleton;
+
+void LiveServer::config(const boost::property_tree::ptree &conf)
+{
+	m_service = conf.get<std::string>("livestream.service", "31415");
+	LiveClient::config(conf);
+}
+
+void LiveServer::init()
+{
+	m_singleton = new LiveServer();
+}
+
+LiveServer::LiveServer()
 {
 	struct addrinfo hints, *ai;
 	std::string msg;
@@ -22,10 +36,10 @@ LiveServer::LiveServer(const std::string &service)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(NULL, service.c_str(), &hints, &ai);
+	rc = getaddrinfo(NULL, m_service.c_str(), &hints, &ai);
 	if (rc) {
 		msg = "Unable to convert service '";
-		msg += service;
+		msg += m_service;
 		msg += "' to a port: ";
 		msg += gai_strerror(rc);
 		throw std::runtime_error(msg);
@@ -54,7 +68,7 @@ LiveServer::LiveServer(const std::string &service)
 
 	if (bind(m_fd, ai->ai_addr, ai->ai_addrlen)) {
 		msg = "Unable to bind to port ";
-		msg += service;
+		msg += m_service;
 		msg += ": ";
 		msg += strerror(errno);
 		goto error_fd;

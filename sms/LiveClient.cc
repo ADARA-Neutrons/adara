@@ -8,6 +8,7 @@
 #include "LiveClient.h"
 #include "StorageFile.h"
 #include "Logging.h"
+#include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 
@@ -18,6 +19,20 @@ static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 
 unsigned int LiveClient::m_max_send_chunk = 2 * 1024 * 1024;
 double LiveClient::m_hello_timeout = 30.0;
+
+void LiveClient::config(const boost::property_tree::ptree &conf)
+{
+	m_hello_timeout = conf.get<double>("livestream.hello_timeout", 30.0);
+
+	std::string size = conf.get<std::string>("livestream.maxsend", "2M");
+	try {
+		m_max_send_chunk = parse_size(size);
+	} catch (std::runtime_error e) {
+		std::string msg("Unable to parse livestream max send size: ");
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
+}
 
 LiveClient::LiveClient(int fd) : 
 	ADARA::Parser(MAX_PKT_SIZE, MAX_PKT_SIZE),

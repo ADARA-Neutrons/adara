@@ -74,6 +74,7 @@ void load_config(const char *pname)
 
 	StorageManager::config(conf);
 	STSClientMgr::config(conf);
+	LiveServer::config(conf);
 }
 
 void block_signals(void)
@@ -119,7 +120,7 @@ int main(int argc, char **argv)
 	block_signals();
 
 	StorageManager::init();
-	LiveServer liveServer("31415");
+	LiveServer::init();
 	SMSControl control("BL14BS", "HYSA", "HYSPECA");
 
 	STSClientMgr::init();

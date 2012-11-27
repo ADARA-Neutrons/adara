@@ -1,6 +1,7 @@
 #ifndef __LIVE_CLIENT_H
 #define __LIVE_CLIENT_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <list>
 
@@ -15,6 +16,8 @@ class LiveClient : public ADARA::Parser {
 public:
 	LiveClient(int fd);
 	~LiveClient();
+
+	static void config(const boost::property_tree::ptree &conf);
 
 private:
 	typedef boost::signals::connection connection;
