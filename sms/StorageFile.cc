@@ -15,6 +15,7 @@
 #include "StorageContainer.h"
 #include "StorageManager.h"
 #include "Logging.h"
+#include "utils.h"
 
 namespace fs = boost::filesystem;
 
@@ -45,6 +46,31 @@ struct run_status_packet {
 
 off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
 off_t StorageFile::m_max_file_size = 200 * 1024 * 1024;
+
+void StorageFile::config(const boost::property_tree::ptree &conf)
+{
+	std::string val = conf.get<std::string>("storage.filesize", "");
+	if (val.length()) {
+		try {
+			m_max_file_size = parse_size(val);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse file size: ");
+			msg += e.what();
+			throw std::runtime_error(msg);
+		}
+	}
+
+	val = conf.get<std::string>("storage.syncdist", "");
+	if (val.length()) {
+		try {
+			m_max_sync_distance = parse_size(val);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse sync distance: ");
+			msg += e.what();
+			throw std::runtime_error(msg);
+		}
+	}
+}
 
 StorageFile::~StorageFile()
 {

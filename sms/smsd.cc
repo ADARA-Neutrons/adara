@@ -10,9 +10,13 @@
 
 #include <log4cxx/propertyconfigurator.h>
 #include <boost/program_options.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 namespace po = boost::program_options;
+namespace ptree = boost::property_tree;
 
+static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
 static std::string source_port("31416");
 static std::string sts_port("31417");
@@ -22,6 +26,8 @@ static void parse_options(int argc, char **argv)
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help,h", "Show usage information")
+		("conf,c", po::value<std::string>(),
+				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
 				"Path to log4cxx property file")
 		("source-port", po::value<std::string>(),
@@ -44,12 +50,34 @@ static void parse_options(int argc, char **argv)
 		exit(2);
 	}
 
+	if (vm.count("conf"))
+		config_file = vm["conf"].as<std::string>();
 	if (vm.count("logconf"))
 		log_conf = vm["logconf"].as<std::string>();
 	if (vm.count("source-port"))
 		source_port = vm["source-port"].as<std::string>();
 	if (vm.count("sts-port"))
 		sts_port = vm["sts-port"].as<std::string>();
+}
+
+void load_config(const char *pname)
+{
+	ptree::ptree conf;
+
+	try {
+		ptree::read_ini(config_file, conf);
+	} catch (ptree::ini_parser_error e) {
+		std::cerr << pname << ": Unable to parse configuration file"
+			<< std::endl;
+		std::cerr << pname << ": " << e.what() << std::endl;
+		exit(1);
+	}
+
+	std::string t = conf.get<std::string>("sms.basedir", "");
+	if (!t.length())
+		conf.put("sms.basedir", "/SNSlocal/sms");
+
+	StorageManager::config(conf);
 }
 
 void block_signals(void)
@@ -87,11 +115,14 @@ int main(int argc, char **argv)
 {
 	parse_options(argc, argv);
 
+	/* XXX do this later, but setup a simple console appender initially. */
 	PropertyConfigurator::configure(log_conf);
+
+	load_config(argv[0]);
 
 	block_signals();
 
-	StorageManager::init("/SNSlocal/sms/data");
+	StorageManager::init();
 	LiveServer liveServer("31415");
 	SMSControl control("BL14BS", "HYSA", "HYSPECA");
 	// STSClientMgr stsclient("localhost:31417");

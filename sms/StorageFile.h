@@ -4,6 +4,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/signal.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include "ADARA.h"
 #include "Storage.h"
@@ -54,6 +55,8 @@ public:
 	void terminate(ADARA::RunStatus::Enum status);
 
 	~StorageFile();
+
+	static void config(const boost::property_tree::ptree &conf);
 
 private:
 	OwnerPtr m_owner;

@@ -22,7 +22,11 @@ int main(int argc, char **argv)
 	hdr->payload_len = sizeof(pkt) - sizeof(*hdr);
 	hdr->pkt_format = ADARA::PacketType::RAW_EVENT_V0;
 
-	StorageManager::init("/data/dad/adara");
+	boost::property_tree::ptree conf;
+	conf.put("basedir", "/SNSlocal/sms");
+
+	StorageManager::config(conf);
+	StorageManager::init();
 
 	for (i = 0; i < 10240; i++) {
 		clock_gettime(CLOCK_REALTIME, &ts);

@@ -1,6 +1,7 @@
 #ifndef __STORAGE_MANAGER_H
 #define __STORAGE_MANAGER_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/signal.hpp>
@@ -25,7 +26,7 @@ public:
 	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
 								FileOffSetFunc;
 
-	static void init(const std::string &baseDir);
+	static void init(void);
 	static void stop(void);
 
 	static void startRecording(uint32_t run);
@@ -72,6 +73,8 @@ public:
 	static const struct timespec &scanStart(void) {
 		return m_scanStart;
 	}
+
+	static void config(const boost::property_tree::ptree &conf);
 
 private:
 	typedef boost::signals::connection connection;

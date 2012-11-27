@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <ctype.h>
 
@@ -17,8 +18,8 @@
 #include "ADARA.h"
 #include "EventFd.h"
 #include "STSClientMgr.h"
-
 #include "Logging.h"
+#include "utils.h"
 
 namespace fs = boost::filesystem;
 
@@ -72,21 +73,63 @@ const char *StorageManager::m_run_tempname = "next_run.temp";
 
 boost::thread StorageManager::m_ioThread;
 
-void StorageManager::init(const std::string &baseDir)
+void StorageManager::config(const boost::property_tree::ptree &conf)
 {
+	m_baseDir = conf.get<std::string>("storage.basedir", "");
+	if (!m_baseDir.length()) {
+		m_baseDir = conf.get<std::string>("sms.basedir");
+		m_baseDir += "/data";
+	}
+
 	struct stat stats;
-
-	m_baseDir = baseDir;
-
-	if (stat(baseDir.c_str(), &stats)) {
+	if (stat(m_baseDir.c_str(), &stats)) {
 		int err = errno;
-		std::string msg("StorageManager::init() stat() error: ");
+		std::string msg("Unable to stat ");
+		msg += m_baseDir;
+		msg += ": ";
 		msg += strerror(err);
 		throw std::runtime_error(msg);
 	}
 
+	uint64_t maxSize = 0;
+	std::string poolsize = conf.get<std::string>("storage.poolsize", "");
+	if (poolsize.length()) {
+		try {
+			maxSize = parse_size(poolsize);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse storage pool size: ");
+			msg += e.what();
+			throw std::runtime_error(msg);
+		}
+	} else {
+		/* If the user doesn't specify a size, we'll use a percentage
+		 * of the total space, 80% by default.
+		 */
+		struct statfs fsstats;
+		if (statfs(m_baseDir.c_str(), &fsstats)) {
+			int err = errno;
+			std::string msg("Unable to statfs ");
+			msg += m_baseDir;
+			msg += ": ";
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
+
+		int percent = conf.get<int>("storage.percent", 80);
+		maxSize = fsstats.f_blocks * 100 / percent;
+		maxSize *= 512;
+	}
+
 	m_block_size = stats.st_blksize;
-	m_base_fd = open(baseDir.c_str(), O_RDONLY | O_DIRECTORY);
+	m_max_blocks_allowed = maxSize + m_block_size - 1;
+	m_max_blocks_allowed /= m_block_size;
+
+	StorageFile::config(conf);
+}
+
+void StorageManager::init(void)
+{
+	m_base_fd = open(m_baseDir.c_str(), O_RDONLY | O_DIRECTORY);
 	if (m_base_fd < 0) {
 		int err = errno;
 		std::string msg("StorageManager::init() open() error: ");
