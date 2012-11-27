@@ -279,6 +279,18 @@ NxGen::finalize
         writeScalarAttribute( "/entry/DASlogs/frequency/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( "/entry/DASlogs/frequency/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
 
+        writeStringAttribute( "/entry/DASlogs/pause/time", "start", time );
+        writeScalarAttribute( "/entry/DASlogs/pause/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( "/entry/DASlogs/pause/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
+        writeStringAttribute( "/entry/DASlogs/scan_index/time", "start", time );
+        writeScalarAttribute( "/entry/DASlogs/scan_index/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( "/entry/DASlogs/scan_index/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
+        writeStringAttribute( "/entry/DASlogs/comments/time", "start", time );
+        writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
         // End time
         time = timeToISO8601( a_run_metrics.end_time );
         writeString( "/entry/", "end_time", time );
