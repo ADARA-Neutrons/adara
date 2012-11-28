@@ -1,9 +1,14 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <iostream>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
 #include "ADARAParser.h"
+
+#include <boost/program_options.hpp>
+
+namespace po = boost::program_options;
 
 static const char *statusString(ADARA::VariableStatus::Enum status)
 {
@@ -123,12 +128,15 @@ static const char *markerType(ADARA::MarkerType::Enum type)
 
 class Parser : public ADARA::Parser {
 public:
+	Parser(bool hex, bool word) : m_hexDump(hex), m_wordDump(word) { }
+
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
 			   const uint8_t *chunk,
 			   unsigned int chunk_offset,
 			   unsigned int chunk_len);
 
+	bool rxPacket(const ADARA::Packet &pkt);
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
@@ -149,7 +157,38 @@ public:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
 	using ADARA::Parser::rxPacket;
+
+private:
+	bool m_hexDump;
+	bool m_wordDump;
 };
+
+bool Parser::rxPacket(const ADARA::Packet &pkt)
+{
+	bool ret = ADARA::Parser::rxPacket(pkt);
+
+	if (m_hexDump) {
+		const uint8_t *p = pkt.packet();
+		uint32_t addr;
+
+		for (addr = 0; addr < pkt.packet_length(); addr++, p++) {
+			if ((addr % 16) == 0)
+				printf("%s%04x:", addr ? "\n" : "", addr);
+			printf(" %02x", *p);
+		}
+		printf("\n");
+	}
+
+	if (m_wordDump) {
+		const uint32_t *p = (const uint32_t *) pkt.packet();
+		uint32_t addr;
+
+		for (addr = 0; addr < pkt.packet_length(); addr += 4, p++)
+			printf("%04x: %08x\n", addr, *p);
+	}
+
+	return ret;
+}
 
 bool Parser::rxUnknownPkt(const ADARA::Packet &pkt)
 {
@@ -575,10 +614,30 @@ bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 	return false;
 }
 
-int main(int, char **)
+int main(int argc, char **argv)
 {
-	Parser parser;
+        po::options_description desc("Allowed options");
+        desc.add_options()
+                ("help,h", "Show usage information")
+                ("hexdump,x", "Dump the contents of each packet in hex (bytes)")
+                ("worddump,w", "Dump the contents of each packet in hex (words)");
 
+        po::variables_map vm;
+        try {
+                po::store(po::parse_command_line(argc, argv, desc), vm);
+                po::notify(vm);
+        } catch (po::unknown_option e) {
+                std::cerr << argv[0] << ": " << e.what() << std::endl
+                        << std::endl << desc << std::endl;
+                exit(2);
+        }
+
+        if (vm.count("help")) {
+                std::cerr << desc << std::endl;
+                exit(2);
+        }
+
+	Parser parser(vm.count("hexdump"), vm.count("worddump"));
 	parser.read(0);
 	return 0;
 }
