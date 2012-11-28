@@ -173,7 +173,8 @@ private:
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
-	void addSource(const std::string &uri);
+	void addSource(const std::string &name,
+		       const boost::property_tree::ptree &info);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);

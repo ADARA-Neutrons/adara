@@ -14,11 +14,6 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
-double DataSource::m_connect_retry = 15.0;
-double DataSource::m_connect_timeout = 5.0;
-double DataSource::m_data_timeout = 5.0;
-
-unsigned int DataSource::m_max_read_chunk = 4 * 1024 * 1024;
 
 class HWSource {
 public:
@@ -123,9 +118,14 @@ private:
 	uint8_t		m_timingStatus;
 };
 
-DataSource::DataSource(const std::string &uri, uint32_t id) :
+
+DataSource::DataSource(const std::string &uri, uint32_t id,
+		       double connect_retry, double connect_timeout,
+		       double data_timeout, unsigned int read_chunk) :
 	m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
-	m_state(IDLE), m_smsSourceId(id), m_fd(-1)
+	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
+	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
+	m_data_timeout(data_timeout), m_max_read_chunk(read_chunk)
 {
 	std::string node;
 	std::string service("31416");

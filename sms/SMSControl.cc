@@ -9,8 +9,8 @@
 #include "BeamlineInfo.h"
 #include "MetaDataMgr.h"
 #include "Markers.h"
-
 #include "Logging.h"
+#include "utils.h"
 
 #include <math.h>
 #include <boost/lexical_cast.hpp>
@@ -70,22 +70,82 @@ void SMSControl::init(void)
 
 void SMSControl::addSources(const boost::property_tree::ptree &conf)
 {
-	std::string prefix("source ");
-	boost::property_tree::ptree::const_assoc_iterator uri;
+	std::string name, prefix("source ");
 	boost::property_tree::ptree::const_iterator it;
 	SMSControl *sms = getInstance();
-	size_t plen = prefix.length();
+	size_t b, e, plen = prefix.length();
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
 		if (it->first.compare(0, plen, prefix))
 			continue;
 
-		uri = it->second.find("uri");
-		if (uri == it->second.not_found())
-			continue;
+		b = it->first.find_first_of('\"', plen);
+		if (b != std::string::npos)
+			e = it->first.find_first_of('\"', b + 1);
+		else
+			e = std::string::npos;
 
-		sms->addSource(uri->second.data());
+		if (b == std::string::npos || e == std::string::npos) {
+			std::string msg("Invalid source section name '");
+			msg += it->first;
+			msg += "'";
+			throw std::runtime_error(msg);
+		}
+
+		name = it->first.substr(b + 1, e - b - 1);
+
+		if (it->second.count("disabled")) {
+			INFO("Ignoring disabled source '" << name << "'");
+			continue;
+		}
+
+		sms->addSource(name, it->second);
 	}
+}
+
+void SMSControl::addSource(const std::string &name,
+			   const boost::property_tree::ptree &info)
+{
+	/* TODO will eventually need to configure fast metadata conversion
+	 */
+	boost::property_tree::ptree::const_assoc_iterator uri;
+	double connect_retry, connect_timeout, data_timeout;
+	unsigned int chunk_size;
+
+	uri = info.find("uri");
+	if (uri == info.not_found()) {
+		std::string msg("Source '");
+		msg += name;
+		msg += "' is missing URI";
+		throw std::runtime_error(msg);
+	}
+
+	std::string val = info.get<std::string>("readsize", "4M");
+	try {
+		chunk_size = parse_size(val);
+	} catch (std::runtime_error e) {
+		std::string msg("Unable to parse read size for source '");
+		msg += name;
+		msg += "': ";
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
+
+	connect_retry = info.get<double>("connect_retry", 15.0);
+	connect_timeout = info.get<double>("connect_timeout", 5.0);
+	data_timeout = info.get<double>("data_timeout", 5.0);
+
+	boost::shared_ptr<DataSource> src(new DataSource(uri->second.data(),
+							 m_nextSrcId,
+							 connect_retry,
+							 connect_timeout,
+							 data_timeout,
+							 chunk_size));
+	m_sources.push_back(src);
+
+	/* We save source ID 0 for internal use. */
+	m_nextSrcId++;
+	/* TODO check against the max number of sources? */
 }
 
 SMSControl::SMSControl() :
@@ -235,19 +295,6 @@ bool SMSControl::setRecording(bool v)
 
 	m_recording = v;
 	return true;
-}
-
-void SMSControl::addSource(const std::string &uri)
-{
-	/* TODO will eventually need to configure fast metadata conversion,
-	 * and if we expect to see pulse data from this source
-	 */
-	boost::shared_ptr<DataSource> src(new DataSource(uri, m_nextSrcId));
-	m_sources.push_back(src);
-
-	/* We save source ID 0 for internal use. */
-	m_nextSrcId++;
-	/* TODO check against the max number of sources? */
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)

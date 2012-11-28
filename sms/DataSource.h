@@ -15,7 +15,9 @@ class HWSource;
 
 class DataSource : public ADARA::Parser {
 public:
-	DataSource(const std::string &uri, uint32_t id);
+	DataSource(const std::string &uri, uint32_t id,
+		   double connect_retry, double connect_timeout,
+		   double data_timeout, unsigned int read_chunk);
 	~DataSource();
 
 private:
@@ -32,11 +34,10 @@ private:
 	uint32_t m_smsSourceId;
 	int m_fd;
 	HWSrcMap m_hwSources;
-
-	static unsigned int m_max_read_chunk;
-	static double m_connect_retry;
-	static double m_connect_timeout;
-	static double m_data_timeout;
+	double m_connect_retry;
+	double m_connect_timeout;
+	double m_data_timeout;
+	unsigned int m_max_read_chunk;
 
 	void fdReady(void);
 
