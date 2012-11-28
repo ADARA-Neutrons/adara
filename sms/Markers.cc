@@ -54,7 +54,7 @@ Markers::Markers(const std::string &beamline, SMSControl *sms)
 	sms->addPV(m_scanStartPV);
 
 	m_scanStopPV.reset(new MarkerTriggerPV(prefix + "StopScan",
-			    boost::bind(&Markers::startScan, this)));
+			    boost::bind(&Markers::stopScan, this)));
 	sms->addPV(m_scanStopPV);
 
 	m_annotatePV.reset(new MarkerTriggerPV(prefix + "Annotate",
