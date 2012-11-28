@@ -255,8 +255,8 @@ private:
                                     while( count <= ( a_count - m_chunk_size ))
                                     {
                                         writeSlab( a_path, buf, slab_size );
-                                        count += m_chunk_size;
-                                        slab_size += m_chunk_size;
+                                        count += buf.size();
+                                        slab_size += buf.size();
                                     }
                                 }
 

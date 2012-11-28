@@ -192,7 +192,7 @@ NxGen::initialize()
         makeLink( "/entry/DASlogs/frequency/time", "/entry/DASlogs/proton_charge/time" );
 
         // Create pulse veto log
-        makeGroup( "/entry/DASlogs/Veto_pulse", "NXlog" );
+        makeGroup( "/entry/DASlogs/Veto_pulse", "NXcollection" );
         makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
 
         // Create pause event log
@@ -211,6 +211,14 @@ NxGen::initialize()
         makeDataset( "/entry/DASlogs/comments/", "offset", NeXus::UINT32 );
         makeDataset( "/entry/DASlogs/comments/", "length", NeXus::UINT32 );
         makeDataset( "/entry/DASlogs/comments/", "data", NeXus::CHAR );
+
+        // Insert initial "not in scan" value
+        m_scan_time.push_back( 0.0 );
+        m_scan_value.push_back( 0 );
+
+        // Insert initial "not paused" value
+        m_pause_time.push_back( 0.0 );
+        m_pause_value.push_back( 0 );
     }
     catch( TraceException &e )
     {

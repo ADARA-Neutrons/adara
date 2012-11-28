@@ -200,8 +200,6 @@ StreamParser::rxPacket
     const ADARA::Packet &a_pkt    ///< [in] An ADARA packet
 )
 {
-//    cout << getPktName( a_pkt.type()) << endl;
-
     if ( m_gather_stats )
         gatherStats( a_pkt );
 
@@ -392,7 +390,9 @@ StreamParser::rxPacket
 )
 {
     processPulseID( a_pkt.pulseId() );
-    processPulseInfo( a_pkt );
+
+    if ( !( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE ))
+        processPulseInfo( a_pkt );
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
@@ -449,7 +449,17 @@ StreamParser::processPulseInfo
     // Handle time and frequency info
     if ( m_pulse_info.start_time )
     {
-        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time;
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
+
+        // It is (or should be) considered a fatal error if pulse times are not monotonically increasing
+        if ( pulse_time < m_pulse_info.start_time )
+        {
+            //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Pulse time went backwards at pulse ID " << a_pkt.pulseId() );
+            pulse_time = 0;
+        }
+        else
+            pulse_time -= m_pulse_info.start_time;
+
         m_pulse_info.times.push_back( pulse_time/1000000000.0 );
         m_pulse_info.freqs.push_back( 1000000000.0 / ( pulse_time - m_pulse_info.last_time ));
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
@@ -1063,7 +1073,10 @@ StreamParser::rxPacket
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
     {
-        t = (timespec_to_nsec( a_pkt.timestamp() ) - m_pulse_info.start_time)/1000000000.0;
+        uint64_t t1 = timespec_to_nsec( a_pkt.timestamp() );
+        // Truncate negative time offsets to 0
+        if ( t1 > m_pulse_info.start_time )
+            t = ( t1 - m_pulse_info.start_time ) / 1000000000.0;
     }
 
     // Switch on event type

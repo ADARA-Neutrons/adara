@@ -35,3 +35,6 @@ Version History
         Many small changes based on Maries short diff document (some still outstanding)
 0.1.4 - Added base cataloging path option (for test harness/manual translation)
 0.1.5 - Added stream marker support
+0.1.6 - Fixed marker initial values, changed marker format in Nexus files
+0.1.7 - Fixed bugs for Misaligned event index, negative time offsets, veto
+        pulse class type in Nexus file.
