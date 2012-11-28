@@ -1,6 +1,7 @@
 #ifndef __SMS_CONTROL_H
 #define __SMS_CONTROL_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <string>
 #include <map>
@@ -29,11 +30,6 @@ class SMSControl : public caServer {
 public:
 	typedef boost::shared_ptr<casPV> PVSharedPtr;
 
-	SMSControl(const std::string &beamlineId,
-		   const std::string &beamlineShortName,
-		   const std::string &beamlineLongName);
-	~SMSControl();
-
 	void show(unsigned level) const;
 
 	pvExistReturn pvExistTest(const casCtx &, const caNetAddr &,
@@ -43,7 +39,6 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
-	void addSource(const std::string &uri);
 	void sourceUp(uint32_t smsId);
 	void sourceDown(uint32_t smsId);
 
@@ -65,7 +60,14 @@ public:
 	void updateValue(const ADARA::VariableStringPkt &pkt,
 			 uint32_t sourceId);
 
+	static void config(const boost::property_tree::ptree &conf);
+	static void init(void);
+	static void addSources(const boost::property_tree::ptree &conf);
+
 private:
+	SMSControl();
+	~SMSControl();
+
 	typedef std::bitset<256> SourceSet;
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
 
@@ -161,10 +163,17 @@ private:
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
 
+	static std::string m_beamlineId;
+	static std::string m_beamlineShortName;
+	static std::string m_beamlineLongName;
+	static std::string m_geometryPath;
+	static std::string m_pixelMapPath;
+
 	static SMSControl *m_singleton;
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
+	void addSource(const std::string &uri);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);

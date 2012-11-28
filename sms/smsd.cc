@@ -18,7 +18,6 @@ namespace ptree = boost::property_tree;
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
-static std::string source_port("31416");
 
 static void parse_options(int argc, char **argv)
 {
@@ -28,9 +27,7 @@ static void parse_options(int argc, char **argv)
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
-				"Path to log4cxx property file")
-		("source-port", po::value<std::string>(),
-				"Socket port for connecting to DAS control source");
+				"Path to log4cxx property file");
 
 	po::variables_map vm;
 	try {
@@ -51,14 +48,10 @@ static void parse_options(int argc, char **argv)
 		config_file = vm["conf"].as<std::string>();
 	if (vm.count("logconf"))
 		log_conf = vm["logconf"].as<std::string>();
-	if (vm.count("source-port"))
-		source_port = vm["source-port"].as<std::string>();
 }
 
-void load_config(const char *pname)
+void load_config(const char *pname, ptree::ptree &conf)
 {
-	ptree::ptree conf;
-
 	try {
 		ptree::read_ini(config_file, conf);
 	} catch (ptree::ini_parser_error e) {
@@ -73,6 +66,7 @@ void load_config(const char *pname)
 		conf.put("sms.basedir", "/SNSlocal/sms");
 
 	StorageManager::config(conf);
+	SMSControl::config(conf);
 	STSClientMgr::config(conf);
 	LiveServer::config(conf);
 }
@@ -110,24 +104,23 @@ void block_signals(void)
 
 int main(int argc, char **argv)
 {
+	ptree::ptree conf;
+
 	parse_options(argc, argv);
 
 	/* XXX do this later, but setup a simple console appender initially. */
 	PropertyConfigurator::configure(log_conf);
 
-	load_config(argv[0]);
+	load_config(argv[0], conf);
 
 	block_signals();
 
 	StorageManager::init();
+	SMSControl::init();
 	LiveServer::init();
-	SMSControl control("BL14BS", "HYSA", "HYSPECA");
-
 	STSClientMgr::init();
 
-	// control.addSource("localhost:31416");
-	std::string source_host("localhost");
-	control.addSource(source_host + ":" + source_port);
+	SMSControl::addSources(conf);
 
 	for (;;) {
 		fileDescriptorManager.process(1000.0);

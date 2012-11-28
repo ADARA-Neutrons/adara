@@ -17,6 +17,11 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
+std::string SMSControl::m_beamlineId;
+std::string SMSControl::m_beamlineShortName;
+std::string SMSControl::m_beamlineLongName;
+std::string SMSControl::m_geometryPath;
+std::string SMSControl::m_pixelMapPath;
 SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
@@ -32,23 +37,69 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 	return (E0 / sqrt(1 - (beta * beta))) - E0;
 }
 
-SMSControl::SMSControl(const std::string &beamlineId,
-		       const std::string &beamlineShortName,
-		       const std::string &beamlineLongName) :
+void SMSControl::config(const boost::property_tree::ptree &conf)
+{
+	std::string base = conf.get<std::string>("sms.basedir");
+	base += "/conf";
+
+	m_geometryPath = conf.get<std::string>("sms.geometry_file", "");
+	if (!m_geometryPath.length())
+		m_geometryPath = base + "/geometry.xml";
+
+	m_pixelMapPath = conf.get<std::string>("sms.pixelmap_file", "");
+	if (!m_pixelMapPath.length())
+		m_pixelMapPath = base + "/pixelmap";
+
+	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
+	m_beamlineShortName =
+			conf.get<std::string>("sms.beamline_shortname", "");
+	m_beamlineLongName = conf.get<std::string>("sms.beamline_longname", "");
+
+	if (!m_beamlineId.length())
+		throw std::runtime_error("Missing beamline ID");
+	if (!m_beamlineShortName.length())
+		throw std::runtime_error("Missing beamline short name");
+	if (!m_beamlineLongName.length())
+		throw std::runtime_error("Missing beamline long name");
+}
+
+void SMSControl::init(void)
+{
+	m_singleton = new SMSControl();
+}
+
+void SMSControl::addSources(const boost::property_tree::ptree &conf)
+{
+	std::string prefix("source ");
+	boost::property_tree::ptree::const_assoc_iterator uri;
+	boost::property_tree::ptree::const_iterator it;
+	SMSControl *sms = getInstance();
+	size_t plen = prefix.length();
+
+	for (it = conf.begin(); it != conf.end(); ++it) {
+		if (it->first.compare(0, plen, prefix))
+			continue;
+
+		uri = it->second.find("uri");
+		if (uri == it->second.not_found())
+			continue;
+
+		sms->addSource(uri->second.data());
+	}
+}
+
+SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
 	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr)
 {
-	if (m_singleton)
-		throw std::runtime_error("SMSControl is a singleton");
-
-	std::string prefix(beamlineId);
+	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
 						smsRecordingPV(prefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(prefix));
-	m_markers = boost::shared_ptr<Markers>(new Markers(beamlineId, this));
+	m_markers = boost::shared_ptr<Markers>(new Markers(m_beamlineId, this));
 
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
@@ -57,15 +108,13 @@ SMSControl::SMSControl(const std::string &beamlineId,
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(beamlineId, beamlineShortName,
-					      beamlineLongName));
-	m_runInfo.reset(new RunInfo(beamlineId, this));
-	m_geometry.reset(new Geometry("/SNSlocal/sms/conf/geometry.xml"));
-	m_pixelMap.reset(new PixelMap("/SNSlocal/sms/conf/pixelmap"));
+	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId, m_beamlineShortName,
+					      m_beamlineLongName));
+	m_runInfo.reset(new RunInfo(m_beamlineId, this));
+	m_geometry.reset(new Geometry(m_geometryPath));
+	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
 
 	m_maxBanks = m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET;
-
-	m_singleton = this;
 }
 
 SMSControl::~SMSControl()
