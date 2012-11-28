@@ -165,7 +165,7 @@ StreamParser::printStats
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
     {                                   \
-        return Parser::rxPacket(a_pkt);   \
+        return Parser::rxPacket(a_pkt); \
     }                                   \
     else                                \
     {                                   \
@@ -175,10 +175,10 @@ StreamParser::printStats
     }
 
 #define PROCESS_IN_STATES_ONCE(s,x)     \
-    if (( m_processing_state & (s)) && !(m_pkt_recvd & x))    \
+    if (( m_processing_state & (s)) && !(m_pkt_recvd & (x)))    \
     {                                   \
-        m_pkt_recvd |= x;               \
-        return Parser::rxPacket(a_pkt);   \
+        m_pkt_recvd |= (x);             \
+        return Parser::rxPacket(a_pkt); \
     }                                   \
     else                                \
     {                                   \
@@ -217,23 +217,23 @@ StreamParser::rxPacket
     // These packets shall be processed ONCE during header and event processing
     // Note: these should arrive before event processing, but it is no guaranteed.
     case ADARA::PacketType::PIXEL_MAPPING_V0:
-        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_PIXELMAP)
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_PIXELMAP)
 
     case ADARA::PacketType::RUN_INFO_V0:
-        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_RUNINFO)
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_RUNINFO)
 
     case ADARA::PacketType::GEOMETRY_V0:
-        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_GEOMETRY)
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
-        PROCESS_IN_STATES_ONCE((PROCESSING_RUN_HEADER|PROCESSING_EVENTS),PKT_BIT_BEAMINFO)
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
 
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
     case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
     case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        PROCESS_IN_STATES((PROCESSING_RUN_HEADER|PROCESSING_EVENTS))
+        PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
     // These packets shall only be processed during event processing
     case ADARA::PacketType::BANKED_EVENT_V0:
@@ -1073,16 +1073,16 @@ StreamParser::rxPacket
         markerComment( t, a_pkt.comment() );
         break;
     case ADARA::MarkerType::PAUSE:
-        markerPause( t );
+        markerPause( t, a_pkt.comment() );
         break;
     case ADARA::MarkerType::RESUME:
-        markerResume( t );
+        markerResume( t, a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_START:
         markerScanStart( t, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_STOP:
-        markerScanStop( t, a_pkt.scanIndex() );
+        markerScanStop( t, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
         runComment( a_pkt.comment() );
@@ -1146,7 +1146,7 @@ StreamParser::finalizeStreamProcessing()
 {
     // Make sure neutron pulses were received
 
-    if ( !m_run_metrics.charge_stats.count() )
+    if ( !m_run_metrics.charge_stats.count() && m_strict )
         THROW_TRACE( ERR_UNEXPECTED_INPUT, "No neutron pulses received in stream.")
 
     // Write any remaining data in bank buffers
