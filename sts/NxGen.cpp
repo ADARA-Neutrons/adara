@@ -299,6 +299,10 @@ NxGen::finalize
         writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
 
+        writeStringAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "start", time );
+        writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
         // End time
         time = timeToISO8601( a_run_metrics.end_time );
         writeString( "/entry/", "end_time", time );
