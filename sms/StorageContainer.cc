@@ -41,6 +41,9 @@ void StorageContainer::terminateFile(void)
 
 void StorageContainer::newFile(void)
 {
+	if (m_cur_file)
+		return;
+
 	ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
 
 	if (m_runNumber) {
@@ -197,10 +200,6 @@ StorageContainer::SharedPtr StorageContainer::create(
 		msg += strerror(err);
 		throw std::runtime_error(msg);
 	}
-
-	/* Run containers should always have a file */
-	if (run)
-		c->newFile();
 
 	return c;
 }

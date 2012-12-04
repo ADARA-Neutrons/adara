@@ -347,6 +347,17 @@ void StorageManager::startContainer(uint32_t run)
 	m_cur_container = StorageContainer::create(now, run);
 
 	m_contChange(m_cur_container, true);
+
+	/* Containers need to be sure to always have a file; otherwise
+	 * there will be no record if we don't currently have pulses
+	 * coming in. This isn't a normal situation, but we should handle
+	 * it gracefully.
+	 *
+	 * This needs to happen after we tell interested parties about
+	 * the new container, so they don't miss the notification of the
+	 * new file.
+	 */
+	m_cur_container->newFile();
 }
 
 void StorageManager::endCurrentContainer(void)

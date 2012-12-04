@@ -36,6 +36,7 @@ public:
 	static uint64_t purge(const std::string &path, uint64_t goal,
 			      bool rmdir);
 
+	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminate(void);
 
@@ -64,7 +65,6 @@ private:
 	StorageContainer(const std::string &name);
 
 	void terminateFile(void);
-	void newFile(void);
 
 	bool createMarker(const char *);
 	bool validate(void);
