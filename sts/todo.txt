@@ -38,3 +38,4 @@ Version History
 0.1.6 - Fixed marker initial values, changed marker format in Nexus files
 0.1.7 - Fixed bugs for Misaligned event index, negative time offsets, veto
         pulse class type in Nexus file.
+0.1.8 - Added time attributes to Veto_pulse log
