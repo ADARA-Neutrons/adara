@@ -146,7 +146,21 @@ bool SMSControl::setRecording(bool v)
 		INFO("Starting run " << m_currentRunNumber);
 		m_runInfo->lock();
 		m_runInfo->setRunNumber(m_currentRunNumber);
-		StorageManager::startRecording(m_currentRunNumber);
+
+		try {
+			StorageManager::startRecording(m_currentRunNumber);
+		} catch (std::runtime_error e) {
+			ERROR("Unable to start recording: " << e.what());
+			m_runInfo->setRunNumber(0);
+			m_runInfo->unlock();
+			return false;
+		} catch (...) {
+			ERROR("Unable to start recording, unknown exception");
+			m_runInfo->setRunNumber(0);
+			m_runInfo->unlock();
+			return false;
+		}
+
 		m_pvRunNumber->update(m_currentRunNumber, &now);
 		m_pvRecording->update(v, &now);
 	} else {
@@ -154,7 +168,13 @@ bool SMSControl::setRecording(bool v)
 		INFO("Stopping run " << m_currentRunNumber);
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
-		StorageManager::stopRecording();
+
+		try {
+			StorageManager::stopRecording();
+		} catch (std::runtime_error e) {
+			ERROR("Unable to stop recording: " << e.what());
+			return false;
+		}
 		m_pvRunNumber->update(0, &now);
 		m_pvRecording->update(v, &now);
 	}
