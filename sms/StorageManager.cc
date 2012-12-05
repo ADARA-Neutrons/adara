@@ -341,7 +341,7 @@ void StorageManager::startContainer(uint32_t run)
 	struct timespec now;
 
 	if (m_cur_container)
-		throw std::runtime_error("Already have a container");
+		throw std::logic_error("Already have a container");
 
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run);
@@ -352,7 +352,7 @@ void StorageManager::startContainer(uint32_t run)
 void StorageManager::endCurrentContainer(void)
 {
 	if (!m_cur_container)
-		throw std::runtime_error("No container to end");
+		throw std::logic_error("No container to end");
 
 	m_cur_container->terminate();
 	m_contChange(m_cur_container, false);
@@ -362,7 +362,7 @@ void StorageManager::endCurrentContainer(void)
 void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 {
 	if (m_prologueFile)
-		throw std::runtime_error("Recursive use of prologue files");
+		throw std::logic_error("Recursive use of prologue files");
 
 	m_prologueFile = f;
 	m_prologue();
@@ -372,10 +372,10 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 void StorageManager::startRecording(uint32_t run)
 {
 	if (!run)
-		throw std::runtime_error("Invalid run number");
+		throw std::logic_error("Invalid run number");
 
 	if (m_cur_container->runNumber())
-		throw std::runtime_error("Already recording");
+		throw std::logic_error("Already recording");
 
 	endCurrentContainer();
 	startContainer(run);
@@ -417,7 +417,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	off_t size, blocks;
 
 	if (!m_cur_container)
-		throw std::runtime_error("No container!");
+		throw std::logic_error("No container!");
 
 	size = m_cur_container->write(iovec, len, notify);
 
@@ -441,7 +441,7 @@ void StorageManager::addPrologue(IoVector &iovec)
 	 * updates into a file, so we know we have a current container.
 	 */
 	if (!m_prologueFile) {
-		throw std::runtime_error("Invalid use of "
+		throw std::logic_error("Invalid use of "
 					 "StorageManager::addPrologue");
 	}
 
@@ -459,10 +459,10 @@ uint32_t StorageManager::validatePacket(const IoVector &iovec)
 		len += it->iov_len;
 
 	if (iovec[0].iov_len < (2 * sizeof(uint32_t)))
-		throw std::runtime_error("Initial fragment too small");
+		throw std::logic_error("Initial fragment too small");
 
 	if (len < sizeof(struct header))
-		throw std::runtime_error("Packet too small");
+		throw std::logic_error("Packet too small");
 
 	return len;
 }

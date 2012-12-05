@@ -229,7 +229,7 @@ void DataSource::fdReady(void)
 {
 	switch (m_state) {
 	case IDLE:
-		throw std::runtime_error("Invalid state");
+		throw std::logic_error("Invalid state");
 	case CONNECTING:
 		connectComplete();
 		break;

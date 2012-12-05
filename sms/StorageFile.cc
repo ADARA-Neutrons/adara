@@ -84,7 +84,7 @@ void StorageFile::makePath(void)
 	char name[16];
 
 	if (!c)
-		throw std::runtime_error("StorageFile owner is empty!");
+		throw std::logic_error("StorageFile owner is empty!");
 
 	m_path = c->name();
 

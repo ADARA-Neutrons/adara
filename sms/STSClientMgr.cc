@@ -34,7 +34,7 @@ STSClientMgr::STSClientMgr(const std::string &uri) :
 	m_currentRun(0)
 {
 	if (m_singleton)
-                throw std::runtime_error("STSClientMgr is a singleton");
+                throw std::logic_error("STSClientMgr is a singleton");
 
 	const char *default_service = "31417";
 	size_t pos = uri.find_first_of(':');
@@ -95,7 +95,7 @@ void STSClientMgr::queueRun(StorageContainer::SharedPtr &c)
 
 	ret = m_pendingRuns.insert(std::make_pair(c->runNumber(), c));
 	if (!ret.second)
-		throw std::runtime_error("Duplicate run numbers");
+		throw std::logic_error("Duplicate run numbers");
 
 	if (c->active())
 		m_currentRun = c->runNumber();
@@ -118,7 +118,7 @@ StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 	QueueMode next;
 
 	if (m_pendingRuns.empty())
-		throw std::runtime_error("Trying to dequeue when empty");
+		throw std::logic_error("Trying to dequeue when empty");
 
 	if (m_currentRun) {
 		/* Always send the run we're currently recording if it
@@ -177,7 +177,7 @@ void STSClientMgr::startConnect(void)
 			return;
 
 		/* TODO better message for this non-transient error */
-		throw std::runtime_error("STSClientMgr::startConnect");
+		throw std::logic_error("STSClientMgr::startConnect");
 	}
 
 	m_connecting = true;
