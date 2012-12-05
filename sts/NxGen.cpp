@@ -206,7 +206,7 @@ NxGen::initialize()
         makeDataset( "/entry/DASlogs/scan_index/", "value", NeXus::UINT32 );
 
         // Creare comment event log
-        makeGroup( "/entry/DASlogs/comments", "NXlog" );
+        makeGroup( "/entry/DASlogs/comments", "NXcollection" );
         makeDataset( "/entry/DASlogs/comments/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
         makeDataset( "/entry/DASlogs/comments/", "offset", NeXus::UINT32 );
         makeDataset( "/entry/DASlogs/comments/", "length", NeXus::UINT32 );
