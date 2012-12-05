@@ -534,19 +534,34 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 	// XXX avoid sending the RTDL for a pulse twice (if duplicated)
 
-	if (pulse->m_rtdl) {
-		/* Don't notify clients; we want to keep the banked event
-		 * packet with the RTDL packet.
-		 */
-		StorageManager::addPacket(pulse->m_rtdl->packet(),
-					  pulse->m_rtdl->packet_length(),
-					  false);
-	} else
-		pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
+	try {
+		if (pulse->m_rtdl) {
+			/* Don't notify clients; we want to keep the banked
+			 * event packet with the RTDL packet.
+			 */
+			StorageManager::addPacket(pulse->m_rtdl->packet(),
+						  pulse->m_rtdl->packet_length(),
+						  false);
+		} else
+			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 
-	buildMonitorPacket(pulse);
-	buildBankedPacket(pulse);
-	buildChopperPackets(pulse);
+		buildMonitorPacket(pulse);
+		buildBankedPacket(pulse);
+		buildChopperPackets(pulse);
+	} catch (std::runtime_error e) {
+		ERROR("Failed to record pulse: " << e.what());
+
+		/* Abuse std::logic_error here somewhat -- we want failure to
+		 * write data to be fatal, but don't have a way to distinguish
+		 * those from transient socket errors via std::runtime_error.
+		 * We currently will die on logic_errors in those that call
+		 * down to here, so use those for now.
+		 *
+		 * XXX find a better way to distinguish fatal vs non-fatal
+		 * errors, perhaps using custom exception classes.
+		 */
+		throw std::logic_error("Unable to record pulse");
+	}
 }
 
 void SMSControl::buildMonitorPacket(PulsePtr &pulse)
