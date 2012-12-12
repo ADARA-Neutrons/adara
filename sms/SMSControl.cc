@@ -148,6 +148,11 @@ bool SMSControl::setRecording(bool v)
 		m_runInfo->setRunNumber(m_currentRunNumber);
 
 		try {
+			/* Let our marker control code have a shot at
+			 * fixing up current state before we start recording
+			 * in a new container.
+			 */
+			m_markers->newRun();
 			StorageManager::startRecording(m_currentRunNumber);
 		} catch (std::runtime_error e) {
 			ERROR("Unable to start recording: " << e.what());
