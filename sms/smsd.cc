@@ -9,6 +9,11 @@
 #include "Logging.h"
 
 #include <log4cxx/propertyconfigurator.h>
+#include <log4cxx/consoleappender.h>
+#include <log4cxx/patternlayout.h>
+#include <log4cxx/logmanager.h>
+#include <log4cxx/logger.h>
+
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -18,6 +23,7 @@ namespace ptree = boost::property_tree;
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
+static AppenderPtr console_appender;
 
 static void parse_options(int argc, char **argv)
 {
@@ -50,7 +56,7 @@ static void parse_options(int argc, char **argv)
 		log_conf = vm["logconf"].as<std::string>();
 }
 
-void load_config(const char *pname, ptree::ptree &conf)
+static void load_config(const char *pname, ptree::ptree &conf)
 {
 	try {
 		ptree::read_ini(config_file, conf);
@@ -71,7 +77,7 @@ void load_config(const char *pname, ptree::ptree &conf)
 	LiveServer::config(conf);
 }
 
-void block_signals(void)
+static void block_signals(void)
 {
 	/* We don't want any signals to go to a handler; we will
 	 * register callbacks with the SignalEvent class in order to
@@ -102,14 +108,69 @@ void block_signals(void)
 	pthread_sigmask(SIG_BLOCK, &all, NULL);
 }
 
+static void verify_log4cxx_config(void)
+{
+	LoggerPtr root = Logger::getRootLogger();
+	AppenderList appenders = root->getAllAppenders();
+	AppenderList::iterator ait, end = appenders.end();
+	bool missing_layout = false, console_present = false;
+
+	/* Loop through the root appenders and verify that there is a
+	 * layout for each one to avoid a segfault when we try to use it.
+	 * While we're looking, note if we see a console appender, as
+	 * we always want a copy of messages to go to the console during
+	 * startup.
+	 */
+	for (ait = appenders.begin(); ait != end; ++ait) {
+		Appender *a = *ait;
+
+		if (a->getLayout() == NULL) {
+			std::cerr << "Appender " << a->getName()
+				  << " is missing its layout" << std::endl;
+			missing_layout = true;
+		}
+
+		if (dynamic_cast<ConsoleAppender *>(a))
+			console_present = true;
+	}
+
+	if (missing_layout)
+		exit(1);
+
+	if (console_present)
+		return;
+
+	/* No console present, add one temporarily */
+	static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
+	LayoutPtr layout(new PatternLayout(pattern));
+	console_appender = new ConsoleAppender(layout);
+	root->addAppender(console_appender);
+}
+
+static void remove_temp_logger(void)
+{
+	/* If we added a temporary console logger for startup, remove it
+	 */
+	Appender *a = console_appender;
+	if (a) {
+		LoggerPtr root = Logger::getRootLogger();
+		root->removeAppender(console_appender);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	ptree::ptree conf;
 
 	parse_options(argc, argv);
 
-	/* XXX do this later, but setup a simple console appender initially. */
+	/* Load a configuration for logging, then verify it to ensure we
+	 * have a valid configuration (ie, don't segfault in log4cxx). We
+	 * also want to spit out error messages to the console before
+	 * becoming a daemon.
+	 */
 	PropertyConfigurator::configure(log_conf);
+	verify_log4cxx_config();
 
 	load_config(argv[0], conf);
 
@@ -121,6 +182,8 @@ int main(int argc, char **argv)
 	STSClientMgr::init();
 
 	SMSControl::addSources(conf);
+
+	remove_temp_logger();
 
 	for (;;) {
 		fileDescriptorManager.process(1000.0);
