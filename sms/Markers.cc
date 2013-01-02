@@ -80,16 +80,21 @@ void Markers::newRun(void)
 	clock_gettime(CLOCK_REALTIME, &now);
 
 	/* Reset the scan index, comment, and paused flag at the start of
-	 * each new run. We'll emit a resume marker if we were paused so
-	 * that any live clients will know we're recording again.
+	 * each new run. We'll emit markers if we are paused or in a scan so
+	 * that any live clients can follow our state.
 	 */
-	m_indexPV->update(0, &now);
-	m_commentPV->unset();
+	if (m_scanIndex) {
+		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		m_indexPV->update(0, &now);
+		m_scanIndex = 0;
+	}
 
 	if (m_pausedPV->value()) {
-		emitPacket(now, ADARA::MarkerType::RESUME);
+		emitPacket(now, ADARA::MarkerType::RESUME, false);
 		m_pausedPV->update(false, &now);
 	}
+
+	m_commentPV->unset();
 }
 
 void Markers::pause(void)
@@ -104,12 +109,14 @@ void Markers::resume(void)
 
 void Markers::startScan(void)
 {
+	m_scanIndex = m_indexPV->value();
 	emitPacket(ADARA::MarkerType::SCAN_START);
 }
 
 void Markers::stopScan(void)
 {
 	emitPacket(ADARA::MarkerType::SCAN_STOP);
+	m_scanIndex = 0;
 }
 
 void Markers::annotate(void)
@@ -124,22 +131,30 @@ void Markers::addRunComment(void)
 
 void Markers::onPrologue(void)
 {
+	if (m_scanIndex)
+		emitPacket(ADARA::MarkerType::SCAN_START, false);
 	if (m_pausedPV->value())
-		emitPacket(ADARA::MarkerType::PAUSE);
+		emitPacket(ADARA::MarkerType::PAUSE, false);
 }
 
-void Markers::emitPacket(ADARA::MarkerType::Enum markerType)
+void Markers::emitPacket(ADARA::MarkerType::Enum markerType, bool addComment)
 {
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
-	emitPacket(now, markerType);
+	emitPacket(now, markerType, addComment);
 
-	/* Comments are one-shot, and reset once the packet is inserted. */
-	m_commentPV->unset();
+	/* Comments are one-shot, and reset once the packet is inserted.
+	 * Don't unset it if we aren't adding the comment -- this protects
+	 * against a race between setting up an annotation packet and
+	 * rolling over to a new file in the container.
+	 */
+	if (addComment)
+		m_commentPV->unset();
 }
 
 void Markers::emitPacket(const struct timespec &ts,
-			 ADARA::MarkerType::Enum markerType)
+			 ADARA::MarkerType::Enum markerType,
+			 bool addComment)
 {
 	uint32_t pkt[2 + sizeof(ADARA::Header) / sizeof(uint32_t)];
 	std::string comment;
@@ -156,7 +171,7 @@ void Markers::emitPacket(const struct timespec &ts,
 	if (markerType == ADARA::MarkerType::OVERALL_RUN_COMMENT)
 		pkt[5] = 0;
 	else
-		pkt[5] = m_indexPV->value();
+		pkt[5] = m_scanIndex;
 
 	/* Set the hint flag for clients, but only for scan start/stops */
 	// XXX think this through, maybe get rid of hint
@@ -175,7 +190,7 @@ void Markers::emitPacket(const struct timespec &ts,
 	iovec.push_back(iov);
 
 	/* Append the optional comment to the packet */
-	if (m_commentPV->valid()) {
+	if (addComment && m_commentPV->valid()) {
 		comment = m_commentPV->value();
 
 		/* We only allow so much content... */

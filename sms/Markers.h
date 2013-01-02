@@ -31,13 +31,16 @@ private:
 
 	boost::signals::connection m_connection;
 
+	uint32_t m_scanIndex;
+
 	void startScan(void);
 	void stopScan(void);
 	void annotate(void);
 	void addRunComment(void);
 	void onPrologue(void);
-	void emitPacket(ADARA::MarkerType::Enum);
-	void emitPacket(const struct timespec &, ADARA::MarkerType::Enum);
+	void emitPacket(ADARA::MarkerType::Enum, bool addComment = true);
+	void emitPacket(const struct timespec &, ADARA::MarkerType::Enum,
+			bool addComment);
 };
 
 #endif /* __MARKERS_H */
