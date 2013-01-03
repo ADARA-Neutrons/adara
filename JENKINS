@@ -113,6 +113,8 @@ Jenkins Project Information:
    Description:
       Build the basic SMS and STS software for Jenkins testing
       (by the ADARA Test Suite, supposedly... :-).
+      (This version of the test uses the new "configfile" API,
+      now merged back into master... :-D)
 
    X Restrict where this project can be run
 
@@ -122,7 +124,7 @@ Jenkins Project Information:
       Git:
           Repository URL: git+ssh://trac.sns.gov/var/repos/ADARA
           Name: origin
-          Branch Specifier: origin/jenkins-testing
+          Branch Specifier: origin/master
 
    X Build periodically
 
@@ -137,14 +139,17 @@ Jenkins Project Information:
             pwd
             ls
             ./bootstrap
-            ./doconf --prefix="$WORKSPACE/INSTALL"
+            ./configure --with-epics=/home/epics/R3.14.12.2/base/ --prefix="$WORKSPACE/INSTALL"
             make
             make install
 
    Post-build Actions
 
-      Build other projects: ADARA_Test_Suite
-         X Trigger only if build succeeds
+      Build other projects:
+         ADARA_Test_Suite,
+         ADARA_Test_Suite_Bluish,
+         ADARA_Test_Suite_Golden
+      X Trigger only if build succeeds
 
       Editable Email Notification
          Project Recipient List: y8y@ornl.gov
