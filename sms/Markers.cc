@@ -132,9 +132,16 @@ void Markers::addRunComment(void)
 void Markers::onPrologue(void)
 {
 	if (m_scanIndex)
-		emitPacket(ADARA::MarkerType::SCAN_START, false);
+		emitPrologue(ADARA::MarkerType::SCAN_START);
 	if (m_pausedPV->value())
-		emitPacket(ADARA::MarkerType::PAUSE, false);
+		emitPrologue(ADARA::MarkerType::PAUSE);
+}
+
+void Markers::emitPrologue(ADARA::MarkerType::Enum markerType)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	emitPacket(now, markerType, false, true);
 }
 
 void Markers::emitPacket(ADARA::MarkerType::Enum markerType, bool addComment)
@@ -154,7 +161,7 @@ void Markers::emitPacket(ADARA::MarkerType::Enum markerType, bool addComment)
 
 void Markers::emitPacket(const struct timespec &ts,
 			 ADARA::MarkerType::Enum markerType,
-			 bool addComment)
+			 bool addComment, bool prologue)
 {
 	uint32_t pkt[2 + sizeof(ADARA::Header) / sizeof(uint32_t)];
 	std::string comment;
@@ -211,5 +218,8 @@ void Markers::emitPacket(const struct timespec &ts,
 		}
 	}
 
-	StorageManager::addPacket(iovec);
+	if (prologue)
+		StorageManager::addPrologue(iovec);
+	else
+		StorageManager::addPacket(iovec);
 }

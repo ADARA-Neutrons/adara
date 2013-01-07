@@ -38,9 +38,10 @@ private:
 	void annotate(void);
 	void addRunComment(void);
 	void onPrologue(void);
+	void emitPrologue(ADARA::MarkerType::Enum);
 	void emitPacket(ADARA::MarkerType::Enum, bool addComment = true);
 	void emitPacket(const struct timespec &, ADARA::MarkerType::Enum,
-			bool addComment);
+			bool addComment, bool prologue = false);
 };
 
 #endif /* __MARKERS_H */
