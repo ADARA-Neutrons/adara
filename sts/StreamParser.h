@@ -44,7 +44,7 @@ public:
     std::string             getBeamShortName() const { return m_run_info.instr_shortname; }
     std::string             getProposalID() const { return m_run_info.proposal_id; }
     unsigned long           getRunNumber() const { return m_run_info.run_number; }
-
+    uint64_t                getPulseCount() const { return m_pulse_count; }
 
 private:
     /// Defines internal stream processing states of StreamParser class

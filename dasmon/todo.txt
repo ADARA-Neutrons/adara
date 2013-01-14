@@ -1,0 +1,19 @@
+To Do
+------
+- Rule config load/save (QSettings, db, file?)
+- Rule config local editing in GUI?
+- Reload/config button on GUI
+- Develop ActiveMQ alert forwarding class as client to RuleEngine
+- Add support for stream sampling rate to limit resource loading
+- Port to Windows? (sockets I/O, ADARAParser read method, timespec struct)
+- Implement reset button (reset all stats)
+- Add timestamp to Rule class for assertion
+- Impl pixel error metric
+- Impl dup pulse metric
+- Impl cycle error metric
+- New Qt label widget with change-triggered highlighting
+- Highlight tabs on change
+- Impl duration field
+- Parse command line args for options
+- Add semantics to handle out-of-order/unexpected destruction of StreamMonitor listeners
+- Add semantics to handle out-of-order/unexpected destruction of ComBus listeners

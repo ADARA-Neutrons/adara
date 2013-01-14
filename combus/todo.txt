@@ -1,0 +1,5 @@
+ComBus To Do
+------------
+- log4cxx appender
+- log recovery (retransmit log file)?
+- define signal/event API
