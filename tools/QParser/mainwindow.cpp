@@ -9,7 +9,9 @@
 #include <QString>
 #include <QFileDialog>
 #include <QDateTime>
-
+#include <QByteArray>
+#include <QStringList>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -18,8 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
   m_in( -1),
   m_pkt( NULL),
   m_displayPacket( true),
-  m_singleStep( true),
-  m_printBufSize(4096)  // 4K should be plenty
+  m_keepReading( true)
 // Parser() will accept values for buffer size and max packet size, but the defaults are fine
 {
   ui->setupUi(this);
@@ -27,7 +28,51 @@ MainWindow::MainWindow(QWidget *parent) :
   ui->textEdit->setWordWrapMode( QTextOption::NoWrap);
   ui->textEdit->setFontFamily( "courier");  // go for a mono-spaced font
 
-  m_printBuf = new char[m_printBufSize];
+  // Add items to the combo box
+  QStringList packetNames;
+  packetNames << "Raw Data Packet"
+    << "RTDL Packet"
+    << "Source List Packet"
+    << "Banked Event Packet"
+    << "Beam Monitor Packet"
+    << "Pixel Mapping Packet"
+    << "Run Status Packet"
+    << "Run Info Packet"
+    << "Translation Complete Packet"
+    << "Client Hello Packet"
+    << "Annotation Packet"
+    << "Sync Packet"
+    << "Heartbeat Packet"
+    << "Geometry Packet"
+    << "Beamline Info Packet"
+    << "Device Descriptor Packet"
+    << "Variable U32 Packet"
+    << "Variable Double Packet"
+    << "Variable String Packet";
+  ui->pktTypeCombo->insertItems(0, packetNames);
+  ui->pktTypeCombo->setCurrentIndex( 0);
+
+  // map the combo box indexes to the actual enum values (make sure this list
+  // matches the order of the QStringList above!
+  m_comboMap[0]  = ADARA::PacketType::RAW_EVENT_V0;
+  m_comboMap[1]  = ADARA::PacketType::RTDL_V0;
+  m_comboMap[2]  = ADARA::PacketType::SOURCE_LIST_V0;
+  m_comboMap[3]  = ADARA::PacketType::BANKED_EVENT_V0;
+  m_comboMap[4]  = ADARA::PacketType::BEAM_MONITOR_EVENT_V0;
+  m_comboMap[5]  = ADARA::PacketType::PIXEL_MAPPING_V0;
+  m_comboMap[6]  = ADARA::PacketType::RUN_STATUS_V0;
+  m_comboMap[7]  = ADARA::PacketType::RUN_INFO_V0;
+  m_comboMap[8]  = ADARA::PacketType::TRANS_COMPLETE_V0;
+  m_comboMap[9]  = ADARA::PacketType::CLIENT_HELLO_V0;
+  m_comboMap[10] = ADARA::PacketType::STREAM_ANNOTATION_V0;
+  m_comboMap[11] = ADARA::PacketType::SYNC_V0;
+  m_comboMap[12] = ADARA::PacketType::HEARTBEAT_V0;
+  m_comboMap[13] = ADARA::PacketType::GEOMETRY_V0;
+  m_comboMap[14] = ADARA::PacketType::BEAMLINE_INFO_V0;
+  m_comboMap[15] = ADARA::PacketType::DEVICE_DESC_V0;
+  m_comboMap[16] = ADARA::PacketType::VAR_VALUE_U32_V0;
+  m_comboMap[17] = ADARA::PacketType::VAR_VALUE_DOUBLE_V0;
+  m_comboMap[18] = ADARA::PacketType::VAR_VALUE_STRING_V0;
 
   m_stdout.open( 1, QIODevice::WriteOnly);  // open up standard output
 }
@@ -40,7 +85,6 @@ MainWindow::~MainWindow()
   }
 
   m_stdout.close();
-  delete m_printBuf;
   delete ui;
 }
 
@@ -69,15 +113,12 @@ void MainWindow::openFile()
     {
       // if we've got a file, then enable the single step button and
       // get the first packet
-      ui->stepBtn->setEnabled(true);
-      bool singleStepTemp = m_singleStep;
-      m_singleStep = true;
+      ui->goBtn->setEnabled(true);
       step();
-      m_singleStep = singleStepTemp;
     }
     else
     {
-      ui->stepBtn->setEnabled(false);
+      ui->goBtn->setEnabled(false);
     }
   }
 }
@@ -90,9 +131,34 @@ void MainWindow::resetInput()
 
   // NOTE: Make sure the GUI properly reflects these changes!
   m_displayPacket = true;
-  m_singleStep = true;
 
   step();
+}
+
+
+// Start reading the file - when we stop depends on the various settings.
+void MainWindow::go()
+{
+  m_keepReading = true;  // reset the bool in case it was false from the last call to go()
+  int curIndex = ui->pktTypeCombo->currentIndex();  // for debugging
+
+  do
+  {
+    // Basically, we step until we get a stop condition...
+    //  TODO: this should probably go into a background thread (or something that won't lock the GUI up...)
+    step();
+
+    if (ui->oneStepRB->isChecked())
+         // Stop if the single step radio button is checked
+      m_keepReading = false;
+    else if (ui->pktTypeRB->isChecked())
+    {
+      if (m_pkt->type() == m_comboMap.value( ui->pktTypeCombo->currentIndex()))
+        // stop if the packet type radio button is checked AND the current packet's type matches the selected type
+        m_keepReading = false;
+    }
+  } while ( m_keepReading);
+
 }
 
 // A "step" consists of three parts:  sending the previous packet out via the output stream,
@@ -101,6 +167,7 @@ void MainWindow::resetInput()
 // least one is necessary for this to be at all useful...
 void MainWindow::step()
 {
+  m_haveReadPacket = false;  // Used to test for EOF.  See below.
 
   // If we're supposed to send out packets AND we have a packet to send out
   // then send it...
@@ -112,7 +179,24 @@ void MainWindow::step()
 
   read( m_in);
 
-  // the individual rxpacket() functions will handle the display
+  // the individual rxpacket() functions (called from within read())
+  // will handle displaying info in the text box.
+
+
+  // Check to see if we're at the end of the file.  If so, display a message and
+  // disable the buttons
+  // Note: this flag is really only a proxy for a true EOF test, and there's a variety
+  // of ways to spoof it.  I'm not going to worry about that now.
+  if (m_haveReadPacket == false)
+  {
+    QMessageBox msgBox;
+    msgBox.setText("End of input file.");
+    msgBox.exec();
+
+    ui->goBtn->setEnabled(false);
+
+    m_keepReading = false;  // cause us to break out of the while loop in go() (if we were called from there)
+  }
 
 }
 
@@ -167,63 +251,84 @@ void MainWindow::displayPacketHeader( const ADARA::PacketHeader &hdr)
 
 
 // RXPacket functions shamelessly ripped off of Dave's original adara-parser
-// Minor changes made to output to QTextEdit instead of stdout with the
+// and modified to output to QTextEdit instead of stdout with the
 // expectation that more advanced work (multiple colors, for example)
 // will happen as I have time...
+
+// This is the default function that get called when we don't have an rxPacket()
+// function specific to the actual packet type
 bool MainWindow::rxPacket(const ADARA::Packet &pkt)
 {
   m_pkt = &pkt;
+  m_haveReadPacket = true;
 
   if (m_displayPacket)
   {
     ui->textEdit->clear();
     displayPacketHeader( pkt);
 
-#if 0
-    char buf[256];
-    m_printBuf[0] = '\0';
+    // Dump the packet (including the header) in hex...
+    QString oneLine;
+    const uint8_t *p = pkt.packet();
+    uint32_t addr = 0;
 
-    if (m_hexDump)
+    while (addr < pkt.packet_length())
     {
-      const uint8_t *p = pkt.packet();
-      uint32_t addr;
+      // one line of text consists of the address, 16 hex digits
+      // followed 16 ASCII chars
 
-      for (addr = 0; addr < pkt.packet_length(); addr++, p++)
+      unsigned lineLength = 16;
+      if (pkt.packet_length() - addr < 16)
       {
-        if ((addr % 16) == 0)
-        {
-          sprintf(buf, "%04x:", addr);
-          strcat( m_printBuf, buf);
-        }
-        sprintf(buf, " %02x", *p);
-        strcat( m_printBuf, buf);
+        lineLength = pkt.packet_length() - addr;
+        // Properly handle the last line of the packet, which might
+        // not have a full 16 bytes
+      }
 
-        if (addr % 16 == 15)
+      oneLine = QString("0x%1 |").arg( addr, 4, 16, QChar('0'));
+      // Note: has to be QChar('0').  Just using '0' does really strange things...
+
+      for (unsigned i = 0; i < 16; i++)
+      {
+        if (i < lineLength)
         {
-          strcat( m_printBuf, "\n");
-          ui->textEdit->append( m_printBuf);
+          oneLine.append( QString(" %1").arg( (unsigned)(*(p+i)), 2, 16, QChar('0')));
+        }
+        else
+        {
+          oneLine.append( " ..");  // filler to keep everything lined up nicely
         }
       }
-      strcat( m_printBuf, "\n");
-      ui->textEdit->append( m_printBuf);
-    }
 
-    if (m_wordDump)
-    {
-      const uint32_t *p = (const uint32_t *) pkt.packet();
-      uint32_t addr;
+      oneLine.append( " | ");
 
-      for (addr = 0; addr < pkt.packet_length(); addr += 4, p++)
+      QByteArray ba( (const char *)p, lineLength);
+      // QTextEdit can gracefully handle the non-printable bytes, but it does actually
+      // break on CR/LF chars, so we'll replace those with spaces
+      for (int i=0; i < ba.size(); i++)
       {
-        sprintf( m_printBuf, "%04x: %08x\n", addr, *p);
-        ui->textEdit->append( m_printBuf);
+        // using a switch statement to make it easier to add other substitions
+        // in the future.
+        switch (ba[i])
+        {
+        case 0x0A:
+        case 0x0D:
+          ba[i] = ' ';
+          break;
+        default:
+          break; // do nothing
+        }
       }
+
+      oneLine.append( ba);
+
+      ui->textEdit->append( oneLine);
+      addr += lineLength;
+      p += lineLength;
     }
-#endif
   }
 
   return true;
-
 }
 
 

@@ -2,10 +2,12 @@
 #define MAINWINDOW_H
 
 #include <../../common/ADARAParser.h>
+#include <../../common/ADARA.h>
 
 #include <QMainWindow>
 #include <QDataStream>
 #include <QFile>
+#include <QMap>
 
 namespace Ui {
 class MainWindow;
@@ -21,10 +23,11 @@ public:
   
 private slots:
   void openFile();
-  void step();  // Step through the input file one packet at a time
+  void go();  // slot for the "Go" button - exactly what happens depends on some other settings
 
 private:
   void resetInput();
+  void step();  // Step through the input file one packet at a time
 
   // Packet parsing functions
   bool rxPacket(const ADARA::Packet &pkt);
@@ -54,25 +57,18 @@ private:
   Ui::MainWindow *ui;
 
   int m_in;   // Posix file descriptor because that's what the packet parser expects for now
+  bool m_haveReadPacket;  // used to help test for eof (because file descriptors don't have explicit eof tests)
 
   QFile m_stdout; // for now, output to stdout.  In the future, this may become a QIODevice pointer
                   // that could point to a file (stdout) or maybe a TCP socket...
 
   const ADARA::Packet *m_pkt;  // holds onto the packet so we can send it out after looking at it on the screen
 
+  QMap< int, ADARA::PacketType::Enum> m_comboMap;  // Maps indexes from the packet type combo to actual ADARA packet types
+
   // The following flags control the behavior of the packet parser
   bool m_displayPacket;  // Parse & display the packet on the screen
-  bool m_singleStep; // Process one packet then stop
-
-  // These two are used by rxPacket(const ADARA::Packet &pkt)
-  // For now, I'm just leaving them false...
-  bool m_hexDump;
-  bool m_wordDump;
-
-  char *m_printBuf;  // Used as a temporary space to store formatted text for the rxPacket() functions
-  const unsigned m_printBufSize;
-
-
+  bool m_keepReading;  // whether or not to break out of the packet processing loop
 };
 
 #endif // MAINWINDOW_H
