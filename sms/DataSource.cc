@@ -344,7 +344,7 @@ void DataSource::dataReady(void)
 	m_timer->start(m_data_timeout);
 
 	try {
-		if (!read(m_fd, m_max_read_chunk)) {
+		if (!read(m_fd, 0, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name);
 			connectionFailed();
 		}

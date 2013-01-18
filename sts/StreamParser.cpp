@@ -33,7 +33,7 @@ StreamParser::StreamParser
     uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
 )
 :
-    Parser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
+    POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
     m_fd(a_fd_in),
     m_processing_state(PROCESSING_NOT_STARTED),
     m_pkt_recvd(0),
@@ -100,7 +100,7 @@ StreamParser::processStream()
 
         while( m_processing_state < DONE_PROCESSING )
         {
-            if ( !read( m_fd, ADARA_IN_BUF_SIZE ))
+            if ( !read( m_fd ))
             {
               if ( m_processing_state != DONE_PROCESSING )
               {

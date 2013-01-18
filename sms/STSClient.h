@@ -5,7 +5,7 @@
 #include <boost/smart_ptr.hpp>
 #include <memory>
 
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 #include "STSClientMgr.h"
 #include "StorageManager.h"
 #include "StorageContainer.h"
@@ -14,7 +14,7 @@
 
 class ReadyAdapter;
 
-class STSClient : public ADARA::Parser {
+class STSClient : public ADARA::POSIXParser {
 public:
 	STSClient(int fd, StorageContainer::SharedPtr &run,
 		  STSClientMgr &mgr);
@@ -54,7 +54,7 @@ private:
 	static double m_heartbeat_interval;
 	static unsigned int m_max_send_chunk;
 
-	using ADARA::Parser::rxPacket;
+	using ADARA::POSIXParser::rxPacket;
 };
 
 #endif /* __STS_CLIENT_H */

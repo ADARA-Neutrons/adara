@@ -4,7 +4,7 @@
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 
 #include <boost/program_options.hpp>
 
@@ -128,7 +128,7 @@ static const char *markerType(ADARA::MarkerType::Enum type)
 	return "UndefinedType";
 }
 
-class Parser : public ADARA::Parser {
+class Parser : public ADARA::POSIXParser {
 public:
 	Parser(bool hex, bool word) : m_hexDump(hex), m_wordDump(word) { }
 
@@ -158,7 +158,7 @@ public:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
-	using ADARA::Parser::rxPacket;
+	using ADARA::POSIXParser::rxPacket;
 
 private:
 	bool m_hexDump;

@@ -35,7 +35,7 @@ void STSClient::config(const boost::property_tree::ptree &conf)
 
 STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 		     STSClientMgr &mgr) :
-	ADARA::Parser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
+	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
 	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
 	m_read(new ReadyAdapter(fd, fdrRead,
 				boost::bind(&STSClient::readable, this))),
@@ -205,7 +205,7 @@ void STSClient::readable(void)
 	bool ok = false;
 
 	try {
-		ok = read(m_sts_fd, MAX_PACKET_SIZE);
+		ok = read(m_sts_fd, 0, MAX_PACKET_SIZE);
 		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
 			/* We log the reason for closing the connection
 			 * elsewhere, except for the default case of an

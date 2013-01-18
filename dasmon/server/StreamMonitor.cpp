@@ -40,7 +40,7 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
 #else
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
 #endif
-    : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
+    : POSIXParser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
       m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0)
@@ -263,9 +263,9 @@ StreamMonitor::processThread()
                         }
                     }
 
-                    if ( !read( m_fd_in, ADARA_IN_BUF_SIZE ))
+                    if ( !read( m_fd_in, 0, ADARA_IN_BUF_SIZE ))
                     {
-                        syslog( LOG_WARNING, "ADARA::Parser::read() returned 0. Dropping connection." );
+                        syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0. Dropping connection." );
                         // Connection lost due to source closing socket
                         handleLostConnection();
                     }
@@ -513,7 +513,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     case ADARA::PacketType::STREAM_ANNOTATION_V0:
     case ADARA::PacketType::BANKED_EVENT_V0:
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return Parser::rxPacket(a_pkt);
+        return POSIXParser::rxPacket(a_pkt);
 
     // Packet types that are not processes by StreamParser
     case ADARA::PacketType::GEOMETRY_V0:
@@ -528,7 +528,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         break;
     }
 
-    //return Parser::rxPacket(a_pkt);
+    //return POSIXParser::rxPacket(a_pkt);
     return false;
 }
 

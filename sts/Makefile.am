@@ -4,7 +4,7 @@ bin_PROGRAMS += sts/sts
 endif
 
 sts_sts_SOURCES = sts/main.cpp sts/NxGen.cpp sts/StreamParser.cpp \
-    sts/h5nx.cpp sts/ComBusTransMon.cpp combus/ComBus.cpp $(COMMON_PARSER)
+    sts/h5nx.cpp sts/ComBusTransMon.cpp combus/ComBus.cpp $(POSIX_PARSER)
 
 sts_sts_CPPFLAGS = -Ists $(libxml_CPPFLAGS) $(activemq_CPPFLAGS) \
 		$(apr_CPPFLAGS) $(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \

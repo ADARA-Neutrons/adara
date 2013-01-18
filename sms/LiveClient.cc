@@ -35,7 +35,7 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 }
 
 LiveClient::LiveClient(int fd) : 
-	ADARA::Parser(MAX_PKT_SIZE, MAX_PKT_SIZE),
+	ADARA::POSIXParser(MAX_PKT_SIZE, MAX_PKT_SIZE),
 	m_read(NULL), m_write(NULL), m_hello_received(false),
 	m_client_fd(fd), m_file_fd(-1)
 {
@@ -241,7 +241,7 @@ void LiveClient::fileUpdated(const StorageFile &f)
 void LiveClient::readable(void)
 {
 	try {
-		if (!read(m_client_fd, MAX_PKT_SIZE)) {
+		if (!read(m_client_fd, 0, MAX_PKT_SIZE)) {
 			/* EOF or our handlers indicated it was time to stop,
 			 * so kill ourselves off. We can't do this from the
 			 * handlers, as ADARA::Parser::read() will modify

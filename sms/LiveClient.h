@@ -5,14 +5,14 @@
 #include <boost/smart_ptr.hpp>
 #include <list>
 
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
-class LiveClient : public ADARA::Parser {
+class LiveClient : public ADARA::POSIXParser {
 public:
 	LiveClient(int fd);
 	~LiveClient();
@@ -57,7 +57,7 @@ private:
 
 	friend class TimerAdapter<LiveClient>;
 
-	using ADARA::Parser::rxPacket;
+	using ADARA::POSIXParser::rxPacket;
 };
 
 #endif /* __LIVE_CLIENT_H */

@@ -6,7 +6,7 @@
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 
 struct pevent {
 	uint32_t	tof;
@@ -43,7 +43,7 @@ static void dump_events(struct pevent *ev, uint32_t num_events,
 	}
 }
 
-class Parser : public ADARA::Parser {
+class Parser : public ADARA::POSIXParser {
 public:
         Parser() {
 		m_hadMonitors = false;
@@ -54,7 +54,7 @@ public:
         bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
         bool rxPacket(const ADARA::PixelMappingPkt &pkt);
 
-        using ADARA::Parser::rxPacket;
+        using ADARA::POSIXParser::rxPacket;
 
 private:
 	bool		m_hadMonitors;

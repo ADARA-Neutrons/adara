@@ -9,7 +9,7 @@ dasmon_server_dasmond_SOURCES = dasmon/server/main.cpp dasmon/server/StreamAnaly
         dasmon/server/engine/muParser.cpp dasmon/server/engine/muParserTokenReader.cpp \
         dasmon/server/engine/muParserError.cpp dasmon/server/engine/muParserCallback.cpp \
         dasmon/server/engine/muParserBytecode.cpp dasmon/server/engine/muParserBase.cpp \
-        $(COMMON_PARSER)
+        $(POSIX_PARSER)
 
 dasmon_server_dasmond_CPPFLAGS = -Idasmon/common -Icombus \
 			-Idasmon/server/engine $(libxml_CPPFLAGS) \
