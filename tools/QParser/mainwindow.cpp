@@ -85,6 +85,7 @@ MainWindow::~MainWindow()
   }
 
   m_stdout.close();
+  delete m_pkt;
   delete ui;
 }
 
@@ -114,11 +115,16 @@ void MainWindow::openFile()
       // if we've got a file, then enable the single step button and
       // get the first packet
       ui->goBtn->setEnabled(true);
+      ui->stepBtn->setEnabled(true);
+      ui->resetBtn->setEnabled(true);
+      reset();  // reset's the parser's internals (ie: we already had a file open and are switching to another one)
       step();
     }
     else
     {
       ui->goBtn->setEnabled(false);
+      ui->stepBtn->setEnabled(false);
+      ui->resetBtn->setEnabled(false);
     }
   }
 }
@@ -126,12 +132,11 @@ void MainWindow::openFile()
 // Go to the beginning of the input file/stream, display the first packet
 void MainWindow::resetInput()
 {
-
   lseek( m_in, 0, SEEK_SET);  // Jump back to the beginning of the file
-
-  // NOTE: Make sure the GUI properly reflects these changes!
+  delete m_pkt;
+  m_pkt = NULL;
   m_displayPacket = true;
-
+  reset();  // reset's the parser's internals (ie: we already had a file open and are switching to another one)
   step();
 }
 
@@ -140,18 +145,16 @@ void MainWindow::resetInput()
 void MainWindow::go()
 {
   m_keepReading = true;  // reset the bool in case it was false from the last call to go()
-  int curIndex = ui->pktTypeCombo->currentIndex();  // for debugging
-
+  m_displayPacket = false;  // No need to display packets while we're scanning through them
+                            // (Wouldn't see them anyway since the GUI doesn't update while
+                            // while we're in the loop below.)
   do
   {
     // Basically, we step until we get a stop condition...
     //  TODO: this should probably go into a background thread (or something that won't lock the GUI up...)
     step();
 
-    if (ui->oneStepRB->isChecked())
-         // Stop if the single step radio button is checked
-      m_keepReading = false;
-    else if (ui->pktTypeRB->isChecked())
+    if (ui->pktTypeRB->isChecked())
     {
       if (m_pkt->type() == m_comboMap.value( ui->pktTypeCombo->currentIndex()))
         // stop if the packet type radio button is checked AND the current packet's type matches the selected type
@@ -159,7 +162,11 @@ void MainWindow::go()
     }
   } while ( m_keepReading);
 
+  // Turn packet display back on then re-display the last packet
+  m_displayPacket = true;
+  displayPacket();
 }
+
 
 // A "step" consists of three parts:  sending the previous packet out via the output stream,
 // reading the next packet in from the input stream and decoding & displaying it.  The
@@ -173,15 +180,17 @@ void MainWindow::step()
   // then send it...
   if (ui->stdoutChk->isChecked() && m_pkt != NULL)
   {
-      m_stdout.write( (const char *)m_pkt, m_pkt->packet_length());
-      m_stdout.flush();
+    m_stdout.write( (const char *)m_pkt->packet(), m_pkt->packet_length());
+    m_stdout.flush();
   }
 
-  read( m_in);
+  read( m_in);  // will eventually call rxPacket(), which will copy the packet
+                // into m_pkt
 
-  // the individual rxpacket() functions (called from within read())
-  // will handle displaying info in the text box.
-
+  if (m_displayPacket)
+  {
+    displayPacket();
+  }
 
   // Check to see if we're at the end of the file.  If so, display a message and
   // disable the buttons
@@ -194,12 +203,27 @@ void MainWindow::step()
     msgBox.exec();
 
     ui->goBtn->setEnabled(false);
+    ui->stepBtn->setEnabled(false);
 
     m_keepReading = false;  // cause us to break out of the while loop in go() (if we were called from there)
   }
-
 }
 
+
+// Copy one packet out of the parser's buffer and into our own local memory (because the
+// parser doesn't guarentee what will happen to the data once rxPacket() returns)
+// Actual display and output is handled elsewhere
+bool MainWindow::rxPacket( const ADARA::Packet &pkt)
+{
+  // Packet's copy constructor allocates memory and does a deep copy,
+  // so the fact that we're calling new here for every packet probably
+  // doesn't make things much slower....
+  delete m_pkt;
+  m_pkt = new ADARA::Packet( pkt);
+
+  m_haveReadPacket = true;
+  return true;
+}
 
 // Helper function for the other rxPacket() functions.  Displays info from the packet header
 void MainWindow::displayPacketHeader( const ADARA::PacketHeader &hdr)
@@ -249,90 +273,83 @@ void MainWindow::displayPacketHeader( const ADARA::PacketHeader &hdr)
   // TODO: figure out how to put some kind of horizontal separator in here (instead of the blank line)
 }
 
-
-// RXPacket functions shamelessly ripped off of Dave's original adara-parser
-// and modified to output to QTextEdit instead of stdout with the
-// expectation that more advanced work (multiple colors, for example)
-// will happen as I have time...
-
-// This is the default function that get called when we don't have an rxPacket()
-// function specific to the actual packet type
-bool MainWindow::rxPacket(const ADARA::Packet &pkt)
+// Generic packet display (for times when we don't have display function specific
+// to the packet type
+void MainWindow::displayPacket()
 {
-  m_pkt = &pkt;
-  m_haveReadPacket = true;
+  ui->textEdit->clear();
+  displayPacketHeader( *m_pkt);
 
-  if (m_displayPacket)
+  // Dump the packet (including the header) in hex...
+  QString oneLine;
+  const uint8_t *p = m_pkt->packet();
+  uint32_t addr = 0;
+
+  while (addr < m_pkt->packet_length())
   {
-    ui->textEdit->clear();
-    displayPacketHeader( pkt);
-
-    // Dump the packet (including the header) in hex...
-    QString oneLine;
-    const uint8_t *p = pkt.packet();
-    uint32_t addr = 0;
-
-    while (addr < pkt.packet_length())
+    // one line of text consists of the address, 16 hex digits
+    // followed 16 ASCII chars
+    unsigned lineLength = 16;
+    if (m_pkt->packet_length() - addr < 16)
     {
-      // one line of text consists of the address, 16 hex digits
-      // followed 16 ASCII chars
-
-      unsigned lineLength = 16;
-      if (pkt.packet_length() - addr < 16)
-      {
-        lineLength = pkt.packet_length() - addr;
-        // Properly handle the last line of the packet, which might
-        // not have a full 16 bytes
-      }
-
-      oneLine = QString("0x%1 |").arg( addr, 4, 16, QChar('0'));
-      // Note: has to be QChar('0').  Just using '0' does really strange things...
-
-      for (unsigned i = 0; i < 16; i++)
-      {
-        if (i < lineLength)
-        {
-          oneLine.append( QString(" %1").arg( (unsigned)(*(p+i)), 2, 16, QChar('0')));
-        }
-        else
-        {
-          oneLine.append( " ..");  // filler to keep everything lined up nicely
-        }
-      }
-
-      oneLine.append( " | ");
-
-      QByteArray ba( (const char *)p, lineLength);
-      // QTextEdit can gracefully handle the non-printable bytes, but it does actually
-      // break on CR/LF chars, so we'll replace those with spaces
-      for (int i=0; i < ba.size(); i++)
-      {
-        // using a switch statement to make it easier to add other substitions
-        // in the future.
-        switch (ba[i])
-        {
-        case 0x0A:
-        case 0x0D:
-          ba[i] = ' ';
-          break;
-        default:
-          break; // do nothing
-        }
-      }
-
-      oneLine.append( ba);
-
-      ui->textEdit->append( oneLine);
-      addr += lineLength;
-      p += lineLength;
+      lineLength = m_pkt->packet_length() - addr;
+      // Properly handle the last line of the packet, which might
+      // not have a full 16 bytes
     }
+
+    oneLine = QString("0x%1 |").arg( addr, 4, 16, QChar('0'));
+    // Note: has to be QChar('0').  Just using '0' does really strange things...
+
+    for (unsigned i = 0; i < 16; i++)
+    {
+      if (i < lineLength)
+      {
+        oneLine.append( QString(" %1").arg( (unsigned)(*(p+i)), 2, 16, QChar('0')));
+      }
+      else
+      {
+        oneLine.append( " ..");  // filler to keep everything lined up nicely
+      }
+    }
+
+    oneLine.append( " | ");
+
+    QByteArray ba( (const char *)p, lineLength);
+    // QTextEdit can gracefully handle the non-printable bytes, but it does actually
+    // break on CR/LF chars, so we'll replace those with spaces
+    for (int i=0; i < ba.size(); i++)
+    {
+      // using a switch statement to make it easier to add other substitions
+      // in the future.
+      switch (ba[i])
+      {
+      case 0x0A:
+      case 0x0D:
+        ba[i] = ' ';
+        break;
+      default:
+        break; // do nothing
+      }
+    }
+
+    oneLine.append( ba);
+
+    ui->textEdit->append( oneLine);
+    addr += lineLength;
+    p += lineLength;
   }
 
-  return true;
+  // Move the vertical scroll (if it was needed) back up to the top of the textEdit
+  ui->textEdit->moveCursor (QTextCursor::Start) ;
+  ui->textEdit->ensureCursorVisible() ;
 }
 
 
 #if 0
+// RXPacket functions shamelessly ripped off of Dave's original adara-parser
+// and modified to output to QTextEdit instead of stdout with the
+// expectation that more advanced work (multiple colors, for example)
+// will happen as I have time...
 
 bool MainWindow::rxUnknownPkt(const ADARA::Packet &pkt)
 {
