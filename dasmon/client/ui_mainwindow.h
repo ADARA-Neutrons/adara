@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Mon Jan 14 16:24:33 2013
+** Created: Wed Jan 23 17:28:05 2013
 **      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -41,44 +41,33 @@ public:
     QLabel *runStatusLabel;
     QLabel *scanStatusLabel;
     QLabel *pauseStatusLabel;
+    QLabel *signalStatusLabel;
     QGridLayout *gridLayout;
-    QLabel *durationLabel;
-    QLabel *runNumLabel;
-    QLabel *scanNumLabel;
-    QLabel *pchargeLabel;
-    QLabel *countRateLabel;
-    QLabel *pfreqLabel;
-    QLabel *label_2;
-    QLabel *label_3;
     QLabel *label_23;
     QLabel *label_17;
     QLabel *label_19;
     QLabel *label_21;
-    QLabel *label_8;
-    QLabel *smsHostLabel;
     QLabel *label_12;
-    QLabel *bitRateLabel;
+    QLineEdit *pchargeLabel;
+    QLineEdit *durationLabel;
+    QLineEdit *countRateLabel;
+    QLineEdit *pfreqLabel;
+    QLineEdit *bitRateLabel;
+    QLabel *label_2;
+    QLineEdit *runNumLabel;
+    QLabel *label_3;
+    QLineEdit *scanNumLabel;
+    QLabel *label_29;
+    QLineEdit *startTimeEdit;
     QWidget *widget;
     QVBoxLayout *verticalLayout_3;
     QSplitter *splitter;
     QTabWidget *tabWidget;
-    QWidget *tab;
-    QHBoxLayout *horizontalLayout_4;
-    QTableWidget *alertTable;
-    QWidget *tab_3;
-    QHBoxLayout *horizontalLayout_6;
-    QTableWidget *eventTable;
     QWidget *runInfoTab;
     QGridLayout *gridLayout_2;
     QSpacerItem *verticalSpacer_2;
     QLabel *label_7;
-    QLabel *label_9;
     QLineEdit *runTitleEdit;
-    QLineEdit *totalChargeEdit;
-    QLabel *label_29;
-    QLineEdit *startTimeEdit;
-    QLabel *label_30;
-    QLineEdit *totalCountsEdit;
     QLabel *label_24;
     QLineEdit *sampleIdEdit;
     QLabel *label_31;
@@ -102,31 +91,35 @@ public:
     QLineEdit *sampleEnvironmentEdit;
     QLineEdit *sampleFormulaEdit;
     QLineEdit *sampleNatureEdit;
-    QWidget *tab_2;
-    QHBoxLayout *horizontalLayout_5;
-    QTableWidget *pvTable;
+    QLabel *label_30;
+    QLabel *label_9;
+    QLineEdit *totalCountsEdit;
+    QLineEdit *totalChargeEdit;
+    QWidget *tab;
+    QHBoxLayout *horizontalLayout_4;
+    QTableWidget *alertTable;
+    QWidget *tab_3;
+    QHBoxLayout *horizontalLayout_6;
+    QTableWidget *eventTable;
     QWidget *tab_4;
     QHBoxLayout *horizontalLayout_7;
     QTableWidget *procStatusTable;
     QWidget *tab_5;
     QHBoxLayout *horizontalLayout_8;
     QTableWidget *logTable;
-    QWidget *markerTab;
-    QHBoxLayout *horizontalLayout_3;
-    QTableWidget *statisticsTable;
     QTableWidget *monitorTable;
     QHBoxLayout *horizontalLayout_2;
-    QLabel *smsStatusLabel;
     QLabel *combusStatusLabel;
+    QLabel *dasmonStatusLabel;
+    QLabel *smsStatusLabel;
     QSpacerItem *horizontalSpacer;
-    QPushButton *smsConfigBtn;
     QPushButton *exitButton;
 
     void setupUi(QMainWindow *MainWindow)
     {
         if (MainWindow->objectName().isEmpty())
             MainWindow->setObjectName(QString::fromUtf8("MainWindow"));
-        MainWindow->resize(741, 722);
+        MainWindow->resize(924, 769);
         actionSMS_Connection = new QAction(MainWindow);
         actionSMS_Connection->setObjectName(QString::fromUtf8("actionSMS_Connection"));
         centralWidget = new QWidget(MainWindow);
@@ -139,7 +132,7 @@ public:
         horizontalLayout->setSpacing(6);
         horizontalLayout->setObjectName(QString::fromUtf8("horizontalLayout"));
         verticalLayout_2 = new QVBoxLayout();
-        verticalLayout_2->setSpacing(6);
+        verticalLayout_2->setSpacing(3);
         verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
         runStatusLabel = new QLabel(centralWidget);
         runStatusLabel->setObjectName(QString::fromUtf8("runStatusLabel"));
@@ -181,53 +174,21 @@ public:
 
         verticalLayout_2->addWidget(pauseStatusLabel);
 
+        signalStatusLabel = new QLabel(centralWidget);
+        signalStatusLabel->setObjectName(QString::fromUtf8("signalStatusLabel"));
+        signalStatusLabel->setFont(font);
+        signalStatusLabel->setFrameShape(QFrame::Box);
+        signalStatusLabel->setAlignment(Qt::AlignCenter);
+
+        verticalLayout_2->addWidget(signalStatusLabel);
+
 
         horizontalLayout->addLayout(verticalLayout_2);
 
         gridLayout = new QGridLayout();
         gridLayout->setSpacing(6);
         gridLayout->setObjectName(QString::fromUtf8("gridLayout"));
-        gridLayout->setVerticalSpacing(6);
-        durationLabel = new QLabel(centralWidget);
-        durationLabel->setObjectName(QString::fromUtf8("durationLabel"));
-
-        gridLayout->addWidget(durationLabel, 3, 1, 1, 1);
-
-        runNumLabel = new QLabel(centralWidget);
-        runNumLabel->setObjectName(QString::fromUtf8("runNumLabel"));
-
-        gridLayout->addWidget(runNumLabel, 1, 1, 1, 1);
-
-        scanNumLabel = new QLabel(centralWidget);
-        scanNumLabel->setObjectName(QString::fromUtf8("scanNumLabel"));
-
-        gridLayout->addWidget(scanNumLabel, 2, 1, 1, 1);
-
-        pchargeLabel = new QLabel(centralWidget);
-        pchargeLabel->setObjectName(QString::fromUtf8("pchargeLabel"));
-
-        gridLayout->addWidget(pchargeLabel, 1, 3, 1, 1);
-
-        countRateLabel = new QLabel(centralWidget);
-        countRateLabel->setObjectName(QString::fromUtf8("countRateLabel"));
-
-        gridLayout->addWidget(countRateLabel, 2, 3, 1, 1);
-
-        pfreqLabel = new QLabel(centralWidget);
-        pfreqLabel->setObjectName(QString::fromUtf8("pfreqLabel"));
-
-        gridLayout->addWidget(pfreqLabel, 3, 3, 1, 1);
-
-        label_2 = new QLabel(centralWidget);
-        label_2->setObjectName(QString::fromUtf8("label_2"));
-
-        gridLayout->addWidget(label_2, 1, 0, 1, 1);
-
-        label_3 = new QLabel(centralWidget);
-        label_3->setObjectName(QString::fromUtf8("label_3"));
-
-        gridLayout->addWidget(label_3, 2, 0, 1, 1);
-
+        gridLayout->setVerticalSpacing(3);
         label_23 = new QLabel(centralWidget);
         label_23->setObjectName(QString::fromUtf8("label_23"));
 
@@ -236,37 +197,85 @@ public:
         label_17 = new QLabel(centralWidget);
         label_17->setObjectName(QString::fromUtf8("label_17"));
 
-        gridLayout->addWidget(label_17, 1, 2, 1, 1);
+        gridLayout->addWidget(label_17, 1, 3, 1, 1);
 
         label_19 = new QLabel(centralWidget);
         label_19->setObjectName(QString::fromUtf8("label_19"));
 
-        gridLayout->addWidget(label_19, 2, 2, 1, 1);
+        gridLayout->addWidget(label_19, 2, 3, 1, 1);
 
         label_21 = new QLabel(centralWidget);
         label_21->setObjectName(QString::fromUtf8("label_21"));
 
-        gridLayout->addWidget(label_21, 3, 2, 1, 1);
-
-        label_8 = new QLabel(centralWidget);
-        label_8->setObjectName(QString::fromUtf8("label_8"));
-
-        gridLayout->addWidget(label_8, 0, 0, 1, 1);
-
-        smsHostLabel = new QLabel(centralWidget);
-        smsHostLabel->setObjectName(QString::fromUtf8("smsHostLabel"));
-
-        gridLayout->addWidget(smsHostLabel, 0, 1, 1, 1);
+        gridLayout->addWidget(label_21, 3, 3, 1, 1);
 
         label_12 = new QLabel(centralWidget);
         label_12->setObjectName(QString::fromUtf8("label_12"));
 
-        gridLayout->addWidget(label_12, 0, 2, 1, 1);
+        gridLayout->addWidget(label_12, 0, 3, 1, 1);
 
-        bitRateLabel = new QLabel(centralWidget);
+        pchargeLabel = new QLineEdit(centralWidget);
+        pchargeLabel->setObjectName(QString::fromUtf8("pchargeLabel"));
+        pchargeLabel->setReadOnly(true);
+
+        gridLayout->addWidget(pchargeLabel, 1, 4, 1, 1);
+
+        durationLabel = new QLineEdit(centralWidget);
+        durationLabel->setObjectName(QString::fromUtf8("durationLabel"));
+        durationLabel->setReadOnly(true);
+
+        gridLayout->addWidget(durationLabel, 3, 2, 1, 1);
+
+        countRateLabel = new QLineEdit(centralWidget);
+        countRateLabel->setObjectName(QString::fromUtf8("countRateLabel"));
+        countRateLabel->setReadOnly(true);
+
+        gridLayout->addWidget(countRateLabel, 2, 4, 1, 1);
+
+        pfreqLabel = new QLineEdit(centralWidget);
+        pfreqLabel->setObjectName(QString::fromUtf8("pfreqLabel"));
+        pfreqLabel->setReadOnly(true);
+
+        gridLayout->addWidget(pfreqLabel, 3, 4, 1, 1);
+
+        bitRateLabel = new QLineEdit(centralWidget);
         bitRateLabel->setObjectName(QString::fromUtf8("bitRateLabel"));
+        bitRateLabel->setReadOnly(true);
 
-        gridLayout->addWidget(bitRateLabel, 0, 3, 1, 1);
+        gridLayout->addWidget(bitRateLabel, 0, 4, 1, 1);
+
+        label_2 = new QLabel(centralWidget);
+        label_2->setObjectName(QString::fromUtf8("label_2"));
+
+        gridLayout->addWidget(label_2, 0, 0, 1, 1);
+
+        runNumLabel = new QLineEdit(centralWidget);
+        runNumLabel->setObjectName(QString::fromUtf8("runNumLabel"));
+        runNumLabel->setReadOnly(true);
+
+        gridLayout->addWidget(runNumLabel, 0, 2, 1, 1);
+
+        label_3 = new QLabel(centralWidget);
+        label_3->setObjectName(QString::fromUtf8("label_3"));
+
+        gridLayout->addWidget(label_3, 1, 0, 1, 1);
+
+        scanNumLabel = new QLineEdit(centralWidget);
+        scanNumLabel->setObjectName(QString::fromUtf8("scanNumLabel"));
+        scanNumLabel->setReadOnly(true);
+
+        gridLayout->addWidget(scanNumLabel, 1, 2, 1, 1);
+
+        label_29 = new QLabel(centralWidget);
+        label_29->setObjectName(QString::fromUtf8("label_29"));
+
+        gridLayout->addWidget(label_29, 2, 0, 1, 1);
+
+        startTimeEdit = new QLineEdit(centralWidget);
+        startTimeEdit->setObjectName(QString::fromUtf8("startTimeEdit"));
+        startTimeEdit->setReadOnly(true);
+
+        gridLayout->addWidget(startTimeEdit, 2, 2, 1, 1);
 
 
         horizontalLayout->addLayout(gridLayout);
@@ -286,46 +295,13 @@ public:
         splitter->setOrientation(Qt::Vertical);
         tabWidget = new QTabWidget(splitter);
         tabWidget->setObjectName(QString::fromUtf8("tabWidget"));
-        tab = new QWidget();
-        tab->setObjectName(QString::fromUtf8("tab"));
-        horizontalLayout_4 = new QHBoxLayout(tab);
-        horizontalLayout_4->setSpacing(6);
-        horizontalLayout_4->setContentsMargins(11, 11, 11, 11);
-        horizontalLayout_4->setObjectName(QString::fromUtf8("horizontalLayout_4"));
-        alertTable = new QTableWidget(tab);
-        if (alertTable->columnCount() < 3)
-            alertTable->setColumnCount(3);
-        alertTable->setObjectName(QString::fromUtf8("alertTable"));
-        alertTable->setColumnCount(3);
-        alertTable->horizontalHeader()->setStretchLastSection(true);
-        alertTable->verticalHeader()->setVisible(false);
-
-        horizontalLayout_4->addWidget(alertTable);
-
-        tabWidget->addTab(tab, QString());
-        tab_3 = new QWidget();
-        tab_3->setObjectName(QString::fromUtf8("tab_3"));
-        horizontalLayout_6 = new QHBoxLayout(tab_3);
-        horizontalLayout_6->setSpacing(6);
-        horizontalLayout_6->setContentsMargins(11, 11, 11, 11);
-        horizontalLayout_6->setObjectName(QString::fromUtf8("horizontalLayout_6"));
-        eventTable = new QTableWidget(tab_3);
-        if (eventTable->columnCount() < 3)
-            eventTable->setColumnCount(3);
-        eventTable->setObjectName(QString::fromUtf8("eventTable"));
-        eventTable->setColumnCount(3);
-        eventTable->horizontalHeader()->setStretchLastSection(true);
-        eventTable->verticalHeader()->setVisible(false);
-
-        horizontalLayout_6->addWidget(eventTable);
-
-        tabWidget->addTab(tab_3, QString());
         runInfoTab = new QWidget();
         runInfoTab->setObjectName(QString::fromUtf8("runInfoTab"));
         gridLayout_2 = new QGridLayout(runInfoTab);
         gridLayout_2->setSpacing(6);
         gridLayout_2->setContentsMargins(11, 11, 11, 11);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
+        gridLayout_2->setVerticalSpacing(3);
         verticalSpacer_2 = new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding);
 
         gridLayout_2->addItem(verticalSpacer_2, 13, 0, 1, 1);
@@ -335,41 +311,11 @@ public:
 
         gridLayout_2->addWidget(label_7, 2, 0, 1, 1);
 
-        label_9 = new QLabel(runInfoTab);
-        label_9->setObjectName(QString::fromUtf8("label_9"));
-
-        gridLayout_2->addWidget(label_9, 6, 0, 1, 1);
-
         runTitleEdit = new QLineEdit(runInfoTab);
         runTitleEdit->setObjectName(QString::fromUtf8("runTitleEdit"));
         runTitleEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(runTitleEdit, 2, 3, 1, 1);
-
-        totalChargeEdit = new QLineEdit(runInfoTab);
-        totalChargeEdit->setObjectName(QString::fromUtf8("totalChargeEdit"));
-
-        gridLayout_2->addWidget(totalChargeEdit, 6, 3, 1, 1);
-
-        label_29 = new QLabel(runInfoTab);
-        label_29->setObjectName(QString::fromUtf8("label_29"));
-
-        gridLayout_2->addWidget(label_29, 4, 0, 1, 1);
-
-        startTimeEdit = new QLineEdit(runInfoTab);
-        startTimeEdit->setObjectName(QString::fromUtf8("startTimeEdit"));
-
-        gridLayout_2->addWidget(startTimeEdit, 4, 3, 1, 1);
-
-        label_30 = new QLabel(runInfoTab);
-        label_30->setObjectName(QString::fromUtf8("label_30"));
-
-        gridLayout_2->addWidget(label_30, 5, 0, 1, 1);
-
-        totalCountsEdit = new QLineEdit(runInfoTab);
-        totalCountsEdit->setObjectName(QString::fromUtf8("totalCountsEdit"));
-
-        gridLayout_2->addWidget(totalCountsEdit, 5, 3, 1, 1);
 
         label_24 = new QLabel(runInfoTab);
         label_24->setObjectName(QString::fromUtf8("label_24"));
@@ -378,6 +324,7 @@ public:
 
         sampleIdEdit = new QLineEdit(runInfoTab);
         sampleIdEdit->setObjectName(QString::fromUtf8("sampleIdEdit"));
+        sampleIdEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(sampleIdEdit, 2, 5, 1, 1);
 
@@ -410,6 +357,7 @@ public:
 
         facilityNameEdit = new QLineEdit(runInfoTab);
         facilityNameEdit->setObjectName(QString::fromUtf8("facilityNameEdit"));
+        facilityNameEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(facilityNameEdit, 9, 3, 1, 1);
 
@@ -420,6 +368,7 @@ public:
 
         beamIdEdit = new QLineEdit(runInfoTab);
         beamIdEdit->setObjectName(QString::fromUtf8("beamIdEdit"));
+        beamIdEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(beamIdEdit, 10, 3, 1, 1);
 
@@ -430,6 +379,7 @@ public:
 
         beamNameShortEdit = new QLineEdit(runInfoTab);
         beamNameShortEdit->setObjectName(QString::fromUtf8("beamNameShortEdit"));
+        beamNameShortEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(beamNameShortEdit, 9, 5, 1, 1);
 
@@ -440,6 +390,7 @@ public:
 
         beamNameLongEdit = new QLineEdit(runInfoTab);
         beamNameLongEdit->setObjectName(QString::fromUtf8("beamNameLongEdit"));
+        beamNameLongEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(beamNameLongEdit, 10, 5, 1, 1);
 
@@ -450,6 +401,7 @@ public:
 
         propIdEdit = new QLineEdit(runInfoTab);
         propIdEdit->setObjectName(QString::fromUtf8("propIdEdit"));
+        propIdEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(propIdEdit, 3, 3, 1, 1);
 
@@ -475,42 +427,87 @@ public:
 
         sampleNameEdit = new QLineEdit(runInfoTab);
         sampleNameEdit->setObjectName(QString::fromUtf8("sampleNameEdit"));
+        sampleNameEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(sampleNameEdit, 3, 5, 1, 1);
 
         sampleEnvironmentEdit = new QLineEdit(runInfoTab);
         sampleEnvironmentEdit->setObjectName(QString::fromUtf8("sampleEnvironmentEdit"));
+        sampleEnvironmentEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(sampleEnvironmentEdit, 4, 5, 1, 1);
 
         sampleFormulaEdit = new QLineEdit(runInfoTab);
         sampleFormulaEdit->setObjectName(QString::fromUtf8("sampleFormulaEdit"));
+        sampleFormulaEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(sampleFormulaEdit, 5, 5, 1, 1);
 
         sampleNatureEdit = new QLineEdit(runInfoTab);
         sampleNatureEdit->setObjectName(QString::fromUtf8("sampleNatureEdit"));
+        sampleNatureEdit->setReadOnly(true);
 
         gridLayout_2->addWidget(sampleNatureEdit, 6, 5, 1, 1);
 
+        label_30 = new QLabel(runInfoTab);
+        label_30->setObjectName(QString::fromUtf8("label_30"));
+
+        gridLayout_2->addWidget(label_30, 4, 0, 1, 1);
+
+        label_9 = new QLabel(runInfoTab);
+        label_9->setObjectName(QString::fromUtf8("label_9"));
+
+        gridLayout_2->addWidget(label_9, 5, 0, 1, 1);
+
+        totalCountsEdit = new QLineEdit(runInfoTab);
+        totalCountsEdit->setObjectName(QString::fromUtf8("totalCountsEdit"));
+        totalCountsEdit->setReadOnly(true);
+
+        gridLayout_2->addWidget(totalCountsEdit, 4, 3, 1, 1);
+
+        totalChargeEdit = new QLineEdit(runInfoTab);
+        totalChargeEdit->setObjectName(QString::fromUtf8("totalChargeEdit"));
+        totalChargeEdit->setReadOnly(true);
+
+        gridLayout_2->addWidget(totalChargeEdit, 5, 3, 1, 1);
+
         tabWidget->addTab(runInfoTab, QString());
-        tab_2 = new QWidget();
-        tab_2->setObjectName(QString::fromUtf8("tab_2"));
-        horizontalLayout_5 = new QHBoxLayout(tab_2);
-        horizontalLayout_5->setSpacing(6);
-        horizontalLayout_5->setContentsMargins(11, 11, 11, 11);
-        horizontalLayout_5->setObjectName(QString::fromUtf8("horizontalLayout_5"));
-        pvTable = new QTableWidget(tab_2);
-        if (pvTable->columnCount() < 2)
-            pvTable->setColumnCount(2);
-        pvTable->setObjectName(QString::fromUtf8("pvTable"));
-        pvTable->setColumnCount(2);
-        pvTable->horizontalHeader()->setStretchLastSection(true);
-        pvTable->verticalHeader()->setVisible(false);
+        tab = new QWidget();
+        tab->setObjectName(QString::fromUtf8("tab"));
+        horizontalLayout_4 = new QHBoxLayout(tab);
+        horizontalLayout_4->setSpacing(6);
+        horizontalLayout_4->setContentsMargins(11, 11, 11, 11);
+        horizontalLayout_4->setObjectName(QString::fromUtf8("horizontalLayout_4"));
+        alertTable = new QTableWidget(tab);
+        if (alertTable->columnCount() < 4)
+            alertTable->setColumnCount(4);
+        alertTable->setObjectName(QString::fromUtf8("alertTable"));
+        alertTable->setColumnCount(4);
+        alertTable->horizontalHeader()->setStretchLastSection(true);
+        alertTable->verticalHeader()->setVisible(false);
 
-        horizontalLayout_5->addWidget(pvTable);
+        horizontalLayout_4->addWidget(alertTable);
 
-        tabWidget->addTab(tab_2, QString());
+        tabWidget->addTab(tab, QString());
+        tab_3 = new QWidget();
+        tab_3->setObjectName(QString::fromUtf8("tab_3"));
+        horizontalLayout_6 = new QHBoxLayout(tab_3);
+        horizontalLayout_6->setSpacing(6);
+        horizontalLayout_6->setContentsMargins(11, 11, 11, 11);
+        horizontalLayout_6->setObjectName(QString::fromUtf8("horizontalLayout_6"));
+        eventTable = new QTableWidget(tab_3);
+        if (eventTable->columnCount() < 4)
+            eventTable->setColumnCount(4);
+        eventTable->setObjectName(QString::fromUtf8("eventTable"));
+        eventTable->setColumnCount(4);
+        eventTable->horizontalHeader()->setVisible(false);
+        eventTable->horizontalHeader()->setHighlightSections(true);
+        eventTable->horizontalHeader()->setStretchLastSection(true);
+        eventTable->verticalHeader()->setVisible(false);
+
+        horizontalLayout_6->addWidget(eventTable);
+
+        tabWidget->addTab(tab_3, QString());
         tab_4 = new QWidget();
         tab_4->setObjectName(QString::fromUtf8("tab_4"));
         horizontalLayout_7 = new QHBoxLayout(tab_4);
@@ -546,27 +543,6 @@ public:
         horizontalLayout_8->addWidget(logTable);
 
         tabWidget->addTab(tab_5, QString());
-        markerTab = new QWidget();
-        markerTab->setObjectName(QString::fromUtf8("markerTab"));
-        horizontalLayout_3 = new QHBoxLayout(markerTab);
-        horizontalLayout_3->setSpacing(6);
-        horizontalLayout_3->setContentsMargins(11, 11, 11, 11);
-        horizontalLayout_3->setObjectName(QString::fromUtf8("horizontalLayout_3"));
-        statisticsTable = new QTableWidget(markerTab);
-        if (statisticsTable->columnCount() < 6)
-            statisticsTable->setColumnCount(6);
-        if (statisticsTable->rowCount() < 3)
-            statisticsTable->setRowCount(3);
-        statisticsTable->setObjectName(QString::fromUtf8("statisticsTable"));
-        statisticsTable->setRowCount(3);
-        statisticsTable->setColumnCount(6);
-        statisticsTable->horizontalHeader()->setHighlightSections(false);
-        statisticsTable->horizontalHeader()->setStretchLastSection(true);
-        statisticsTable->verticalHeader()->setVisible(false);
-
-        horizontalLayout_3->addWidget(statisticsTable);
-
-        tabWidget->addTab(markerTab, QString());
         splitter->addWidget(tabWidget);
         monitorTable = new QTableWidget(splitter);
         if (monitorTable->columnCount() < 2)
@@ -604,13 +580,6 @@ public:
         horizontalLayout_2 = new QHBoxLayout();
         horizontalLayout_2->setSpacing(6);
         horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
-        smsStatusLabel = new QLabel(centralWidget);
-        smsStatusLabel->setObjectName(QString::fromUtf8("smsStatusLabel"));
-        smsStatusLabel->setFont(font);
-        smsStatusLabel->setFrameShape(QFrame::Box);
-
-        horizontalLayout_2->addWidget(smsStatusLabel);
-
         combusStatusLabel = new QLabel(centralWidget);
         combusStatusLabel->setObjectName(QString::fromUtf8("combusStatusLabel"));
         combusStatusLabel->setFont(font);
@@ -618,14 +587,23 @@ public:
 
         horizontalLayout_2->addWidget(combusStatusLabel);
 
+        dasmonStatusLabel = new QLabel(centralWidget);
+        dasmonStatusLabel->setObjectName(QString::fromUtf8("dasmonStatusLabel"));
+        dasmonStatusLabel->setFont(font);
+        dasmonStatusLabel->setFrameShape(QFrame::Box);
+
+        horizontalLayout_2->addWidget(dasmonStatusLabel);
+
+        smsStatusLabel = new QLabel(centralWidget);
+        smsStatusLabel->setObjectName(QString::fromUtf8("smsStatusLabel"));
+        smsStatusLabel->setFont(font);
+        smsStatusLabel->setFrameShape(QFrame::Box);
+
+        horizontalLayout_2->addWidget(smsStatusLabel);
+
         horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_2->addItem(horizontalSpacer);
-
-        smsConfigBtn = new QPushButton(centralWidget);
-        smsConfigBtn->setObjectName(QString::fromUtf8("smsConfigBtn"));
-
-        horizontalLayout_2->addWidget(smsConfigBtn);
 
         exitButton = new QPushButton(centralWidget);
         exitButton->setObjectName(QString::fromUtf8("exitButton"));
@@ -640,9 +618,8 @@ public:
 
         retranslateUi(MainWindow);
         QObject::connect(exitButton, SIGNAL(clicked()), MainWindow, SLOT(close()));
-        QObject::connect(smsConfigBtn, SIGNAL(clicked()), MainWindow, SLOT(configureSMSConnection()));
 
-        tabWidget->setCurrentIndex(2);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(MainWindow);
@@ -658,28 +635,16 @@ public:
         runStatusLabel->setText(QApplication::translate("MainWindow", "Recording", 0, QApplication::UnicodeUTF8));
         scanStatusLabel->setText(QApplication::translate("MainWindow", "No Scan", 0, QApplication::UnicodeUTF8));
         pauseStatusLabel->setText(QApplication::translate("MainWindow", "------", 0, QApplication::UnicodeUTF8));
-        durationLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        runNumLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        scanNumLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        pchargeLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        countRateLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        pfreqLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        label_2->setText(QApplication::translate("MainWindow", "Run Number:", 0, QApplication::UnicodeUTF8));
-        label_3->setText(QApplication::translate("MainWindow", "Scan Number:", 0, QApplication::UnicodeUTF8));
+        signalStatusLabel->setText(QApplication::translate("MainWindow", "------", 0, QApplication::UnicodeUTF8));
         label_23->setText(QApplication::translate("MainWindow", "Duration:", 0, QApplication::UnicodeUTF8));
         label_17->setText(QApplication::translate("MainWindow", "Proton Charge:", 0, QApplication::UnicodeUTF8));
         label_19->setText(QApplication::translate("MainWindow", "Count Rate:", 0, QApplication::UnicodeUTF8));
         label_21->setText(QApplication::translate("MainWindow", "Pulse Frequency:", 0, QApplication::UnicodeUTF8));
-        label_8->setText(QApplication::translate("MainWindow", "SMS:", 0, QApplication::UnicodeUTF8));
-        smsHostLabel->setText(QApplication::translate("MainWindow", "None", 0, QApplication::UnicodeUTF8));
         label_12->setText(QApplication::translate("MainWindow", "Stream Rate (KB/s):", 0, QApplication::UnicodeUTF8));
-        bitRateLabel->setText(QApplication::translate("MainWindow", "0", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MainWindow", "Alerts", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("MainWindow", "Events", 0, QApplication::UnicodeUTF8));
-        label_7->setText(QApplication::translate("MainWindow", "Run Title:", 0, QApplication::UnicodeUTF8));
-        label_9->setText(QApplication::translate("MainWindow", "Total Charge:", 0, QApplication::UnicodeUTF8));
+        label_2->setText(QApplication::translate("MainWindow", "Run Number:", 0, QApplication::UnicodeUTF8));
+        label_3->setText(QApplication::translate("MainWindow", "Scan Number:", 0, QApplication::UnicodeUTF8));
         label_29->setText(QApplication::translate("MainWindow", "Start Time:", 0, QApplication::UnicodeUTF8));
-        label_30->setText(QApplication::translate("MainWindow", "Total Counts:", 0, QApplication::UnicodeUTF8));
+        label_7->setText(QApplication::translate("MainWindow", "Run Title:", 0, QApplication::UnicodeUTF8));
         label_24->setText(QApplication::translate("MainWindow", "Identifier:", 0, QApplication::UnicodeUTF8));
         label_31->setText(QApplication::translate("MainWindow", "Sample Information", 0, QApplication::UnicodeUTF8));
         label_32->setText(QApplication::translate("MainWindow", "Run Information", 0, QApplication::UnicodeUTF8));
@@ -693,18 +658,20 @@ public:
         label_26->setText(QApplication::translate("MainWindow", "Environment:", 0, QApplication::UnicodeUTF8));
         label_27->setText(QApplication::translate("MainWindow", "Formula:", 0, QApplication::UnicodeUTF8));
         label_28->setText(QApplication::translate("MainWindow", "Nature:", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(runInfoTab), QApplication::translate("MainWindow", "Run Info", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab_2), QApplication::translate("MainWindow", "PVs", 0, QApplication::UnicodeUTF8));
+        label_30->setText(QApplication::translate("MainWindow", "Total Counts:", 0, QApplication::UnicodeUTF8));
+        label_9->setText(QApplication::translate("MainWindow", "Total Charge:", 0, QApplication::UnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(runInfoTab), QApplication::translate("MainWindow", "Info", 0, QApplication::UnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MainWindow", "Signals", 0, QApplication::UnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("MainWindow", "Events", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(tab_4), QApplication::translate("MainWindow", "Status", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(tab_5), QApplication::translate("MainWindow", "Log", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(markerTab), QApplication::translate("MainWindow", "Statistics", 0, QApplication::UnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem = monitorTable->horizontalHeaderItem(0);
         ___qtablewidgetitem->setText(QApplication::translate("MainWindow", "Monitor ID", 0, QApplication::UnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem1 = monitorTable->horizontalHeaderItem(1);
         ___qtablewidgetitem1->setText(QApplication::translate("MainWindow", "Count Rate", 0, QApplication::UnicodeUTF8));
-        smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         combusStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
-        smsConfigBtn->setText(QApplication::translate("MainWindow", "SMS Config", 0, QApplication::UnicodeUTF8));
+        dasmonStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
+        smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         exitButton->setText(QApplication::translate("MainWindow", "Exit", 0, QApplication::UnicodeUTF8));
     } // retranslateUi
 

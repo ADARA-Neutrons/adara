@@ -1,17 +1,17 @@
-#include "rule.h"
+#include "Rule.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
 using namespace std;
 
-namespace RuleEng
+namespace RuleEngine
 {
 
-Rule::Rule( const std::string &a_item, const std::string &a_msg_prefix, RuleType a_type, RuleSeverity a_severity, double a_value )
-    : m_item(a_item), m_type(a_type), m_severity(a_severity), m_value(a_value), m_asserted(false)
+Rule::Rule( const std::string &a_name, const std::string &a_source, RuleType a_type, ADARA::Level a_level, double a_value )
+    : m_name(a_name), m_source(a_source), m_type(a_type), m_level(a_level), m_value(a_value), m_asserted(false)
 {
-    m_id = boost::lexical_cast<string>(CRITICAL - a_severity) + "_" + a_item + "_" + boost::lexical_cast<string>(a_type);
-    m_message = a_msg_prefix + a_item;
+    m_id = boost::lexical_cast<string>(a_level) + "_" + a_name + "_" + boost::lexical_cast<string>(a_type);
+    m_message = a_name;
 
     switch ( a_type )
     {

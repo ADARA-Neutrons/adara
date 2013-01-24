@@ -8,6 +8,7 @@
 #include "ComBus.h"
 #include "ComBusMessages.h"
 #include "STSMessages.h"
+#include "DASMonMessages.h"
 
 using namespace std;
 
@@ -42,7 +43,7 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
     {
         if ( m_listener )
         {
-            Message *msg = Connection::makeMessage( *a_msg );
+            MessageBase *msg = Connection::makeMessage( *a_msg );
 
             m_listener->comBusMessage( *msg );
 
@@ -162,8 +163,8 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
         m_broker_uri += string( ":61616" );
     }
 
-    if ( a_inst_num )
-        m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
+    //if ( a_inst_num )
+    //    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + ".txt";
 
@@ -222,6 +223,23 @@ Connection::getInst()
 }
 
 
+bool
+Connection::waitForConnect( unsigned short a_timeout ) const
+{
+    unsigned short t = a_timeout;
+    while ( 1 )
+    {
+        if ( m_connected )
+            return true;
+
+        if ( a_timeout && t-- == 0 )
+            return false;
+
+        sleep( 1 );
+    }
+    return false;
+}
+
 void
 Connection::reconnectThread()
 {
@@ -239,7 +257,7 @@ Connection::reconnectThread()
 
         try
         {
-            cout << "retry connect" << endl;
+            //cout << "retry connect" << endl;
             m_connection = dynamic_cast<activemq::core::ActiveMQConnection*>( factory.createConnection() );
             if ( !m_connection )
                 throw std::runtime_error( "Failed to create ActiveMQConnection" );
@@ -250,14 +268,14 @@ Connection::reconnectThread()
             m_connected = true;
             lock.unlock();
 
-            // Notify connection status thread
-            m_status_cond.notify_one();
-
             // Reconnect all message consumers
             for ( map<ITopicListener*,Translator*>::iterator il = m_listeners.begin(); il != m_listeners.end(); ++il )
             {
                 il->second->connect_all();
             }
+
+            // Notify connection status thread
+            m_status_cond.notify_one();
 
             // Connected! (Retain lock)
             break;
@@ -295,7 +313,7 @@ Connection::connectionStatusNotifyThread()
 
     while( 1 )
     {
-        cout << "chk status" << endl;
+        //cout << "chk status" << endl;
         boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
         // If Connection object is being destroyed, exit
@@ -367,7 +385,7 @@ Connection::sendStatus( StatusCode a_status )
 
 
 bool
-Connection::sendLog( const std::string &a_msg, LogLevel a_level, const char *a_file, unsigned long a_line, unsigned long a_tid )
+Connection::sendLog( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid )
 {
     bool res = false;
 
@@ -407,7 +425,7 @@ Connection::sendCommandAsync( Command &a_cmd, unsigned long a_timeout )
 
 
 bool
-Connection::sendMessage( Message &a_msg )
+Connection::sendMessage( MessageBase &a_msg )
 {
     bool res = false;
     cms::Message *cmsmsg = 0;
@@ -420,6 +438,7 @@ Connection::sendMessage( Message &a_msg )
 
             // Set source and timestamp when msg sent
             cmsmsg->setStringProperty( "source", m_proc_name );
+            cmsmsg->setIntProperty( "instance", m_inst_num );
             cmsmsg->setIntProperty( "timestamp", time(0) );
 
             string topic = a_msg.getTopic();
@@ -431,10 +450,12 @@ Connection::sendMessage( Message &a_msg )
                 p.first = m_session->createTopic( string("ADARA.") + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
                 m_producer_topics[topic] = p;
+                //cout << "send: ADARA." << topic << "." << m_proc_name  << ", ty: " << a_msg.getMessageType() << endl;
                 p.second->send( cmsmsg );
             }
             else
             {
+                //cout << "--> send: ADARA." << topic << "." << m_proc_name << ", ty: " << a_msg.getMessageType() << endl;
                 itop->second.second->send( cmsmsg );
             }
 
@@ -443,10 +464,15 @@ Connection::sendMessage( Message &a_msg )
         }
         catch(...)
         {
+            cout << "send failed - exception." << endl;
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
         }
+    }
+    else
+    {
+        cout << "send failed - not connected." << endl;
     }
 
     return res;
@@ -454,31 +480,31 @@ Connection::sendMessage( Message &a_msg )
 
 
 
-Message*
+MessageBase*
 Connection::makeMessage( const cms::Message &a_msg )
 {
-    Message *msg = 0;
-    short msg_type = a_msg.getShortProperty( "type" );
+    unsigned long msg_type = a_msg.getIntProperty( "type" );
 
     switch( msg_type )
     {
-    case MSG_STATUS:
-        msg = new StatusMessage( a_msg );
-        break;
-
-    case MSG_LOG:
-        msg = new LogMessage( a_msg );
-        break;
-
-    case MSG_STATUS_STS_TRANS_COMPLETE:
-        msg = new STS::TranslationCompleteMessage( a_msg );
-        break;
+    case MSG_LOG:                   return new LogMessage( a_msg );
+    case MSG_STATUS:                return new StatusMessage( a_msg );
+    case MSG_SIGNAL_ASSERT:         return new SignalAssertMessage( a_msg );
+    case MSG_SIGNAL_RETRACT:        return new SignalRetractMessage( a_msg );
+    case MSG_SIGNAL_EVENT:          return new SignalEventMessage( a_msg );
+    case MSG_STS_TRANS_COMPLETE:    return new STS::TranslationCompleteMessage( a_msg );
+    case MSG_DASMON_SMS_CONN_STATUS:return new DASMON::ConnectionStatusMessage( a_msg );
+    case MSG_DASMON_RUN_STATUS:     return new DASMON::RunStatusMessage( a_msg );
+    case MSG_DASMON_PAUSE_STATUS:   return new DASMON::PauseStatusMessage( a_msg );
+    case MSG_DASMON_SCAN_STATUS:    return new DASMON::ScanStatusMessage( a_msg );
+    case MSG_DASMON_BEAM_INFO:      return new DASMON::BeamInfoMessage( a_msg );
+    case MSG_DASMON_RUN_INFO:       return new DASMON::RunInfoMessage( a_msg );
+    case MSG_DASMON_BEAM_METRICS:   return new DASMON::BeamMetricsMessage( a_msg );
+    case MSG_DASMON_RUN_METRICS:    return new DASMON::RunMetricsMessage( a_msg );
 
     default:
         throw std::runtime_error("Unknown message type");
     }
-
-    return msg;
 }
 
 
@@ -490,6 +516,7 @@ Connection::attach( IStatusListener  &a_subscriber )
     if ( l == m_status_listeners.end() )
     {
         m_status_listeners.push_back( &a_subscriber );
+        a_subscriber.comBusConnectionStatus( m_connected );
     }
 }
 

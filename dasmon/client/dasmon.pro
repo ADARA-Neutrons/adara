@@ -1,0 +1,34 @@
+#-------------------------------------------------
+#
+# Project created by QtCreator 2012-11-29T11:26:24
+#
+#-------------------------------------------------
+
+QT       += core gui
+
+TARGET = dasmon
+TEMPLATE = app
+
+INCLUDEPATH +=  ../common \
+                ../../combus \
+                ../../sts \
+                ../../common \
+                /usr/include/activemq-cpp-3.4.0 \
+                /usr/include/apr-1
+
+SOURCES += main.cpp \
+        mainwindow.cpp \
+        ../../combus/ComBus.cpp
+
+HEADERS  += mainwindow.h \
+    ../../combus/STSMessages.h \
+    ../../combus/ComBusMessages.h \
+    ../../combus/ComBusAppender.h \
+    ../../combus/ComBus.h
+
+LIBS += -lboost_thread-mt -lxml2 -lactivemq-cpp
+
+FORMS    += mainwindow.ui
+
+OTHER_FILES += \
+    todo.txt

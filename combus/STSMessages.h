@@ -1,15 +1,17 @@
 #ifndef STSMESSAGES_H
 #define STSMESSAGES_H
 
+#include "ComBusMessages.h"
+
 namespace ADARA {
 namespace ComBus {
 namespace STS {
 
-class TranslationCompleteMessage : public Message
+class TranslationCompleteMessage : public MessageBase
 {
 public:
     TranslationCompleteMessage( const cms::Message &a_msg )
-        : Message( a_msg )
+        : MessageBase( a_msg )
     {
         translateFrom( a_msg );
     }
@@ -21,7 +23,7 @@ public:
     }
 
     MessageType         getMessageType() const
-                        { return MSG_STATUS_STS_TRANS_COMPLETE; }
+                        { return MSG_STS_TRANS_COMPLETE; }
 
     const std::string  &getBeamShortName() const
                         { return m_beam_sname; }
@@ -38,7 +40,7 @@ public:
 protected:
     virtual void        translateTo( cms::Message &a_msg )
                         {
-                            Message::translateTo( a_msg );
+                            MessageBase::translateTo( a_msg );
                             a_msg.setStringProperty( "beamname", m_beam_sname );
                             a_msg.setIntProperty( "runnum", m_run_num );
                             a_msg.setStringProperty( "nexusfile", m_nexus_file );

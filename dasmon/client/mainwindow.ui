@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>741</width>
-    <height>722</height>
+    <width>924</width>
+    <height>769</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,6 +19,9 @@
      <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,1">
       <item>
        <layout class="QVBoxLayout" name="verticalLayout_2">
+        <property name="spacing">
+         <number>3</number>
+        </property>
         <item>
          <widget class="QLabel" name="runStatusLabel">
           <property name="sizePolicy">
@@ -115,69 +118,32 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QLabel" name="signalStatusLabel">
+          <property name="font">
+           <font>
+            <weight>75</weight>
+            <bold>true</bold>
+           </font>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Box</enum>
+          </property>
+          <property name="text">
+           <string>------</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item>
-       <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0">
+       <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0">
         <property name="verticalSpacing">
-         <number>6</number>
+         <number>3</number>
         </property>
-        <item row="3" column="1">
-         <widget class="QLabel" name="durationLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QLabel" name="runNumLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QLabel" name="scanNumLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="3">
-         <widget class="QLabel" name="pchargeLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="3">
-         <widget class="QLabel" name="countRateLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="3">
-         <widget class="QLabel" name="pfreqLabel">
-          <property name="text">
-           <string>0</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>Run Number:</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>Scan Number:</string>
-          </property>
-         </widget>
-        </item>
         <item row="3" column="0">
          <widget class="QLabel" name="label_23">
           <property name="text">
@@ -185,52 +151,108 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="2">
+        <item row="1" column="3">
          <widget class="QLabel" name="label_17">
           <property name="text">
            <string>Proton Charge:</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="2">
+        <item row="2" column="3">
          <widget class="QLabel" name="label_19">
           <property name="text">
            <string>Count Rate:</string>
           </property>
          </widget>
         </item>
-        <item row="3" column="2">
+        <item row="3" column="3">
          <widget class="QLabel" name="label_21">
           <property name="text">
            <string>Pulse Frequency:</string>
           </property>
          </widget>
         </item>
-        <item row="0" column="0">
-         <widget class="QLabel" name="label_8">
-          <property name="text">
-           <string>SMS:</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QLabel" name="smsHostLabel">
-          <property name="text">
-           <string>None</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
+        <item row="0" column="3">
          <widget class="QLabel" name="label_12">
           <property name="text">
            <string>Stream Rate (KB/s):</string>
           </property>
          </widget>
         </item>
-        <item row="0" column="3">
-         <widget class="QLabel" name="bitRateLabel">
+        <item row="1" column="4">
+         <widget class="QLineEdit" name="pchargeLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="2">
+         <widget class="QLineEdit" name="durationLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="4">
+         <widget class="QLineEdit" name="countRateLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="4">
+         <widget class="QLineEdit" name="pfreqLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="4">
+         <widget class="QLineEdit" name="bitRateLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_2">
           <property name="text">
-           <string>0</string>
+           <string>Run Number:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <widget class="QLineEdit" name="runNumLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Scan Number:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="2">
+         <widget class="QLineEdit" name="scanNumLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="label_29">
+          <property name="text">
+           <string>Start Time:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="2">
+         <widget class="QLineEdit" name="startTimeEdit">
+          <property name="readOnly">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
@@ -248,59 +270,16 @@
          </property>
          <widget class="QTabWidget" name="tabWidget">
           <property name="currentIndex">
-           <number>2</number>
+           <number>0</number>
           </property>
-          <widget class="QWidget" name="tab">
-           <attribute name="title">
-            <string>Alerts</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_4">
-            <item>
-             <widget class="QTableWidget" name="alertTable">
-              <property name="columnCount">
-               <number>3</number>
-              </property>
-              <attribute name="horizontalHeaderStretchLastSection">
-               <bool>true</bool>
-              </attribute>
-              <attribute name="verticalHeaderVisible">
-               <bool>false</bool>
-              </attribute>
-              <column/>
-              <column/>
-              <column/>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="tab_3">
-           <attribute name="title">
-            <string>Events</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_6">
-            <item>
-             <widget class="QTableWidget" name="eventTable">
-              <property name="columnCount">
-               <number>3</number>
-              </property>
-              <attribute name="horizontalHeaderStretchLastSection">
-               <bool>true</bool>
-              </attribute>
-              <attribute name="verticalHeaderVisible">
-               <bool>false</bool>
-              </attribute>
-              <column/>
-              <column/>
-              <column/>
-             </widget>
-            </item>
-           </layout>
-          </widget>
           <widget class="QWidget" name="runInfoTab">
            <attribute name="title">
-            <string>Run Info</string>
+            <string>Info</string>
            </attribute>
            <layout class="QGridLayout" name="gridLayout_2">
+            <property name="verticalSpacing">
+             <number>3</number>
+            </property>
             <item row="13" column="0">
              <spacer name="verticalSpacer_2">
               <property name="orientation">
@@ -321,42 +300,12 @@
               </property>
              </widget>
             </item>
-            <item row="6" column="0">
-             <widget class="QLabel" name="label_9">
-              <property name="text">
-               <string>Total Charge:</string>
-              </property>
-             </widget>
-            </item>
             <item row="2" column="3">
              <widget class="QLineEdit" name="runTitleEdit">
               <property name="readOnly">
                <bool>true</bool>
               </property>
              </widget>
-            </item>
-            <item row="6" column="3">
-             <widget class="QLineEdit" name="totalChargeEdit"/>
-            </item>
-            <item row="4" column="0">
-             <widget class="QLabel" name="label_29">
-              <property name="text">
-               <string>Start Time:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="3">
-             <widget class="QLineEdit" name="startTimeEdit"/>
-            </item>
-            <item row="5" column="0">
-             <widget class="QLabel" name="label_30">
-              <property name="text">
-               <string>Total Counts:</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="3">
-             <widget class="QLineEdit" name="totalCountsEdit"/>
             </item>
             <item row="2" column="4">
              <widget class="QLabel" name="label_24">
@@ -366,7 +315,11 @@
              </widget>
             </item>
             <item row="2" column="5">
-             <widget class="QLineEdit" name="sampleIdEdit"/>
+             <widget class="QLineEdit" name="sampleIdEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="1" column="4" colspan="2">
              <widget class="QLabel" name="label_31">
@@ -418,7 +371,11 @@
              </widget>
             </item>
             <item row="9" column="3">
-             <widget class="QLineEdit" name="facilityNameEdit"/>
+             <widget class="QLineEdit" name="facilityNameEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="10" column="0">
              <widget class="QLabel" name="label_4">
@@ -428,7 +385,11 @@
              </widget>
             </item>
             <item row="10" column="3">
-             <widget class="QLineEdit" name="beamIdEdit"/>
+             <widget class="QLineEdit" name="beamIdEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="9" column="4">
              <widget class="QLabel" name="label_5">
@@ -438,7 +399,11 @@
              </widget>
             </item>
             <item row="9" column="5">
-             <widget class="QLineEdit" name="beamNameShortEdit"/>
+             <widget class="QLineEdit" name="beamNameShortEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="10" column="4">
              <widget class="QLabel" name="label_6">
@@ -448,7 +413,11 @@
              </widget>
             </item>
             <item row="10" column="5">
-             <widget class="QLineEdit" name="beamNameLongEdit"/>
+             <widget class="QLineEdit" name="beamNameLongEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="3" column="0">
              <widget class="QLabel" name="label_11">
@@ -458,7 +427,11 @@
              </widget>
             </item>
             <item row="3" column="3">
-             <widget class="QLineEdit" name="propIdEdit"/>
+             <widget class="QLineEdit" name="propIdEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="3" column="4">
              <widget class="QLabel" name="label_25">
@@ -489,28 +462,72 @@
              </widget>
             </item>
             <item row="3" column="5">
-             <widget class="QLineEdit" name="sampleNameEdit"/>
+             <widget class="QLineEdit" name="sampleNameEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="4" column="5">
-             <widget class="QLineEdit" name="sampleEnvironmentEdit"/>
+             <widget class="QLineEdit" name="sampleEnvironmentEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="5" column="5">
-             <widget class="QLineEdit" name="sampleFormulaEdit"/>
+             <widget class="QLineEdit" name="sampleFormulaEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
             <item row="6" column="5">
-             <widget class="QLineEdit" name="sampleNatureEdit"/>
+             <widget class="QLineEdit" name="sampleNatureEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="label_30">
+              <property name="text">
+               <string>Total Counts:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="label_9">
+              <property name="text">
+               <string>Total Charge:</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="3">
+             <widget class="QLineEdit" name="totalCountsEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="3">
+             <widget class="QLineEdit" name="totalChargeEdit">
+              <property name="readOnly">
+               <bool>true</bool>
+              </property>
+             </widget>
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="tab_2">
+          <widget class="QWidget" name="tab">
            <attribute name="title">
-            <string>PVs</string>
+            <string>Signals</string>
            </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_5">
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
             <item>
-             <widget class="QTableWidget" name="pvTable">
+             <widget class="QTableWidget" name="alertTable">
               <property name="columnCount">
-               <number>2</number>
+               <number>4</number>
               </property>
               <attribute name="horizontalHeaderStretchLastSection">
                <bool>true</bool>
@@ -518,6 +535,38 @@
               <attribute name="verticalHeaderVisible">
                <bool>false</bool>
               </attribute>
+              <column/>
+              <column/>
+              <column/>
+              <column/>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="tab_3">
+           <attribute name="title">
+            <string>Events</string>
+           </attribute>
+           <layout class="QHBoxLayout" name="horizontalLayout_6">
+            <item>
+             <widget class="QTableWidget" name="eventTable">
+              <property name="columnCount">
+               <number>4</number>
+              </property>
+              <attribute name="horizontalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
+              <attribute name="horizontalHeaderHighlightSections">
+               <bool>true</bool>
+              </attribute>
+              <attribute name="horizontalHeaderStretchLastSection">
+               <bool>true</bool>
+              </attribute>
+              <attribute name="verticalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
+              <column/>
+              <column/>
               <column/>
               <column/>
              </widget>
@@ -565,41 +614,6 @@
               <attribute name="verticalHeaderVisible">
                <bool>false</bool>
               </attribute>
-              <column/>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-          <widget class="QWidget" name="markerTab">
-           <attribute name="title">
-            <string>Statistics</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_3">
-            <item>
-             <widget class="QTableWidget" name="statisticsTable">
-              <property name="rowCount">
-               <number>3</number>
-              </property>
-              <property name="columnCount">
-               <number>6</number>
-              </property>
-              <attribute name="horizontalHeaderHighlightSections">
-               <bool>false</bool>
-              </attribute>
-              <attribute name="horizontalHeaderStretchLastSection">
-               <bool>true</bool>
-              </attribute>
-              <attribute name="verticalHeaderVisible">
-               <bool>false</bool>
-              </attribute>
-              <row/>
-              <row/>
-              <row/>
-              <column/>
-              <column/>
-              <column/>
-              <column/>
-              <column/>
               <column/>
              </widget>
             </item>
@@ -675,7 +689,7 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QLabel" name="smsStatusLabel">
+       <widget class="QLabel" name="combusStatusLabel">
         <property name="font">
          <font>
           <weight>75</weight>
@@ -691,7 +705,23 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="combusStatusLabel">
+       <widget class="QLabel" name="dasmonStatusLabel">
+        <property name="font">
+         <font>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Box</enum>
+        </property>
+        <property name="text">
+         <string>!!!</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="smsStatusLabel">
         <property name="font">
          <font>
           <weight>75</weight>
@@ -718,13 +748,6 @@
          </size>
         </property>
        </spacer>
-      </item>
-      <item>
-       <widget class="QPushButton" name="smsConfigBtn">
-        <property name="text">
-         <string>SMS Config</string>
-        </property>
-       </widget>
       </item>
       <item>
        <widget class="QPushButton" name="exitButton">
@@ -762,22 +785,6 @@
     <hint type="destinationlabel">
      <x>370</x>
      <y>304</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>smsConfigBtn</sender>
-   <signal>clicked()</signal>
-   <receiver>MainWindow</receiver>
-   <slot>configureSMSConnection()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>594</x>
-     <y>698</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>370</x>
-     <y>360</y>
     </hint>
    </hints>
   </connection>

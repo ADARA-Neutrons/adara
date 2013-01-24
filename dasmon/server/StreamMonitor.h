@@ -1,5 +1,5 @@
-#ifndef MONITORADAPTER_H
-#define MONITORADAPTER_H
+#ifndef STREAMMONITOR_H
+#define STREAMMONITOR_H
 
 #include <ADARAParser.h>
 #include <map>
@@ -8,6 +8,10 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 #include <libxml/tree.h>
+#include "DASMonDefs.h"
+
+namespace ADARA {
+namespace DASMON {
 
 struct PktStats
 {
@@ -23,23 +27,16 @@ struct PktStats
 class IStreamListener
 {
 public:
+    virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
     virtual void runStatus( bool a_recording, unsigned long a_run_number ) = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
-    virtual void scanStart( unsigned long a_scan_number ) = 0;
-    virtual void scanStop() = 0;
-    virtual void runTitle( const std::string &a_run_title ) = 0;
-    virtual void facilityName( const std::string &a_facility_name ) = 0;
-    virtual void beamInfo( const std::string &a_id, const std::string &a_short_name, const std::string &a_long_name ) = 0;
-    virtual void proposalID( const std::string &a_proposal_id ) = 0;
-    virtual void sampleID( const std::string &a_sample_id ) = 0;
-    virtual void sampleName( const std::string &a_sample_name ) = 0;
-    virtual void sampleNature( const std::string &a_sample_nature ) = 0;
-    virtual void sampleFormula( const std::string &a_sample_formula ) = 0;
-    virtual void sampleEnvironment( const std::string &a_sample_environment ) = 0;
-    virtual void userInfo( const std::string &a_uid, const std::string &a_uname, const std::string &a_urole ) = 0;
+    virtual void scanStatus( bool a_scanning, unsigned long a_scan_number ) = 0;
+    virtual void beamInfo( const BeamInfo &a_info ) = 0;
+    virtual void runInfo( const RunInfo &a_info ) = 0;
+    virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
+    virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvValue( const std::string &a_name, double a_value ) = 0;
-    virtual void connectionStatus( bool a_connected ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -147,9 +144,10 @@ public:
                     { m_notify.addListener( a_listener ); }
     void            removeListener( IStreamListener &a_listener )
                     { m_notify.removeListener( a_listener ); }
+    void            resendState( IStreamListener &a_listener ) const;
 
     // Polling API for instantaneous values
-
+#if 0
     uint64_t        getCountRate();
     void            getMonitorCountRates( std::map<uint32_t,uint64_t> &a_monitor_count_rates );
     double          getProtonCharge();
@@ -164,6 +162,7 @@ public:
     void            getStatistics( std::map<uint32_t,PktStats> &a_stats );
     const char*     getPktName( uint32_t a_pkt_type ) const;
     bool            getPV( const std::string &a_pv_name, double &a_value ) const;
+#endif
 
 private:
     class Notifier : public IStreamListener
@@ -174,31 +173,27 @@ private:
 
         void runStatus( bool a_recording, unsigned long a_run_number  );
         void pauseStatus( bool a_paused );
-        void scanStart( unsigned long a_scan_number );
-        void scanStop();
-        void runTitle( const std::string &a_run_title );
-        void facilityName( const std::string &a_facility_name );
-        void beamInfo( const std::string &a_id, const std::string &a_short_name, const std::string &a_long_name );
-        void proposalID( const std::string &a_proposal_id );
-        void sampleID( const std::string &a_sample_id );
-        void sampleName( const std::string &a_sample_name );
-        void sampleNature( const std::string &a_sample_nature );
-        void sampleFormula( const std::string &a_sample_formula );
-        void sampleEnvironment( const std::string &a_sample_environment );
-        void userInfo( const std::string &a_uid, const std::string &a_uname, const std::string &a_urole );
+        void scanStatus( bool a_scanning, unsigned long a_scan_number );
+        void beamInfo( const BeamInfo &a_info );
+        void runInfo( const RunInfo &a_info );
+        void beamMetrics( const BeamMetrics &a_metrics );
+        void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
         void pvValue( const std::string &a_name, double a_value );
-        void connectionStatus( bool a_connected );
+        void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     private:
         std::vector<IStreamListener*>   m_listeners;
     };
 
-    void        processStream();
+    void        startProcessing();
+    void        stopProcessing();
+    void        processThread();
     int         connect();
     void        handleLostConnection();
     void        resetStreamStats();
     void        resetRunStats();
+    void        metricsThread();
 
 
     bool        rxPacket( const ADARA::Packet &a_pkt );
@@ -225,20 +220,25 @@ private:
     std::string                     m_sms_host;
     unsigned short                  m_sms_port;
     boost::thread                  *m_stream_thread;
+    boost::thread                  *m_metrics_thread;
     bool                            m_process_stream;
     Notifier                        m_notify;
     std::map<uint32_t,PktStats>     m_stats;
     uint32_t                        m_bank_count;
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
-    ADARA::RunStatus::Enum          m_run_status;
+    bool                            m_recording;
+    unsigned long                   m_run_num;
+    bool                            m_paused;
+    short                           m_info_rcv;
+    BeamInfo                        m_beam_info;
+    BeamMetrics                     m_beam_metrics;
+    RunInfo                         m_run_info;
+    RunMetrics                      m_run_metrics;
     bool                            m_scanning;
+    unsigned long                   m_scan_index;
     CountInfo<double>               m_pcharge;
     CountInfo<double>               m_pfreq;
-    uint64_t                        m_pcount;
-    CountInfo<uint64_t>             m_run_dup_pulse_count;
-    CountInfo<uint64_t>             m_run_cycle_error_count;
-    CountInfo<uint64_t>             m_run_pixel_error_count;
     uint64_t                        m_first_pulse_time;
     uint64_t                        m_last_pulse_time;
     uint64_t                        m_stream_size;
@@ -247,5 +247,7 @@ private:
     boost::mutex                    m_mutex;
     mutable boost::mutex            m_api_mutex;
 };
+
+}}
 
 #endif // MONITORADAPTER_H

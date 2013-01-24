@@ -7,20 +7,23 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-//#include <signal.h>
 #include <fcntl.h>
 #include "Utils.h"
 
 
 using namespace std;
 
+namespace ADARA {
+namespace DASMON {
+
 #define ADARA_IN_BUF_SIZE 0x100000
 
 
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
-    : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0),
-      m_process_stream(true), m_bank_count(0), m_run_status(ADARA::RunStatus::NO_RUN),
-      m_scanning(false), m_pcount(0), m_first_pulse_time(0), m_last_pulse_time(0),
+    : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port),
+      m_stream_thread(0), m_metrics_thread(0),
+      m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_paused(false),
+      m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0),
       m_stream_size(0), m_stream_rate(0)
 {
 }
@@ -28,6 +31,8 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
 
 StreamMonitor::~StreamMonitor()
 {
+    boost::lock_guard<boost::mutex> lock(m_api_mutex);
+    stopProcessing();
 }
 
 
@@ -36,13 +41,7 @@ StreamMonitor::start()
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
-    if ( !m_stream_thread )
-    {
-        m_process_stream = true;
-        resetRunStats();
-        resetStreamStats();
-        m_stream_thread = new boost::thread( boost::bind( &StreamMonitor::processStream, this ));
-    }
+    startProcessing();
 }
 
 
@@ -51,13 +50,7 @@ StreamMonitor::stop()
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
-    if ( m_stream_thread )
-    {
-        m_process_stream = false;
-        m_stream_thread->join();
-        resetRunStats();
-        resetStreamStats();
-    }
+    stopProcessing();
 }
 
 
@@ -76,36 +69,79 @@ StreamMonitor::setSMSHostInfo( std::string a_hostname, unsigned short a_port )
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
-    if ( m_stream_thread )
-    {
-        m_process_stream = false;
-        m_stream_thread->join();
-
-        if ( m_fd_in > -1 )
-        {
-            close( m_fd_in );
-            m_fd_in = -1;
-            m_notify.connectionStatus( true );
-        }
-    }
+    stopProcessing();
 
     m_sms_host = a_hostname;
     m_sms_port = a_port;
 
-    resetRunStats();
-    resetStreamStats();
-    m_process_stream = true;
-    m_stream_thread = new boost::thread( boost::bind( &StreamMonitor::processStream, this ));
+    startProcessing();
 }
 
 
 void
-StreamMonitor::processStream()
+StreamMonitor::resendState( IStreamListener &a_listener ) const
+{
+    boost::lock_guard<boost::mutex> lock(m_api_mutex);
+
+    if ( m_fd_in > -1 )
+    {
+        a_listener.connectionStatus( true, m_sms_host, m_sms_port );
+        a_listener.runStatus( m_recording, m_run_num );
+        a_listener.pauseStatus( m_paused );
+        a_listener.scanStatus( m_scanning, m_scan_index );
+
+        if ( m_info_rcv == 3 )
+        {
+            a_listener.beamInfo( m_beam_info );
+            a_listener.runInfo( m_run_info );
+        }
+    }
+    else
+    {
+        a_listener.connectionStatus( false, m_sms_host, m_sms_port );
+    }
+}
+
+
+void
+StreamMonitor::startProcessing()
+{
+    if ( !m_stream_thread )
+    {
+        m_process_stream = true;
+        resetRunStats();
+        resetStreamStats();
+        m_stream_thread = new boost::thread( boost::bind( &StreamMonitor::processThread, this ));
+        m_metrics_thread = new boost::thread( boost::bind( &StreamMonitor::metricsThread, this ));
+    }
+}
+
+
+void
+StreamMonitor::stopProcessing()
+{
+    if ( m_stream_thread )
+    {
+        m_process_stream = false;
+        m_stream_thread->join();
+        m_metrics_thread->join();
+        m_stream_thread = 0;
+        m_metrics_thread = 0;
+        resetRunStats();
+        resetStreamStats();
+    }
+}
+
+
+void
+StreamMonitor::processThread()
 {
     char buf;
     unsigned short delay_count = 0;
 
-    m_notify.connectionStatus( false );
+//    cout << "processing..." << endl;
+
+    m_notify.connectionStatus( false, m_sms_host, m_sms_port );
 
     while ( m_process_stream )
     {
@@ -119,7 +155,10 @@ StreamMonitor::processStream()
                     sleep(1);
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
-                        m_notify.connectionStatus( true );
+                    {
+                        cout << "STREAM: connected!" << endl;
+                        m_notify.connectionStatus( true, m_sms_host, m_sms_port );
+                    }
                 }
                 else
                 {
@@ -213,24 +252,27 @@ StreamMonitor::connect()
 void
 StreamMonitor::handleLostConnection()
 {
-    m_notify.connectionStatus( false );
+    m_notify.connectionStatus( false, m_sms_host, m_sms_port );
     close( m_fd_in );
     m_fd_in = -1;
+
+    resetStreamStats();
+    resetRunStats();
+
+    cout << "STREAM: disconnected." << endl;
 }
 
 
 void
 StreamMonitor::resetRunStats()
 {
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
+    m_info_rcv = 0;
+    m_run_info.clear();
+    m_run_metrics.clear();
     m_stats.clear();
+
     m_first_pulse_time = 0;
     m_pcharge.total = 0.0;
-    m_pcount = 0;
-    m_run_dup_pulse_count.total = 0;
-    m_run_cycle_error_count.total = 0;
-    m_run_pixel_error_count.total = 0;
 
     clearPVs();
 }
@@ -239,99 +281,50 @@ StreamMonitor::resetRunStats()
 void
 StreamMonitor::resetStreamStats()
 {
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
     m_bank_count_info.reset();
     for ( map<uint32_t,CountInfo<uint64_t> >::iterator m = m_mon_count_info.begin(); m != m_mon_count_info.end(); ++m )
         m->second.reset();
 
     m_pcharge.reset();
     m_pfreq.reset();
-    m_stream_rate = 0;
-}
-
-
-uint64_t
-StreamMonitor::getCountRate()
-{
-    return m_bank_count_info.average * 60.0;
+    m_beam_metrics.clear();
 }
 
 
 void
-StreamMonitor::getMonitorCountRates( std::map<uint32_t,uint64_t> &a_monitor_count_rates )
+StreamMonitor::metricsThread()
 {
-    a_monitor_count_rates.clear();
-
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    for ( map<uint32_t,CountInfo<uint64_t> >::iterator m = m_mon_count_info.begin(); m != m_mon_count_info.end(); ++m )
+    while( m_process_stream )
     {
-        a_monitor_count_rates[m->first] = m->second.average * 60;
+        sleep(2);
+
+        // If connected, send beam info and beam metrics
+        if ( m_fd_in > -1 )
+        {
+            boost::lock_guard<boost::mutex> lock(m_mutex);
+
+            m_beam_metrics.m_count_rate = m_bank_count_info.average * 60.0;;
+            m_beam_metrics.m_pulse_charge = m_pcharge.average;
+            m_beam_metrics.m_pulse_freq =  m_pfreq.average;
+            m_beam_metrics.m_stream_bps = m_stream_rate;
+
+            m_beam_metrics.m_num_monitors = m_mon_count_info.size() < 8? m_mon_count_info.size() : 8;
+            int i = 0;
+            for ( map<uint32_t,CountInfo<uint64_t> >::iterator m = m_mon_count_info.begin(); m != m_mon_count_info.end() && i < 8; ++m, ++i )
+            {
+                m_beam_metrics.m_monitor_count_rate[i] = m->second.average * 60;
+            }
+
+            m_notify.beamMetrics( m_beam_metrics );
+
+            // If recording, send run info and run metrics
+            if ( m_recording )
+            {
+                m_run_metrics.m_pulse_charge = m_pcharge.total;
+                m_notify.runMetrics( m_run_metrics );
+            }
+        }
     }
-}
-
-
-double
-StreamMonitor::getProtonCharge()
-{
-    return m_pcharge.average;
-}
-
-
-double
-StreamMonitor::getPulseFrequency()
-{
-    return m_pfreq.average;
-}
-
-
-uint64_t
-StreamMonitor::getRunPulseCount()
-{
-    return m_pcount;
-}
-
-
-double
-StreamMonitor::getRunPulseCharge()
-{
-    return m_pcharge.total;
-}
-
-
-uint64_t
-StreamMonitor::getPixelErrorCount()
-{
-    return m_run_pixel_error_count.total;
-}
-
-
-uint64_t
-StreamMonitor::getPixelErrorRate()
-{
-    return m_run_pixel_error_count.average * 60;
-}
-
-
-uint64_t
-StreamMonitor::getDuplicatePulseCount()
-{
-    return m_run_dup_pulse_count.total;
-}
-
-
-uint64_t
-StreamMonitor::getCycleErrorCount()
-{
-    return m_run_cycle_error_count.total;
-}
-
-
-uint64_t
-StreamMonitor::getByteRate() const
-{
-    return m_stream_rate;
 }
 
 
@@ -380,33 +373,34 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
-    if ( m_run_status != a_pkt.status() )
+//    cout << "STREAM: RunStat: " << a_pkt.status() << endl;
+
+    bool recording = (a_pkt.status() != ADARA::RunStatus::NO_RUN) && (a_pkt.runNumber() != 0);
+
+    if ( recording && !m_recording )
     {
-        m_run_status = a_pkt.status();
+        boost::lock_guard<boost::mutex> lock(m_mutex);
 
-        if ( m_run_status == ADARA::RunStatus::NEW_RUN )
+        m_recording = true;
+        m_run_num = a_pkt.runNumber();
+        resetRunStats();
+        m_notify.runStatus( true, m_run_num );
+    }
+    else if ( !recording && m_recording )
+    {
+        boost::lock_guard<boost::mutex> lock(m_mutex);
+
+        m_recording = false;
+        m_run_num = 0;
+        resetRunStats();
+        m_notify.runStatus( false, 0 );
+
+        // Make sure scan is stopped
+        if ( m_scanning )
         {
-            // New run - reset statistics
-            resetRunStats();
-
-            // Update run status on GUI
-            m_notify.runStatus( true, a_pkt.runNumber() );
-
-            //m_listener->setRunStartTime();
-        }
-        else if ( m_run_status == ADARA::RunStatus::END_RUN )
-        {
-            // Update run status on GUI
-            m_notify.runStatus( false, 0 );
-
-            resetRunStats();
-
-            // Make sure scan is stopped
-            if ( m_scanning )
-            {
-                m_scanning = false;
-                m_notify.scanStop();
-            }
+            m_scanning = false;
+            m_scan_index = 0;
+            m_notify.scanStatus( false, 0 );
         }
     }
 
@@ -485,7 +479,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     m_pcharge.addSample( a_pkt.pulseCharge() * 10.0 );
-    m_pcount++;
+    m_run_metrics.m_pulse_count++;
 
     uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
 
@@ -540,6 +534,8 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
         string tag;
         string value;
 
+        boost::lock_guard<boost::mutex> lock(m_mutex);
+
         try
         {
             for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
@@ -547,15 +543,14 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
                 tag = (char*)node->name;
                 getXmlNodeValue( node, value );
 
-                // TODO should this compare run no from RunStatusPkt?
-                // m_run_info.run_number = boost::lexical_cast<unsigned long>( value );
-                //if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
-                if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
-                    m_notify.proposalID( value );
+                if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
+                    m_run_info.m_run_num = boost::lexical_cast<unsigned long>( value );
+                else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
+                    m_run_info.m_proposal_id = value;
                 else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
-                    m_notify.runTitle( value );
+                    m_run_info.m_run_title = value;
                 else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
-                    m_notify.facilityName( value );
+                    m_beam_info.m_facility = value;
                 else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
                 {
                     for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
@@ -564,39 +559,43 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
                         getXmlNodeValue( sample_node, value );
 
                         if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
-                            m_notify.sampleID( value );
+                            m_run_info.m_sample_id = value;
                         else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
-                            m_notify.sampleName( value );
+                            m_run_info.m_sample_name = value;
                         else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
-                            m_notify.sampleNature( value );
+                            m_run_info.m_sample_nature = value;
                         else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
-                            m_notify.sampleFormula( value );
+                            m_run_info.m_sample_formula = value;
                         else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
-                            m_notify.sampleEnvironment( value );
+                            m_run_info.m_sample_environ = value;
                     }
                 }
                 else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
                 {
-                    string uid, uname, urole;
+                    UserInfo info;
 
                     for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
                     {
                         if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
                         {
+                            info.m_id = "";
+                            info.m_name = "";
+                            info.m_role = "";
+
                             for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
                             {
                                 tag = (char*)uinfo_node->name;
                                 getXmlNodeValue( uinfo_node, value );
 
                                 if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
-                                    uid = (char*)uinfo_node->children->content;
+                                    info.m_id = (char*)uinfo_node->children->content;
                                 if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
-                                    uname = (char*)uinfo_node->children->content;
+                                    info.m_name = (char*)uinfo_node->children->content;
                                 else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
-                                    urole = (char*)uinfo_node->children->content;
+                                    info.m_role = (char*)uinfo_node->children->content;
                             }
 
-                            m_notify.userInfo( uid, uname, urole );
+                            m_run_info.m_user_info.push_back( info );
                         }
                     }
                 }
@@ -610,6 +609,14 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
         xmlFreeDoc( doc );
     }
 
+    m_info_rcv |= 1;
+
+    if ( m_info_rcv == 3 )
+    {
+        m_notify.beamInfo( m_beam_info );
+        m_notify.runInfo( m_run_info );
+    }
+
     return false;
 }
 
@@ -617,7 +624,19 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 {
-    m_notify.beamInfo( a_pkt.id(), a_pkt.shortName(), a_pkt.longName() );
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    m_beam_info.m_beam_id = a_pkt.id();
+    m_beam_info.m_beam_sname = a_pkt.shortName();
+    m_beam_info.m_beam_lname = a_pkt.longName();
+
+    m_info_rcv |= 2;
+
+    if ( m_info_rcv == 3 )
+    {
+        m_notify.beamInfo( m_beam_info );
+        m_notify.runInfo( m_run_info );
+    }
 
     return false;
 }
@@ -803,22 +822,26 @@ StreamMonitor::clearPVs()
 bool
 StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 {
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
     switch( a_pkt.type() )
     {
     case ADARA::MarkerType::SCAN_START:
         m_scanning = true;
-        m_notify.scanStart( a_pkt.scanIndex() );
+        m_scan_index = a_pkt.scanIndex();
+        m_notify.scanStatus( true, a_pkt.scanIndex() );
         break;
     case ADARA::MarkerType::SCAN_STOP:
         m_scanning = false;
-        m_notify.scanStop();
+        m_scan_index = 0;
+        m_notify.scanStatus( false, 0 );
         break;
     case ADARA::MarkerType::PAUSE:
-        //cout << "Paused!" << endl;
+        m_paused = true;
         m_notify.pauseStatus( true );
         break;
     case ADARA::MarkerType::RESUME:
-        //cout << "Resume!" << endl;
+        m_paused = false;
         m_notify.pauseStatus( false );
         break;
     default:
@@ -868,6 +891,7 @@ StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
 }
 
 
+#if 0
 void
 StreamMonitor::getStatistics( std::map<uint32_t,PktStats> &a_stats )
 {
@@ -875,7 +899,6 @@ StreamMonitor::getStatistics( std::map<uint32_t,PktStats> &a_stats )
 
     a_stats = m_stats;
 }
-
 
 const char*
 StreamMonitor::getPktName(
@@ -927,6 +950,7 @@ StreamMonitor::getPktName(
 
     return "Unknown";
 }
+#endif
 
 void
 StreamMonitor::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
@@ -973,89 +997,40 @@ StreamMonitor::Notifier::pauseStatus( bool a_paused )
 }
 
 void
-StreamMonitor::Notifier::scanStart( unsigned long a_scan_number )
+StreamMonitor::Notifier::scanStatus( bool a_scanning, unsigned long a_scan_number )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->scanStart( a_scan_number );
+        (*l)->scanStatus( a_scanning, a_scan_number );
 }
 
 void
-StreamMonitor::Notifier::scanStop()
+StreamMonitor::Notifier::beamInfo( const BeamInfo &a_info )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->scanStop();
+        (*l)->beamInfo( a_info );
 }
 
 void
-StreamMonitor::Notifier::runTitle( const std::string &a_run_title )
+StreamMonitor::Notifier::runInfo( const RunInfo &a_info )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->runTitle( a_run_title );
+        (*l)->runInfo( a_info );
+}
+
+
+void
+StreamMonitor::Notifier::beamMetrics( const BeamMetrics &a_metrics )
+{
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+        (*l)->beamMetrics( a_metrics );
 }
 
 void
-StreamMonitor::Notifier::facilityName( const std::string &a_facility_name )
+StreamMonitor::Notifier::runMetrics( const RunMetrics &a_metrics )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->facilityName( a_facility_name );
+        (*l)->runMetrics( a_metrics );
 }
-
-void
-StreamMonitor::Notifier::beamInfo( const std::string &a_id, const std::string &a_short_name, const std::string &a_long_name )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->beamInfo( a_id, a_short_name, a_long_name );
-}
-
-void
-StreamMonitor::Notifier::proposalID( const std::string &a_proposal_id )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->proposalID( a_proposal_id );
-}
-
-void
-StreamMonitor::Notifier::sampleID( const std::string &a_sample_id )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->sampleID( a_sample_id );
-}
-
-void
-StreamMonitor::Notifier::sampleName( const std::string &a_sample_name )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->sampleName( a_sample_name );
-}
-
-void
-StreamMonitor::Notifier::sampleNature( const std::string &a_sample_nature )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->sampleNature( a_sample_nature );
-}
-
-void
-StreamMonitor::Notifier::sampleFormula( const std::string &a_sample_formula )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->sampleFormula( a_sample_formula );
-}
-
-void
-StreamMonitor::Notifier::sampleEnvironment( const std::string &a_sample_environment )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->sampleEnvironment( a_sample_environment );
-}
-
-void
-StreamMonitor::Notifier::userInfo( const std::string &a_uid, const std::string &a_uname, const std::string &a_urole )
-{
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->userInfo( a_uid, a_uname, a_urole );
-}
-
 
 void
 StreamMonitor::Notifier::pvDefined( const std::string &a_name )
@@ -1074,10 +1049,11 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value )
 
 
 void
-StreamMonitor::Notifier::connectionStatus( bool a_connected )
+StreamMonitor::Notifier::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->connectionStatus( a_connected );
+        (*l)->connectionStatus( a_connected, a_host, a_port );
 }
 
+}}
 

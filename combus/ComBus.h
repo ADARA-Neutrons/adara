@@ -49,7 +49,7 @@ COMMAND messahe structure:
 
 */
 
-class Message;
+class MessageBase;
 class Command;
 
 class IStatusListener
@@ -61,7 +61,7 @@ public:
 class ITopicListener
 {
 public:
-    virtual void    comBusMessage( const Message &a_msg ) = 0;
+    virtual void    comBusMessage( const MessageBase &a_msg ) = 0;
 };
 
 class IControllable
@@ -80,9 +80,10 @@ public:
     ~Connection() throw();
 
     static Connection&  getInst();
+    bool                waitForConnect( unsigned short a_timeout ) const;
     bool                sendStatus( StatusCode a_status );
-    bool                sendLog( const std::string &a_msg, LogLevel a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
-    bool                sendMessage( Message &a_msg );
+    bool                sendLog( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
+    bool                sendMessage( MessageBase &a_msg );
     //void              sendCommand( Command &a_cmd, bool a_wait_ack = true, unsigned long a_timeout = 0 );
     //void              sendCommandAsync( Command &a_cmd, unsigned long a_timeout = 0 );
     void                attach( IStatusListener  &a_subscriber );
@@ -122,7 +123,7 @@ private:
     void                    createTopicConsumer( const std::string &a_topic_name, cms::Topic **a_topic, cms::MessageConsumer **a_consumer );
 
     // Message factory methods/attribs
-    static Message*         makeMessage( const cms::Message &a_msg );
+    static MessageBase*     makeMessage( const cms::Message &a_msg );
 
     bool                                    m_running;
     bool                                    m_connected;

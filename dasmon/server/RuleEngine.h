@@ -2,8 +2,8 @@
 #define RULEENGINE_H
 
 #include "StreamMonitor.h"
-#include "ruledefs.h"
-#include "rule.h"
+#include "RuleDefs.h"
+#include "Rule.h"
 
 #include <map>
 #include <vector>
@@ -12,41 +12,34 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 
-namespace RuleEng
+namespace RuleEngine
 {
 
-class RuleEngine: public IStreamListener
+class StreamAnalyzer: public ADARA::DASMON::IStreamListener
 {
 public:
-    RuleEngine( StreamMonitor &a_monitor );
-    virtual ~RuleEngine();
+    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor );
+    virtual ~StreamAnalyzer();
 
     void    addListener( IRuleListener &a_listener );
     void    removeListener( IRuleListener &a_listener );
     void    configureRules( std::vector<RuleSettings> &a_rule_settings );
+    void    resendAsserted( IRuleListener &a_listener );
 
     static const char *toString( RuleType a_type );
-    static const char *toString( RuleSeverity a_type );
 
 protected:
 
     void runStatus( bool a_recording, unsigned long a_run_number );
     void pauseStatus( bool a_paused );
-    void scanStart( unsigned long a_scan_number );
-    void scanStop();
-    void runTitle( const std::string &a_run_title );
-    void facilityName( const std::string &a_facility_name );
-    void beamInfo( const std::string &a_id, const std::string &a_short_name, const std::string &a_long_name );
-    void proposalID( const std::string &a_proposal_id );
-    void sampleID( const std::string &a_sample_id );
-    void sampleName( const std::string &a_sample_name );
-    void sampleNature( const std::string &a_sample_nature );
-    void sampleFormula( const std::string &a_sample_formula );
-    void sampleEnvironment( const std::string &a_sample_environment );
-    void userInfo( const std::string &a_uid, const std::string &a_uname, const std::string &a_urole );
+    void scanStatus( bool a_scanning, unsigned long a_scan_number );
+    void beamInfo( const ADARA::DASMON::BeamInfo &a_info );
+    void runInfo( const ADARA::DASMON::RunInfo &a_run_info );
+    void beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics );
+    void runMetrics( const ADARA::DASMON::RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvValue( const std::string &a_name, double a_value );
-    void connectionStatus( bool a_connected );
+    void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
 private:
     enum BIR
@@ -98,37 +91,36 @@ private:
         BIR_MONITOR5_COUNT_RATE,
         BIR_MONITOR6_COUNT_RATE,
         BIR_MONITOR7_COUNT_RATE,
-        BIR_PIXEL_ERROR_COUNT,
         BIR_PIXEL_ERROR_RATE,
-        BIR_DUPLICATE_PULSE_COUNT,
-        BIR_CYCLE_ERROR_COUNT,
         BIR_PULSE_CHARGE,
         BIR_PULSE_FREQ,
         BIR_STREAM_RATE,
+        BIR_RUN_PULSE_CHARGE,
+        BIR_RUN_PIXEL_ERROR_COUNT,
+        BIR_RUN_DUP_PULSE_COUNT,
+        BIR_RUN_CYCLE_ERROR_COUNT,
 
         BIR_TOTAL_RULE_COUNT
     };
 
-    void            defineRule( const std::string &a_item, RuleType a_type, RuleSeverity a_severity, double a_value );
-    void            definePvRule( const std::string &a_item, RuleType a_type, RuleSeverity a_severity, double a_value );
+    void            defineRule( const std::string &a_name, const std::string &a_source, RuleType a_type, ADARA::Level a_level, double a_value );
+    void            definePvRule( const std::string &a_name, const std::string &a_source, RuleType a_type, ADARA::Level a_level, double a_value );
     void            populateBIRTable();
     BIR             toBIR( const char *a_name );
     RuleCategory    getCategory( RuleType a_type );
     RuleCategory    getCategory( BIR a_bir );
-    void            pollThread();
     void            deleteRules();
 
-    StreamMonitor                     &m_monitor;
+    ADARA::DASMON::StreamMonitor       &m_monitor;
     std::map<uint32_t,uint64_t>         m_monitor_rate;
     bool                                m_monitorx_rate;
-    boost::thread                      *m_poll_thread;
+    //boost::thread                      *m_poll_thread;
     std::vector<RuleGroup*>             m_bir;
     std::map<std::string,RuleGroup*>    m_rules;
     std::map<std::string,RuleGroup*>    m_pv_rules;
     std::vector<IRuleListener*>         m_listeners;
     std::map<std::string,BIR>           m_bir_names;
     boost::mutex                        m_mutex;
-    bool                                m_exit_flag;
 };
 
 
