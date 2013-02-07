@@ -5,8 +5,8 @@ ACLOCAL_AMFLAGS = ${ALOCAL_FLAGS}
 AM_CPPFLAGS =
 AM_CFLAGS = -Wall -Werror
 AM_CXXFLAGS = -Wall -Wextra -Werror -Winit-self -Wpointer-arith -Wcast-align \
-		-Woverloaded-virtual -Wno-missing-field-initializers \
-		-Wno-unused-parameter
+        -Woverloaded-virtual -Wno-missing-field-initializers \
+        -Wno-unused-parameter
 
 # These flags reduce warnings, which conflicts with finding problems
 # -Wno-write-strings, -Wno-deprecated, -Wno-unused-result
@@ -22,3 +22,4 @@ include common/Makefile.am
 include tools/Makefile.am
 include sms/Makefile.am
 include sts/Makefile.am
+include dasmon/server/Makefile.am

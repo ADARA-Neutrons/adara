@@ -262,11 +262,11 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
                 break;
 
             case VT_INT:
-                a_listener.onAssert( f->second->m_id, f->second->m_value.m_int_value );
+                a_listener.onAssertInteger( f->second->m_id, f->second->m_value.m_int_value );
                 break;
 
             case VT_REAL:
-                a_listener.onAssert( f->second->m_id, f->second->m_value.m_real_value );
+                a_listener.onAssertDouble( f->second->m_id, f->second->m_value.m_real_value );
                 break;
             }
         }
@@ -927,12 +927,12 @@ RuleEngine::notify_assert( Fact *a_fact )
 
         case VT_INT:
             for ( ; l != m_listeners.end(); ++l )
-                (*l)->onAssert( a_fact->m_id, a_fact->m_value.m_int_value );
+                (*l)->onAssertInteger( a_fact->m_id, a_fact->m_value.m_int_value );
             break;
 
         case VT_REAL:
             for ( ; l != m_listeners.end(); ++l )
-                (*l)->onAssert( a_fact->m_id, a_fact->m_value.m_real_value );
+                (*l)->onAssertDouble( a_fact->m_id, a_fact->m_value.m_real_value );
             break;
         }
     }

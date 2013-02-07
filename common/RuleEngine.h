@@ -16,9 +16,9 @@ class IFactListener
 {
 public:
     virtual void onAssert( const std::string &a_fact ) = 0;
-    virtual void onAssert( const std::string &a_fact, int64_t a_value )
+    virtual void onAssertInteger( const std::string &a_fact, int64_t a_value )
     { (void)a_value; onAssert( a_fact ); }
-    virtual void onAssert( const std::string &a_fact, double a_value )
+    virtual void onAssertDouble( const std::string &a_fact, double a_value )
     { (void)a_value; onAssert( a_fact ); }
     virtual void onRetract( const std::string &a_fact ) = 0;
 };

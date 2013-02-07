@@ -4,7 +4,7 @@
 #include <string>
 #include <boost/lexical_cast.hpp>
 #include "ComBusMessages.h"
-#include "DASMonDefs.h"
+#include "../dasmon/common/DASMonDefs.h"
 
 namespace ADARA {
 namespace ComBus {
