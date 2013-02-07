@@ -9,7 +9,6 @@
 //#include "ComBusAppender.h"
 
 using namespace std;
-using namespace RuleEngine;
 using namespace ADARA::DASMON;
 
 #define DASMON_VERSION "0.1.0"
@@ -24,6 +23,7 @@ int main(int argc, char *argv[])
     string          broker_user;
     string          broker_pass;
     unsigned short  log_level;
+    string          config_file;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
             ("help,h", "show help")
             ("version", "show version number")
             ("verbosity,v", po::value<unsigned short>( &log_level )->default_value( 3 ), "verbosity level (0=trace,3=warn,5=fatal)")
+            ("config,c", po::value<string>( &config_file )->default_value( "signal.cfg" ), "Rule/signal configuration file")
             ("sms_host", po::value<string>( &sms_host )->default_value( "localhost" ), "set sms hostname/ip")
             ("sms_port", po::value<unsigned short>( &sms_port )->default_value( 31415 ), "set sms port")
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
@@ -71,6 +72,13 @@ int main(int argc, char *argv[])
         StreamMonitor   monitor( sms_host, sms_port );
         StreamAnalyzer  analyzer( monitor );
         ComBusRouter    router( monitor, analyzer );
+
+        if ( !config_file.empty())
+            analyzer.loadConfig( config_file );
+        else
+            cout << "Starting without signal configuration." << endl;
+
+        combus->setControlListener( router );
 
         // Connect to and process the stream
         monitor.start();

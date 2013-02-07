@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'mainwindow.h'
 **
-** Created: Thu Jan 24 16:47:08 2013
+** Created: Thu Feb 7 15:30:12 2013
 **      by: The Qt Meta Object Compiler version 63 (Qt 4.8.1)
 **
 ** WARNING! All changes made in this file will be lost!
@@ -82,6 +82,8 @@ void *MainWindow::qt_metacast(const char *_clname)
         return static_cast< ADARA::ComBus::ITopicListener*>(const_cast< MainWindow*>(this));
     if (!strcmp(_clname, "ADARA::ComBus::IStatusListener"))
         return static_cast< ADARA::ComBus::IStatusListener*>(const_cast< MainWindow*>(this));
+    if (!strcmp(_clname, "ADARA::ComBus::IControlListener"))
+        return static_cast< ADARA::ComBus::IControlListener*>(const_cast< MainWindow*>(this));
     return QMainWindow::qt_metacast(_clname);
 }
 

@@ -2,7 +2,6 @@
 #include "DASMonMessages.h"
 
 using namespace std;
-using namespace RuleEngine;
 
 namespace ADARA {
 namespace DASMON {
@@ -10,7 +9,7 @@ namespace DASMON {
 // TODO Eventually connect to ComBus command topic to handle general commands
 
 
-ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, RuleEngine::StreamAnalyzer &a_analyzer )
+ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
       m_resend_state(false), m_sms_connected(false), m_combus_connected(false)
 
@@ -36,10 +35,10 @@ ComBusRouter::run()
         m_combus.sendStatus( ADARA::ComBus::STATUS_RUNNING );
         if ( m_resend_state )
         {
-            cout << "Resend State..." << endl;
-            m_resend_state = false;
+            //cout << "Resend State..." << endl;
             m_monitor.resendState( *this );
-            m_analyzer.resendAsserted( *this );
+            m_analyzer.resendState();
+            m_resend_state = false;
         }
     }
 }
@@ -51,7 +50,7 @@ ComBusRouter::run()
 void
 ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number )
 {
-    cout << "runStatus: " << a_recording << " (" << a_run_number << ")" << endl;
+    //cout << "runStatus: " << a_recording << " (" << a_run_number << ")" << endl;
     ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number );
     m_combus.sendMessage( msg );
 }
@@ -59,7 +58,7 @@ ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number )
 void
 ComBusRouter::pauseStatus( bool a_paused )
 {
-    cout << "pauseStatus: " << a_paused << endl;
+    //cout << "pauseStatus: " << a_paused << endl;
     ComBus::DASMON::PauseStatusMessage msg( a_paused );
     m_combus.sendMessage( msg );
 }
@@ -67,7 +66,7 @@ ComBusRouter::pauseStatus( bool a_paused )
 void
 ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
 {
-    cout << "scanStatus: " << a_scanning << " (" << a_scan_number << ")" << endl;
+    //cout << "scanStatus: " << a_scanning << " (" << a_scan_number << ")" << endl;
     ComBus::DASMON::ScanStatusMessage msg( a_scanning, a_scan_number );
     m_combus.sendMessage( msg );
 }
@@ -75,7 +74,7 @@ ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
 void
 ComBusRouter::beamInfo( const BeamInfo &a_info )
 {
-    cout << "beamInfo..." << endl;
+    //cout << "beamInfo..." << endl;
     ComBus::DASMON::BeamInfoMessage msg( a_info );
     m_combus.sendMessage( msg );
 }
@@ -130,7 +129,7 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 
     if ( a_connected && !m_sms_connected )
     {
-        cout << "GOT SMS CONNECT - RESEND!!!" << endl;
+        //cout << "RESEND b/c SMS CONNECTED" << endl;
 
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
@@ -140,31 +139,21 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// IRuleListener Interface
+// ISignalListener Interface
 
 void
-ComBusRouter::reportEvent( const Rule &a_rule )
+ComBusRouter::signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg )
 {
-    cout << "event: " << a_rule.getName() << endl;
-    ComBus::SignalEventMessage msg( a_rule.getName(), a_rule.getSource(), a_rule.getMessage(), a_rule.getLevel() );
+    //cout << "sigAssert: " << a_name << endl;
+    ComBus::SignalAssertMessage msg( a_name, a_source, a_msg, a_level );
     m_combus.sendMessage( msg );
 }
 
-
 void
-ComBusRouter::assertFinding( const std::string &a_id, const Rule &a_rule )
+ComBusRouter::signalRetract( const std::string &a_name )
 {
-    cout << "assert: " << a_rule.getName() << ", id: " << a_id << endl;
-    ComBus::SignalAssertMessage msg( a_id, a_rule.getName(), a_rule.getSource(), a_rule.getMessage(), a_rule.getLevel() );
-    m_combus.sendMessage( msg );
-}
-
-
-void
-ComBusRouter::retractFinding( const std::string &a_id )
-{
-    cout << "retract: " << a_id << endl;
-    ComBus::SignalRetractMessage msg( a_id );
+    //cout << "sigRetract: " << a_name << endl;
+    ComBus::SignalRetractMessage msg( a_name );
     m_combus.sendMessage( msg );
 }
 
@@ -178,11 +167,39 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 {
     if ( a_connected && !m_combus_connected )
     {
-        cout << "GOT COMBUS CONNECT - RESEND!!!" << endl;
+        //cout << "RESEND b/c COMBUS CONNECTED!!!" << endl;
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
     }
     m_combus_connected = a_connected;
+}
+
+
+///////////////////////////////////////////////////////////
+// IControlListener methods
+
+
+bool
+ComBusRouter::comBusCommand( const ADARA::ComBus::Command &a_cmd )
+{
+    //cout << "Got Command: " << hex << a_cmd.getMessageType() << endl;
+    switch( a_cmd.getMessageType() )
+    {
+    case ADARA::ComBus::MSG_CMD_EMIT_STATE:
+        //cout << "RESEND b/c GOT EMIT STATE CMD!!!" << endl;
+        m_resend_state = true;
+        break;
+    default:
+        break;
+    }
+    return false;
+}
+
+
+void
+ComBusRouter::comBusReply( const ADARA::ComBus::Reply &a_reply )
+{
+    //cout << "Got Reply: " << hex << a_reply.getMessageType() << endl;
 }
 
 

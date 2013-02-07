@@ -12,7 +12,6 @@
 #include <boost/thread/locks.hpp>
 
 #include "ComBus.h"
-#include "RuleDefs.h"
 #include "DASMonDefs.h"
 
 namespace Ui {
@@ -20,10 +19,11 @@ class MainWindow;
 }
 
 
-class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, public ADARA::ComBus::IStatusListener
+class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, public ADARA::ComBus::IStatusListener,
+        public ADARA::ComBus::IControlListener
 {
     Q_OBJECT
-    
+
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
@@ -96,6 +96,8 @@ private:
     void        clearSignals();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
+    bool        comBusCommand( const ADARA::ComBus::Command &a_cmd );
+    void        comBusReply( const ADARA::ComBus::Reply &a_reply );
 
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();
@@ -128,16 +130,16 @@ private:
 
     Ui::MainWindow *ui;
 
+    bool                            m_init;
     QTimer                          m_table_timer;
     QTimer                          m_proc_timer;
     std::map<uint32_t,uint64_t>     m_monitor_rate;
-    std::map<QString,std::pair<double,unsigned short> > m_pvs;
+//    std::map<QString,std::pair<double,unsigned short> > m_pvs;
     std::map<std::string,ProcInfo>  m_proc_status;
     bool                            m_refresh_proc_table;
     bool                            m_refresh_signal_table;
     bool                            m_refresh_event_table;
     bool                            m_refresh_log_table;
-    //unsigned short                  m_connect_flags;
     Tristate                        m_combus_state;
     Tristate                        m_dasmon_state;
     Tristate                        m_sms_state;

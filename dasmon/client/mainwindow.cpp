@@ -18,7 +18,7 @@ using namespace std;
 
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent), ui(new Ui::MainWindow),
+    QMainWindow(parent), ui(new Ui::MainWindow), m_init(true),
     m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_event_table(false), m_refresh_log_table(false),
     m_recording(false), m_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
@@ -74,6 +74,7 @@ MainWindow::MainWindow(QWidget *parent) :
     m_combus.attach( *this, "ADARA.STATUS.>" ); // Listen to ADARA process health status (display only)
     m_combus.attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
     m_combus.attach( *this, "ADARA.APP.DASMON" );
+    m_combus.setControlListener( *this );
 
     connect( &m_proc_timer, SIGNAL(timeout()), this, SLOT(onProcTimer()));
     m_proc_timer.start(5200);
@@ -87,7 +88,6 @@ MainWindow::~MainWindow()
 {
     m_combus.detach( (ITopicListener&)*this );
     m_combus.detach( (IStatusListener&)*this );
-//    m_combus.detach( *this, "ADARA.>" );
 
     delete ui;
 }
@@ -717,6 +717,13 @@ void
 MainWindow::comBusConnectionStatus( bool a_connected )
 {
     setComBusActive( a_connected );
+
+    if ( m_init )
+    {
+        ADARA::ComBus::EmitStateCommand cmd;
+        m_combus.sendCommand( cmd, "DASMON" );
+        m_init = false;
+    }
 }
 
 
@@ -778,7 +785,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
     case ADARA::ComBus::MSG_STS_TRANS_COMPLETE:
         break;
-
+#if 0
     case ADARA::ComBus::MSG_SIGNAL_EVENT:
         {
             const ADARA::ComBus::SignalEventMessage &msg = dynamic_cast<const ADARA::ComBus::SignalEventMessage&>(a_msg);
@@ -791,13 +798,14 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             m_refresh_event_table = true;
         }
         break;
+#endif
     case ADARA::ComBus::MSG_SIGNAL_ASSERT:
         {
             const ADARA::ComBus::SignalAssertMessage &msg = dynamic_cast<const ADARA::ComBus::SignalAssertMessage&>(a_msg);
 
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
-            m_alerts[msg.getSignalID()] = AlertInfo( msg.getSignalName(), msg.getSignalSource(), msg.getSignalLevel(),
+            m_alerts[msg.getSignalName()] = AlertInfo( msg.getSignalName(), msg.getSignalSource(), msg.getSignalLevel(),
                                                      msg.getSignalMessage(), PV_HIGHLIGH_DURATION );
 
             if ( msg.getSignalLevel()  > m_highest_level || m_alerts.size() == 1 )
@@ -817,7 +825,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
-            map<string,AlertInfo>::iterator ia = m_alerts.find( msg.getSignalID());
+            map<string,AlertInfo>::iterator ia = m_alerts.find( msg.getSignalName());
             if ( ia != m_alerts.end() )
             {
                 bool recalc = false;
@@ -924,7 +932,28 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             updateRunMetrics( msg );
         }
         break;
+
+    default:
+        break;
     }
 }
 
+
+///////////////////////////////////////////////////////////
+// IControlListener methods
+
+
+bool
+MainWindow::comBusCommand( const ADARA::ComBus::Command &a_cmd )
+{
+    (void)a_cmd;
+    return false;
+}
+
+
+void
+MainWindow::comBusReply( const ADARA::ComBus::Reply &a_reply )
+{
+    (void)a_reply;
+}
 

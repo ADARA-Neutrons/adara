@@ -81,7 +81,7 @@ StreamMonitor::setSMSHostInfo( std::string a_hostname, unsigned short a_port )
 void
 StreamMonitor::resendState( IStreamListener &a_listener ) const
 {
-    boost::lock_guard<boost::mutex> lock(m_api_mutex);
+    boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( m_fd_in > -1 )
     {
@@ -156,7 +156,7 @@ StreamMonitor::processThread()
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
                     {
-                        cout << "STREAM: connected!" << endl;
+                        //cout << "STREAM: connected!" << endl;
                         m_notify.connectionStatus( true, m_sms_host, m_sms_port );
                     }
                 }
@@ -259,7 +259,7 @@ StreamMonitor::handleLostConnection()
     resetStreamStats();
     resetRunStats();
 
-    cout << "STREAM: disconnected." << endl;
+    //cout << "STREAM: disconnected." << endl;
 }
 
 
@@ -782,11 +782,9 @@ StreamMonitor::pvValueUpdate
 
     std::map<PVKey,PVInfo*>::iterator ipv = m_pvs.find(key);
 
+    // TODO Alert - bad stream packet!
     if ( ipv == m_pvs.end() )
         return;
-    // TODO Alert - bad stream packet!
-    //THROW_TRACE( ERR_PV_NOT_DEFINED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not defined." )
-
 
     double t = 0;
 
@@ -800,10 +798,13 @@ StreamMonitor::pvValueUpdate
             t = (t1 - m_first_pulse_time)/1000000000.0;
     }
 
-    ipv->second->m_value = a_value;
-    ipv->second->m_time = t;
-
-    m_notify.pvValue( ipv->second->m_name, a_value );
+    // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
+    if ( t - ipv->second->m_time < 0.5 )
+    {
+        ipv->second->m_value = a_value;
+        ipv->second->m_time = t;
+        m_notify.pvValue( ipv->second->m_name, a_value );
+    }
 }
 
 

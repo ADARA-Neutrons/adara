@@ -24,7 +24,7 @@ Connection::Translator::Translator( ITopicListener &a_listener )
 }
 
 
-Connection::Translator::Translator( IControllable &a_handler )
+Connection::Translator::Translator( IControlListener &a_handler )
     : m_listener(0), m_handler(&a_handler)
 {
 }
@@ -51,18 +51,28 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
         }
         else
         {
-#if 0
-            // TODO Need message factory here
-            Command cmd;
-            if ( m_handler->onCommand( cmd ))
+            MessageBase *msg = Connection::makeMessage( *a_msg );
+            if ( msg->getMessageCategory() == CAT_CONTROL)
             {
-                // ACK
+                if ( msg->getMessageType() & CTRL_REPLY_FLAG )
+                {
+                    Reply *reply = dynamic_cast<Reply*>(msg);
+                    if ( reply )
+                        m_handler->comBusReply( *reply );
+                }
+                else
+                {
+                    Command *cmd = dynamic_cast<Command*>(msg);
+                    if ( cmd )
+                    {
+                        if ( !m_handler->comBusCommand( *cmd ) && cmd->replyRequested() )
+                        {
+                            // TODO: Auto-NACK sender since listener will not process/experienced error
+                        }
+                    }
+                }
             }
-            else
-            {
-                // NACK
-            }
-#endif
+            delete msg;
         }
     }
     catch(...)
@@ -140,9 +150,9 @@ Connection * Connection::g_inst = 0;
 
 Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_num,
                          const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
-                         const std::string &a_log_dir,  IControllable *a_cmd_handler )
+                         const std::string &a_log_dir )
   : m_running(true), m_connected(false), m_proc_name(a_proc_name), m_inst_num(a_inst_num),
-    m_cmd_translator(0), m_cmd_handler(a_cmd_handler), m_cmd_destination(0), m_cmd_consumer(0),
+    m_ctrl_listener(0), m_ctrl_translator(0),
     m_broker_uri(a_broker_uri), m_broker_user(a_user), m_broker_pass(a_pass),
     m_connection(0), m_session(0), m_reconnect_thread(0), m_status_thread(0)
 {
@@ -170,20 +180,6 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
 
     activemq::library::ActiveMQCPP::initializeLibrary();
 
-#if 0
-    // If a command handler is specified, this process can receive AMQP commands
-    if ( m_cmd_handler )
-    {
-        // Setup topic for incomming commands
-        m_cmd_destination = m_session->createTopic( string("ADARA.CMD.") + m_proc_name );
-        m_cmd_consumer = m_session->createConsumer( m_cmd_destination );
-
-        // Connect incomming CMS messages to translator and process cmd handler
-        m_cmd_translator = new Translator( *a_cmd_handler );
-        m_cmd_consumer->setMessageListener( m_cmd_translator );
-    }
-#endif
-
     m_status_thread = new boost::thread( boost::bind( &Connection::connectionStatusNotifyThread, this ));
 
     g_inst = this;
@@ -199,9 +195,8 @@ Connection::~Connection() throw()
     m_status_cond.notify_one();
     m_status_thread->join();
 
-    //delete m_cmd_consumer;
-    //delete m_cmd_destination;
-    //delete m_cmd_translator;
+    if ( m_ctrl_translator )
+        delete m_ctrl_translator;
 
     map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
     for( ; ilist != m_listeners.end(); ++ilist )
@@ -220,6 +215,22 @@ Connection::getInst()
         throw std::runtime_error("No ComBus::Connection instance present.");
 
     return *g_inst;
+}
+
+
+void
+Connection::setControlListener( IControlListener &a_ctrl_listener )
+{
+    if ( m_ctrl_translator )
+    {
+        delete m_ctrl_translator;
+        m_ctrl_translator = 0;
+        m_ctrl_listener = 0;
+    }
+
+    m_ctrl_listener = &a_ctrl_listener;
+    m_ctrl_translator = new Translator( *m_ctrl_listener );
+    m_ctrl_translator->attach( string("ADARA.CONTROL.") + m_proc_name );
 }
 
 
@@ -276,6 +287,10 @@ Connection::reconnectThread()
 
             // Notify connection status thread
             m_status_cond.notify_one();
+
+            // Reconnect control listener, if specified
+            if ( m_ctrl_listener )
+                m_ctrl_translator->connect_all();
 
             // Connected! (Retain lock)
             break;
@@ -365,6 +380,10 @@ Connection::disconnect()
             il->second->disconnect_all();
         }
 
+        // Disconnect control listener, if specified
+        if ( m_ctrl_listener )
+            m_ctrl_translator->disconnect_all();
+
         delete m_session;
         m_session = 0;
         delete m_connection;
@@ -409,19 +428,6 @@ Connection::sendLog( const std::string &a_msg, Level a_level, const char *a_file
     return res;
 }
 
-
-#if 0
-void
-Connection::sendCommand( Command &a_cmd, bool a_wait_ack = true, unsigned long a_timeout )
-{
-}
-
-
-void
-Connection::sendCommandAsync( Command &a_cmd, unsigned long a_timeout )
-{
-}
-#endif
 
 
 bool
@@ -479,6 +485,77 @@ Connection::sendMessage( MessageBase &a_msg )
 }
 
 
+bool
+Connection::sendCommand( Command &a_cmd, const std::string &a_dest_proc )
+{
+    return sendCommandReply( a_cmd, a_dest_proc, true );
+}
+
+
+bool
+Connection::reply( Reply &a_reply, const std::string &a_dest_proc  )
+{
+    return sendCommandReply( a_reply, a_dest_proc, false );
+}
+
+
+bool
+Connection::sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc, bool a_command )
+{
+    bool res = false;
+    cms::Message *cmsmsg = 0;
+
+    if ( m_connected )
+    {
+        try
+        {
+            cmsmsg = a_msg.createCMSMessage( *m_session );
+
+            // Set source and timestamp when msg sent
+            cmsmsg->setStringProperty( "source", m_proc_name );
+            cmsmsg->setIntProperty( "instance", m_inst_num );
+            cmsmsg->setIntProperty( "timestamp", time(0) );
+
+            map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( a_dest_proc );
+            if ( itop == m_producer_topics.end())
+            {
+                // First message sent on this topic, create producer and put in "cache"
+                pair<cms::Topic*,cms::MessageProducer*> p;
+                p.first = m_session->createTopic( string("ADARA.CONTROL.") + a_dest_proc );
+                p.second = m_session->createProducer( p.first );
+                m_producer_topics[a_dest_proc] = p;
+
+                p.second->send( cmsmsg );
+            }
+            else
+            {
+                itop->second.second->send( cmsmsg );
+            }
+
+            if ( a_command )
+            {
+                ((Command&)a_msg).m_cmd_id = cmsmsg->getCMSMessageID();
+            }
+
+            delete cmsmsg;
+            res = true;
+        }
+        catch(...)
+        {
+            cout << "send failed - exception." << endl;
+            // An exception indicates a loss of connection
+            delete cmsmsg;
+            disconnect();
+        }
+    }
+    else
+    {
+        cout << "send failed - not connected." << endl;
+    }
+
+    return res;
+}
+
 
 MessageBase*
 Connection::makeMessage( const cms::Message &a_msg )
@@ -491,7 +568,11 @@ Connection::makeMessage( const cms::Message &a_msg )
     case MSG_STATUS:                return new StatusMessage( a_msg );
     case MSG_SIGNAL_ASSERT:         return new SignalAssertMessage( a_msg );
     case MSG_SIGNAL_RETRACT:        return new SignalRetractMessage( a_msg );
-    case MSG_SIGNAL_EVENT:          return new SignalEventMessage( a_msg );
+    //case MSG_SIGNAL_EVENT:          return new SignalEventMessage( a_msg );
+    case MSG_CMD_EMIT_STATUS:       return new EmitStatusCommand( a_msg );
+    case MSG_CMD_EMIT_STATE:        return new EmitStateCommand( a_msg );
+    case MSG_REPLY_ACK:             return new AckReply( a_msg );
+    case MSG_REPLY_NACK:            return new NackReply( a_msg );
     case MSG_STS_TRANS_COMPLETE:    return new STS::TranslationCompleteMessage( a_msg );
     case MSG_DASMON_SMS_CONN_STATUS:return new DASMON::ConnectionStatusMessage( a_msg );
     case MSG_DASMON_RUN_STATUS:     return new DASMON::RunStatusMessage( a_msg );

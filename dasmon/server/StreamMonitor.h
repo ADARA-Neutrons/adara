@@ -71,7 +71,9 @@ public:
         m_name(a_name),
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
-        m_type(a_type)
+        m_type(a_type),
+        m_time(0.0),
+        m_value(0.0)
     {}
 
     /// PVInfoBase destructor
@@ -244,7 +246,7 @@ private:
     uint64_t                        m_stream_size;
     uint64_t                        m_stream_rate;
     std::map<PVKey,PVInfo*>         m_pvs;
-    boost::mutex                    m_mutex;
+    mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
 };
 

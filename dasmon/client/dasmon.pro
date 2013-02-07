@@ -24,7 +24,8 @@ HEADERS  += mainwindow.h \
     ../../combus/STSMessages.h \
     ../../combus/ComBusMessages.h \
     ../../combus/ComBusAppender.h \
-    ../../combus/ComBus.h
+    ../../combus/ComBus.h \
+    ../../combus/DASMonMessages.h
 
 LIBS += -lboost_thread-mt -lxml2 -lactivemq-cpp
 

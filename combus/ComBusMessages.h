@@ -44,6 +44,7 @@ enum MessageCategory
     CAT_APP     = 0x05000000
 };
 
+
 enum AppCategory
 {
     APP_NONE        = 0x000000,
@@ -61,6 +62,8 @@ enum AppCategory
     APP_DASMON      = 0x0C0000
 };
 
+#define CTRL_REPLY_FLAG 0x800000
+
 /**
  * Message types are used to uniquely identify a message class and indirectly
  * identify the category (topic) for a message. These values are used by the
@@ -73,6 +76,13 @@ enum MessageType
     MSG_SIGNAL_ASSERT           = CAT_SIGNAL,
     MSG_SIGNAL_RETRACT,
     MSG_SIGNAL_EVENT,
+    MSG_CMD_EMIT_STATUS         = CAT_CONTROL,
+    MSG_CMD_EMIT_STATE,
+    MSG_CMD_REINIT,
+    MSG_CMD_SHUTDOWN,
+    MSG_CMD_CONFIG_LOGGING,
+    MSG_REPLY_ACK               = CAT_CONTROL | CTRL_REPLY_FLAG,
+    MSG_REPLY_NACK,
     MSG_STS_TRANS_COMPLETE      = CAT_APP | APP_STS,
     MSG_DASMON_SMS_CONN_STATUS  = CAT_APP | APP_DASMON,
     MSG_DASMON_RUN_STATUS,
@@ -100,6 +110,7 @@ enum StatusCode
     STATUS_FAULT
 };
 
+typedef std::string CommandID;
 
 class ComBusHelper
 {
@@ -202,6 +213,164 @@ protected:
     friend class Connection;
 };
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Command Class
+
+/*
+Command class should be an active object with send/recv API on class. This
+prevents the need for external life cycle management and command-reply
+re-association.
+*/
+class Command : public MessageBase
+{
+public:
+    Command( const cms::Message &a_msg )
+        : MessageBase( a_msg )
+    { translateFrom( a_msg ); }
+
+    Command( bool a_reply_requested = false )
+        : m_reply_requested(a_reply_requested)
+    {}
+
+    inline CommandID getCommandID() const
+    { return m_cmd_id; }
+
+    inline bool replyRequested() const
+    { return m_reply_requested; }
+
+protected:
+    virtual void translateTo( cms::Message &a_msg )
+    {
+        MessageBase::translateTo( a_msg );
+
+        a_msg.setBooleanProperty( "reply_req", m_reply_requested );
+    }
+
+    void translateFrom( const cms::Message &a_msg )
+    {
+        m_cmd_id = a_msg.getCMSMessageID();
+        m_reply_requested = a_msg.getBooleanProperty( "reply_req" );
+    }
+
+    CommandID           m_cmd_id;
+    bool                m_reply_requested;
+
+    // Connection class sets cmd_id when message is sent
+    friend class Connection;
+};
+
+// ---------------------------- Common Commands ---------------------------
+
+#define DEF_SIMPLE_CMD(name,type) \
+    class name : public Command { \
+    public: \
+        name() {} \
+        name( const cms::Message &a_msg ) \
+            : Command( a_msg ) {} \
+        inline MessageType getMessageType() const \
+        { return type; } };
+
+DEF_SIMPLE_CMD(EmitStatusCommand,MSG_CMD_EMIT_STATUS)
+DEF_SIMPLE_CMD(EmitStateCommand,MSG_CMD_EMIT_STATE)
+DEF_SIMPLE_CMD(ReinitCommand,MSG_CMD_REINIT)
+DEF_SIMPLE_CMD(ShutdownCommand,MSG_CMD_SHUTDOWN)
+
+class ConfigureLoggingCommand: public Command
+{
+public:
+    ConfigureLoggingCommand( bool a_enabled, Level a_level )
+        : m_enabled(a_enabled), m_level(a_level)
+    {}
+    ConfigureLoggingCommand( const cms::Message &a_msg )
+        : Command( a_msg )
+    {  translateFrom( a_msg ); }
+
+    inline MessageType getMessageType() const
+    { return MSG_CMD_CONFIG_LOGGING; }
+
+private:
+    virtual void translateTo( cms::Message &a_msg )
+    {
+        Command::translateTo( a_msg );
+
+        a_msg.setBooleanProperty( "log_enabled", m_enabled );
+        a_msg.setShortProperty( "log_level", (short)m_level );
+    }
+
+    void translateFrom( const cms::Message &a_msg )
+    {
+        m_enabled = a_msg.getBooleanProperty( "log_enabled" );
+        m_level = (Level)a_msg.getShortProperty( "log_level" );
+    }
+
+    bool    m_enabled;
+    Level   m_level;
+};
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Reply Class
+
+class Reply : public MessageBase
+{
+public:
+    Reply() {}
+    Reply( const cms::Message &a_msg )
+        : MessageBase( a_msg )
+    {  translateFrom( a_msg ); }
+
+    inline CommandID getCommandID() const
+    { return m_cmd_id; }
+
+protected:
+    virtual void translateTo( cms::Message &a_msg )
+    {
+        MessageBase::translateTo( a_msg );
+
+        a_msg.setStringProperty( "cmd_id", m_cmd_id );
+    }
+
+    void translateFrom( const cms::Message &a_msg )
+    {
+        m_cmd_id = a_msg.getStringProperty( "cmd_id" );
+    }
+
+    std::string         m_cmd_id;
+
+    // Command class sets cmd_id when message is sent
+    friend class Command;
+    // Connection class uses cmd_id to associae with command
+    friend class Connection;
+};
+
+// ---------------------------- Common Replies ---------------------------
+
+class AckReply : public Reply
+{
+public:
+    AckReply() {}
+    AckReply( const cms::Message &a_msg )
+        : Reply( a_msg ) {}
+
+    inline MessageType getMessageType() const
+    { return MSG_REPLY_ACK; }
+};
+
+
+class NackReply : public Reply
+{
+public:
+    NackReply() {}
+    NackReply( const cms::Message &a_msg )
+        : Reply( a_msg ) {}
+
+    inline MessageType getMessageType() const
+    { return MSG_REPLY_NACK; }
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LogMessage Class
 
 class LogMessage : public MessageBase
 {
@@ -318,7 +487,7 @@ protected:
 };
 
 
-
+#if 0
 class SignalEventMessage : virtual public MessageBase
 {
 public:
@@ -371,17 +540,18 @@ protected:
     std::string         m_sig_message;
     Level               m_sig_level;
 };
+#endif
 
 
-class SignalRetractMessage : virtual public MessageBase
+class SignalRetractMessage : public MessageBase
 {
 public:
     SignalRetractMessage( const cms::Message &a_msg )
         : MessageBase( a_msg )
     { translateFrom( a_msg ); }
 
-    SignalRetractMessage( const std::string &a_id )
-        : m_sig_id(a_id)
+    SignalRetractMessage( const std::string &a_name )
+        : m_sig_name(a_name)
     {}
 
     virtual ~SignalRetractMessage()
@@ -390,26 +560,26 @@ public:
     inline MessageType getMessageType() const
     { return MSG_SIGNAL_RETRACT; }
 
-    inline const std::string  &getSignalID() const
-    { return m_sig_id; }
+    inline const std::string  &getSignalName() const
+    { return m_sig_name; }
 
 protected:
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
-        a_msg.setStringProperty( "id", m_sig_id );
+        a_msg.setStringProperty( "sig_name", m_sig_name );
     }
 
     void translateFrom( const cms::Message &a_msg )
     {
-        m_sig_id = a_msg.getStringProperty( "id" );
+        m_sig_name = a_msg.getStringProperty( "sig_name" );
     }
 
-    std::string         m_sig_id;
+    std::string         m_sig_name;
 };
 
 
-
+#if 0
 class SignalAssertMessage : virtual public SignalEventMessage, virtual public SignalRetractMessage
 {
 public:
@@ -432,7 +602,61 @@ protected:
         SignalRetractMessage::translateTo( a_msg );
     }
 };
+#endif
 
+class SignalAssertMessage : public MessageBase
+{
+public:
+    SignalAssertMessage( const cms::Message &a_msg )
+        : MessageBase( a_msg )
+    { translateFrom( a_msg ); }
+
+    SignalAssertMessage( const std::string &a_name, const std::string &a_source, const std::string &a_msg, Level a_level )
+        : m_sig_name(a_name), m_sig_source(a_source), m_sig_message(a_msg), m_sig_level(a_level)
+    {}
+
+    virtual ~SignalAssertMessage()
+    {}
+
+    inline MessageType getMessageType() const
+    { return MSG_SIGNAL_ASSERT; }
+
+    inline const std::string &getSignalName() const
+    { return m_sig_name; }
+
+    inline const std::string &getSignalSource() const
+    { return m_sig_source; }
+
+    inline Level getSignalLevel() const
+    { return m_sig_level; }
+
+    inline const std::string  &getSignalMessage() const
+    { return m_sig_message; }
+
+protected:
+    virtual void translateTo( cms::Message &a_msg )
+    {
+        MessageBase::translateTo( a_msg );
+
+        a_msg.setStringProperty( "sig_name", m_sig_name );
+        a_msg.setStringProperty( "sig_source", m_sig_source );
+        a_msg.setStringProperty( "sig_message", m_sig_message );
+        a_msg.setShortProperty( "sig_level", (short)m_sig_level );
+    }
+
+    void translateFrom( const cms::Message &a_msg )
+    {
+        m_sig_name = a_msg.getStringProperty( "sig_name" );
+        m_sig_source = a_msg.getStringProperty( "sig_source" );
+        m_sig_message = a_msg.getStringProperty( "sig_message" );
+        m_sig_level = (Level) a_msg.getShortProperty( "sig_level" );
+    }
+
+    std::string         m_sig_name;
+    std::string         m_sig_source;
+    std::string         m_sig_message;
+    Level               m_sig_level;
+};
 
 
 }}
