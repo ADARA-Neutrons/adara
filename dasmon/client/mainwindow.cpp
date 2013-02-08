@@ -4,8 +4,7 @@
 #include <iostream>
 #include <QMetaObject>
 #include <QStringList>
-#include <QDateTime>
-#include <log4cxx/logger.h>
+//#include <log4cxx/logger.h>
 
 #include "DASMonMessages.h"
 
@@ -75,6 +74,8 @@ MainWindow::MainWindow(QWidget *parent) :
     m_combus.attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
     m_combus.attach( *this, "ADARA.APP.DASMON" );
     m_combus.setControlListener( *this );
+
+    m_start_time = QDateTime::currentDateTime();
 
     connect( &m_proc_timer, SIGNAL(timeout()), this, SLOT(onProcTimer()));
     m_proc_timer.start(5200);
@@ -351,6 +352,12 @@ MainWindow::onTableTimer()
         ui->eventTable->scrollToBottom();
     }
 
+    // Not a table, but use this timer callback to update duration field on mainwindow
+    uint t = QDateTime::currentDateTime().toTime_t() - m_start_time.toTime_t();
+    uint hour = t / 3600;
+    uint min = t / 60;
+    uint sec = t % 60;
+    ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
 
 #if 0
         m_monitor->getStatistics( m_stats );
@@ -701,7 +708,7 @@ MainWindow::writeLog( ADARA::Level a_level, const std::string &a_msg )
     if ( m_log_entries.size() == 1000 )
         m_log_entries.pop_front();
 
-    m_log_entries.push_back( QString("%1 [DASMON:%2] %3 ").arg( time(0) )
+    m_log_entries.push_back( QString("%1 [%2] %3").arg( QDateTime::currentDateTime().toString("MMM d, hh:mm:ss") )
                              .arg(ADARA::ComBus::ComBusHelper::toText( a_level ))
                              .arg(a_msg.c_str()));
 
@@ -875,19 +882,25 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     case ADARA::ComBus::MSG_DASMON_RUN_STATUS:
         {
             const ADARA::ComBus::DASMON::RunStatusMessage &msg = (const ADARA::ComBus::DASMON::RunStatusMessage&)a_msg;
-            m_recording = msg.m_recording;
-            m_run_number = msg.m_run_number;
-            updateRunStatusIndicator();
 
-            if ( m_recording )
+            if ( msg.m_recording && ( !m_recording || ( msg.m_run_number != m_run_number )))
             {
-                QDateTime time = QDateTime::currentDateTime();
-                QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(time.toString())));
+                m_recording = msg.m_recording;
+                m_run_number = msg.m_run_number;
+                updateRunStatusIndicator();
+
+                m_start_time = QDateTime::currentDateTime();
+                QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString())));
 
                 writeLog( ADARA::INFO, string("Run started. Run number = ") + boost::lexical_cast<string>(m_run_number) );
             }
-            else
+            else if ( !msg.m_recording && m_recording )
             {
+                m_recording = msg.m_recording;
+                m_run_number = msg.m_run_number;
+                updateRunStatusIndicator();
+
+                m_start_time = QDateTime::currentDateTime();
                 clearRunDisplay();
                 writeLog( ADARA::INFO, "Run stopped." );
             }
@@ -896,6 +909,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     case ADARA::ComBus::MSG_DASMON_PAUSE_STATUS:
         {
             const ADARA::ComBus::DASMON::PauseStatusMessage &msg = (const ADARA::ComBus::DASMON::PauseStatusMessage&)a_msg;
+
+            if ( !m_paused && msg.m_paused )
+                writeLog( ADARA::INFO, "System paused." );
+            else if ( m_paused && !msg.m_paused )
+                writeLog( ADARA::INFO, "System resumed." );
+
             m_paused = msg.m_paused;
             updatePauseStatusIndicator();
         }
@@ -903,6 +922,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     case ADARA::ComBus::MSG_DASMON_SCAN_STATUS:
         {
             const ADARA::ComBus::DASMON::ScanStatusMessage &msg = (const ADARA::ComBus::DASMON::ScanStatusMessage&)a_msg;
+
+            if ( !m_scanning && msg.m_scaning )
+                writeLog( ADARA::INFO, string("Scan started. Scan index = ") + boost::lexical_cast<string>(m_scan_index) );
+            else if ( m_scanning && !msg.m_scaning )
+                writeLog( ADARA::INFO, "Scanning stopped." );
+
             m_scanning = msg.m_scaning;
             m_scan_index = msg.m_scan_index;
             updateScanStatusIndicator();

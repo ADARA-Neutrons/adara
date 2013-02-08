@@ -7,7 +7,7 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QTableWidgetItem>
-
+#include <QDateTime>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 
@@ -157,6 +157,7 @@ private:
     std::list<AlertInfo>            m_events;
     QColor                          m_default_bg_color;
     std::vector<QColor>             m_hl_color;
+    QDateTime                       m_start_time;
     boost::mutex                    m_mutex;
     boost::mutex                    m_log_mutex;
     ADARA::ComBus::Connection      &m_combus;

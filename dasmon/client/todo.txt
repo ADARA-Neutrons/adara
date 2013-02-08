@@ -3,27 +3,20 @@ To Do
 
 Server
 ------
-- Add Control message to rebroadcast asserted rules
-- Support compound rules (i.e. recording == true && energyReq Not Defined)
-- Refactor to expert system rule system (assert facts, dependency-driven rule eval)
+- Impl pixel error metric
+- Impl dup pulse metric
+- Impl cycle error metric
+- Add timestamp to Rule class for assertion
 
 Client
 -------
 
 - Add a "Stale" GUI state to provide last-known info when disconnected or non-responsive
 - Make ComBus router/uname/pass configurable from GUI
-- Display process status table
 - Display event table
 - Rule config load/save (QSettings, db, file?)
 - Rule config local editing in GUI?
 - Reload/config button on GUI
 - Build for Windows
-- Add timestamp to Rule class for assertion
-- Impl pixel error metric
-- Impl dup pulse metric
-- Impl cycle error metric
 - New Qt label widget with change-triggered highlighting
 - Highlight tabs on change
-- Impl duration field
-- Add semantics to handle out-of-order/unexpected destruction of StreamMonitor listeners
-- Add semantics to handle out-of-order/unexpected destruction of ComBus listeners

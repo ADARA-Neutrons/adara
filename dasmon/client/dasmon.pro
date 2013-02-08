@@ -12,8 +12,9 @@ TEMPLATE = app
 INCLUDEPATH +=  ../common \
                 ../../combus \
                 ../../sts \
-                ../../common \
-                /usr/include/activemq-cpp-3.4.0 \
+                ../../common
+
+unix:INCLUDEPATH += /usr/include/activemq-cpp \
                 /usr/include/apr-1
 
 SOURCES += main.cpp \
@@ -27,7 +28,7 @@ HEADERS  += mainwindow.h \
     ../../combus/ComBus.h \
     ../../combus/DASMonMessages.h
 
-LIBS += -lboost_thread-mt -lxml2 -lactivemq-cpp
+unix:LIBS += -lboost_thread-mt -lactivemq-cpp
 
 FORMS    += mainwindow.ui
 
