@@ -3,6 +3,8 @@ AC_PREREQ([2.59])
 AM_INIT_AUTOMAKE([1.11 -Wall no-define foreign silent-rules subdir-objects])
 AM_SILENT_RULES([yes])
 
+m4_include([m4/ax_lib_hdf5.m4])
+
 dnl AC_PROG_CC
 dnl AC_LANG_C
 
@@ -153,6 +155,14 @@ AS_IF([test "x$epics_disabled" != "xno"], [
 	AS_IF([test "x$enable_adara_pvgen" != "xno"], [
 		enable_adara_pvgen=no;
 		AC_WARN(Disabling adara-pvgen due to missing EPICS)
+	])
+])
+
+AS_IF([test "x$enable_sts" != "xno"], [
+	AX_LIB_HDF5([serial])
+	AS_IF([test "x$with_hdf5" = "xno"], [
+		enable_sts=no
+		AC_WARN(Disabling STS due to missing HDF5)
 	])
 ])
 
