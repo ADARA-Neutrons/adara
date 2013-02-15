@@ -28,7 +28,7 @@ HEADERS  += mainwindow.h \
     ../../combus/ComBus.h \
     ../../combus/DASMonMessages.h
 
-unix:LIBS += -lboost_thread-mt -lactivemq-cpp
+unix:LIBS += -lboost_thread-mt -lboost_program_options -lactivemq-cpp
 
 FORMS    += mainwindow.ui
 
