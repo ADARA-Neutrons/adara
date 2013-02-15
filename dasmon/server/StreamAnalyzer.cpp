@@ -317,13 +317,21 @@ StreamAnalyzer::pvDefined( const std::string &a_name )
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, double a_value )
+StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     m_engine.assert( m_pv_prefix + a_name, a_value );
 }
 
+
+void
+StreamAnalyzer::pvValue( const std::string &a_name, double a_value )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    m_engine.assert( m_pv_prefix + a_name, a_value );
+}
 
 void
 StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )

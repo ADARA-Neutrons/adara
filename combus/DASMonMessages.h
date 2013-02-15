@@ -10,6 +10,46 @@ namespace ADARA {
 namespace ComBus {
 namespace DASMON {
 
+//////////////////////////////////////////////////////////////////////////////
+// DASMon Commands
+
+#if 0
+class SubscribeProcessVariableCommand : public Command
+{
+public:
+SubscribeProcessVariableCommand( std::string a_pv_name, bool a_subscribe, uint32_t a_update_interval )
+    : m_pv_name(a_pv_name), m_subscribe(a_subscribe), m_update_interval(a_update_interval)
+{}
+SubscribeProcessVariableCommand( const cms::Message &a_msg )
+    : Command( a_msg )
+{  translateFrom( a_msg ); }
+
+inline MessageType getMessageType() const
+{ return MSG_CMD_CONFIG_LOGGING; }
+
+private:
+virtual void translateTo( cms::Message &a_msg )
+{
+    Command::translateTo( a_msg );
+
+    a_msg.setBooleanProperty( "log_enabled", m_enabled );
+    a_msg.setShortProperty( "log_level", (short)m_level );
+}
+
+void translateFrom( const cms::Message &a_msg )
+{
+    m_enabled = a_msg.getBooleanProperty( "log_enabled" );
+    m_level = (Level)a_msg.getShortProperty( "log_level" );
+}
+
+std::string     m_pv_name;
+bool            m_subscribe;
+uint32_t        m_update_interval;
+};
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// DASMon Application Messages
 
 class ConnectionStatusMessage : public MessageBase
 {

@@ -173,8 +173,8 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
         m_broker_uri += string( ":61616" );
     }
 
-    //if ( a_inst_num )
-    //    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
+    if ( a_inst_num )
+        m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + ".txt";
 

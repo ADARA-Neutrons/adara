@@ -111,6 +111,15 @@ ComBusRouter::pvDefined( const std::string &a_name )
 }
 
 void
+ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value )
+{
+    (void)a_name;
+    (void)a_value;
+    // TODO - Maybe eventually support a subscriber API for PVs?
+    // Don't want to spam the system
+}
+
+void
 ComBusRouter::pvValue( const std::string &a_name, double a_value )
 {
     (void)a_name;

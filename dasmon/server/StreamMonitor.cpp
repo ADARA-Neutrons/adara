@@ -728,7 +728,18 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 
                                 if ( m_pvs.find(key) == m_pvs.end() )
                                 {
-                                    m_pvs[key] = new PVInfo( pv_name, a_pkt.devId(), pv_id, pv_type );
+                                    switch ( pv_type )
+                                    {
+                                    case PVT_INT:
+                                    case PVT_UINT:
+                                    case PVT_ENUM:
+                                        m_pvs[key] = new PVInfo<uint32_t>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                        break;
+                                    case PVT_FLOAT:
+                                    case PVT_DOUBLE:
+                                        m_pvs[key] = new PVInfo<double>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                        break;
+                                    }
                                     m_notify.pvDefined( pv_name );
                                 }
                             }
@@ -752,7 +763,7 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 {
-    pvValueUpdate( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
@@ -761,18 +772,19 @@ StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
-    pvValueUpdate( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
 
 
+template<class T>
 void
 StreamMonitor::pvValueUpdate
 (
     Identifier      a_device_id,
     Identifier      a_pv_id,
-    double          a_value,
+    T               a_value,
     const timespec &a_timestamp
 )
 {
@@ -780,7 +792,7 @@ StreamMonitor::pvValueUpdate
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    std::map<PVKey,PVInfo*>::iterator ipv = m_pvs.find(key);
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
 
     // TODO Alert - bad stream packet!
     if ( ipv == m_pvs.end() )
@@ -801,17 +813,24 @@ StreamMonitor::pvValueUpdate
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
     if ( t - ipv->second->m_time < 0.5 )
     {
-        ipv->second->m_value = a_value;
-        ipv->second->m_time = t;
-        m_notify.pvValue( ipv->second->m_name, a_value );
+        PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
+        if ( pv )
+        {
+            pv->m_value = a_value;
+            pv->m_time = t;
+            m_notify.pvValue( pv->m_name, a_value );
+        }
     }
 }
+
+template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value, const timespec &a_timestamp);
+template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Identifier a_pv_id, double a_value, const timespec &a_timestamp);
 
 
 void
 StreamMonitor::clearPVs()
 {
-    for ( map<PVKey,PVInfo*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
     {
         delete ipv->second;
     }
@@ -1042,12 +1061,18 @@ StreamMonitor::Notifier::pvDefined( const std::string &a_name )
 
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->pvValue( a_name, a_value );
 }
 
+void
+StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value )
+{
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+        (*l)->pvValue( a_name, a_value );
+}
 
 void
 StreamMonitor::Notifier::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )

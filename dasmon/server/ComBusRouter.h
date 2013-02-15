@@ -38,6 +38,7 @@ private:
     void    beamMetrics( const BeamMetrics &a_metrics );
     void    runMetrics( const RunMetrics &a_metrics );
     void    pvDefined( const std::string &a_name );
+    void    pvValue( const std::string &a_name, uint32_t a_value );
     void    pvValue( const std::string &a_name, double a_value );
     void    connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 

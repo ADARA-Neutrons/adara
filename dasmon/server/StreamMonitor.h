@@ -36,6 +36,7 @@ public:
     virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
+    virtual void pvValue( const std::string &a_name, uint32_t a_value ) = 0;
     virtual void pvValue( const std::string &a_name, double a_value ) = 0;
 };
 
@@ -56,11 +57,11 @@ enum PVType
 };
 
 /// Base class for all process variable (PV) types
-class PVInfo
+class PVInfoBase
 {
 public:
     /// PVInfoBase constructor
-    PVInfo
+    PVInfoBase
     (
         const std::string  &a_name,         ///< [in] Name of PV
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
@@ -72,12 +73,12 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
-        m_time(0.0),
-        m_value(0.0)
+        m_time(0.0)
+        //m_value(0.0
     {}
 
     /// PVInfoBase destructor
-    virtual ~PVInfo()
+    virtual ~PVInfoBase()
     {}
 
     std::string         m_name;         ///< Name of PV
@@ -85,9 +86,26 @@ public:
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
     double              m_time;
-    double              m_value;
+    //double              m_value;
 };
 
+template<class T>
+class PVInfo : public PVInfoBase
+{
+public:
+    PVInfo
+    (
+        const std::string  &a_name,         ///< [in] Name of PV
+        Identifier          a_device_id,    ///< [in] ID of device that owns the PV
+        Identifier          a_pv_id,        ///< [in] ID of the PV
+        PVType              a_type,         ///< [in] Type of PV
+        T                   a_value
+    )
+    : PVInfoBase( a_name, a_device_id, a_pv_id, a_type ), m_value(a_value)
+    {}
+
+    T                   m_value;
+};
 
 #define WIN_AVG_SIZE 20
 
@@ -148,24 +166,6 @@ public:
                     { m_notify.removeListener( a_listener ); }
     void            resendState( IStreamListener &a_listener ) const;
 
-    // Polling API for instantaneous values
-#if 0
-    uint64_t        getCountRate();
-    void            getMonitorCountRates( std::map<uint32_t,uint64_t> &a_monitor_count_rates );
-    double          getProtonCharge();
-    double          getPulseFrequency();
-    uint64_t        getRunPulseCount();
-    double          getRunPulseCharge();
-    uint64_t        getPixelErrorCount();
-    uint64_t        getPixelErrorRate();
-    uint64_t        getDuplicatePulseCount();
-    uint64_t        getCycleErrorCount();
-    uint64_t        getByteRate() const;
-    void            getStatistics( std::map<uint32_t,PktStats> &a_stats );
-    const char*     getPktName( uint32_t a_pkt_type ) const;
-    bool            getPV( const std::string &a_pv_name, double &a_value ) const;
-#endif
-
 private:
     class Notifier : public IStreamListener
     {
@@ -181,6 +181,7 @@ private:
         void beamMetrics( const BeamMetrics &a_metrics );
         void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
+        void pvValue( const std::string &a_name, uint32_t a_value );
         void pvValue( const std::string &a_name, double a_value );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
@@ -214,7 +215,8 @@ private:
 
     void        gatherStats( const ADARA::Packet &a_pkt );
     void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
-    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, double a_value, const timespec &a_timestamp );
+    template<class T>
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
     PVType      toPVType( const char *a_source ) const;
     void        clearPVs();
 
@@ -245,7 +247,7 @@ private:
     uint64_t                        m_last_pulse_time;
     uint64_t                        m_stream_size;
     uint64_t                        m_stream_rate;
-    std::map<PVKey,PVInfo*>         m_pvs;
+    std::map<PVKey,PVInfoBase*>     m_pvs;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
 };
