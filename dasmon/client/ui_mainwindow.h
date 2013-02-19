@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Fri Feb 15 11:14:32 2013
+** Created: Tue Feb 19 15:56:47 2013
 **      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -98,9 +98,6 @@ public:
     QWidget *tab;
     QHBoxLayout *horizontalLayout_4;
     QTableWidget *alertTable;
-    QWidget *tab_3;
-    QHBoxLayout *horizontalLayout_6;
-    QTableWidget *eventTable;
     QWidget *tab_4;
     QHBoxLayout *horizontalLayout_7;
     QTableWidget *procStatusTable;
@@ -109,6 +106,7 @@ public:
     QTableWidget *logTable;
     QTableWidget *monitorTable;
     QHBoxLayout *horizontalLayout_2;
+    QPushButton *configButton;
     QLabel *combusStatusLabel;
     QLabel *dasmonStatusLabel;
     QLabel *smsStatusLabel;
@@ -489,25 +487,6 @@ public:
         horizontalLayout_4->addWidget(alertTable);
 
         tabWidget->addTab(tab, QString());
-        tab_3 = new QWidget();
-        tab_3->setObjectName(QString::fromUtf8("tab_3"));
-        horizontalLayout_6 = new QHBoxLayout(tab_3);
-        horizontalLayout_6->setSpacing(6);
-        horizontalLayout_6->setContentsMargins(11, 11, 11, 11);
-        horizontalLayout_6->setObjectName(QString::fromUtf8("horizontalLayout_6"));
-        eventTable = new QTableWidget(tab_3);
-        if (eventTable->columnCount() < 4)
-            eventTable->setColumnCount(4);
-        eventTable->setObjectName(QString::fromUtf8("eventTable"));
-        eventTable->setColumnCount(4);
-        eventTable->horizontalHeader()->setVisible(false);
-        eventTable->horizontalHeader()->setHighlightSections(true);
-        eventTable->horizontalHeader()->setStretchLastSection(true);
-        eventTable->verticalHeader()->setVisible(false);
-
-        horizontalLayout_6->addWidget(eventTable);
-
-        tabWidget->addTab(tab_3, QString());
         tab_4 = new QWidget();
         tab_4->setObjectName(QString::fromUtf8("tab_4"));
         horizontalLayout_7 = new QHBoxLayout(tab_4);
@@ -580,6 +559,11 @@ public:
         horizontalLayout_2 = new QHBoxLayout();
         horizontalLayout_2->setSpacing(6);
         horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
+        configButton = new QPushButton(centralWidget);
+        configButton->setObjectName(QString::fromUtf8("configButton"));
+
+        horizontalLayout_2->addWidget(configButton);
+
         combusStatusLabel = new QLabel(centralWidget);
         combusStatusLabel->setObjectName(QString::fromUtf8("combusStatusLabel"));
         combusStatusLabel->setFont(font);
@@ -618,6 +602,7 @@ public:
 
         retranslateUi(MainWindow);
         QObject::connect(exitButton, SIGNAL(clicked()), MainWindow, SLOT(close()));
+        QObject::connect(configButton, SIGNAL(clicked()), MainWindow, SLOT(configure()));
 
         tabWidget->setCurrentIndex(0);
 
@@ -662,13 +647,13 @@ public:
         label_9->setText(QApplication::translate("MainWindow", "Total Charge:", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(runInfoTab), QApplication::translate("MainWindow", "Info", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MainWindow", "Signals", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab_3), QApplication::translate("MainWindow", "Events", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(tab_4), QApplication::translate("MainWindow", "Status", 0, QApplication::UnicodeUTF8));
         tabWidget->setTabText(tabWidget->indexOf(tab_5), QApplication::translate("MainWindow", "Log", 0, QApplication::UnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem = monitorTable->horizontalHeaderItem(0);
         ___qtablewidgetitem->setText(QApplication::translate("MainWindow", "Monitor ID", 0, QApplication::UnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem1 = monitorTable->horizontalHeaderItem(1);
         ___qtablewidgetitem1->setText(QApplication::translate("MainWindow", "Count Rate", 0, QApplication::UnicodeUTF8));
+        configButton->setText(QApplication::translate("MainWindow", "Configure", 0, QApplication::UnicodeUTF8));
         combusStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         dasmonStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));

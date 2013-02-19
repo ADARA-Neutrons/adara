@@ -45,12 +45,12 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
-    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(),
-                                                                       broker_uri, broker_user, broker_pass );
+    //ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(),
+    //                                                                   broker_uri, broker_user, broker_pass );
 
     try
     {
-        MainWindow main_window;
+        MainWindow main_window( broker_uri, broker_user, broker_pass );
         main_window.show();
 
         res = a.exec();
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
         cout << e.what() << endl;
     }
 
-    delete combus;
+    //delete combus;
 
     return res;
 }

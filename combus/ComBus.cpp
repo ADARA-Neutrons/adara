@@ -219,6 +219,21 @@ Connection::getInst()
 
 
 void
+Connection::setBroker( const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass )
+{
+    boost::unique_lock<boost::mutex> lock( m_status_mutex );
+
+    m_broker_uri = a_broker_uri;
+    m_broker_user = a_user;
+    m_broker_pass = a_pass;
+
+    lock.unlock();
+
+    disconnect();
+}
+
+
+void
 Connection::setControlListener( IControlListener &a_ctrl_listener )
 {
     if ( m_ctrl_translator )
@@ -254,13 +269,14 @@ Connection::waitForConnect( unsigned short a_timeout ) const
 void
 Connection::reconnectThread()
 {
-    activemq::core::ActiveMQConnectionFactory factory(m_broker_uri); // = new activemq::core::ActiveMQConnectionFactory( m_broker_uri );
     unsigned short retry_period = 2;
     boost::unique_lock<boost::mutex> lock( m_status_mutex, boost::defer_lock );
 
     while( 1 )
     {
         lock.lock();
+
+        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri);
 
         // Exit if terminating
         if ( !m_running )
@@ -269,7 +285,7 @@ Connection::reconnectThread()
         try
         {
             //cout << "retry connect" << endl;
-            m_connection = dynamic_cast<activemq::core::ActiveMQConnection*>( factory.createConnection() );
+            m_connection = dynamic_cast<activemq::core::ActiveMQConnection*>( factory.createConnection( m_broker_user, m_broker_pass ) );
             if ( !m_connection )
                 throw std::runtime_error( "Failed to create ActiveMQConnection" );
 

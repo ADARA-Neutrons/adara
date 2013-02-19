@@ -25,7 +25,8 @@ class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, pub
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    //explicit MainWindow( QWidget *parent );
+    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass );
     ~MainWindow();
 
 
@@ -33,6 +34,7 @@ private slots:
 
     void onProcTimer();
     void onTableTimer();
+    void configure();
 
 private:
     struct AlertInfo
@@ -138,7 +140,6 @@ private:
     std::map<std::string,ProcInfo>  m_proc_status;
     bool                            m_refresh_proc_table;
     bool                            m_refresh_signal_table;
-    bool                            m_refresh_event_table;
     bool                            m_refresh_log_table;
     Tristate                        m_combus_state;
     Tristate                        m_dasmon_state;
@@ -160,7 +161,11 @@ private:
     QDateTime                       m_start_time;
     boost::mutex                    m_mutex;
     boost::mutex                    m_log_mutex;
-    ADARA::ComBus::Connection      &m_combus;
+    ADARA::ComBus::Connection      *m_combus;
+    //ADARA::ComBus::Connection      &m_combus;
+    std::string                     m_broker_uri;
+    std::string                     m_broker_user;
+    std::string                     m_broker_pass;
 };
 
 #endif // MAINWINDOW_H

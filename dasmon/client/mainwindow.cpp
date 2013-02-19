@@ -4,8 +4,10 @@
 #include <iostream>
 #include <QMetaObject>
 #include <QStringList>
+#include <QSettings>
 //#include <log4cxx/logger.h>
 
+#include "AMQConfigDialog.h"
 #include "DASMonMessages.h"
 
 using namespace std;
@@ -16,14 +18,29 @@ using namespace std;
 #define TIMEOUT_DEAD_CLEANUP 5
 
 
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent), ui(new Ui::MainWindow), m_init(true),
-    m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_event_table(false), m_refresh_log_table(false),
+MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass )
+    : QMainWindow(0), ui(new Ui::MainWindow),
+    m_init(true), m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_log_table(false),
     m_recording(false), m_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
-    m_combus(ADARA::ComBus::Connection::getInst())
+    m_combus(0),
+    m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ), m_broker_pass( a_broker_pass )
 {
     ui->setupUi(this);
+
+    QCoreApplication::setOrganizationDomain("ornl.gov");
+    QCoreApplication::setOrganizationName("sns");
+    QCoreApplication::setApplicationName("dasmon-gui");
+
+    QSettings settings;
+
+    settings.beginGroup( "ActiveMQ" );
+    m_broker_uri = settings.value( "broker_uri" ).toString().toStdString();
+    m_broker_user = settings.value( "username" ).toString().toStdString();
+    m_broker_pass = settings.value( "password" ).toString().toStdString();
+    settings.endGroup();
+
+    m_combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(), m_broker_uri, m_broker_user, m_broker_pass );
 
     updateComBusStatusIndicator();
     updateDASMonStatusIndicator();
@@ -44,9 +61,6 @@ MainWindow::MainWindow(QWidget *parent) :
     headers << "Name" << "Source" << "Level" << "Message";
     ui->alertTable->setHorizontalHeaderLabels( headers );
     ui->alertTable->horizontalHeader()->show();
-
-    ui->eventTable->setHorizontalHeaderLabels( headers );
-    ui->eventTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Process" << "Status";
@@ -69,11 +83,11 @@ MainWindow::MainWindow(QWidget *parent) :
         m_hl_color[i] = QColor( br + dr*i, bg + dg*i, bb + db*i );
     }
 
-    m_combus.attach( *this );   // Listen to ComBus connection status
-    m_combus.attach( *this, "ADARA.STATUS.>" ); // Listen to ADARA process health status (display only)
-    m_combus.attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
-    m_combus.attach( *this, "ADARA.APP.DASMON" );
-    m_combus.setControlListener( *this );
+    m_combus->attach( *this );   // Listen to ComBus connection status
+    m_combus->attach( *this, "ADARA.STATUS.>" ); // Listen to ADARA process health status (display only)
+    m_combus->attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
+    m_combus->attach( *this, "ADARA.APP.DASMON" );
+    m_combus->setControlListener( *this );
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -87,9 +101,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-    m_combus.detach( (ITopicListener&)*this );
-    m_combus.detach( (IStatusListener&)*this );
+    m_combus->detach( (ITopicListener&)*this );
+    m_combus->detach( (IStatusListener&)*this );
 
+    delete m_combus;
     delete ui;
 }
 
@@ -173,7 +188,7 @@ MainWindow::setSMSActive( bool a_active )
 void
 MainWindow::onProcTimer()
 {
-    m_combus.sendStatus( ADARA::ComBus::STATUS_RUNNING );
+    m_combus->sendStatus( ADARA::ComBus::STATUS_RUNNING );
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
     unsigned long t = time(0);
@@ -317,41 +332,6 @@ MainWindow::onTableTimer()
         }
     }
 
-    if ( m_refresh_event_table )
-    {
-        m_refresh_event_table = false;
-
-        int rows = ui->eventTable->rowCount();
-
-        // Remove old messages to keep scroll back limit
-        if ( m_events.size() > m_event_scrollback )
-        {
-            while ( m_events.size() > m_event_scrollback )
-            {
-                m_events.pop_front();
-                if ( rows )
-                {
-                    ui->eventTable->removeRow( 0 );
-                    --rows;
-                }
-            }
-        }
-
-        list<AlertInfo>::iterator ie = m_events.begin();
-        advance( ie, rows );
-
-        for ( int r = rows; r < (int)m_events.size(); ++r, ++ie )
-        {
-            ui->eventTable->insertRow( r );
-            ui->eventTable->setItem( r, 0, new QTableWidgetItem( ie->name.c_str() ));
-            ui->eventTable->setItem( r, 1, new QTableWidgetItem( ie->source.c_str() ));
-            ui->eventTable->setItem( r, 2, new QTableWidgetItem( ADARA::ComBus::ComBusHelper::toText( ie->level ) ));
-            ui->eventTable->setItem( r, 3, new QTableWidgetItem( ie->msg.c_str() ));
-
-        }
-        ui->eventTable->scrollToBottom();
-    }
-
     // Not a table, but use this timer callback to update duration field on mainwindow
     uint t = QDateTime::currentDateTime().toTime_t() - m_start_time.toTime_t();
     uint hour = t / 3600;
@@ -375,6 +355,31 @@ MainWindow::onTableTimer()
 
 #endif
 }
+
+
+void
+MainWindow::configure()
+{
+    AMQConfigDialog  dlg( this, m_broker_uri, m_broker_user, m_broker_pass );
+
+    if ( dlg.exec() == QDialog::Accepted )
+    {
+        m_broker_uri = dlg.getBrokerURI();
+        m_broker_user = dlg.getUsername();
+        m_broker_pass = dlg.getPassword();
+
+        QSettings settings;
+
+        settings.beginGroup( "ActiveMQ" );
+        settings.setValue( "broker_uri", m_broker_uri.c_str() );
+        settings.setValue( "username", m_broker_user.c_str() );
+        settings.setValue( "password", m_broker_pass.c_str() );
+        settings.endGroup();
+
+        ADARA::ComBus::Connection::getInst().setBroker( m_broker_uri, m_broker_user, m_broker_pass );
+    }
+}
+
 
 void
 MainWindow::updateAllStatusIndicators()
@@ -725,10 +730,11 @@ MainWindow::comBusConnectionStatus( bool a_connected )
 {
     setComBusActive( a_connected );
 
-    if ( m_init )
+    // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
+    if ( m_init && a_connected )
     {
         ADARA::ComBus::EmitStateCommand cmd;
-        m_combus.sendCommand( cmd, "DASMON" );
+        m_combus->sendCommand( cmd, "DASMON" );
         m_init = false;
     }
 }

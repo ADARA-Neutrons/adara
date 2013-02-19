@@ -51,6 +51,7 @@ public:
     ~Connection() throw();
 
     static Connection&  getInst();
+    void                setBroker( const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass );
     bool                waitForConnect( unsigned short a_timeout ) const;
     bool                sendStatus( StatusCode a_status );
     bool                sendLog( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );

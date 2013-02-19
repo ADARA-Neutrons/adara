@@ -543,36 +543,6 @@
             </item>
            </layout>
           </widget>
-          <widget class="QWidget" name="tab_3">
-           <attribute name="title">
-            <string>Events</string>
-           </attribute>
-           <layout class="QHBoxLayout" name="horizontalLayout_6">
-            <item>
-             <widget class="QTableWidget" name="eventTable">
-              <property name="columnCount">
-               <number>4</number>
-              </property>
-              <attribute name="horizontalHeaderVisible">
-               <bool>false</bool>
-              </attribute>
-              <attribute name="horizontalHeaderHighlightSections">
-               <bool>true</bool>
-              </attribute>
-              <attribute name="horizontalHeaderStretchLastSection">
-               <bool>true</bool>
-              </attribute>
-              <attribute name="verticalHeaderVisible">
-               <bool>false</bool>
-              </attribute>
-              <column/>
-              <column/>
-              <column/>
-              <column/>
-             </widget>
-            </item>
-           </layout>
-          </widget>
           <widget class="QWidget" name="tab_4">
            <attribute name="title">
             <string>Status</string>
@@ -689,6 +659,13 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
+       <widget class="QPushButton" name="configButton">
+        <property name="text">
+         <string>Configure</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QLabel" name="combusStatusLabel">
         <property name="font">
          <font>
@@ -788,8 +765,24 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>configButton</sender>
+   <signal>clicked()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>configure()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>52</x>
+     <y>745</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>461</x>
+     <y>384</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
-  <slot>configureSMSConnection()</slot>
+  <slot>configure()</slot>
  </slots>
 </ui>
