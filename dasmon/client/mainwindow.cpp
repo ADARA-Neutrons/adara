@@ -734,7 +734,7 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     if ( m_init && a_connected )
     {
         ADARA::ComBus::EmitStateCommand cmd;
-        m_combus->sendCommand( cmd, "DASMON" );
+        m_combus->sendControl( cmd, "DASMON" );
         m_init = false;
     }
 }
@@ -751,7 +751,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
 
-    const string &source = a_msg.getSource();
+    const string &source = a_msg.getSourceName() + "." + boost::lexical_cast<string>(a_msg.getSourceInstance());
 
     switch( a_msg.getMessageType() )
     {
@@ -790,7 +790,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
             if ( m_log_entries.size() == 1000 )
                 m_log_entries.pop_front();
-            m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSource().c_str())
+            m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSourceName().c_str())
                                      .arg(logmsg.getLevelText().c_str()).arg(logmsg.getMessage().c_str()));
             m_refresh_log_table = true;
         }
@@ -975,7 +975,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
 
 bool
-MainWindow::comBusCommand( const ADARA::ComBus::Command &a_cmd )
+MainWindow::comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd )
 {
     (void)a_cmd;
     return false;
@@ -983,7 +983,7 @@ MainWindow::comBusCommand( const ADARA::ComBus::Command &a_cmd )
 
 
 void
-MainWindow::comBusReply( const ADARA::ComBus::Reply &a_reply )
+MainWindow::comBusReply( const ADARA::ComBus::ControlMessage &a_reply )
 {
     (void)a_reply;
 }

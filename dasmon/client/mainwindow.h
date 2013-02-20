@@ -98,8 +98,8 @@ private:
     void        clearSignals();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
-    bool        comBusCommand( const ADARA::ComBus::Command &a_cmd );
-    void        comBusReply( const ADARA::ComBus::Reply &a_reply );
+    bool        comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd );
+    void        comBusReply( const ADARA::ComBus::ControlMessage &a_reply );
 
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();

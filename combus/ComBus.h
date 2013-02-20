@@ -20,7 +20,7 @@ namespace ADARA {
 namespace ComBus {
 
 class MessageBase;
-class Command;
+class ControlMessage;
 
 class IStatusListener
 {
@@ -37,9 +37,10 @@ public:
 class IControlListener
 {
 public:
-    virtual bool    comBusCommand( const Command &a_cmd ) = 0;
-    virtual void    comBusReply( const Reply &a_reply ) = 0;
+    virtual bool    comBusCommand( const ControlMessage &a_msg ) = 0;
+    virtual void    comBusReply( const ControlMessage &a_msg ) = 0;
 };
+
 
 class Connection
 {
@@ -56,9 +57,7 @@ public:
     bool                sendStatus( StatusCode a_status );
     bool                sendLog( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
     bool                sendMessage( MessageBase &a_msg );
-    bool                sendCommand( Command &a_cmd, const std::string &a_dest_proc );
-    //bool                sendCommand( Command &a_cmd, const std::string &a_dest_proc, Reply *&a_reply, unsigned long a_timeout = 0 );
-    bool                reply( Reply &a_reply, const std::string &a_dest_proc );
+    bool                sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, unsigned long m_dest_inst = 0 );
     void                setControlListener( IControlListener &a_ctrl_listener );
     void                attach( IStatusListener  &a_subscriber );
     void                detach( IStatusListener  &a_subscriber );
@@ -88,6 +87,8 @@ private:
         IControlListener   *m_handler;
         std::map<std::string,std::pair<cms::Topic*,cms::MessageConsumer*> > m_topics;
 
+        std::string         m_proc_name;
+        unsigned long       m_inst_num;
         friend class Connection;
     };
 

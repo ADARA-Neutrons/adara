@@ -46,8 +46,8 @@ private:
     void    comBusConnectionStatus( bool a_connected );
 
     // IControlListener Interface
-    bool    comBusCommand( const ADARA::ComBus::Command &a_cmd );
-    void    comBusReply( const ADARA::ComBus::Reply &a_reply );
+    bool    comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd );
+    void    comBusReply( const ADARA::ComBus::ControlMessage &a_reply );
 
     // ISignalListener Interface
     void    signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg );

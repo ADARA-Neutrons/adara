@@ -189,7 +189,7 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 
 
 bool
-ComBusRouter::comBusCommand( const ADARA::ComBus::Command &a_cmd )
+ComBusRouter::comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd )
 {
     //cout << "Got Command: " << hex << a_cmd.getMessageType() << endl;
     switch( a_cmd.getMessageType() )
@@ -206,7 +206,7 @@ ComBusRouter::comBusCommand( const ADARA::ComBus::Command &a_cmd )
 
 
 void
-ComBusRouter::comBusReply( const ADARA::ComBus::Reply &a_reply )
+ComBusRouter::comBusReply( const ADARA::ComBus::ControlMessage &a_reply )
 {
     //cout << "Got Reply: " << hex << a_reply.getMessageType() << endl;
 }

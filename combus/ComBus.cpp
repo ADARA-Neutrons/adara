@@ -21,12 +21,16 @@ namespace ComBus {
 Connection::Translator::Translator( ITopicListener &a_listener )
     : m_listener(&a_listener), m_handler(0)
 {
+    m_proc_name = Connection::getInst().m_proc_name;
+    m_inst_num = Connection::getInst().m_inst_num;
 }
 
 
 Connection::Translator::Translator( IControlListener &a_handler )
     : m_listener(0), m_handler(&a_handler)
 {
+    m_proc_name = Connection::getInst().m_proc_name;
+    m_inst_num = Connection::getInst().m_inst_num;
 }
 
 
@@ -41,39 +45,42 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 {
     try
     {
-        if ( m_listener )
-        {
-            MessageBase *msg = Connection::makeMessage( *a_msg );
+        MessageBase *msg = Connection::makeMessage( *a_msg );
 
-            m_listener->comBusMessage( *msg );
-
-            delete msg;
-        }
-        else
+        // Filter-out messages this process sent on topics that it is also listening to
+        if ( msg->m_src_name != m_proc_name && msg->m_src_inst != m_inst_num )
         {
-            MessageBase *msg = Connection::makeMessage( *a_msg );
-            if ( msg->getMessageCategory() == CAT_CONTROL)
+            if ( m_listener )
             {
-                if ( msg->getMessageType() & CTRL_REPLY_FLAG )
+                m_listener->comBusMessage( *msg );
+            }
+            else
+            {
+                // TODO The Command Reply API doesnt really make sense - their all control msgs
+                if ( msg->getMessageCategory() == CAT_CONTROL)
                 {
-                    Reply *reply = dynamic_cast<Reply*>(msg);
-                    if ( reply )
-                        m_handler->comBusReply( *reply );
-                }
-                else
-                {
-                    Command *cmd = dynamic_cast<Command*>(msg);
-                    if ( cmd )
+                    ControlMessage *control = dynamic_cast<ControlMessage*>(msg);
+
+                    // Filter out Control messages sent to other instances
+                    if ( control && control->m_dest_inst == m_inst_num )
                     {
-                        if ( !m_handler->comBusCommand( *cmd ) && cmd->replyRequested() )
+                        if ( msg->getMessageType() & CTRL_REPLY_FLAG )
                         {
-                            // TODO: Auto-NACK sender since listener will not process/experienced error
+                            m_handler->comBusReply( *control );
+                        }
+                        else
+                        {
+                            if ( !m_handler->comBusCommand( *control ) && control->replyRequested() )
+                            {
+                                // TODO: Auto-NACK sender since listener will not process/experienced error
+                            }
                         }
                     }
                 }
             }
-            delete msg;
         }
+
+        delete msg;
     }
     catch(...)
     {
@@ -173,10 +180,10 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
         m_broker_uri += string( ":61616" );
     }
 
-    if ( a_inst_num )
-        m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
+    //if ( a_inst_num )
+    //    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
 
-    m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + ".txt";
+    m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + "." + boost::lexical_cast<string>(a_inst_num) + ".txt";
 
     activemq::library::ActiveMQCPP::initializeLibrary();
 
@@ -456,12 +463,11 @@ Connection::sendMessage( MessageBase &a_msg )
     {
         try
         {
-            cmsmsg = a_msg.createCMSMessage( *m_session );
-
             // Set source and timestamp when msg sent
-            cmsmsg->setStringProperty( "source", m_proc_name );
-            cmsmsg->setIntProperty( "instance", m_inst_num );
-            cmsmsg->setIntProperty( "timestamp", time(0) );
+            a_msg.setSourceInfo( m_proc_name, m_inst_num );
+            a_msg.setTimestamp( time(0) );
+
+            cmsmsg = a_msg.createCMSMessage( *m_session );
 
             string topic = a_msg.getTopic();
             map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( topic );
@@ -501,22 +507,9 @@ Connection::sendMessage( MessageBase &a_msg )
 }
 
 
-bool
-Connection::sendCommand( Command &a_cmd, const std::string &a_dest_proc )
-{
-    return sendCommandReply( a_cmd, a_dest_proc, true );
-}
-
 
 bool
-Connection::reply( Reply &a_reply, const std::string &a_dest_proc  )
-{
-    return sendCommandReply( a_reply, a_dest_proc, false );
-}
-
-
-bool
-Connection::sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc, bool a_command )
+Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, unsigned long a_dest_inst )
 {
     bool res = false;
     cms::Message *cmsmsg = 0;
@@ -525,12 +518,11 @@ Connection::sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc
     {
         try
         {
-            cmsmsg = a_msg.createCMSMessage( *m_session );
+            a_msg.setSourceInfo( m_proc_name, m_inst_num );
+            a_msg.setDestInfo( a_dest_inst );
+            a_msg.setTimestamp( time(0) );
 
-            // Set source and timestamp when msg sent
-            cmsmsg->setStringProperty( "source", m_proc_name );
-            cmsmsg->setIntProperty( "instance", m_inst_num );
-            cmsmsg->setIntProperty( "timestamp", time(0) );
+            cmsmsg = a_msg.createCMSMessage( *m_session );
 
             map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( a_dest_proc );
             if ( itop == m_producer_topics.end())
@@ -546,11 +538,6 @@ Connection::sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc
             else
             {
                 itop->second.second->send( cmsmsg );
-            }
-
-            if ( a_command )
-            {
-                ((Command&)a_msg).m_cmd_id = cmsmsg->getCMSMessageID();
             }
 
             delete cmsmsg;

@@ -110,7 +110,6 @@ enum StatusCode
     STATUS_FAULT
 };
 
-typedef std::string CommandID;
 
 class ComBusHelper
 {
@@ -149,7 +148,7 @@ class MessageBase
 {
 public:
     MessageBase()
-        : m_timestamp(0)
+        : m_src_inst(0), m_timestamp(0)
     { }
 
     MessageBase( const cms::Message &a_msg )
@@ -187,8 +186,11 @@ public:
         throw std::runtime_error("bad message category");
     }
 
-    inline const std::string &getSource() const
-    { return m_source; }
+    inline const std::string &getSourceName() const
+    { return m_src_name; }
+
+    inline unsigned long getSourceInstance() const
+    { return m_src_inst; }
 
     inline unsigned long getTimestamp() const
     { return m_timestamp; }
@@ -197,44 +199,65 @@ protected:
     virtual void translateTo( cms::Message &a_msg )
     {
         a_msg.setIntProperty( "type", (long) getMessageType() );
+        a_msg.setStringProperty( "src_name", m_src_name );
+        a_msg.setIntProperty( "src_inst", (long) m_src_inst );
         a_msg.setIntProperty( "timestamp", m_timestamp );
     }
 
     void translateFrom( const cms::Message &a_msg )
     {
-        m_source = a_msg.getStringProperty( "source" );
-        m_timestamp = a_msg.getIntProperty( "timestamp" );
+        m_src_name = a_msg.getStringProperty( "src_name" );
+        m_src_inst = (unsigned long)a_msg.getIntProperty( "src_inst" );
+        m_timestamp = (unsigned long)a_msg.getIntProperty( "timestamp" );
     }
 
-    std::string         m_source;
+private:
+    void setSourceInfo( const std::string &a_src_name, unsigned long a_src_inst )
+    {
+        m_src_name = a_src_name;
+        m_src_inst = a_src_inst;
+    }
+
+    void setTimestamp( unsigned long a_timestamp )
+    {
+        m_timestamp = a_timestamp;
+    }
+
+    std::string         m_src_name;
+    unsigned long       m_src_inst;
     unsigned long       m_timestamp;
 
-    // Connection class sets source & timestamp when message is sent
+    // Connection class sets source, instance, and timestamp when message is sent
     friend class Connection;
 };
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Command Class
+// ControlMessage Class
 
-/*
-Command class should be an active object with send/recv API on class. This
-prevents the need for external life cycle management and command-reply
-re-association.
-*/
-class Command : public MessageBase
+/**
+ * @class ControlMessage
+ *
+ * The ControlMessage class is a type of message intended for perr-to-peer communication over the CONTROL topic
+ * of the ComBus. The primary specialization of this class is the inclusion of destination information (to
+ * identify a specific ComBus process) and a unique session ID that can be used to (re)associate messages within
+ * a "conversation". There is no automatic reply mechanism as "conversations" could invlobe an arbitrary number of
+ * related exchanges (i.e. handshaking). The requirements for a conversation are application specific. The ComBus
+ * class does provide an API for sending and receiving basic commands and replies.
+ */
+class ControlMessage : public MessageBase
 {
 public:
-    Command( const cms::Message &a_msg )
+    ControlMessage( const cms::Message &a_msg )
         : MessageBase( a_msg )
     { translateFrom( a_msg ); }
 
-    Command( bool a_reply_requested = false )
-        : m_reply_requested(a_reply_requested)
+    ControlMessage( unsigned long a_key = 0, bool a_reply_requested = false )
+        : m_key(a_key), m_dest_inst(0), m_reply_requested(a_reply_requested)
     {}
 
-    inline CommandID getCommandID() const
-    { return m_cmd_id; }
+    inline unsigned long getKey() const
+    { return m_key; }
 
     inline bool replyRequested() const
     { return m_reply_requested; }
@@ -244,30 +267,41 @@ protected:
     {
         MessageBase::translateTo( a_msg );
 
+        a_msg.setIntProperty( "key", (long)m_key );
+        a_msg.setIntProperty( "dest_inst", (long)m_dest_inst );
         a_msg.setBooleanProperty( "reply_req", m_reply_requested );
     }
 
     void translateFrom( const cms::Message &a_msg )
     {
-        m_cmd_id = a_msg.getCMSMessageID();
+        m_key = (unsigned long)a_msg.getIntProperty( "key" );
+        m_dest_inst = (unsigned long)a_msg.getIntProperty( "dest_inst" );
         m_reply_requested = a_msg.getBooleanProperty( "reply_req" );
     }
 
-    CommandID           m_cmd_id;
-    bool                m_reply_requested;
+private:
+    void setDestInfo( unsigned long a_dest_inst )
+    {
+        m_dest_inst = a_dest_inst;
+    }
+
+    unsigned long       m_key;              ///< Key identifier used to (re)associate messages
+    unsigned long       m_dest_inst;        ///< Destination instance (dest name is implied by topic)
+    bool                m_reply_requested;  ///< Sender is requesting an acknowlegement
 
     // Connection class sets cmd_id when message is sent
     friend class Connection;
 };
 
-// ---------------------------- Common Commands ---------------------------
+
+// ---------------------------- Common Commands / Replies ---------------------------
 
 #define DEF_SIMPLE_CMD(name,type) \
-    class name : public Command { \
+    class name : public ControlMessage { \
     public: \
         name() {} \
         name( const cms::Message &a_msg ) \
-            : Command( a_msg ) {} \
+            : ControlMessage( a_msg ) {} \
         inline MessageType getMessageType() const \
         { return type; } };
 
@@ -275,15 +309,18 @@ DEF_SIMPLE_CMD(EmitStatusCommand,MSG_CMD_EMIT_STATUS)
 DEF_SIMPLE_CMD(EmitStateCommand,MSG_CMD_EMIT_STATE)
 DEF_SIMPLE_CMD(ReinitCommand,MSG_CMD_REINIT)
 DEF_SIMPLE_CMD(ShutdownCommand,MSG_CMD_SHUTDOWN)
+DEF_SIMPLE_CMD(AckReply,MSG_REPLY_ACK)
+DEF_SIMPLE_CMD(NackReply,MSG_REPLY_NACK)
 
-class ConfigureLoggingCommand: public Command
+
+class ConfigureLoggingCommand: public ControlMessage
 {
 public:
     ConfigureLoggingCommand( bool a_enabled, Level a_level )
         : m_enabled(a_enabled), m_level(a_level)
     {}
     ConfigureLoggingCommand( const cms::Message &a_msg )
-        : Command( a_msg )
+        : ControlMessage( a_msg )
     {  translateFrom( a_msg ); }
 
     inline MessageType getMessageType() const
@@ -292,7 +329,7 @@ public:
 private:
     virtual void translateTo( cms::Message &a_msg )
     {
-        Command::translateTo( a_msg );
+        ControlMessage::translateTo( a_msg );
 
         a_msg.setBooleanProperty( "log_enabled", m_enabled );
         a_msg.setShortProperty( "log_level", (short)m_level );
@@ -309,65 +346,6 @@ private:
 };
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Reply Class
-
-class Reply : public MessageBase
-{
-public:
-    Reply() {}
-    Reply( const cms::Message &a_msg )
-        : MessageBase( a_msg )
-    {  translateFrom( a_msg ); }
-
-    inline CommandID getCommandID() const
-    { return m_cmd_id; }
-
-protected:
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-
-        a_msg.setStringProperty( "cmd_id", m_cmd_id );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_cmd_id = a_msg.getStringProperty( "cmd_id" );
-    }
-
-    std::string         m_cmd_id;
-
-    // Command class sets cmd_id when message is sent
-    friend class Command;
-    // Connection class uses cmd_id to associae with command
-    friend class Connection;
-};
-
-// ---------------------------- Common Replies ---------------------------
-
-class AckReply : public Reply
-{
-public:
-    AckReply() {}
-    AckReply( const cms::Message &a_msg )
-        : Reply( a_msg ) {}
-
-    inline MessageType getMessageType() const
-    { return MSG_REPLY_ACK; }
-};
-
-
-class NackReply : public Reply
-{
-public:
-    NackReply() {}
-    NackReply( const cms::Message &a_msg )
-        : Reply( a_msg ) {}
-
-    inline MessageType getMessageType() const
-    { return MSG_REPLY_NACK; }
-};
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LogMessage Class
@@ -388,8 +366,8 @@ public:
 
     std::string getFormattedMessage( bool a_debug_info ) const
     {
-        std::string formatted_msg = m_source + ":" + ComBusHelper::toText(m_level)
-                    + " [" + boost::lexical_cast<std::string>(m_timestamp) + "] "
+        std::string formatted_msg = getSourceName() + "." + boost::lexical_cast<std::string>(getSourceInstance()) + ":" + ComBusHelper::toText(m_level)
+                    + " [" + boost::lexical_cast<std::string>(getTimestamp()) + "] "
                     + m_msg;
 
         if ( a_debug_info )
@@ -483,6 +461,7 @@ protected:
         m_status = (StatusCode) a_msg.getShortProperty( "status" );
     }
 
+private:
     StatusCode          m_status;
 };
 
@@ -575,6 +554,7 @@ protected:
         m_sig_name = a_msg.getStringProperty( "sig_name" );
     }
 
+private:
     std::string         m_sig_name;
 };
 
@@ -652,6 +632,7 @@ protected:
         m_sig_level = (Level) a_msg.getShortProperty( "sig_level" );
     }
 
+private:
     std::string         m_sig_name;
     std::string         m_sig_source;
     std::string         m_sig_message;
