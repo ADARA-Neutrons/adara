@@ -70,6 +70,7 @@ std::list<std::string> StorageManager::m_dailyCache;
 
 const char *StorageManager::m_run_filename = "next_run";
 const char *StorageManager::m_run_tempname = "next_run.temp";
+std::string StorageManager::m_stateDirPrefix("state-storage");
 
 boost::thread StorageManager::m_ioThread;
 
@@ -152,6 +153,9 @@ void StorageManager::init(void)
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
+
+	if (cleanupIndexes())
+		throw std::runtime_error("Unable to clean stale indexes");
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -586,6 +590,11 @@ void StorageManager::scanStorage(void)
 		if (file == m_run_filename || file == m_run_tempname)
 			continue;
 
+		/* Skip index directories; they are handled by other means. */
+		if (file.string().compare(0, m_stateDirPrefix.length(),
+						m_stateDirPrefix) == 0)
+			continue;
+
 		if (status.type() != fs::directory_file) {
 			WARN("Ignoring non-directory '" << it->path() << "'");
 			continue;
@@ -825,4 +834,106 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 
 	m_dailyExhausted = (purged < purgeRequested);
 	return purged;
+}
+
+static void removeIndexDir(fs::path *indexDir)
+{
+	try {
+		DEBUG("removeIndexDir " << *indexDir);
+		fs::remove_all(*indexDir);
+	} catch (fs::filesystem_error err) {
+		WARN("Error removing index: " << err.what());
+	}
+
+	delete indexDir;
+}
+
+static void scheduleIndexRemoval(const fs::path &indexDir)
+{
+	/* Spawn a background thread to remove this directory, but don't
+	 * wait around for it.
+	 */
+	boost::thread removal(removeIndexDir, new fs::path(indexDir));
+	removal.detach();
+}
+
+bool StorageManager::retireIndexDir(bool remove)
+{
+	std::string name;
+	uint32_t attempt;
+
+	for (attempt = 1; attempt != 0; attempt++) {
+		name = m_stateDirPrefix;
+		name.append(".");
+		name.append(boost::lexical_cast<std::string>(attempt));
+
+		/* We do this in two steps, as renameat() can overwrite a
+		 * directory if it is empty; this could lead to race conditions
+		 * with the removal thread, leaving stale directories.
+		 */
+		if (!faccessat(m_base_fd, name.c_str(), 0,
+			      AT_SYMLINK_NOFOLLOW) || errno != ENOENT)
+			continue;
+
+		if (renameat(m_base_fd, m_stateDirPrefix.c_str(),
+			     m_base_fd, name.c_str()) < 0) {
+			int e = errno;
+			ERROR("Unable to rename index to " << name << ": "
+			      << strerror(e));
+			return true;
+		}
+
+		break;
+	}
+
+	/* We should always succeed before ~4 billion attempts, but make sure
+	 * we notice the failure -- we must have a bug.
+	 */
+	if (!attempt)
+		throw std::logic_error("wraparound in retireIndexDir");
+
+	if (remove) {
+		fs::path dir(m_baseDir);
+		dir /= name;
+		scheduleIndexRemoval(dir);
+	}
+
+	return false;
+}
+
+bool StorageManager::cleanupIndexes(void)
+{
+	/* If we have a stale index directory, rename it so that we may
+	 * make a new one while we kill the old ones in the background.
+	 *
+	 * Don't kick off the background delete, we'll do that as part
+	 * of walking the directory; this covers us in case there are
+	 * other stale index directories present.
+	 */
+	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
+		if (retireIndexDir(false))
+			return true;
+	}
+
+	fs::directory_iterator end, it(m_baseDir);
+
+	for (; it != end; ++it) {
+		fs::path entry(it->path().filename());
+
+		/* Skip everything except for stale indexes. */
+		if (entry.string().compare(0, m_stateDirPrefix.length(),
+						m_stateDirPrefix))
+			continue;
+
+		fs::file_status status = it->status();
+		if (status.type() != fs::directory_file) {
+			WARN("Ignoring non-directory '" << it->path()
+			     << "' with index prefix");
+			continue;
+		}
+
+		scheduleIndexRemoval(it->path());
+	}
+
+	return false;
 }

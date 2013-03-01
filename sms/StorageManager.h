@@ -98,6 +98,7 @@ private:
 
 	static const char *m_run_filename;
 	static const char *m_run_tempname;
+	static std::string m_stateDirPrefix;
 
 	static boost::thread m_ioThread;
 	static bool m_ioActive;
@@ -112,6 +113,8 @@ private:
 	static bool cleanupRunFiles(void);
 
 	static void stateSnapshot(StorageFile::SharedPtr &f);
+	static bool retireIndexDir(bool remove = true);
+	static bool cleanupIndexes(void);
 
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
