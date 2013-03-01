@@ -71,6 +71,11 @@ std::list<std::string> StorageManager::m_dailyCache;
 const char *StorageManager::m_run_filename = "next_run";
 const char *StorageManager::m_run_tempname = "next_run.temp";
 std::string StorageManager::m_stateDirPrefix("state-storage");
+std::string StorageManager::m_stateDir;
+uint32_t StorageManager::m_pulseTime;
+uint32_t StorageManager::m_nextIndexTime;
+uint32_t StorageManager::m_indexPeriod;
+std::list<StorageManager::IndexEntry> StorageManager::m_stateIndex;
 
 boost::thread StorageManager::m_ioThread;
 
@@ -125,6 +130,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	m_max_blocks_allowed = maxSize + m_block_size - 1;
 	m_max_blocks_allowed /= m_block_size;
 
+	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
+
 	StorageFile::config(conf);
 }
 
@@ -163,6 +170,13 @@ void StorageManager::init(void)
 	 * scan process must skip them.
 	 */
         clock_gettime(CLOCK_REALTIME, &m_scanStart);
+
+	/* We need a timestamp for the initial index entry; any timestamp
+	 * will do, as it will be the catch-all if we are asked to go back
+	 * to the beginning of the first container. We just set it here
+	 * to note that it has not been overlooked.
+	 */
+	m_pulseTime = m_nextIndexTime = 1;
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -390,6 +404,13 @@ void StorageManager::startContainer(uint32_t run)
 	if (m_cur_container)
 		throw std::logic_error("Already have a container");
 
+	if (mkdirat(m_base_fd, m_stateDirPrefix.c_str(), 0775) < 0) {
+		int e = errno;
+		std::string msg("Unable to create new state dir: ");
+		msg += strerror(e);
+		throw std::runtime_error(msg);
+	}
+
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run);
 
@@ -403,6 +424,9 @@ void StorageManager::startContainer(uint32_t run)
 	 * This needs to happen after we tell interested parties about
 	 * the new container, so they don't miss the notification of the
 	 * new file.
+	 *
+	 * We'll see this file via the fileCreated() call back, and add
+	 * it to the state index at that point.
 	 */
 	m_cur_container->newFile();
 }
@@ -415,6 +439,13 @@ void StorageManager::endCurrentContainer(void)
 	m_cur_container->terminate();
 	m_contChange(m_cur_container, false);
 	m_cur_container.reset();
+
+	/* Now that we've changed containers, our index of past state
+	 * snapshots is invalid; clear it out. We'll start repopulating
+	 * the index when we create a new container.
+	 */
+	m_stateIndex.clear();
+	retireIndexDir();
 }
 
 void StorageManager::stateSnapshot(StorageFile::SharedPtr &f)
@@ -429,6 +460,13 @@ void StorageManager::stateSnapshot(StorageFile::SharedPtr &f)
 
 void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 {
+	/* Each new file gives us an opportunity to add a state checkpoint
+	 * at low cost; we do not need a separate state file as we'll be
+	 * taking a snapshot as part of the file creation.
+	 */
+	StorageFile::SharedPtr noFile;
+	indexState(noFile, f, 0);
+
 	stateSnapshot(f);
 }
 
@@ -476,13 +514,42 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
+	struct header *hdr = (struct header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
-	off_t size, blocks;
+	off_t size, blocks, resumeLocation;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
+	switch (hdr->pkt_format) {
+	default:
+		/* Only pulse data should determine if it is time to take
+		 * a new state snapshot.
+		 */
+		break;
+	case ADARA::PacketType::RTDL_V0:
+	case ADARA::PacketType::BANKED_EVENT_V0:
+	case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+		m_pulseTime = hdr->ts_sec;
+		break;
+	}
+
+	/* Save off where we are in the stream, as we may need to point
+	 * to this location for replay after a snapshot.
+	 */
+	resumeLocation = m_cur_container->file()->size();
 	size = m_cur_container->write(iovec, len, notify);
+
+	/* Is it time to take a state snapshot? If we took one while writing
+	 * the current packet out -- ie, we started a new file -- then
+	 * that will update m_nextTimeIndex and we'll know to skip it here.
+	 */
+	if (m_pulseTime >= m_nextIndexTime) {
+		StorageFile::SharedPtr state(StorageFile::stateFile(
+					     m_cur_container, m_stateDir));
+		stateSnapshot(state);
+		indexState(state, m_cur_container->file(), resumeLocation);
+	}
 
 	/* Is it time to initiate a purge of old data?
 	 *
@@ -834,6 +901,16 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 
 	m_dailyExhausted = (purged < purgeRequested);
 	return purged;
+}
+
+void StorageManager::indexState(StorageFile::SharedPtr &state,
+				StorageFile::SharedPtr &data,
+				off_t dataOffset)
+{
+	IndexEntry entry(m_pulseTime, state, data, dataOffset);
+	m_stateIndex.push_front(entry);
+
+	m_nextIndexTime = m_pulseTime + m_indexPeriod;
 }
 
 static void removeIndexDir(fs::path *indexDir)

@@ -79,6 +79,20 @@ public:
 private:
 	typedef boost::signals::connection connection;
 
+	struct IndexEntry {
+		StorageFile::SharedPtr	m_stateFile;
+		StorageFile::SharedPtr	m_dataFile;
+		uint32_t		m_key;
+		off_t			m_resumeOffset;
+
+		IndexEntry(uint32_t s, StorageFile::SharedPtr &f,
+			   StorageFile::SharedPtr &d, off_t r) :
+				m_stateFile(f), m_dataFile(d), m_key(s),
+				m_resumeOffset(r) {}
+
+		bool isDataOnly(void) const { return !m_resumeOffset; }
+	};
+
 	static std::string m_baseDir;
 	static int m_base_fd;
 
@@ -99,6 +113,12 @@ private:
 	static const char *m_run_filename;
 	static const char *m_run_tempname;
 	static std::string m_stateDirPrefix;
+	static std::string m_stateDir;
+
+	static std::list<IndexEntry> m_stateIndex;
+	static uint32_t m_pulseTime;
+	static uint32_t m_nextIndexTime;
+	static uint32_t m_indexPeriod;
 
 	static boost::thread m_ioThread;
 	static bool m_ioActive;
@@ -115,6 +135,8 @@ private:
 	static void stateSnapshot(StorageFile::SharedPtr &f);
 	static bool retireIndexDir(bool remove = true);
 	static bool cleanupIndexes(void);
+	static void indexState(StorageFile::SharedPtr &state,
+			       StorageFile::SharedPtr &data, off_t dataOffset);
 
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
