@@ -521,7 +521,7 @@ uint32_t StorageManager::validatePacket(const IoVector &iovec)
 	for (it = iovec.begin(); it != iovec.end(); it++)
 		len += it->iov_len;
 
-	if (iovec[0].iov_len < (2 * sizeof(uint32_t)))
+	if (iovec[0].iov_len < (4 * sizeof(uint32_t)))
 		throw std::logic_error("Initial fragment too small");
 
 	if (len < sizeof(struct header))
