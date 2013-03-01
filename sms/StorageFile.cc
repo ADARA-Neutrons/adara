@@ -333,7 +333,9 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 	if (f->m_fd < 0) {
 		int err = errno;
 		free(path);
-		std::string msg("StorageFile::stateFile() mkstemp error: ");
+		std::string msg("StorageFile::stateFile(");
+		msg += f->m_path;
+		msg += ") mkstemp error: ";
 		msg += strerror(err);
 		throw std::runtime_error(msg);
         }
