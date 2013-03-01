@@ -413,7 +413,7 @@ void StorageManager::endCurrentContainer(void)
 	m_cur_container.reset();
 }
 
-void StorageManager::fileCreated(StorageFile::SharedPtr &f)
+void StorageManager::stateSnapshot(StorageFile::SharedPtr &f)
 {
 	if (m_prologueFile)
 		throw std::logic_error("Recursive use of prologue files");
@@ -421,6 +421,11 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 	m_prologueFile = f;
 	m_prologue();
 	m_prologueFile.reset();
+}
+
+void StorageManager::fileCreated(StorageFile::SharedPtr &f)
+{
+	stateSnapshot(f);
 }
 
 void StorageManager::startRecording(uint32_t run)

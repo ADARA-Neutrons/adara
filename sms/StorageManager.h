@@ -111,6 +111,8 @@ private:
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
 
+	static void stateSnapshot(StorageFile::SharedPtr &f);
+
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
 	static bool isValidDaily(const std::string &dir);
