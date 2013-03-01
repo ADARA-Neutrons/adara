@@ -490,26 +490,65 @@ void StorageManager::stopRecording(void)
 
 void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 {
-	/* TODO allow requests of actual historical data */
+	if (startSeconds) {
+		if (m_stateIndex.empty())
+			throw std::logic_error("State index is empty");
 
-	/* Ok, we don't want any historical data, so just create a
-	 * transient file to hold the current state information.
-	 */
+		/* We store newest entries to the front of the list, so
+		 * we only need to go until we find a entry that has an
+		 * older timestamp than we're looking for. That's our
+		 * starting point, but we want the iterator to point
+		 * past it so the conversion to a reverse_iterator points
+		 * to the proper entry.
+		 */
+		std::list<IndexEntry>::iterator v, it, end;
+		end = m_stateIndex.end();
+		for (it = m_stateIndex.begin(), v = it++; it != end; v = it++) {
+			if (v->m_key < startSeconds)
+				break;
+		}
 
-	/* Create a file for the current state, and call the prologue
-	 * handlers to populate it.
-	 */
-	StorageFile::SharedPtr state(StorageFile::stateFile(m_cur_container,
-							    "/tmp"));
-	state->persist(false);
-	fileCreated(state);
-	cb(state, 0);
+		/* We've found the entry that satisfies the request; tell
+		 * the callback about the state file, if any. We may not
+		 * have one, if the caller's request is satisfied at the
+		 * start of a data file.
+		 *
+		 * Once we've got the state out of the way, resume from the
+		 * appropriate location in the associated data file, and
+		 * walk to the start of the list, informing the callback
+		 * of each data file after our starting position.
+		 *
+		 * This has the desired side effect of handling the currently
+		 * active file without a special case -- as we index every
+		 * new file as a snapshot, it will be the last file we hand
+		 * to the callback.
+		 */
+		std::list<IndexEntry>::reverse_iterator rit(it), rend;
+		rend = m_stateIndex.rend();
 
-	/* Now, tell the callback about the current file we're working on.
-	 */
-	StorageFile::SharedPtr &f = m_cur_container->file();
-	if (f)
+		if (rit->m_stateFile)
+			cb(rit->m_stateFile, 0);
+		cb(rit->m_dataFile, rit->m_resumeOffset);
+		for (rit++; rit != rend; rit++) {
+			if (rit->isDataOnly())
+				cb(rit->m_dataFile, 0);
+		}
+	} else {
+		/* Ok, we don't want any historical data, so just create a
+		 * transient file to hold the current state information.
+		 */
+		StorageFile::SharedPtr state(StorageFile::stateFile(
+						m_cur_container, "/tmp"));
+		state->persist(false);
+		stateSnapshot(state);
+		cb(state, 0);
+
+		/* Now that we've snapshotted the state, inform the
+		 * callback about the current file we're working on.
+		 */
+		StorageFile::SharedPtr &f = m_cur_container->file();
 		cb(f, f->size());
+	}
 }
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
