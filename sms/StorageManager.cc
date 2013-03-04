@@ -97,6 +97,10 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		throw std::runtime_error(msg);
 	}
 
+	m_stateDir = m_baseDir;
+	m_stateDir += "/";
+	m_stateDir += m_stateDirPrefix;
+
 	uint64_t maxSize = 0;
 	std::string poolsize = conf.get<std::string>("storage.poolsize", "");
 	if (poolsize.length()) {
