@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ADARA Stream Monitor</string>
+   <string>SNS DAS Monitor</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QVBoxLayout" name="verticalLayout" stretch="0,1,0">
@@ -659,13 +659,6 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QPushButton" name="configButton">
-        <property name="text">
-         <string>Configure</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QLabel" name="combusStatusLabel">
         <property name="font">
          <font>
@@ -737,12 +730,52 @@
     </item>
    </layout>
   </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>924</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuConfigure">
+    <property name="title">
+     <string>Configure</string>
+    </property>
+    <addaction name="actionActiveMQ"/>
+    <addaction name="actionRules"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <addaction name="menuConfigure"/>
+   <addaction name="menuHelp"/>
+  </widget>
   <action name="actionSMS_Connection">
    <property name="text">
     <string>SMS Connection...</string>
    </property>
    <property name="toolTip">
     <string>Set SMS hostname and port</string>
+   </property>
+  </action>
+  <action name="actionActiveMQ">
+   <property name="text">
+    <string>ActiveMQ...</string>
+   </property>
+  </action>
+  <action name="actionRules">
+   <property name="text">
+    <string>Rules...</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About...</string>
    </property>
   </action>
  </widget>
@@ -766,14 +799,46 @@
    </hints>
   </connection>
   <connection>
-   <sender>configButton</sender>
-   <signal>clicked()</signal>
+   <sender>actionActiveMQ</sender>
+   <signal>triggered()</signal>
    <receiver>MainWindow</receiver>
-   <slot>configure()</slot>
+   <slot>configActiveMQ()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>52</x>
-     <y>745</y>
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>461</x>
+     <y>384</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>actionRules</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>configRules()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>461</x>
+     <y>384</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>actionAbout</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>about()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
     </hint>
     <hint type="destinationlabel">
      <x>461</x>
@@ -783,6 +848,8 @@
   </connection>
  </connections>
  <slots>
-  <slot>configure()</slot>
+  <slot>configActiveMQ()</slot>
+  <slot>configRules()</slot>
+  <slot>about()</slot>
  </slots>
 </ui>

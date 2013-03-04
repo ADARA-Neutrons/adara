@@ -3,12 +3,23 @@
 
 #include <string>
 #include <vector>
+#include "ADARADefs.h"
+
 
 /*
   DASMon common data structures and definitions
 */
 namespace ADARA {
 namespace DASMON {
+
+struct SignalInfo
+{
+    std::string     name;
+    std::string     fact;
+    std::string     source;
+    ADARA::Level    level;
+    std::string     msg;
+};
 
 
 class BeamInfo

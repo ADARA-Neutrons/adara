@@ -1,13 +1,17 @@
-#include "mainwindow.h"
-#include "ui_mainwindow.h"
+#include "MainWindow.h"
+#include "ui_MainWindow.h"
 //#include "ConfigureSMSConnectionDlg.h"
 #include <iostream>
+#include <algorithm>
 #include <QMetaObject>
 #include <QStringList>
 #include <QSettings>
+#include <QMessageBox>
+#include <QMutexLocker>
 //#include <log4cxx/logger.h>
 
 #include "AMQConfigDialog.h"
+#include "RuleConfigDialog.h"
 #include "DASMonMessages.h"
 
 using namespace std;
@@ -16,6 +20,7 @@ using namespace std;
 #define TIMEOUT_UNRESPONSIVE 10
 #define TIMEOUT_DEAD 20
 #define TIMEOUT_DEAD_CLEANUP 5
+
 
 
 MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass )
@@ -86,7 +91,7 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     m_combus->attach( *this );   // Listen to ComBus connection status
     m_combus->attach( *this, "ADARA.STATUS.>" ); // Listen to ADARA process health status (display only)
     m_combus->attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
-    m_combus->attach( *this, "ADARA.APP.DASMON" );
+    m_combus->attach( *this, "ADARA.APP.DASMON.0" );
     m_combus->setControlListener( *this );
 
     m_start_time = QDateTime::currentDateTime();
@@ -107,6 +112,23 @@ MainWindow::~MainWindow()
     delete m_combus;
     delete ui;
 }
+
+
+void
+MainWindow::attach( SubClient &a_sub_client )
+{
+    QMutexLocker lock( &m_mutex );
+
+    if ( ::find( m_sub_clients.begin(), m_sub_clients.end(), &a_sub_client ) == m_sub_clients.end())
+    {
+        m_sub_clients.push_back( &a_sub_client );
+
+        a_sub_client.dasmonStatus( m_dasmon_state.activeTrue() );
+    }
+}
+
+
+
 
 void
 MainWindow::setComBusActive( bool a_active )
@@ -130,6 +152,11 @@ MainWindow::setComBusActive( bool a_active )
 
         updateAllStatusIndicators();
 
+        // TODO This is WRONG - need to encapsulate calbacks in one place (setDASMonActive)
+        QMutexLocker lock( &m_mutex );
+        for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
+            (*c)->dasmonStatus( false );
+
         writeLog( ADARA::ERROR, "ComBus connection lost." );
     }
 }
@@ -143,6 +170,10 @@ MainWindow::setDASMonActive( bool a_active )
         m_dasmon_state.set( a_active, true );
         updateDASMonStatusIndicator();
 
+        QMutexLocker lock( &m_mutex );
+        for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
+            (*c)->dasmonStatus( a_active );
+
         writeLog( ADARA::INFO, "DASMON server connection established." );
     }
     else if ( !a_active && !m_dasmon_state.activeFalse() )
@@ -155,6 +186,10 @@ MainWindow::setDASMonActive( bool a_active )
         clearSignals();
 
         updateAllStatusIndicators();
+
+        QMutexLocker lock( &m_mutex );
+        for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
+            (*c)->dasmonStatus( a_active );
 
         writeLog( ADARA::ERROR, "DASMON server connection lost." );
     }
@@ -190,7 +225,7 @@ MainWindow::onProcTimer()
 {
     m_combus->sendStatus( ADARA::ComBus::STATUS_RUNNING );
 
-    boost::unique_lock<boost::mutex> lock(m_mutex);
+    QMutexLocker lock( &m_mutex );
     unsigned long t = time(0);
     bool kill_dasmon = false;
 
@@ -200,7 +235,7 @@ MainWindow::onProcTimer()
         if ((( p->second.status == ADARA::ComBus::STATUS_STOPPING ) && ( t > p->second.last_updated + TIMEOUT_DEAD_CLEANUP )) ||
             ( t > p->second.last_updated + TIMEOUT_DEAD ))
         {
-            if ( p->first == "DASMON" )
+            if ( p->first == "DASMON.0" )
                 kill_dasmon = true;
 
             m_proc_status.erase( p++ );
@@ -246,7 +281,7 @@ MainWindow::onTableTimer()
 
     if ( m_refresh_log_table )
     {
-        boost::lock_guard<boost::mutex> lock(m_log_mutex);
+        QMutexLocker lock( &m_log_mutex );
 
         m_refresh_log_table = false;
 
@@ -260,7 +295,7 @@ MainWindow::onTableTimer()
     }
 
 
-    boost::lock_guard<boost::mutex> lock(m_mutex);
+    QMutexLocker lock( &m_mutex );
 
     if ( m_refresh_proc_table )
     {
@@ -358,7 +393,7 @@ MainWindow::onTableTimer()
 
 
 void
-MainWindow::configure()
+MainWindow::configActiveMQ()
 {
     AMQConfigDialog  dlg( this, m_broker_uri, m_broker_user, m_broker_pass );
 
@@ -380,6 +415,30 @@ MainWindow::configure()
     }
 }
 
+void
+MainWindow::configRules()
+{
+    if ( !m_dasmon_state.activeTrue() )
+    {
+        QMessageBox::information( this, "DAS Monitor", QString( "Must be connected to DASMON service\nbefore rules can be configured." ));
+    }
+    else
+    {
+        RuleConfigDialog  dlg( *this );
+
+        attach( dlg );
+
+        if ( dlg.exec() == QDialog::Accepted )
+        {
+        }
+    }
+}
+
+void
+MainWindow::about()
+{
+    QMessageBox::about( this, "About DAS Monitor", QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg( DASMON_GUI_VERSION ));
+}
 
 void
 MainWindow::updateAllStatusIndicators()
@@ -695,7 +754,7 @@ MainWindow::clearRunDisplay()
 void
 MainWindow::clearSignals()
 {
-    boost::lock_guard<boost::mutex> lock(m_mutex);
+    QMutexLocker lock( &m_mutex );
 
     m_alerts.clear();
     m_signalled = false;
@@ -708,7 +767,7 @@ MainWindow::clearSignals()
 void
 MainWindow::writeLog( ADARA::Level a_level, const std::string &a_msg )
 {
-    boost::lock_guard<boost::mutex> lock(m_log_mutex);
+    QMutexLocker lock( &m_log_mutex );
 
     if ( m_log_entries.size() == 1000 )
         m_log_entries.pop_front();
@@ -733,8 +792,9 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
     if ( m_init && a_connected )
     {
+        string id;
         ADARA::ComBus::EmitStateCommand cmd;
-        m_combus->sendControl( cmd, "DASMON" );
+        m_combus->sendControl( cmd, "DASMON.0", id );
         m_init = false;
     }
 }
@@ -751,19 +811,21 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
 
-    const string &source = a_msg.getSourceName() + "." + boost::lexical_cast<string>(a_msg.getSourceInstance());
+    //const string &source = a_msg.getSourceName() + "." + boost::lexical_cast<string>(a_msg.getSourceInstance());
+
+    QMutexLocker lock( &m_mutex );
 
     switch( a_msg.getMessageType() )
     {
     case ADARA::ComBus::MSG_STATUS:
         {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-            map<string,ProcInfo>::iterator ip = m_proc_status.find( source );
+
+            map<string,ProcInfo>::iterator ip = m_proc_status.find( a_msg.getSourceName() );
             if ( ip != m_proc_status.end())
             {
-                if ( ip->second.status != ((ADARA::ComBus::StatusMessage&)a_msg).getStatus() )
+                if ( ip->second.status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
                 {
-                    ip->second.status = ((ADARA::ComBus::StatusMessage&)a_msg).getStatus();
+                    ip->second.status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
                     ip->second.label = QString( ADARA::ComBus::ComBusHelper::toText( ip->second.status ));
                     ip->second.hl_count = PV_HIGHLIGH_DURATION;
                     m_refresh_proc_table = true;
@@ -772,9 +834,9 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             }
             else
             {
-                ProcInfo &info = m_proc_status[source];
-                info.name = QString( source.c_str() );
-                info.status = ((ADARA::ComBus::StatusMessage&)a_msg).getStatus();
+                ProcInfo &info = m_proc_status[a_msg.getSourceName()];
+                info.name = QString( a_msg.getSourceName().c_str() );
+                info.status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
                 info.label = QString( ADARA::ComBus::ComBusHelper::toText( info.status ));
                 info.hl_count = PV_HIGHLIGH_DURATION;
                 info.last_updated = time(0);
@@ -786,44 +848,28 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     case ADARA::ComBus::MSG_LOG:
         {
             const ADARA::ComBus::LogMessage &logmsg = (const ADARA::ComBus::LogMessage&)a_msg;
-            boost::lock_guard<boost::mutex> lock(m_log_mutex);
 
             if ( m_log_entries.size() == 1000 )
                 m_log_entries.pop_front();
             m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSourceName().c_str())
-                                     .arg(logmsg.getLevelText().c_str()).arg(logmsg.getMessage().c_str()));
+                                     .arg(logmsg.getLevelText().c_str()).arg(logmsg.m_msg.c_str()));
             m_refresh_log_table = true;
         }
         break;
 
     case ADARA::ComBus::MSG_STS_TRANS_COMPLETE:
         break;
-#if 0
-    case ADARA::ComBus::MSG_SIGNAL_EVENT:
-        {
-            const ADARA::ComBus::SignalEventMessage &msg = dynamic_cast<const ADARA::ComBus::SignalEventMessage&>(a_msg);
 
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-
-            m_events.push_back( AlertInfo( msg.getSignalName(), msg.getSignalSource(), msg.getSignalLevel(),
-                                           msg.getSignalMessage(), PV_HIGHLIGH_DURATION ));
-
-            m_refresh_event_table = true;
-        }
-        break;
-#endif
     case ADARA::ComBus::MSG_SIGNAL_ASSERT:
         {
             const ADARA::ComBus::SignalAssertMessage &msg = dynamic_cast<const ADARA::ComBus::SignalAssertMessage&>(a_msg);
 
-            boost::lock_guard<boost::mutex> lock(m_mutex);
+            m_alerts[msg.m_sig_name] = AlertInfo( msg.m_sig_name, msg.m_sig_source, msg.m_sig_level,
+                                                     msg.m_sig_message, PV_HIGHLIGH_DURATION );
 
-            m_alerts[msg.getSignalName()] = AlertInfo( msg.getSignalName(), msg.getSignalSource(), msg.getSignalLevel(),
-                                                     msg.getSignalMessage(), PV_HIGHLIGH_DURATION );
-
-            if ( msg.getSignalLevel()  > m_highest_level || m_alerts.size() == 1 )
+            if ( msg.m_sig_level  > m_highest_level || m_alerts.size() == 1 )
             {
-                m_highest_level = msg.getSignalLevel();
+                m_highest_level = msg.m_sig_level;
                 m_signalled = true;
             }
 
@@ -836,9 +882,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         {
             const ADARA::ComBus::SignalRetractMessage &msg = dynamic_cast<const ADARA::ComBus::SignalRetractMessage&>(a_msg);
 
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-
-            map<string,AlertInfo>::iterator ia = m_alerts.find( msg.getSignalName());
+            map<string,AlertInfo>::iterator ia = m_alerts.find( msg.m_sig_name);
             if ( ia != m_alerts.end() )
             {
                 bool recalc = false;
@@ -975,16 +1019,85 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
 
 bool
-MainWindow::comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd )
+MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 {
-    (void)a_cmd;
+    setComBusActive( true );
+    if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
+        setDASMonActive( true );
+
+    cout << "Control Msg: " << a_msg.getMessageType() << endl;
+
+    // See if this message belogs to a sub client (by correlation id)
+    QMutexLocker lock( &m_mutex );
+
+    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.m_correlation_id );
+    if ( iRoute != m_client_cids.end() )
+    {
+        if ( !iRoute->second->comBusControlMessage( a_msg ))
+        {
+            // If sub client is done talking, release CID routing entry
+            m_client_cids.erase( iRoute );
+        }
+
+        return true;
+    }
+
+    // Process main thread commands here
+    // None yet...
+
     return false;
+}
+
+///////////////////////////////////////////////////////////
+// SubClient support methods
+
+void
+MainWindow::detach( SubClient &a_sub_client )
+{
+    QMutexLocker lock( &m_mutex );
+
+    clearCIDs_nolock( a_sub_client );
+
+    vector<SubClient*>::iterator i = ::find( m_sub_clients.begin(), m_sub_clients.end(), &a_sub_client );
+    if ( i != m_sub_clients.end())
+        m_sub_clients.erase( i );
 }
 
 
 void
-MainWindow::comBusReply( const ADARA::ComBus::ControlMessage &a_reply )
+MainWindow::clearCIDs_nolock( SubClient &a_sub_client )
 {
-    (void)a_reply;
+    for ( map<string,SubClient*>::iterator c = m_client_cids.begin(); c != m_client_cids.end(); )
+    {
+        if ( c->second == &a_sub_client )
+            m_client_cids.erase( c++ );
+        else
+            ++c;
+    }
+}
+
+bool
+MainWindow::createRoute( SubClient &a_sub_client, ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id )
+{
+    QMutexLocker lock( &m_mutex );
+    bool res = m_combus->sendControl( a_msg, a_dest_proc, a_correlation_id );
+
+    if ( res )
+    {
+        // If send worked, add routing entry for CID
+        m_client_cids[a_correlation_id] = &a_sub_client;
+    }
+
+    return res;
+}
+
+void
+MainWindow::removeRoute( SubClient &a_sub_client, std::string &a_correlation_id )
+{
+    QMutexLocker lock( &m_mutex );
+
+    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_correlation_id );
+    if ( iRoute != m_client_cids.end() && iRoute->second == &a_sub_client )
+        m_client_cids.erase( iRoute );
 }
 

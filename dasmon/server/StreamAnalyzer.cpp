@@ -1,7 +1,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
-//#include <boost/bind.hpp>
 #include <boost/tokenizer.hpp>
+
+#include "ComBus.h"
 #include "StreamAnalyzer.h"
 
 #include <iostream>
@@ -9,67 +10,74 @@
 
 using namespace std;
 
+namespace ADARA {
+namespace DASMON {
 
-StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor )
-    :m_monitor(a_monitor), m_pv_prefix("PV_")
+StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_file )
+    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_cfg_file( a_cfg_file )
 {
+    m_engine = new RuleEngine();
     m_monitor.addListener( *this );
-    m_engine.attach( *this );
+    m_engine->attach( *this );
 
-    m_fact_recording            = m_engine.getFactHandle("RECORDING");
-    m_fact_run_number           = m_engine.getFactHandle("RUN_NUMBER");
-    m_fact_paused               = m_engine.getFactHandle("PAUSED");
-    m_fact_scanning             = m_engine.getFactHandle("SCANNING");
-    m_fact_scan_index           = m_engine.getFactHandle("SCAN_INDEX");
-    m_fact_facility_name        = m_engine.getFactHandle("FACILITY_NAME");
-    m_fact_beam_id              = m_engine.getFactHandle("BEAM_ID");
-    m_fact_beam_sname           = m_engine.getFactHandle("BEAM_SHORT_NAME");
-    m_fact_beam_lname           = m_engine.getFactHandle("BEAM_LONG_NAME");
-    m_fact_run_title            = m_engine.getFactHandle("RUN_TITLE");
-    m_fact_prop_id              = m_engine.getFactHandle("PROPOSAL_ID");
-    m_fact_sample_id            = m_engine.getFactHandle("SAMPLE_ID");
-    m_fact_sample_name          = m_engine.getFactHandle("SAMPLE_NAME");
-    m_fact_sample_nature        = m_engine.getFactHandle("SAMPLE_NATURE");
-    m_fact_sample_form          = m_engine.getFactHandle("SAMPLE_FORMULA");
-    m_fact_sample_env           = m_engine.getFactHandle("SAMPLE_ENVIRONMENT");
-    m_fact_user_info            = m_engine.getFactHandle("USER_INFO");
-    m_fact_count_rate           = m_engine.getFactHandle("COUNT_RATE");
-    m_fact_mon_count_rate[0]    = m_engine.getFactHandle("MON0_COUNT_RATE");
-    m_fact_mon_count_rate[1]    = m_engine.getFactHandle("MON1_COUNT_RATE");
-    m_fact_mon_count_rate[2]    = m_engine.getFactHandle("MON2_COUNT_RATE");
-    m_fact_mon_count_rate[3]    = m_engine.getFactHandle("MON3_COUNT_RATE");
-    m_fact_mon_count_rate[4]    = m_engine.getFactHandle("MON4_COUNT_RATE");
-    m_fact_mon_count_rate[5]    = m_engine.getFactHandle("MON5_COUNT_RATE");
-    m_fact_mon_count_rate[6]    = m_engine.getFactHandle("MON6_COUNT_RATE");
-    m_fact_mon_count_rate[7]    = m_engine.getFactHandle("MON7_COUNT_RATE");
-    m_fact_pulse_charge         = m_engine.getFactHandle("PULSE_CHARGE");
-    m_fact_pulse_freq           = m_engine.getFactHandle("PULSE_FREQ");
-    m_fact_stream_rate          = m_engine.getFactHandle("STREAM_RATE");
-    m_fact_run_pulse_charge     = m_engine.getFactHandle("RUN_PULSE_CHARGE");
-    m_fact_pix_err_count        = m_engine.getFactHandle("RUN_PIXEL_ERR_COUNT");
-    m_fact_dup_pulse_count      = m_engine.getFactHandle("RUN_DUP_PULSE_COUNT");
-    m_fact_cycle_err_count      = m_engine.getFactHandle("RUN_CYCLE_ERR_COUNT");
-    m_fact_sms_connected        = m_engine.getFactHandle("SMS_CONNECTED");
+    m_fact_name[BIF_RECORDING]           = "RECORDING";
+    m_fact_name[BIF_RUN_NUMBER]          = "RUN_NUMBER";
+    m_fact_name[BIF_PAUSED]              = "PAUSED";
+    m_fact_name[BIF_SCANNING]            = "SCANNING";
+    m_fact_name[BIF_SCAN_INDEX]          = "SCAN_INDEX";
+    m_fact_name[BIF_FAC_NAME]            = "FACILITY_NAME";
+    m_fact_name[BIF_BEAM_ID]             = "BEAM_ID";
+    m_fact_name[BIF_BEAM_SNAME]          = "BEAM_SHORT_NAME";
+    m_fact_name[BIF_BEAM_LNAME]          = "BEAM_LONG_NAME";
+    m_fact_name[BIF_RUN_TITLE]           = "RUN_TITLE";
+    m_fact_name[BIF_PROP_ID]             = "PROPOSAL_ID";
+    m_fact_name[BIF_SAMPLE_ID]           = "SAMPLE_ID";
+    m_fact_name[BIF_SAMPLE_NAME]         = "SAMPLE_NAME";
+    m_fact_name[BIF_SAMPLE_NAT]          = "SAMPLE_NATURE";
+    m_fact_name[BIF_SAMPLE_FORM]         = "SAMPLE_FORMULA";
+    m_fact_name[BIF_SAMPLE_ENV]          = "SAMPLE_ENVIRONMENT";
+    m_fact_name[BIF_USER_INFO]           = "USER_INFO";
+    m_fact_name[BIF_COUNT_RATE]          = "COUNT_RATE";
+    m_fact_name[BIF_MON0_COUNT_RATE]     = "MON0_COUNT_RATE";
+    m_fact_name[BIF_MON1_COUNT_RATE]     = "MON1_COUNT_RATE";
+    m_fact_name[BIF_MON2_COUNT_RATE]     = "MON2_COUNT_RATE";
+    m_fact_name[BIF_MON3_COUNT_RATE]     = "MON3_COUNT_RATE";
+    m_fact_name[BIF_MON4_COUNT_RATE]     = "MON4_COUNT_RATE";
+    m_fact_name[BIF_MON5_COUNT_RATE]     = "MON5_COUNT_RATE";
+    m_fact_name[BIF_MON6_COUNT_RATE]     = "MON6_COUNT_RATE";
+    m_fact_name[BIF_MON7_COUNT_RATE]     = "MON7_COUNT_RATE";
+    m_fact_name[BIF_PULSE_CHARGE]        = "PULSE_CHARGE";
+    m_fact_name[BIF_PULSE_FREQ]          = "PULSE_FREQ";
+    m_fact_name[BIF_STREAM_RATE]         = "STREAM_RATE";
+    m_fact_name[BIF_RUN_PULSE_CHARGE]    = "RUN_PULSE_CHARGE";
+    m_fact_name[BIF_PIX_ERR_COUNT]       = "RUN_PIXEL_ERR_COUNT";
+    m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
+    m_fact_name[BIF_CYCLE_ERR_COUNT]     = "RUN_CYCLE_ERR_COUNT";
+    m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
+
+    for ( int i = 0; i < BIF_COUNT; ++i )
+        m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
+
+    loadConfig();
 }
 
 
 StreamAnalyzer::~StreamAnalyzer()
 {
     m_monitor.removeListener( *this );
+    delete m_engine;
 }
 
 
 void
-StreamAnalyzer::loadConfig( const std::string &a_file )
+StreamAnalyzer::loadConfig()
 {
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    ifstream inf( a_file.c_str());
+    ifstream inf( m_cfg_file.c_str());
     string line;
     int mode = 0;
 
     if ( !inf.is_open())
-        throw std::runtime_error( string("Could not open configuration file: ") + a_file );
+        throw std::runtime_error( string("Could not open configuration file: ") + m_cfg_file );
 
     while( !inf.eof())
     {
@@ -85,7 +93,7 @@ StreamAnalyzer::loadConfig( const std::string &a_file )
         {
             //cout << line << endl;
             if ( mode == 1 )
-                m_engine.defineRule( line );
+                m_engine->defineRule( line );
             else if ( mode == 2 )
                 defineSignal( line );
         }
@@ -96,16 +104,54 @@ StreamAnalyzer::loadConfig( const std::string &a_file )
 
 
 void
-StreamAnalyzer::addListener( ISignalListener &a_listener )
+StreamAnalyzer::saveConfig()
 {
+    ofstream outf( m_cfg_file.c_str(), ios_base::out | ios_base::trunc );
+
+    if ( !outf.is_open())
+        throw std::runtime_error( string("Could not open configuration file: ") + m_cfg_file );
+
+    // RULE_LOST_SMS_CONN          SMS_CONNECTED UNDEF
+
+    outf << "[rules]" << endl;
+
+    vector<RuleEngine::RuleInfo> rules;
+    m_engine->getDefinedRules( rules );
+
+    for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
+    {
+        outf << rule->fact << "  " << rule->expr << endl;
+    }
+
+    // SIG_RECORDING,RECORDING,SMS,INFO,Recording in progress
+
+    outf << "[signals]" << endl;
+
+    for ( map<string,SignalInfo>::iterator sig = m_signals.begin(); sig != m_signals.end(); ++sig )
+    {
+        outf << sig->first << "," << sig->second.fact << "," << sig->second.source << ",";
+        outf << sig->second.level << "," << sig->second.msg << endl;
+    }
+
+    outf.close();
+}
+
+
+void
+StreamAnalyzer::attach( ISignalListener &a_listener )
+{
+    boost::lock_guard<boost::mutex> lock(m_list_mutex);
+
     if ( find( m_listeners.begin(), m_listeners.end(), &a_listener ) == m_listeners.end())
         m_listeners.push_back( &a_listener );
 }
 
 
 void
-StreamAnalyzer::removeListener( ISignalListener &a_listener )
+StreamAnalyzer::detach( ISignalListener &a_listener )
 {
+    boost::lock_guard<boost::mutex> lock(m_list_mutex);
+
     vector<ISignalListener*>::iterator l = find( m_listeners.begin(), m_listeners.end(), &a_listener );
     if ( l != m_listeners.end())
         m_listeners.erase(l);
@@ -119,49 +165,45 @@ StreamAnalyzer::defineSignal( const std::string &a_expression )
     boost::tokenizer<boost::char_separator<char> > tokens(a_expression, sep);
     boost::tokenizer<boost::char_separator<char> >::iterator tok = tokens.begin();
     SignalInfo info;
-    string fact;
 
     if ( tok == tokens.end())
         throw "Syntax error";
 
-    info.sig_name = *tok;
+    info.name = *tok;
 
     if ( ++tok == tokens.end())
         throw "Syntax error";
 
-    fact = *tok;
+    info.fact = *tok;
 
     if ( ++tok == tokens.end())
         throw "Syntax error";
 
-    info.sig_source = *tok;
+    info.source = *tok;
 
     if ( ++tok == tokens.end())
         throw "Syntax error";
 
-    if ( *tok == "TRACE" )
-        info.sig_level = ADARA::TRACE;
-    else if ( *tok == "DEBUG" )
-        info.sig_level = ADARA::DEBUG;
-    else if ( *tok == "INFO" )
-        info.sig_level = ADARA::INFO;
-    else if ( *tok == "WARN" )
-        info.sig_level = ADARA::WARN;
-    else if ( *tok == "WARNING" )
-        info.sig_level = ADARA::WARN;
-    else if ( *tok == "ERROR" )
-        info.sig_level = ADARA::ERROR;
-    else if ( *tok == "FATAL" )
-        info.sig_level = ADARA::FATAL;
-    else
-        throw "Syntax error (bad level)";
+    // Level can be a number from 0 to 6, or a symbol
+    try
+    {
+        unsigned short tmp = boost::lexical_cast<unsigned short>( *tok );
+        if ( tmp > 6 )
+            throw "Syntax error (bad level)";
+        info.level = (ADARA::Level)tmp;
+    }
+    catch(...)
+    {
+        // May also throw an exception (which is OK)
+        info.level = ADARA::ComBus::ComBusHelper::toLevel( *tok );
+    }
 
     if ( ++tok == tokens.end())
         throw "Syntax error";
 
-    info.sig_msg = *tok;
+    info.msg = *tok;
 
-    m_signals[fact] = info;
+    m_signals[info.fact] = info;
 }
 
 void
@@ -169,7 +211,218 @@ StreamAnalyzer::resendState()
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine.sendAsserted( *this );
+    m_engine->sendAsserted( *this );
+}
+
+
+void
+StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals )
+{
+    m_engine->getDefinedRules( a_rules );
+
+    a_signals.clear();
+    for ( map<string,SignalInfo>::const_iterator s = m_signals.begin(); s != m_signals.end(); ++s )
+        a_signals.push_back( s->second );
+}
+
+
+bool
+StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, const vector<SignalInfo> &a_signals )
+{
+    // The process for setting new rules is to create a new RuleEngine instance and
+    // attempt to initizlize it with the provided rules. If this succeeds, then the
+    // current engine will be replaced with the new engine, and all listeners will be
+    // transferred. Next, old/invalid signals will be retracted, and new/updated signals
+    // will be asserted.
+
+    RuleEngine *engine = new RuleEngine();
+    vector<RuleEngine::RuleInfo>::const_iterator r;
+    string tmp;
+    try
+    {
+        for ( r = a_rules.begin(); r != a_rules.end(); ++r )
+        {
+            tmp = r->fact + " " + r->expr;
+            engine->defineRule( tmp );
+        }
+    }
+    catch ( ... )
+    {
+        // Rule failed to parse, abort
+        cout << "Bad rules" << endl;
+        return false;
+    }
+
+    // Engine has been initialized successfully, now validate signals
+
+    std::map<std::string,SignalInfo>  tmp_signals;
+    int  i;
+    for ( vector<SignalInfo>::const_iterator sig = a_signals.begin(); sig != a_signals.end(); ++sig )
+    {
+        // The only real check to do here is to ensure referential integrity
+        for ( r = a_rules.begin(); r != a_rules.end(); ++r )
+        {
+            if ( sig->fact == r->fact )
+            {
+                tmp_signals[sig->fact] = *sig;
+                break;
+            }
+        }
+
+        if ( r == a_rules.end())
+        {
+            // Is this a built-in fact?
+            for ( i = 0; i < BIF_COUNT; ++i )
+            {
+                if ( m_fact_name[i] == sig->fact )
+                {
+                    tmp_signals[sig->fact] = *sig;
+                    break;
+                }
+            }
+
+            // If unassociated signal found, abort (probably a mistake)
+            if ( i == BIF_COUNT )
+            {
+                cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
+                return false;
+            }
+        }
+    }
+
+    // Rules & signals are OK, now perform swap-out of engine and updating of listeners
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    // Prevent current engine from generating new assert/retacts while we're working
+    m_engine->beginBatch();
+
+    // Transfer currently asserted non-rule facts from old engine to new
+    // Build a list of currently asserted signals
+
+    vector<string>                      asserted_facts;
+    vector<string>                      old_asserted_signals;
+    vector<string>                      new_asserted_signals;
+    vector<string>                      signals_to_assert;
+    std::map<std::string,SignalInfo>    old_signals;
+    map<string,SignalInfo>::iterator    iSig, iSig2;
+    vector<string>::iterator            iAF;
+
+    m_engine->getAsserted( asserted_facts );
+
+    cout << "old asserted signals: ";
+
+    for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
+    {
+        iSig = m_signals.find( *iAF );
+        if ( iSig != m_signals.end())
+        {
+            old_asserted_signals.push_back( iSig->second.name );
+            cout << " " << iSig->second.name;
+        }
+    }
+    cout << endl;
+
+    // This call does NOT generate any assert/retract traffic
+    engine->synchronize( *m_engine );
+
+    // Build list of new asserted signals
+
+    engine->getAsserted( asserted_facts );
+
+    cout << "new asserted signals: ";
+
+    for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
+    {
+        iSig = tmp_signals.find( *iAF );
+        if ( iSig != tmp_signals.end())
+        {
+            new_asserted_signals.push_back( iSig->second.name );
+            cout << " " << iSig->second.name;
+        }
+    }
+
+    cout << endl;
+
+    // Retract any old signals that are no longer asserted
+    for ( vector<string>::iterator iOld = old_asserted_signals.begin(); iOld != old_asserted_signals.end(); ++iOld )
+    {
+        if ( find( new_asserted_signals.begin(), new_asserted_signals.end(), *iOld ) == new_asserted_signals.end())
+        {
+            // m_signals is indexed by fact name, not signal name, so we have to search linearly
+            iSig = findByName( m_signals, *iOld );
+            if ( iSig != m_signals.end() )
+                onRetract( iSig->second.fact );
+        }
+    }
+
+    // Swap-out signals (so we can call onAssert method)
+    old_signals = m_signals;
+    m_signals = tmp_signals;
+
+    // Determine if any new signals are present
+    for ( vector<string>::iterator iNew = new_asserted_signals.begin(); iNew != new_asserted_signals.end(); ++iNew )
+    {
+        if ( find( old_asserted_signals.begin(), old_asserted_signals.end(), *iNew ) == old_asserted_signals.end())
+            signals_to_assert.push_back( *iNew );
+    }
+
+    // Determine if any signals have different signal content
+    for ( vector<string>::iterator iNew = new_asserted_signals.begin(); iNew != new_asserted_signals.end(); ++iNew )
+    {
+        // m_signals is indexed by fact name, not signal name, so we have to search linearly
+        iSig = findByName( old_signals, *iNew );
+        if ( iSig != old_signals.end() )
+        {
+            iSig2 = findByName( m_signals, *iNew );
+            if ( iSig2 != m_signals.end() )
+            {
+                // Are the signal params different? If not, reassert
+                if ( iSig->second.level != iSig2->second.level ||
+                     iSig->second.source != iSig2->second.source ||
+                     iSig->second.msg != iSig2->second.msg )
+                {
+                    signals_to_assert.push_back( *iNew );
+                }
+            }
+        }
+    }
+
+    // Assert new/changed signals
+    for ( vector<string>::iterator iNew = signals_to_assert.begin(); iNew != signals_to_assert.end(); ++iNew )
+    {
+        // m_signals is indexed by fact name, not signal name, so we have to search linearly
+        iSig = findByName( m_signals, *iNew );
+        if ( iSig != m_signals.end())
+            onAssert( iSig->second.fact );
+    }
+
+    // Re-acquire fact handles for built-in-facts
+    for ( int i = 0; i < BIF_COUNT; ++i )
+        m_fact[i] = engine->getFactHandle( m_fact_name[i] );
+
+    // Clean-up
+    delete m_engine;
+
+    // Make new engine and new signals active
+    m_engine = engine;
+
+    saveConfig();
+
+    return true;
+}
+
+map<string,SignalInfo>::iterator
+StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
+{
+    map<string,SignalInfo>::iterator i;
+    for ( i = a_map.begin(); i != a_map.end(); ++i )
+    {
+        if ( i->second.name == a_name )
+            break;
+    }
+
+    return i;
 }
 
 //////////////////////////////////////////////
@@ -183,26 +436,26 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
 
     if ( a_recording )
     {
-        m_engine.assert( m_fact_recording );
-        m_engine.assert( m_fact_run_number, a_run_number );
+        m_engine->assert( m_fact[BIF_RECORDING] );
+        m_engine->assert( m_fact[BIF_RUN_NUMBER], a_run_number );
     }
     else
     {
-        m_engine.retract( m_fact_recording );
-        m_engine.retract( m_fact_run_number );
+        m_engine->retract( m_fact[BIF_RECORDING] );
+        m_engine->retract( m_fact[BIF_RUN_NUMBER] );
 
-        m_engine.retract( m_fact_facility_name );
-        m_engine.retract( m_fact_beam_id );
-        m_engine.retract( m_fact_beam_sname );
-        m_engine.retract( m_fact_beam_lname );
-        m_engine.retract( m_fact_run_title );
-        m_engine.retract( m_fact_prop_id );
-        m_engine.retract( m_fact_sample_id );
-        m_engine.retract( m_fact_sample_name );
-        m_engine.retract( m_fact_sample_nature );
-        m_engine.retract( m_fact_sample_form );
-        m_engine.retract( m_fact_sample_env );
-        m_engine.retract( m_fact_user_info );
+        m_engine->retract( m_fact[BIF_FAC_NAME] );
+        m_engine->retract( m_fact[BIF_BEAM_ID] );
+        m_engine->retract( m_fact[BIF_BEAM_SNAME] );
+        m_engine->retract( m_fact[BIF_BEAM_LNAME] );
+        m_engine->retract( m_fact[BIF_RUN_TITLE] );
+        m_engine->retract( m_fact[BIF_PROP_ID] );
+        m_engine->retract( m_fact[BIF_SAMPLE_ID] );
+        m_engine->retract( m_fact[BIF_SAMPLE_NAME] );
+        m_engine->retract( m_fact[BIF_SAMPLE_NAT] );
+        m_engine->retract( m_fact[BIF_SAMPLE_FORM] );
+        m_engine->retract( m_fact[BIF_SAMPLE_ENV] );
+        m_engine->retract( m_fact[BIF_USER_INFO] );
     }
 }
 
@@ -214,11 +467,11 @@ StreamAnalyzer::pauseStatus( bool a_paused )
 
     if ( a_paused )
     {
-        m_engine.assert( m_fact_paused );
+        m_engine->assert( m_fact[BIF_PAUSED] );
     }
     else
     {
-        m_engine.retract( m_fact_paused );
+        m_engine->retract( m_fact[BIF_PAUSED] );
     }
 }
 
@@ -230,13 +483,13 @@ StreamAnalyzer::scanStatus( bool a_scanning, unsigned long a_scan_index )
 
     if ( a_scanning )
     {
-        m_engine.assert( m_fact_scanning );
-        m_engine.assert( m_fact_scan_index, a_scan_index );
+        m_engine->assert( m_fact[BIF_SCANNING] );
+        m_engine->assert( m_fact[BIF_SCAN_INDEX], a_scan_index );
     }
     else
     {
-        m_engine.retract( m_fact_scanning );
-        m_engine.retract( m_fact_scan_index );
+        m_engine->retract( m_fact[BIF_SCANNING] );
+        m_engine->retract( m_fact[BIF_SCAN_INDEX] );
     }
 }
 
@@ -247,13 +500,13 @@ StreamAnalyzer::beamInfo( const ADARA::DASMON::BeamInfo &a_info )
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( !a_info.m_facility.empty() )
-        m_engine.assert( m_fact_facility_name );
+        m_engine->assert( m_fact[BIF_FAC_NAME] );
     if ( !a_info.m_beam_id.empty() )
-        m_engine.assert( m_fact_beam_id );
+        m_engine->assert( m_fact[BIF_BEAM_ID] );
     if ( !a_info.m_beam_sname.empty() )
-        m_engine.assert( m_fact_beam_sname );
+        m_engine->assert( m_fact[BIF_BEAM_SNAME] );
     if ( !a_info.m_beam_lname.empty() )
-        m_engine.assert( m_fact_beam_lname );
+        m_engine->assert( m_fact[BIF_BEAM_LNAME] );
 }
 
 
@@ -263,21 +516,21 @@ StreamAnalyzer::runInfo( const ADARA::DASMON::RunInfo &a_info )
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( !a_info.m_run_title.empty() )
-        m_engine.assert( m_fact_run_title );
+        m_engine->assert( m_fact[BIF_RUN_TITLE] );
     if ( !a_info.m_proposal_id.empty() )
-        m_engine.assert( m_fact_prop_id );
+        m_engine->assert( m_fact[BIF_PROP_ID] );
     if ( !a_info.m_sample_id.empty() )
-        m_engine.assert( m_fact_sample_id );
+        m_engine->assert( m_fact[BIF_SAMPLE_ID] );
     if ( !a_info.m_sample_name.empty() )
-        m_engine.assert( m_fact_sample_name );
+        m_engine->assert( m_fact[BIF_SAMPLE_NAME] );
     if ( !a_info.m_sample_nature.empty() )
-        m_engine.assert( m_fact_sample_nature );
+        m_engine->assert( m_fact[BIF_SAMPLE_NAT] );
     if ( !a_info.m_sample_formula.empty() )
-        m_engine.assert( m_fact_sample_form );
+        m_engine->assert( m_fact[BIF_SAMPLE_FORM] );
     if ( !a_info.m_sample_environ.empty() )
-        m_engine.assert( m_fact_sample_env );
+        m_engine->assert( m_fact[BIF_SAMPLE_ENV] );
     if ( !a_info.m_user_info.empty() )
-        m_engine.assert( m_fact_user_info );
+        m_engine->assert( m_fact[BIF_USER_INFO] );
 }
 
 
@@ -286,14 +539,14 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine.assert( m_fact_count_rate, a_metrics.m_count_rate );
+    m_engine->assert( m_fact[BIF_COUNT_RATE], a_metrics.m_count_rate );
 
     for ( short i = 0; i < a_metrics.m_num_monitors; ++i )
-        m_engine.assert( m_fact_mon_count_rate[i], a_metrics.m_monitor_count_rate[i] );
+        m_engine->assert( m_fact[BIF_MON0_COUNT_RATE + i], a_metrics.m_monitor_count_rate[i] );
 
-    m_engine.assert( m_fact_pulse_charge, a_metrics.m_pulse_charge );
-    m_engine.assert( m_fact_pulse_freq, a_metrics.m_pulse_freq );
-    m_engine.assert( m_fact_stream_rate, a_metrics.m_stream_bps );
+    m_engine->assert( m_fact[BIF_PULSE_CHARGE], a_metrics.m_pulse_charge );
+    m_engine->assert( m_fact[BIF_PULSE_FREQ], a_metrics.m_pulse_freq );
+    m_engine->assert( m_fact[BIF_STREAM_RATE], a_metrics.m_stream_bps );
 }
 
 
@@ -302,10 +555,10 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine.assert( m_fact_run_pulse_charge, a_metrics.m_pulse_charge );
-    m_engine.assert( m_fact_pix_err_count, a_metrics.m_pixel_error_count );
-    m_engine.assert( m_fact_dup_pulse_count, a_metrics.m_dup_pulse_count );
-    m_engine.assert( m_fact_cycle_err_count, a_metrics.m_cycle_error_count );
+    m_engine->assert( m_fact[BIF_RUN_PULSE_CHARGE], a_metrics.m_pulse_charge );
+    m_engine->assert( m_fact[BIF_PIX_ERR_COUNT], a_metrics.m_pixel_error_count );
+    m_engine->assert( m_fact[BIF_DUP_PULSE_COUNT], a_metrics.m_dup_pulse_count );
+    m_engine->assert( m_fact[BIF_CYCLE_ERR_COUNT], a_metrics.m_cycle_error_count );
 }
 
 
@@ -321,7 +574,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine.assert( m_pv_prefix + a_name, a_value );
+    m_engine->assert( m_pv_prefix + a_name, a_value );
 }
 
 
@@ -330,7 +583,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine.assert( m_pv_prefix + a_name, a_value );
+    m_engine->assert( m_pv_prefix + a_name, a_value );
 }
 
 void
@@ -342,9 +595,9 @@ StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, u
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( a_connected )
-        m_engine.assert( m_fact_sms_connected );
+        m_engine->assert( m_fact[BIF_SMS_CONNECTED] );
     else
-        m_engine.retract( m_fact_sms_connected );
+        m_engine->retract( m_fact[BIF_SMS_CONNECTED] );
 }
 
 // IFactListener Interface
@@ -357,7 +610,8 @@ StreamAnalyzer::onAssert( const std::string &a_fact )
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         {
-            (*l)->signalAssert( isig->second.sig_name, isig->second.sig_source, isig->second.sig_level, isig->second.sig_msg );
+            //(*l)->signalAssert( isig->second.sig_name, isig->second.sig_source, isig->second.sig_level, isig->second.sig_msg );
+            (*l)->signalAssert( isig->second );
         }
     }
 }
@@ -371,8 +625,9 @@ StreamAnalyzer::onRetract( const std::string &a_fact )
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         {
-            (*l)->signalRetract( isig->second.sig_name );
+            (*l)->signalRetract( isig->second.name );
         }
     }
 }
 
+}}

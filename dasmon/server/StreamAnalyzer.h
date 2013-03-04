@@ -12,37 +12,83 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
 
+namespace ADARA {
+namespace DASMON {
 
-class ISignalListener
+
+class StreamAnalyzer: public IStreamListener, public RuleEngine::IFactListener
 {
 public:
-    virtual void    signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg ) = 0;
-    virtual void    signalRetract( const std::string &a_name ) = 0;
-};
+    class ISignalListener
+    {
+    public:
+        virtual void    signalAssert( const SignalInfo &a_signal ) = 0;
+        virtual void    signalRetract( const std::string &a_name ) = 0;
+    };
 
-
-class StreamAnalyzer: public ADARA::DASMON::IStreamListener, public IFactListener
-{
-public:
-    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor );
+    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_file );
     virtual ~StreamAnalyzer();
 
-    void    loadConfig( const std::string &a_file );
-    void    addListener( ISignalListener &a_listener );
-    void    removeListener( ISignalListener &a_listener );
+    void    setConfigSource( const std::string &a_file );
+    void    loadConfig();
+    void    saveConfig();
+    void    attach( ISignalListener &a_listener );
+    void    detach( ISignalListener &a_listener );
     void    defineSignal( const std::string &a_expression );
     void    resendState();
+    void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
+    bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
 
 private:
+    std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );
+
+    enum BIF
+    {
+        BIF_RECORDING = 0,
+        BIF_RUN_NUMBER,
+        BIF_PAUSED,
+        BIF_SCANNING,
+        BIF_SCAN_INDEX,
+        BIF_FAC_NAME,
+        BIF_BEAM_ID,
+        BIF_BEAM_SNAME,
+        BIF_BEAM_LNAME,
+        BIF_RUN_TITLE,
+        BIF_PROP_ID,
+        BIF_SAMPLE_ID,
+        BIF_SAMPLE_NAME,
+        BIF_SAMPLE_FORM,
+        BIF_SAMPLE_NAT,
+        BIF_SAMPLE_ENV,
+        BIF_USER_INFO,
+        BIF_COUNT_RATE,
+        BIF_MON0_COUNT_RATE,
+        BIF_MON1_COUNT_RATE,
+        BIF_MON2_COUNT_RATE,
+        BIF_MON3_COUNT_RATE,
+        BIF_MON4_COUNT_RATE,
+        BIF_MON5_COUNT_RATE,
+        BIF_MON6_COUNT_RATE,
+        BIF_MON7_COUNT_RATE,
+        BIF_PULSE_CHARGE,
+        BIF_PULSE_FREQ,
+        BIF_STREAM_RATE,
+        BIF_RUN_PULSE_CHARGE,
+        BIF_PIX_ERR_COUNT,
+        BIF_DUP_PULSE_COUNT,
+        BIF_CYCLE_ERR_COUNT,
+        BIF_SMS_CONNECTED,
+        BIF_COUNT
+    };
 
     // IStreamListener Interface
     void runStatus( bool a_recording, unsigned long a_run_number );
     void pauseStatus( bool a_paused );
     void scanStatus( bool a_scanning, unsigned long a_scan_number );
-    void beamInfo( const ADARA::DASMON::BeamInfo &a_info );
-    void runInfo( const ADARA::DASMON::RunInfo &a_run_info );
-    void beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics );
-    void runMetrics( const ADARA::DASMON::RunMetrics &a_metrics );
+    void beamInfo( const BeamInfo &a_info );
+    void runInfo( const RunInfo &a_run_info );
+    void beamMetrics( const BeamMetrics &a_metrics );
+    void runMetrics( const RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvValue( const std::string &a_name, uint32_t a_value );
     void pvValue( const std::string &a_name, double a_value );
@@ -52,51 +98,21 @@ private:
     void onAssert( const std::string &a_fact );
     void onRetract( const std::string &a_fact );
 
-    struct SignalInfo
-    {
-        std::string     sig_name;
-        std::string     sig_source;
-        ADARA::Level    sig_level;
-        std::string     sig_msg;
-    };
-
     ADARA::DASMON::StreamMonitor       &m_monitor;
-    RuleEngine                          m_engine;
+    RuleEngine                         *m_engine;
     std::map<uint32_t,uint64_t>         m_monitor_rate;
     bool                                m_monitorx_rate;
     std::vector<ISignalListener*>       m_listeners;
     std::map<std::string,SignalInfo>    m_signals;
     std::string                         m_pv_prefix;
     boost::mutex                        m_mutex;
+    boost::mutex                        m_list_mutex;
+    std::string                         m_cfg_file;
 
-    HFACT   m_fact_recording;
-    HFACT   m_fact_run_number;
-    HFACT   m_fact_paused;
-    HFACT   m_fact_scanning;
-    HFACT   m_fact_scan_index;
-    HFACT   m_fact_facility_name;
-    HFACT   m_fact_beam_id;
-    HFACT   m_fact_beam_sname;
-    HFACT   m_fact_beam_lname;
-    HFACT   m_fact_run_title;
-    HFACT   m_fact_prop_id;
-    HFACT   m_fact_sample_id;
-    HFACT   m_fact_sample_name;
-    HFACT   m_fact_sample_nature;
-    HFACT   m_fact_sample_form;
-    HFACT   m_fact_sample_env;
-    HFACT   m_fact_user_info;
-    HFACT   m_fact_count_rate;
-    HFACT   m_fact_mon_count_rate[8];
-    HFACT   m_fact_pulse_charge;
-    HFACT   m_fact_pulse_freq;
-    HFACT   m_fact_stream_rate;
-    HFACT   m_fact_run_pulse_charge;
-    HFACT   m_fact_pix_err_count;
-    HFACT   m_fact_dup_pulse_count;
-    HFACT   m_fact_cycle_err_count;
-    HFACT   m_fact_sms_connected;
+    RuleEngine::HFACT   m_fact[BIF_COUNT];
+    std::string         m_fact_name[BIF_COUNT];
 };
 
+}}
 
 #endif // RULEENGINE_H

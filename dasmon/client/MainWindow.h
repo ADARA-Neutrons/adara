@@ -8,11 +8,15 @@
 #include <QTimer>
 #include <QTableWidgetItem>
 #include <QDateTime>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/locks.hpp>
+#include <QMutex>
+//#include <boost/thread/mutex.hpp>
+//#include <boost/thread/locks.hpp>
 
 #include "ComBus.h"
 #include "DASMonDefs.h"
+#include "SubClient.h"
+
+#define DASMON_GUI_VERSION "1.0.0"
 
 namespace Ui {
 class MainWindow;
@@ -29,12 +33,13 @@ public:
     MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass );
     ~MainWindow();
 
-
 private slots:
 
     void onProcTimer();
     void onTableTimer();
-    void configure();
+    void configActiveMQ();
+    void configRules();
+    void about();
 
 private:
     struct AlertInfo
@@ -98,8 +103,7 @@ private:
     void        clearSignals();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
-    bool        comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd );
-    void        comBusReply( const ADARA::ComBus::ControlMessage &a_reply );
+    bool        comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
 
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();
@@ -119,6 +123,13 @@ private:
     void        setSMSActive( bool a_active );
 
     void        writeLog( ADARA::Level a_level, const std::string &a_msg );
+
+    // Methods to support SubClient command routing
+    void        attach( SubClient &a_sub_client );
+    void        detach( SubClient &a_sub_client );
+    bool        createRoute( SubClient &a_sub_client, ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id );
+    void        removeRoute( SubClient &a_sub_client, std::string &a_correlation_id );
+    void        clearCIDs_nolock( SubClient &a_sub_client );
 
     inline void testSetBkgnd( unsigned short &hlcnt, QTableWidgetItem* items[], int icnt )
     {
@@ -159,13 +170,19 @@ private:
     QColor                          m_default_bg_color;
     std::vector<QColor>             m_hl_color;
     QDateTime                       m_start_time;
-    boost::mutex                    m_mutex;
-    boost::mutex                    m_log_mutex;
+    //boost::mutex                    m_mutex;
+    //boost::mutex                    m_log_mutex;
+    QMutex                          m_mutex;
+    QMutex                          m_log_mutex;
     ADARA::ComBus::Connection      *m_combus;
     //ADARA::ComBus::Connection      &m_combus;
     std::string                     m_broker_uri;
     std::string                     m_broker_user;
     std::string                     m_broker_pass;
+    std::vector<SubClient*>        m_sub_clients;
+    std::map<std::string,SubClient*>    m_client_cids;
+
+    friend class SubClient;
 };
 
 #endif // MAINWINDOW_H

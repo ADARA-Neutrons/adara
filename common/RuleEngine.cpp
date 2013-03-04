@@ -2,6 +2,7 @@
 #include "RuleEngine.h"
 #include <iostream>
 #include <boost/lexical_cast.hpp>
+#include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/tokenizer.hpp>
 #include <stdexcept>
@@ -17,6 +18,10 @@ using namespace std;
 RuleEngine::Value::Value()
     : m_type( VT_VOID ), m_int_value( 0 )
 {}
+
+//RuleEngine::Value( const Value &a_src )
+//    : m_type( a_src.m_type ), m_int_value( a_src.m_int_value )
+//{}
 
 RuleEngine::Value::Value( bool a_value )
     : m_type( VT_INT ), m_int_value( (int64_t)a_value )
@@ -217,6 +222,31 @@ RuleEngine::~RuleEngine()
 }
 
 
+void
+RuleEngine::synchronize( const RuleEngine &a_source )
+{
+    // Prevent callbacks to listeners
+    m_batch = true;
+
+    // Transfer listeners
+    for ( vector<IFactListener*>::const_iterator l = a_source.m_listeners.begin(); l != a_source.m_listeners.end(); ++l )
+        m_listeners.push_back( *l );
+
+    // Transfer asserted, non-rule facts
+    for ( map<string,Fact*>::const_iterator f = a_source.m_facts.begin(); f != a_source.m_facts.end(); ++f )
+    {
+        if ( f->second->m_asserted && !f->second->m_rule_fact )
+        {
+            cout << "injecting fact: " << f->first << endl;
+            assert( f->first, f->second->m_value );
+        }
+    }
+
+    // Restore callbacks
+    m_batch = false;
+}
+
+
 /**
  * @param a_listener - Listener to attach
  *
@@ -319,6 +349,14 @@ RuleEngine::defineRule( const std::string &a_expression )
 
         rule = new Rule();
         rule->m_id = *tok;
+
+        size_t p = a_expression.find_first_of( " " );
+        if ( p == string::npos )
+            throw std::runtime_error( "Syntax error." );
+
+        rule->m_expr = a_expression.substr( p );
+        boost::algorithm::trim(rule->m_expr);
+
         rule->m_rule_fact = getFact( *tok );
         rule->m_rule_fact->m_rule_fact = true;
 
@@ -424,6 +462,21 @@ RuleEngine::undefineAllRules()
     m_rules.clear();
 }
 
+
+void
+RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
+{
+    RuleInfo info;
+    a_rules.clear();
+    for ( map<string,Rule*>::const_iterator r = m_rules.begin(); r != m_rules.end(); ++r )
+    {
+        info.fact = r->first;
+        info.expr = r->second->m_expr;
+        a_rules.push_back( info );
+    }
+}
+
+
 /**
  * @param
  *
@@ -488,6 +541,8 @@ template void RuleEngine::assert<int64_t>( const string &a_id, int64_t a_value )
 template void RuleEngine::assert<uint64_t>( const string &a_id, uint64_t a_value );
 template void RuleEngine::assert<float>( const string &a_id, float a_value );
 template void RuleEngine::assert<double>( const string &a_id, double a_value );
+template void RuleEngine::assert<RuleEngine::Value>( const string &a_id, RuleEngine::Value a_value ); // Used internally only
+
 
 
 /**
@@ -519,7 +574,20 @@ RuleEngine::retractAllFacts()
     }
 }
 
-HFACT
+
+void
+RuleEngine::getAsserted( std::vector<std::string> &a_asserted_facts )
+{
+    a_asserted_facts.clear();
+    for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+    {
+        if ( f->second->m_asserted )
+            a_asserted_facts.push_back( f->first );
+    }
+}
+
+
+RuleEngine::HFACT
 RuleEngine::getFactHandle( const std::string &a_id )
 {
     Fact *fact = getFact( a_id );
@@ -527,6 +595,12 @@ RuleEngine::getFactHandle( const std::string &a_id )
         return (HFACT)fact;
 
     throw std::runtime_error("Fact associated with a rule.");
+}
+
+std::string
+RuleEngine::getNameHFACT( HFACT a_fact ) const
+{
+    return ((Fact*)a_fact)->m_id;
 }
 
 void

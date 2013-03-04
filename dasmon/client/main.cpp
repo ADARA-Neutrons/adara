@@ -2,12 +2,11 @@
 #include <iostream>
 #include <string>
 #include <boost/program_options.hpp>
-#include "mainwindow.h"
+#include "MainWindow.h"
 #include "ComBus.h"
 
 using namespace std;
 
-#define DASMON_GUI_VERSION "0.1.0"
 
 int main(int argc, char *argv[])
 {

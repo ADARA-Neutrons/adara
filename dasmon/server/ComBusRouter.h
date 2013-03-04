@@ -19,7 +19,7 @@ namespace DASMON {
  * must be employed to prevent stuck signals if the retract message is missed (due to process or broker crash).
  */
 class ComBusRouter : public IStreamListener, public ADARA::ComBus::IStatusListener,
-        public ADARA::ComBus::IControlListener, public ISignalListener
+        public ADARA::ComBus::IControlListener, public StreamAnalyzer::ISignalListener
 {
 public:
     ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
@@ -28,6 +28,8 @@ public:
     void    run();
 
 private:
+    void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
+    void    setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg );
 
     // IStreamListener Interface
     void    runStatus( bool a_recording, unsigned long a_run_number );
@@ -46,11 +48,11 @@ private:
     void    comBusConnectionStatus( bool a_connected );
 
     // IControlListener Interface
-    bool    comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd );
-    void    comBusReply( const ADARA::ComBus::ControlMessage &a_reply );
+    bool    comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
 
     // ISignalListener Interface
-    void    signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg );
+    //void    signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg );
+    void    signalAssert( const SignalInfo &a_signal );
     void    signalRetract( const std::string &a_name );
 
     StreamMonitor                  &m_monitor;

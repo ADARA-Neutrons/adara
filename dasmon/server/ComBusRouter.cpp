@@ -15,14 +15,16 @@ ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer
 
 {
     m_monitor.addListener( *this );
-    m_analyzer.addListener( *this );
+    m_analyzer.attach( *this );
     m_combus.attach( *this );
+    m_combus.setControlListener( *this );
 }
 
 
 ComBusRouter::~ComBusRouter()
 {
     m_combus.detach( *this );
+    m_analyzer.detach( *this );
 }
 
 
@@ -40,6 +42,32 @@ ComBusRouter::run()
             m_analyzer.resendState();
             m_resend_state = false;
         }
+    }
+}
+
+
+void
+ComBusRouter::sendRuleDefinitions( const string &a_src_proc, const string &a_CID )
+{
+    string cid = a_CID;
+    ADARA::ComBus::DASMON::RuleDefinitions defs;
+
+    m_analyzer.getDefinitions( defs.m_rules, defs.m_signals );
+    m_combus.sendControl( defs, a_src_proc, cid );
+}
+
+
+void
+ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
+{
+    const ADARA::ComBus::DASMON::SetRuleDefinitions *set_msg =
+            dynamic_cast<const ADARA::ComBus::DASMON::SetRuleDefinitions*>( a_msg );
+    if ( set_msg )
+    {
+        // If this succeeds, current rules will be set to specified;
+        // otherwise, current rules will remain unchanged
+        m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals );
+        sendRuleDefinitions( a_msg->getSourceName(), a_msg->m_correlation_id );
     }
 }
 
@@ -151,17 +179,18 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 // ISignalListener Interface
 
 void
-ComBusRouter::signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg )
+//ComBusRouter::signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg )
+ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
-    //cout << "sigAssert: " << a_name << endl;
-    ComBus::SignalAssertMessage msg( a_name, a_source, a_msg, a_level );
+    cout << "CBR sigAssert: " << a_signal.name << endl;
+    ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
     m_combus.sendMessage( msg );
 }
 
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
-    //cout << "sigRetract: " << a_name << endl;
+    cout << "CBR sigRetract: " << a_name << endl;
     ComBus::SignalRetractMessage msg( a_name );
     m_combus.sendMessage( msg );
 }
@@ -189,27 +218,31 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 
 
 bool
-ComBusRouter::comBusCommand( const ADARA::ComBus::ControlMessage &a_cmd )
+ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 {
-    //cout << "Got Command: " << hex << a_cmd.getMessageType() << endl;
-    switch( a_cmd.getMessageType() )
+    //cout << "Got Command: " << hex << a_msg.getMessageType() << endl;
+
+    switch( a_msg.getMessageType() )
     {
     case ADARA::ComBus::MSG_CMD_EMIT_STATE:
         //cout << "RESEND b/c GOT EMIT STATE CMD!!!" << endl;
         m_resend_state = true;
         break;
+
+    case ADARA::ComBus::MSG_DASMON_GET_RULES:
+        sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
+        break;
+
+    case ADARA::ComBus::MSG_DASMON_SET_RULES:
+        setRuleDefinitions( &a_msg );
+        break;
+
     default:
         break;
     }
     return false;
 }
 
-
-void
-ComBusRouter::comBusReply( const ADARA::ComBus::ControlMessage &a_reply )
-{
-    //cout << "Got Reply: " << hex << a_reply.getMessageType() << endl;
-}
 
 
 }}

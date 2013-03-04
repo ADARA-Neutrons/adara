@@ -10,19 +10,6 @@
 
 #undef assert
 
-typedef void *  HFACT;
-
-class IFactListener
-{
-public:
-    virtual void onAssert( const std::string &a_fact ) = 0;
-    virtual void onAssertInteger( const std::string &a_fact, int64_t a_value )
-    { (void)a_value; onAssert( a_fact ); }
-    virtual void onAssertDouble( const std::string &a_fact, double a_value )
-    { (void)a_value; onAssert( a_fact ); }
-    virtual void onRetract( const std::string &a_fact ) = 0;
-};
-
 /**
  * @class RuleEngine
  *
@@ -46,25 +33,48 @@ public:
 class RuleEngine
 {
 public:
+    typedef void *  HFACT;
+
+    struct RuleInfo
+    {
+        std::string     fact;
+        std::string     expr;
+    };
+
+    class IFactListener
+    {
+    public:
+        virtual void onAssert( const std::string &a_fact ) = 0;
+        virtual void onAssertInteger( const std::string &a_fact, int64_t a_value )
+        { (void)a_value; onAssert( a_fact ); }
+        virtual void onAssertDouble( const std::string &a_fact, double a_value )
+        { (void)a_value; onAssert( a_fact ); }
+        virtual void onRetract( const std::string &a_fact ) = 0;
+    };
+
     RuleEngine();
     ~RuleEngine();
 
+    void    synchronize( const RuleEngine &a_source );
     void    attach( IFactListener &a_listener );
     void    detach( IFactListener &a_listener );
     void    sendAsserted( IFactListener &a_listener );
     void    defineRule( const std::string &a_expression );
     void    undefineRule( const std::string &a_rule_id );
     void    undefineAllRules();
+    void    getDefinedRules( std::vector<RuleInfo> &a_rules ) const;
     void    assert( const std::string &a_id );
     template<class T>
     void    assert( const std::string &a_id, T a_value );
     void    retract( const std::string &a_id );
     void    retractAllFacts();
+    void    getAsserted( std::vector<std::string> &a_asserted_facts );
     HFACT   getFactHandle( const std::string &a_id );
     void    assert( HFACT a_fact );
     template<class T>
     void    assert( HFACT a_fact, T a_value );
     void    retract( HFACT a_fact );
+    std::string getNameHFACT( HFACT a_fact ) const;
     void    beginBatch();
     void    endBatch();
 
@@ -103,6 +113,7 @@ private:
     {
     public:
         Value();
+        //Value( const Value &a_src );
         Value( bool a_value );
         Value( uint8_t a_value );
         Value( int8_t a_value );
@@ -191,6 +202,7 @@ private:
         }
 
         std::string             m_id;
+        std::string             m_expr;
         Fact                   *m_rule_fact;
         std::vector<Condition>  m_conditions;
         std::vector<Fact*>      m_fact_deps;

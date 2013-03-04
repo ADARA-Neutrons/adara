@@ -2,7 +2,12 @@
 #define COMBUSMESSAGES_H
 
 #include <string>
+#include <sstream>
 #include <boost/lexical_cast.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/foreach.hpp>
+#include <boost/algorithm/string.hpp>
 #include "ADARADefs.h"
 
 //#include <activemq/core/ActiveMQConnectionFactory.h>
@@ -62,7 +67,7 @@ enum AppCategory
     APP_DASMON      = 0x0C0000
 };
 
-#define CTRL_REPLY_FLAG 0x800000
+//#define CTRL_REPLY_FLAG 0x800000
 
 /**
  * Message types are used to uniquely identify a message class and indirectly
@@ -81,8 +86,11 @@ enum MessageType
     MSG_CMD_REINIT,
     MSG_CMD_SHUTDOWN,
     MSG_CMD_CONFIG_LOGGING,
-    MSG_REPLY_ACK               = CAT_CONTROL | CTRL_REPLY_FLAG,
+    MSG_REPLY_ACK,               //= CAT_CONTROL | CTRL_REPLY_FLAG,
     MSG_REPLY_NACK,
+    MSG_DASMON_GET_RULES        = CAT_CONTROL | APP_DASMON,
+    MSG_DASMON_SET_RULES,
+    MSG_DASMON_RULE_DEFINITIONS,
     MSG_STS_TRANS_COMPLETE      = CAT_APP | APP_STS,
     MSG_DASMON_SMS_CONN_STATUS  = CAT_APP | APP_DASMON,
     MSG_DASMON_RUN_STATUS,
@@ -141,6 +149,28 @@ public:
         default: return "UNKNOWN";
         }
     }
+
+    static Level toLevel( std::string a_level )
+    {
+        if ( boost::iequals( a_level, "TRACE" ))
+            return TRACE;
+        else if ( boost::iequals( a_level, "DEBUG" ))
+            return DEBUG;
+        else if ( boost::iequals( a_level, "INFORMATION" ))
+            return INFO;
+        else if ( boost::iequals( a_level, "INFO" ))
+            return INFO;
+        else if ( boost::iequals( a_level, "WARNING" ))
+            return WARN;
+        else if ( boost::iequals( a_level, "WARN" ))
+            return WARN;
+        else if ( boost::iequals( a_level, "ERROR" ))
+            return ERROR;
+        else if ( boost::iequals( a_level, "FATAL" ))
+            return FATAL;
+
+        throw std::runtime_error( "Invalid level" );
+    }
 };
 
 
@@ -148,24 +178,53 @@ class MessageBase
 {
 public:
     MessageBase()
-        : m_src_inst(0), m_timestamp(0)
-    { }
-
-    MessageBase( const cms::Message &a_msg )
         : m_timestamp(0)
-    { translateFrom( a_msg ); }
+//        : m_src_inst(0), m_timestamp(0)
+    { }
 
     virtual ~MessageBase()
     {}
 
-    cms::Message *createCMSMessage( cms::Session &a_session )
+    virtual void serialize( cms::TextMessage &a_msg )
     {
-        cms::Message *msg = a_session.createMessage();
-        translateTo( *msg );
-        return msg;
+        // Type must not be in payload - used by factory method
+        a_msg.setIntProperty( "type", (long) getMessageType() );
+
+        boost::property_tree::ptree prop_tree;
+
+        write( prop_tree );
+
+        std::stringstream sstr;
+        write_json( sstr, prop_tree );
+
+        a_msg.setText( sstr.str() );
     }
 
-    virtual MessageType     getMessageType() const = 0;
+    virtual void unserialize( const cms::TextMessage &a_msg )
+    {
+        boost::property_tree::ptree prop_tree;
+
+        std::stringstream sstr( a_msg.getText() );
+        read_json( sstr, prop_tree );
+
+        read( prop_tree );
+    }
+
+    /*
+    cms::Message *createCMSMessage( cms::Session &a_session )
+    {
+        boost::property_tree::ptree prop_tree;
+
+        cms::Message *msg = a_session.createMessage();
+        // Type must not be in payload - used by factory method
+        msg.setIntProperty( "type", (long) getMessageType() );
+        // Translate message content
+        write( prop_tree );
+        //translateTo( *msg );
+        return msg;
+    }
+*/
+    virtual MessageType getMessageType() const = 0;
 
     inline MessageCategory getMessageCategory() const
     { return (MessageCategory)(getMessageType() & 0xFF000000 ); }
@@ -189,13 +248,27 @@ public:
     inline const std::string &getSourceName() const
     { return m_src_name; }
 
-    inline unsigned long getSourceInstance() const
-    { return m_src_inst; }
+//    inline unsigned long getSourceInstance() const
+//    { return m_src_inst; }
 
     inline unsigned long getTimestamp() const
     { return m_timestamp; }
 
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        m_src_name = a_prop_tree.get( "src_name", "" );
+//        m_src_inst = a_prop_tree.get( "src_inst", 0 );
+        m_timestamp = a_prop_tree.get( "timestamp", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        a_prop_tree.put( "src_name", m_src_name );
+//        a_prop_tree.put( "src_inst", m_src_inst );
+        a_prop_tree.put( "timestamp", m_timestamp );
+    }
+/*
     virtual void translateTo( cms::Message &a_msg )
     {
         a_msg.setIntProperty( "type", (long) getMessageType() );
@@ -210,12 +283,13 @@ protected:
         m_src_inst = (unsigned long)a_msg.getIntProperty( "src_inst" );
         m_timestamp = (unsigned long)a_msg.getIntProperty( "timestamp" );
     }
+*/
 
 private:
-    void setSourceInfo( const std::string &a_src_name, unsigned long a_src_inst )
+    void setSourceInfo( const std::string &a_src_name ) //, unsigned long a_src_inst )
     {
         m_src_name = a_src_name;
-        m_src_inst = a_src_inst;
+//        m_src_inst = a_src_inst;
     }
 
     void setTimestamp( unsigned long a_timestamp )
@@ -224,7 +298,7 @@ private:
     }
 
     std::string         m_src_name;
-    unsigned long       m_src_inst;
+//    unsigned long       m_src_inst;
     unsigned long       m_timestamp;
 
     // Connection class sets source, instance, and timestamp when message is sent
@@ -248,46 +322,67 @@ private:
 class ControlMessage : public MessageBase
 {
 public:
-    ControlMessage( const cms::Message &a_msg )
-        : MessageBase( a_msg )
-    { translateFrom( a_msg ); }
-
-    ControlMessage( unsigned long a_key = 0, bool a_reply_requested = false )
-        : m_key(a_key), m_dest_inst(0), m_reply_requested(a_reply_requested)
+    ControlMessage()
+//        : m_dest_inst(0)
     {}
 
-    inline unsigned long getKey() const
-    { return m_key; }
+    std::string         m_correlation_id;   ///< Key identifier used to (re)associate messages
+//    unsigned long       m_dest_inst;        ///< Destination instance (dest name is implied by topic)
 
-    inline bool replyRequested() const
-    { return m_reply_requested; }
+    virtual void unserialize( const cms::TextMessage &a_msg )
+    {
+        MessageBase::unserialize( a_msg );
+
+        if ( m_correlation_id.empty() )
+        {
+            m_correlation_id = a_msg.getCMSMessageID();
+            std::cout << "Rcv new msg, assigned CID from MID = " << m_correlation_id << std::endl;
+        }
+    }
 
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_correlation_id = a_prop_tree.get( "correl_id", "" );
+//        m_dest_inst = a_prop_tree.get( "dest_inst", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        a_prop_tree.put( "correl_id", m_correlation_id );
+//        a_prop_tree.put( "dest_inst", m_dest_inst );
+    }
+/*
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
 
-        a_msg.setIntProperty( "key", (long)m_key );
+        a_msg.setStringProperty( "correl_id", m_correlation_id );
         a_msg.setIntProperty( "dest_inst", (long)m_dest_inst );
-        a_msg.setBooleanProperty( "reply_req", m_reply_requested );
     }
 
     void translateFrom( const cms::Message &a_msg )
     {
-        m_key = (unsigned long)a_msg.getIntProperty( "key" );
+        m_correlation_id = a_msg.getIntProperty( "correl_id" );
+        if ( m_correlation_id.empty() )
+            m_correlation_id = a_msg.getCMSMessageID();
+
         m_dest_inst = (unsigned long)a_msg.getIntProperty( "dest_inst" );
-        m_reply_requested = a_msg.getBooleanProperty( "reply_req" );
     }
+*/
 
 private:
-    void setDestInfo( unsigned long a_dest_inst )
+//    void setDestInfo( unsigned long a_dest_inst, const std::string &a_correlation_id = "" )
+    void setDestInfo( const std::string &a_correlation_id )
     {
-        m_dest_inst = a_dest_inst;
+        //m_dest_inst = a_dest_inst;
+        m_correlation_id = a_correlation_id;
     }
 
-    unsigned long       m_key;              ///< Key identifier used to (re)associate messages
-    unsigned long       m_dest_inst;        ///< Destination instance (dest name is implied by topic)
-    bool                m_reply_requested;  ///< Sender is requesting an acknowlegement
 
     // Connection class sets cmd_id when message is sent
     friend class Connection;
@@ -300,8 +395,6 @@ private:
     class name : public ControlMessage { \
     public: \
         name() {} \
-        name( const cms::Message &a_msg ) \
-            : ControlMessage( a_msg ) {} \
         inline MessageType getMessageType() const \
         { return type; } };
 
@@ -319,14 +412,31 @@ public:
     ConfigureLoggingCommand( bool a_enabled, Level a_level )
         : m_enabled(a_enabled), m_level(a_level)
     {}
-    ConfigureLoggingCommand( const cms::Message &a_msg )
-        : ControlMessage( a_msg )
-    {  translateFrom( a_msg ); }
 
     inline MessageType getMessageType() const
     { return MSG_CMD_CONFIG_LOGGING; }
 
-private:
+    bool    m_enabled;
+    Level   m_level;
+
+protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::read( a_prop_tree );
+
+        m_enabled = a_prop_tree.get( "log_enabled", false );
+        m_level = (ADARA::Level) a_prop_tree.get( "log_level", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::write( a_prop_tree );
+
+        a_prop_tree.put( "log_enabled", m_enabled );
+        a_prop_tree.put( "log_level", (unsigned short)m_level );
+    }
+
+    /*
     virtual void translateTo( cms::Message &a_msg )
     {
         ControlMessage::translateTo( a_msg );
@@ -340,9 +450,7 @@ private:
         m_enabled = a_msg.getBooleanProperty( "log_enabled" );
         m_level = (Level)a_msg.getShortProperty( "log_level" );
     }
-
-    bool    m_enabled;
-    Level   m_level;
+    */
 };
 
 
@@ -353,9 +461,9 @@ private:
 class LogMessage : public MessageBase
 {
 public:
-    LogMessage( const cms::Message &a_msg )
-        : MessageBase( a_msg ), m_line(0), m_tid(0)
-    { translateFrom( a_msg ); }
+    LogMessage()
+        : m_level(TRACE), m_line(0), m_tid(0)
+    {}
 
     LogMessage( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid = 0 )
         : m_msg(a_msg), m_level(a_level), m_file(a_file), m_line(a_line), m_tid(a_tid)
@@ -366,9 +474,12 @@ public:
 
     std::string getFormattedMessage( bool a_debug_info ) const
     {
-        std::string formatted_msg = getSourceName() + "." + boost::lexical_cast<std::string>(getSourceInstance()) + ":" + ComBusHelper::toText(m_level)
+        std::string formatted_msg = getSourceName() + ":" + ComBusHelper::toText(m_level)
                     + " [" + boost::lexical_cast<std::string>(getTimestamp()) + "] "
                     + m_msg;
+//        std::string formatted_msg = getSourceName() + "." + boost::lexical_cast<std::string>(getSourceInstance()) + ":" + ComBusHelper::toText(m_level)
+//                    + " [" + boost::lexical_cast<std::string>(getTimestamp()) + "] "
+//                    + m_msg;
 
         if ( a_debug_info )
         {
@@ -379,25 +490,39 @@ public:
         return formatted_msg;
     }
 
-    inline const std::string &getMessage() const
-    { return m_msg; }
-
-    inline Level getLevel() const
-    { return m_level; }
-
-    inline unsigned long getThreadID() const
-    { return m_tid; }
-
-    inline const std::string &getSourceFile() const
-    { return m_file; }
-
-    inline unsigned long getSourceLine() const
-    { return m_line; }
-
     inline std::string  getLevelText() const
     { return ComBusHelper::toText( m_level ); }
 
+    std::string         m_msg;
+    Level               m_level;
+    std::string         m_file;
+    unsigned long       m_line;
+    unsigned long       m_tid;
+
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_msg = a_prop_tree.get( "message", "" );
+        m_level = (Level)a_prop_tree.get( "level", 0 );
+        m_file = a_prop_tree.get( "file", "" );
+        m_line = a_prop_tree.get( "line", 0 );
+        m_tid = a_prop_tree.get( "tid", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        a_prop_tree.put( "message", m_msg );
+        a_prop_tree.put( "level", (unsigned short)m_level );
+        a_prop_tree.put( "file", m_file );
+        a_prop_tree.put( "line", m_line );
+        a_prop_tree.put( "tid", m_tid );
+    }
+
+    /*
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
@@ -423,21 +548,17 @@ protected:
         if ( a_msg.propertyExists( "tid" ))
             m_tid = a_msg.getIntProperty( "tid" );
     }
+    */
 
-    std::string         m_msg;
-    Level               m_level;
-    std::string         m_file;
-    unsigned long       m_line;
-    unsigned long       m_tid;
 };
 
 
 class StatusMessage : public MessageBase
 {
 public:
-    StatusMessage( const cms::Message &a_msg )
-        : MessageBase( a_msg )
-    { translateFrom( a_msg ); }
+    StatusMessage()
+        : m_status(STATUS_FAULT)
+    {}
 
     StatusMessage( StatusCode a_status )
         : m_status(a_status)
@@ -446,10 +567,23 @@ public:
     inline MessageType getMessageType() const
     { return MSG_STATUS; }
 
-    inline StatusCode  getStatus() const
-    { return m_status; }
+    StatusCode   m_status;
 
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_status = (StatusCode) a_prop_tree.get( "status", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        a_prop_tree.put( "status", m_status );
+    }
+    /*
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
@@ -460,9 +594,7 @@ protected:
     {
         m_status = (StatusCode) a_msg.getShortProperty( "status" );
     }
-
-private:
-    StatusCode          m_status;
+    */
 };
 
 
@@ -525,9 +657,8 @@ protected:
 class SignalRetractMessage : public MessageBase
 {
 public:
-    SignalRetractMessage( const cms::Message &a_msg )
-        : MessageBase( a_msg )
-    { translateFrom( a_msg ); }
+    SignalRetractMessage()
+    {}
 
     SignalRetractMessage( const std::string &a_name )
         : m_sig_name(a_name)
@@ -539,10 +670,23 @@ public:
     inline MessageType getMessageType() const
     { return MSG_SIGNAL_RETRACT; }
 
-    inline const std::string  &getSignalName() const
-    { return m_sig_name; }
+    std::string         m_sig_name;
 
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_sig_name = a_prop_tree.get( "sig_name", "" );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        a_prop_tree.put( "sig_name", m_sig_name );
+    }
+/*
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
@@ -553,9 +697,7 @@ protected:
     {
         m_sig_name = a_msg.getStringProperty( "sig_name" );
     }
-
-private:
-    std::string         m_sig_name;
+*/
 };
 
 
@@ -587,9 +729,9 @@ protected:
 class SignalAssertMessage : public MessageBase
 {
 public:
-    SignalAssertMessage( const cms::Message &a_msg )
-        : MessageBase( a_msg )
-    { translateFrom( a_msg ); }
+    SignalAssertMessage()
+        : m_sig_level(TRACE)
+    {}
 
     SignalAssertMessage( const std::string &a_name, const std::string &a_source, const std::string &a_msg, Level a_level )
         : m_sig_name(a_name), m_sig_source(a_source), m_sig_message(a_msg), m_sig_level(a_level)
@@ -601,19 +743,32 @@ public:
     inline MessageType getMessageType() const
     { return MSG_SIGNAL_ASSERT; }
 
-    inline const std::string &getSignalName() const
-    { return m_sig_name; }
-
-    inline const std::string &getSignalSource() const
-    { return m_sig_source; }
-
-    inline Level getSignalLevel() const
-    { return m_sig_level; }
-
-    inline const std::string  &getSignalMessage() const
-    { return m_sig_message; }
+    std::string         m_sig_name;
+    std::string         m_sig_source;
+    std::string         m_sig_message;
+    Level               m_sig_level;
 
 protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_sig_name = a_prop_tree.get( "sig_name", "" );
+        m_sig_source = a_prop_tree.get( "sig_source", "" );
+        m_sig_message = a_prop_tree.get( "sig_message", "" );
+        m_sig_level = (Level)a_prop_tree.get( "sig_level", 0 );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+         a_prop_tree.put( "sig_name", m_sig_name );
+         a_prop_tree.put( "sig_source", m_sig_source );
+         a_prop_tree.put( "sig_message", m_sig_message );
+         a_prop_tree.put( "sig_level", (unsigned short)m_sig_level );
+    }
+/*
     virtual void translateTo( cms::Message &a_msg )
     {
         MessageBase::translateTo( a_msg );
@@ -631,12 +786,7 @@ protected:
         m_sig_message = a_msg.getStringProperty( "sig_message" );
         m_sig_level = (Level) a_msg.getShortProperty( "sig_level" );
     }
-
-private:
-    std::string         m_sig_name;
-    std::string         m_sig_source;
-    std::string         m_sig_message;
-    Level               m_sig_level;
+*/
 };
 
 

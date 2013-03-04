@@ -43,12 +43,18 @@ Connection::Translator::~Translator() throw()
 void
 Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 {
+    const cms::TextMessage *txtmsg = dynamic_cast<const cms::TextMessage*>(a_msg);
+
+    // ALL ComBus messages are TextMessages - ignore if not
+    if ( !txtmsg )
+        return;
+
     try
     {
-        MessageBase *msg = Connection::makeMessage( *a_msg );
+        MessageBase *msg = Connection::makeMessage( *txtmsg );
 
         // Filter-out messages this process sent on topics that it is also listening to
-        if ( msg->m_src_name != m_proc_name && msg->m_src_inst != m_inst_num )
+        //if ( !m_handler && msg->m_src_name != m_proc_name ) //&& msg->m_src_inst != m_inst_num )
         {
             if ( m_listener )
             {
@@ -56,26 +62,13 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
             }
             else
             {
-                // TODO The Command Reply API doesnt really make sense - their all control msgs
                 if ( msg->getMessageCategory() == CAT_CONTROL)
                 {
                     ControlMessage *control = dynamic_cast<ControlMessage*>(msg);
 
                     // Filter out Control messages sent to other instances
-                    if ( control && control->m_dest_inst == m_inst_num )
-                    {
-                        if ( msg->getMessageType() & CTRL_REPLY_FLAG )
-                        {
-                            m_handler->comBusReply( *control );
-                        }
-                        else
-                        {
-                            if ( !m_handler->comBusCommand( *control ) && control->replyRequested() )
-                            {
-                                // TODO: Auto-NACK sender since listener will not process/experienced error
-                            }
-                        }
-                    }
+                    //if ( control && control->m_dest_inst == m_inst_num )
+                        m_handler->comBusControlMessage( *control );
                 }
             }
         }
@@ -181,7 +174,7 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
     }
 
     //if ( a_inst_num )
-    //    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
+    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + "." + boost::lexical_cast<string>(a_inst_num) + ".txt";
 
@@ -457,17 +450,20 @@ bool
 Connection::sendMessage( MessageBase &a_msg )
 {
     bool res = false;
-    cms::Message *cmsmsg = 0;
 
     if ( m_connected )
     {
+        cms::TextMessage *cmsmsg = 0;
+
         try
         {
             // Set source and timestamp when msg sent
-            a_msg.setSourceInfo( m_proc_name, m_inst_num );
+            a_msg.setSourceInfo( m_proc_name ); //, m_inst_num );
             a_msg.setTimestamp( time(0) );
 
-            cmsmsg = a_msg.createCMSMessage( *m_session );
+            //cmsmsg = a_msg.createCMSMessage( *m_session );
+            cmsmsg = m_session->createTextMessage();
+            a_msg.serialize( *cmsmsg );
 
             string topic = a_msg.getTopic();
             map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( topic );
@@ -507,22 +503,41 @@ Connection::sendMessage( MessageBase &a_msg )
 }
 
 
-
+/**
+ * @param a_msg - ComBus ControlMessage to send
+ * @param a_dest_proc - Name of recipient process
+ * @param a_dest_inst - Instance ID of recipient process
+ * @param a_correlation_id - Correlation ID to use (or will be set if empty)
+ *
+ * This method send a ControlMessage to the CONTROL topic associated with the specified recipient. If the message
+ * sent is the first of a "conversation", then the correlation ID should be left empty as it will be filled-in
+ * when the message is successfully sent. If the message is a continuation of an ongoing conversation, then the
+ * correlation ID of that conversation should be passed-in (if not, the recipient will assum this is a new
+ * conversation). The life cycle of conversations is application-specific and both parties must implement the same
+ * life cycle (i.e. how long correlation IDs and associated state information is maintained).
+ */
 bool
-Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, unsigned long a_dest_inst )
+Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /*, unsigned long a_dest_inst*/, std::string &a_correlation_id  )
 {
     bool res = false;
-    cms::Message *cmsmsg = 0;
 
     if ( m_connected )
     {
+        cms::TextMessage *cmsmsg = 0;
+
         try
         {
-            a_msg.setSourceInfo( m_proc_name, m_inst_num );
-            a_msg.setDestInfo( a_dest_inst );
+            a_msg.setSourceInfo( m_proc_name ); //, m_inst_num );
+            a_msg.setDestInfo( /*a_dest_inst,*/ a_correlation_id );
             a_msg.setTimestamp( time(0) );
 
-            cmsmsg = a_msg.createCMSMessage( *m_session );
+            //string full_dest = a_dest_proc + "." + boost::lexical_cast<string>(a_dest_inst);
+
+            //cout << "Send Topic = " << "ADARA.CONTROL." << full_dest << endl;
+
+            //cmsmsg = a_msg.createCMSMessage( *m_session );
+            cmsmsg = m_session->createTextMessage();
+            a_msg.serialize( *cmsmsg );
 
             map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( a_dest_proc );
             if ( itop == m_producer_topics.end())
@@ -538,6 +553,13 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, 
             else
             {
                 itop->second.second->send( cmsmsg );
+            }
+
+            // If the correl ID is not set, use the current message ID (receiver will use same)
+            if ( a_correlation_id.empty() )
+            {
+                a_correlation_id = cmsmsg->getCMSMessageID();
+                cout << "New msg assigned CID = " << a_correlation_id << endl;
             }
 
             delete cmsmsg;
@@ -561,12 +583,35 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, 
 
 
 MessageBase*
-Connection::makeMessage( const cms::Message &a_msg )
+Connection::makeMessage( const cms::TextMessage &a_msg )
 {
     unsigned long msg_type = a_msg.getIntProperty( "type" );
+    MessageBase *msg = 0;
 
     switch( msg_type )
     {
+    case MSG_LOG:                   msg = new LogMessage(); break;
+    case MSG_STATUS:                msg = new StatusMessage(); break;
+    case MSG_SIGNAL_ASSERT:         msg = new SignalAssertMessage(); break;
+    case MSG_SIGNAL_RETRACT:        msg = new SignalRetractMessage(); break;
+    case MSG_CMD_EMIT_STATUS:       msg = new EmitStatusCommand(); break;
+    case MSG_CMD_EMIT_STATE:        msg = new EmitStateCommand(); break;
+    case MSG_REPLY_ACK:             msg = new AckReply(); break;
+    case MSG_REPLY_NACK:            msg = new NackReply(); break;
+    case MSG_STS_TRANS_COMPLETE:    msg = new STS::TranslationCompleteMessage(); break;
+    case MSG_DASMON_SMS_CONN_STATUS:msg = new DASMON::ConnectionStatusMessage(); break;
+    case MSG_DASMON_RUN_STATUS:     msg = new DASMON::RunStatusMessage(); break;
+    case MSG_DASMON_PAUSE_STATUS:   msg = new DASMON::PauseStatusMessage(); break;
+    case MSG_DASMON_SCAN_STATUS:    msg = new DASMON::ScanStatusMessage(); break;
+    case MSG_DASMON_BEAM_INFO:      msg = new DASMON::BeamInfoMessage(); break;
+    case MSG_DASMON_RUN_INFO:       msg = new DASMON::RunInfoMessage(); break;
+    case MSG_DASMON_BEAM_METRICS:   msg = new DASMON::BeamMetricsMessage(); break;
+    case MSG_DASMON_RUN_METRICS:    msg = new DASMON::RunMetricsMessage(); break;
+
+    case MSG_DASMON_RULE_DEFINITIONS:msg = new DASMON::RuleDefinitions(); break;
+    case MSG_DASMON_GET_RULES:      msg = new DASMON::GetRuleDefinitions(); break;
+    case MSG_DASMON_SET_RULES:      msg = new DASMON::SetRuleDefinitions(); break;
+/*
     case MSG_LOG:                   return new LogMessage( a_msg );
     case MSG_STATUS:                return new StatusMessage( a_msg );
     case MSG_SIGNAL_ASSERT:         return new SignalAssertMessage( a_msg );
@@ -585,10 +630,14 @@ Connection::makeMessage( const cms::Message &a_msg )
     case MSG_DASMON_RUN_INFO:       return new DASMON::RunInfoMessage( a_msg );
     case MSG_DASMON_BEAM_METRICS:   return new DASMON::BeamMetricsMessage( a_msg );
     case MSG_DASMON_RUN_METRICS:    return new DASMON::RunMetricsMessage( a_msg );
-
+*/
     default:
         throw std::runtime_error("Unknown message type");
     }
+
+    msg->unserialize( a_msg );
+
+    return msg;
 }
 
 

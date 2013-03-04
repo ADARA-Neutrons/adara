@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created: Wed Feb 20 15:17:32 2013
+** Created: Tue Feb 26 11:13:20 2013
 **      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
@@ -20,6 +20,8 @@
 #include <QtGui/QLabel>
 #include <QtGui/QLineEdit>
 #include <QtGui/QMainWindow>
+#include <QtGui/QMenu>
+#include <QtGui/QMenuBar>
 #include <QtGui/QPushButton>
 #include <QtGui/QSpacerItem>
 #include <QtGui/QSplitter>
@@ -34,6 +36,9 @@ class Ui_MainWindow
 {
 public:
     QAction *actionSMS_Connection;
+    QAction *actionActiveMQ;
+    QAction *actionRules;
+    QAction *actionAbout;
     QWidget *centralWidget;
     QVBoxLayout *verticalLayout;
     QHBoxLayout *horizontalLayout;
@@ -106,12 +111,14 @@ public:
     QTableWidget *logTable;
     QTableWidget *monitorTable;
     QHBoxLayout *horizontalLayout_2;
-    QPushButton *configButton;
     QLabel *combusStatusLabel;
     QLabel *dasmonStatusLabel;
     QLabel *smsStatusLabel;
     QSpacerItem *horizontalSpacer;
     QPushButton *exitButton;
+    QMenuBar *menuBar;
+    QMenu *menuConfigure;
+    QMenu *menuHelp;
 
     void setupUi(QMainWindow *MainWindow)
     {
@@ -120,6 +127,12 @@ public:
         MainWindow->resize(924, 769);
         actionSMS_Connection = new QAction(MainWindow);
         actionSMS_Connection->setObjectName(QString::fromUtf8("actionSMS_Connection"));
+        actionActiveMQ = new QAction(MainWindow);
+        actionActiveMQ->setObjectName(QString::fromUtf8("actionActiveMQ"));
+        actionRules = new QAction(MainWindow);
+        actionRules->setObjectName(QString::fromUtf8("actionRules"));
+        actionAbout = new QAction(MainWindow);
+        actionAbout->setObjectName(QString::fromUtf8("actionAbout"));
         centralWidget = new QWidget(MainWindow);
         centralWidget->setObjectName(QString::fromUtf8("centralWidget"));
         verticalLayout = new QVBoxLayout(centralWidget);
@@ -559,11 +572,6 @@ public:
         horizontalLayout_2 = new QHBoxLayout();
         horizontalLayout_2->setSpacing(6);
         horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
-        configButton = new QPushButton(centralWidget);
-        configButton->setObjectName(QString::fromUtf8("configButton"));
-
-        horizontalLayout_2->addWidget(configButton);
-
         combusStatusLabel = new QLabel(centralWidget);
         combusStatusLabel->setObjectName(QString::fromUtf8("combusStatusLabel"));
         combusStatusLabel->setFont(font);
@@ -599,10 +607,26 @@ public:
 
         verticalLayout->setStretch(1, 1);
         MainWindow->setCentralWidget(centralWidget);
+        menuBar = new QMenuBar(MainWindow);
+        menuBar->setObjectName(QString::fromUtf8("menuBar"));
+        menuBar->setGeometry(QRect(0, 0, 924, 25));
+        menuConfigure = new QMenu(menuBar);
+        menuConfigure->setObjectName(QString::fromUtf8("menuConfigure"));
+        menuHelp = new QMenu(menuBar);
+        menuHelp->setObjectName(QString::fromUtf8("menuHelp"));
+        MainWindow->setMenuBar(menuBar);
+
+        menuBar->addAction(menuConfigure->menuAction());
+        menuBar->addAction(menuHelp->menuAction());
+        menuConfigure->addAction(actionActiveMQ);
+        menuConfigure->addAction(actionRules);
+        menuHelp->addAction(actionAbout);
 
         retranslateUi(MainWindow);
         QObject::connect(exitButton, SIGNAL(clicked()), MainWindow, SLOT(close()));
-        QObject::connect(configButton, SIGNAL(clicked()), MainWindow, SLOT(configure()));
+        QObject::connect(actionActiveMQ, SIGNAL(triggered()), MainWindow, SLOT(configActiveMQ()));
+        QObject::connect(actionRules, SIGNAL(triggered()), MainWindow, SLOT(configRules()));
+        QObject::connect(actionAbout, SIGNAL(triggered()), MainWindow, SLOT(about()));
 
         tabWidget->setCurrentIndex(0);
 
@@ -612,11 +636,14 @@ public:
 
     void retranslateUi(QMainWindow *MainWindow)
     {
-        MainWindow->setWindowTitle(QApplication::translate("MainWindow", "ADARA Stream Monitor", 0, QApplication::UnicodeUTF8));
+        MainWindow->setWindowTitle(QApplication::translate("MainWindow", "SNS DAS Monitor", 0, QApplication::UnicodeUTF8));
         actionSMS_Connection->setText(QApplication::translate("MainWindow", "SMS Connection...", 0, QApplication::UnicodeUTF8));
 #ifndef QT_NO_TOOLTIP
         actionSMS_Connection->setToolTip(QApplication::translate("MainWindow", "Set SMS hostname and port", 0, QApplication::UnicodeUTF8));
 #endif // QT_NO_TOOLTIP
+        actionActiveMQ->setText(QApplication::translate("MainWindow", "ActiveMQ...", 0, QApplication::UnicodeUTF8));
+        actionRules->setText(QApplication::translate("MainWindow", "Rules...", 0, QApplication::UnicodeUTF8));
+        actionAbout->setText(QApplication::translate("MainWindow", "About...", 0, QApplication::UnicodeUTF8));
         runStatusLabel->setText(QApplication::translate("MainWindow", "Recording", 0, QApplication::UnicodeUTF8));
         scanStatusLabel->setText(QApplication::translate("MainWindow", "No Scan", 0, QApplication::UnicodeUTF8));
         pauseStatusLabel->setText(QApplication::translate("MainWindow", "------", 0, QApplication::UnicodeUTF8));
@@ -653,11 +680,12 @@ public:
         ___qtablewidgetitem->setText(QApplication::translate("MainWindow", "Monitor ID", 0, QApplication::UnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem1 = monitorTable->horizontalHeaderItem(1);
         ___qtablewidgetitem1->setText(QApplication::translate("MainWindow", "Count Rate", 0, QApplication::UnicodeUTF8));
-        configButton->setText(QApplication::translate("MainWindow", "Configure", 0, QApplication::UnicodeUTF8));
         combusStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         dasmonStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
         exitButton->setText(QApplication::translate("MainWindow", "Exit", 0, QApplication::UnicodeUTF8));
+        menuConfigure->setTitle(QApplication::translate("MainWindow", "Configure", 0, QApplication::UnicodeUTF8));
+        menuHelp->setTitle(QApplication::translate("MainWindow", "Help", 0, QApplication::UnicodeUTF8));
     } // retranslateUi
 
 };

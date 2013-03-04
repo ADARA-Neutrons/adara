@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
             ("help,h", "show help")
             ("version", "show version number")
             ("verbosity,v", po::value<unsigned short>( &log_level )->default_value( 3 ), "verbosity level (0=trace,3=warn,5=fatal)")
-            ("config,c", po::value<string>( &config_file )->default_value( "signal.cfg" ), "Rule/signal configuration file")
+            ("config,c", po::value<string>( &config_file )->default_value( "dasmond.cfg" ), "Rule/signal configuration file")
             ("sms_host", po::value<string>( &sms_host )->default_value( "localhost" ), "set sms hostname/ip")
             ("sms_port", po::value<unsigned short>( &sms_port )->default_value( 31415 ), "set sms port")
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
@@ -70,15 +70,11 @@ int main(int argc, char *argv[])
         combus->waitForConnect( 10 );
 
         StreamMonitor   monitor( sms_host, sms_port );
-        StreamAnalyzer  analyzer( monitor );
+        StreamAnalyzer  analyzer( monitor, config_file );
         ComBusRouter    router( monitor, analyzer );
 
-        if ( !config_file.empty())
-            analyzer.loadConfig( config_file );
-        else
-            cout << "Starting without signal configuration." << endl;
-
-        combus->setControlListener( router );
+        // TODO This needs to change at some point - config should be from a central data source
+        //analyzer.loadConfig();
 
         // Connect to and process the stream
         monitor.start();

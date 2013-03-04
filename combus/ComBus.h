@@ -37,8 +37,7 @@ public:
 class IControlListener
 {
 public:
-    virtual bool    comBusCommand( const ControlMessage &a_msg ) = 0;
-    virtual void    comBusReply( const ControlMessage &a_msg ) = 0;
+    virtual bool    comBusControlMessage( const ControlMessage &a_msg ) = 0;
 };
 
 
@@ -57,7 +56,7 @@ public:
     bool                sendStatus( StatusCode a_status );
     bool                sendLog( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
     bool                sendMessage( MessageBase &a_msg );
-    bool                sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, unsigned long m_dest_inst = 0 );
+    bool                sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, /*unsigned long m_dest_inst,*/ std::string &a_correlation_id );
     void                setControlListener( IControlListener &a_ctrl_listener );
     void                attach( IStatusListener  &a_subscriber );
     void                detach( IStatusListener  &a_subscriber );
@@ -96,10 +95,10 @@ private:
     void                    connectionStatusNotifyThread();
     void                    disconnect();
     void                    createTopicConsumer( const std::string &a_topic_name, cms::Topic **a_topic, cms::MessageConsumer **a_consumer );
-    bool                    sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc, bool a_command );
+    //bool                    sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc, bool a_command );
 
     // Message factory methods/attribs
-    static MessageBase*     makeMessage( const cms::Message &a_msg );
+    static MessageBase*     makeMessage( const cms::TextMessage &a_msg );
 
     bool                                    m_running;
     bool                                    m_connected;

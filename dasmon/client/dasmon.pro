@@ -18,22 +18,29 @@ unix:INCLUDEPATH += /usr/include/activemq-cpp \
                 /usr/include/apr-1
 
 SOURCES += main.cpp \
-        mainwindow.cpp \
         ../../combus/ComBus.cpp \
-    AMQConfigDialog.cpp
+    AMQConfigDialog.cpp \
+    RuleConfigDialog.cpp \
+    SubClient.cpp \
+    MainWindow.cpp
 
-HEADERS  += mainwindow.h \
+HEADERS  += \
     ../../combus/STSMessages.h \
     ../../combus/ComBusMessages.h \
     ../../combus/ComBusAppender.h \
     ../../combus/ComBus.h \
     ../../combus/DASMonMessages.h \
-    AMQConfigDialog.h
+    AMQConfigDialog.h \
+    RuleConfigDialog.h \
+    SubClient.h \
+    MainWindow.h
 
 unix:LIBS += -lboost_thread-mt -lboost_program_options -lactivemq-cpp
 
-FORMS    += mainwindow.ui \
-    AMQConfigDialog.ui
+FORMS    += \
+    AMQConfigDialog.ui \
+    RuleConfigDialog.ui \
+    MainWindow.ui
 
 OTHER_FILES += \
     todo.txt
