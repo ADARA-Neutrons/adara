@@ -243,7 +243,8 @@ StreamMonitor::connect()
     data[3] = 0;
     data[4] = 0;
 
-    write( sms_socket, data, sizeof(data));
+    if ( write( sms_socket, data, sizeof(data)) != sizeof( data ))
+        return -4;
 
     return sms_socket;
 }
