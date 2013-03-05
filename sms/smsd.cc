@@ -23,7 +23,7 @@ namespace ptree = boost::property_tree;
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
-static AppenderPtr console_appender;
+static Appender *console_appender;
 
 static void parse_options(int argc, char **argv)
 {
@@ -114,6 +114,7 @@ static void verify_log4cxx_config(void)
 	AppenderList appenders = root->getAllAppenders();
 	AppenderList::iterator ait, end = appenders.end();
 	bool missing_layout = false, console_present = false;
+	bool had_appender = false;
 
 	/* Loop through the root appenders and verify that there is a
 	 * layout for each one to avoid a segfault when we try to use it.
@@ -132,6 +133,14 @@ static void verify_log4cxx_config(void)
 
 		if (dynamic_cast<ConsoleAppender *>(a))
 			console_present = true;
+
+		had_appender = true;
+	}
+
+	if (!had_appender) {
+		std::cerr << "No log appenders configured, aborting"
+			  << std::endl;
+		exit(1);
 	}
 
 	if (missing_layout)
@@ -151,10 +160,10 @@ static void remove_temp_logger(void)
 {
 	/* If we added a temporary console logger for startup, remove it
 	 */
-	Appender *a = console_appender;
-	if (a) {
+	if (console_appender) {
 		LoggerPtr root = Logger::getRootLogger();
 		root->removeAppender(console_appender);
+		console_appender = NULL;
 	}
 }
 
