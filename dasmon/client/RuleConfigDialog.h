@@ -25,18 +25,21 @@ public slots:
 
     void accept();
     void reject();
+    void getFacts();
     void getRules();
     void setRules();
     void addRule();
     void removeSelectedRule();
     void addSignal();
     void removeSelectedSignal();
+    void showHelp();
 
 private slots:
     void commTimeout();
     void ruleCellChanged( int row, int col );
     void signalCellChanged( int row, int col );
     void updateRuleTables();
+    void updateFactList();
 
 private:
     enum DataStatus
@@ -73,6 +76,7 @@ private:
     std::vector<ItemStatus>                 m_rules_status;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
     std::vector<ItemStatus>                 m_signal_status;
+    std::map<std::string,std::string>       m_fact_list;
 };
 
 #endif // RULECONFIGDIALOG_H

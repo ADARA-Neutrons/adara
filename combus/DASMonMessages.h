@@ -14,8 +14,10 @@ namespace DASMON {
 //////////////////////////////////////////////////////////////////////////////
 // DASMon Commands
 
+/// Simple request message to retrieve currently defined rule (and signal) definitions
 DEF_SIMPLE_CMD(GetRuleDefinitions,MSG_DASMON_GET_RULES)
 
+/// Message containing current rule & signal definitions
 class RuleDefinitions : public ControlMessage
 {
 public:
@@ -104,6 +106,45 @@ protected:
     }
 };
 
+
+/// Simple request message to retrieve currently defined rule (and signal) definitions
+DEF_SIMPLE_CMD(GetInputFacts,MSG_DASMON_GET_INPUT_FACTS)
+
+/// Message containing current built-in facts
+class InputFacts : public ControlMessage
+{
+public:
+    InputFacts()
+    {}
+
+    inline MessageType getMessageType() const
+    { return MSG_DASMON_INPUT_FACTS; }
+
+    std::map<std::string,std::string> m_facts;
+
+protected:
+    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::read( a_prop_tree );
+
+        m_facts.clear();
+
+        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("facts"))
+            m_facts[v.first] = v.second.get( "desc", "" );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::write( a_prop_tree );
+
+        for ( std::map<std::string,std::string>::iterator fact = m_facts.begin(); fact != m_facts.end(); ++fact )
+        {
+            boost::property_tree::ptree pt;
+            pt.put( "desc", fact->second );
+            a_prop_tree.add_child( std::string("facts.") + fact->first, pt );
+        }
+    }
+};
 
 #if 0
 class SubscribeProcessVariableCommand : public Command

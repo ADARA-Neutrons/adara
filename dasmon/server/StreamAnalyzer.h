@@ -38,6 +38,7 @@ public:
     void    resendState();
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
+    void    getInputFacts( std::map<std::string,std::string> &a_facts ) const;
 
 private:
     std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );

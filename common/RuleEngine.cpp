@@ -236,10 +236,7 @@ RuleEngine::synchronize( const RuleEngine &a_source )
     for ( map<string,Fact*>::const_iterator f = a_source.m_facts.begin(); f != a_source.m_facts.end(); ++f )
     {
         if ( f->second->m_asserted && !f->second->m_rule_fact )
-        {
-            cout << "injecting fact: " << f->first << endl;
             assert( f->first, f->second->m_value );
-        }
     }
 
     // Restore callbacks
@@ -333,8 +330,9 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
 void
 RuleEngine::defineRule( const std::string &a_expression )
 {
+    string upper_expr = boost::to_upper_copy( a_expression );
     boost::char_separator<char> sep(" ");
-    boost::tokenizer<boost::char_separator<char> > tokens(a_expression, sep);
+    boost::tokenizer<boost::char_separator<char> > tokens( upper_expr, sep );
     boost::tokenizer<boost::char_separator<char> >::iterator tok = tokens.begin();
     Condition cond;
     Rule *rule = 0;
@@ -350,11 +348,11 @@ RuleEngine::defineRule( const std::string &a_expression )
         rule = new Rule();
         rule->m_id = *tok;
 
-        size_t p = a_expression.find_first_of( " " );
+        size_t p = upper_expr.find_first_of( " " );
         if ( p == string::npos )
             throw std::runtime_error( "Syntax error." );
 
-        rule->m_expr = a_expression.substr( p );
+        rule->m_expr = upper_expr.substr( p );
         boost::algorithm::trim(rule->m_expr);
 
         rule->m_rule_fact = getFact( *tok );

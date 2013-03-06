@@ -611,26 +611,8 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
     case MSG_DASMON_RULE_DEFINITIONS:msg = new DASMON::RuleDefinitions(); break;
     case MSG_DASMON_GET_RULES:      msg = new DASMON::GetRuleDefinitions(); break;
     case MSG_DASMON_SET_RULES:      msg = new DASMON::SetRuleDefinitions(); break;
-/*
-    case MSG_LOG:                   return new LogMessage( a_msg );
-    case MSG_STATUS:                return new StatusMessage( a_msg );
-    case MSG_SIGNAL_ASSERT:         return new SignalAssertMessage( a_msg );
-    case MSG_SIGNAL_RETRACT:        return new SignalRetractMessage( a_msg );
-    //case MSG_SIGNAL_EVENT:          return new SignalEventMessage( a_msg );
-    case MSG_CMD_EMIT_STATUS:       return new EmitStatusCommand( a_msg );
-    case MSG_CMD_EMIT_STATE:        return new EmitStateCommand( a_msg );
-    case MSG_REPLY_ACK:             return new AckReply( a_msg );
-    case MSG_REPLY_NACK:            return new NackReply( a_msg );
-    case MSG_STS_TRANS_COMPLETE:    return new STS::TranslationCompleteMessage( a_msg );
-    case MSG_DASMON_SMS_CONN_STATUS:return new DASMON::ConnectionStatusMessage( a_msg );
-    case MSG_DASMON_RUN_STATUS:     return new DASMON::RunStatusMessage( a_msg );
-    case MSG_DASMON_PAUSE_STATUS:   return new DASMON::PauseStatusMessage( a_msg );
-    case MSG_DASMON_SCAN_STATUS:    return new DASMON::ScanStatusMessage( a_msg );
-    case MSG_DASMON_BEAM_INFO:      return new DASMON::BeamInfoMessage( a_msg );
-    case MSG_DASMON_RUN_INFO:       return new DASMON::RunInfoMessage( a_msg );
-    case MSG_DASMON_BEAM_METRICS:   return new DASMON::BeamMetricsMessage( a_msg );
-    case MSG_DASMON_RUN_METRICS:    return new DASMON::RunMetricsMessage( a_msg );
-*/
+    case MSG_DASMON_GET_INPUT_FACTS:msg = new DASMON::GetInputFacts(); break;
+    case MSG_DASMON_INPUT_FACTS:    msg = new DASMON::InputFacts(); break;
     default:
         throw std::runtime_error("Unknown message type");
     }

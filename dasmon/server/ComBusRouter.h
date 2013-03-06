@@ -30,6 +30,7 @@ public:
 private:
     void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
     void    setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg );
+    void    sendInputFacts( const std::string &a_src_proc, const std::string &a_CID );
 
     // IStreamListener Interface
     void    runStatus( bool a_recording, unsigned long a_run_number );

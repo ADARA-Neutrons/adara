@@ -1,4 +1,8 @@
 #include <QMessageBox>
+#include <QLineEdit>
+#include <QCompleter>
+#include <QMessageBox>
+#include <boost/algorithm/string.hpp>
 #include "ComBus.h"
 #include "ComBusMessages.h"
 #include "DASMonMessages.h"
@@ -25,7 +29,11 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->signalTable->horizontalHeader()->show();
 
+    ui->splitter->setStretchFactor( 0, 1 );
+    ui->splitter->setStretchFactor( 1, 0 );
+
     connect( &m_load_timer, SIGNAL(timeout()), this, SLOT(getRules()));
+    connect( &m_load_timer, SIGNAL(timeout()), this, SLOT(getFacts()));
     connect( &m_com_timer, SIGNAL(timeout()), this, SLOT(commTimeout()));
     connect( ui->ruleTable, SIGNAL(cellChanged(int,int)), this, SLOT(ruleCellChanged(int,int)));
     connect( ui->signalTable, SIGNAL(cellChanged(int,int)), this, SLOT(signalCellChanged(int,int)));
@@ -108,9 +116,9 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
                 {
                     for ( rule_recv = defs->m_rules.begin(); rule_recv != defs->m_rules.end(); ++rule_recv )
                     {
-                        if ( rule_recv->fact == rule_cur->fact )
+                        if ( boost::iequals( rule_recv->fact, rule_cur->fact ))
                         {
-                            if ( rule_recv->expr == rule_cur->expr )
+                            if ( boost::iequals( rule_recv->expr, rule_cur->expr ))
                                 m_rules_status.push_back( ItemOK );
                             else
                             {
@@ -136,12 +144,12 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
                 {
                     for ( sig_recv = defs->m_signals.begin(); sig_recv != defs->m_signals.end(); ++sig_recv )
                     {
-                        if ( sig_recv->name == sig_cur->name )
+                        if ( boost::iequals( sig_recv->name, sig_cur->name ))
                         {
-                            if ( sig_recv->fact == sig_cur->fact &&
-                                 sig_recv->source == sig_cur->source &&
+                            if ( boost::iequals( sig_recv->fact, sig_cur->fact ) &&
+                                 boost::iequals( sig_recv->source, sig_cur->source ) &&
                                  sig_recv->level == sig_cur->level &&
-                                 sig_recv->msg == sig_cur->msg )
+                                 boost::iequals( sig_recv->msg, sig_cur->msg ))
                                 m_signal_status.push_back( ItemOK );
                             else
                             {
@@ -206,8 +214,18 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
             updateStatusIndicator();
         }
     }
+    else if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_INPUT_FACTS )
+    {
+        using namespace ADARA::ComBus::DASMON;
+        const InputFacts *in_facts = dynamic_cast<const InputFacts *>( &a_msg );
+        if ( in_facts )
+        {
+            m_fact_list = in_facts->m_facts;
+            QMetaObject::invokeMethod( this, "updateFactList", Qt::QueuedConnection );
+        }
+    }
 
-
+    // Returning false here will remove the sub route created by the client
     return false;
 }
 
@@ -306,6 +324,17 @@ RuleConfigDialog::updateRuleTables()
 
 
 void
+RuleConfigDialog::updateFactList()
+{
+    ui->factList->clear();
+    for ( map<string,string>::iterator fact = m_fact_list.begin(); fact != m_fact_list.end(); ++fact )
+    {
+        ui->factList->addItem( fact->first.c_str() );
+    }
+}
+
+
+void
 RuleConfigDialog::accept()
 {
     if ( m_dirty )
@@ -358,6 +387,21 @@ RuleConfigDialog::signalCellChanged( int row, int col )
     item->setTextColor( Qt::darkBlue );
     ui->setButton->setEnabled( true );
 }
+
+
+void
+RuleConfigDialog::getFacts()
+{
+    if ( m_status != Disconnected )
+    {
+        // Send GetRuleDefinitions message to DASMON service
+        ADARA::ComBus::DASMON::GetInputFacts cmd;
+        string cid;
+
+        createRoute( cmd, "DASMON.0", cid );
+    }
+}
+
 
 void
 RuleConfigDialog::getRules()
@@ -564,4 +608,31 @@ RuleConfigDialog::setupSignalTableRow( int a_row, bool err )
     ui->signalTable->item( a_row, 4 )->setTextColor( c );
     ui->signalTable->item( a_row, 5 )->setTextColor( c );
 }
+
+
+void
+RuleConfigDialog::showHelp()
+{
+    string help_msg =
+            "Rule expression syntax:\n\n"
+            "    FACT_ID OP [VALUE] [OP FACT_ID OP [VALUE] ...]\n\n"
+            "where OP is one of:\n\n"
+            "    DEF (unary - fact is defined)\n"
+            "    UNDEF (unary - fact is undefined)\n"
+            "    <, <=, =, !=, >=, >  (numeric comparisons)\n"
+            "    |    (boolean OR)\n"
+            "    &    (boolean AND)\n"
+            "    !|   (boolean NOR)\n"
+            "    !&   (boolean NAND)\n"
+            "    ^    (boolean XOR)\n\n"
+            "For non-unary operators, a value must be specified. The value "
+            "can be a numberic constant, or it may be a FACT_ID. For compound "
+            "expressions, additional fact-value clauses must be preceeded by "
+            "a boolean operator.";
+
+    QMessageBox::information( this, "DAS Monitor Rule Configuration Help", help_msg.c_str(), QMessageBox::Ok );
+}
+
+
+
 

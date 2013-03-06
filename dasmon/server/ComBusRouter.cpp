@@ -72,6 +72,16 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
 }
 
 
+void
+ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &a_CID )
+{
+    string cid = a_CID;
+    ADARA::ComBus::DASMON::InputFacts facts;
+
+    m_analyzer.getInputFacts( facts.m_facts );
+    m_combus.sendControl( facts, a_src_proc, cid );
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IStreamListener Interface
 
@@ -182,7 +192,7 @@ void
 //ComBusRouter::signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg )
 ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
-    cout << "CBR sigAssert: " << a_signal.name << endl;
+    //cout << "CBR sigAssert: " << a_signal.name << endl;
     ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
     m_combus.sendMessage( msg );
 }
@@ -190,7 +200,7 @@ ComBusRouter::signalAssert( const SignalInfo &a_signal )
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
-    cout << "CBR sigRetract: " << a_name << endl;
+    //cout << "CBR sigRetract: " << a_name << endl;
     ComBus::SignalRetractMessage msg( a_name );
     m_combus.sendMessage( msg );
 }
@@ -235,6 +245,10 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 
     case ADARA::ComBus::MSG_DASMON_SET_RULES:
         setRuleDefinitions( &a_msg );
+        break;
+
+    case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
+        sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
         break;
 
     default:

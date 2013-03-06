@@ -249,7 +249,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     catch ( ... )
     {
         // Rule failed to parse, abort
-        cout << "Bad rules" << endl;
+        //cout << "Bad rules" << endl;
         return false;
     }
 
@@ -284,7 +284,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
             // If unassociated signal found, abort (probably a mistake)
             if ( i == BIF_COUNT )
             {
-                cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
+                //cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
                 return false;
             }
         }
@@ -310,7 +310,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     m_engine->getAsserted( asserted_facts );
 
-    cout << "old asserted signals: ";
+    //cout << "old asserted signals: ";
 
     for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
     {
@@ -318,10 +318,10 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
         if ( iSig != m_signals.end())
         {
             old_asserted_signals.push_back( iSig->second.name );
-            cout << " " << iSig->second.name;
+            //cout << " " << iSig->second.name;
         }
     }
-    cout << endl;
+    //cout << endl;
 
     // This call does NOT generate any assert/retract traffic
     engine->synchronize( *m_engine );
@@ -330,7 +330,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     engine->getAsserted( asserted_facts );
 
-    cout << "new asserted signals: ";
+    //cout << "new asserted signals: ";
 
     for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
     {
@@ -338,11 +338,11 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
         if ( iSig != tmp_signals.end())
         {
             new_asserted_signals.push_back( iSig->second.name );
-            cout << " " << iSig->second.name;
+            //cout << " " << iSig->second.name;
         }
     }
 
-    cout << endl;
+    //cout << endl;
 
     // Retract any old signals that are no longer asserted
     for ( vector<string>::iterator iOld = old_asserted_signals.begin(); iOld != old_asserted_signals.end(); ++iOld )
@@ -424,6 +424,58 @@ StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
 
     return i;
 }
+
+
+void
+StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) const
+{
+    a_facts[m_fact_name[BIF_RECORDING]]         = "Recording is in progress when defined";
+    a_facts[m_fact_name[BIF_RUN_NUMBER]]        = "Integer run number available when recording";
+    a_facts[m_fact_name[BIF_PAUSED]]            = "System is paused when defined";
+    a_facts[m_fact_name[BIF_SCANNING]]          = "System is scanning when defined";
+    a_facts[m_fact_name[BIF_SCAN_INDEX]]        = "Integer scan index available when scanning";
+    a_facts[m_fact_name[BIF_FAC_NAME]]          = "Facility name is present when defined";
+    a_facts[m_fact_name[BIF_BEAM_ID]]           = "Beam ID is present when defined";
+    a_facts[m_fact_name[BIF_BEAM_SNAME]]        = "Beam short name is present when defined";
+    a_facts[m_fact_name[BIF_BEAM_LNAME]]        = "Beam long name is present when defined";
+    a_facts[m_fact_name[BIF_RUN_TITLE]]         = "Run title is present when defined";
+    a_facts[m_fact_name[BIF_PROP_ID]]           = "Proposal ID is present when defined";
+    a_facts[m_fact_name[BIF_SAMPLE_ID]]         = "Sample ID is present when defined";
+    a_facts[m_fact_name[BIF_SAMPLE_NAME]]       = "Sample name is present when defined";
+    a_facts[m_fact_name[BIF_SAMPLE_NAT]]        = "Sample nature is present when defined";
+    a_facts[m_fact_name[BIF_SAMPLE_FORM]]       = "Sample formula is present when defined";
+    a_facts[m_fact_name[BIF_SAMPLE_ENV]]        = "Sample environment is present when defined";
+    a_facts[m_fact_name[BIF_USER_INFO]]         = "User info is present when defined";
+    a_facts[m_fact_name[BIF_COUNT_RATE]]        = "Event count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON0_COUNT_RATE]]   = "Monitor 0 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON1_COUNT_RATE]]   = "Monitor 1 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON2_COUNT_RATE]]   = "Monitor 2 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON3_COUNT_RATE]]   = "Monitor 3 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON4_COUNT_RATE]]   = "Monitor 4 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON5_COUNT_RATE]]   = "Monitor 5 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON6_COUNT_RATE]]   = "Monitor 6 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON7_COUNT_RATE]]   = "Monitor 7 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_PULSE_CHARGE]]      = "Pulse charge (Co)";
+    a_facts[m_fact_name[BIF_PULSE_FREQ]]        = "Pulse frequency (Hz)";
+    a_facts[m_fact_name[BIF_STREAM_RATE]]       = "ADARA stream data rate (bits/sec)";
+    a_facts[m_fact_name[BIF_RUN_PULSE_CHARGE]]  = "Accumulated pulse charge (Co)";
+    a_facts[m_fact_name[BIF_PIX_ERR_COUNT]]     = "Accumulated pixel error count";
+    a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
+    a_facts[m_fact_name[BIF_CYCLE_ERR_COUNT]]   = "Accumulated cycle error count";
+    a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
+
+    vector<string> facts;
+    m_engine->getAsserted( facts );
+    for ( vector<string>::iterator f = facts.begin(); f != facts.end(); ++f )
+    {
+        // If asserted fact is not a built-in fact, then it is a PV fact
+        if ( a_facts.find( *f ) == a_facts.end())
+        {
+            a_facts[*f] = "Process variable";
+        }
+    }
+}
+
 
 //////////////////////////////////////////////
 // IStreamListener
@@ -574,7 +626,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine->assert( m_pv_prefix + a_name, a_value );
+    m_engine->assert( m_pv_prefix + boost::to_upper_copy( a_name ), a_value );
 }
 
 
@@ -583,7 +635,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine->assert( m_pv_prefix + a_name, a_value );
+    m_engine->assert( m_pv_prefix + boost::to_upper_copy( a_name ), a_value );
 }
 
 void
