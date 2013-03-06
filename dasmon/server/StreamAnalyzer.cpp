@@ -38,7 +38,6 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_SAMPLE_ENV]          = "SAMPLE_ENVIRONMENT";
     m_fact_name[BIF_USER_INFO]           = "USER_INFO";
     m_fact_name[BIF_COUNT_RATE]          = "COUNT_RATE";
-    m_fact_name[BIF_MON0_COUNT_RATE]     = "MON0_COUNT_RATE";
     m_fact_name[BIF_MON1_COUNT_RATE]     = "MON1_COUNT_RATE";
     m_fact_name[BIF_MON2_COUNT_RATE]     = "MON2_COUNT_RATE";
     m_fact_name[BIF_MON3_COUNT_RATE]     = "MON3_COUNT_RATE";
@@ -46,6 +45,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_MON5_COUNT_RATE]     = "MON5_COUNT_RATE";
     m_fact_name[BIF_MON6_COUNT_RATE]     = "MON6_COUNT_RATE";
     m_fact_name[BIF_MON7_COUNT_RATE]     = "MON7_COUNT_RATE";
+    m_fact_name[BIF_MON8_COUNT_RATE]     = "MON8_COUNT_RATE";
     m_fact_name[BIF_PULSE_CHARGE]        = "PULSE_CHARGE";
     m_fact_name[BIF_PULSE_FREQ]          = "PULSE_FREQ";
     m_fact_name[BIF_STREAM_RATE]         = "STREAM_RATE";
@@ -447,7 +447,6 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_SAMPLE_ENV]]        = "Sample environment is present when defined";
     a_facts[m_fact_name[BIF_USER_INFO]]         = "User info is present when defined";
     a_facts[m_fact_name[BIF_COUNT_RATE]]        = "Event count rate (counts/sec)";
-    a_facts[m_fact_name[BIF_MON0_COUNT_RATE]]   = "Monitor 0 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_MON1_COUNT_RATE]]   = "Monitor 1 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_MON2_COUNT_RATE]]   = "Monitor 2 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_MON3_COUNT_RATE]]   = "Monitor 3 count rate (counts/sec)";
@@ -455,6 +454,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_MON5_COUNT_RATE]]   = "Monitor 5 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_MON6_COUNT_RATE]]   = "Monitor 6 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_MON7_COUNT_RATE]]   = "Monitor 7 count rate (counts/sec)";
+    a_facts[m_fact_name[BIF_MON8_COUNT_RATE]]   = "Monitor 8 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_PULSE_CHARGE]]      = "Pulse charge (Co)";
     a_facts[m_fact_name[BIF_PULSE_FREQ]]        = "Pulse frequency (Hz)";
     a_facts[m_fact_name[BIF_STREAM_RATE]]       = "ADARA stream data rate (bits/sec)";
@@ -594,7 +594,7 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_COUNT_RATE], a_metrics.m_count_rate );
 
     for ( short i = 0; i < a_metrics.m_num_monitors; ++i )
-        m_engine->assert( m_fact[BIF_MON0_COUNT_RATE + i], a_metrics.m_monitor_count_rate[i] );
+        m_engine->assert( m_fact[BIF_MON1_COUNT_RATE + i], a_metrics.m_monitor_count_rate[i] );
 
     m_engine->assert( m_fact[BIF_PULSE_CHARGE], a_metrics.m_pulse_charge );
     m_engine->assert( m_fact[BIF_PULSE_FREQ], a_metrics.m_pulse_freq );

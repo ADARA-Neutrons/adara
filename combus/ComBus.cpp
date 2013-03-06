@@ -488,7 +488,7 @@ Connection::sendMessage( MessageBase &a_msg )
         }
         catch(...)
         {
-            cout << "send failed - exception." << endl;
+            //cout << "send failed - exception." << endl;
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
@@ -496,7 +496,7 @@ Connection::sendMessage( MessageBase &a_msg )
     }
     else
     {
-        cout << "send failed - not connected." << endl;
+        //cout << "send failed - not connected." << endl;
     }
 
     return res;
@@ -559,7 +559,7 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
             if ( a_correlation_id.empty() )
             {
                 a_correlation_id = cmsmsg->getCMSMessageID();
-                cout << "New msg assigned CID = " << a_correlation_id << endl;
+                //cout << "New msg assigned CID = " << a_correlation_id << endl;
             }
 
             delete cmsmsg;
@@ -567,7 +567,7 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
         }
         catch(...)
         {
-            cout << "send failed - exception." << endl;
+            //cout << "send failed - exception." << endl;
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
@@ -575,7 +575,7 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
     }
     else
     {
-        cout << "send failed - not connected." << endl;
+        //cout << "send failed - not connected." << endl;
     }
 
     return res;
