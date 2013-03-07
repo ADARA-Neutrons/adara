@@ -91,6 +91,7 @@ enum MessageType
     MSG_DASMON_GET_RULES        = CAT_CONTROL | APP_DASMON,
     MSG_DASMON_SET_RULES,
     MSG_DASMON_RULE_DEFINITIONS,
+    MSG_DASMON_RESTORE_DEFAULT_RULES,
     MSG_DASMON_GET_INPUT_FACTS,
     MSG_DASMON_INPUT_FACTS,
     MSG_STS_TRANS_COMPLETE      = CAT_APP | APP_STS,
@@ -338,7 +339,7 @@ public:
         if ( m_correlation_id.empty() )
         {
             m_correlation_id = a_msg.getCMSMessageID();
-            std::cout << "Rcv new msg, assigned CID from MID = " << m_correlation_id << std::endl;
+            //std::cout << "Rcv new msg, assigned CID from MID = " << m_correlation_id << std::endl;
         }
     }
 

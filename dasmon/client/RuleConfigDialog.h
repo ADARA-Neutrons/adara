@@ -21,6 +21,10 @@ public:
     explicit RuleConfigDialog( MainWindow &a_parent );
     ~RuleConfigDialog();
 
+signals:
+    void busy( bool a_busy );
+    void configDirty( bool a_dirty );
+
 public slots:
 
     void accept();
@@ -28,6 +32,8 @@ public slots:
     void getFacts();
     void getRules();
     void setRules();
+    void getDefaultRules();
+    void setDefaultRules();
     void addRule();
     void removeSelectedRule();
     void addSignal();
@@ -61,6 +67,7 @@ private:
     bool comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg );
     void setupRuleTableRow( int a_row, bool a_err = false );
     void setupSignalTableRow( int a_row, bool a_err = false );
+    void setRules( bool a_set_default );
 
     Ui::RuleConfigDialog *ui;
 

@@ -590,29 +590,29 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
 
     switch( msg_type )
     {
-    case MSG_LOG:                   msg = new LogMessage(); break;
-    case MSG_STATUS:                msg = new StatusMessage(); break;
-    case MSG_SIGNAL_ASSERT:         msg = new SignalAssertMessage(); break;
-    case MSG_SIGNAL_RETRACT:        msg = new SignalRetractMessage(); break;
-    case MSG_CMD_EMIT_STATUS:       msg = new EmitStatusCommand(); break;
-    case MSG_CMD_EMIT_STATE:        msg = new EmitStateCommand(); break;
-    case MSG_REPLY_ACK:             msg = new AckReply(); break;
-    case MSG_REPLY_NACK:            msg = new NackReply(); break;
-    case MSG_STS_TRANS_COMPLETE:    msg = new STS::TranslationCompleteMessage(); break;
-    case MSG_DASMON_SMS_CONN_STATUS:msg = new DASMON::ConnectionStatusMessage(); break;
-    case MSG_DASMON_RUN_STATUS:     msg = new DASMON::RunStatusMessage(); break;
-    case MSG_DASMON_PAUSE_STATUS:   msg = new DASMON::PauseStatusMessage(); break;
-    case MSG_DASMON_SCAN_STATUS:    msg = new DASMON::ScanStatusMessage(); break;
-    case MSG_DASMON_BEAM_INFO:      msg = new DASMON::BeamInfoMessage(); break;
-    case MSG_DASMON_RUN_INFO:       msg = new DASMON::RunInfoMessage(); break;
-    case MSG_DASMON_BEAM_METRICS:   msg = new DASMON::BeamMetricsMessage(); break;
-    case MSG_DASMON_RUN_METRICS:    msg = new DASMON::RunMetricsMessage(); break;
-
-    case MSG_DASMON_RULE_DEFINITIONS:msg = new DASMON::RuleDefinitions(); break;
-    case MSG_DASMON_GET_RULES:      msg = new DASMON::GetRuleDefinitions(); break;
-    case MSG_DASMON_SET_RULES:      msg = new DASMON::SetRuleDefinitions(); break;
-    case MSG_DASMON_GET_INPUT_FACTS:msg = new DASMON::GetInputFacts(); break;
-    case MSG_DASMON_INPUT_FACTS:    msg = new DASMON::InputFacts(); break;
+    case MSG_LOG:                           msg = new LogMessage(); break;
+    case MSG_STATUS:                        msg = new StatusMessage(); break;
+    case MSG_SIGNAL_ASSERT:                 msg = new SignalAssertMessage(); break;
+    case MSG_SIGNAL_RETRACT:                msg = new SignalRetractMessage(); break;
+    case MSG_CMD_EMIT_STATUS:               msg = new EmitStatusCommand(); break;
+    case MSG_CMD_EMIT_STATE:                msg = new EmitStateCommand(); break;
+    case MSG_REPLY_ACK:                     msg = new AckReply(); break;
+    case MSG_REPLY_NACK:                    msg = new NackReply(); break;
+    case MSG_STS_TRANS_COMPLETE:            msg = new STS::TranslationCompleteMessage(); break;
+    case MSG_DASMON_SMS_CONN_STATUS:        msg = new DASMON::ConnectionStatusMessage(); break;
+    case MSG_DASMON_RUN_STATUS:             msg = new DASMON::RunStatusMessage(); break;
+    case MSG_DASMON_PAUSE_STATUS:           msg = new DASMON::PauseStatusMessage(); break;
+    case MSG_DASMON_SCAN_STATUS:            msg = new DASMON::ScanStatusMessage(); break;
+    case MSG_DASMON_BEAM_INFO:              msg = new DASMON::BeamInfoMessage(); break;
+    case MSG_DASMON_RUN_INFO:               msg = new DASMON::RunInfoMessage(); break;
+    case MSG_DASMON_BEAM_METRICS:           msg = new DASMON::BeamMetricsMessage(); break;
+    case MSG_DASMON_RUN_METRICS:            msg = new DASMON::RunMetricsMessage(); break;
+    case MSG_DASMON_RULE_DEFINITIONS:       msg = new DASMON::RuleDefinitions(); break;
+    case MSG_DASMON_GET_RULES:              msg = new DASMON::GetRuleDefinitions(); break;
+    case MSG_DASMON_SET_RULES:              msg = new DASMON::SetRuleDefinitions(); break;
+    case MSG_DASMON_RESTORE_DEFAULT_RULES:  msg = new DASMON::RestoreDefaultRuleDefinitions(); break;
+    case MSG_DASMON_GET_INPUT_FACTS:        msg = new DASMON::GetInputFacts(); break;
+    case MSG_DASMON_INPUT_FACTS:            msg = new DASMON::InputFacts(); break;
     default:
         throw std::runtime_error("Unknown message type");
     }

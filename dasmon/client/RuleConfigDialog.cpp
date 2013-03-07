@@ -173,7 +173,7 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
                 if ( !err )
                 {
                     m_dirty = false;
-                    ui->setButton->setEnabled( false );
+                    emit configDirty( m_dirty );
 
                     if ( m_quit_on_set )
                         QMetaObject::invokeMethod( this, "accept", Qt::QueuedConnection );
@@ -186,6 +186,7 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
 
             m_last_cid.clear();
             m_status = Idle;
+            emit busy(false);
             updateStatusIndicator();
         }
         else if ( m_status == Getting )
@@ -210,7 +211,9 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_m
             m_last_cid.clear();
             m_status = Idle;
             m_dirty = false;
-            ui->setButton->setEnabled( false );
+            emit configDirty( m_dirty );
+            emit busy(false);
+
             updateStatusIndicator();
         }
     }
@@ -238,6 +241,7 @@ RuleConfigDialog::commTimeout()
         removeRoute( m_last_cid );
         m_last_cid.clear();
         m_status = Idle;
+        emit busy( false );
         updateStatusIndicator();
     }
 }
@@ -374,18 +378,20 @@ void
 RuleConfigDialog::ruleCellChanged( int row, int col )
 {
     m_dirty = true;
+    emit configDirty( m_dirty );
+
     QTableWidgetItem *item = ui->ruleTable->item( row, col );
     item->setTextColor( Qt::darkBlue );
-    ui->setButton->setEnabled( true );
 }
 
 void
 RuleConfigDialog::signalCellChanged( int row, int col )
 {
     m_dirty = true;
+    emit configDirty( m_dirty );
+
     QTableWidgetItem *item = ui->signalTable->item( row, col );
     item->setTextColor( Qt::darkBlue );
-    ui->setButton->setEnabled( true );
 }
 
 
@@ -420,7 +426,10 @@ RuleConfigDialog::getRules()
 
         m_status = Getting;
         if ( createRoute( cmd, "DASMON.0", m_last_cid ))
+        {
             m_com_timer.start( 10000 );
+            emit busy(true);
+        }
         else
             m_status = Disconnected;
 
@@ -430,6 +439,18 @@ RuleConfigDialog::getRules()
 
 void
 RuleConfigDialog::setRules()
+{
+    setRules( false );
+}
+
+void
+RuleConfigDialog::setDefaultRules()
+{
+    setRules( true );
+}
+
+void
+RuleConfigDialog::setRules( bool a_set_default )
 {
     if ( m_status == Idle )
     {
@@ -473,6 +494,7 @@ RuleConfigDialog::setRules()
             // Send SetRuleDefinitions message to DASMON service
             ADARA::ComBus::DASMON::SetRuleDefinitions cmd;
 
+            cmd.m_set_default = a_set_default;
             cmd.m_rules = m_rules;
             cmd.m_signals = m_signals;
 
@@ -481,6 +503,7 @@ RuleConfigDialog::setRules()
                 m_status = Setting;
                 updateStatusIndicator();
                 m_com_timer.start( 10000 );
+                emit busy(true);
             }
             else
             {
@@ -495,6 +518,36 @@ RuleConfigDialog::setRules()
         }
     }
 }
+
+
+void
+RuleConfigDialog::getDefaultRules()
+{
+    if ( m_status == Idle )
+    {
+        if ( m_dirty )
+        {
+            if ( QMessageBox::question( this, "DAS Monitor", "This action will discard local edits. Continue?",
+                                        QMessageBox::Yes, QMessageBox::No ) == QMessageBox::No )
+                return;
+        }
+
+        // Send GetRuleDefinitions message to DASMON service
+        ADARA::ComBus::DASMON::RestoreDefaultRuleDefinitions cmd;
+
+        m_status = Getting;
+        if ( createRoute( cmd, "DASMON.0", m_last_cid ))
+        {
+            m_com_timer.start( 10000 );
+            emit busy(true);
+        }
+        else
+            m_status = Disconnected;
+
+        updateStatusIndicator();
+    }
+}
+
 
 void
 RuleConfigDialog::addRule()
@@ -512,15 +565,16 @@ RuleConfigDialog::addRule()
     ui->ruleTable->edit( ind );
 
     m_dirty = true;
-    ui->setButton->setEnabled( true );
+    emit configDirty( m_dirty );
 }
 
 void
 RuleConfigDialog::removeSelectedRule()
 {
     ui->ruleTable->removeRow( ui->ruleTable->currentRow());
+
     m_dirty = true;
-    ui->setButton->setEnabled( true );
+    emit configDirty( m_dirty );
 }
 
 void
@@ -540,16 +594,18 @@ RuleConfigDialog::addSignal()
     ui->signalTable->setCurrentCell( ui->signalTable->rowCount() - 1, 1 );
     QModelIndex ind = ui->signalTable->model()->index( ui->signalTable->rowCount() - 1, 1 );
     ui->signalTable->edit( ind );
+
     m_dirty = true;
-    ui->setButton->setEnabled( true );
+    emit configDirty( m_dirty );
 }
 
 void
 RuleConfigDialog::removeSelectedSignal()
 {
     ui->signalTable->removeRow( ui->signalTable->currentRow());
+
     m_dirty = true;
-    ui->setButton->setEnabled( true );
+    emit configDirty( m_dirty );
 }
 
 

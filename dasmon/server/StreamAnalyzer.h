@@ -23,6 +23,8 @@ public:
     {
     public:
         virtual void    signalAssert( const SignalInfo &a_signal ) = 0;
+        virtual void    signalAssertInteger( const SignalInfo &a_signal, int64_t a_value ) = 0;
+        virtual void    signalAssertDouble( const SignalInfo &a_signal, double a_value ) = 0;
         virtual void    signalRetract( const std::string &a_name ) = 0;
     };
 
@@ -32,6 +34,8 @@ public:
     void    setConfigSource( const std::string &a_file );
     void    loadConfig();
     void    saveConfig();
+    void    restoreDefaultConfig();
+    void    setDefaultConfig();
     void    attach( ISignalListener &a_listener );
     void    detach( ISignalListener &a_listener );
     void    defineSignal( const std::string &a_expression );
@@ -97,6 +101,8 @@ private:
 
     // IFactListener Interface
     void onAssert( const std::string &a_fact );
+    void onAssertInteger( const std::string &a_fact, int64_t a_value );
+    void onAssertDouble( const std::string &a_fact, double a_value );
     void onRetract( const std::string &a_fact );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;
@@ -108,7 +114,7 @@ private:
     std::string                         m_pv_prefix;
     boost::mutex                        m_mutex;
     boost::mutex                        m_list_mutex;
-    std::string                         m_cfg_file;
+    std::string                         m_cfg_dir;
 
     RuleEngine::HFACT   m_fact[BIF_COUNT];
     std::string         m_fact_name[BIF_COUNT];

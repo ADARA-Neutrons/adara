@@ -14,7 +14,7 @@ INCLUDEPATH +=  ../common \
                 ../../sts \
                 ../../common
 
-unix:INCLUDEPATH += /usr/include/activemq-cpp \
+unix:INCLUDEPATH += /usr/include/activemq-cpp-3.4.0 \
                 /usr/include/apr-1
 
 SOURCES += main.cpp \

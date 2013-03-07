@@ -1,3 +1,4 @@
+#include <boost/filesystem.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
@@ -13,8 +14,8 @@ using namespace std;
 namespace ADARA {
 namespace DASMON {
 
-StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_file )
-    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_cfg_file( a_cfg_file )
+StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
+    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_cfg_dir( a_cfg_dir )
 {
     m_engine = new RuleEngine();
     m_monitor.addListener( *this );
@@ -58,7 +59,14 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
 
-    loadConfig();
+    try
+    {
+        loadConfig();
+    }
+    catch ( std::exception &e )
+    {
+        cout << e.what() << endl;
+    }
 }
 
 
@@ -72,12 +80,14 @@ StreamAnalyzer::~StreamAnalyzer()
 void
 StreamAnalyzer::loadConfig()
 {
-    ifstream inf( m_cfg_file.c_str());
+    string cfg = m_cfg_dir + "dasmond.cfg";
+
+    ifstream inf( cfg.c_str());
     string line;
     int mode = 0;
 
     if ( !inf.is_open())
-        throw std::runtime_error( string("Could not open configuration file: ") + m_cfg_file );
+        throw std::runtime_error( string("Could not open configuration file: ") + cfg );
 
     while( !inf.eof())
     {
@@ -106,10 +116,12 @@ StreamAnalyzer::loadConfig()
 void
 StreamAnalyzer::saveConfig()
 {
-    ofstream outf( m_cfg_file.c_str(), ios_base::out | ios_base::trunc );
+    string cfg = m_cfg_dir + "dasmond.cfg";
+
+    ofstream outf( cfg.c_str(), ios_base::out | ios_base::trunc );
 
     if ( !outf.is_open())
-        throw std::runtime_error( string("Could not open configuration file: ") + m_cfg_file );
+        throw std::runtime_error( string("Could not open configuration file: ") + cfg );
 
     // RULE_LOST_SMS_CONN          SMS_CONNECTED UNDEF
 
@@ -136,6 +148,35 @@ StreamAnalyzer::saveConfig()
     outf.close();
 }
 
+
+void
+StreamAnalyzer::restoreDefaultConfig()
+{
+    boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
+    boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
+
+    if ( boost::filesystem::exists( cfg_bak ))
+    {
+        if ( boost::filesystem::exists( cfg ))
+            boost::filesystem::remove( cfg );
+        boost::filesystem::copy_file( cfg_bak, cfg );
+    }
+}
+
+
+void
+StreamAnalyzer::setDefaultConfig()
+{
+    boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
+    boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
+
+    if ( boost::filesystem::exists( cfg ))
+    {
+        if ( boost::filesystem::exists( cfg_bak ))
+            boost::filesystem::remove( cfg_bak );
+        boost::filesystem::copy_file( cfg, cfg_bak );
+    }
+}
 
 void
 StreamAnalyzer::attach( ISignalListener &a_listener )
@@ -665,6 +706,30 @@ StreamAnalyzer::onAssert( const std::string &a_fact )
             //(*l)->signalAssert( isig->second.sig_name, isig->second.sig_source, isig->second.sig_level, isig->second.sig_msg );
             (*l)->signalAssert( isig->second );
         }
+    }
+}
+
+
+void
+StreamAnalyzer::onAssertInteger( const std::string &a_fact, int64_t a_value )
+{
+    map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
+    if ( isig != m_signals.end())
+    {
+        for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+            (*l)->signalAssertInteger( isig->second, a_value );
+    }
+}
+
+
+void
+StreamAnalyzer::onAssertDouble( const std::string &a_fact, double a_value )
+{
+    map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
+    if ( isig != m_signals.end())
+    {
+        for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+            (*l)->signalAssertDouble( isig->second, a_value );
     }
 }
 

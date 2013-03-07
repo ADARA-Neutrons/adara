@@ -14,8 +14,8 @@ namespace DASMON {
 //////////////////////////////////////////////////////////////////////////////
 // DASMon Commands
 
-/// Simple request message to retrieve currently defined rule (and signal) definitions
 DEF_SIMPLE_CMD(GetRuleDefinitions,MSG_DASMON_GET_RULES)
+DEF_SIMPLE_CMD(RestoreDefaultRuleDefinitions,MSG_DASMON_RESTORE_DEFAULT_RULES)
 
 /// Message containing current rule & signal definitions
 class RuleDefinitions : public ControlMessage
@@ -94,15 +94,21 @@ public:
     inline MessageType getMessageType() const
     { return MSG_DASMON_SET_RULES; }
 
+    bool m_set_default;
+
 protected:
     virtual void read( boost::property_tree::ptree &a_prop_tree )
     {
         RuleDefinitions::read( a_prop_tree );
+
+        a_prop_tree.put( "set_default", m_set_default );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         RuleDefinitions::write( a_prop_tree );
+
+        m_set_default = a_prop_tree.get( "set_default", false );
     }
 };
 

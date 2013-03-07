@@ -1,6 +1,7 @@
 TEMPLATE = app
 CONFIG += console
 CONFIG -= qt
+TARGET = dasmond
 
 INCLUDEPATH += ../../common \
     ../../../combus \
@@ -31,7 +32,7 @@ HEADERS += \
     ../../../common/RuleEngine.h \
     ../StreamAnalyzer.h
 
-LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp
+LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
 
 OTHER_FILES += \
     ../signal.cfg

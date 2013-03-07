@@ -52,8 +52,9 @@ private:
     bool    comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
 
     // ISignalListener Interface
-    //void    signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg );
     void    signalAssert( const SignalInfo &a_signal );
+    void    signalAssertInteger( const SignalInfo &a_signal, int64_t a_value );
+    void    signalAssertDouble( const SignalInfo &a_signal, double a_value );
     void    signalRetract( const std::string &a_name );
 
     StreamMonitor                  &m_monitor;

@@ -1,3 +1,4 @@
+#include <string.h>
 #include "ComBusRouter.h"
 #include "DASMonMessages.h"
 
@@ -67,6 +68,8 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
         // If this succeeds, current rules will be set to specified;
         // otherwise, current rules will remain unchanged
         m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals );
+        if ( set_msg->m_set_default )
+            m_analyzer.setDefaultConfig();
         sendRuleDefinitions( a_msg->getSourceName(), a_msg->m_correlation_id );
     }
 }
@@ -197,6 +200,26 @@ ComBusRouter::signalAssert( const SignalInfo &a_signal )
     m_combus.sendMessage( msg );
 }
 
+
+void
+ComBusRouter::signalAssertInteger( const SignalInfo &a_signal, int64_t a_value )
+{
+    char tmp[500];
+    sprintf( tmp, a_signal.msg.c_str(), a_value );
+    ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, tmp, a_signal.level );
+    m_combus.sendMessage( msg );
+}
+
+
+void
+ComBusRouter::signalAssertDouble( const SignalInfo &a_signal, double a_value )
+{
+    char tmp[500];
+    sprintf( tmp, a_signal.msg.c_str(), a_value );
+    ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, tmp, a_signal.level );
+    m_combus.sendMessage( msg );
+}
+
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
@@ -232,28 +255,42 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 {
     //cout << "Got Command: " << hex << a_msg.getMessageType() << endl;
 
-    switch( a_msg.getMessageType() )
+    try
     {
-    case ADARA::ComBus::MSG_CMD_EMIT_STATE:
-        //cout << "RESEND b/c GOT EMIT STATE CMD!!!" << endl;
-        m_resend_state = true;
-        break;
+        switch( a_msg.getMessageType() )
+        {
+        case ADARA::ComBus::MSG_CMD_EMIT_STATE:
+            //cout << "RESEND b/c GOT EMIT STATE CMD!!!" << endl;
+            m_resend_state = true;
+            break;
 
-    case ADARA::ComBus::MSG_DASMON_GET_RULES:
-        sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
-        break;
+        case ADARA::ComBus::MSG_DASMON_GET_RULES:
+            sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
+            break;
 
-    case ADARA::ComBus::MSG_DASMON_SET_RULES:
-        setRuleDefinitions( &a_msg );
-        break;
+        case ADARA::ComBus::MSG_DASMON_SET_RULES:
+            setRuleDefinitions( &a_msg );
+            break;
 
-    case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
-        sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
-        break;
+        case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
+            cout << "Got restore defaults" << endl;
+            m_analyzer.restoreDefaultConfig();
+            cout << "Sending restored config" << endl;
+            sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
+            break;
 
-    default:
-        break;
+        case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
+            sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
+            break;
+
+        default:
+            break;
+        }
     }
+    catch ( ... )
+    {
+    }
+
     return false;
 }
 
