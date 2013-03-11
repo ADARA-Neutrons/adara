@@ -27,6 +27,7 @@ public:
 								FileOffSetFunc;
 
 	static void init(void);
+	static void lateInit(void);
 	static void stop(void);
 
 	static void startRecording(uint32_t run);

@@ -192,6 +192,7 @@ int main(int argc, char **argv)
 
 	SMSControl::addSources(conf);
 
+	StorageManager::lateInit();
 	remove_temp_logger();
 
 	for (;;) {

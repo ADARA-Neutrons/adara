@@ -177,6 +177,24 @@ void StorageManager::init(void)
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
 
+	/* If we have a stale index directory, rename it so that we may
+	 * make a new one while we kill the old ones in the background.
+	 *
+	 * Don't kick off the background delete, we'll do that in lateInit()
+	 * as part of walking the directory; this covers us in case there are
+	 * other stale index directories present.
+	 */
+	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
+		if (retireIndexDir(false)) {
+			throw std::runtime_error("Unable to retire stale "
+						 "index");
+		}
+	}
+}
+
+void StorageManager::lateInit(void)
+{
+	/* Clean up any lingering index directories in the background. */
 	if (cleanupIndexes())
 		throw std::runtime_error("Unable to clean stale indexes");
 
@@ -202,7 +220,12 @@ void StorageManager::init(void)
 	 */
 	m_ioActive = true;
 
-	/* Start the initial container */
+	/* Start the initial container; we do this in lateInit() to give
+	 * the Geometry, PixelMap, and any other future experiment information
+	 * classes a chance to be created and registered for the prologue
+	 * before creating any files -- this ensures all of the correct
+	 * information is in every file we create.
+	 */
 	startContainer();
 }
 
@@ -1035,18 +1058,6 @@ bool StorageManager::retireIndexDir(bool remove)
 
 bool StorageManager::cleanupIndexes(void)
 {
-	/* If we have a stale index directory, rename it so that we may
-	 * make a new one while we kill the old ones in the background.
-	 *
-	 * Don't kick off the background delete, we'll do that as part
-	 * of walking the directory; this covers us in case there are
-	 * other stale index directories present.
-	 */
-	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
-		if (retireIndexDir(false))
-			return true;
-	}
-
 	fs::directory_iterator end, it(m_baseDir);
 
 	for (; it != end; ++it) {
