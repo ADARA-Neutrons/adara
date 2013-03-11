@@ -31,7 +31,7 @@ public:
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         ControlMessage::read( a_prop_tree );
 
@@ -97,18 +97,18 @@ public:
     bool m_set_default;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         RuleDefinitions::read( a_prop_tree );
 
-        a_prop_tree.put( "set_default", m_set_default );
+        m_set_default = a_prop_tree.get( "set_default", false );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         RuleDefinitions::write( a_prop_tree );
 
-        m_set_default = a_prop_tree.get( "set_default", false );
+        a_prop_tree.put( "set_default", m_set_default );
     }
 };
 
@@ -129,7 +129,7 @@ public:
     std::map<std::string,std::string> m_facts;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         ControlMessage::read( a_prop_tree );
 
@@ -206,7 +206,7 @@ public:
     unsigned short      m_port;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -258,7 +258,7 @@ public:
     unsigned long       m_run_number;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -304,7 +304,7 @@ public:
     bool                m_paused;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -347,7 +347,7 @@ public:
     unsigned long       m_scan_index;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -393,7 +393,7 @@ public:
     inline MessageType  getMessageType() const { return MSG_DASMON_BEAM_INFO; }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -447,7 +447,7 @@ public:
     inline MessageType  getMessageType() const { return MSG_DASMON_RUN_INFO; }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -539,7 +539,7 @@ public:
     inline MessageType  getMessageType() const { return MSG_DASMON_BEAM_METRICS; }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -611,7 +611,7 @@ public:
     inline MessageType  getMessageType() const { return MSG_DASMON_RUN_METRICS; }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 

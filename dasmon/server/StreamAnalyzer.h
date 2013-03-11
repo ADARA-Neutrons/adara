@@ -23,8 +23,6 @@ public:
     {
     public:
         virtual void    signalAssert( const SignalInfo &a_signal ) = 0;
-        virtual void    signalAssertInteger( const SignalInfo &a_signal, int64_t a_value ) = 0;
-        virtual void    signalAssertDouble( const SignalInfo &a_signal, double a_value ) = 0;
         virtual void    signalRetract( const std::string &a_name ) = 0;
     };
 
@@ -101,8 +99,6 @@ private:
 
     // IFactListener Interface
     void onAssert( const std::string &a_fact );
-    void onAssertInteger( const std::string &a_fact, int64_t a_value );
-    void onAssertDouble( const std::string &a_fact, double a_value );
     void onRetract( const std::string &a_fact );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;

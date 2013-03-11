@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'AMQConfigDialog.ui'
 **
-** Created: Thu Mar 7 13:46:43 2013
+** Created: Fri Mar 8 13:44:02 2013
 **      by: Qt User Interface Compiler version 4.8.1
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!

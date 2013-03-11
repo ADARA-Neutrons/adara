@@ -22,8 +22,8 @@ public:
     ~RuleConfigDialog();
 
 signals:
-    void busy( bool a_busy );
-    void configDirty( bool a_dirty );
+    void readAllowed( bool a_allowed );
+    void writeAllowed( bool a_allowed );
 
 public slots:
 
@@ -48,7 +48,7 @@ private slots:
     void updateFactList();
 
 private:
-    enum DataStatus
+    enum CommStatus
     {
         Disconnected,
         Idle,
@@ -59,20 +59,22 @@ private:
     enum ItemStatus
     {
         ItemOK,
-        ItemMissing
+        ItemMissing,
+        ItemNew
     };
 
     void updateStatusIndicator();
     void dasmonStatus( bool active );
     bool comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg );
-    void setupRuleTableRow( int a_row, bool a_err = false );
-    void setupSignalTableRow( int a_row, bool a_err = false );
+    void setupRuleTableRow( int a_row, ItemStatus a_status = ItemOK );
+    void setupSignalTableRow( int a_row, ItemStatus a_status = ItemOK );
     void setRules( bool a_set_default );
+    void updateGUIState();
 
     Ui::RuleConfigDialog *ui;
 
     MainWindow     &m_mainwin;
-    DataStatus      m_status;
+    CommStatus      m_comm_status;
     QTimer          m_load_timer;
     QTimer          m_com_timer;
     std::string     m_last_cid;
@@ -80,7 +82,7 @@ private:
     bool            m_quit_on_set;
     QColor          m_def_color;
     std::vector<RuleEngine::RuleInfo>       m_rules;
-    std::vector<ItemStatus>                 m_rules_status;
+    std::vector<ItemStatus>                 m_rule_status;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
     std::vector<ItemStatus>                 m_signal_status;
     std::map<std::string,std::string>       m_fact_list;

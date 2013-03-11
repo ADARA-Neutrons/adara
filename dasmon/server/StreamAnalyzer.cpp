@@ -80,6 +80,15 @@ StreamAnalyzer::~StreamAnalyzer()
 void
 StreamAnalyzer::loadConfig()
 {
+    RuleEngine::RuleInfo            rule;
+    vector<RuleEngine::RuleInfo>    loaded_rules;
+    SignalInfo                      signal;
+    vector<SignalInfo>              loaded_signals;
+
+    //string upper_expr = boost::to_upper_copy( a_expression );
+    boost::char_separator<char> sep(",");
+    boost::tokenizer<boost::char_separator<char> >::iterator tok; // = tokens.begin();
+
     string cfg = m_cfg_dir + "dasmond.cfg";
 
     ifstream inf( cfg.c_str());
@@ -89,27 +98,70 @@ StreamAnalyzer::loadConfig()
     if ( !inf.is_open())
         throw std::runtime_error( string("Could not open configuration file: ") + cfg );
 
-    while( !inf.eof())
+    try
     {
-        getline( inf, line );
-
-        if ( line.empty() || line[0] == '#' )
-            continue;
-        if ( line == "[rules]" )
-            mode = 1;
-        else if ( line == "[signals]" )
-            mode = 2;
-        else
+        while( !inf.eof())
         {
-            //cout << line << endl;
-            if ( mode == 1 )
-                m_engine->defineRule( line );
-            else if ( mode == 2 )
-                defineSignal( line );
-        }
-    }
+            getline( inf, line );
 
-    inf.close();
+            if ( line.empty() || line[0] == '#' )
+                continue;
+            if ( line == "[rules]" )
+                mode = 1;
+            else if ( line == "[signals]" )
+                mode = 2;
+            else
+            {
+                boost::tokenizer<boost::char_separator<char> > tokens( line, sep );
+                tok = tokens.begin();
+
+                if ( mode == 1 )
+                {
+                    if ( tok == tokens.end())
+                        throw -1;
+                    rule.fact = *tok++;
+                    if ( tok == tokens.end())
+                        throw -1;
+                    rule.expr = *tok;
+                    loaded_rules.push_back( rule );
+                }
+                else if ( mode == 2 )
+                {
+                    if ( tok == tokens.end())
+                        throw -1;
+                    signal.name = *tok++;
+                    if ( tok == tokens.end())
+                        throw -1;
+                    signal.fact = *tok++;
+                    if ( tok == tokens.end())
+                        throw -1;
+                    signal.source = *tok++;
+                    if ( tok == tokens.end())
+                        throw -1;
+                    signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
+                    if ( tok == tokens.end())
+                        throw -1;
+                    signal.msg = *tok++;
+
+                    loaded_signals.push_back( signal );
+                }
+                //if ( mode == 1 )
+                //    m_engine->defineRule( line );
+                //else if ( mode == 2 )
+                //    defineSignal( line );
+            }
+        }
+
+        inf.close();
+
+        // Push rules and signals into engine
+        setDefinitions( loaded_rules, loaded_signals );
+    }
+    catch ( ... )
+    {
+        inf.close();
+        throw std::runtime_error( string("Failed loading configuration file: ") + cfg );
+    }
 }
 
 
@@ -121,9 +173,12 @@ StreamAnalyzer::saveConfig()
     ofstream outf( cfg.c_str(), ios_base::out | ios_base::trunc );
 
     if ( !outf.is_open())
-        throw std::runtime_error( string("Could not open configuration file: ") + cfg );
+    {
+        cout << "Could not open configuration file: " << cfg << endl;
+        return;
+    }
 
-    // RULE_LOST_SMS_CONN          SMS_CONNECTED UNDEF
+    // FACT_ID  Rule expression
 
     outf << "[rules]" << endl;
 
@@ -132,16 +187,16 @@ StreamAnalyzer::saveConfig()
 
     for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
     {
-        outf << rule->fact << "  " << rule->expr << endl;
+        outf << rule->fact << "," << rule->expr << endl;
     }
 
-    // SIG_RECORDING,RECORDING,SMS,INFO,Recording in progress
+    // SIGNAL_ID,FACT_ID,SOURCE,LEVEL,Message
 
     outf << "[signals]" << endl;
 
     for ( map<string,SignalInfo>::iterator sig = m_signals.begin(); sig != m_signals.end(); ++sig )
     {
-        outf << sig->first << "," << sig->second.fact << "," << sig->second.source << ",";
+        outf << sig->second.name << "," << sig->second.fact << "," << sig->second.source << ",";
         outf << sig->second.level << "," << sig->second.msg << endl;
     }
 
@@ -152,14 +207,25 @@ StreamAnalyzer::saveConfig()
 void
 StreamAnalyzer::restoreDefaultConfig()
 {
-    boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
-    boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
-
-    if ( boost::filesystem::exists( cfg_bak ))
+    try
     {
-        if ( boost::filesystem::exists( cfg ))
-            boost::filesystem::remove( cfg );
-        boost::filesystem::copy_file( cfg_bak, cfg );
+        // Move def config file to current
+
+        boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
+        boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
+
+        if ( boost::filesystem::exists( cfg_bak ))
+        {
+            if ( boost::filesystem::exists( cfg ))
+                boost::filesystem::remove( cfg );
+            boost::filesystem::copy_file( cfg_bak, cfg );
+
+            loadConfig();
+        }
+    }
+    catch ( ... )
+    {
+        cout << "failed." << endl;
     }
 }
 
@@ -167,14 +233,21 @@ StreamAnalyzer::restoreDefaultConfig()
 void
 StreamAnalyzer::setDefaultConfig()
 {
-    boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
-    boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
-
-    if ( boost::filesystem::exists( cfg ))
+    try
     {
-        if ( boost::filesystem::exists( cfg_bak ))
-            boost::filesystem::remove( cfg_bak );
-        boost::filesystem::copy_file( cfg, cfg_bak );
+        boost::filesystem::path  cfg( m_cfg_dir + "dasmond.cfg" );
+        boost::filesystem::path  cfg_bak( m_cfg_dir + "dasmond_def.cfg" );
+
+        if ( boost::filesystem::exists( cfg ))
+        {
+            if ( boost::filesystem::exists( cfg_bak ))
+                boost::filesystem::remove( cfg_bak );
+            boost::filesystem::copy_file( cfg, cfg_bak );
+        }
+    }
+    catch ( ... )
+    {
+        cout << "failed." << endl;
     }
 }
 
@@ -284,13 +357,14 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
         for ( r = a_rules.begin(); r != a_rules.end(); ++r )
         {
             tmp = r->fact + " " + r->expr;
+            cout << "set rule: " << tmp << endl;
             engine->defineRule( tmp );
         }
     }
     catch ( ... )
     {
         // Rule failed to parse, abort
-        //cout << "Bad rules" << endl;
+        cout << "Bad rules" << endl;
         return false;
     }
 
@@ -325,7 +399,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
             // If unassociated signal found, abort (probably a mistake)
             if ( i == BIF_COUNT )
             {
-                //cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
+                cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
                 return false;
             }
         }
@@ -447,8 +521,6 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     // Make new engine and new signals active
     m_engine = engine;
-
-    saveConfig();
 
     return true;
 }
@@ -702,34 +774,7 @@ StreamAnalyzer::onAssert( const std::string &a_fact )
     if ( isig != m_signals.end())
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        {
-            //(*l)->signalAssert( isig->second.sig_name, isig->second.sig_source, isig->second.sig_level, isig->second.sig_msg );
             (*l)->signalAssert( isig->second );
-        }
-    }
-}
-
-
-void
-StreamAnalyzer::onAssertInteger( const std::string &a_fact, int64_t a_value )
-{
-    map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
-    if ( isig != m_signals.end())
-    {
-        for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-            (*l)->signalAssertInteger( isig->second, a_value );
-    }
-}
-
-
-void
-StreamAnalyzer::onAssertDouble( const std::string &a_fact, double a_value )
-{
-    map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
-    if ( isig != m_signals.end())
-    {
-        for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-            (*l)->signalAssertDouble( isig->second, a_value );
     }
 }
 
@@ -741,9 +786,7 @@ StreamAnalyzer::onRetract( const std::string &a_fact )
     if ( isig != m_signals.end())
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        {
             (*l)->signalRetract( isig->second.name );
-        }
     }
 }
 

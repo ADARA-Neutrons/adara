@@ -1025,7 +1025,7 @@ MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
 
-    cout << "Control Msg: " << a_msg.getMessageType() << endl;
+    //cout << "Control Msg: " << a_msg.getMessageType() << endl;
 
     // See if this message belogs to a sub client (by correlation id)
     QMutexLocker lock( &m_mutex );

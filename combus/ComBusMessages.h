@@ -155,24 +155,37 @@ public:
 
     static Level toLevel( std::string a_level )
     {
-        if ( boost::iequals( a_level, "TRACE" ))
-            return TRACE;
-        else if ( boost::iequals( a_level, "DEBUG" ))
-            return DEBUG;
-        else if ( boost::iequals( a_level, "INFORMATION" ))
-            return INFO;
-        else if ( boost::iequals( a_level, "INFO" ))
-            return INFO;
-        else if ( boost::iequals( a_level, "WARNING" ))
-            return WARN;
-        else if ( boost::iequals( a_level, "WARN" ))
-            return WARN;
-        else if ( boost::iequals( a_level, "ERROR" ))
-            return ERROR;
-        else if ( boost::iequals( a_level, "FATAL" ))
-            return FATAL;
+        try
+        {
+            unsigned short tmp = boost::lexical_cast<unsigned short>( a_level );
+            if ( tmp > 6 )
+                throw "Invalid level";
 
-        throw std::runtime_error( "Invalid level" );
+            return (ADARA::Level)tmp;
+        }
+        catch(...)
+        {
+            // Will throw an exception is symbol is used
+
+            if ( boost::iequals( a_level, "TRACE" ))
+                return TRACE;
+            else if ( boost::iequals( a_level, "DEBUG" ))
+                return DEBUG;
+            else if ( boost::iequals( a_level, "INFORMATION" ))
+                return INFO;
+            else if ( boost::iequals( a_level, "INFO" ))
+                return INFO;
+            else if ( boost::iequals( a_level, "WARNING" ))
+                return WARN;
+            else if ( boost::iequals( a_level, "WARN" ))
+                return WARN;
+            else if ( boost::iequals( a_level, "ERROR" ))
+                return ERROR;
+            else if ( boost::iequals( a_level, "FATAL" ))
+                return FATAL;
+
+            throw std::runtime_error( "Invalid level" );
+        }
     }
 };
 
@@ -258,7 +271,7 @@ public:
     { return m_timestamp; }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         m_src_name = a_prop_tree.get( "src_name", "" );
 //        m_src_inst = a_prop_tree.get( "src_inst", 0 );
@@ -344,7 +357,7 @@ public:
     }
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -423,7 +436,7 @@ public:
     Level   m_level;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         ControlMessage::read( a_prop_tree );
 
@@ -503,7 +516,7 @@ public:
     unsigned long       m_tid;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -573,7 +586,7 @@ public:
     StatusCode   m_status;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -676,7 +689,7 @@ public:
     std::string         m_sig_name;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
@@ -752,7 +765,7 @@ public:
     Level               m_sig_level;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 

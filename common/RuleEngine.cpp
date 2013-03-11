@@ -281,22 +281,7 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
     for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
     {
         if ( f->second->m_asserted )
-        {
-            switch ( f->second->m_value.m_type )
-            {
-            case VT_VOID:
-                a_listener.onAssert( f->second->m_id );
-                break;
-
-            case VT_INT:
-                a_listener.onAssertInteger( f->second->m_id, f->second->m_value.m_int_value );
-                break;
-
-            case VT_REAL:
-                a_listener.onAssertDouble( f->second->m_id, f->second->m_value.m_real_value );
-                break;
-            }
-        }
+            a_listener.onAssert( f->second->m_id );
     }
 }
 
@@ -988,25 +973,8 @@ RuleEngine::notify_assert( Fact *a_fact )
     }
     else
     {
-        vector<IFactListener*>::iterator l = m_listeners.begin();
-
-        switch ( a_fact->m_value.m_type )
-        {
-        case VT_VOID:
-            for ( ; l != m_listeners.end(); ++l )
-                (*l)->onAssert( a_fact->m_id );
-            break;
-
-        case VT_INT:
-            for ( ; l != m_listeners.end(); ++l )
-                (*l)->onAssertInteger( a_fact->m_id, a_fact->m_value.m_int_value );
-            break;
-
-        case VT_REAL:
-            for ( ; l != m_listeners.end(); ++l )
-                (*l)->onAssertDouble( a_fact->m_id, a_fact->m_value.m_real_value );
-            break;
-        }
+        for ( vector<IFactListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+            (*l)->onAssert( a_fact->m_id );
     }
 }
 

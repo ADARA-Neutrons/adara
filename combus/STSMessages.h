@@ -28,7 +28,7 @@ public:
     std::string         m_adara_file;
 
 protected:
-    virtual void read( boost::property_tree::ptree &a_prop_tree )
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 

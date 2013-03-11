@@ -53,8 +53,6 @@ private:
 
     // ISignalListener Interface
     void    signalAssert( const SignalInfo &a_signal );
-    void    signalAssertInteger( const SignalInfo &a_signal, int64_t a_value );
-    void    signalAssertDouble( const SignalInfo &a_signal, double a_value );
     void    signalRetract( const std::string &a_name );
 
     StreamMonitor                  &m_monitor;
