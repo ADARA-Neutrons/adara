@@ -182,7 +182,8 @@ void StorageManager::init(void)
 	 *
 	 * Don't kick off the background delete, we'll do that in lateInit()
 	 * as part of walking the directory; this covers us in case there are
-	 * other stale index directories present.
+	 * other stale index directories present, and ensures the threads are
+	 * part of the correct process.
 	 */
 	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
 		if (retireIndexDir(false)) {

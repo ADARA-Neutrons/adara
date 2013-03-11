@@ -1,6 +1,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/eventfd.h>
 
 #include "EPICS.h"
 #include "SMSControl.h"
@@ -19,6 +22,9 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
+#define CHILD_INIT_SUCCESS	1
+#define CHILD_INIT_FAILED	2
+
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
 
@@ -27,12 +33,16 @@ static LoggerPtr logger(Logger::getLogger("SMS"));
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
 static Appender *console_appender;
+static bool become_daemon = true;
+
+static int initCompleteFd = -1;
 
 static void parse_options(int argc, char **argv)
 {
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help,h", "Show usage information")
+		("foregound,f", "Don't become a daemon")
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
@@ -52,7 +62,8 @@ static void parse_options(int argc, char **argv)
 		std::cerr << desc << std::endl;
 		exit(2);
 	}
-
+	if (vm.count("foreground"))
+		become_daemon = false;
 	if (vm.count("conf"))
 		config_file = vm["conf"].as<std::string>();
 	if (vm.count("logconf"))
@@ -166,8 +177,123 @@ static void remove_temp_logger(void)
 	if (console_appender) {
 		LoggerPtr root = Logger::getRootLogger();
 		root->removeAppender(console_appender);
+
+		/* Not strictly necessary, but avoid using it in the future;
+		 * it was destroyed when we removed it from the root logger.
+		 */
 		console_appender = NULL;
 	}
+}
+
+static void release_parent(uint64_t val)
+{
+	if (initCompleteFd >= 0) {
+		if (write(initCompleteFd, &val, sizeof(val)) < 0) {
+			int e = errno;
+			ERROR("unable to signal parent: " << strerror(e));
+			exit(1);
+		}
+
+		if (close(initCompleteFd) < 0) {
+			int e = errno;
+			ERROR("unable to close event fd: " << strerror(e));
+			exit(1);
+		}
+
+		initCompleteFd = -1;
+	}
+}
+
+static void daemonize(const char *pname)
+{
+	pid_t pid;
+
+	initCompleteFd = eventfd(0, EFD_CLOEXEC);
+
+	if (initCompleteFd < 0) {
+		int e = errno;
+		ERROR("unable to create event fd: " << strerror(e));
+		exit(1);
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		int e = errno;
+		ERROR("unable to fork: " << strerror(e));
+		exit(1);
+	}
+
+	if (pid) {
+		/* Parent process; wait for the child to signal us that
+		 * has finished initialization, successful or not.
+		 */
+		uint64_t ok;
+		if (read(initCompleteFd, &ok, sizeof(ok)) < 0) {
+			int e = errno;
+			ERROR("unable to receive child signal: "
+			      << strerror(e));
+			exit(1);
+		}
+
+		if (ok != CHILD_INIT_SUCCESS)
+			exit(1);
+
+		exit(0);
+	}
+
+	/* We're the child process, become a daemon.
+	 * Create a new session, then fokr and have the parent exit,
+	 * ensuring we are not the leader of the session -- we don't
+	 * want a controlling terminal. StorageManager::init() already
+	 * took care of our working directory and umask settings.
+	 */
+	if (setsid() < 0) {
+		int e = errno;
+		ERROR("unable to setsid: " << strerror(e));
+		release_parent(CHILD_INIT_FAILED);
+		exit(1);
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		int e = errno;
+		ERROR("second fork failed: " << strerror(e));
+		release_parent(CHILD_INIT_FAILED);
+		exit(1);
+	} else if (pid) {
+		/* Parent process just exits */
+		exit(0);
+	}
+
+	/* We're the second child now; we are in our own session, but
+	 * are not the leader of it. Let initialization continue.
+	 */
+}
+
+static void close_std_files(void)
+{
+	int fd = open("/dev/null", O_RDWR);
+
+	if (fd < 0) {
+		int e = errno;
+		std::string msg("Unable to open /dev/null: ");
+		msg += strerror(e);
+		throw std::runtime_error(msg);
+	}
+
+	/* Make /dev/null be our stdin and stderr. If we added a console
+	 * appender, then we can also do stdout as it won't be used any
+	 * longer. If we didn't add the console appender, we need to leave
+	 * stdout alone, as the user requested logging go there.
+	 *
+	 * Note that we need to be called before remove_temp_logger()
+	 */
+	dup2(fd, 0);
+	dup2(fd, 2);
+	if (console_appender)
+		dup2(fd, 1);
+	if (fd > 2)
+		close(fd);
 }
 
 int main(int argc, char **argv)
@@ -188,6 +314,11 @@ int main(int argc, char **argv)
 
 	block_signals();
 
+	/* Do all of the initialization we can before we become a daemon;
+	 * we'll do a post-daemon round of init as well, so that creation
+	 * of threads get the right parent, and allow for tasks that need
+	 * to happen later.
+	 */
 	try {
 		StorageManager::init();
 		SMSControl::init();
@@ -195,19 +326,29 @@ int main(int argc, char **argv)
 		STSClientMgr::init();
 
 		SMSControl::addSources(conf);
-
-		StorageManager::lateInit();
-		remove_temp_logger();
 	} catch (std::exception e) {
 		ERROR("failed to start: " << e.what());
 		exit(1);
+	}
+
+	if (become_daemon)
+		daemonize(argv[0]);
+
+	try {
+		StorageManager::lateInit();
+		close_std_files();
+		remove_temp_logger();
+	} catch (std::exception e) {
+		ERROR("failed to start: " << e.what());
+		release_parent(CHILD_INIT_FAILED);
+		exit(1);
 	} catch (...) {
 		ERROR("failed to start; unknown exception");
+		release_parent(CHILD_INIT_FAILED);
 		throw;
 	}
 
-
-
+	release_parent(CHILD_INIT_SUCCESS);
 	for (;;) {
 		fileDescriptorManager.process(1000.0);
 	}
