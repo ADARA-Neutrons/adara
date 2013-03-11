@@ -102,7 +102,41 @@ LDAS_PVReader::socketConnected( LDAS_PVReaderAgent &a_agent )
 void
 LDAS_PVReader::socketDisconnected( LDAS_PVReaderAgent &a_agent )
 {
+    // This is an expected callback that is triggered when a device disconnects in an orderly fashion
+    handleInactiveAgent( a_agent );
+}
+
+/**
+ * \brief Callback that indicate that a reader agent has encountered a general socket error.
+ * \param a_agent - The LDAS_PVReaderAgent instance that has the error.
+ * \param a_err_code - An error code obtained from the DataSockets layer.
+ */
+void
+LDAS_PVReader::socketError( LDAS_PVReaderAgent &a_agent, long a_err_code )
+{
+    // This is an unexpected callback - something has gone away when it shouldn't have
+    LOG_ERROR( "Unknown data socket error for PV " << a_agent.getPV()->m_name );
+
     PVInfo *pv = a_agent.getPV();
+
+    handleInactiveAgent( a_agent );
+
+    // Need to retry connecting to this PV
+
+}
+
+/**
+ * \brief Disconnect agent and move to free pool
+ * \param a_agent - Agent to disconnect
+ */
+void
+LDAS_PVReader::handleInactiveAgent( LDAS_PVReaderAgent &a_agent )
+{
+    PVInfo *pv = a_agent.getPV();
+
+    // It's possible that we received multiple callbacks for an agent having connection issues
+    if ( !pv )
+        return;
 
     Timestamp ts;
     ts.sec = (unsigned long)time(0);
@@ -119,8 +153,6 @@ LDAS_PVReader::socketDisconnected( LDAS_PVReaderAgent &a_agent )
         list<LDAS_PVReaderAgent*>::iterator ia = find( idev->second.begin(), idev->second.end(), &a_agent );
         if ( ia != idev->second.end() )
         {
-            LOG_WARNING( "LDAS reader agent disconnected unexpectedly (PV " << pv->m_name << ")" );
-
             // Remove disconnected agent from device list
             idev->second.erase(ia);
         }
@@ -129,29 +161,6 @@ LDAS_PVReader::socketDisconnected( LDAS_PVReaderAgent &a_agent )
     m_free_agents.push_back( &a_agent );
 }
 
-/**
- * \brief Callback that indicate that a reader agent has failed to connect.
- * \param a_agent - The LDAS_PVReaderAgent instance that failed to connect.
- * \param a_err_code - An error code obtained from the DataSockets layer.
- */
-void
-LDAS_PVReader::socketConnectionError( LDAS_PVReaderAgent &a_agent, long a_err_code )
-{
-    // TODO What should we do with socket connection errors?
-    LOG_ERROR( "Failed to connect to data socket for PV " << a_agent.getPV()->m_name << ", error code: " << a_err_code );
-}
-
-/**
- * \brief Callback that indicate that a reader agent has encountered a general socket error.
- * \param a_agent - The LDAS_PVReaderAgent instance that has the error.
- * \param a_err_code - An error code obtained from the DataSockets layer.
- */
-void
-LDAS_PVReader::socketError( LDAS_PVReaderAgent &a_agent, long a_err_code )
-{
-    // TODO What should we do with socket errors that don't cause a disconnect? Log?
-    LOG_ERROR( "Unknown data socket error for PV " << a_agent.getPV()->m_name );
-}
 
 // ---------- LDAS_IDevMonitorMgr Methods -------------------------------------
 
@@ -228,7 +237,7 @@ LDAS_PVReader::deviceInactive( Identifier a_dev_id, Timestamp a_time )
         }
         else
         {
-            // First send a device active stream packet
+            // First send a device inactive stream packet
             sendDeviceInactive( a_dev_id, a_time );
 
             // Retain soon-to-be disconnected agents
@@ -239,6 +248,7 @@ LDAS_PVReader::deviceInactive( Identifier a_dev_id, Timestamp a_time )
 
             // Tell inactive agents to disconnect
             // Must do this outside of the mutex as disconnect() causes an immediate callback (causing deadlock)
+            // The disconnect call triggers a socketDisconnected which moves the associated agent to the free pool
             lock.unlock();
             for ( ia = disc_agents.begin(); ia != disc_agents.end(); ++ia )
                 (*ia)->disconnect();

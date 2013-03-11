@@ -29,7 +29,7 @@ class LDAS_IPVReaderAgentMgr
 public:
     virtual void    socketConnected( LDAS_PVReaderAgent &a_gent ) = 0;
     virtual void    socketDisconnected( LDAS_PVReaderAgent &a_gent ) = 0;
-    virtual void    socketConnectionError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
+    //virtual void    socketConnectionError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
     virtual void    socketError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
 };
 
@@ -74,7 +74,7 @@ private:
 
     void            socketConnected( LDAS_PVReaderAgent &a_agent );
     void            socketDisconnected( LDAS_PVReaderAgent &a_agent );
-    void            socketConnectionError( LDAS_PVReaderAgent &a_gent, long a_err_code );
+    //void            socketConnectionError( LDAS_PVReaderAgent &a_gent, long a_err_code );
     void            socketError( LDAS_PVReaderAgent &a_gent, long a_err_code );
 
     // ---------- LDAS_IDevMonitorMgr Methods ---------------------------------
@@ -84,6 +84,7 @@ private:
 
     // ---------- Internal Methods --------------------------------------------
 
+    void            handleInactiveAgent( LDAS_PVReaderAgent &a_agent );
     void            sendDeviceActive( Identifier a_dev_id, Timestamp a_time );
     void            sendDeviceInactive( Identifier a_dev_id, Timestamp a_time );
     void            sendPVActive( PVInfo *a_pv_info, Timestamp a_time );

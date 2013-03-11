@@ -322,16 +322,31 @@ LDAS_PVReaderAgent::socketStatus( long a_status, long a_error, const CString& a_
     }
     else if ( a_status == CNiDataSocket::Unconnected )
     {
+        // This is an expected event triggered from a call to disconnect() (which is properly guarded)
         m_pv_info->m_active = false;
         m_mgr.socketDisconnected( *this );
     }
-    else if ( a_status == CNiDataSocket::ConnectionError )
+    else if ( a_status == CNiDataSocket::ConnectionError || a_error != 0 )
     {
-        m_mgr.socketConnectionError( *this, a_error );
-    }
-    else if ( a_error != 0 )
-    {
+        // This is an unexpected event - must guard here for deinitialization of socket
+        boost::lock_guard<boost::mutex> lock(m_mutex);
+
+        // Tell PVReader about error - it will move agent into free pool and mark the
+        // associated PV for retry
+        m_pv_info->m_active = false;
         m_mgr.socketError( *this, a_error );
+
+        // Now disconnect socket & clear PV data
+        // This may or may not generate a "Unconnected" callback (see above).
+        // In case it does, reset PV info first so the callback will be ignored.
+        m_pv_info = 0;
+        m_array_idx = -1;
+        m_cache_array_info = false;
+        m_array_size = 0;
+
+        m_socket.Disconnect(); // Will (might?) trigger callbacks
+        m_socket.RemoveEventHandler( CNiDataSocket::StatusUpdatedEvent );
+        m_socket.RemoveEventHandler( CNiDataSocket::DataUpdatedEvent );
     }
 }
 
