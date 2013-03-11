@@ -149,6 +149,18 @@ void StorageManager::init(void)
 		throw std::runtime_error(msg);
 	}
 
+	if (fchdir(m_base_fd)) {
+		int err = errno;
+		std::string msg("StorageManager::init() chdir() error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
+
+	/* Others should not be able to write to our files, but we'll
+	 * leave them readable for now.
+	 */
+	umask(0002);
+
 	/* m_ioStartEvent will be used by the background IO thread to wait
 	 * for requests (blocking reads). m_ioCompleteEvent will be used
 	 * in the event loop to let us know when the thread has completed
