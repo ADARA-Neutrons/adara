@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 #include <signal.h>
 
 #include "EPICS.h"
@@ -20,6 +21,8 @@
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
+
+static LoggerPtr logger(Logger::getLogger("SMS"));
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
@@ -185,15 +188,25 @@ int main(int argc, char **argv)
 
 	block_signals();
 
-	StorageManager::init();
-	SMSControl::init();
-	LiveServer::init();
-	STSClientMgr::init();
+	try {
+		StorageManager::init();
+		SMSControl::init();
+		LiveServer::init();
+		STSClientMgr::init();
 
-	SMSControl::addSources(conf);
+		SMSControl::addSources(conf);
 
-	StorageManager::lateInit();
-	remove_temp_logger();
+		StorageManager::lateInit();
+		remove_temp_logger();
+	} catch (std::exception e) {
+		ERROR("failed to start: " << e.what());
+		exit(1);
+	} catch (...) {
+		ERROR("failed to start; unknown exception");
+		throw;
+	}
+
+
 
 	for (;;) {
 		fileDescriptorManager.process(1000.0);
