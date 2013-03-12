@@ -268,6 +268,7 @@ static void daemonize(const char *pname)
 	/* We're the second child now; we are in our own session, but
 	 * are not the leader of it. Let initialization continue.
 	 */
+	DEBUG("daemonized");
 }
 
 static void close_std_files(void)
