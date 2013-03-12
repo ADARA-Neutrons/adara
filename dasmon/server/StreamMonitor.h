@@ -36,8 +36,8 @@ public:
     virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
-    virtual void pvValue( const std::string &a_name, uint32_t a_value ) = 0;
-    virtual void pvValue( const std::string &a_name, double a_value ) = 0;
+    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status ) = 0;
+    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -181,8 +181,8 @@ private:
         void beamMetrics( const BeamMetrics &a_metrics );
         void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
-        void pvValue( const std::string &a_name, uint32_t a_value );
-        void pvValue( const std::string &a_name, double a_value );
+        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
+        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     private:
@@ -216,7 +216,7 @@ private:
     void        gatherStats( const ADARA::Packet &a_pkt );
     void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
     template<class T>
-    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp, VariableStatus::Enum a_status );
     PVType      toPVType( const char *a_source ) const;
     void        clearPVs();
 

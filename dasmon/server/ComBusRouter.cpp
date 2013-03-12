@@ -67,17 +67,17 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
     {
         // If this succeeds, current rules will be set to specified;
         // otherwise, current rules will remain unchanged
-        cout << "setting" << endl;
+        //cout << "setting" << endl;
         m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals );
-        cout << "Saving new rules" << endl;
+        //cout << "Saving new rules" << endl;
         m_analyzer.saveConfig();
 
         if ( set_msg->m_set_default )
         {
-            cout << "set as default" << endl;
+            //cout << "set as default" << endl;
             m_analyzer.setDefaultConfig();
         }
-        cout << "sending reply" << endl;
+        //cout << "sending reply" << endl;
         sendRuleDefinitions( a_msg->getSourceName(), a_msg->m_correlation_id );
     }
 }
@@ -160,19 +160,21 @@ ComBusRouter::pvDefined( const std::string &a_name )
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value )
+ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
 {
     (void)a_name;
     (void)a_value;
+    (void)a_status;
     // TODO - Maybe eventually support a subscriber API for PVs?
     // Don't want to spam the system
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, double a_value )
+ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
 {
     (void)a_name;
     (void)a_value;
+    (void)a_status;
     // TODO - Maybe eventually support a subscriber API for PVs?
     // Don't want to spam the system
 }
@@ -249,28 +251,28 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
         switch( a_msg.getMessageType() )
         {
         case ADARA::ComBus::MSG_CMD_EMIT_STATE:
-            cout << "Got: EMIT_STATE" << endl;
+            //cout << "Got: EMIT_STATE" << endl;
             m_resend_state = true;
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_RULES:
-            cout << "Got: GET_RULES" << endl;
+            //cout << "Got: GET_RULES" << endl;
             sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
-            cout << "Got: SET_RULES" << endl;
+            //cout << "Got: SET_RULES" << endl;
             setRuleDefinitions( &a_msg );
             break;
 
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
-            cout << "Got: RESTORE DEFAULT" << endl;
+            //cout << "Got: RESTORE DEFAULT" << endl;
             m_analyzer.restoreDefaultConfig();
             sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
-            cout << "Got: GET FACTS" << endl;
+            //cout << "Got: GET FACTS" << endl;
             sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 

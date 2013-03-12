@@ -6,6 +6,7 @@
 #include "RuleEngine.h"
 
 #include <map>
+#include <set>
 #include <vector>
 #include <string>
 #include <boost/thread.hpp>
@@ -81,6 +82,7 @@ private:
         BIF_DUP_PULSE_COUNT,
         BIF_CYCLE_ERR_COUNT,
         BIF_SMS_CONNECTED,
+        BIF_PV_ERROR,
         BIF_COUNT
     };
 
@@ -93,13 +95,15 @@ private:
     void beamMetrics( const BeamMetrics &a_metrics );
     void runMetrics( const RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
-    void pvValue( const std::string &a_name, uint32_t a_value );
-    void pvValue( const std::string &a_name, double a_value );
+    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
+    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
     void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface
     void onAssert( const std::string &a_fact );
     void onRetract( const std::string &a_fact );
+
+    void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;
     RuleEngine                         *m_engine;
@@ -108,12 +112,13 @@ private:
     std::vector<ISignalListener*>       m_listeners;
     std::map<std::string,SignalInfo>    m_signals;
     std::string                         m_pv_prefix;
+    std::string                         m_pv_err_prefix;
     boost::mutex                        m_mutex;
     boost::mutex                        m_list_mutex;
     std::string                         m_cfg_dir;
-
-    RuleEngine::HFACT   m_fact[BIF_COUNT];
-    std::string         m_fact_name[BIF_COUNT];
+    std::set<std::string>               m_error_pvs;
+    RuleEngine::HFACT                   m_fact[BIF_COUNT];
+    std::string                         m_fact_name[BIF_COUNT];
 };
 
 }}

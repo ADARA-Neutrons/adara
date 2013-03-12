@@ -764,7 +764,7 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 {
-    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -773,7 +773,7 @@ StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
-    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -786,7 +786,8 @@ StreamMonitor::pvValueUpdate
     Identifier      a_device_id,
     Identifier      a_pv_id,
     T               a_value,
-    const timespec &a_timestamp
+    const timespec &a_timestamp,
+    VariableStatus::Enum a_status
 )
 {
     PVKey   key(a_device_id,a_pv_id);
@@ -795,7 +796,7 @@ StreamMonitor::pvValueUpdate
 
     std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
 
-    // TODO Alert - bad stream packet!
+    // TODO Alert - bad stream packet (got value w/o ddp)
     if ( ipv == m_pvs.end() )
         return;
 
@@ -812,20 +813,25 @@ StreamMonitor::pvValueUpdate
     }
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
-    if ( t - ipv->second->m_time < 0.5 )
+    if ( t - ipv->second->m_time >= 0.5 )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
         if ( pv )
         {
+            //if ( a_device_id < 100 )
+            //    cout << "PV " << a_device_id << "." << a_pv_id << " = " << a_value << endl;
+
             pv->m_value = a_value;
             pv->m_time = t;
-            m_notify.pvValue( pv->m_name, a_value );
+            m_notify.pvValue( pv->m_name, a_value, a_status );
         }
     }
 }
 
-template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value, const timespec &a_timestamp);
-template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Identifier a_pv_id, double a_value, const timespec &a_timestamp);
+template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value,
+    const timespec &a_timestamp, VariableStatus::Enum a_status);
+template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Identifier a_pv_id, double a_value,
+    const timespec &a_timestamp, VariableStatus::Enum a_status);
 
 
 void
@@ -1062,17 +1068,17 @@ StreamMonitor::Notifier::pvDefined( const std::string &a_name )
 
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->pvValue( a_name, a_value );
+        (*l)->pvValue( a_name, a_value, a_status );
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->pvValue( a_name, a_value );
+        (*l)->pvValue( a_name, a_value, a_status );
 }
 
 void

@@ -12,6 +12,13 @@
 namespace ADARA {
 namespace DASMON {
 
+enum PVState
+{
+    PV_OK = 0,
+    PV_LIMIT,
+    PV_ERROR
+};
+
 struct SignalInfo
 {
     std::string     name;

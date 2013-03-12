@@ -3,6 +3,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
 
+#include "ADARA.h"
 #include "ComBus.h"
 #include "StreamAnalyzer.h"
 
@@ -15,7 +16,7 @@ namespace ADARA {
 namespace DASMON {
 
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
-    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_cfg_dir( a_cfg_dir )
+    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"), m_cfg_dir( a_cfg_dir )
 {
     m_engine = new RuleEngine();
     m_monitor.addListener( *this );
@@ -55,6 +56,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
     m_fact_name[BIF_CYCLE_ERR_COUNT]     = "RUN_CYCLE_ERR_COUNT";
     m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
+    m_fact_name[BIF_PV_ERROR]            = "PV_ERROR";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
@@ -357,7 +359,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
         for ( r = a_rules.begin(); r != a_rules.end(); ++r )
         {
             tmp = r->fact + " " + r->expr;
-            cout << "set rule: " << tmp << endl;
+            //cout << "set rule: " << tmp << endl;
             engine->defineRule( tmp );
         }
     }
@@ -576,6 +578,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
     a_facts[m_fact_name[BIF_CYCLE_ERR_COUNT]]   = "Accumulated cycle error count";
     a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
+    a_facts[m_fact_name[BIF_PV_ERROR]]          = "One or more PVs have error codes set";
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -601,6 +604,24 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
 
     if ( a_recording )
     {
+        // TODO Should the PV facts be reset at run stops too?
+
+        // All device descriptor packets will be received after a run start
+        // Must clear-out all currently asserted PVs to get rid of any that
+        // have been removed.
+        vector<string> asserted;
+        m_engine->getAsserted( asserted );
+        for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
+        {
+            if ( fact->find_first_of( m_pv_prefix ) != string::npos ||
+                 fact->find_first_of( m_pv_err_prefix ) != string::npos )
+                m_engine->retract( *fact );
+        }
+
+        // Reset Invalid PVS at each run start boundary
+        m_engine->retract( m_fact[BIF_PV_ERROR] );
+        m_error_pvs.clear();
+
         m_engine->assert( m_fact[BIF_RECORDING] );
         m_engine->assert( m_fact[BIF_RUN_NUMBER], a_run_number );
     }
@@ -735,21 +756,69 @@ StreamAnalyzer::pvDefined( const std::string &a_name )
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value )
+StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_name );
 
-    m_engine->assert( m_pv_prefix + boost::to_upper_copy( a_name ), a_value );
+    m_engine->assert( m_pv_prefix + pv_name, a_value );
+
+    processPvStatus( pv_name, a_status );
 }
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, double a_value )
+StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_name );
 
-    m_engine->assert( m_pv_prefix + boost::to_upper_copy( a_name ), a_value );
+    m_engine->assert( m_pv_prefix + pv_name, a_value );
+
+    processPvStatus( pv_name, a_status );
 }
+
+
+void
+StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_status )
+{
+    bool err = false;
+
+    if ( a_status != VariableStatus::OK )
+    {
+        // TODO Surely there is a better way to define PV status so code like the following can be avoided?
+        if (( a_status >= VariableStatus::HIHI_LIMIT && a_status <= VariableStatus::LOW_LIMIT ) || a_status == VariableStatus::HARDWARE_LIMIT )
+            m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_LIMIT );
+        else
+        {
+            m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_ERROR );
+            err = true;
+        }
+    }
+
+    if ( err )
+    {
+        if ( m_error_pvs.empty())
+            m_engine->assert( m_fact[BIF_PV_ERROR] );
+
+        m_error_pvs.insert( pv_name );
+    }
+    else
+    {
+        // Did this PV previously have an error status?
+        // If so, clean-up associated facts
+        set<string>::iterator ipv = m_error_pvs.find( pv_name );
+        if ( ipv != m_error_pvs.end() )
+        {
+            m_engine->retract( m_pv_err_prefix + pv_name );
+
+            m_error_pvs.erase( ipv );
+            if ( m_error_pvs.empty())
+                m_engine->retract( m_fact[BIF_PV_ERROR] );
+        }
+    }
+}
+
 
 void
 StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
