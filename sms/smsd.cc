@@ -42,7 +42,7 @@ static void parse_options(int argc, char **argv)
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help,h", "Show usage information")
-		("foregound,f", "Don't become a daemon")
+		("foreground,f", "Don't become a daemon")
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
