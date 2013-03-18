@@ -83,8 +83,10 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    //cout << "resend stat: ";
     if ( m_fd_in > -1 )
     {
+        //cout << " connected" << endl;
         a_listener.connectionStatus( true, m_sms_host, m_sms_port );
         a_listener.runStatus( m_recording, m_run_num );
         a_listener.pauseStatus( m_paused );
@@ -98,6 +100,7 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
     }
     else
     {
+        //cout << " not connected" << endl;
         a_listener.connectionStatus( false, m_sms_host, m_sms_port );
     }
 }
@@ -139,7 +142,7 @@ StreamMonitor::processThread()
     char buf;
     unsigned short delay_count = 0;
 
-//    cout << "processing..." << endl;
+    //cout << "processing..." << endl;
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
 
@@ -253,14 +256,14 @@ StreamMonitor::connect()
 void
 StreamMonitor::handleLostConnection()
 {
+    //cout << "STREAM: disconnected." << endl;
+
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
     close( m_fd_in );
     m_fd_in = -1;
 
     resetStreamStats();
     resetRunStats();
-
-    //cout << "STREAM: disconnected." << endl;
 }
 
 
@@ -374,7 +377,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
-//    cout << "STREAM: RunStat: " << a_pkt.status() << endl;
+    //cout << "RunStat: " << a_pkt.status() << endl;
 
     bool recording = (a_pkt.status() != ADARA::RunStatus::NO_RUN) && (a_pkt.runNumber() != 0);
 
@@ -485,7 +488,10 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
 
     if ( !m_first_pulse_time )
+    {
         m_first_pulse_time = pulse_time;
+        //cout << "Got first pulse: t = " << m_first_pulse_time << endl;
+    }
 
     if ( m_last_pulse_time )
         m_pfreq.addSample( 1000000000.0 /(pulse_time - m_last_pulse_time));
@@ -669,9 +675,11 @@ StreamMonitor::toPVType
 bool
 StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 {
-    //cout << "DeviceDescriptorPkt" << endl;
+    //cout << "DDP: " << endl;
 
     const string &xml =  a_pkt.description();
+
+    //cout << xml << endl;
 
     xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
     if ( doc )
@@ -687,10 +695,18 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         {
             xmlNode *root = xmlDocGetRootElement( doc );
 
+            //cout << "DDP: ";
+
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
             {
+                //if ( xmlStrcmp( lev1->name, (const xmlChar*)"device_name" ) == 0)
+                //{
+                //    getXmlNodeValue( lev1, value );
+                //    cout << value << endl;
+                //}
+
                 if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
                 {
                     xmlNode *pvnode;
@@ -798,7 +814,10 @@ StreamMonitor::pvValueUpdate
 
     // TODO Alert - bad stream packet (got value w/o ddp)
     if ( ipv == m_pvs.end() )
+    {
+        //cout << "got update w/o DDP: " << a_device_id << "." << a_pv_id << endl;
         return;
+    }
 
     double t = 0;
 
@@ -813,19 +832,23 @@ StreamMonitor::pvValueUpdate
     }
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
-    if ( t - ipv->second->m_time >= 0.5 )
+    if ( t - ipv->second->m_time >= 0.5 || t == 0 )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
         if ( pv )
         {
             //if ( a_device_id < 100 )
-            //    cout << "PV " << a_device_id << "." << a_pv_id << " = " << a_value << endl;
+            //    cout << "Got PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", status = " << a_status << endl;
 
             pv->m_value = a_value;
             pv->m_time = t;
             m_notify.pvValue( pv->m_name, a_value, a_status );
         }
     }
+    //else if ( a_device_id < 100 )
+    //{
+    //    cout << "Skip PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", t = " << t << ", tl = " << m_first_pulse_time << endl;
+    //}
 }
 
 template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value,

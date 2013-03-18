@@ -30,8 +30,11 @@ class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, pub
 
 public:
     //explicit MainWindow( QWidget *parent );
-    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass );
+    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk );
     ~MainWindow();
+
+signals:
+    void kioskMode( bool a_enabled );
 
 private slots:
 
@@ -144,6 +147,7 @@ private:
     Ui::MainWindow *ui;
 
     bool                            m_init;
+    bool                            m_kiosk;
     QTimer                          m_table_timer;
     QTimer                          m_proc_timer;
     std::map<uint32_t,uint64_t>     m_monitor_rate;
@@ -179,7 +183,7 @@ private:
     std::string                     m_broker_uri;
     std::string                     m_broker_user;
     std::string                     m_broker_pass;
-    std::vector<SubClient*>        m_sub_clients;
+    std::vector<SubClient*>         m_sub_clients;
     std::map<std::string,SubClient*>    m_client_cids;
 
     friend class SubClient;

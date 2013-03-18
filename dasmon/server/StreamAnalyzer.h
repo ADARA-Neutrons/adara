@@ -82,7 +82,7 @@ private:
         BIF_DUP_PULSE_COUNT,
         BIF_CYCLE_ERR_COUNT,
         BIF_SMS_CONNECTED,
-        BIF_PV_ERROR,
+        BIF_GENERAL_PV_ERROR,
         BIF_COUNT
     };
 

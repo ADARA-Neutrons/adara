@@ -202,10 +202,9 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 // ISignalListener Interface
 
 void
-//ComBusRouter::signalAssert( const std::string &a_name, const std::string &a_source, ADARA::Level a_level, const std::string &a_msg )
 ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
-    //cout << "CBR sigAssert: " << a_signal.name << endl;
+    //cout << "signal assert:  " << a_signal.name << endl;
     ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
     m_combus.sendMessage( msg );
 }
@@ -214,7 +213,7 @@ ComBusRouter::signalAssert( const SignalInfo &a_signal )
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
-    //cout << "CBR sigRetract: " << a_name << endl;
+    //cout << "signal retract: " << a_name << endl;
     ComBus::SignalRetractMessage msg( a_name );
     m_combus.sendMessage( msg );
 }

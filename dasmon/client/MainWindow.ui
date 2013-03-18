@@ -846,8 +846,41 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>MainWindow</sender>
+   <signal>kioskMode(bool)</signal>
+   <receiver>exitButton</receiver>
+   <slot>setHidden(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>461</x>
+     <y>384</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>871</x>
+     <y>745</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>MainWindow</sender>
+   <signal>kioskMode(bool)</signal>
+   <receiver>actionActiveMQ</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>461</x>
+     <y>384</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
+  <signal>kioskMode(bool)</signal>
   <slot>configActiveMQ()</slot>
   <slot>configRules()</slot>
   <slot>about()</slot>

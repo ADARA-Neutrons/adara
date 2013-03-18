@@ -494,6 +494,8 @@ template<class T>
 void
 RuleEngine::assert( const std::string &a_id, T a_value )
 {
+    //cout << "engine.assert(str) " << a_id << endl;
+
     Value value(a_value);
 
     // If fact is not in fact space, then there are no dependencies no it yet
@@ -783,6 +785,7 @@ RuleEngine::assert( Fact *a_fact )
 void
 RuleEngine::assert( Fact *a_fact, Value &a_value )
 {
+    //cout << "engine.assert " << a_fact->m_id << endl;
     a_fact->m_asserted = true;
     a_fact->m_value = a_value;
 
@@ -967,6 +970,7 @@ RuleEngine::toOperator( const std::string &a_opr )
 void
 RuleEngine::notify_assert( Fact *a_fact )
 {
+    //cout << "RuleEng assert: " << a_fact->m_id << endl;
     if ( m_batch )
     {
         m_new_facts.insert( a_fact );
@@ -987,6 +991,8 @@ RuleEngine::notify_assert( Fact *a_fact )
 void
 RuleEngine::notify_retract( Fact *a_fact )
 {
+    //cout << "RuleEng retract: " << a_fact->m_id << endl;
+
     if ( m_batch )
     {
         m_new_facts.erase( a_fact );

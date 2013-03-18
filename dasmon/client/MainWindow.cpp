@@ -23,9 +23,9 @@ using namespace std;
 
 
 
-MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass )
+MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk )
     : QMainWindow(0), ui(new Ui::MainWindow),
-    m_init(true), m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_log_table(false),
+    m_init(true), m_kiosk(a_kiosk), m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_log_table(false),
     m_recording(false), m_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0),
@@ -101,6 +101,14 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
 
     connect( &m_table_timer, SIGNAL(timeout()), this, SLOT(onTableTimer()));
     m_table_timer.start(1000);
+
+    emit kioskMode( m_kiosk );
+
+    //if ( m_kiosk )
+    //{
+    //    ui->exitButton->hide();
+    //    ui->actionActiveMQ->setDisabled( true );
+    //}
 }
 
 

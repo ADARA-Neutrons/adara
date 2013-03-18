@@ -56,7 +56,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
     m_fact_name[BIF_CYCLE_ERR_COUNT]     = "RUN_CYCLE_ERR_COUNT";
     m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
-    m_fact_name[BIF_PV_ERROR]            = "PV_ERROR";
+    m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
@@ -147,10 +147,6 @@ StreamAnalyzer::loadConfig()
 
                     loaded_signals.push_back( signal );
                 }
-                //if ( mode == 1 )
-                //    m_engine->defineRule( line );
-                //else if ( mode == 2 )
-                //    defineSignal( line );
             }
         }
 
@@ -578,7 +574,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
     a_facts[m_fact_name[BIF_CYCLE_ERR_COUNT]]   = "Accumulated cycle error count";
     a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
-    a_facts[m_fact_name[BIF_PV_ERROR]]          = "One or more PVs have error codes set";
+    a_facts[m_fact_name[BIF_GENERAL_PV_ERROR]]  = "One or more PVs have error codes set";
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -604,6 +600,8 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
 
     if ( a_recording )
     {
+        //cout << "Analyzer Run Started" << endl;
+
         // TODO Should the PV facts be reset at run stops too?
 
         // All device descriptor packets will be received after a run start
@@ -613,13 +611,16 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
         m_engine->getAsserted( asserted );
         for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
         {
-            if ( fact->find_first_of( m_pv_prefix ) != string::npos ||
-                 fact->find_first_of( m_pv_err_prefix ) != string::npos )
+            if ( fact->find( m_pv_prefix ) == 0 ||
+                 fact->find( m_pv_err_prefix ) == 0 )
+            {
+                //cout << *fact << " starts with PV_ or PVERR_" << endl;
                 m_engine->retract( *fact );
+            }
         }
 
         // Reset Invalid PVS at each run start boundary
-        m_engine->retract( m_fact[BIF_PV_ERROR] );
+        m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
         m_error_pvs.clear();
 
         m_engine->assert( m_fact[BIF_RECORDING] );
@@ -782,24 +783,18 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStat
 void
 StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_status )
 {
-    bool err = false;
-
     if ( a_status != VariableStatus::OK )
     {
+        //cout << "Analyzer: " << pv_name << " ERROR" << endl;
+
         // TODO Surely there is a better way to define PV status so code like the following can be avoided?
         if (( a_status >= VariableStatus::HIHI_LIMIT && a_status <= VariableStatus::LOW_LIMIT ) || a_status == VariableStatus::HARDWARE_LIMIT )
             m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_LIMIT );
         else
-        {
             m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_ERROR );
-            err = true;
-        }
-    }
 
-    if ( err )
-    {
         if ( m_error_pvs.empty())
-            m_engine->assert( m_fact[BIF_PV_ERROR] );
+            m_engine->assert( m_fact[BIF_GENERAL_PV_ERROR] );
 
         m_error_pvs.insert( pv_name );
     }
@@ -814,7 +809,7 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
 
             m_error_pvs.erase( ipv );
             if ( m_error_pvs.empty())
-                m_engine->retract( m_fact[BIF_PV_ERROR] );
+                m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
         }
     }
 }
@@ -828,6 +823,7 @@ StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, u
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    //cout << "Analyzer connected = " << a_connected << endl;
     if ( a_connected )
         m_engine->assert( m_fact[BIF_SMS_CONNECTED] );
     else

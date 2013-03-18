@@ -12,9 +12,10 @@ int main(int argc, char *argv[])
 {
     int res = 0;
 
-    string broker_uri;
-    string broker_user;
-    string broker_pass;
+    string  broker_uri;
+    string  broker_user;
+    string  broker_pass;
+    bool    kiosk = false;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon options" );
@@ -24,6 +25,7 @@ int main(int argc, char *argv[])
             ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("kiosk,k", "run in kiosk mode" )
             ;
 
     po::variables_map opt_map;
@@ -42,6 +44,9 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if ( opt_map.count( "kiosk" ))
+        kiosk = true;
+
     QApplication a(argc, argv);
 
     //ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(),
@@ -49,7 +54,7 @@ int main(int argc, char *argv[])
 
     try
     {
-        MainWindow main_window( broker_uri, broker_user, broker_pass );
+        MainWindow main_window( broker_uri, broker_user, broker_pass, kiosk );
         main_window.show();
 
         res = a.exec();
