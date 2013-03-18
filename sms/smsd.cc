@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/eventfd.h>
+#include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
 
 #include "EPICS.h"
 #include "SMSControl.h"
@@ -70,6 +73,47 @@ static void parse_options(int argc, char **argv)
 		log_conf = vm["logconf"].as<std::string>();
 }
 
+static void setcredentials(const char *pname, ptree::ptree &conf)
+{
+	std::string group = conf.get<std::string>("sms.group", "");
+	if (group.length()) {
+		struct group *grp = getgrnam(group.c_str());
+		gid_t gid = getgid();
+
+		if (!grp) {
+			std::cerr << pname << ": unable to lookup group '"
+				<< group << "'" << std::endl;
+			exit(1);
+		}
+
+		if (gid != grp->gr_gid && setgid(grp->gr_gid) < 0) {
+			int e = errno;
+			std::cerr << pname << ": unable to setgid for '"
+				<< group << "':" << strerror(e) << std::endl;
+			exit(1);
+		}
+	}
+
+	std::string user = conf.get<std::string>("sms.user", "");
+	if (user.length()) {
+		struct passwd *pwd = getpwnam(user.c_str());
+		uid_t uid = getuid();
+
+		if (!pwd) {
+			std::cerr << pname << ": unable to lookup user '"
+				<< user << "'" << std::endl;
+			exit(1);
+		}
+
+		if (uid != pwd->pw_uid && setuid(pwd->pw_uid) < 0) {
+			int e = errno;
+			std::cerr << pname << ": unable to setuid for '"
+				<< user << "':" << strerror(e) << std::endl;
+			exit(1);
+		}
+	}
+}
+
 static void load_config(const char *pname, ptree::ptree &conf)
 {
 	try {
@@ -84,6 +128,8 @@ static void load_config(const char *pname, ptree::ptree &conf)
 	std::string t = conf.get<std::string>("sms.basedir", "");
 	if (!t.length())
 		conf.put("sms.basedir", "/SNSlocal/sms");
+
+	setcredentials(pname, conf);
 
 	StorageManager::config(conf);
 	SMSControl::config(conf);
