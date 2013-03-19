@@ -46,6 +46,7 @@ private slots:
     void signalCellChanged( int row, int col );
     void updateRuleTables();
     void updateFactList();
+    void setFactFilter( int a_index );
 
 private:
     enum CommStatus
@@ -61,6 +62,14 @@ private:
         ItemOK,
         ItemMissing,
         ItemNew
+    };
+
+    enum FactFilter
+    {
+        FilterAll = 0,
+        FilterBuiltIn,
+        FilterPV,
+        FilterPVERR
     };
 
     void updateStatusIndicator();
@@ -81,6 +90,7 @@ private:
     bool            m_dirty;
     bool            m_quit_on_set;
     QColor          m_def_color;
+    FactFilter      m_fact_filter;
     std::vector<RuleEngine::RuleInfo>       m_rules;
     std::vector<ItemStatus>                 m_rule_status;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;

@@ -13,7 +13,7 @@ using namespace std;
 
 RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     QDialog( &a_parent), SubClient(a_parent), ui(new Ui::RuleConfigDialog), m_mainwin(a_parent),
-    m_comm_status(Disconnected), m_dirty(false), m_quit_on_set(false)
+    m_comm_status(Disconnected), m_dirty(false), m_fact_filter(FilterAll), m_quit_on_set(false)
 {
     ui->setupUi(this);
 
@@ -28,6 +28,12 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     ui->signalTable->setHorizontalHeaderLabels( headers );
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->signalTable->horizontalHeader()->show();
+
+    ui->factFilterCB->insertItem(0,"PVs with Errors");
+    ui->factFilterCB->insertItem(0,"Process Variables");
+    ui->factFilterCB->insertItem(0,"Built-in");
+    ui->factFilterCB->insertItem(0,"All");
+    ui->factFilterCB->setCurrentIndex(0);
 
     ui->splitter->setStretchFactor( 0, 1 );
     ui->splitter->setStretchFactor( 1, 0 );
@@ -358,8 +364,33 @@ RuleConfigDialog::updateFactList()
     ui->factList->clear();
     for ( map<string,string>::iterator fact = m_fact_list.begin(); fact != m_fact_list.end(); ++fact )
     {
-        ui->factList->addItem( fact->first.c_str() );
+        switch ( m_fact_filter )
+        {
+        case FilterAll:
+            ui->factList->addItem( fact->first.c_str() );
+            break;
+        case FilterBuiltIn:
+            if ( !boost::istarts_with( fact->first, "pv_" ) && !boost::istarts_with( fact->first, "pverr_" ))
+                ui->factList->addItem( fact->first.c_str() );
+            break;
+        case FilterPV:
+            if ( boost::istarts_with( fact->first, "pv_" ))
+                ui->factList->addItem( fact->first.c_str() );
+            break;
+        case FilterPVERR:
+            if ( boost::istarts_with( fact->first, "pverr_" ))
+                ui->factList->addItem( fact->first.c_str() );
+            break;
+        }
     }
+}
+
+
+void
+RuleConfigDialog::setFactFilter( int a_index )
+{
+    m_fact_filter = (FactFilter)a_index;
+    updateFactList();
 }
 
 

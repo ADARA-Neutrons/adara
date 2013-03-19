@@ -19,7 +19,7 @@
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_6">
@@ -242,7 +242,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget_2">
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_7">
@@ -271,6 +271,9 @@
             </size>
            </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QComboBox" name="factFilterCB"/>
          </item>
         </layout>
        </item>
@@ -785,6 +788,22 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>factFilterCB</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>RuleConfigDialog</receiver>
+   <slot>setFactFilter(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>1058</x>
+     <y>24</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>555</x>
+     <y>334</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
  <slots>
   <signal>writeAllowed(bool)</signal>
@@ -799,5 +818,6 @@
   <slot>getFacts()</slot>
   <slot>getDefaultRules()</slot>
   <slot>setDefaultRules()</slot>
+  <slot>setFactFilter(int)</slot>
  </slots>
 </ui>
