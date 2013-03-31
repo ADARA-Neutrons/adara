@@ -579,9 +579,10 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 		 */
 		StorageFile::SharedPtr state(StorageFile::stateFile(
 						m_cur_container, "/tmp"));
-		state->persist(false);
 		stateSnapshot(state);
 		cb(state, 0);
+		state->persist(false);
+		state->put_fd();
 
 		/* Now that we've snapshotted the state, inform the
 		 * callback about the current file we're working on.
@@ -628,6 +629,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 					     m_cur_container, m_stateDir));
 		stateSnapshot(state);
 		indexState(state, m_cur_container->file(), resumeLocation);
+		state->put_fd();
 	}
 
 	/* Is it time to initiate a purge of old data?
