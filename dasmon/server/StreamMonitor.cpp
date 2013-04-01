@@ -171,7 +171,7 @@ StreamMonitor::processThread()
                         if ( errno == EWOULDBLOCK )
                         {
                             usleep(200000);
-                            // Detect stall stream & reset statistics
+                            // Detect stalled stream & reset statistics
                             if ( ++delay_count == 5 )
                                 resetStreamStats();
 
@@ -286,9 +286,7 @@ void
 StreamMonitor::resetStreamStats()
 {
     m_bank_count_info.reset();
-    for ( map<uint32_t,CountInfo<uint64_t> >::iterator m = m_mon_count_info.begin(); m != m_mon_count_info.end(); ++m )
-        m->second.reset();
-
+    m_mon_count_info.clear();
     m_pcharge.reset();
     m_pfreq.reset();
     m_beam_metrics.clear();
@@ -307,17 +305,14 @@ StreamMonitor::metricsThread()
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
-            m_beam_metrics.m_count_rate = m_bank_count_info.average * 60.0;;
-            m_beam_metrics.m_pulse_charge = m_pcharge.average;
-            m_beam_metrics.m_pulse_freq =  m_pfreq.average;
+            m_beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;;
+            m_beam_metrics.m_pulse_charge = m_pcharge.average();
+            m_beam_metrics.m_pulse_freq =  m_pfreq.average();
             m_beam_metrics.m_stream_bps = m_stream_rate;
 
-            m_beam_metrics.m_num_monitors = m_mon_count_info.size() < 8? m_mon_count_info.size() : 8;
-            int i = 0;
-            for ( map<uint32_t,CountInfo<uint64_t> >::iterator m = m_mon_count_info.begin(); m != m_mon_count_info.end() && i < 8; ++m, ++i )
-            {
-                m_beam_metrics.m_monitor_count_rate[i] = m->second.average * 60;
-            }
+            m_beam_metrics.m_monitor_count_rate.clear();
+            for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
+                m_beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
 
             m_notify.beamMetrics( m_beam_metrics );
 
@@ -523,9 +518,20 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
     {
         monitor_id = *rpos >> 22;
         event_count = *rpos++ & 0x003FFFFF;
+
         m_mon_count_info[monitor_id].addSample( event_count );
+        m_mon_last_pulse[monitor_id] = a_pkt.pulseId();
 
         rpos += 2 + event_count;
+    }
+
+    // Add zero count to monitors that had no events
+    for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
+    {
+        if ( m_mon_last_pulse[im->first] != a_pkt.pulseId())
+        {
+            im->second.addSample(0);
+        }
     }
 
     return false;

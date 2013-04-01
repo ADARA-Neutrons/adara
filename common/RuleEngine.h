@@ -65,6 +65,7 @@ public:
     template<class T>
     void    assert( const std::string &a_id, T a_value );
     void    retract( const std::string &a_id );
+    void    retractPrefix( const std::string &a_id );
     void    retractAllFacts();
 
     void    getAsserted( std::vector<std::string> &a_asserted_facts );

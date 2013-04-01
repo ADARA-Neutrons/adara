@@ -13,7 +13,7 @@ using namespace std;
 
 RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     QDialog( &a_parent), SubClient(a_parent), ui(new Ui::RuleConfigDialog), m_mainwin(a_parent),
-    m_comm_status(Disconnected), m_dirty(false), m_fact_filter(FilterAll), m_quit_on_set(false)
+    m_comm_status(Disconnected), m_dirty(false), m_quit_on_set(false), m_fact_filter(FilterAll)
 {
     ui->setupUi(this);
 

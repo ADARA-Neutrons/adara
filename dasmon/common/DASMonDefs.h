@@ -3,6 +3,8 @@
 
 #include <string>
 #include <vector>
+#include <map>
+#include <stdint.h>
 #include "ADARADefs.h"
 
 
@@ -95,20 +97,19 @@ public:
     void clear()
     {
         m_count_rate            = 0.0;
-        m_num_monitors          = 0;
+        m_monitor_count_rate.clear();
         m_pulse_charge          = 0.0;
         m_pulse_freq            = 0.0;
         m_pixel_error_rate      = 0.0;
         m_stream_bps            = 0;
     }
 
-    double                  m_count_rate;
-    unsigned short          m_num_monitors;
-    double                  m_monitor_count_rate[8];
-    double                  m_pulse_charge;
-    double                  m_pulse_freq;
-    double                  m_pixel_error_rate;
-    unsigned long           m_stream_bps;
+    double                      m_count_rate;
+    std::map<uint32_t,double>   m_monitor_count_rate;
+    double                      m_pulse_charge;
+    double                      m_pulse_freq;
+    double                      m_pixel_error_rate;
+    unsigned long               m_stream_bps;
 };
 
 

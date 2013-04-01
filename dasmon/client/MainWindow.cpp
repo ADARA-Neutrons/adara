@@ -25,7 +25,9 @@ using namespace std;
 
 MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk )
     : QMainWindow(0), ui(new Ui::MainWindow),
-    m_init(true), m_kiosk(a_kiosk), m_refresh_proc_table(false), m_refresh_signal_table(false), m_refresh_log_table(false),
+    m_init(true), m_kiosk(a_kiosk),
+    m_refresh_proc_table(false), m_refresh_signal_table(false),
+    m_refresh_log_table(false), m_refresh_monitor_table(false),
     m_recording(false), m_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0),
@@ -192,6 +194,7 @@ MainWindow::setDASMonActive( bool a_active )
         clearBeamDisplay();
         clearRunDisplay();
         clearSignals();
+        clearMonitors();
 
         updateAllStatusIndicators();
 
@@ -373,6 +376,22 @@ MainWindow::onTableTimer()
                 testSetBkgnd( ia->second.hl_count, item, 4 );
             }
         }
+    }
+
+    if ( m_refresh_monitor_table )
+    {
+        if ( ui->monitorTable->rowCount() != (int)m_monitor_rate.size() )
+            ui->monitorTable->setRowCount( m_monitor_rate.size());
+
+        map<uint32_t,double>::const_iterator im = m_monitor_rate.begin();
+        int i = 0;
+        for ( ; im != m_monitor_rate.end(); ++im, ++i )
+        {
+            ui->monitorTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( im->first )));
+            ui->monitorTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( im->second )));
+        }
+
+        m_refresh_monitor_table = false;
     }
 
     // Not a table, but use this timer callback to update duration field on mainwindow
@@ -699,15 +718,8 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_freq )));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_stream_bps/1024 )));
 
-
-    if ( ui->monitorTable->rowCount() != a_metrics.m_num_monitors )
-        ui->monitorTable->setRowCount( a_metrics.m_num_monitors );
-
-    for ( int i = 0; i < a_metrics.m_num_monitors; ++i )
-    {
-        ui->monitorTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( i + 1 )));
-        ui->monitorTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( a_metrics.m_monitor_count_rate[i] )));
-    }
+    m_monitor_rate = a_metrics.m_monitor_count_rate;
+    m_refresh_monitor_table = true;
 
     // TODO add pix error rate
     //double                  m_pixel_error_rate;
@@ -769,6 +781,15 @@ MainWindow::clearSignals()
     m_highest_level = ADARA::TRACE;
 
     m_refresh_signal_table = true;
+}
+
+void
+MainWindow::clearMonitors()
+{
+    QMutexLocker lock( &m_mutex );
+
+    m_monitor_rate.clear();
+    m_refresh_monitor_table = true;
 }
 
 

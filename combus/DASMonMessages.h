@@ -548,10 +548,14 @@ protected:
         m_pulse_freq = a_prop_tree.get( "pulse_freq", 0.0 );
         m_pixel_error_rate = a_prop_tree.get( "pixel_error_rate", 0.0 );
         m_stream_bps = a_prop_tree.get( "stream_bps", 0 );
-        m_num_monitors = a_prop_tree.get( "num_monitors", 0 );
 
-        for ( unsigned short m = 0; m < m_num_monitors; ++m )
-            m_monitor_count_rate[m] = a_prop_tree.get( std::string("monitor_count_rate_") + boost::lexical_cast<std::string>(m), 0.0 );
+        uint16_t    num_monitors = a_prop_tree.get( "num_monitors", 0 );
+        uint32_t    mon_id;
+        for ( unsigned short m = 0; m < num_monitors; ++m )
+        {
+            mon_id = a_prop_tree.get( std::string("mon_id_") + boost::lexical_cast<std::string>(m), 0 );
+            m_monitor_count_rate[mon_id] = a_prop_tree.get( std::string("mon_counts_") + boost::lexical_cast<std::string>(m), 0.0 );
+        }
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -563,10 +567,15 @@ protected:
         a_prop_tree.put( "pulse_freq", m_pulse_freq );
         a_prop_tree.put( "pixel_error_rate", m_pixel_error_rate );
         a_prop_tree.put( "stream_bps", m_stream_bps );
-        a_prop_tree.put( "num_monitors", m_num_monitors );
 
-        for ( unsigned short m = 0; m < m_num_monitors; ++m )
-            a_prop_tree.put( std::string("monitor_count_rate_") + boost::lexical_cast<std::string>(m), m_monitor_count_rate[m] );
+        a_prop_tree.put( "num_monitors", m_monitor_count_rate.size() );
+        std::map<uint32_t,double>::const_iterator im = m_monitor_count_rate.begin();
+        unsigned short m = 0;
+        for ( ; im != m_monitor_count_rate.end(); ++m, ++im )
+        {
+            a_prop_tree.put( std::string("mon_id_") + boost::lexical_cast<std::string>(m), im->first );
+            a_prop_tree.put( std::string("mon_counts_") + boost::lexical_cast<std::string>(m), im->second );
+        }
     }
 
     /*

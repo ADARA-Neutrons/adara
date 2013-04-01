@@ -546,6 +546,24 @@ RuleEngine::retract( const std::string &a_id )
     }
 }
 
+
+/**
+ * @param a_prefix - ID prefix of fact(s) to retract
+ *
+ * This is a public retract method that retracts all facts that begin with the specified ID prefix
+ * and updates forward dependencies based on current mode (immediate or batch).
+ */
+void
+RuleEngine::retractPrefix( const std::string &a_prefix )
+{
+    for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+    {
+        if ( boost::istarts_with( f->first, a_prefix ) && f->second->m_asserted && !f->second->m_rule_fact )
+            retract( f->second );
+    }
+}
+
+
 /**
  * This method retracts all user-asserted facts (rule asserted facts may remain asserted)
  */
@@ -681,7 +699,9 @@ RuleEngine::endBatch()
         for ( set<Fact*>::iterator inew = m_new_facts.begin(); inew != m_new_facts.end(); ++inew )
         {
             iold = m_old_facts.find( *inew );
-            if ( iold != m_old_facts.end() )
+            if ( iold == m_old_facts.end() )
+                notify_assert( *inew );
+            else
             {
                 if ( iold->second != (*inew)->m_value )
                     notify_assert( *inew );

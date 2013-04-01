@@ -3,6 +3,7 @@
 
 #include <ADARAParser.h>
 #include <map>
+#include <set>
 #include <vector>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
@@ -115,7 +116,7 @@ class CountInfo
 {
 public:
     CountInfo()
-        : total(0), average(0.0), idx(0)
+        : total(0), window_total(0), window_average(0.0), idx(0)
     {
         for ( int i = 0; i < WIN_AVG_SIZE; ++i )
             samples[i] = 0;
@@ -124,28 +125,34 @@ public:
     void addSample( T sample )
     {
         total += sample;
-        average -= ((double)samples[idx])/WIN_AVG_SIZE;
+        window_total += sample;
+        window_total -= samples[idx];
         samples[idx++] = sample;
 
         if ( idx >= WIN_AVG_SIZE )
             idx = 0;
 
-        average += ((double)sample)/WIN_AVG_SIZE;
+        //average += ((double)sample)/WIN_AVG_SIZE;
+        window_average = ((double)window_total)/WIN_AVG_SIZE;
     }
 
     void reset()
     {
         total = 0;
-        average = 0.0;
+        window_total = 0;
+        window_average = 0.0;
         idx = 0;
 
         for ( int i = 0; i < WIN_AVG_SIZE; ++i )
             samples[i] = 0;
     }
 
+    inline double average() { return window_average; }
+
     T           samples[WIN_AVG_SIZE];
     T           total;
-    double      average;
+    T           window_total;
+    double      window_average;
     uint16_t    idx;
 };
 
@@ -231,6 +238,8 @@ private:
     uint32_t                        m_bank_count;
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
+    std::map<uint32_t,uint64_t>     m_mon_last_pulse;
+    //std::set<uint32_t>              m_active_monitors;
     bool                            m_recording;
     unsigned long                   m_run_num;
     bool                            m_paused;
