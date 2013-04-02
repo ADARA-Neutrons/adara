@@ -29,6 +29,7 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->signalTable->horizontalHeader()->show();
 
+    ui->factFilterCB->insertItem(0,"PVs at Limits");
     ui->factFilterCB->insertItem(0,"PVs with Errors");
     ui->factFilterCB->insertItem(0,"Process Variables");
     ui->factFilterCB->insertItem(0,"Built-in");
@@ -370,7 +371,7 @@ RuleConfigDialog::updateFactList()
             ui->factList->addItem( fact->first.c_str() );
             break;
         case FilterBuiltIn:
-            if ( !boost::istarts_with( fact->first, "pv_" ) && !boost::istarts_with( fact->first, "pverr_" ))
+            if ( !boost::istarts_with( fact->first, "pv_" ) && !boost::istarts_with( fact->first, "pverr_" ) && !boost::istarts_with( fact->first, "pvlim_" ))
                 ui->factList->addItem( fact->first.c_str() );
             break;
         case FilterPV:
@@ -379,6 +380,10 @@ RuleConfigDialog::updateFactList()
             break;
         case FilterPVERR:
             if ( boost::istarts_with( fact->first, "pverr_" ))
+                ui->factList->addItem( fact->first.c_str() );
+            break;
+        case FilterPVLIM:
+            if ( boost::istarts_with( fact->first, "pvlim_" ))
                 ui->factList->addItem( fact->first.c_str() );
             break;
         }

@@ -16,7 +16,8 @@ namespace ADARA {
 namespace DASMON {
 
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
-    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"), m_cfg_dir( a_cfg_dir )
+    :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
+      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir )
 {
     m_engine = new RuleEngine();
     m_monitor.addListener( *this );
@@ -40,14 +41,6 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_SAMPLE_ENV]          = "SAMPLE_ENVIRONMENT";
     m_fact_name[BIF_USER_INFO]           = "USER_INFO";
     m_fact_name[BIF_COUNT_RATE]          = "COUNT_RATE";
-    //m_fact_name[BIF_MON1_COUNT_RATE]     = "MON1_COUNT_RATE";
-    //m_fact_name[BIF_MON2_COUNT_RATE]     = "MON2_COUNT_RATE";
-    //m_fact_name[BIF_MON3_COUNT_RATE]     = "MON3_COUNT_RATE";
-    //m_fact_name[BIF_MON4_COUNT_RATE]     = "MON4_COUNT_RATE";
-    //m_fact_name[BIF_MON5_COUNT_RATE]     = "MON5_COUNT_RATE";
-    //m_fact_name[BIF_MON6_COUNT_RATE]     = "MON6_COUNT_RATE";
-    //m_fact_name[BIF_MON7_COUNT_RATE]     = "MON7_COUNT_RATE";
-    //m_fact_name[BIF_MON8_COUNT_RATE]     = "MON8_COUNT_RATE";
     m_fact_name[BIF_PULSE_CHARGE]        = "PULSE_CHARGE";
     m_fact_name[BIF_PULSE_FREQ]          = "PULSE_FREQ";
     m_fact_name[BIF_STREAM_RATE]         = "STREAM_RATE";
@@ -56,6 +49,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
     m_fact_name[BIF_CYCLE_ERR_COUNT]     = "RUN_CYCLE_ERR_COUNT";
     m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
+    m_fact_name[BIF_GENERAL_PV_LIMIT]    = "GENERAL_PV_LIMIT";
     m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
@@ -558,14 +552,6 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_SAMPLE_ENV]]        = "Sample environment is present when defined";
     a_facts[m_fact_name[BIF_USER_INFO]]         = "User info is present when defined";
     a_facts[m_fact_name[BIF_COUNT_RATE]]        = "Event count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON1_COUNT_RATE]]   = "Monitor 1 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON2_COUNT_RATE]]   = "Monitor 2 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON3_COUNT_RATE]]   = "Monitor 3 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON4_COUNT_RATE]]   = "Monitor 4 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON5_COUNT_RATE]]   = "Monitor 5 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON6_COUNT_RATE]]   = "Monitor 6 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON7_COUNT_RATE]]   = "Monitor 7 count rate (counts/sec)";
-    //a_facts[m_fact_name[BIF_MON8_COUNT_RATE]]   = "Monitor 8 count rate (counts/sec)";
     a_facts[m_fact_name[BIF_PULSE_CHARGE]]      = "Pulse charge (Co)";
     a_facts[m_fact_name[BIF_PULSE_FREQ]]        = "Pulse frequency (Hz)";
     a_facts[m_fact_name[BIF_STREAM_RATE]]       = "ADARA stream data rate (bits/sec)";
@@ -574,6 +560,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
     a_facts[m_fact_name[BIF_CYCLE_ERR_COUNT]]   = "Accumulated cycle error count";
     a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
+    a_facts[m_fact_name[BIF_GENERAL_PV_LIMIT]]  = "One or more PVs have limit codes set";
     a_facts[m_fact_name[BIF_GENERAL_PV_ERROR]]  = "One or more PVs have error codes set";
 
     vector<string> facts;
@@ -611,17 +598,19 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
         m_engine->getAsserted( asserted );
         for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
         {
-            if ( fact->find( m_pv_prefix ) == 0 ||
-                 fact->find( m_pv_err_prefix ) == 0 )
+            if ( boost::istarts_with( *fact, m_pv_prefix ) ||
+                 boost::istarts_with( *fact, m_pv_lim_prefix ) ||
+                 boost::istarts_with( *fact, m_pv_err_prefix ))
             {
-                //cout << *fact << " starts with PV_ or PVERR_" << endl;
                 m_engine->retract( *fact );
             }
         }
 
-        // Reset Invalid PVS at each run start boundary
+        // Reset PVS at each run start boundary
         m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
         m_error_pvs.clear();
+        m_engine->retract( m_fact[BIF_GENERAL_PV_LIMIT] );
+        m_limit_pvs.clear();
 
         m_engine->assert( m_fact[BIF_RECORDING] );
         m_engine->assert( m_fact[BIF_RUN_NUMBER], a_run_number );
@@ -798,18 +787,27 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
 
         // TODO Surely there is a better way to define PV status so code like the following can be avoided?
         if (( a_status >= VariableStatus::HIHI_LIMIT && a_status <= VariableStatus::LOW_LIMIT ) || a_status == VariableStatus::HARDWARE_LIMIT )
-            m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_LIMIT );
+        {
+            m_engine->assert( m_pv_lim_prefix + pv_name, (uint32_t)PV_LIMIT );
+
+            if ( m_limit_pvs.empty())
+                m_engine->assert( m_fact[BIF_GENERAL_PV_LIMIT] );
+
+            m_limit_pvs.insert( pv_name );
+        }
         else
+        {
             m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_ERROR );
 
-        if ( m_error_pvs.empty())
-            m_engine->assert( m_fact[BIF_GENERAL_PV_ERROR] );
+            if ( m_error_pvs.empty())
+                m_engine->assert( m_fact[BIF_GENERAL_PV_ERROR] );
 
-        m_error_pvs.insert( pv_name );
+            m_error_pvs.insert( pv_name );
+        }
     }
     else
     {
-        // Did this PV previously have an error status?
+        // Did this PV previously have an error or limit status?
         // If so, clean-up associated facts
         set<string>::iterator ipv = m_error_pvs.find( pv_name );
         if ( ipv != m_error_pvs.end() )
@@ -819,6 +817,18 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
             m_error_pvs.erase( ipv );
             if ( m_error_pvs.empty())
                 m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
+        }
+        else
+        {
+            ipv = m_limit_pvs.find( pv_name );
+            if ( ipv != m_limit_pvs.end() )
+            {
+                m_engine->retract( m_pv_lim_prefix + pv_name );
+
+                m_limit_pvs.erase( ipv );
+                if ( m_limit_pvs.empty())
+                    m_engine->retract( m_fact[BIF_GENERAL_PV_LIMIT] );
+            }
         }
     }
 }

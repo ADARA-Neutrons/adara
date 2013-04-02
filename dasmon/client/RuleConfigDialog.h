@@ -69,7 +69,8 @@ private:
         FilterAll = 0,
         FilterBuiltIn,
         FilterPV,
-        FilterPVERR
+        FilterPVERR,
+        FilterPVLIM
     };
 
     void updateStatusIndicator();

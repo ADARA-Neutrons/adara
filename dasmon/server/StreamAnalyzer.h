@@ -82,6 +82,7 @@ private:
         BIF_DUP_PULSE_COUNT,
         BIF_CYCLE_ERR_COUNT,
         BIF_SMS_CONNECTED,
+        BIF_GENERAL_PV_LIMIT,
         BIF_GENERAL_PV_ERROR,
         BIF_COUNT
     };
@@ -113,10 +114,12 @@ private:
     std::map<std::string,SignalInfo>    m_signals;
     std::string                         m_pv_prefix;
     std::string                         m_pv_err_prefix;
+    std::string                         m_pv_lim_prefix;
     boost::mutex                        m_mutex;
     boost::mutex                        m_list_mutex;
     std::string                         m_cfg_dir;
     std::set<std::string>               m_error_pvs;
+    std::set<std::string>               m_limit_pvs;
     RuleEngine::HFACT                   m_fact[BIF_COUNT];
     std::string                         m_fact_name[BIF_COUNT];
 };
