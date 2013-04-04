@@ -385,7 +385,12 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
     if ( alarms )
     {
         // TODO Need to revist/verify these alarm and status mappings
-        if ( alarms & ( PV_HW_LIMIT_HI | PV_HW_LIMIT_LO ))
+        if ( alarms & PV_COMM_ALARM )
+        {
+            a_adara_pkt.vvp.status      = Comm;
+            a_adara_pkt.vvp.severity    = Major;
+        }
+        else if ( alarms & ( PV_HW_LIMIT_HI | PV_HW_LIMIT_LO ))
         {
             a_adara_pkt.vvp.status      = HwLimit;
             a_adara_pkt.vvp.severity    = Major;

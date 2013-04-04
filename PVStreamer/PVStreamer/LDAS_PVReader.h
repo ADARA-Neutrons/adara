@@ -30,7 +30,7 @@ public:
     virtual void    socketConnected( LDAS_PVReaderAgent &a_gent ) = 0;
     virtual void    socketDisconnected( LDAS_PVReaderAgent &a_gent ) = 0;
     //virtual void    socketConnectionError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
-    virtual void    socketError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
+    //virtual void    socketError( LDAS_PVReaderAgent &a_gent, long a_err_code ) = 0;
 };
 
 /// Interface used by LDAS_DeviceMonitor instances to communicate with the LDAS_PVReader instance

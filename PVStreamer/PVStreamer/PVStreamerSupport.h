@@ -49,15 +49,16 @@ public:
 /// Variable alarm types
 enum Alarms
 {
-    PV_NO_ALARM     = 0x00,
-    PV_HW_ALARM_HI  = 0x01,
-    PV_HW_ALARM_LO  = 0x02,
-    PV_HW_LIMIT_HI  = 0x04,
-    PV_HW_LIMIT_LO  = 0x08,
-    PV_SW_ALARM_HI  = 0x10, // TODO Not currently using SW alarms or limits, what is their purpose?
-    PV_SW_ALARM_LO  = 0x20,
-    PV_SW_LIMIT_HI  = 0x40,
-    PV_SW_LIMIT_LO  = 0x80
+    PV_NO_ALARM     = 0x0000,
+    PV_HW_ALARM_HI  = 0x0001,
+    PV_HW_ALARM_LO  = 0x0002,
+    PV_HW_LIMIT_HI  = 0x0004,
+    PV_HW_LIMIT_LO  = 0x0008,
+    PV_SW_ALARM_HI  = 0x0010, // TODO Not currently using SW alarms or limits, what is their purpose?
+    PV_SW_ALARM_LO  = 0x0020,
+    PV_SW_LIMIT_HI  = 0x0040,
+    PV_SW_LIMIT_LO  = 0x0080,
+    PV_COMM_ALARM   = 0x0100
 };
 
 std::string

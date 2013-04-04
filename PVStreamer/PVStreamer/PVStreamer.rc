@@ -59,22 +59,13 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Icon
-//
-
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDR_MAINFRAME           ICON                    "res\\PVStreamer.ico"
-
-/////////////////////////////////////////////////////////////////////////////
-//
 // Dialog
 //
 
 IDD_PVSTREAMER_DIALOG DIALOGEX 0, 0, 362, 294
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
-CAPTION "SNS-SMS Process Variable Streamer"
+CAPTION "ADARA Process Variable Streamer"
 FONT 8, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Exit",IDCANCEL,305,271,50,16
@@ -89,8 +80,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,1
- PRODUCTVERSION 1,0,0,1
+ FILEVERSION 1,1,0,0
+ PRODUCTVERSION 1,1,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -107,12 +98,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Oak Ridge National Laboratory"
             VALUE "FileDescription", "SNS Process Variable Streamer"
-            VALUE "FileVersion", "1.0.0.1"
+            VALUE "FileVersion", "1.1.0.0"
             VALUE "InternalName", "PVStreamer.exe"
             VALUE "LegalCopyright", "(c) 2012 Oak Ridg National Laboratory.  All rights reserved."
             VALUE "OriginalFilename", "PVStreamer.exe"
             VALUE "ProductName", "SNS Next Gen DAS"
-            VALUE "ProductVersion", "1.0.0.1"
+            VALUE "ProductVersion", "1.1.0.0"
         END
     END
     BLOCK "VarFileInfo"
@@ -140,6 +131,15 @@ BEGIN
 END
 #endif    // APSTUDIO_INVOKED
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_MAINICON            ICON                    "icon1.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 //

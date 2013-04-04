@@ -45,18 +45,18 @@ private:
     template<class T> bool  testAndSet( T &a_val, T a_new_val );
     void                    socketRead( NI::CNiDataSocketData &data );
     void                    socketStatus( long status, long error, const CString& message );
+    void                    resendLastValue();
 
     LDAS_IPVReaderAgentMgr &m_mgr;                  ///< Owning reader agent manager instance
     IPVReaderServices      &m_reader_services;      ///< PVStreamer reader services interface
     PVInfo                 *m_pv_info;              ///< Associated process variable info struct
+    int                     m_error;                ///< Current DataSockets error code
     long                    m_array_idx;            ///< PV index for array types
     bool                    m_first_send;           ///< Flag to force pkt send for first pkt regardless of value diff
     bool                    m_cache_array_info;     ///< Flag to initiate caching of array attributes
     unsigned long           m_array_size;           ///< Array size fo array types
     NI::CNiDataSocket       m_socket;               ///< DataSocket use to read PV values & status
     boost::mutex            m_mutex;                ///< Mutex to protect public interface
-
-    //std::vector<double>     m_val_history;
 };
 
 }}}

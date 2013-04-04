@@ -119,8 +119,8 @@ int _tmain(int argc, _TCHAR* argv[])
         {
             ++pkt_count;
             // Get payload len from header
-            if ( !test )
-                cout << "Pkt # " << pkt_count << " [" << hex << hdr.format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.sec << "." << hdr.nsec << endl;
+            //if ( !test )
+            //    cout << "Pkt # " << pkt_count << " [" << hex << hdr.format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.sec << "." << hdr.nsec << endl;
 
             if ( hdr.payload_len )
             {
@@ -160,30 +160,33 @@ int _tmain(int argc, _TCHAR* argv[])
             {
                 if ( hdr.format == 0x800000 )
                 {
-                    cout << "  dev_id: " << pkt->dev_id << endl;
-                    cout << "  xml len: " << pkt->ddp.xml_len << endl;
-                    cout << "  xml: " << &pkt->ddp.xml << endl;
+                    cout << "DDP: ";
+                    cout << " id: " << pkt->dev_id;
+                    cout << ", xml len: " << pkt->ddp.xml_len << endl;
+                    //cout << "  xml: " << &pkt->ddp.xml << endl;
                 }
                 else if ( hdr.format == 0x800100 )
                 {
-                    cout << "  pv id: " << pkt->dev_id << "." << pkt->vvp.var_id << endl;
-                    cout << "  pv value: " << pkt->vvp.uval << endl;
-                    cout << "  pv alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
+                    cout << "VVP: ";
+                    cout << " id: " << pkt->dev_id << "." << pkt->vvp.var_id;
+                    cout << ", value: " << pkt->vvp.uval;
+                    cout << ", alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
                 }
                 else if ( hdr.format == 0x800200 )
                 {
-                    cout << "  pv id: " << pkt->dev_id << "." << pkt->vvp.var_id << endl;
-                    cout << "  pv value: " << pkt->vvp.dval << endl;
-                    cout << "  pv alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
+                    cout << "VVP: ";
+                    cout << " id: " << pkt->dev_id << "." << pkt->vvp.var_id;
+                    cout << ", value: " << pkt->vvp.dval;
+                    cout << ", alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
                 }
-                else if ( hdr.format == 0x400900 )
-                    cout << "  heartbeat." << endl;
-                else if ( hdr.format == 0x200 )
-                    cout << "  source list pkt." << endl;
-                else
-                {
-                    cout << "  unknown pkt type!" << endl;
-                }
+                //else if ( hdr.format == 0x400900 )
+                    //cout << "  heartbeat." << endl;
+                //else if ( hdr.format == 0x200 )
+                    //cout << "  source list pkt." << endl;
+                //else
+                //{
+                //    cout << "  unknown pkt type!" << endl;
+                //}
             }
             else
             {

@@ -106,6 +106,7 @@ LDAS_PVReader::socketDisconnected( LDAS_PVReaderAgent &a_agent )
     handleInactiveAgent( a_agent );
 }
 
+#if 0
 /**
  * \brief Callback that indicate that a reader agent has encountered a general socket error.
  * \param a_agent - The LDAS_PVReaderAgent instance that has the error.
@@ -122,8 +123,8 @@ LDAS_PVReader::socketError( LDAS_PVReaderAgent &a_agent, long a_err_code )
     handleInactiveAgent( a_agent );
 
     // Need to retry connecting to this PV
-
 }
+#endif
 
 /**
  * \brief Disconnect agent and move to free pool
@@ -268,11 +269,14 @@ LDAS_PVReader::sendDeviceActive( Identifier a_dev_id, Timestamp a_time )
 {
     PVStreamPacket *pkt = m_reader_services->getFreePacket();
 
-    pkt->pkt_type = DeviceActive;
-    pkt->device_id = a_dev_id;
-    pkt->time = a_time;
+    if ( pkt )
+    {
+        pkt->pkt_type = DeviceActive;
+        pkt->device_id = a_dev_id;
+        pkt->time = a_time;
 
-    m_reader_services->putFilledPacket(pkt);
+        m_reader_services->putFilledPacket(pkt);
+    }
 }
 
 /**
@@ -285,11 +289,14 @@ LDAS_PVReader::sendDeviceInactive( Identifier a_dev_id, Timestamp a_time )
 {
     PVStreamPacket *pkt = m_reader_services->getFreePacket();
 
-    pkt->pkt_type = DeviceInactive;
-    pkt->device_id = a_dev_id;
-    pkt->time = a_time;
+    if ( pkt )
+    {
+        pkt->pkt_type = DeviceInactive;
+        pkt->device_id = a_dev_id;
+        pkt->time = a_time;
 
-    m_reader_services->putFilledPacket(pkt);
+        m_reader_services->putFilledPacket(pkt);
+    }
 }
 
 /**
@@ -302,12 +309,15 @@ LDAS_PVReader::sendPVActive( PVInfo *a_pv_info, Timestamp a_time )
 {
     PVStreamPacket *pkt = m_reader_services->getFreePacket();
 
-    pkt->pkt_type = VarActive;
-    pkt->device_id = a_pv_info->m_device_id;
-    pkt->time = a_time;
-    pkt->pv_info = a_pv_info;
+    if ( pkt )
+    {
+        pkt->pkt_type = VarActive;
+        pkt->device_id = a_pv_info->m_device_id;
+        pkt->time = a_time;
+        pkt->pv_info = a_pv_info;
 
-    m_reader_services->putFilledPacket(pkt);
+        m_reader_services->putFilledPacket(pkt);
+    }
 }
 
 /**
@@ -319,13 +329,15 @@ void
 LDAS_PVReader::sendPVInactive( PVInfo *a_pv_info, Timestamp a_time )
 {
     PVStreamPacket *pkt = m_reader_services->getFreePacket();
+    if ( pkt )
+    {
+        pkt->pkt_type = VarInactive;
+        pkt->device_id = a_pv_info->m_device_id;
+        pkt->time = a_time;
+        pkt->pv_info = a_pv_info;
 
-    pkt->pkt_type = VarInactive;
-    pkt->device_id = a_pv_info->m_device_id;
-    pkt->time = a_time;
-    pkt->pv_info = a_pv_info;
-
-    m_reader_services->putFilledPacket(pkt);
+        m_reader_services->putFilledPacket(pkt);
+    }
 }
 
 

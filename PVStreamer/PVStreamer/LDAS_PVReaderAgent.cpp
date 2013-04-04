@@ -23,7 +23,7 @@ namespace SNS { namespace PVS { namespace LDAS {
  * \param a_pv_info - PVInfo instance for variable to be associated with this reader agent (optional)
  */
 LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services, PVInfo *a_pv_info )
-: m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_array_idx(-1), m_first_send(false), m_cache_array_info(false), m_array_size(0)
+: m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_error(0), m_array_idx(-1), m_first_send(false), m_cache_array_info(false), m_array_size(0)
 {
     if ( a_pv_info )
         connect( *a_pv_info);
@@ -59,6 +59,7 @@ LDAS_PVReaderAgent::connect( PVInfo &a_pv_info )
         EXC( EC_INVALID_OPERATION, "Already connected to a process variable" );
 
     m_pv_info = &a_pv_info;
+    m_error = 0;
 
     // If DataSocket connection URI ends with [xxx], then this is an array-based PV
     // and we need to extract the array index
@@ -94,6 +95,7 @@ LDAS_PVReaderAgent::disconnect()
         m_socket.RemoveEventHandler( CNiDataSocket::StatusUpdatedEvent );
         m_socket.RemoveEventHandler( CNiDataSocket::DataUpdatedEvent );
         m_pv_info = 0;
+        m_error = 0;
         m_array_idx = -1;
         m_cache_array_info = false;
         m_array_size = 0;
@@ -241,6 +243,29 @@ LDAS_PVReaderAgent::socketRead( NI::CNiDataSocketData &a_data )
     }
 }
 
+void
+LDAS_PVReaderAgent::resendLastValue()
+{
+    PVStreamPacket *pkt = m_reader_services.getFreePacket();
+    if ( pkt )
+    {
+        pkt->time.sec = (unsigned long)time(0);
+        pkt->time.nsec = 0;
+        pkt->pkt_type = VarUpdate;
+        pkt->device_id = m_pv_info->m_device_id;
+        pkt->pv_info = m_pv_info;
+        // Update Comm alarm (limits will be same since value hasn't changed)
+        if ( m_error )
+            m_pv_info->m_alarms |= PV_COMM_ALARM;
+        else
+            m_pv_info->m_alarms &= ~PV_COMM_ALARM;
+
+        pkt->alarms = m_pv_info->m_alarms;
+
+        m_reader_services.putFilledPacket(pkt);
+    }
+}
+
 /**
  * \brief This is a generic method that tests PVs for changes and updates the PVInfo object if it has.
  * \param a_val - The current PV value (as a ref)
@@ -250,29 +275,15 @@ template<class T>
 bool
 LDAS_PVReaderAgent::testAndSet(  T &a_val, T a_new_val )
 {
-    /*
-    bool differs;
-
-    if ( typeid(a_new_val) == typeid(double))
-    {
-        differs = (fabs((double)(a_new_val - a_val)) > DBL_EPSILON );
-    }
-    else
-        differs = (a_new_val != a_val);
-
-    // DVS - The above code was commented out b/c this process should nt make any decisions
-    // about how close or accurate something is - only that it has changed. For doubles,
-    // this means the simple == operator will work fine.
-
-
-    if (differs)
-    */
-
-    if ( a_new_val != a_val )
+    // If value is different or error state has changed, send update
+    if ( a_new_val != a_val || (((m_pv_info->m_alarms & PV_COMM_ALARM) != 0 ) != ( m_error != 0 )))
     {
         a_val = a_new_val;
 
-        m_pv_info->m_alarms = PV_NO_ALARM;
+        if ( m_error )
+            m_pv_info->m_alarms = PV_COMM_ALARM;
+        else
+            m_pv_info->m_alarms = PV_NO_ALARM;
 
         if ( m_pv_info->m_hw_limits.m_active )
         {
@@ -326,27 +337,27 @@ LDAS_PVReaderAgent::socketStatus( long a_status, long a_error, const CString& a_
         m_pv_info->m_active = false;
         m_mgr.socketDisconnected( *this );
     }
-    else if ( a_status == CNiDataSocket::ConnectionError || a_error != 0 )
+    else if ( a_status == CNiDataSocket::ConnectionError )
     {
-        // This is an unexpected event - must guard here for deinitialization of socket
-        boost::lock_guard<boost::mutex> lock(m_mutex);
+        // Unexpectd event - failed to connect to specified PV URL
+        LOG_WARNING( "Connect failed for PV: " << m_pv_info->m_name );
 
-        // Tell PVReader about error - it will move agent into free pool and mark the
-        // associated PV for retry
         m_pv_info->m_active = false;
-        m_mgr.socketError( *this, a_error );
-
-        // Now disconnect socket & clear PV data
-        // This may or may not generate a "Unconnected" callback (see above).
-        // In case it does, reset PV info first so the callback will be ignored.
-        m_pv_info = 0;
-        m_array_idx = -1;
-        m_cache_array_info = false;
-        m_array_size = 0;
-
-        m_socket.Disconnect(); // Will (might?) trigger callbacks
-        m_socket.RemoveEventHandler( CNiDataSocket::StatusUpdatedEvent );
-        m_socket.RemoveEventHandler( CNiDataSocket::DataUpdatedEvent );
+        m_mgr.socketDisconnected( *this );
+    }
+    else if ( a_error != 0 && m_error != a_error )
+    {
+        // Unexpected event - set alarm state for PV and re-emit last known value
+        LOG_WARNING( "Error code (" << a_error << ") set for PV: " << m_pv_info->m_name );
+        m_error = a_error;
+        resendLastValue();
+    }
+    else if ( a_error == 0 && m_error != 0 )
+    {
+        // Error code has cleared
+        LOG_WARNING( "Error code cleared for PV: " << m_pv_info->m_name );
+        m_error = a_error;
+        resendLastValue();
     }
 }
 

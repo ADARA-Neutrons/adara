@@ -21,7 +21,7 @@ using namespace std;
 CPVStreamerDlg::CPVStreamerDlg(CWnd* pParent /*=NULL*/)
 	: CDialog(CPVStreamerDlg::IDD, pParent)
 {
-	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	m_hIcon = AfxGetApp()->LoadIcon(IDI_MAINICON);
     m_start_time = (unsigned long)time(0);
 }
 
@@ -280,7 +280,7 @@ void
 CPVStreamerDlg::OnCancel()
 {
     if ( MessageBox( "PVStreamer is a required component of the SNS beamline data acquisition system.\n"
-        "Are you sure you want to close this application?", "SNS Process Variable Streamer", MB_YESNO | MB_ICONWARNING ) == IDYES )
+        "Are you sure you want to close this application?", "ADARA Process Variable Streamer", MB_YESNO | MB_ICONWARNING ) == IDYES )
     {
         CDialog::OnCancel();
         PostQuitMessage(0);
