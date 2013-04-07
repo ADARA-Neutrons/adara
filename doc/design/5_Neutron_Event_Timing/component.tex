@@ -1,0 +1,47 @@
+\section {Details of Neutron Event Timing}
+The Spallation Neutron Source (SNS) instruments use time and distance or time-of-flight, (TOF), measurements to determine the velocities of neutrons used in scattering experiments.  This document will present an overview of timing parameters needed at SNS, and also highlight some of the finer details of Timing that are often overlooked or misunderstood.
+
+\subsection{Accelerator Timing: It ends with the production of neutrons}
+The Accelerator needs a complex distributed timing system to synchronize the production, acceleration and accumulation of the energetic proton beam in the storage ring.  After the Ring is considered full, the planned number of mini-pulses have been overlaid in the ring, the aggregated circulating beam is directed to hit the target to produce neutron through the spallation process.  Many precisely timed signals that are needed to run the Accelerator fill the storage Ring and send the proton beam pulse to the target via extraction.  These signals are distributed on the Event Link throughout the site.  There are other parameters associated with the production of each neutron bunch that are also available from the Accelerator Timing System on another link called the Real Time Data Link, (RTDL).  This transfer of information and time synchronization is where the Accelerator Timing and DAS systems intersect.  This physically happens in a 1U PC called the ETC computer.
+
+A Beam Diagnostics Card, the ETC card, receives and decodes timing event triggers from the Event Link and data from the RTDL.  Timing triggers are produced when ``Events'' are decoded on the Accelerator Event Link.  A C++ software application, ETC app,  runs on the ETC computer and it causes the ETC card to produce a timing trigger pulse to synchronize the DAS hardware with the arrival of the proton pulse at the target.   Other pertinent data about the pulse are read from the RTDL and broadcast to the DAS Timing Computer, and the Preprocessor Computer.  Examples of this data would include the accelerator time stamp or Pulse ID, and the Proton Charge and these are used to uniquely identify each bunch of neutrons as produced from the given machine cycle.  This data is must be passed to DAS hardware and software.
+
+The critical timing marker to allow the TOF to be measured for neutrons is the exact time the proton pulse hits the spallation target.  This is called the $PT_{0}$ (Proton on Target, Time Zero) timing reference.  This is a timing synchronization signal that is needed to keep the Data Acquisition System, (DAS), hardware and the neutron Choppers synchronized with the neutron bunches that travel down the beam lines.  The Event Link does not actually contain an event with the exact timing as needed and defined by $PT_{0}$ above.  But there is an event with the proper characteristics (phase locked to proton beam, and present each 60 Hz cycle even when beam is not produced or sent to the target1)  that can be used to create this Time Zero reference mark.   This event is Event 39, or T-Extract, which always occurs at Turn 5050 on the Accelerator timeline each cycle.  All that is missing is the correct offset to add to this Event to account for the time delay until the proton beam actually makes it to the target. 
+
+Thus a  $PT_{0}$  timing signal is generated as an output from the ETC Card and this becomes the  Fiducial Timing Marker or synchronization pulse to the DAS Timing Card.  It occurs at the same time as the beam hits the target is sent to the DAS.   This delay is comprised of two or three parts depending on how one divides up the contributing pieces.  The time after T-Extract but before it actually leaves the ring and the time it takes to travel to the target.
+
+$$PT_{0} Time Reference: Delay compensation$$
+$$RingPeriod*(StoredTruns | TurnOffset) + FixedOffset$$
+
+\begin{itemize}
+\item
+RingPeriod is the number of ${\mu}s$ for the accumulated protons to circle the ring.
+\item
+StoredTurns are the number of ``extra'' turns the beam circulates after the last input pulse of protons is injected into the storage ring.
+\item
+TurnOffset is another delay to compensate for timing latencies including: RTBT flight time.
+\item
+FixedOffset is used to correct/compensate for various electrical transport delays.
+\item
+RTBT flight time is just the time it takes the beam to travel to the actual target after extraction.  
+\end{itemize}
+
+\subsection {Timing information inside DAS}
+The actual Time-Of-Flight, (TOF), for a neutron event as known to the instrument scientists is defined as the elapsed time from exiting the moderator until the neutron is detected by the low level detector hardware.  At least two time intervals are accounted for by the DAS hardware that occur after the PT0 marker.  These details are not important to the final result, but are split across two different hardware boards, the Timing Card and another top level acquisition board, called the Data Systems Packetizer, (DSP), board.   This will be explained in the next paragraph.
+
+The TOF is broken into two parts out of convenience not necessity (since two boards are handling these times independent of each other).  Care is taken to define a frame beginning and ending to keep the neutron bunches separate in time as they reach the detectors.  Neutron Choppers are used to help accomplish this where possible.  This ``Framing'' of the neutron arrival times at the detectors to start at the beginning of a Frame is done with a delay offset called $T_{sync}\_Delay$ in the DAS Timing Card.  (This is calculated by the TimingHandler application running on the DAS Timing Computer, by selecting a center wavelength.)   The Framing issue is another motivation to break the TOF into two parts.  The first $T_{sync}\_Delay$ insures that the next local time from the last $T_{sync}$ pulse will be applied to only neutrons that came from the same Pulse-ID to the extent possible with proper setup of neutron Choppers.
+
+Thus the DAS hardware starts with a delay offset for the purpose of ``Framing'', and then measures a local delay from this Framing ($T_{sync}$ signal) trigger, until the events are detected in the detectors.   This first delay is added by the DAS Timing Card in the Timing Computer before it is sent to the rest of DAS detector electronics.  The $T_{sync}$ pulse then travels by a fiber-opticlink to the top DAS hardware system board, the DSP, and is distributed down to the lowest detector hardware level where the Local Time Stamp, (LTS), is applied to each neutron as it arrives and is detected.   This locally measured delay, LTS, is always a measure of time from last $T_{sync}$ Framing trigger.  Thus the $T_{sync}$ delay offset + LTS is a measure of TOF in units of {100ns}.   These are the two parts mentioned at the beginning of the previous paragraph.
+
+If operating in the 1st Frame. 
+$$Total TOF = [T_sync_ Delay] + [LTS]$$
+
+If operating past the first Frame (this happens if it takes more than one frame for neutrons to arrive at the detector), the times for previous Frames must be added to the currently measured LTS.
+
+$$Total TOF = [T_sync_ Delay] + [LTS + sum(Previous Frame Periods)]$$
+
+\subsection {Other Notes}
+\subsubsection {Moderator Emission}
+One more delay to Chopper phasing is associated with the moderators.  Different groups of beamlines have different moderator characteristics that contribute to a delay in neutron production from the incident proton spallation of neutrons and to a broadening in time of the exiting neutrons.  This, Moderator Emission Timing, can be calculated theoretically or from fitting data from known energy neutrons by using the Beam monitors, etc., to calculate a more accurate correction to the $PT_0$ that is used by the DAS electronics hardware.  This more accurate estimation of $PT_0$ is then used to maximize the neutron flux through the Fermi Chopper by more accurately phasing the Chopper to the exact emission function of the given moderator.   Also this time correction information can be used in the post run Data Analysis step to make refinements on reduction calculations.   The Chopper ``Pass-Through`` Application is responsible for the fine adjustments to the Chopper Phase on beamlines with Fermi Choppers.
+
+Currently an effort is underway to eliminate the ETC PC, and move the functions carried out by the DAS Timing Card into the top level DAS data collection hardware board, the Data Systems Packetizer, (DSP).  This will eliminate 2 PCs and 2 software applications.  
