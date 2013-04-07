@@ -83,6 +83,7 @@ namespace VariableStatus {
 		SIMULATED		= 19,
 		READ_PERMISSION		= 20,
 		WRITE_PERMISSION	= 21,
+		UPSTREAM_DISCONNECTED	= 0xfffe,
 		NOT_REPORTED		= 0xffff,
 	};
 }
