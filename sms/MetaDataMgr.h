@@ -46,6 +46,8 @@ private:
 	DeviceMap m_devices;
 	boost::signals::connection m_connection;
 
+	void upstreamDisconnected(VariableMap &vars);
+
 	void updateVariable(uint32_t dev, uint32_t var,
 			    const ADARA::Packet &in, uint32_t tag);
 	void onPrologue(void);

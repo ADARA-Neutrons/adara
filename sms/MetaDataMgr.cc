@@ -18,15 +18,65 @@ MetaDataMgr::~MetaDataMgr()
 	m_connection.disconnect();
 }
 
+void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
+{
+	/* For each variable, modify the packet to indicate that we
+	 * lost the upstream connection and feed it into the stream.
+	 */
+	VariableMap::iterator vit, vend = vars.end();
+	uint32_t len, pktSize = 0;
+	uint32_t *fields = NULL;
+	uint8_t *pkt = NULL;
+
+	for (vit = vars.begin(); vit != vend; vit++) {
+		PacketSharedPtr orig = vit->second;
+
+		len = orig->packet_length();
+		if (len > pktSize) {
+			delete pkt;
+			pktSize = len;
+			pkt = new uint8_t[pktSize];
+			fields = (uint32_t *) (pkt +
+					ADARA::PacketHeader::header_length());
+		}
+
+		memcpy(pkt, orig->packet(), len);
+		fields[2] = ADARA::VariableStatus::UPSTREAM_DISCONNECTED;
+		fields[2] <<= 16;
+		fields[2] |= ADARA::VariableSeverity::INVALID;
+
+		/* Don't notify storage clients about the file size change;
+		 * there is no reason to start a new file in the middle of
+		 * these drops -- they should be small, and we should not
+		 * dump the state of the variables we're dropping.
+		 *
+		 * We'll push the whole batch out at once when we are done.
+		 */
+		StorageManager::addPacket(pkt, len, false);
+	}
+
+	delete pkt;
+}
+
 void MetaDataMgr::dropTag(uint32_t tag)
 {
 	DeviceMap::iterator dit, dend = m_devices.end();
+	bool dropped = false;
+
 	for (dit = m_devices.begin(); dit != dend; ) {
-		// TODO should we send a severity update for these variables?
-		if (dit->second.m_tag == tag)
+		DeviceVariables &dev = dit->second;
+
+		upstreamDisconnected(dev.m_variables);
+		if (dev.m_tag == tag)
 			m_devices.erase(dit++);
 		else
 			++dit;
+
+		dropped = true;
+	}
+
+	if (dropped) {
+		/* TODO tell storage clients about the file size change */
 	}
 }
 
