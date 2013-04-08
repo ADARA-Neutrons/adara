@@ -24,6 +24,7 @@ int main(int argc, char *argv[])
     string          broker_pass;
     unsigned short  log_level;
     string          config_dir;
+    DBConnectInfo   db_info;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
@@ -37,6 +38,12 @@ int main(int argc, char *argv[])
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
+            ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
+            ("db_name", po::value<string>( &db_info.name )->default_value( "" ), "set database name")
+            ("db_user", po::value<string>( &db_info.user )->default_value( "" ), "set database user name")
+            ("db_pass", po::value<string>( &db_info.pass )->default_value( "" ), "set database password")
+            ("db_period", po::value<unsigned short>( &db_info.period )->default_value( 5 ), "set database update period in seconds")
             ;
 
     po::variables_map opt_map;
@@ -69,7 +76,7 @@ int main(int argc, char *argv[])
     {
         combus->waitForConnect( 10 );
 
-        StreamMonitor   monitor( sms_host, sms_port );
+        StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info );
         StreamAnalyzer  analyzer( monitor, config_dir );
         ComBusRouter    router( monitor, analyzer );
 

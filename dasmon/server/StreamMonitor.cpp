@@ -9,7 +9,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "Utils.h"
-
+#include "libpq-fe.h"
 
 using namespace std;
 
@@ -27,13 +27,15 @@ namespace DASMON {
  * The StreamMonitor constructor performs limited initialization. Full initialization is not
  * performed until the start() method is called.
  */
-StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
+StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info )
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port),
       m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0),
-      m_stream_size(0), m_stream_rate(0)
+      m_stream_size(0), m_stream_rate(0), m_db_info(a_db_info)
 {
+    if ( m_db_info )
+        m_db_thread = new boost::thread( boost::bind( &StreamMonitor::dbThread, this ));
 }
 
 
@@ -954,6 +956,9 @@ StreamMonitor::pvValueUpdate
         return;
     }
 
+    //double t = timespec_to_nsec( a_timestamp );
+
+#if 0
     double t = 0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
@@ -965,9 +970,11 @@ StreamMonitor::pvValueUpdate
         if ( t1 > m_first_pulse_time )
             t = (t1 - m_first_pulse_time)/1000000000.0;
     }
+#endif
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
-    if ( t - ipv->second->m_time >= 0.5 || t == 0 )
+//    if ( t - ipv->second->m_time >= 0.5 || t == 0 )
+    if ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
         if ( pv )
@@ -976,7 +983,8 @@ StreamMonitor::pvValueUpdate
             //    cout << "Got PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", status = " << a_status << endl;
 
             pv->m_value = a_value;
-            pv->m_time = t;
+            pv->m_time = a_timestamp.tv_sec;
+            pv->m_updated = true;
             m_notify.pvValue( pv->m_name, a_value, a_status );
         }
     }
@@ -1004,6 +1012,94 @@ StreamMonitor::clearPVs()
     }
 
     m_pvs.clear();
+}
+
+
+void
+StreamMonitor::dbThread()
+{
+    // Attempt to connect
+    string connect_string;
+
+    if ( !m_db_info->host.empty() )
+        connect_string += "host = " + m_db_info->host;
+
+    if ( m_db_info->port > 0 )
+        connect_string += " port = " + boost::lexical_cast<string>(m_db_info->port);
+
+    if ( !m_db_info->user.empty() )
+        connect_string += " user = " + m_db_info->user;
+
+    if ( !m_db_info->pass.empty() )
+        connect_string += " password = " + m_db_info->pass;
+
+    connect_string += " dbname = " + m_db_info->name;
+
+    PGconn *conn;
+    PGresult *res;
+    map<PVKey,PVInfoBase*>::iterator ipvm;
+    vector<PVInfoBase*> pvs;
+    vector<PVInfoBase*>::iterator ipvv;
+    char buf[500];
+    double value;
+    bool send_all =  true;
+    bool update;
+
+    pvs.reserve(400);
+
+    while ( 1 )
+    {
+        conn = PQconnectdb( connect_string.c_str() );
+        if ( conn )
+        {
+            update = true;
+            while ( update )
+            {
+                sleep( m_db_info->period );
+
+                pvs.clear();
+
+                // Cache updated PVs
+                m_mutex.lock();
+
+                for ( ipvm = m_pvs.begin(); ipvm != m_pvs.end(); ++ipvm )
+                {
+                    if ( ipvm->second->m_updated || send_all )
+                    {
+                        ipvm->second->m_updated = false;
+                        pvs.push_back( ipvm->second );
+                    }
+                }
+
+                m_mutex.unlock();
+
+                // Send PV updates to database
+                for ( ipvv = pvs.begin(); ipvv != pvs.end(); ++ipvv )
+                {
+                    if ( (*ipvv)->m_type == PVT_FLOAT || (*ipvv)->m_type == PVT_DOUBLE )
+                        value = ((PVInfo<double>*)(*ipvv))->m_value;
+                    else
+                        value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
+
+                    sprintf( buf, "select pvUpdate('%s',%g,%u)", (*ipvv)->m_name.c_str(), value, (*ipvv)->m_time );
+                    res = PQexec( conn, buf );
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                    {
+                        update = false;
+                        break;
+                    }
+
+                    PQclear( res );
+                    send_all = false;
+                }
+            }
+            PQfinish( conn );
+        }
+
+        // Error may have been caused by DB being off-line, or network error
+        // wait a bit and try connecting again
+        sleep( 15 );
+    }
 }
 
 

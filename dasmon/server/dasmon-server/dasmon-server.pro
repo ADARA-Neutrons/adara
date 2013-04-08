@@ -32,7 +32,7 @@ HEADERS += \
     ../../../common/RuleEngine.h \
     ../StreamAnalyzer.h
 
-LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
+LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem -lpq
 
 OTHER_FILES += \
     ../signal.cfg

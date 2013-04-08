@@ -74,8 +74,8 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
-        m_time(0.0)
-        //m_value(0.0
+        m_time(0),
+        m_updated(false)
     {}
 
     /// PVInfoBase destructor
@@ -86,8 +86,8 @@ public:
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
-    double              m_time;
-    //double              m_value;
+    unsigned long       m_time;
+    bool                m_updated;
 };
 
 template<class T>
@@ -156,11 +156,20 @@ public:
     uint16_t    idx;
 };
 
+struct DBConnectInfo
+{
+    std::string     host;
+    unsigned short  port;
+    std::string     name;
+    std::string     user;
+    std::string     pass;
+    unsigned short  period;
+};
 
 class StreamMonitor : public ADARA::Parser
 {
 public:
-    StreamMonitor( const std::string &a_sms_host, unsigned short a_port = 31415 );
+    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415, DBConnectInfo *a_db_info = 0 );
     virtual ~StreamMonitor();
 
     void            getSMSHostInfo( std::string &a_hostname, unsigned short &a_port ) const;
@@ -204,6 +213,7 @@ private:
     void        resetStreamStats();
     void        resetRunStats();
     void        metricsThread();
+    void        dbThread();
 
 
     bool        rxPacket( const ADARA::Packet &a_pkt );
@@ -259,6 +269,8 @@ private:
     std::map<PVKey,PVInfoBase*>     m_pvs;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
+    DBConnectInfo*                  m_db_info;
+    boost::thread                  *m_db_thread;
 };
 
 }}
