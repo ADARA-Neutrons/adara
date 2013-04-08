@@ -10,29 +10,6 @@
 #include <boost/algorithm/string.hpp>
 #include "ADARADefs.h"
 
-//#include <activemq/core/ActiveMQConnectionFactory.h>
-//#include <activemq/core/ActiveMQConnection.h>
-//#include <activemq/library/ActiveMQCPP.h>
-//#include <cms/Connection.h>
-//#include <cms/Session.h>
-
-/*
-Message Hierarchy maps to topics on ComBus.
-
-All
-  header: source, time, msg type
-Log [out]
-  log: level, msg, location
-Status [out]
-  update: state
-Signals [out]
-  assert: name, id, message
-  retract: id
-Control [in]
-  command: destination, id
-  response: id, ack/nack
-*/
-
 namespace ADARA {
 namespace ComBus {
 
@@ -226,20 +203,6 @@ public:
         read( prop_tree );
     }
 
-    /*
-    cms::Message *createCMSMessage( cms::Session &a_session )
-    {
-        boost::property_tree::ptree prop_tree;
-
-        cms::Message *msg = a_session.createMessage();
-        // Type must not be in payload - used by factory method
-        msg.setIntProperty( "type", (long) getMessageType() );
-        // Translate message content
-        write( prop_tree );
-        //translateTo( *msg );
-        return msg;
-    }
-*/
     virtual MessageType getMessageType() const = 0;
 
     inline MessageCategory getMessageCategory() const
@@ -264,9 +227,6 @@ public:
     inline const std::string &getSourceName() const
     { return m_src_name; }
 
-//    inline unsigned long getSourceInstance() const
-//    { return m_src_inst; }
-
     inline unsigned long getTimestamp() const
     { return m_timestamp; }
 
@@ -274,38 +234,19 @@ protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         m_src_name = a_prop_tree.get( "src_name", "" );
-//        m_src_inst = a_prop_tree.get( "src_inst", 0 );
         m_timestamp = a_prop_tree.get( "timestamp", 0 );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         a_prop_tree.put( "src_name", m_src_name );
-//        a_prop_tree.put( "src_inst", m_src_inst );
         a_prop_tree.put( "timestamp", m_timestamp );
     }
-/*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        a_msg.setIntProperty( "type", (long) getMessageType() );
-        a_msg.setStringProperty( "src_name", m_src_name );
-        a_msg.setIntProperty( "src_inst", (long) m_src_inst );
-        a_msg.setIntProperty( "timestamp", m_timestamp );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_src_name = a_msg.getStringProperty( "src_name" );
-        m_src_inst = (unsigned long)a_msg.getIntProperty( "src_inst" );
-        m_timestamp = (unsigned long)a_msg.getIntProperty( "timestamp" );
-    }
-*/
 
 private:
     void setSourceInfo( const std::string &a_src_name ) //, unsigned long a_src_inst )
     {
         m_src_name = a_src_name;
-//        m_src_inst = a_src_inst;
     }
 
     void setTimestamp( unsigned long a_timestamp )
@@ -314,7 +255,6 @@ private:
     }
 
     std::string         m_src_name;
-//    unsigned long       m_src_inst;
     unsigned long       m_timestamp;
 
     // Connection class sets source, instance, and timestamp when message is sent
@@ -339,11 +279,9 @@ class ControlMessage : public MessageBase
 {
 public:
     ControlMessage()
-//        : m_dest_inst(0)
     {}
 
     std::string         m_correlation_id;   ///< Key identifier used to (re)associate messages
-//    unsigned long       m_dest_inst;        ///< Destination instance (dest name is implied by topic)
 
     virtual void unserialize( const cms::TextMessage &a_msg )
     {
@@ -352,7 +290,6 @@ public:
         if ( m_correlation_id.empty() )
         {
             m_correlation_id = a_msg.getCMSMessageID();
-            //std::cout << "Rcv new msg, assigned CID from MID = " << m_correlation_id << std::endl;
         }
     }
 
@@ -362,7 +299,6 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_correlation_id = a_prop_tree.get( "correl_id", "" );
-//        m_dest_inst = a_prop_tree.get( "dest_inst", 0 );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -370,35 +306,14 @@ protected:
         MessageBase::write( a_prop_tree );
 
         a_prop_tree.put( "correl_id", m_correlation_id );
-//        a_prop_tree.put( "dest_inst", m_dest_inst );
     }
-/*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-
-        a_msg.setStringProperty( "correl_id", m_correlation_id );
-        a_msg.setIntProperty( "dest_inst", (long)m_dest_inst );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_correlation_id = a_msg.getIntProperty( "correl_id" );
-        if ( m_correlation_id.empty() )
-            m_correlation_id = a_msg.getCMSMessageID();
-
-        m_dest_inst = (unsigned long)a_msg.getIntProperty( "dest_inst" );
-    }
-*/
 
 private:
-//    void setDestInfo( unsigned long a_dest_inst, const std::string &a_correlation_id = "" )
     void setDestInfo( const std::string &a_correlation_id )
     {
         //m_dest_inst = a_dest_inst;
         m_correlation_id = a_correlation_id;
     }
-
 
     // Connection class sets cmd_id when message is sent
     friend class Connection;
@@ -451,22 +366,6 @@ protected:
         a_prop_tree.put( "log_enabled", m_enabled );
         a_prop_tree.put( "log_level", (unsigned short)m_level );
     }
-
-    /*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        ControlMessage::translateTo( a_msg );
-
-        a_msg.setBooleanProperty( "log_enabled", m_enabled );
-        a_msg.setShortProperty( "log_level", (short)m_level );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_enabled = a_msg.getBooleanProperty( "log_enabled" );
-        m_level = (Level)a_msg.getShortProperty( "log_level" );
-    }
-    */
 };
 
 
@@ -537,35 +436,6 @@ protected:
         a_prop_tree.put( "line", m_line );
         a_prop_tree.put( "tid", m_tid );
     }
-
-    /*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-
-        a_msg.setStringProperty( "message", m_msg );
-        a_msg.setShortProperty( "level", m_level );
-        if ( !m_file.empty() )
-            a_msg.setStringProperty( "file", m_file );
-        if ( m_line > 0 )
-            a_msg.setIntProperty( "line", m_line );
-        if ( m_tid > 0 )
-            a_msg.setIntProperty( "tid", m_tid );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_msg = a_msg.getStringProperty( "message" );
-        m_level = (Level)a_msg.getShortProperty( "level" );
-        if ( a_msg.propertyExists( "file" ))
-            m_file = a_msg.getStringProperty( "file" );
-        if ( a_msg.propertyExists( "line" ))
-            m_line = a_msg.getIntProperty( "line" );
-        if ( a_msg.propertyExists( "tid" ))
-            m_tid = a_msg.getIntProperty( "tid" );
-    }
-    */
-
 };
 
 
@@ -599,18 +469,6 @@ protected:
 
         a_prop_tree.put( "status", m_status );
     }
-    /*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-        a_msg.setShortProperty( "status", (short)m_status );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_status = (StatusCode) a_msg.getShortProperty( "status" );
-    }
-    */
 };
 
 
@@ -702,18 +560,6 @@ protected:
 
         a_prop_tree.put( "sig_name", m_sig_name );
     }
-/*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-        a_msg.setStringProperty( "sig_name", m_sig_name );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_sig_name = a_msg.getStringProperty( "sig_name" );
-    }
-*/
 };
 
 
@@ -784,25 +630,6 @@ protected:
          a_prop_tree.put( "sig_message", m_sig_message );
          a_prop_tree.put( "sig_level", (unsigned short)m_sig_level );
     }
-/*
-    virtual void translateTo( cms::Message &a_msg )
-    {
-        MessageBase::translateTo( a_msg );
-
-        a_msg.setStringProperty( "sig_name", m_sig_name );
-        a_msg.setStringProperty( "sig_source", m_sig_source );
-        a_msg.setStringProperty( "sig_message", m_sig_message );
-        a_msg.setShortProperty( "sig_level", (short)m_sig_level );
-    }
-
-    void translateFrom( const cms::Message &a_msg )
-    {
-        m_sig_name = a_msg.getStringProperty( "sig_name" );
-        m_sig_source = a_msg.getStringProperty( "sig_source" );
-        m_sig_message = a_msg.getStringProperty( "sig_message" );
-        m_sig_level = (Level) a_msg.getShortProperty( "sig_level" );
-    }
-*/
 };
 
 

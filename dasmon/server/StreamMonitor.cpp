@@ -19,6 +19,14 @@ namespace DASMON {
 #define ADARA_IN_BUF_SIZE 0x100000
 
 
+/**
+ * \brief StreamMonitor constructor.
+ * \param a_sms_host - Hostname of SMS stream source
+ * \param a_port - Port number of SMS stream source
+ *
+ * The StreamMonitor constructor performs limited initialization. Full initialization is not
+ * performed until the start() method is called.
+ */
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port),
       m_stream_thread(0), m_metrics_thread(0),
@@ -29,6 +37,9 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
 }
 
 
+/**
+ * \brief StreamMonitor destructor.
+ */
 StreamMonitor::~StreamMonitor()
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
@@ -36,6 +47,12 @@ StreamMonitor::~StreamMonitor()
 }
 
 
+/**
+ * \brief Begins stream processing.
+ *
+ * This method calls the startProcessing() method which performs full initialization and
+ * provides connection management.
+ */
 void
 StreamMonitor::start()
 {
@@ -45,6 +62,9 @@ StreamMonitor::start()
 }
 
 
+/**
+ * \brief Halts stream processing.
+ */
 void
 StreamMonitor::stop()
 {
@@ -54,6 +74,11 @@ StreamMonitor::stop()
 }
 
 
+/**
+ * \brief Retrieves SMS host information.
+ * \param a_hostname - (output) Hostname of SMS stream source
+ * \param a_port - (output) Port number of SMS stream source
+ */
 void
 StreamMonitor::getSMSHostInfo( std::string &a_hostname, unsigned short &a_port ) const
 {
@@ -64,20 +89,39 @@ StreamMonitor::getSMSHostInfo( std::string &a_hostname, unsigned short &a_port )
 }
 
 
+/**
+ * \brief Sets SMS host information.
+ * \param a_hostname - (input) Hostname of SMS stream source
+ * \param a_port - (input) Port number of SMS stream source
+ *
+ * If stream processing is on-going, it is halted before the new connection information is
+ * set, then restarted automatically.
+ */
 void
 StreamMonitor::setSMSHostInfo( std::string a_hostname, unsigned short a_port )
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
-    stopProcessing();
+    bool proc = (m_stream_thread != 0);
+
+    if ( proc )
+        stopProcessing();
 
     m_sms_host = a_hostname;
     m_sms_port = a_port;
 
-    startProcessing();
+    if ( proc )
+        startProcessing();
 }
 
 
+/**
+ * \brief Requests current stream state and metrics to be re-emitted.
+ * \param a_listener - (input) IStreamListener instance to receieve state data.
+ *
+ * This method provides a mechanism to synchronize late-joining stream listeners that may have
+ * missed earlier state or stream metrics data.
+ */
 void
 StreamMonitor::resendState( IStreamListener &a_listener ) const
 {
@@ -106,6 +150,12 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
 }
 
 
+/**
+ * \brief Starts stream processing.
+ *
+ * This method performs additional initialization required to start stream processing (establishing
+ * connection and monitoring threads).
+ */
 void
 StreamMonitor::startProcessing()
 {
@@ -120,6 +170,11 @@ StreamMonitor::startProcessing()
 }
 
 
+/**
+ * \brief Stops stream processing.
+ *
+ * This method halts start stream processing and disconnects from the data source.
+ */
 void
 StreamMonitor::stopProcessing()
 {
@@ -130,12 +185,19 @@ StreamMonitor::stopProcessing()
         m_metrics_thread->join();
         m_stream_thread = 0;
         m_metrics_thread = 0;
-        resetRunStats();
-        resetStreamStats();
+
+        if ( m_fd_in >= 0 )
+            handleLostConnection();
     }
 }
 
 
+/**
+ * \brief Stream processing thread.
+ *
+ * This method is the stream input, processing, and connection management thread. Incoming ADARA
+ * packets are distributed to handlers via the recv() method().
+ */
 void
 StreamMonitor::processThread()
 {
@@ -211,6 +273,15 @@ StreamMonitor::processThread()
 }
 
 
+/**
+ * \brief Connect to stream source
+ * \return File descriptor on success, -1 on failure
+ *
+ * This method attempts to connect to the currently configures stream source (sms host/port)
+ * and returns a file descriptor for the socket connection if successful (or -1 if a connection
+ * could not be established). If a connection is established, an ADARA "client hello" packet
+ * is sent prior to returning.
+ */
 int
 StreamMonitor::connect()
 {
@@ -253,6 +324,9 @@ StreamMonitor::connect()
 }
 
 
+/**
+ * \brief Clean-up after source connection is lost.
+ */
 void
 StreamMonitor::handleLostConnection()
 {
@@ -267,6 +341,9 @@ StreamMonitor::handleLostConnection()
 }
 
 
+/**
+ * \brief Resets run statistics.
+ */
 void
 StreamMonitor::resetRunStats()
 {
@@ -282,6 +359,9 @@ StreamMonitor::resetRunStats()
 }
 
 
+/**
+ * \brief Resets stream statistics.
+ */
 void
 StreamMonitor::resetStreamStats()
 {
@@ -293,6 +373,13 @@ StreamMonitor::resetStreamStats()
 }
 
 
+/**
+ * \brief Stream metrics update thread.
+ *
+ * This method provides a thread to periodically gather stream metrics and notify listeners via
+ * the beamMetrics() and runMetrics() callbacks. Run metrics are only processed while a run is
+ * being recorded.
+ */
 void
 StreamMonitor::metricsThread()
 {
@@ -327,6 +414,11 @@ StreamMonitor::metricsThread()
 }
 
 
+/**
+ * \brief Top-level ADARA packet handler.
+ *
+ * See ADARAParser for documentation.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 {
@@ -369,6 +461,9 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 }
 
 
+/**
+ * \brief ADARA run status packet handler
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
@@ -407,6 +502,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA pixel mapping packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 {
@@ -440,6 +538,9 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA banked event packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
@@ -498,6 +599,9 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA beam monitor packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
@@ -538,6 +642,9 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA run info pacet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 {
@@ -634,6 +741,9 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA beamline info packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 {
@@ -655,6 +765,9 @@ StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 }
 
 
+/**
+ * \brief Converts text to ADARA process variable type.
+ */
 PVType
 StreamMonitor::toPVType
 (
@@ -678,6 +791,9 @@ StreamMonitor::toPVType
 }
 
 
+/**
+ * \brief ADARA device descriptor packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 {
@@ -783,6 +899,9 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA variable update packet (uint32)
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 {
@@ -792,6 +911,9 @@ StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 }
 
 
+/**
+ * \brief ADARA variable update packet (double)
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
@@ -801,6 +923,13 @@ StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 }
 
 
+/**
+ * \brief Process variable update method.
+ *
+ * This is a template method that handles PV updates. Updates are rate-limited and
+ * listeners are notified as appropriate. Updates received before first pulse are
+ * set to t-zero.
+ */
 template<class T>
 void
 StreamMonitor::pvValueUpdate
@@ -863,6 +992,9 @@ template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Iden
     const timespec &a_timestamp, VariableStatus::Enum a_status);
 
 
+/**
+ * \brief Removes all cached process variable data.
+ */
 void
 StreamMonitor::clearPVs()
 {
@@ -875,6 +1007,9 @@ StreamMonitor::clearPVs()
 }
 
 
+/**
+ * \brief ADARA annotation packet handler.
+ */
 bool
 StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 {
@@ -909,6 +1044,9 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 }
 
 
+/**
+ * \brief Gathers general statistics from all ADARA packet types.
+ */
 void
 StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
 {
@@ -917,6 +1055,8 @@ StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    // Packet statistics are not currently used - commented out to reduce loading
+    /*
     PktStats &stats = m_stats[a_pkt.type()];
 
     ++stats.count;
@@ -928,6 +1068,7 @@ StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
         stats.max_pkt_size = a_pkt.packet_length();
 
     stats.total_size += a_pkt.packet_length();
+    */
 
     m_stream_size += a_pkt.packet_length();
     uint64_t t = timespec_to_nsec( a_pkt.timestamp() );
@@ -1008,6 +1149,9 @@ StreamMonitor::getPktName(
 }
 #endif
 
+/**
+ * \brief Extracts and trims the value string from an XML node.
+ */
 void
 StreamMonitor::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
 {

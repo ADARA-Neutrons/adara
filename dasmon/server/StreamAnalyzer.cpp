@@ -15,6 +15,14 @@ using namespace std;
 namespace ADARA {
 namespace DASMON {
 
+/**
+ * \brief StreamAnalyser constructor.
+ * \param a_monitor - StreamMonitor that will feed this analyzer
+ * \param a_cfg_dir - Path to configuration files
+ *
+ * Constructs a new StreamAnalyzer and attaches to the specified monitor. Rule
+ * configuration file is loaded and rule engine setup.
+ */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
       m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir )
@@ -66,6 +74,9 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
 }
 
 
+/**
+ * StreamAnalyzer destructor.
+ */
 StreamAnalyzer::~StreamAnalyzer()
 {
     m_monitor.removeListener( *this );

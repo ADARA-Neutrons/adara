@@ -223,23 +223,6 @@ protected:
         a_prop_tree.put( "host", m_host );
         a_prop_tree.put( "port", m_port );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setBooleanProperty( "connected", m_connected );
-                            a_msg.setStringProperty( "host", m_host );
-                            a_msg.setShortProperty( "port", (short)m_port );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_connected = a_msg.getBooleanProperty( "connected" );
-                            m_host = a_msg.getStringProperty( "host" );
-                            m_port = (unsigned short)a_msg.getShortProperty( "port" );
-                        }
-    */
 };
 
 
@@ -273,21 +256,6 @@ protected:
         a_prop_tree.put( "recording", m_recording );
         a_prop_tree.put( "run_number", m_run_number );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setBooleanProperty( "recording", m_recording );
-                            a_msg.setIntProperty( "run_number", (long)m_run_number );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_recording = a_msg.getBooleanProperty( "recording" );
-                            m_run_number = (unsigned long)a_msg.getIntProperty( "run_number" );
-                        }
-    */
 };
 
 
@@ -317,18 +285,6 @@ protected:
 
         a_prop_tree.put( "paused", m_paused );
     }
-/*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setBooleanProperty( "paused", m_paused );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_paused = a_msg.getBooleanProperty( "paused" );
-                        }
-*/
 };
 
 
@@ -362,21 +318,6 @@ protected:
         a_prop_tree.put( "scanning", m_scaning );
         a_prop_tree.put( "scan_index", m_scan_index );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setBooleanProperty( "scanning", m_scaning );
-                            a_msg.setIntProperty( "scan_index", (long)m_scan_index );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_scaning = a_msg.getBooleanProperty( "scanning" );
-                            m_scan_index = (unsigned long)a_msg.getIntProperty( "scan_index" );
-                        }
-    */
 };
 
 
@@ -412,25 +353,6 @@ protected:
         a_prop_tree.put( "beam_sname", m_beam_sname );
         a_prop_tree.put( "beam_lname", m_beam_lname );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setStringProperty( "facility", m_facility );
-                            a_msg.setStringProperty( "beam_id", m_beam_id );
-                            a_msg.setStringProperty( "beam_sname", m_beam_sname );
-                            a_msg.setStringProperty( "beam_lname", m_beam_lname );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_facility = a_msg.getStringProperty( "facility" );
-                            m_beam_id = a_msg.getStringProperty( "beam_id" );
-                            m_beam_sname = a_msg.getStringProperty( "beam_sname" );
-                            m_beam_lname = a_msg.getStringProperty( "beam_lname" );
-                        }
-    */
 };
 
 
@@ -470,7 +392,6 @@ protected:
             info.m_role = v.second.get( "role", "" );
             m_user_info.push_back( info );
         }
-
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -495,33 +416,6 @@ protected:
             a_prop_tree.add_child( "users.user", ut );
         }
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setStringProperty( "proposal_id", m_proposal_id );
-                            a_msg.setStringProperty( "run_title", m_run_title );
-                            a_msg.setIntProperty( "run_num", (long)m_run_num );
-                            a_msg.setStringProperty( "sample_id", m_sample_id );
-                            a_msg.setStringProperty( "sample_name", m_sample_name );
-                            a_msg.setStringProperty( "sample_environment", m_sample_environ );
-                            a_msg.setStringProperty( "sample_formula", m_sample_formula );
-                            a_msg.setStringProperty( "sample_nature", m_sample_nature );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_proposal_id = a_msg.getStringProperty( "proposal_id" );
-                            m_run_title = a_msg.getStringProperty( "run_title" );
-                            m_run_num = (unsigned long)a_msg.getIntProperty( "run_num" );
-                            m_sample_id = a_msg.getStringProperty( "sample_id" );
-                            m_sample_name = a_msg.getStringProperty( "sample_name" );
-                            m_sample_environ = a_msg.getStringProperty( "sample_environment" );
-                            m_sample_formula = a_msg.getStringProperty( "sample_formula" );
-                            m_sample_nature = a_msg.getStringProperty( "sample_nature" );
-                        }
-    */
 };
 
 
@@ -549,12 +443,15 @@ protected:
         m_pixel_error_rate = a_prop_tree.get( "pixel_error_rate", 0.0 );
         m_stream_bps = a_prop_tree.get( "stream_bps", 0 );
 
-        uint16_t    num_monitors = a_prop_tree.get( "num_monitors", 0 );
-        uint32_t    mon_id;
-        for ( unsigned short m = 0; m < num_monitors; ++m )
+        m_monitor_count_rate.clear();
+        uint32_t id;
+        double counts;
+
+        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("monitors"))
         {
-            mon_id = a_prop_tree.get( std::string("mon_id_") + boost::lexical_cast<std::string>(m), 0 );
-            m_monitor_count_rate[mon_id] = a_prop_tree.get( std::string("mon_counts_") + boost::lexical_cast<std::string>(m), 0.0 );
+            id = v.second.get( "id", 0 );
+            counts = v.second.get( "counts", 0.0 );
+            m_monitor_count_rate[id] = counts;
         }
     }
 
@@ -568,42 +465,15 @@ protected:
         a_prop_tree.put( "pixel_error_rate", m_pixel_error_rate );
         a_prop_tree.put( "stream_bps", m_stream_bps );
 
-        a_prop_tree.put( "num_monitors", m_monitor_count_rate.size() );
         std::map<uint32_t,double>::const_iterator im = m_monitor_count_rate.begin();
-        unsigned short m = 0;
-        for ( ; im != m_monitor_count_rate.end(); ++m, ++im )
+        for ( ; im != m_monitor_count_rate.end(); ++im )
         {
-            a_prop_tree.put( std::string("mon_id_") + boost::lexical_cast<std::string>(m), im->first );
-            a_prop_tree.put( std::string("mon_counts_") + boost::lexical_cast<std::string>(m), im->second );
+            boost::property_tree::ptree sub;
+            sub.put( "id", im->first );
+            sub.put( "counts", im->second );
+            a_prop_tree.add_child( "monitors.monitor", sub );
         }
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setDoubleProperty( "count_rate", m_count_rate );
-                            a_msg.setDoubleProperty( "pulse_charge", m_pulse_charge );
-                            a_msg.setDoubleProperty( "pulse_freq", m_pulse_freq );
-                            a_msg.setDoubleProperty( "pixel_error_rate", m_pixel_error_rate );
-                            a_msg.setIntProperty( "stream_bps", (long)m_stream_bps );
-                            a_msg.setShortProperty( "num_monitors", m_num_monitors );
-                            for ( unsigned short m = 0; m < m_num_monitors; ++m )
-                                a_msg.setDoubleProperty( std::string("monitor_count_rate_") + boost::lexical_cast<std::string>(m), m_monitor_count_rate[m] );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_count_rate = a_msg.getDoubleProperty( "count_rate" );
-                            m_pulse_charge = a_msg.getDoubleProperty( "pulse_charge" );
-                            m_pulse_freq = a_msg.getDoubleProperty( "pulse_freq" );
-                            m_pixel_error_rate = a_msg.getDoubleProperty( "pixel_error_rate" );
-                            m_stream_bps = (unsigned long)a_msg.getIntProperty( "stream_bps" );
-                            m_num_monitors = (unsigned short)a_msg.getShortProperty( "num_monitors" );
-                            for ( unsigned short m = 0; m < m_num_monitors; ++m )
-                                m_monitor_count_rate[m] = a_msg.getDoubleProperty( std::string("monitor_count_rate_") + boost::lexical_cast<std::string>(m) );
-                        }
-    */
 };
 
 
@@ -641,27 +511,6 @@ protected:
         a_prop_tree.put( "dup_pulse_count", m_dup_pulse_count );
         a_prop_tree.put( "cycle_error_count", m_cycle_error_count );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setIntProperty( "pulse_count", (long)m_pulse_count );
-                            a_msg.setDoubleProperty( "pulse_charge", m_pulse_charge );
-                            a_msg.setIntProperty( "pixel_error_count", (long)m_pixel_error_count );
-                            a_msg.setIntProperty( "dup_pulse_count", (long)m_dup_pulse_count );
-                            a_msg.setIntProperty( "cycle_error_count", (long)m_cycle_error_count );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_pulse_count = (unsigned long) a_msg.getIntProperty( "pulse_count" );
-                            m_pulse_charge = a_msg.getDoubleProperty( "pulse_charge" );
-                            m_pixel_error_count = (unsigned long) a_msg.getIntProperty( "pixel_error_count" );
-                            m_dup_pulse_count = (unsigned long) a_msg.getIntProperty( "dup_pulse_count" );
-                            m_cycle_error_count = (unsigned long) a_msg.getIntProperty( "cycle_error_count" );
-                        }
-    */
 };
 
 }}}
