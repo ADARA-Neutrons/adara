@@ -85,6 +85,12 @@ void StorageContainer::terminate(void)
 		terminateFile();
 }
 
+void StorageContainer::notify(void)
+{
+	if (m_cur_file)
+		m_cur_file->notify();
+}
+
 void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
 {
 	if (m_active || !m_files.empty()) {

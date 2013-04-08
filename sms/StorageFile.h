@@ -51,8 +51,9 @@ public:
 	static SharedPtr importFile(OwnerPtr owner,
 				    const std::string &path);
 
-	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
+	off_t write(IoVector &iovec, uint32_t len, bool do_notify = true);
 	void terminate(ADARA::RunStatus::Enum status);
+	void notify(void);
 
 	~StorageFile();
 
@@ -68,6 +69,7 @@ private:
 	bool m_oversize;
 	bool m_active;
 	off_t m_size;
+	off_t m_sizeLastUpdate;
 	off_t m_syncDistance;
 	int m_fd;
 	unsigned int m_fdRefs;

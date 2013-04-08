@@ -75,9 +75,8 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		dropped = true;
 	}
 
-	if (dropped) {
-		/* TODO tell storage clients about the file size change */
-	}
+	if (dropped)
+		StorageManager::notify();
 }
 
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,

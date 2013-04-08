@@ -209,7 +209,7 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	write(iovec, sizeof(spkt), false);
 }
 
-off_t StorageFile::write(IoVector &iovec, uint32_t len, bool notify)
+off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 {
 	struct iovec *vec = &iovec.front();
 	int nvecs = iovec.size();
@@ -266,14 +266,21 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool notify)
 	 * to stop recording before more data comes in, and we don't want
 	 * to have a file that's only contents are the "I'm done" indication.
 	 */
-	if (notify) {
-		if (m_size >= m_max_file_size)
-			m_oversize = true;
-
-		m_update(*this);
-	}
+	if (do_notify)
+		notify();
 
 	return m_size;
+}
+
+void StorageFile::notify(void)
+{
+	if (m_size >= m_max_file_size)
+		m_oversize = true;
+
+	if (m_size > m_sizeLastUpdate) {
+		m_sizeLastUpdate = m_size;
+		m_update(*this);
+	}
 }
 
 void StorageFile::terminate(ADARA::RunStatus::Enum status)
@@ -292,7 +299,7 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 StorageFile::StorageFile(OwnerPtr &owner, uint32_t fileNumber) :
 	m_owner(owner), m_runNumber(0), m_fileNumber(fileNumber),
 	m_startTime(0), m_persist(true), m_oversize(false), m_active(false),
-	m_size(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
+	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	if (c) {
