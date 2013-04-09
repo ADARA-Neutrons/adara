@@ -1,0 +1,378 @@
+\section{Stream Management Service}
+
+\subsection{Overview}
+
+In the SNS DAS system, there are many sources of information. Neutron data is
+generated from one or more detectors for each beamline, as well as from at
+least one beam monitor. Information about the evironmental conditions and
+positioning of the sample under study is generally provided by ``Slow
+Controls'', though certain pieces -- such as strain force and chopper phase
+information -- come in as ``Fast Metadata''.  All of this information must be
+connected to user-provided information such as the sample material being
+investigated and the proposal number for which the experimental data is being
+generated.
+
+There are currently several consumers of the totality of this information, and
+it makes little sense to have each one of these applications need to speak
+to multiple data sources, each often using different protocols to obtain the
+data. It becomes much more simple to have a single clearing house to which
+interested parties can go to obtain data relating to the current experiment --
+an ``oracle'', if you will.
+
+The Stream Management Service (SMS) provides this functionality for the DAS
+system. It will operate as a Unix-style daemon, and aggregate experiment data
+into a coherent data stream. It will further manage certain pieces of
+experiment metadata such as the ``run number''. While the SMS is not
+user-facing, it will provide an interface to associate user-collected meta-data
+with the appropriate experimental data.
+
+\detail{Resetting environment to defaults}{There are a number of configuration
+items that may be set by the user via EPICS PVs. It seems likely that we will
+want a method to reset those to default values to make things easy during
+changeovers.}
+
+
+\subsection{Detector Input}
+
+Neutron time-of-flight data and ``Fast Metadata'' are delivered
+through the ``preprocessor'', a process that communicates with the detector
+hardware and translates that data to the streaming protocol. Metadata
+and neutron events are sent comingled in the same data stream, separable
+via distinct physical pixel IDs. Currently, there are separate preprocessors
+for the beam monitors, but their events are also distinguishable via
+the pixel ID value.
+
+\subsubsection{Detector (Preprocessor) Communications}
+
+The SMS daemon will attempt to maintain communication at all times with each
+configured preprocesor.  The SMS will initiate a TCP connection to the
+preprocessor at the address and port given in the config file, performing any
+needed hostname to IP address resolution asynchronously. Once connected, the
+preprocessor will stream its data in the new format to the SMS until the
+connection is closed. Should the connection be broken, whether by a timeout,
+remote service reset, or deliberate acction on behalf of the preprocessor, a
+new connection attempt will be immeditately scheduled. Should this new
+connection attempt fail (timeout, refusal, or otherwise), additional attempts
+will be scheduled for configurable times in the future.
+
+When connected, all data sourced by the preprocessor will be processed and
+stored onto local stable storage as described in section~\ref{sec:storage}.
+This processing will occur whether or not there is currently an experimental
+run being recorded. Based on a combination of source and pixel id, each packet
+will be passed to the appropriate transformation engine. Packets containing
+accelerator timing and/or error information will be parsed and the events fed
+to the appropriate tranformation engines as needed. Unknown packets will be
+logged and dropped.
+
+The SMS will export status and configuration information for each known
+preprocessor in process variables accessible via the EPIC Channel Access
+protocol. Each preprocessor may be configured at runtime into various
+modes to indicate that a preprocessor is or is not required for an
+experimental recording.
+
+\detail{Preprocessor PVs}{Add a table to this document containing the PVs
+associated with the preprocessor and their form and function.}
+
+\subsubsection{Neutron Event Transformation}
+
+As each raw event is processed, the source and pixel id from the raw
+event packet will be used to determine if this event is for a detected neutron
+or fast metadata. If the event is for a neutron, the pixel ID will be decoded
+to determine if this is an event from a beam monitor or from the detector
+array. For beam monitor events, the time-of-flight will be collected with
+other data for the source beam monitor. For detector array events, the
+raw physical ID will be remapped to its new logical ID
+given by a lookup table. This lookup will also give us the bank associated
+with the pixel. Any pixel id that does not have a mapping in the table will
+have its high-bit (bit 31) set to indicate a raw pixel value, and the bank will
+be set to all ones ({\raise.17ex\hbox{$\scriptstyle\sim$}}0).  Once the pixel
+is remapped, the new ID and time-of-flight value will be appended to a buffer
+corresponding to the appropriate detector bank.
+
+The pixel mapping and banking will be loaded from a configuration file specific
+to each beamline. This mapping shall be a one-to-one, reversible mapping such
+that no two input values map to the same output value. The revisibilty property
+shall be enforced during load of the configuration, and violation will be
+considered a fatal error preventing startup of the service.
+
+Once the end of raw frames for a pulse has been detected, the transformation
+engine will check that all packets for the pulse were received using the
+packet sequence and end-of-packet fields of the raw event data packet. If
+we successfully received all of the data for the pulse, the current buffers
+for each bank will be pushed to the aggregation component for storage and
+publication to interested subscribers. These buffers will be in a packet format
+for processed neutron event data, similar but separate from the raw event
+format.
+
+If missing packets are detected, the SMS will log the occurance, mark the
+event data buffers as incomplete, and push the buffers to the aggregation
+component. Additionally, the device variable corresponding to packet loss
+for each preprocessor missing data will be incremented, and the updated
+value placed into the aggregated stream to be preserved for later analysis.
+
+\detail{Pixel ID error bit}{%
+The current preprocessor is not believed to pass on events with the error
+bit set, and if it does, those events are corrupt and should be discarded
+(and logged/accounted/etc). This allows SMS to use bit 31 ({\bf ERR}) to
+indicate that there was no physical-to-logical mapping for this event.}
+
+
+\subsubsection{Fast Metadata Transformation}
+
+Raw events from fast-metadata sources will be passed to the fast metadata
+transformation code for mapping into variable value packets. The pixel ids will
+be decoded and matched to variable ids loaded from the configuration file. As
+each pixel is translated, the variable value packet will be forwarded to the
+aggregator without waiting for the end-of-pulse. Optionally, variables that
+were not updated in a pulse may be placed into a minor alarm state and their
+status marked as ``not communicating'' until they receive a future update.
+
+Pixel IDs that map to metadata but do not map to a configured ADARA device
+variable will be handled as an invalid detector event -- the high bit will
+be set and the bank ID set to all ones. This will preserve the raw ID and
+data value for manual correction during analysis, or by semi-automated
+reprocessing with a corrected metadata mapping.
+
+The variable value packets presented to the aggregation component will
+use the current pulse ID for their timestamp. Analysis of the experimental
+data must consider neutron velocity and instrument geometry to correlate the
+updated values with the proper neutron events.
+
+
+\subsection{Slow Controls}
+
+The SMS must maintain a list of descriptions and current values of the process
+variables describing the sample environment in order to record the environment
+for each experiment as well as provide newly-connecting live clients to obtain
+the current operating parameters. These process variables will be monitored
+using the EPICS Channel Access protocol, and the list will be obtained from a
+confinguration file shared with the Scan Server. While most of the information
+required to generate the device descriptor packets should be available
+via Channel Access, the file will contain any data needed fill the gaps.
+
+
+\subsection{Run Management}
+
+\subsubsection{Run Number}
+
+The SMS will be responsible for managing the current run identifier. It is
+expected that there will be PVs for the {\bf previous}, {\bf current}, and {\bf
+next} run number to be used. The PVs for current and next are mutually
+exclusive, with only one being valid at a time; which one is valid will depend
+on if we are currently recording an experimental run for translation. If we are
+in an experimental run, then {\bf current} will contain the run number and {\bf
+next} will be blank. If we are not in an experimental run, then {\bf next} will
+contain the next run number to be used and {\bf current} will be blank. When
+the user moves state from ``recording'' to ``end'' (our corresponding
+transition would to move the ``record'' PV from true to false,) we will move
+the current run number to {\bf previous} and generate a new number for {\bf
+next}. When we transition from ``end'' to ``recording'' (``record'' to true) we
+would move the number from {\bf next} to {\bf current}.
+
+The run number will be monotonically increasing. The SMS will maintain
+the next value to use on stable media to prevent issuing duplicate numbers
+in the event of an abnormal system termination.
+
+\addvspace{\baselineskip}
+\noindent
+Note: the aggregated data stream will always be sent to the local disk.
+``Recording'' in this context means that we are sending this data to the
+translation service.
+
+\subsubsection{Run Information}
+
+Each experiment must have certain information associated with it, such items as
+the instrument performing the experiment, the proposal number, the
+investigators, the user associated with the proposal, and the sample being
+studied. The SMS will provide EPICS process variables for these items, and will
+lock the values as part of the entrance to the ``recording'' state. The values
+will be used to populate the run information for the experiment, and will be
+included in each data file written to stable storage by the SMS.
+
+The SMS will expose a comment field via an EPICS process variable. At
+the beginning of a run -- and when ever this PV is updated during the run --
+the contents of this field will be copied into the state sample environment
+and included in the protocol stream using variable value packets.
+
+
+\subsection{Stream Storage}
+\label{sec:storage}
+
+The SMS daemon will store the aggregated stream to local stable storage. The
+top-level directory for this storage will be specified in the configuration
+file.  The subdirectory used for the current stream will be determined by the
+time (UTC) we last changed states as given by the {\tt gettimeofday()} system
+call. The base subdirectory name will be ``YYYYMMDD-HHMMSS.SSSSSS''; if we are
+currently recording a run, then ``-run-'' and the current run number will be
+appended.
+
+There will be a separate directory provided for storage of experimental runs
+flagged as in permament error by the translation service. As this will move the
+streams outside of the SMS's pervue, this area will need to be monitored and
+commands provided to manually resubmit the runs to the translation service once
+the offending issue has been repaired. While this mechanism is not intended to
+be needed outside of the testing environment, Murphy's Law dictates that this
+must be designed to be usable at 3am localtime.
+
+On startup, the SMS daemon will generate a list of directories within the
+storage area. Each entry in the list will contain the base path and the total
+space consumed by the files in the directory. Those directories associated with
+experimental runs will be marked as such and be placed on additional list(s)
+used to manage interaction with the translation service. The experimental run
+entries will have a field to indicate a successful translation.
+
+Once the storage area is scanned upon startup, the size will be checked
+against a configurable limit, and the data files will be pruned as necessary.
+Files marked as runs that have not yet been successfully translated will be
+exempt from pruning.
+
+As each data packet is presented to the aggregator, it will be appended to the
+current data file. The file's length will be updated, as will the total storage
+used. The new data is published to subscribers by informing them of the change
+to the file size. Should the length of the file exceed the configured limit on
+file size, an end-of-file packet will be written to indicate that the file is
+not corrupt, and a new data file will be started. This file size limit provides
+the granularity at which space is reclaimed from the system, and may be tuned
+for each beamline based on local characteristics.
+
+When starting a new file, whether from hitting the file-size limit or from
+starting a new experimental run, the current sample environment state must be 
+put in the file, along with the experiment information, geometry, translation
+tables, and any other data required to understand the neutron events contained
+in the file. This replication of data into each file ensures that it is not
+lost, rendering the neutron data useless, as old data files are pruned after
+translation.
+
+At the beginning of a data file, and again at configurable intervals, the SMS
+storage process will add signature packets to the stream stored on disk. These
+packets will be used to identify the file as belonging to the DAS system and to
+provide some level of data recovery in the event that an IO error occurs during
+readback of the file.
+
+At periodic intervals based on event timestamps, the storage system will add an
+entry to the index for the current data file. This entry will include the
+current pulse ID, the file and offset of the first packet describing data
+related to the pulse ID, and a snapshot of the sample environment. This index
+will be used to provide the clients of the Event Stream Server the ability to
+request data from a given timestamp. It is expected that there will be limited
+granularity for these entries -- on the order of 5 to 15 minutes -- and the
+granularity may become more coarse the older the timestamp is. This value is
+expected to be configured for each beamline to balance index growth against
+minimizing the transfer of extra event data prior to the timestamp requested.
+The index is transient, and any transition between recording states will reset
+it.
+
+The storage system expects that the system administrators will place the
+data store on its own file system, or will limit other uses on a shared
+file system to avoid impacting the configured size of the data store. To
+help guard against inadvertent encroachment, the SMS will periodically check
+that the free space reported by the operating system exceeds the room
+SMS believes it can use. Should the reported free space drop below that level,
+a message will be logged and a status variable exported via EPICS Channel
+Access will be placed into an alarm state.
+
+
+\detail{Add PVs for monitoring}{I expect we will define some PVs to export
+various state information about space used, etc.}
+\comment{Reword this section a bit for clarity?}
+
+
+\subsection{Translation Client}
+
+The SMS daemon will manage the transmission of ``recorded'' (including runs
+currently being recorded) experimental runs to the translation service (TS).
+For each run to be translated, the SMS will open a separate connection to the
+TS, performing any needed hostname to address translation asynchronously. The
+data from the file(s) associated with that run will be relayed across the the
+socket until the end of the run. Once the data has been transfered to the TS,
+the SMS will wait for a response packet indicating the success or failure of
+the translation.  On a successful translation, the SMS will mark the current
+run as translated and eligible for pruning.
+
+If there is a communication error or the TS indicates that an error occurred,
+the run will \emph{not} be marked as translated. On receipt of a permament
+error indication from TS, the run directory will be moved to the error area,
+and a message logged. For transient errors, the run will placed on a list for
+future translation, after a delay specified by the TS. After the delay passes,
+the entire experimental run will be resent to the TS. There is will be a
+configurable retry limit for transient error attempts to avoid repeatedly
+attempting to translate a run with issues and impeding forward progress on
+other runs.  Runs exceeding this retry limit will also be moved to the error
+area. Communication errors will be handled as transient errors, with a retry
+delay specified from the configuration file.
+
+When a backlog of experimental runs are queued up for transmission to the TS,
+the SMS will allow for a configurable number of connections to be opened. This
+will allow a beamline to realize the benefits of having a cluster of
+translation servers. One slot will be reserved for the current experimental run
+on the theory that the users should continue to get new data as soon as
+possible. This mechanism must be tuned to avoid having beamlines monopolize
+the bandwidth/CPU/memory available to the TS, and may benefit from being
+controlled via a PV to allow administrators to make on-the-fly adjustments
+based on operating conditions. These adjustments must be restricted to
+avoid unintentional denial of service attacks.
+
+The translation queue may be managed via an alogorithm selected via a process
+variable exported via EPICS Channel Access. By default, the system will
+give the oldest experiment runs priority to ensure that their storage may
+be reclaimed in a timely manner. However, it should also be possible to
+direct the system to give the newest runs priority, or to process the backlog
+from both ends of the queue.
+
+The translation client will export status information via Channel Access.
+Potential items that may be monitored include the number of experiment runs
+waiting for translation, the number of runs currently being translated from
+this beamline, and the oldest run number waiting for translation.
+
+As the translation client will be using OS facilities to avoid memory copies,
+the translation service will need to tolerate certain packets that make little
+sense in a network stream context. This includes signature packets and
+end-of-file packets. It is expected that the TS will discard these packets and
+insert its own instance of them as needed by its local configuration aimed more
+at archival than transient storage.
+
+
+\detail{Setting histogram/reduction parameters}{We need to decide how to set
+the histogram parameters for use by the translation service and automatic
+reduction handling. This may be communicated via a specific packet type
+(likely) or via the variable value system.}
+
+
+\subsection{Event Stream Server}
+
+The SMS will provide a mechanism to allow clients to subscribe to the
+aggregated event stream. The SMS will listen on a well-defined port for new
+subscribers. Once connected, subscribers will send an initialization packet to
+establish their requested service. This ``hello'' packet will indicate
+the requested timestamp from which they wish to begin receiving data.
+
+To avoid the need to index every pulse generated in the system, the SMS will
+limit the resolution of timestamps that may be requested by clients. The
+timestamp requested will be rounded further into the past to the nearest
+indexed pulse. In this manner, the client will always receive the data
+for the timestamp it requests, but may be required to discard data prior
+to that timestamp.
+
+The timestamp requested will be further clamped to the most recent transistion
+of run state. In other words, the client will be able to go back to the
+beginning of the current run, but no further. If there is no run currently
+being recorded, the client will be able to go back to the first pulse after
+the previous run completed.
+
+During sample alignment, calibration, and other routine procedures on
+the SNS beamlines, it is desirable to collect data for immediate use
+without sending it to the Translation Service for conversion to NeXus
+format and archiving. During these periods of operation, it may be
+necessary to inform clients of the live-data feed that they should reset
+their statistical counters and discard any temporary or partially
+analyzed data. The SNS will enable this reset by inserting a ``statistics
+reset'' packet into the aggregated stream. This insertion will be
+generated on the rising edge of a self-resetting EPICS PV. The reset packet
+will be inserted prior to the beginning of the next pulse, ensuring that
+all clients will begin new analysis at the same point in the data stream.
+
+
+\detail{List of control PVs}{We will send down statistical reset
+packets to indicate to live clients that they should descard previous
+data and start anew. This will be triggered by writing a PV using CAS.}
+

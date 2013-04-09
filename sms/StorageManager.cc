@@ -528,6 +528,11 @@ void StorageManager::stopRecording(void)
 	startContainer();
 }
 
+void StorageManager::notify(void)
+{
+	m_cur_container->notify();
+}
+
 void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 {
 	if (startSeconds) {

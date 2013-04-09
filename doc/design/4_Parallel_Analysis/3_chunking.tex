@@ -1,0 +1,16 @@
+\subsection{Splitting up the Processing Task}
+
+\subsubsection{Overview}
+
+We want to be able to split up large processing tasks into smaller chunks.  In this case, the term 'large' is very dependent on the infrastructure you are trying to run on, e.g. a large task for a laptop will be different than a large task for a cluster.
+
+\subsubsection{What to split on ?}
+
+For any given data set there are many ways that we could split it up into smaller chunks.  
+
+\begin{itemize}
+\item Detector Banks (i.e. based on parts of the instrument)
+\item Neutron Events (effectively collection time)
+\item Additional Parameters (e.g. for multi-rotation experiments, you may want to split on motor angle)
+\end{itemize}
+

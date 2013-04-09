@@ -39,6 +39,7 @@ public:
 	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
 	void terminate(void);
+	void notify(void);
 
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 

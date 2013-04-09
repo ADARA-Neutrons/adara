@@ -1,0 +1,36 @@
+\subsection{Mantid Task Submission}
+\subsubsection{Overview}
+We want to be able to submit and monitor parallel jobs from within MantidPlot.  This implies some kind of network communication between the client running MantidPlot and the parallel cluster.
+
+Condor is a cluster-management package from the University of Wisconsin (http://research.cs.wisc.edu/condor/) that should fit our needs quite well.  It is designed to schedule jobs on otherwise unused computing resources (for example, idle computers in a student lab), but will function just fine on a dedicated cluster.  More importantly for the Mantid project, Condor is designed to allow remote job submission.  It has a complete API for submitting jobs, monitoring jobs and retrieving results over the network via SOAP calls.  That means that we only need to write a minimal amount of code for MantidPlot to actually call the Condor API's.
+
+Another option for a job scheduler is MOAB.  MOAB has the advantage that it's used elsewhere at NCCS and NCCS personnel are familiar with it.   The latest version of MOAB - due to be released in February - will have an entirely new remote API and we will be evaluating a beta version to see if this API meets our needs.  If it does, then we will probably use it instead of Condor.  
+
+
+\subsubsection{GUI}
+\label{subsubsec:GUI}
+We envision creating a new box on the right side of the MantidPlot window below the algorithms box.  This one would be called ``Remote Algorithms'' and would list the tools that Russell has developed (see \ref{subsec:ParallelExtensions}).  Clicking on one of these remote algorithms would open a dialog box containing user-selectable options (number of processes, input files, etc...) and a ``Submit'' button.
+
+The list of available algorithms, along with the necessary parameters to invoke them would be read from a configuration file.  We would like to fetch this file from a well-known location on the cluster.  That way, when changes are made to the software on the cluster, they would automatically be distributed to every MantidPlot user.
+
+There should also be a ``Job Monitor'' button (or perhaps a menu choice) that will bring up a window showing current and completed jobs.
+
+\subsubsection{Data Transfer}
+Wherever possible, we want to avoid moving data between the workstation running MantidPlot and the parallel cluster.  Ideally, all data will reside on a parallel filesystem that's shared by both systems.  In such cases, when a parallel job is submitted from MantidPlot, all that needs to be included is the name of the input file and the parallel cluster can read it locally.  
+
+In cases where a parallel filesystem is not available (such as a user working remotely), then some kind of file transfer mechanism will be necessary.  Condor's API's allow for transferring the input data to the cluster and retrieving the output.  We aren't sure what MOAB's API's allow, so if we decide to use MOAB, it might be necessary to set up a separate transfer mechanism such as scp or gridFTP.
+
+%
+%There's going to be some interesting issues with transferring data.  (Or, more specifically, avoiding data transfers wherever possible.)  If necessary,   However, it would be far more efficient to access input and output locally via a shared filesystem.  Ideally, MantidPlot would know if the data it's working on is located on the shared filesystem.  Otherwise, that is something that will have to be specified in the options dialog before the job is submitted.
+%
+
+
+
+\subsubsection{Setup and Configuration}
+We will need a dialog box in MantidPlot to hold various configuration options, such as the address of the cluster head node and the location of the algorithm configuration file mentioned in \ref{subsubsec:GUI}.  Given that there is only one cluster right now and that there will probably never be more than a few, it seems practical to include these details in a config file that's included in the MantidPlot distribution.  This will allow users to just select the cluster from a drop-down list.  Moreover, given the prerequisite of having a remote API that MantidPlot can communicate with, we don't expect it to be practical for the user to specify their own cluster.
+
+
+\subsubsection{User Authentication and Authorization}
+Condor accepts a number of different authentication/authorization options (and we assume that MOAB will as well).  We would like something that would allow the user to authenticate once yet allow multiple connections to the cluster.  For example, forcing the user to enter a password every time he/she wanted to check on the status of a running job would not be ideal.
+
+One possible option is to use X.509 certificates.  We can set up a server (either the cluster head node or some other convenient server) that will issue X.509 certificates.  The user logs in and obtains a certificate that is valid for a reasonable amount of time (12 hours, for example).  This certificate is then used for all of the Condor API calls.  We would expect to integrate the act of obtaining the certificate into MantidPlot so that users needn't even be aware that certificates are in use.

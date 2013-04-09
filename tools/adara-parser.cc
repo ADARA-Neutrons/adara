@@ -57,6 +57,8 @@ static const char *statusString(ADARA::VariableStatus::Enum status)
 		return "ReadPerm";
 	case ADARA::VariableStatus::WRITE_PERMISSION:
 		return "WritePerm";
+	case ADARA::VariableStatus::UPSTREAM_DISCONNECTED:
+		return "UpDisc";
 	case ADARA::VariableStatus::NOT_REPORTED:
 		return "NotReported";
 	}

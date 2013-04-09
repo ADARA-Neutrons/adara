@@ -44,6 +44,8 @@ public:
 		addPacket(iovec, notify);
 	}
 
+	static void notify(void);
+
 	static void addPrologue(IoVector &iovec);
 	static void addPrologue(const void *pkt, uint32_t len) {
 		IoVector iovec(1);
