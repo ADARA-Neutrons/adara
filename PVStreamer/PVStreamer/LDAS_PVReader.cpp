@@ -59,13 +59,23 @@ LDAS_PVReader::configurationLoaded( Protocol a_protocol, const std::string &a_so
     if ( a_protocol != LDAS_PROTOCOL )
         return;
 
-    boost::lock_guard<boost::mutex> lock(m_mutex);
+    LDAS_DeviceMonitor *dev_mon = 0;
+
+    boost::unique_lock<boost::mutex> lock(m_mutex);
 
     // Launch device monitor for this host if not already running
     if ( m_monitors.find(a_source) == m_monitors.end())
     {
-        m_monitors[a_source] = new LDAS_DeviceMonitor( *this, m_streamer, a_source );
+        dev_mon = new LDAS_DeviceMonitor( *this, m_streamer, a_source );
+        m_monitors[a_source] = dev_mon;
     }
+
+    lock.unlock();
+
+    // Must connect dev mon outside of lock as it can (does) cause synchronous callbacks into
+    // other protected regions of the PVReader object.
+    if ( dev_mon )
+        dev_mon->connect();
 }
 
 /**
@@ -176,7 +186,7 @@ LDAS_PVReader::deviceActive( Identifier a_dev_id, Timestamp a_time )
     // See if this device is defined (might get notified about apps that we're not interested in?)
     if ( m_streamer.isDeviceDefined( a_dev_id ))
     {
-        boost::lock_guard<boost::mutex> lock(m_mutex);
+        boost::unique_lock<boost::mutex> lock(m_mutex);
 
         if ( m_active_devices.find( a_dev_id ) != m_active_devices.end() )
         {
@@ -187,32 +197,45 @@ LDAS_PVReader::deviceActive( Identifier a_dev_id, Timestamp a_time )
             // First send a device active stream packet
             sendDeviceActive( a_dev_id, a_time );
 
+            // Assign and/or allocate agents for each PV that belongs to this device
+            // Do not connect yet as deadlock would result
+
             vector<PVInfo*> & pvs = m_reader_services->getWriteableDevicePVs( a_dev_id );
             list<LDAS_PVReaderAgent*> agents;
 
-            // The following code will call connect() on agents which will trigger callbacks
-            // Ensure that these callbacks do not deadlocks on the m_mutex mutex
-
             for ( vector<PVInfo*>::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
             {
-                if ( (*ipv)->m_access == PV_READ )
+                if ( (*ipv)->m_access != PV_READ )
+                    continue;
+
+                if ( m_free_agents.size())
                 {
-                    if ( m_free_agents.size())
-                    {
-                        agents.push_back(m_free_agents.front());
-                        m_free_agents.pop_front();
-                        agents.back()->connect( **ipv );
-                    }
-                    else
-                        agents.push_back(new LDAS_PVReaderAgent(*this,*m_reader_services,*ipv));
+                    agents.push_back(m_free_agents.front());
+                    m_free_agents.pop_front();
                 }
+                else
+                    agents.push_back(new LDAS_PVReaderAgent( *this, *m_reader_services ));
             }
 
-            if ( agents.size() )
+            if ( agents.size())
                 m_active_devices[a_dev_id] = agents;
+
+            lock.unlock();
+
+            // Now connect agents to PV sources (will generate synchronous callbacks)
+            list<LDAS_PVReaderAgent*>::iterator ia = agents.begin();
+            for ( vector<PVInfo*>::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+            {
+                if ( (*ipv)->m_access != PV_READ )
+                    continue;
+
+                (*ia)->connect( **ipv );
+                ++ia;
+            }
         }
     }
 }
+
 
 /**
  * \brief Callback that indicate that a device has become inactive.
@@ -251,6 +274,7 @@ LDAS_PVReader::deviceInactive( Identifier a_dev_id, Timestamp a_time )
             // Must do this outside of the mutex as disconnect() causes an immediate callback (causing deadlock)
             // The disconnect call triggers a socketDisconnected which moves the associated agent to the free pool
             lock.unlock();
+
             for ( ia = disc_agents.begin(); ia != disc_agents.end(); ++ia )
                 (*ia)->disconnect();
         }

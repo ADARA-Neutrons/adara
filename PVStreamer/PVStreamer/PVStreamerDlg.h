@@ -10,6 +10,7 @@
 #include "ADARA_PVWriter.h"
 #include "afxwin.h"
 
+
 using namespace SNS::PVS;
 
 // CPVStreamerDlg dialog
@@ -53,10 +54,13 @@ protected:
     void                addLogEntry( Timestamp *ts, std::string &entry );
 
     void                OnCancel();
+    void                OnTimer( UINT a_timer_id );
 
     std::string             m_log_text;
     std::list<std::string>  m_log_entries;
     unsigned long           m_start_time;
+    boost::mutex            m_mutex;
+    bool                    m_update_log;
 
     // Generated message map functions
 	virtual BOOL OnInitDialog();

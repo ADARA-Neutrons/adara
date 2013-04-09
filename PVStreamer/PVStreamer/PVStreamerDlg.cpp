@@ -15,11 +15,10 @@
 
 using namespace std;
 
-// CPVStreamerDlg dialog
-
+#define MAX_LOG_SIZE 500
 
 CPVStreamerDlg::CPVStreamerDlg(CWnd* pParent /*=NULL*/)
-	: CDialog(CPVStreamerDlg::IDD, pParent)
+	: CDialog(CPVStreamerDlg::IDD, pParent), m_update_log(false)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDI_MAINICON);
     m_start_time = (unsigned long)time(0);
@@ -36,6 +35,7 @@ BEGIN_MESSAGE_MAP(CPVStreamerDlg, CDialog)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+    ON_WM_TIMER()
 	//}}AFX_MSG_MAP
 //    ON_BN_CLICKED(IDOK, &CPVStreamerDlg::OnBnClickedOk)
 //ON_EN_CHANGE(IDC_LOG_EDIT, &CPVStreamerDlg::OnEnChangeLogEdit)
@@ -55,6 +55,8 @@ BOOL CPVStreamerDlg::OnInitDialog()
     SetIcon(m_hIcon, FALSE);		// Set small icon
 
     m_status_edit.SetWindowText( "ADARA: Not listening" );
+
+    SetTimer( 1, 1000, 0 );
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -101,24 +103,21 @@ HCURSOR CPVStreamerDlg::OnQueryDragIcon()
 }
 
 void
-CPVStreamerDlg::print( const std::string & a_msg )
+CPVStreamerDlg::OnTimer( UINT a_timer_id )
 {
-    if ( m_log_entries.size() > 500 )
-        m_log_entries.pop_front();
-
-    m_log_entries.push_back( a_msg );
-    m_log_text.clear();
-
-    for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
+    if ( a_timer_id == 1 && m_update_log )
     {
-        m_log_text += *e + "\r\n";
-    }
+        boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    int visline = m_log_edit.GetFirstVisibleLine();
-    m_log_edit.SetWindowText( m_log_text.c_str() );
-    if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
-        m_log_edit.LineScroll((visline + 1));
+        int visline = m_log_edit.GetFirstVisibleLine();
+        m_log_edit.SetWindowText( m_log_text.c_str() );
+        if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
+            m_log_edit.LineScroll((visline + 1));
+
+        m_update_log = false;
+    }
 }
+
 
 void
 CPVStreamerDlg::listening( const std::string & a_address, unsigned short a_port )
@@ -248,14 +247,16 @@ CPVStreamerDlg::timeString( Timestamp *ts ) const
 void
 CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
 {
-    if ( m_log_entries.size() > 500 )
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    if ( m_log_entries.size() > MAX_LOG_SIZE )
         m_log_entries.pop_front();
 
     //char ts[20];
     //sprintf_s( ts, "[%06i] ", 20, sec - m_start_time );
     //m_log_entries.push_back( string(ts) + entry );
 
-    m_log_entries.push_back( timeString(ts) + entry );
+    m_log_entries.push_back( timeString(ts) + " - " + entry );
     m_log_text.clear();
 
     for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
@@ -263,10 +264,31 @@ CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
         m_log_text += *e + "\r\n";
     }
 
-    int visline = m_log_edit.GetFirstVisibleLine();
-    m_log_edit.SetWindowText( m_log_text.c_str() );
-    if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
-        m_log_edit.LineScroll((visline + 1));
+    m_update_log = true;
+
+    //int visline = m_log_edit.GetFirstVisibleLine();
+    //m_log_edit.SetWindowText( m_log_text.c_str() );
+    //if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
+    //    m_log_edit.LineScroll((visline + 1));
+}
+
+void
+CPVStreamerDlg::print( const std::string & a_msg )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    if ( m_log_entries.size() > MAX_LOG_SIZE )
+        m_log_entries.pop_front();
+
+    m_log_entries.push_back( a_msg );
+    m_log_text.clear();
+
+    for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
+    {
+        m_log_text += *e + "\r\n";
+    }
+
+    m_update_log = true;
 }
 
 void

@@ -22,13 +22,9 @@ namespace SNS { namespace PVS { namespace LDAS {
  * \param a_reader_services - PVStreamer reader services interface
  * \param a_pv_info - PVInfo instance for variable to be associated with this reader agent (optional)
  */
-LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services, PVInfo *a_pv_info )
+LDAS_PVReaderAgent::LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services )
 : m_mgr(a_mgr), m_reader_services(a_reader_services), m_pv_info(0), m_error(0), m_array_idx(-1), m_first_send(false), m_cache_array_info(false), m_array_size(0)
 {
-    if ( a_pv_info )
-        connect( *a_pv_info);
-
-    //m_val_history.reserve(10000);
 }
 
 /**

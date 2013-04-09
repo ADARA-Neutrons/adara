@@ -41,6 +41,8 @@ public:
     LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_reader, PVStreamer &a_streamer, const std::string &a_hostname );
     ~LDAS_DeviceMonitor();
 
+    void                    connect();
+
 private:
 
     void                    notifySocketData( NI::CNiDataSocketData &a_data );

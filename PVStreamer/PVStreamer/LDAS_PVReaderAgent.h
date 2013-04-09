@@ -34,7 +34,7 @@ namespace SNS { namespace PVS { namespace LDAS {
 class LDAS_PVReaderAgent
 {
 public:
-    LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services, PVInfo *a_pv_info );
+    LDAS_PVReaderAgent( LDAS_IPVReaderAgentMgr &a_mgr, IPVReaderServices &a_reader_services );
     ~LDAS_PVReaderAgent();
 
     void                    connect( PVInfo &a_pv_info );

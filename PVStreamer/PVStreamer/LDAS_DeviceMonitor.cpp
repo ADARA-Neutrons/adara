@@ -11,6 +11,9 @@
 #include "LDAS_PVReader.h"
 #include "LDAS_XmlParser.h"
 
+#include "PVStreamerApp.h"
+#include "PVStreamerDlg.h"
+
 using namespace std;
 using namespace NI;
 
@@ -27,10 +30,6 @@ LDAS_DeviceMonitor::LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_mgr, PVStreamer &
 {
     // Install DataSocket event handlers
     m_notify_socket.InstallEventHandler( *this, &LDAS_DeviceMonitor::notifySocketData );
-
-    // Connect to the "notifymsg" variable on the specified host
-    string uri = string("dstp://") + m_hostname + "/notifymsg";
-    m_notify_socket.Connect( uri.c_str(), CNiDataSocket::ReadAutoUpdate );
 }
 
 /**
@@ -39,6 +38,16 @@ LDAS_DeviceMonitor::LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_mgr, PVStreamer &
 LDAS_DeviceMonitor::~LDAS_DeviceMonitor()
 {
 }
+
+
+void
+LDAS_DeviceMonitor::connect()
+{
+    // Connect to the "notifymsg" variable on the specified host
+    string uri = string("dstp://") + m_hostname + "/notifymsg";
+    m_notify_socket.Connect( uri.c_str(), CNiDataSocket::ReadAutoUpdate );
+}
+
 
 /**
  * \brief This is the callback method that receives data from the notify DataSocket.
@@ -87,14 +96,25 @@ LDAS_DeviceMonitor::notifySocketData( CNiDataSocketData &a_data )
 
                 if ( app_id > 0 )
                 {
-                    // Get list of devices owned by this application
-                    const vector<Identifier> &devices = m_streamer.getAppDevices( app_id );
-                    for ( vector<Identifier>::const_iterator d = devices.begin(); d != devices.end(); ++d )
+                    if ( m_streamer.isAppDefined( app_id ))
                     {
-                        if ( msg_type == 200 )
-                            m_mgr.deviceActive( *d, time );
-                        else
-                            m_mgr.deviceInactive( *d, time );
+                        // Get list of devices owned by this application
+                        const vector<Identifier> &devices = m_streamer.getAppDevices( app_id );
+                        for ( vector<Identifier>::const_iterator d = devices.begin(); d != devices.end(); ++d )
+                        {
+                            if ( msg_type == 200 )
+                                m_mgr.deviceActive( *d, time );
+                            else
+                                m_mgr.deviceInactive( *d, time );
+                        }
+                    }
+                    else
+                    {
+                        LOG_WARNING( "Received activation notice for unknown application ID: " << app_id );
+
+                        // This REALLY needs to be put in the GUI log window
+                        ((CPVStreamerDlg*)theApp.m_pMainWnd)->print( "***** Received activation notice from UNKNOWN APPLICATION *****" );
+                        ((CPVStreamerDlg*)theApp.m_pMainWnd)->print( "***** PVStreamer must be restarted when configuration is changed *****" );
                     }
                 }
             }
