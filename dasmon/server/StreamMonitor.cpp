@@ -977,7 +977,7 @@ StreamMonitor::pvValueUpdate
     if ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
-        if ( pv )
+        if ( pv && pv->m_value != a_value )
         {
             //if ( a_device_id < 100 )
             //    cout << "Got PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", status = " << a_status << endl;
@@ -1081,7 +1081,7 @@ StreamMonitor::dbThread()
                     else
                         value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
 
-                    sprintf( buf, "select pvUpdate('%s',%g,%u)", (*ipvv)->m_name.c_str(), value, (*ipvv)->m_time );
+                    sprintf( buf, "select pvUpdate('%s',%g,%lu)", (*ipvv)->m_name.c_str(), value, (*ipvv)->m_time );
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
