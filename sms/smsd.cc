@@ -395,9 +395,14 @@ int main(int argc, char **argv)
 		throw;
 	}
 
-	release_parent(CHILD_INIT_SUCCESS);
-	for (;;) {
-		fileDescriptorManager.process(1000.0);
+	try {
+		release_parent(CHILD_INIT_SUCCESS);
+		for (;;) {
+			fileDescriptorManager.process(1000.0);
+		}
+	} catch (...) {
+		ERROR("dying on an unexpected/unhandled exception");
+		throw;
 	}
 
 	return 0;
