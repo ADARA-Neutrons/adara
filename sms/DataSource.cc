@@ -17,8 +17,8 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
 class HWSource {
 public:
-	HWSource(const std::string &uri, uint32_t hwId, uint32_t smsId) :
-		m_uri(uri), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
+	HWSource(const std::string &name, uint32_t hwId, uint32_t smsId) :
+		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
 		m_lastPulse(0), m_dupCount(0)
 	{ }
 
@@ -35,7 +35,7 @@ public:
 		SMSControl *ctrl = SMSControl::getInstance();
 		if (!eop) {
 			/* TODO rate-limited logging of dropped packets */
-			ERROR("Lost packet from " << m_uri << " src 0x"
+			ERROR("Lost packet from " << m_name << " src 0x"
 				<< std::hex << m_hwId);
 			ctrl->markPartial(m_activePulse, m_dupCount);
 		}
@@ -58,7 +58,7 @@ public:
 		m_activePulse = pkt.pulseId();
 		if (m_lastPulse == m_activePulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
-			ERROR("Duplicate pulse from " << m_uri << " src 0x"
+			ERROR("Duplicate pulse from " << m_name << " src 0x"
 				<< std::hex << m_hwId);
 			m_dupCount++;
 		} else
@@ -96,7 +96,7 @@ public:
 	}
 
 private:
-	const std::string &	m_uri;
+	const std::string &m_name;
 
 	uint32_t	m_hwId;
 	uint32_t	m_smsId;
@@ -119,10 +119,11 @@ private:
 };
 
 
-DataSource::DataSource(const std::string &uri, uint32_t id,
-		       double connect_retry, double connect_timeout,
-		       double data_timeout, unsigned int read_chunk) :
-	m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
+DataSource::DataSource(const std::string &name, const std::string &uri,
+		       uint32_t id, double connect_retry,
+		       double connect_timeout, double data_timeout,
+		       unsigned int read_chunk) :
+	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_max_read_chunk(read_chunk)
@@ -132,6 +133,10 @@ DataSource::DataSource(const std::string &uri, uint32_t id,
 	struct addrinfo hints;
 	size_t pos = uri.find_first_of(':');
 	int rc;
+
+	m_name += " (";
+	m_name += name;
+	m_name += ")";
 
 	if (pos != std::string::npos) {
 		node = uri.substr(0, pos);
@@ -148,9 +153,9 @@ DataSource::DataSource(const std::string &uri, uint32_t id,
 
 	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
-		std::string msg("Unable to lookup data source '");
-		msg += uri;
-		msg += "': ";
+		std::string msg("Unable to lookup data source ");
+		msg += m_name;
+		msg += ": ";
 		msg += gai_strerror(rc);
 		throw std::runtime_error(msg);
 	}
@@ -213,11 +218,11 @@ bool DataSource::timerExpired(void)
 		break;
 	case CONNECTING:
 		/* TODO only send this once until we successfully connect */
-		WARN("Connection request timed out to " << m_uri);
+		WARN("Connection request timed out to " << m_name);
 		connectionFailed();
 		break;
 	case ACTIVE:
-		WARN("Timed out waiting for data from " << m_uri);
+		WARN("Timed out waiting for data from " << m_name);
 		connectionFailed();
 		break;
 	}
@@ -263,14 +268,14 @@ void DataSource::startConnect(void)
 	switch (rc) {
 	case ECONNREFUSED:
 		/* TODO ratelimited logging of refused connection */
-		WARN("Connection refused by " << m_uri);
+		WARN("Connection refused by " << m_name);
 		goto error_fd;
 	case EINTR:
 	case EINPROGRESS:
 		m_state = CONNECTING;
 		break;
 	case 0:
-		INFO("Connection established to " << m_uri);
+		INFO("Connection established to " << m_name);
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 	}
@@ -316,7 +321,7 @@ void DataSource::connectComplete(void)
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
-		INFO("Connection established to " << m_uri);
+		INFO("Connection established to " << m_name);
 		return;
 	}
 
@@ -329,7 +334,7 @@ void DataSource::connectComplete(void)
 	}
 
 	/* TODO ratelimited logging of connection issue */
-	WARN("Connection request to " << m_uri << " failed: " << strerror(e));
+	WARN("Connection request to " << m_name << " failed: " << strerror(e));
 	connectionFailed();
 }
 
@@ -340,12 +345,12 @@ void DataSource::dataReady(void)
 
 	try {
 		if (!read(m_fd, m_max_read_chunk)) {
-			INFO("Connection closed with " << m_uri);
+			INFO("Connection closed with " << m_name);
 			connectionFailed();
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
-		ERROR("Exception reading from " << m_uri << ": " << e.what());
+		ERROR("Exception reading from " << m_name << ": " << e.what());
 		connectionFailed();
 	}
 }
@@ -368,7 +373,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 * active pulse, and nothing should ever send one to us.
 		 */
 		if (!pkt.pulseId()) {
-			WARN("Received pulse id 0 from " << m_uri);
+			WARN("Received pulse id 0 from " << m_name);
 			return false;
 		}
 		return Parser::rxPacket(pkt);
@@ -380,7 +385,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-	ERROR("Unknown packet from " << m_uri);
+	ERROR("Unknown packet from " << m_name);
 	return true;
 }
 
@@ -388,7 +393,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *chunk, unsigned int chunk_offset,
 			       unsigned int chunk_len)
 {
-	ERROR("Oversized packet from " << m_uri);
+	ERROR("Oversized packet from " << m_name);
 	return true;
 }
 
@@ -401,7 +406,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		/* XXX Error handling? */
 		SMSControl *ctrl = SMSControl::getInstance();
 		uint32_t smsId = ctrl->registerEventSource(hwId);
-		HWSrcPtr src(new HWSource(m_uri, hwId, smsId));
+		HWSrcPtr src(new HWSource(m_name, hwId, smsId));
 		it = m_hwSources.insert(HWSrcMap::value_type(hwId, src)).first;
 	}
 

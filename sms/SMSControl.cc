@@ -135,7 +135,8 @@ void SMSControl::addSource(const std::string &name,
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
 
-	boost::shared_ptr<DataSource> src(new DataSource(uri->second.data(),
+	boost::shared_ptr<DataSource> src(new DataSource(name,
+							 uri->second.data(),
 							 m_nextSrcId,
 							 connect_retry,
 							 connect_timeout,

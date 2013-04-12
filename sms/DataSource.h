@@ -15,7 +15,7 @@ class HWSource;
 
 class DataSource : public ADARA::Parser {
 public:
-	DataSource(const std::string &uri, uint32_t id,
+	DataSource(const std::string &name, const std::string &uri, uint32_t id,
 		   double connect_retry, double connect_timeout,
 		   double data_timeout, unsigned int read_chunk);
 	~DataSource();
@@ -26,7 +26,7 @@ private:
 
 	enum State { IDLE, CONNECTING, ACTIVE };
 
-	std::string m_uri;
+	std::string m_name;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
