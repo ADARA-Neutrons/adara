@@ -34,6 +34,7 @@ private:
 	connection m_mgrConnection;
 	connection m_contConnection;
 	connection m_fileConnection;
+	std::string m_clientName;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
 	void historicalFile(StorageFile::SharedPtr &f, off_t start);

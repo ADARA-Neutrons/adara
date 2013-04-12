@@ -39,6 +39,37 @@ LiveClient::LiveClient(int fd) :
 	m_read(NULL), m_write(NULL), m_hello_received(false),
 	m_client_fd(fd), m_file_fd(-1)
 {
+	char hostname[1024], service[256];
+	struct sockaddr_in6 sa;
+	socklen_t saLen = sizeof(sa);
+	int rc;
+
+	if (getpeername(m_client_fd, (struct sockaddr *) &sa, &saLen) < 0) {
+		int e = errno;
+		ERROR("Unable to get peer name: " << strerror(e));
+		throw std::runtime_error("Unable to create client");
+	}
+
+	if (saLen > sizeof(sa)) {
+		std::string msg("peer name is too long");
+		ERROR(msg);
+		throw std::runtime_error(msg);
+	}
+
+	rc = getnameinfo((struct sockaddr *) &sa, saLen, hostname,
+			 sizeof(hostname), service, sizeof(service),
+			 NI_NUMERICHOST | NI_NUMERICSERV);
+	if (rc) {
+		std::string msg("Unable to name client: ");
+		msg += gai_strerror(rc);
+		ERROR(msg);
+		throw std::runtime_error(msg);
+	}
+
+	m_clientName = hostname;
+	m_clientName += ":";
+	m_clientName += service;
+
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
@@ -49,10 +80,14 @@ LiveClient::LiveClient(int fd) :
 		delete m_read;
 		throw;
 	}
+
+	INFO("client " << m_clientName << " connected");
 }
 
 LiveClient::~LiveClient()
 {
+	INFO("client " << m_clientName << " disconnected");
+
 	m_mgrConnection.disconnect();
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
@@ -66,7 +101,7 @@ LiveClient::~LiveClient()
 
 bool LiveClient::timerExpired(void)
 {
-	/* TODO log no hello from live client */
+	WARN("client " << m_clientName << " did not send hello");
 	delete this;
 	return false;
 }
@@ -91,9 +126,9 @@ void LiveClient::writable(void)
 				else
 					cname = "(unknown)";
 
-				ERROR("Unable to open file " << f->fileNumber()
-					<< " for container " << cname << ": "
-					<< re.what());
+				ERROR(m_clientName << ": Unable to open file "
+				      << f->fileNumber() << " for container "
+				      << cname << ": " << re.what());
 				delete this;
 				return;
 			}
@@ -112,7 +147,8 @@ void LiveClient::writable(void)
 			/* Only complain if it's not the client going away */
 			if (errno != EPIPE && errno != ECONNRESET) {
 				int e = errno;
-				ERROR("Fatal error during sendfile: "
+				ERROR("client " << m_clientName
+				      << ": Fatal error during sendfile: "
 				      << strerror(e));
 			}
 
@@ -223,7 +259,9 @@ bool LiveClient::rxPacket(const ADARA::Packet &pkt)
 	if (pkt.type() == ADARA::PacketType::CLIENT_HELLO_V0)
 		return ADARA::Parser::rxPacket(pkt);
 
-	/* TODO log unexpected packet */
+	WARN("client " << m_clientName
+	     << " sent us an unexpected packet type 0x"
+	     << std::hex << pkt.type());
 	return true;
 }
 
@@ -235,7 +273,7 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
-	/* TODO log oversize packet */
+	WARN("client " << m_clientName << " sent us an oversized packet");
 	return true;
 }
 

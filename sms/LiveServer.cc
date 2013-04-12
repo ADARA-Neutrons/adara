@@ -124,7 +124,11 @@ void LiveServer::newConnection(void)
 		throw std::runtime_error(msg);
 	}
 
-	new LiveClient(rc);
+	try {
+		new LiveClient(rc);
+	} catch (...) {
+		close(rc);
+	}
 
 	/* TODO may want to put on list to cleanup during shutdown */
 }
