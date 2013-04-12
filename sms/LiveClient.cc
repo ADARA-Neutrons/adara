@@ -240,13 +240,18 @@ void LiveClient::fileUpdated(const StorageFile &f)
 
 void LiveClient::readable(void)
 {
-	/* TODO protect against invalid packets from clients */
-	if (!read(m_client_fd, MAX_PKT_SIZE)) {
-		/* EOF or our handlers indicated it was time to stop, so
-		 * kill ourselves off. We can't do this from the handlers,
-		 * as ADARA::Parser::read() will modify member variables
-		 * after calling the handlers.
-		 */
+	try {
+		if (!read(m_client_fd, MAX_PKT_SIZE)) {
+			/* EOF or our handlers indicated it was time to stop,
+			 * so kill ourselves off. We can't do this from the
+			 * handlers, as ADARA::Parser::read() will modify
+			 * member variables after calling the handlers.
+			 */
+			delete this;
+		}
+	} catch (std::runtime_error e) {
+		ERROR("client " << m_clientName
+		      << " exception reading stream: " << e.what());
 		delete this;
 	}
 }
