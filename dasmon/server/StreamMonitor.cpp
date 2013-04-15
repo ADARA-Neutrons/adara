@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include "Utils.h"
 #include "libpq-fe.h"
+#include <syslog.h>
 
 using namespace std;
 
@@ -163,6 +164,8 @@ StreamMonitor::startProcessing()
 {
     if ( !m_stream_thread )
     {
+        syslog( LOG_INFO, "Start processing request." );
+
         m_process_stream = true;
         resetRunStats();
         resetStreamStats();
@@ -182,6 +185,8 @@ StreamMonitor::stopProcessing()
 {
     if ( m_stream_thread )
     {
+        syslog( LOG_INFO, "Stop processing request." );
+
         m_process_stream = false;
         m_stream_thread->join();
         m_metrics_thread->join();
@@ -206,7 +211,7 @@ StreamMonitor::processThread()
     char buf;
     unsigned short delay_count = 0;
 
-    //cout << "processing..." << endl;
+    syslog( LOG_INFO, "Stream monitor process thread started." );
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
 
@@ -219,7 +224,7 @@ StreamMonitor::processThread()
                 if ( m_fd_in < 0 )
                 {
                     // Not connected - attempt connection periodically
-                    sleep(1);
+                    sleep(5);
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
                     {
@@ -272,6 +277,8 @@ StreamMonitor::processThread()
             handleLostConnection();
         }
     }
+
+    syslog( LOG_INFO, "Stream monitor process thread stopping." );
 }
 
 
@@ -289,40 +296,45 @@ StreamMonitor::connect()
 {
     // Create socket connection to SMS
     int sms_socket = socket( AF_INET, SOCK_STREAM, 0);
+
     if ( sms_socket < 0 )
         return -1;
 
     struct hostent *server = gethostbyname( m_sms_host.c_str() );
-    if ( !server )
-        return -2;
+    if ( server )
+    {
+        struct sockaddr_in server_addr;
+        bzero( &server_addr, sizeof( server_addr ));
 
-    struct sockaddr_in server_addr;
-    bzero( &server_addr, sizeof( server_addr ));
+        server_addr.sin_family = AF_INET;
+        bcopy( (char *)server->h_addr, (char *)&server_addr.sin_addr.s_addr, server->h_length );
+        server_addr.sin_port = htons( m_sms_port );
 
-    server_addr.sin_family = AF_INET;
-    bcopy( (char *)server->h_addr, (char *)&server_addr.sin_addr.s_addr, server->h_length );
-    server_addr.sin_port = htons( m_sms_port );
+        if ( ::connect( sms_socket, (struct sockaddr*) &server_addr, sizeof(server_addr)) == 0 )
+        {
+            // Set to non-blocking
+            int flags = fcntl( sms_socket, F_GETFL, 0 ) | O_NONBLOCK;
+            fcntl( sms_socket, F_SETFL, flags );
 
-    if ( ::connect( sms_socket, (struct sockaddr*) &server_addr, sizeof(server_addr)) < 0 )
-        return -3;
+            // Send client hello to begin stream processing
+            uint32_t data[5];
 
-    // Set to non-blocking
-    int flags = fcntl( sms_socket, F_GETFL, 0 ) | O_NONBLOCK;
-    fcntl( sms_socket, F_SETFL, flags );
+            data[0] = 4;
+            data[1] = ADARA::PacketType::CLIENT_HELLO_V0;
+            data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
+            data[3] = 0;
+            data[4] = 0;
 
-    // Send client hello to begin stream processing
-    uint32_t data[5];
+            if ( write( sms_socket, data, sizeof(data)) == sizeof( data ))
+            {
+                syslog( LOG_NOTICE, "Connected to SMS." );
+                return sms_socket;
+            }
+        }
+    }
 
-    data[0] = 4;
-    data[1] = ADARA::PacketType::CLIENT_HELLO_V0;
-    data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
-    data[3] = 0;
-    data[4] = 0;
-
-    if ( write( sms_socket, data, sizeof(data)) != sizeof( data ))
-        return -4;
-
-    return sms_socket;
+    close( sms_socket );
+    return -1;
 }
 
 
@@ -332,7 +344,7 @@ StreamMonitor::connect()
 void
 StreamMonitor::handleLostConnection()
 {
-    //cout << "STREAM: disconnected." << endl;
+    syslog( LOG_NOTICE, "Lost connection to SMS." );
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
     close( m_fd_in );
@@ -385,6 +397,8 @@ StreamMonitor::resetStreamStats()
 void
 StreamMonitor::metricsThread()
 {
+    syslog( LOG_INFO, "Stream metrics thread started." );
+
     while( m_process_stream )
     {
         sleep(2);
@@ -413,6 +427,8 @@ StreamMonitor::metricsThread()
             }
         }
     }
+
+    syslog( LOG_INFO, "Stream metrics thread stopping." );
 }
 
 
@@ -951,47 +967,21 @@ StreamMonitor::pvValueUpdate
 
     // TODO Alert - bad stream packet (got value w/o ddp)
     if ( ipv == m_pvs.end() )
-    {
-        //cout << "got update w/o DDP: " << a_device_id << "." << a_pv_id << endl;
         return;
-    }
-
-    //double t = timespec_to_nsec( a_timestamp );
-
-#if 0
-    double t = 0;
-
-    // Note: if first pulse has not arrived, truncate all PV times to 0
-    if ( m_first_pulse_time )
-    {
-        uint64_t t1 = timespec_to_nsec( a_timestamp );
-
-        // Truncate negative time offsets to 0
-        if ( t1 > m_first_pulse_time )
-            t = (t1 - m_first_pulse_time)/1000000000.0;
-    }
-#endif
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
-//    if ( t - ipv->second->m_time >= 0.5 || t == 0 )
     if ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
-        if ( pv && pv->m_value != a_value )
+        if ( pv && (( pv->m_value != a_value ) || ( pv->m_status != a_status )))
         {
-            //if ( a_device_id < 100 )
-            //    cout << "Got PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", status = " << a_status << endl;
-
             pv->m_value = a_value;
             pv->m_time = a_timestamp.tv_sec;
+            pv->m_status = a_status;
             pv->m_updated = true;
             m_notify.pvValue( pv->m_name, a_value, a_status );
         }
     }
-    //else if ( a_device_id < 100 )
-    //{
-    //    cout << "Skip PV " << a_device_id << "." << a_pv_id << " = " << a_value << ", t = " << t << ", tl = " << m_first_pulse_time << endl;
-    //}
 }
 
 template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value,
@@ -1018,6 +1008,8 @@ StreamMonitor::clearPVs()
 void
 StreamMonitor::dbThread()
 {
+    syslog( LOG_INFO, "Database update thread started." );
+
     // Attempt to connect
     string connect_string;
 
@@ -1081,10 +1073,12 @@ StreamMonitor::dbThread()
                     else
                         value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
 
-                    sprintf( buf, "select pvUpdate('%s',%g,%lu)", (*ipvv)->m_name.c_str(), value, (*ipvv)->m_time );
+                    sprintf( buf, "select pvUpdate('%s','%s',%g,%u,%lu)", m_beam_info.m_beam_id.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
+                        syslog( LOG_NOTICE, "Database update call failed." );
+
                         update = false;
                         break;
                     }
@@ -1100,6 +1094,8 @@ StreamMonitor::dbThread()
         // wait a bit and try connecting again
         sleep( 15 );
     }
+
+    syslog( LOG_INFO, "Database update thread stopping." );
 }
 
 

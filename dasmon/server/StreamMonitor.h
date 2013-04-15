@@ -75,6 +75,7 @@ public:
         m_pv_id(a_pv_id),
         m_type(a_type),
         m_time(0),
+        m_status(VariableStatus::OK),
         m_updated(false)
     {}
 
@@ -82,12 +83,13 @@ public:
     virtual ~PVInfoBase()
     {}
 
-    std::string         m_name;         ///< Name of PV
-    Identifier          m_device_id;    ///< ID of device that owns the PV
-    Identifier          m_pv_id;        ///< ID of the PV
-    PVType              m_type;         ///< Type of PV
-    unsigned long       m_time;
-    bool                m_updated;
+    std::string             m_name;         ///< Name of PV
+    Identifier              m_device_id;    ///< ID of device that owns the PV
+    Identifier              m_pv_id;        ///< ID of the PV
+    PVType                  m_type;         ///< Type of PV
+    unsigned long           m_time;
+    VariableStatus::Enum    m_status;
+    bool                    m_updated;
 };
 
 template<class T>

@@ -4,6 +4,7 @@
 #include "RuleEngine.h"
 #include "StreamMonitor.h"
 #include <boost/program_options.hpp>
+#include <syslog.h>
 
 //#include <log4cxx/logger.h>
 //#include "ComBusAppender.h"
@@ -11,7 +12,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "0.1.0"
+#define DASMON_VERSION "0.1.1"
 
 int main(int argc, char *argv[])
 {
@@ -62,6 +63,9 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    openlog( "dasmond", 0, 0 );
+    syslog( LOG_INFO, "Dasmon service started." );
+
     ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON", 0, broker_uri, broker_user, broker_pass );
 
 #if 0
@@ -100,6 +104,9 @@ int main(int argc, char *argv[])
     //LOG4CXX_INFO(logger,"DASMON exiting");
 
     delete combus;
+
+    syslog( LOG_INFO, "Dasmon service stopping." );
+    closelog();
 
     return res;
 }
