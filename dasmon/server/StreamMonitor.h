@@ -158,6 +158,7 @@ public:
     uint16_t    idx;
 };
 
+#ifdef USE_DB
 struct DBConnectInfo
 {
     std::string     host;
@@ -167,11 +168,16 @@ struct DBConnectInfo
     std::string     pass;
     unsigned short  period;
 };
+#endif
 
 class StreamMonitor : public ADARA::Parser
 {
 public:
+#ifdef USE_DB
     StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415, DBConnectInfo *a_db_info = 0 );
+#else
+    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415 );
+#endif
     virtual ~StreamMonitor();
 
     void            getSMSHostInfo( std::string &a_hostname, unsigned short &a_port ) const;
@@ -271,8 +277,10 @@ private:
     std::map<PVKey,PVInfoBase*>     m_pvs;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
+#ifdef USE_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;
+#endif
 };
 
 }}

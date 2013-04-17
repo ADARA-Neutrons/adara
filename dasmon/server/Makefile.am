@@ -13,4 +13,4 @@ dasmon_server_dasmond_CPPFLAGS = -I/usr/include/libxml2 -I/usr/include/activemq-
 dasmon_server_dasmond_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 
 # TODO pick up most of these from autoconf
-dasmon_server_dasmond_LDADD = -lxml2 -lboost_program_options -lboost_thread-mt -lactivemq-cpp
+dasmon_server_dasmond_LDADD = -lxml2 -lboost_program_options -lboost_thread-mt -lactivemq-cpp -lboost_filesystem

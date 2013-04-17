@@ -9,8 +9,11 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "Utils.h"
-#include "libpq-fe.h"
 #include <syslog.h>
+
+#ifdef USE_DB
+#include "libpq-fe.h"
+#endif
 
 using namespace std;
 
@@ -28,15 +31,24 @@ namespace DASMON {
  * The StreamMonitor constructor performs limited initialization. Full initialization is not
  * performed until the start() method is called.
  */
+#ifdef USE_DB
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info )
+#else
+StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
+#endif
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port),
       m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0),
-      m_stream_size(0), m_stream_rate(0), m_db_info(a_db_info)
+      m_stream_size(0), m_stream_rate(0)
+#ifdef USE_DB
+     ,m_db_info(a_db_info)
+#endif
 {
+#ifdef USE_DB
     if ( m_db_info )
         m_db_thread = new boost::thread( boost::bind( &StreamMonitor::dbThread, this ));
+#endif
 }
 
 
@@ -1005,6 +1017,7 @@ StreamMonitor::clearPVs()
 }
 
 
+#ifdef USE_DB
 void
 StreamMonitor::dbThread()
 {
@@ -1097,6 +1110,7 @@ StreamMonitor::dbThread()
 
     syslog( LOG_INFO, "Database update thread stopping." );
 }
+#endif
 
 
 /**
