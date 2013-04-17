@@ -163,7 +163,7 @@ int _tmain(int argc, _TCHAR* argv[])
                     cout << "DDP: ";
                     cout << " id: " << pkt->dev_id;
                     cout << ", xml len: " << pkt->ddp.xml_len << endl;
-                    //cout << "  xml: " << &pkt->ddp.xml << endl;
+                    cout << "  xml: " << &pkt->ddp.xml << endl;
                 }
                 else if ( hdr.format == 0x800100 )
                 {

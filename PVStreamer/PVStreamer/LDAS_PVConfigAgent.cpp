@@ -895,7 +895,7 @@ LDAS_PVConfigAgent::GetDataAccess(PELE_STRUCT pStruct)
  * @param units The DAS units to be converted.
  * @return The NeXus units.
  */
-const char*
+string
 LDAS_PVConfigAgent::standardizeUnits( const CString & a_units_class, const CString & a_units ) const
 {
     if ( a_units.IsEmpty())
@@ -963,7 +963,8 @@ LDAS_PVConfigAgent::standardizeUnits( const CString & a_units_class, const CStri
             return "degree";
     }
 
-    return units;
+    // If nothing matches, just return original units value
+    return string( (LPCSTR)a_units );
 }
 
 }}}

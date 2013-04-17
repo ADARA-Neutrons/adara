@@ -55,7 +55,7 @@ public:
 
     //static void loadDisabledPVList( const std::string &a_filename );
     static void     loadPVConfigLocal( const std::string &a_filename, bool a_default = false );
-    const char*     standardizeUnits( const CString & a_units_class,  const CString & a_units ) const;
+    std::string     standardizeUnits( const CString & a_units_class,  const CString & a_units ) const;
 
 private:
     struct PVConfigLocal
