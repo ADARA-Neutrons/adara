@@ -239,10 +239,7 @@ StreamMonitor::processThread()
                     sleep(5);
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
-                    {
-                        //cout << "STREAM: connected!" << endl;
                         m_notify.connectionStatus( true, m_sms_host, m_sms_port );
-                    }
                 }
                 else
                 {
@@ -254,12 +251,16 @@ StreamMonitor::processThread()
                             usleep(200000);
                             // Detect stalled stream & reset statistics
                             if ( ++delay_count == 5 )
+                            {
+                                syslog( LOG_WARNING, "Detected stalled ADARA stream." );
                                 resetStreamStats();
+                            }
 
                             continue;
                         }
                         else if ( errno != EINTR && errno != EAGAIN )
                         {
+                            syslog( LOG_ERR, "recv() returned error code %i. Dropping connection.", errno );
                             // Connection lost
                             handleLostConnection();
                             continue;
@@ -272,6 +273,7 @@ StreamMonitor::processThread()
 
                     if ( !read( m_fd_in, ADARA_IN_BUF_SIZE ))
                     {
+                        syslog( LOG_WARNING, "ADARA::Parser::read() returned 0. Dropping connection." );
                         // Connection lost
                         handleLostConnection();
                     }
@@ -283,8 +285,15 @@ StreamMonitor::processThread()
                 }
             }
         }
+        catch( std::exception &e )
+        {
+            syslog( LOG_WARNING, "In processThread(): std::exception caught. Dropping connection. Exception = %s", e.what() );
+            // Connection lost
+            handleLostConnection();
+        }
         catch(...)
         {
+            syslog( LOG_WARNING, "In processThread(): Unknown exception type caught. Dropping connection." );
             // Connection lost
             handleLostConnection();
         }
@@ -356,8 +365,6 @@ StreamMonitor::connect()
 void
 StreamMonitor::handleLostConnection()
 {
-    syslog( LOG_NOTICE, "Lost connection to SMS." );
-
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
     close( m_fd_in );
     m_fd_in = -1;

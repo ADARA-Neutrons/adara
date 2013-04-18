@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    openlog( "dasmond", 0, 0 );
+    openlog( "dasmond", 0, LOG_DAEMON );
     syslog( LOG_INFO, "Dasmon service started." );
 
     ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON", 0, broker_uri, broker_user, broker_pass );
