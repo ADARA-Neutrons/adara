@@ -36,11 +36,10 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
 #else
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
 #endif
-    : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port),
-      m_stream_thread(0), m_metrics_thread(0),
-      m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_paused(false),
-      m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0),
-      m_stream_size(0), m_stream_rate(0)
+    : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
+      m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
+      m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
+      m_stream_rate(0)
 #ifdef USE_DB
      ,m_db_info(a_db_info)
 #endif
@@ -147,7 +146,7 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
     {
         //cout << " connected" << endl;
         a_listener.connectionStatus( true, m_sms_host, m_sms_port );
-        a_listener.runStatus( m_recording, m_run_num );
+        a_listener.runStatus( m_recording, m_run_num, m_run_timestamp );
         a_listener.pauseStatus( m_paused );
         a_listener.scanStatus( m_scanning, m_scan_index );
 
@@ -221,7 +220,6 @@ void
 StreamMonitor::processThread()
 {
     char buf;
-    unsigned short delay_count = 0;
 
     syslog( LOG_INFO, "Stream monitor process thread started." );
 
@@ -249,13 +247,6 @@ StreamMonitor::processThread()
                         if ( errno == EWOULDBLOCK )
                         {
                             usleep(200000);
-                            // Detect stalled stream & reset statistics
-                            if ( ++delay_count == 5 )
-                            {
-                                syslog( LOG_WARNING, "Detected stalled ADARA stream." );
-                                resetStreamStats();
-                            }
-
                             continue;
                         }
                         else if ( errno != EINTR && errno != EAGAIN )
@@ -265,11 +256,7 @@ StreamMonitor::processThread()
                             handleLostConnection();
                             continue;
                         }
-                        else
-                            delay_count = 0;
                     }
-                    else
-                        delay_count = 0;
 
                     if ( !read( m_fd_in, ADARA_IN_BUF_SIZE ))
                     {
@@ -371,6 +358,7 @@ StreamMonitor::handleLostConnection()
 
     resetStreamStats();
     resetRunStats();
+    clearPVs();
 }
 
 
@@ -387,8 +375,6 @@ StreamMonitor::resetRunStats()
 
     m_first_pulse_time = 0;
     m_pcharge.total = 0.0;
-
-    clearPVs();
 }
 
 
@@ -403,6 +389,7 @@ StreamMonitor::resetStreamStats()
     m_pcharge.reset();
     m_pfreq.reset();
     m_beam_metrics.clear();
+    m_stream_rate = 0;
 }
 
 
@@ -418,6 +405,9 @@ StreamMonitor::metricsThread()
 {
     syslog( LOG_INFO, "Stream metrics thread started." );
 
+    unsigned long last_pulse_count = 0;
+    bool    stalled = false;
+
     while( m_process_stream )
     {
         sleep(2);
@@ -427,7 +417,27 @@ StreamMonitor::metricsThread()
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
-            m_beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;;
+            // Check for stalled stream
+            if ( last_pulse_count && ( m_run_metrics.m_pulse_count == last_pulse_count ))
+            {
+                if ( !stalled )
+                {
+                    syslog( LOG_WARNING, "Detected stalled ADARA stream." );
+                    resetStreamStats();
+                    stalled = true;
+                }
+            }
+            else
+            {
+                last_pulse_count = m_run_metrics.m_pulse_count;
+                if ( stalled )
+                {
+                    stalled = false;
+                    syslog( LOG_NOTICE, "Stalled ADARA stream has resumed." );
+                }
+            }
+
+            m_beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;
             m_beam_metrics.m_pulse_charge = m_pcharge.average();
             m_beam_metrics.m_pulse_freq =  m_pfreq.average();
             m_beam_metrics.m_stream_bps = m_stream_rate;
@@ -514,8 +524,10 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         m_recording = true;
         m_run_num = a_pkt.runNumber();
+        m_run_timestamp = a_pkt.timestamp().tv_sec;
         resetRunStats();
-        m_notify.runStatus( true, m_run_num );
+
+        m_notify.runStatus( true, m_run_num, m_run_timestamp );
     }
     else if ( !recording && m_recording )
     {
@@ -523,8 +535,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         m_recording = false;
         m_run_num = 0;
+        m_run_timestamp = a_pkt.timestamp().tv_sec;
         resetRunStats();
-        m_notify.runStatus( false, 0 );
+        m_notify.runStatus( false, 0, m_run_timestamp );
 
         // Make sure scan is stopped
         if ( m_scanning )
@@ -1010,13 +1023,14 @@ template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Iden
 
 
 /**
- * \brief Removes all cached process variable data.
+ * \brief Removes all cached process variable data and notifies listeners.
  */
 void
 StreamMonitor::clearPVs()
 {
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
     {
+        m_notify.pvUndefined( ipv->second->m_name );
         delete ipv->second;
     }
 
@@ -1296,10 +1310,10 @@ StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 }
 
 void
-StreamMonitor::Notifier::runStatus( bool a_recording, unsigned long a_run_number )
+StreamMonitor::Notifier::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->runStatus( a_recording, a_run_number );
+        (*l)->runStatus( a_recording, a_run_number, a_timestamp );
 }
 
 void
@@ -1352,6 +1366,12 @@ StreamMonitor::Notifier::pvDefined( const std::string &a_name )
         (*l)->pvDefined( a_name );
 }
 
+void
+StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
+{
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+        (*l)->pvUndefined( a_name );
+}
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )

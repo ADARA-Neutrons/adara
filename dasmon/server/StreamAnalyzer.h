@@ -88,7 +88,7 @@ private:
     };
 
     // IStreamListener Interface
-    void runStatus( bool a_recording, unsigned long a_run_number );
+    void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp );
     void pauseStatus( bool a_paused );
     void scanStatus( bool a_scanning, unsigned long a_scan_number );
     void beamInfo( const BeamInfo &a_info );
@@ -96,6 +96,7 @@ private:
     void beamMetrics( const BeamMetrics &a_metrics );
     void runMetrics( const RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
+    void pvUndefined( const std::string &a_name );
     void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
     void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
     void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
@@ -104,7 +105,7 @@ private:
     void onAssert( const std::string &a_fact );
     void onRetract( const std::string &a_fact );
 
-    void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status );
+    void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;
     RuleEngine                         *m_engine;

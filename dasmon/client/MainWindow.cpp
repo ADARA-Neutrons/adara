@@ -28,7 +28,7 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
     m_refresh_log_table(false), m_refresh_monitor_table(false),
-    m_recording(false), m_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
+    m_recording(false), m_run_number(0), m_prev_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0),
     m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ), m_broker_pass( a_broker_pass )
@@ -156,14 +156,21 @@ MainWindow::setComBusActive( bool a_active )
         m_dasmon_state.setActive( false );
         m_sms_state.setActive( false );
 
+        m_recording = false;
+        m_run_number = 0;
+        m_scanning = false;
+        m_paused = false;
+        m_scan_index = 0;
+        m_signalled = false;
+
         clearBeamDisplay();
         clearRunDisplay();
         clearSignals();
+        clearMonitors();
 
         updateAllStatusIndicators();
 
         // TODO This is WRONG - need to encapsulate calbacks in one place (setDASMonActive)
-        QMutexLocker lock( &m_mutex );
         for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
             (*c)->dasmonStatus( false );
 
@@ -180,7 +187,6 @@ MainWindow::setDASMonActive( bool a_active )
         m_dasmon_state.set( a_active, true );
         updateDASMonStatusIndicator();
 
-        QMutexLocker lock( &m_mutex );
         for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
             (*c)->dasmonStatus( a_active );
 
@@ -191,6 +197,13 @@ MainWindow::setDASMonActive( bool a_active )
         m_dasmon_state.set( a_active, true );
         m_sms_state.setActive( false );
 
+        m_recording = false;
+        m_run_number = 0;
+        m_scanning = false;
+        m_paused = false;
+        m_scan_index = 0;
+        m_signalled = false;
+
         clearBeamDisplay();
         clearRunDisplay();
         clearSignals();
@@ -198,7 +211,6 @@ MainWindow::setDASMonActive( bool a_active )
 
         updateAllStatusIndicators();
 
-        QMutexLocker lock( &m_mutex );
         for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
             (*c)->dasmonStatus( a_active );
 
@@ -221,8 +233,15 @@ MainWindow::setSMSActive( bool a_active )
     {
         m_sms_state.set( a_active, true );
 
+        m_recording = false;
+        m_run_number = 0;
+        m_scanning = false;
+        m_paused = false;
+        m_scan_index = 0;
+
         clearBeamDisplay();
         clearRunDisplay();
+        clearMonitors();
 
         updateAllStatusIndicators();
 
@@ -268,8 +287,6 @@ MainWindow::onProcTimer()
             ++p;
         }
     }
-
-    lock.unlock();
 
     if ( kill_dasmon )
     {
@@ -395,11 +412,14 @@ MainWindow::onTableTimer()
     }
 
     // Not a table, but use this timer callback to update duration field on mainwindow
-    uint t = QDateTime::currentDateTime().toTime_t() - m_start_time.toTime_t();
-    uint hour = t / 3600;
-    uint min = t / 60;
-    uint sec = t % 60;
-    ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
+    if ( m_sms_state.activeTrue() )
+    {
+        uint t = QDateTime::currentDateTime().toTime_t() - m_start_time.toTime_t();
+        uint hour = t / 3600;
+        uint min = t / 60;
+        uint sec = t % 60;
+        ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
+    }
 
 #if 0
         m_monitor->getStatistics( m_stats );
@@ -438,6 +458,8 @@ MainWindow::configActiveMQ()
         settings.setValue( "password", m_broker_pass.c_str() );
         settings.endGroup();
 
+        // Reset m_init to send an "emit status" message to dasmond when we connect
+        m_init = true;
         ADARA::ComBus::Connection::getInst().setBroker( m_broker_uri, m_broker_user, m_broker_pass );
     }
 }
@@ -568,7 +590,10 @@ MainWindow::updateRunStatusIndicator()
         text = "Idle";
         style = "QLabel { background: grey }";
 
-        QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        if ( m_prev_run_number > 0 )
+            QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("(prev: %1)").arg(m_prev_run_number)));
+        else
+            QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
 
     if ( !m_sms_state.activeTrue() )
@@ -752,12 +777,14 @@ MainWindow::clearBeamDisplay()
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
 
 void
 MainWindow::clearRunDisplay()
 {
+    //QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->propIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->runTitleEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->sampleIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
@@ -774,8 +801,6 @@ MainWindow::clearRunDisplay()
 void
 MainWindow::clearSignals()
 {
-    QMutexLocker lock( &m_mutex );
-
     m_alerts.clear();
     m_signalled = false;
     m_highest_level = ADARA::TRACE;
@@ -786,8 +811,6 @@ MainWindow::clearSignals()
 void
 MainWindow::clearMonitors()
 {
-    QMutexLocker lock( &m_mutex );
-
     m_monitor_rate.clear();
     m_refresh_monitor_table = true;
 }
@@ -816,6 +839,8 @@ MainWindow::writeLog( ADARA::Level a_level, const std::string &a_msg )
 void
 MainWindow::comBusConnectionStatus( bool a_connected )
 {
+    QMutexLocker lock( &m_mutex );
+
     setComBusActive( a_connected );
 
     // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
@@ -836,13 +861,13 @@ MainWindow::comBusConnectionStatus( bool a_connected )
 void
 MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
-    setComBusActive( true );
-    if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
-        setDASMonActive( true );
-
     //const string &source = a_msg.getSourceName() + "." + boost::lexical_cast<string>(a_msg.getSourceInstance());
 
     QMutexLocker lock( &m_mutex );
+
+    setComBusActive( true );
+    if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
+        setDASMonActive( true );
 
     switch( a_msg.getMessageType() )
     {
@@ -887,6 +912,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         break;
 
     case ADARA::ComBus::MSG_STS_TRANS_COMPLETE:
+        // TODO - Put info in log window
         break;
 
     case ADARA::ComBus::MSG_SIGNAL_ASSERT:
@@ -948,14 +974,6 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         {
             const ADARA::ComBus::DASMON::ConnectionStatusMessage &msg = (const ADARA::ComBus::DASMON::ConnectionStatusMessage&)a_msg;
             setSMSActive( msg.m_connected );
-            if ( msg.m_connected )
-            {
-                // TODO update SMS host port GUI
-                //msg.m_host, msg.m_port
-            }
-            else
-            {
-            }
         }
         break;
     case ADARA::ComBus::MSG_DASMON_RUN_STATUS:
@@ -966,9 +984,10 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             {
                 m_recording = msg.m_recording;
                 m_run_number = msg.m_run_number;
+                m_prev_run_number = m_run_number;
+                m_start_time = QDateTime::fromMSecsSinceEpoch( ((qint64)(msg.m_timestamp))*1000 );
                 updateRunStatusIndicator();
 
-                m_start_time = QDateTime::currentDateTime();
                 QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString())));
 
                 writeLog( ADARA::INFO, string("Run started. Run number = ") + boost::lexical_cast<string>(m_run_number) );
@@ -977,9 +996,9 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             {
                 m_recording = msg.m_recording;
                 m_run_number = msg.m_run_number;
+                m_start_time = QDateTime::fromMSecsSinceEpoch( ((qint64)(msg.m_timestamp))*1000 );
                 updateRunStatusIndicator();
 
-                m_start_time = QDateTime::currentDateTime();
                 clearRunDisplay();
                 writeLog( ADARA::INFO, "Run stopped." );
             }
@@ -1050,6 +1069,8 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 bool
 MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 {
+    QMutexLocker lock( &m_mutex );
+
     setComBusActive( true );
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
@@ -1057,7 +1078,6 @@ MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
     //cout << "Control Msg: " << a_msg.getMessageType() << endl;
 
     // See if this message belogs to a sub client (by correlation id)
-    QMutexLocker lock( &m_mutex );
 
     map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.m_correlation_id );
     if ( iRoute != m_client_cids.end() )

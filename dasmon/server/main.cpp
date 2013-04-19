@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
     }
     catch( exception &e )
     {
-        cout << e.what() << endl;
+        syslog( LOG_ERR, "Unhandled exception: %s", e.what());
     }
 
     //LOG4CXX_INFO(logger,"DASMON exiting");

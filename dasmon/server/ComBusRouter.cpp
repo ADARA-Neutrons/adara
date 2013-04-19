@@ -1,4 +1,5 @@
 #include <string.h>
+#include <syslog.h>
 #include "ComBusRouter.h"
 #include "DASMonMessages.h"
 
@@ -38,7 +39,6 @@ ComBusRouter::run()
         m_combus.sendStatus( ADARA::ComBus::STATUS_RUNNING );
         if ( m_resend_state )
         {
-            //cout << "Resend State..." << endl;
             m_monitor.resendState( *this );
             m_analyzer.resendState();
             m_resend_state = false;
@@ -67,17 +67,12 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
     {
         // If this succeeds, current rules will be set to specified;
         // otherwise, current rules will remain unchanged
-        //cout << "setting" << endl;
         m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals );
-        //cout << "Saving new rules" << endl;
         m_analyzer.saveConfig();
 
         if ( set_msg->m_set_default )
-        {
-            //cout << "set as default" << endl;
             m_analyzer.setDefaultConfig();
-        }
-        //cout << "sending reply" << endl;
+
         sendRuleDefinitions( a_msg->getSourceName(), a_msg->m_correlation_id );
     }
 }
@@ -97,10 +92,10 @@ ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &
 // IStreamListener Interface
 
 void
-ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number )
+ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
 {
     //cout << "runStatus: " << a_recording << " (" << a_run_number << ")" << endl;
-    ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number );
+    ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
     m_combus.sendMessage( msg );
 }
 
@@ -160,6 +155,15 @@ ComBusRouter::pvDefined( const std::string &a_name )
 }
 
 void
+ComBusRouter::pvUndefined( const std::string &a_name )
+{
+    (void)a_name;
+
+    // TODO - Maybe eventually support a subscriber API for PVs?
+    // Don't want to spam the system
+}
+
+void
 ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
 {
     (void)a_name;
@@ -182,15 +186,11 @@ ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus
 void
 ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
-    //cout << "connectionStatus:." << a_connected << endl;
-
     ComBus::DASMON::ConnectionStatusMessage msg( a_connected, a_host, a_port );
     m_combus.sendMessage( msg );
 
     if ( a_connected && !m_sms_connected )
     {
-        //cout << "RESEND b/c SMS CONNECTED" << endl;
-
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
     }
@@ -228,10 +228,15 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 {
     if ( a_connected && !m_combus_connected )
     {
-        //cout << "RESEND b/c COMBUS CONNECTED!!!" << endl;
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
+        syslog( LOG_NOTICE, "ComBus connection active." );
     }
+    else if ( !a_connected && m_combus_connected )
+    {
+        syslog( LOG_ERR, "ComBus connection lost." );
+    }
+
     m_combus_connected = a_connected;
 }
 

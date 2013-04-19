@@ -2,6 +2,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
+#include <syslog.h>
 
 #include "ADARA.h"
 #include "ComBus.h"
@@ -69,7 +70,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     }
     catch ( std::exception &e )
     {
-        cout << e.what() << endl;
+        syslog( LOG_ERR, "Exception loading rule configuration file: %s", e.what());
     }
 }
 
@@ -177,7 +178,7 @@ StreamAnalyzer::saveConfig()
 
     if ( !outf.is_open())
     {
-        cout << "Could not open configuration file: " << cfg << endl;
+        syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
         return;
     }
 
@@ -228,7 +229,7 @@ StreamAnalyzer::restoreDefaultConfig()
     }
     catch ( ... )
     {
-        cout << "failed." << endl;
+        syslog( LOG_ERR, "Could not restore default rule configuration file." );
     }
 }
 
@@ -250,7 +251,7 @@ StreamAnalyzer::setDefaultConfig()
     }
     catch ( ... )
     {
-        cout << "failed." << endl;
+        syslog( LOG_ERR, "Could not set default rule configuration file." );
     }
 }
 
@@ -367,7 +368,6 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     catch ( ... )
     {
         // Rule failed to parse, abort
-        cout << "Bad rules" << endl;
         return false;
     }
 
@@ -401,10 +401,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
             // If unassociated signal found, abort (probably a mistake)
             if ( i == BIF_COUNT )
-            {
-                cout << "Signal reference missing fact: " << sig->name << " (" << sig->fact << ")" << endl;
                 return false;
-            }
         }
     }
 
@@ -592,8 +589,10 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
 
 
 void
-StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number )
+StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
 {
+    (void)a_timestamp;  // Don't use timestamp
+
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     if ( a_recording )
@@ -733,10 +732,7 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     m_engine->retractPrefix( "MONITOR_" );
 
     for ( map<uint32_t,double>::const_iterator im = a_metrics.m_monitor_count_rate.begin(); im != a_metrics.m_monitor_count_rate.end(); ++im )
-    {
-        //cout << "MONITOR_" << im->first << ": " << im->second << endl;
         m_engine->assert( string("MONITOR_") + boost::lexical_cast<std::string>(im->first), im->second );
-    }
 
     m_engine->assert( m_fact[BIF_PULSE_CHARGE], a_metrics.m_pulse_charge );
     m_engine->assert( m_fact[BIF_PULSE_FREQ], a_metrics.m_pulse_freq );
@@ -766,14 +762,28 @@ StreamAnalyzer::pvDefined( const std::string &a_name )
 
 
 void
+StreamAnalyzer::pvUndefined( const std::string &a_name )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_name );
+
+    m_engine->retract( m_pv_prefix + pv_name );
+    processPvStatus( pv_name, VariableStatus::OK, true ); // Needed to clean-up PV errors & limits
+}
+
+
+void
 StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    m_engine->assert( m_pv_prefix + pv_name, a_value );
+    if ( a_status == VariableStatus::NO_COMMUNICATION )
+        m_engine->retract( m_pv_prefix + pv_name );
+    else
+        m_engine->assert( m_pv_prefix + pv_name, a_value );
 
-    processPvStatus( pv_name, a_status );
+    processPvStatus( pv_name, a_status, false );
 }
 
 
@@ -783,16 +793,19 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStat
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    m_engine->assert( m_pv_prefix + pv_name, a_value );
+    if ( a_status == VariableStatus::NO_COMMUNICATION )
+        m_engine->retract( m_pv_prefix + pv_name );
+    else
+        m_engine->assert( m_pv_prefix + pv_name, a_value );
 
-    processPvStatus( pv_name, a_status );
+    processPvStatus( pv_name, a_status, false );
 }
 
 
 void
-StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_status )
+StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_status, bool a_retracted )
 {
-    if ( a_status != VariableStatus::OK )
+    if ( !a_retracted && a_status != VariableStatus::OK )
     {
         //cout << "Analyzer: " << pv_name << " ERROR" << endl;
 
@@ -857,7 +870,12 @@ StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, u
     if ( a_connected )
         m_engine->assert( m_fact[BIF_SMS_CONNECTED] );
     else
-        m_engine->retract( m_fact[BIF_SMS_CONNECTED] );
+    {
+        m_engine->beginBatch();
+        m_engine->retractAllFacts();
+        m_engine->endBatch();
+        //m_engine->retract( m_fact[BIF_SMS_CONNECTED] );
+    }
 }
 
 // IFactListener Interface

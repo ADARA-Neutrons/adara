@@ -162,6 +162,7 @@ private:
     Tristate                        m_sms_state;
     bool                            m_recording;
     unsigned long                   m_run_number;
+    unsigned long                   m_prev_run_number;
     bool                            m_paused;
     bool                            m_scanning;
     unsigned long                   m_scan_index;

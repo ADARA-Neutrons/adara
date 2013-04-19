@@ -47,25 +47,6 @@ protected:
         a_prop_tree.put( "nexus_file", m_nexus_file );
         a_prop_tree.put( "adara_file", m_adara_file );
     }
-
-    /*
-    virtual void        translateTo( cms::Message &a_msg )
-                        {
-                            MessageBase::translateTo( a_msg );
-                            a_msg.setStringProperty( "beamname", m_beam_sname );
-                            a_msg.setIntProperty( "runnum", m_run_num );
-                            a_msg.setStringProperty( "nexusfile", m_nexus_file );
-                            a_msg.setStringProperty( "adarafile", m_adara_file );
-                        }
-
-    void                translateFrom( const cms::Message &a_msg )
-                        {
-                            m_beam_sname = a_msg.getStringProperty( "beamname" );
-                            m_run_num = a_msg.getIntProperty( "runnum" );
-                            m_nexus_file  = a_msg.getStringProperty( "nexusfile" );
-                            m_adara_file = a_msg.getStringProperty( "adarafile" );
-                        }
-    */
 };
 
 }}}

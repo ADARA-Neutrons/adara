@@ -37,26 +37,30 @@ protected:
 
         m_rules.clear();
         RuleEngine::RuleInfo rule;
-        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("rules"))
-        {
-            rule.fact = v.second.get( "fact", "" );
-            rule.expr = v.second.get( "expr", "" );
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("rules"))
+            {
+                rule.fact = v.second.get( "fact", "" );
+                rule.expr = v.second.get( "expr", "" );
 
-            m_rules.push_back( rule );
-        }
+                m_rules.push_back( rule );
+            }
+        } catch(...) {}
 
         m_signals.clear();
         ADARA::DASMON::SignalInfo signal;
-        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("signals"))
-        {
-            signal.name = v.second.get( "name", "" );
-            signal.fact = v.second.get( "fact", "" );
-            signal.source = v.second.get( "source", "" );
-            signal.level = (Level)v.second.get( "level", 0 );
-            signal.msg = v.second.get( "message", "" );
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("signals"))
+            {
+                signal.name = v.second.get( "name", "" );
+                signal.fact = v.second.get( "fact", "" );
+                signal.source = v.second.get( "source", "" );
+                signal.level = (Level)v.second.get( "level", 0 );
+                signal.msg = v.second.get( "message", "" );
 
-            m_signals.push_back( signal );
-        }
+                m_signals.push_back( signal );
+            }
+        } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -134,9 +138,10 @@ protected:
         ControlMessage::read( a_prop_tree );
 
         m_facts.clear();
-
-        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("facts"))
-            m_facts[v.first] = v.second.get( "desc", "" );
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("facts"))
+                m_facts[v.first] = v.second.get( "desc", "" );
+        } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -232,13 +237,14 @@ public:
     RunStatusMessage()
     {}
 
-    RunStatusMessage( bool a_recording, unsigned long a_run_number )
-        : m_recording(a_recording), m_run_number(a_run_number) {}
+    RunStatusMessage( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
+        : m_recording(a_recording), m_run_number(a_run_number), m_timestamp(a_timestamp) {}
 
     inline MessageType  getMessageType() const { return MSG_DASMON_RUN_STATUS; }
 
     bool                m_recording;
     unsigned long       m_run_number;
+    unsigned long       m_timestamp;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -247,6 +253,7 @@ protected:
 
         m_recording = a_prop_tree.get( "recording", false );
         m_run_number = a_prop_tree.get( "run_number", 0 );
+        m_timestamp = a_prop_tree.get( "timestamp", 0 );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -255,6 +262,7 @@ protected:
 
         a_prop_tree.put( "recording", m_recording );
         a_prop_tree.put( "run_number", m_run_number );
+        a_prop_tree.put( "timestamp", m_timestamp );
     }
 };
 
@@ -385,13 +393,15 @@ protected:
         m_user_info.clear();
         ADARA::DASMON::UserInfo info;
 
-        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("users"))
-        {
-            info.m_id = v.second.get( "id", "" );
-            info.m_name = v.second.get( "name", "" );
-            info.m_role = v.second.get( "role", "" );
-            m_user_info.push_back( info );
-        }
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("users"))
+            {
+                info.m_id = v.second.get( "id", "" );
+                info.m_name = v.second.get( "name", "" );
+                info.m_role = v.second.get( "role", "" );
+                m_user_info.push_back( info );
+            }
+        } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -447,12 +457,14 @@ protected:
         uint32_t id;
         double counts;
 
-        BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("monitors"))
-        {
-            id = v.second.get( "id", 0 );
-            counts = v.second.get( "counts", 0.0 );
-            m_monitor_count_rate[id] = counts;
-        }
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("monitors"))
+            {
+                id = v.second.get( "id", 0 );
+                counts = v.second.get( "counts", 0.0 );
+                m_monitor_count_rate[id] = counts;
+            }
+        } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )

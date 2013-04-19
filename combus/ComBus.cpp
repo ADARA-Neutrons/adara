@@ -45,6 +45,7 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 {
     const cms::TextMessage *txtmsg = dynamic_cast<const cms::TextMessage*>(a_msg);
 
+
     // ALL ComBus messages are TextMessages - ignore if not
     if ( !txtmsg )
         return;
@@ -53,31 +54,26 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
     {
         MessageBase *msg = Connection::makeMessage( *txtmsg );
 
-        // Filter-out messages this process sent on topics that it is also listening to
-        //if ( !m_handler && msg->m_src_name != m_proc_name ) //&& msg->m_src_inst != m_inst_num )
+        if ( m_listener )
         {
-            if ( m_listener )
+            m_listener->comBusMessage( *msg );
+        }
+        else
+        {
+            if ( msg->getMessageCategory() == CAT_CONTROL)
             {
-                m_listener->comBusMessage( *msg );
-            }
-            else
-            {
-                if ( msg->getMessageCategory() == CAT_CONTROL)
-                {
-                    ControlMessage *control = dynamic_cast<ControlMessage*>(msg);
+                ControlMessage *control = dynamic_cast<ControlMessage*>(msg);
 
-                    // Filter out Control messages sent to other instances
-                    //if ( control && control->m_dest_inst == m_inst_num )
-                        m_handler->comBusControlMessage( *control );
-                }
+                // Filter out Control messages sent to other instances
+                //if ( control && control->m_dest_inst == m_inst_num )
+                    m_handler->comBusControlMessage( *control );
             }
         }
 
         delete msg;
     }
     catch(...)
-    {
-    }
+    {} // TODO - Should probably report exceptions somewhere
 }
 
 
@@ -301,12 +297,12 @@ Connection::reconnectThread()
                 il->second->connect_all();
             }
 
-            // Notify connection status thread
-            m_status_cond.notify_one();
-
             // Reconnect control listener, if specified
             if ( m_ctrl_listener )
                 m_ctrl_translator->connect_all();
+
+            // Notify connection status thread
+            m_status_cond.notify_one();
 
             // Connected! (Retain lock)
             break;
@@ -474,12 +470,12 @@ Connection::sendMessage( MessageBase &a_msg )
                 p.first = m_session->createTopic( string("ADARA.") + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
                 m_producer_topics[topic] = p;
-                //cout << "send: ADARA." << topic << "." << m_proc_name  << ", ty: " << a_msg.getMessageType() << endl;
+                //cout << "send: ADARA." << topic << "." << m_proc_name  << ", ty: " << hex << a_msg.getMessageType() << endl;
                 p.second->send( cmsmsg );
             }
             else
             {
-                //cout << "--> send: ADARA." << topic << "." << m_proc_name << ", ty: " << a_msg.getMessageType() << endl;
+                //cout << "--> send: ADARA." << topic << "." << m_proc_name << ", ty: " << hex << a_msg.getMessageType() << endl;
                 itop->second.second->send( cmsmsg );
             }
 

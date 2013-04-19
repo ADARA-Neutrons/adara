@@ -29,7 +29,7 @@ class IStreamListener
 {
 public:
     virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
-    virtual void runStatus( bool a_recording, unsigned long a_run_number ) = 0;
+    virtual void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp ) = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
     virtual void scanStatus( bool a_scanning, unsigned long a_scan_number ) = 0;
     virtual void beamInfo( const BeamInfo &a_info ) = 0;
@@ -37,6 +37,7 @@ public:
     virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
+    virtual void pvUndefined( const std::string &a_name ) = 0;
     virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status ) = 0;
     virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status ) = 0;
 };
@@ -197,7 +198,7 @@ private:
         void addListener( IStreamListener &a_listener );
         void removeListener( IStreamListener &a_listener );
 
-        void runStatus( bool a_recording, unsigned long a_run_number  );
+        void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp  );
         void pauseStatus( bool a_paused );
         void scanStatus( bool a_scanning, unsigned long a_scan_number );
         void beamInfo( const BeamInfo &a_info );
@@ -205,6 +206,7 @@ private:
         void beamMetrics( const BeamMetrics &a_metrics );
         void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
+        void pvUndefined( const std::string &a_name );
         void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
         void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
@@ -257,9 +259,9 @@ private:
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
     std::map<uint32_t,uint64_t>     m_mon_last_pulse;
-    //std::set<uint32_t>              m_active_monitors;
     bool                            m_recording;
     unsigned long                   m_run_num;
+    unsigned long                   m_run_timestamp;
     bool                            m_paused;
     short                           m_info_rcv;
     BeamInfo                        m_beam_info;
