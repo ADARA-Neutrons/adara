@@ -493,6 +493,7 @@ static void parse_options(int argc, char **argv)
 	desc.add_options()
 		("help,h", "Show usage information")
 		("hz,r", po::value<double>(), "Pulse generation rate")
+		("port,p", po::value<uint16_t>(), "Listening port")
 		("events,e", po::value<unsigned int>(&events_per_pulse),
 				"Events per pulse")
 		("source,s", po::value< std::vector<uint32_t> >(&source_ids),
@@ -544,6 +545,9 @@ static void parse_options(int argc, char **argv)
 
 		pulse_interval = 1.0 / hz;
 	}
+
+	if (vm.count("port"))
+		listen_port = vm["port"].as<uint16_t>();
 
 	if (min_tof >= max_tof) {
 		std::cerr << argv[0] << ": mintof must be less than maxtof"

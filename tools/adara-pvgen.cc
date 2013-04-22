@@ -354,6 +354,7 @@ static void parse_options(int argc, char **argv)
 	desc.add_options()
 		("help,h", "Show usage information")
 		("hz,r", po::value<double>(), "Pulse generation rate")
+		("port,p", po::value<uint16_t>(), "Listening port")
 		("verbose,v", po::bool_switch(), "Add verbose output");
 
 	po::variables_map vm;
@@ -386,6 +387,9 @@ static void parse_options(int argc, char **argv)
 
 		update_interval = 1.0 / hz;
 	}
+
+	if (vm.count("port"))
+		listen_port = vm["port"].as<uint16_t>();
 }
 
 static void block_signals(void)
