@@ -64,14 +64,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
 
-    try
-    {
-        loadConfig();
-    }
-    catch ( std::exception &e )
-    {
-        syslog( LOG_ERR, "Exception loading rule configuration file: %s", e.what());
-    }
+    loadConfig();
 }
 
 
@@ -104,67 +97,71 @@ StreamAnalyzer::loadConfig()
     int mode = 0;
 
     if ( !inf.is_open())
-        throw std::runtime_error( string("Could not open configuration file: ") + cfg );
-
-    try
     {
-        while( !inf.eof())
+        syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
+    }
+    else
+    {
+        try
         {
-            getline( inf, line );
-
-            if ( line.empty() || line[0] == '#' )
-                continue;
-            if ( line == "[rules]" )
-                mode = 1;
-            else if ( line == "[signals]" )
-                mode = 2;
-            else
+            while( !inf.eof())
             {
-                boost::tokenizer<boost::char_separator<char> > tokens( line, sep );
-                tok = tokens.begin();
+                getline( inf, line );
 
-                if ( mode == 1 )
+                if ( line.empty() || line[0] == '#' )
+                    continue;
+                if ( line == "[rules]" )
+                    mode = 1;
+                else if ( line == "[signals]" )
+                    mode = 2;
+                else
                 {
-                    if ( tok == tokens.end())
-                        throw -1;
-                    rule.fact = *tok++;
-                    if ( tok == tokens.end())
-                        throw -1;
-                    rule.expr = *tok;
-                    loaded_rules.push_back( rule );
-                }
-                else if ( mode == 2 )
-                {
-                    if ( tok == tokens.end())
-                        throw -1;
-                    signal.name = *tok++;
-                    if ( tok == tokens.end())
-                        throw -1;
-                    signal.fact = *tok++;
-                    if ( tok == tokens.end())
-                        throw -1;
-                    signal.source = *tok++;
-                    if ( tok == tokens.end())
-                        throw -1;
-                    signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
-                    if ( tok == tokens.end())
-                        throw -1;
-                    signal.msg = *tok++;
+                    boost::tokenizer<boost::char_separator<char> > tokens( line, sep );
+                    tok = tokens.begin();
 
-                    loaded_signals.push_back( signal );
+                    if ( mode == 1 )
+                    {
+                        if ( tok == tokens.end())
+                            throw -1;
+                        rule.fact = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+                        rule.expr = *tok;
+                        loaded_rules.push_back( rule );
+                    }
+                    else if ( mode == 2 )
+                    {
+                        if ( tok == tokens.end())
+                            throw -1;
+                        signal.name = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+                        signal.fact = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+                        signal.source = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+                        signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
+                        if ( tok == tokens.end())
+                            throw -1;
+                        signal.msg = *tok++;
+
+                        loaded_signals.push_back( signal );
+                    }
                 }
             }
+
+            inf.close();
+
+            // Push rules and signals into engine
+            setDefinitions( loaded_rules, loaded_signals );
         }
-
-        inf.close();
-
-        // Push rules and signals into engine
-        setDefinitions( loaded_rules, loaded_signals );
-    }
-    catch ( ... )
-    {
-        inf.close();
-        throw std::runtime_error( string("Failed loading configuration file: ") + cfg );
+        catch ( ... )
+        {
+            inf.close();
+            syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+        }
     }
 }
 
@@ -276,6 +273,8 @@ StreamAnalyzer::detach( ISignalListener &a_listener )
 }
 
 
+#if 0
+
 void
 StreamAnalyzer::defineSignal( const std::string &a_expression )
 {
@@ -323,6 +322,7 @@ StreamAnalyzer::defineSignal( const std::string &a_expression )
 
     m_signals[info.fact] = info;
 }
+#endif
 
 void
 StreamAnalyzer::resendState()

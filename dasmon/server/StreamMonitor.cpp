@@ -234,10 +234,11 @@ StreamMonitor::processThread()
                 if ( m_fd_in < 0 )
                 {
                     // Not connected - attempt connection periodically
-                    sleep(5);
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
                         m_notify.connectionStatus( true, m_sms_host, m_sms_port );
+                    else
+                        sleep(5);
                 }
                 else
                 {
@@ -254,6 +255,7 @@ StreamMonitor::processThread()
                             syslog( LOG_ERR, "recv() returned error code %i. Dropping connection.", errno );
                             // Connection lost
                             handleLostConnection();
+                            // May have lost connection - dont wait for reconnect attempt
                             continue;
                         }
                     }
@@ -261,7 +263,7 @@ StreamMonitor::processThread()
                     if ( !read( m_fd_in, ADARA_IN_BUF_SIZE ))
                     {
                         syslog( LOG_WARNING, "ADARA::Parser::read() returned 0. Dropping connection." );
-                        // Connection lost
+                        // Connection lost due to source closing socket
                         handleLostConnection();
                     }
                     else
@@ -274,15 +276,23 @@ StreamMonitor::processThread()
         }
         catch( std::exception &e )
         {
+            // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): std::exception caught. Dropping connection. Exception = %s", e.what() );
             // Connection lost
             handleLostConnection();
+            // This is probably a misbehaving data source, wait a bit before retrying
+            // (This will rate limit syslog spamming somewhat)
+            sleep(10);
         }
         catch(...)
         {
+            // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): Unknown exception type caught. Dropping connection." );
             // Connection lost
             handleLostConnection();
+            // This is probably a misbehaving data source, wait a bit before retrying
+            // (This will rate limit syslog spamming somewhat)
+            sleep(10);
         }
     }
 

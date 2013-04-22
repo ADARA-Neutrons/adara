@@ -996,7 +996,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             {
                 m_recording = msg.m_recording;
                 m_run_number = msg.m_run_number;
-                m_start_time = QDateTime::fromMSecsSinceEpoch( ((qint64)(msg.m_timestamp))*1000 );
+                m_start_time = QDateTime::fromTime_t( msg.m_timestamp );
                 updateRunStatusIndicator();
 
                 clearRunDisplay();

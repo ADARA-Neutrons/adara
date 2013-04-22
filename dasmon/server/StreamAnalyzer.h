@@ -37,7 +37,7 @@ public:
     void    setDefaultConfig();
     void    attach( ISignalListener &a_listener );
     void    detach( ISignalListener &a_listener );
-    void    defineSignal( const std::string &a_expression );
+//    void    defineSignal( const std::string &a_expression );
     void    resendState();
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
