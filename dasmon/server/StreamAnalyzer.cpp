@@ -778,7 +778,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION )
+    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
         m_engine->retract( m_pv_prefix + pv_name );
     else
         m_engine->assert( m_pv_prefix + pv_name, a_value );
@@ -793,7 +793,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStat
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION )
+    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
         m_engine->retract( m_pv_prefix + pv_name );
     else
         m_engine->assert( m_pv_prefix + pv_name, a_value );

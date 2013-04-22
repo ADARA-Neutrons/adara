@@ -366,6 +366,9 @@ StreamMonitor::handleLostConnection()
     close( m_fd_in );
     m_fd_in = -1;
 
+    // Clear data from input ADARA buffer
+    reset();
+
     resetStreamStats();
     resetRunStats();
     clearPVs();
@@ -1012,7 +1015,8 @@ StreamMonitor::pvValueUpdate
         return;
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
-    if ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
+    // Don't rate limit status changes
+    if (( a_timestamp.tv_sec - ipv->second->m_time >= 1 ) || ( ipv->second->m_status != a_status ))
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
         if ( pv && (( pv->m_value != a_value ) || ( pv->m_status != a_status )))
