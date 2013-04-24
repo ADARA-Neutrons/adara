@@ -16,7 +16,7 @@
 #include "DASMonDefs.h"
 #include "SubClient.h"
 
-#define DASMON_GUI_VERSION "1.0.0"
+#define DASMON_GUI_VERSION "1.0.1"
 
 namespace Ui {
 class MainWindow;

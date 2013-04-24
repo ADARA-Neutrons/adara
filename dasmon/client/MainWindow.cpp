@@ -414,11 +414,22 @@ MainWindow::onTableTimer()
     // Not a table, but use this timer callback to update duration field on mainwindow
     if ( m_sms_state.activeTrue() )
     {
-        uint t = QDateTime::currentDateTime().toTime_t() - m_start_time.toTime_t();
-        uint hour = t / 3600;
-        uint min = t / 60;
-        uint sec = t % 60;
-        ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
+        uint now = QDateTime::currentDateTime().toTime_t();
+        if (( now + 2 ) >= m_start_time.toTime_t() ) // Allow for 2 seconds of clock skew
+        {
+            uint t = 0;
+            if ( now > m_start_time.toTime_t() )
+                t = now - m_start_time.toTime_t();
+
+            uint hour = t / 3600;
+            uint min = (t % 3600) / 60;
+            uint sec = t % 60;
+            ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
+        }
+        else
+        {
+            ui->durationLabel->setText( "[clock skew]" );
+        }
     }
 
 #if 0
