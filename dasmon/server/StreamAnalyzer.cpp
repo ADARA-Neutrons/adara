@@ -595,33 +595,30 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number, unsigne
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    // For both starting and stopping a run, facts associated with PVs must be cleared
+    // as the SMS will re-broadcast only active PVs at these transitions. This allows
+    // stale PVs (from disconnected devices) to be cleared out.
+
+    vector<string> asserted;
+    m_engine->getAsserted( asserted );
+    for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
+    {
+        if ( boost::istarts_with( *fact, m_pv_prefix ) ||
+             boost::istarts_with( *fact, m_pv_lim_prefix ) ||
+             boost::istarts_with( *fact, m_pv_err_prefix ))
+        {
+            m_engine->retract( *fact );
+        }
+    }
+
+    // Reset PVS at each run start boundary
+    m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
+    m_error_pvs.clear();
+    m_engine->retract( m_fact[BIF_GENERAL_PV_LIMIT] );
+    m_limit_pvs.clear();
+
     if ( a_recording )
     {
-        //cout << "Analyzer Run Started" << endl;
-
-        // TODO Should the PV facts be reset at run stops too?
-
-        // All device descriptor packets will be received after a run start
-        // Must clear-out all currently asserted PVs to get rid of any that
-        // have been removed.
-        vector<string> asserted;
-        m_engine->getAsserted( asserted );
-        for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
-        {
-            if ( boost::istarts_with( *fact, m_pv_prefix ) ||
-                 boost::istarts_with( *fact, m_pv_lim_prefix ) ||
-                 boost::istarts_with( *fact, m_pv_err_prefix ))
-            {
-                m_engine->retract( *fact );
-            }
-        }
-
-        // Reset PVS at each run start boundary
-        m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
-        m_error_pvs.clear();
-        m_engine->retract( m_fact[BIF_GENERAL_PV_LIMIT] );
-        m_limit_pvs.clear();
-
         m_engine->assert( m_fact[BIF_RECORDING] );
         m_engine->assert( m_fact[BIF_RUN_NUMBER], a_run_number );
     }

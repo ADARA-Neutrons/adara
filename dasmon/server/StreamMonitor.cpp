@@ -538,7 +538,11 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_recording = true;
         m_run_num = a_pkt.runNumber();
         m_run_timestamp = a_pkt.timestamp().tv_sec;
+
         resetRunStats();
+
+        // Clear all PVs - SMS will send active after RunStatus packet
+        clearPVs();
 
         m_notify.runStatus( true, m_run_num, m_run_timestamp );
     }
@@ -549,7 +553,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_recording = false;
         m_run_num = 0;
         m_run_timestamp = a_pkt.timestamp().tv_sec;
+
         resetRunStats();
+
         m_notify.runStatus( false, 0, m_run_timestamp );
 
         // Make sure scan is stopped
@@ -559,6 +565,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
             m_scan_index = 0;
             m_notify.scanStatus( false, 0 );
         }
+
+        // Clear all PVs - SMS will send active after RunStatus packet
+        clearPVs();
     }
 
     return false;
@@ -1014,12 +1023,15 @@ StreamMonitor::pvValueUpdate
     if ( ipv == m_pvs.end() )
         return;
 
+    //if ( a_device_id < 100 )
+    //    cout << "PV " << a_device_id << "." << a_pv_id << " stat: " << hex << a_status << endl;
+
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
     // Don't rate limit status changes
     if (( a_timestamp.tv_sec - ipv->second->m_time >= 1 ) || ( ipv->second->m_status != a_status ))
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
-        if ( pv && (( pv->m_value != a_value ) || ( pv->m_status != a_status )))
+        if ( pv && (( pv->m_time == 0 ) || ( pv->m_value != a_value ) || ( pv->m_status != a_status )))
         {
             pv->m_value = a_value;
             pv->m_time = a_timestamp.tv_sec;
