@@ -67,6 +67,7 @@ private:
     bool                            m_resend_state;
     bool                            m_sms_connected;
     bool                            m_combus_connected;
+    bool                            m_recording;
     std::map<std::string,ComBus::DASMON::ProcessVariables::PVData> m_pvs;
     mutable boost::mutex            m_mutex;
 };

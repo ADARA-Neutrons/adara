@@ -13,7 +13,7 @@ namespace DASMON {
 
 ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
-      m_resend_state(false), m_sms_connected(false), m_combus_connected(false)
+      m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
 
 {
     m_monitor.addListener( *this );
@@ -109,19 +109,23 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 void
 ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
 {
-    //cout << "runStatus: " << a_recording << " (" << a_run_number << ")" << endl;
-    boost::unique_lock<boost::mutex> lock(m_mutex);
-    m_pvs.clear();
-    lock.unlock();
+    if ( a_recording != m_recording )
+    {
+        // On run state transitions, clear PVs
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+        m_pvs.clear();
+        lock.unlock();
+    }
 
     ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
     m_combus.sendMessage( msg );
+
+    m_recording = a_recording;
 }
 
 void
 ComBusRouter::pauseStatus( bool a_paused )
 {
-    //cout << "pauseStatus: " << a_paused << endl;
     ComBus::DASMON::PauseStatusMessage msg( a_paused );
     m_combus.sendMessage( msg );
 }
@@ -129,7 +133,6 @@ ComBusRouter::pauseStatus( bool a_paused )
 void
 ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
 {
-    //cout << "scanStatus: " << a_scanning << " (" << a_scan_number << ")" << endl;
     ComBus::DASMON::ScanStatusMessage msg( a_scanning, a_scan_number );
     m_combus.sendMessage( msg );
 }
@@ -137,7 +140,6 @@ ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
 void
 ComBusRouter::beamInfo( const BeamInfo &a_info )
 {
-    //cout << "beamInfo..." << endl;
     ComBus::DASMON::BeamInfoMessage msg( a_info );
     m_combus.sendMessage( msg );
 }
@@ -145,7 +147,6 @@ ComBusRouter::beamInfo( const BeamInfo &a_info )
 void
 ComBusRouter::runInfo( const RunInfo &a_info )
 {
-    //cout << "runInfo..." << endl;
     ComBus::DASMON::RunInfoMessage msg( a_info );
     m_combus.sendMessage( msg );
 }
@@ -217,7 +218,6 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 void
 ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
-    //cout << "signal assert:  " << a_signal.name << endl;
     ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
     m_combus.sendMessage( msg );
 }
@@ -226,7 +226,6 @@ ComBusRouter::signalAssert( const SignalInfo &a_signal )
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
-    //cout << "signal retract: " << a_name << endl;
     ComBus::SignalRetractMessage msg( a_name );
     m_combus.sendMessage( msg );
 }
@@ -261,8 +260,6 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 bool
 ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 {
-    //cout << "Got Command: " << hex << a_msg.getMessageType() << endl;
-
     try
     {
         switch( a_msg.getMessageType() )
@@ -294,7 +291,7 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_PVS:
-            syslog( LOG_INFO, "Received request for current PVs" );
+            //syslog( LOG_INFO, "Received request for current PVs" );
             sendPVs( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
