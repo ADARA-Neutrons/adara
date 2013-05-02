@@ -1055,7 +1055,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             const ADARA::ComBus::DASMON::ScanStatusMessage &msg = (const ADARA::ComBus::DASMON::ScanStatusMessage&)a_msg;
 
             if ( !m_scanning && msg.m_scaning )
-                writeLog( ADARA::INFO, string("Scan started. Scan index = ") + boost::lexical_cast<string>(m_scan_index) );
+                writeLog( ADARA::INFO, string("Scan started. Scan index = ") + boost::lexical_cast<string>(msg.m_scan_index) );
             else if ( m_scanning && !msg.m_scaning )
                 writeLog( ADARA::INFO, "Scanning stopped." );
 
