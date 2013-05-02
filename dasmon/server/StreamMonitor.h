@@ -38,8 +38,8 @@ public:
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvUndefined( const std::string &a_name ) = 0;
-    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status ) = 0;
-    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status ) = 0;
+    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -207,8 +207,8 @@ private:
         void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
         void pvUndefined( const std::string &a_name );
-        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
-        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
+        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     private:

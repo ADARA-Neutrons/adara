@@ -609,6 +609,8 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
     case MSG_DASMON_RESTORE_DEFAULT_RULES:  msg = new DASMON::RestoreDefaultRuleDefinitions(); break;
     case MSG_DASMON_GET_INPUT_FACTS:        msg = new DASMON::GetInputFacts(); break;
     case MSG_DASMON_INPUT_FACTS:            msg = new DASMON::InputFacts(); break;
+    case MSG_DASMON_GET_PVS:                msg = new DASMON::GetProcessVariables(); break;
+    case MSG_DASMON_PVS:                    msg = new DASMON::ProcessVariables(); break;
     default:
         throw std::runtime_error("Unknown message type");
     }

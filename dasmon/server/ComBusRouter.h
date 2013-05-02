@@ -3,8 +3,12 @@
 
 #include <string>
 #include "ComBus.h"
+#include "DASMonMessages.h"
 #include "StreamMonitor.h"
 #include "StreamAnalyzer.h"
+//#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/locks.hpp>
 
 namespace ADARA {
 namespace DASMON {
@@ -31,6 +35,7 @@ private:
     void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
     void    setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg );
     void    sendInputFacts( const std::string &a_src_proc, const std::string &a_CID );
+    void    sendPVs( const std::string &a_src_proc, const std::string &a_CID );
 
     // IStreamListener Interface
     void    runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp );
@@ -42,8 +47,8 @@ private:
     void    runMetrics( const RunMetrics &a_metrics );
     void    pvDefined( const std::string &a_name );
     void    pvUndefined( const std::string &a_name );
-    void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
-    void    pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
+    void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+    void    pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
     void    connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IStatusListener Interface
@@ -62,6 +67,8 @@ private:
     bool                            m_resend_state;
     bool                            m_sms_connected;
     bool                            m_combus_connected;
+    std::map<std::string,ComBus::DASMON::ProcessVariables::PVData> m_pvs;
+    mutable boost::mutex            m_mutex;
 };
 
 }}

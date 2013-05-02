@@ -16,6 +16,10 @@ using namespace std;
 namespace ADARA {
 namespace DASMON {
 
+#define RUN_BATCH_MASK      0x0001
+#define METRICS_BATCH_MASK  0x0002
+#define CONN_BATCH_MASK     0x0004
+
 /**
  * \brief StreamAnalyser constructor.
  * \param a_monitor - StreamMonitor that will feed this analyzer
@@ -26,7 +30,7 @@ namespace DASMON {
  */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
-      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir )
+      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0)
 {
     m_engine = new RuleEngine();
     m_monitor.addListener( *this );
@@ -65,6 +69,8 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
 
     loadConfig();
+
+    m_debounce_thread = new boost::thread( boost::bind( &StreamAnalyzer::debounceThread, this ));
 }
 
 
@@ -361,7 +367,6 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
         for ( r = a_rules.begin(); r != a_rules.end(); ++r )
         {
             tmp = r->fact + " " + r->expr;
-            //cout << "set rule: " << tmp << endl;
             engine->defineRule( tmp );
         }
     }
@@ -425,18 +430,14 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     m_engine->getAsserted( asserted_facts );
 
-    //cout << "old asserted signals: ";
-
     for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
     {
         iSig = m_signals.find( *iAF );
         if ( iSig != m_signals.end())
         {
             old_asserted_signals.push_back( iSig->second.name );
-            //cout << " " << iSig->second.name;
         }
     }
-    //cout << endl;
 
     // This call does NOT generate any assert/retract traffic
     engine->synchronize( *m_engine );
@@ -445,19 +446,14 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     engine->getAsserted( asserted_facts );
 
-    //cout << "new asserted signals: ";
-
     for ( iAF = asserted_facts.begin(); iAF != asserted_facts.end(); ++iAF )
     {
         iSig = tmp_signals.find( *iAF );
         if ( iSig != tmp_signals.end())
         {
             new_asserted_signals.push_back( iSig->second.name );
-            //cout << " " << iSig->second.name;
         }
     }
-
-    //cout << endl;
 
     // Retract any old signals that are no longer asserted
     for ( vector<string>::iterator iOld = old_asserted_signals.begin(); iOld != old_asserted_signals.end(); ++iOld )
@@ -584,6 +580,49 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
 }
 
 
+void
+StreamAnalyzer::debounceThread()
+{
+    while ( 1 )
+    {
+        sleep( 1 );
+
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+        if ( m_debounce_sec )
+        {
+            --m_debounce_sec;
+            if ( !m_debounce_sec )
+            {
+                endBatch( RUN_BATCH_MASK );
+            }
+        }
+    }
+}
+
+
+void
+StreamAnalyzer::beginBatch( unsigned long a_mask )
+{
+    if ( !m_batch_mask )
+        m_engine->beginBatch();
+
+    m_batch_mask |= a_mask;
+}
+
+
+void
+StreamAnalyzer::endBatch( unsigned long a_mask )
+{
+    if ( m_batch_mask )
+    {
+        m_batch_mask &= ~a_mask;
+
+        if ( !m_batch_mask )
+            m_engine->endBatch();
+    }
+}
+
+
 //////////////////////////////////////////////
 // IStreamListener
 
@@ -598,6 +637,14 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number, unsigne
     // For both starting and stopping a run, facts associated with PVs must be cleared
     // as the SMS will re-broadcast only active PVs at these transitions. This allows
     // stale PVs (from disconnected devices) to be cleared out.
+
+    // In order to "debounce" signals that may flicker when this happens, batch mode
+    // is initiated here, then ended a few seconds later by a timer. This way only
+    // more persistent signal changes will be emitted rather than the bounce
+    // caused by the clear and reassertion of facts.
+
+    beginBatch( RUN_BATCH_MASK );
+    m_debounce_sec = 3;
 
     vector<string> asserted;
     m_engine->getAsserted( asserted );
@@ -722,7 +769,7 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine->beginBatch();
+    beginBatch( METRICS_BATCH_MASK );
 
     m_engine->assert( m_fact[BIF_COUNT_RATE], a_metrics.m_count_rate );
 
@@ -735,7 +782,7 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_PULSE_FREQ], a_metrics.m_pulse_freq );
     m_engine->assert( m_fact[BIF_STREAM_RATE], a_metrics.m_stream_bps );
 
-    m_engine->endBatch();
+    endBatch( METRICS_BATCH_MASK );
 }
 
 
@@ -770,8 +817,10 @@ StreamAnalyzer::pvUndefined( const std::string &a_name )
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
+StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
+    (void)a_timestamp;
+
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
@@ -785,8 +834,10 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
+StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
+    (void)a_timestamp;
+
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
@@ -804,8 +855,6 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
 {
     if ( !a_retracted && a_status != VariableStatus::OK )
     {
-        //cout << "Analyzer: " << pv_name << " ERROR" << endl;
-
         // TODO Surely there is a better way to define PV status so code like the following can be avoided?
         if (( a_status >= VariableStatus::HIHI_LIMIT && a_status <= VariableStatus::LOW_LIMIT ) || a_status == VariableStatus::HARDWARE_LIMIT )
         {
@@ -863,15 +912,13 @@ StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, u
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    //cout << "Analyzer connected = " << a_connected << endl;
     if ( a_connected )
         m_engine->assert( m_fact[BIF_SMS_CONNECTED] );
     else
     {
-        m_engine->beginBatch();
+        beginBatch( CONN_BATCH_MASK );
         m_engine->retractAllFacts();
-        m_engine->endBatch();
-        //m_engine->retract( m_fact[BIF_SMS_CONNECTED] );
+        endBatch( CONN_BATCH_MASK );
     }
 }
 

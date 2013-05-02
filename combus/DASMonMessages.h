@@ -16,6 +16,7 @@ namespace DASMON {
 
 DEF_SIMPLE_CMD(GetRuleDefinitions,MSG_DASMON_GET_RULES)
 DEF_SIMPLE_CMD(RestoreDefaultRuleDefinitions,MSG_DASMON_RESTORE_DEFAULT_RULES)
+DEF_SIMPLE_CMD(GetProcessVariables,MSG_DASMON_GET_PVS)
 
 /// Message containing current rule & signal definitions
 class RuleDefinitions : public ControlMessage
@@ -156,6 +157,68 @@ protected:
         }
     }
 };
+
+
+/// Message containing current built-in facts
+class ProcessVariables : public ControlMessage
+{
+public:
+    ProcessVariables()
+    {}
+
+    inline MessageType getMessageType() const
+    { return MSG_DASMON_PVS; }
+
+    struct PVData
+    {
+        PVData()
+            : value(0.0), status(0), timestamp(0)
+        {}
+
+        PVData( double a_value, int a_status, unsigned long a_timestamp )
+            : value(a_value), status(a_status), timestamp(a_timestamp)
+        {}
+
+        double          value;
+        int             status;
+        unsigned long   timestamp;
+    };
+
+    std::map<std::string,PVData> m_pvs;
+
+protected:
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::read( a_prop_tree );
+        PVData data;
+        m_pvs.clear();
+        try {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("pvs"))
+            {
+                data.status = v.second.get( "status", 0 );
+                data.value = v.second.get( "value", 0.0 );
+                data.timestamp = v.second.get( "timestamp", 0 );
+                m_pvs[v.first] = data;
+            }
+        } catch(...) {}
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        ControlMessage::write( a_prop_tree );
+
+        for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+        {
+            boost::property_tree::ptree pt;
+            pt.put( "status", ipv->second.status );
+            pt.put( "value", ipv->second.value );
+            pt.put( "timestamp", ipv->second.timestamp );
+
+            a_prop_tree.add_child( std::string("pvs.") + ipv->first, pt );
+        }
+    }
+};
+
 
 #if 0
 class SubscribeProcessVariableCommand : public Command

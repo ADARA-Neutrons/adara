@@ -70,6 +70,8 @@ StreamMonitor::~StreamMonitor()
 void
 StreamMonitor::start()
 {
+    syslog( LOG_INFO, "Start processing request." );
+
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
     startProcessing();
@@ -82,6 +84,8 @@ StreamMonitor::start()
 void
 StreamMonitor::stop()
 {
+    syslog( LOG_INFO, "Stop processing request." );
+
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
     stopProcessing();
@@ -173,10 +177,9 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
 void
 StreamMonitor::startProcessing()
 {
+    // Note - not gaurded b/c called only from gaurded internal methods
     if ( !m_stream_thread )
     {
-        syslog( LOG_INFO, "Start processing request." );
-
         m_process_stream = true;
         resetRunStats();
         resetStreamStats();
@@ -194,10 +197,9 @@ StreamMonitor::startProcessing()
 void
 StreamMonitor::stopProcessing()
 {
+    // Note - not gaurded b/c called only from gaurded internal methods
     if ( m_stream_thread )
     {
-        syslog( LOG_INFO, "Stop processing request." );
-
         m_process_stream = false;
         m_stream_thread->join();
         m_metrics_thread->join();
@@ -371,6 +373,9 @@ StreamMonitor::handleLostConnection()
 
     resetStreamStats();
     resetRunStats();
+
+    // Lock here as clearPVs does not provide gaurded access
+    boost::lock_guard<boost::mutex> lock(m_mutex);
     clearPVs();
 }
 
@@ -541,10 +546,10 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         resetRunStats();
 
+        m_notify.runStatus( true, m_run_num, m_run_timestamp );
+
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
-
-        m_notify.runStatus( true, m_run_num, m_run_timestamp );
     }
     else if ( !recording && m_recording )
     {
@@ -721,12 +726,13 @@ bool
 StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 {
     xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
     if ( doc )
     {
         string tag;
         string value;
-
-        boost::lock_guard<boost::mutex> lock(m_mutex);
 
         try
         {
@@ -869,11 +875,7 @@ StreamMonitor::toPVType
 bool
 StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 {
-    //cout << "DDP: " << endl;
-
     const string &xml =  a_pkt.description();
-
-    //cout << xml << endl;
 
     xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
     if ( doc )
@@ -889,18 +891,10 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         {
             xmlNode *root = xmlDocGetRootElement( doc );
 
-            //cout << "DDP: ";
-
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
             {
-                //if ( xmlStrcmp( lev1->name, (const xmlChar*)"device_name" ) == 0)
-                //{
-                //    getXmlNodeValue( lev1, value );
-                //    cout << value << endl;
-                //}
-
                 if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
                 {
                     xmlNode *pvnode;
@@ -1037,7 +1031,7 @@ StreamMonitor::pvValueUpdate
             pv->m_time = a_timestamp.tv_sec;
             pv->m_status = a_status;
             pv->m_updated = true;
-            m_notify.pvValue( pv->m_name, a_value, a_status );
+            m_notify.pvValue( pv->m_name, a_value, a_status, pv->m_time );
         }
     }
 }
@@ -1323,6 +1317,7 @@ StreamMonitor::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
 void
 StreamMonitor::Notifier::addListener( IStreamListener &a_listener )
 {
+    //TODO These calls are not thread safe, but not a problame based on current usage
     if ( find( m_listeners.begin(), m_listeners.end(), &a_listener ) == m_listeners.end())
         m_listeners.push_back( &a_listener );
 }
@@ -1330,6 +1325,7 @@ StreamMonitor::Notifier::addListener( IStreamListener &a_listener )
 void
 StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 {
+    //TODO These calls are not thread safe, but not a problame based on current usage
     vector<IStreamListener*>::iterator l = find( m_listeners.begin(), m_listeners.end(), &a_listener );
     if ( l != m_listeners.end())
         m_listeners.erase(l);
@@ -1400,17 +1396,17 @@ StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->pvValue( a_name, a_value, a_status );
+        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
-        (*l)->pvValue( a_name, a_value, a_status );
+        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void

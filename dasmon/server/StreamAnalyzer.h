@@ -66,14 +66,6 @@ private:
         BIF_SAMPLE_ENV,
         BIF_USER_INFO,
         BIF_COUNT_RATE,
-        //BIF_MON1_COUNT_RATE,
-        //BIF_MON2_COUNT_RATE,
-        //BIF_MON3_COUNT_RATE,
-        //BIF_MON4_COUNT_RATE,
-        //BIF_MON5_COUNT_RATE,
-        //BIF_MON6_COUNT_RATE,
-        //BIF_MON7_COUNT_RATE,
-        //BIF_MON8_COUNT_RATE,
         BIF_PULSE_CHARGE,
         BIF_PULSE_FREQ,
         BIF_STREAM_RATE,
@@ -97,8 +89,8 @@ private:
     void runMetrics( const RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvUndefined( const std::string &a_name );
-    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status );
-    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status );
+    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
     void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface
@@ -106,6 +98,9 @@ private:
     void onRetract( const std::string &a_fact );
 
     void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
+    void debounceThread();
+    void beginBatch( unsigned long a_mask );
+    void endBatch( unsigned long a_mask );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;
     RuleEngine                         *m_engine;
@@ -123,6 +118,9 @@ private:
     std::set<std::string>               m_limit_pvs;
     RuleEngine::HFACT                   m_fact[BIF_COUNT];
     std::string                         m_fact_name[BIF_COUNT];
+    boost::thread                      *m_debounce_thread;
+    unsigned long                       m_debounce_sec;
+    unsigned long                       m_batch_mask;
 };
 
 }}

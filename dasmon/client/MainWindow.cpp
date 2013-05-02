@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 //#include "ConfigureSMSConnectionDlg.h"
@@ -10,9 +12,11 @@
 #include <QMutexLocker>
 //#include <log4cxx/logger.h>
 
+#include "ADARA.h"
 #include "AMQConfigDialog.h"
 #include "RuleConfigDialog.h"
 #include "DASMonMessages.h"
+#include "STSMessages.h"
 
 using namespace std;
 
@@ -27,7 +31,7 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
-    m_refresh_log_table(false), m_refresh_monitor_table(false),
+    m_refresh_log_table(false), m_refresh_monitor_table(false), m_refresh_pv_table(false),
     m_recording(false), m_run_number(0), m_prev_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0),
@@ -47,6 +51,14 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     m_broker_pass = settings.value( "password" ).toString().toStdString();
     settings.endGroup();
 
+    m_style_unlit = "QLabel { background: grey }";
+    m_style_info = "QLabel { background: rgb(150,150,255) }";
+    m_style_good = "QLabel { background: rgb(100,255,100) }";
+    m_style_warn = "QLabel { background: rgb(255,255,100) }";;
+    m_style_error = "QLabel { background: rgb(255,160,70) }";;
+    m_style_fatal = "QLabel { color: white; background: rgb(255,0,0) }";;
+    m_style_disabled = "QLabel { background: gray; color: rgb(160,160,160)  }";
+
     m_combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(), m_broker_uri, m_broker_user, m_broker_pass );
 
     updateComBusStatusIndicator();
@@ -56,7 +68,6 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     updatePauseStatusIndicator();
     updateScanStatusIndicator();
     updateSignalStatusIndicator();
-
 
     // This code is required due to a bug in Qt designer
     QStringList headers;
@@ -73,6 +84,11 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     headers << "Process" << "Status";
     ui->procStatusTable->setHorizontalHeaderLabels( headers );
     ui->procStatusTable->horizontalHeader()->show();
+
+    headers.clear();
+    headers << "PV" << "Value" << "Status" << "Timestamp";
+    ui->pvTable->setHorizontalHeaderLabels( headers );
+    ui->pvTable->horizontalHeader()->show();
 
     QPalette pal = this->palette();
     m_default_bg_color = pal.color( QPalette::Base );
@@ -104,13 +120,10 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     connect( &m_table_timer, SIGNAL(timeout()), this, SLOT(onTableTimer()));
     m_table_timer.start(1000);
 
-    emit kioskMode( m_kiosk );
+    connect( &m_pv_timer, SIGNAL(timeout()), this, SLOT(onPvTimer()));
+    m_pv_timer.start(5000);
 
-    //if ( m_kiosk )
-    //{
-    //    ui->exitButton->hide();
-    //    ui->actionActiveMQ->setDisabled( true );
-    //}
+    emit kioskMode( m_kiosk );
 }
 
 
@@ -136,8 +149,6 @@ MainWindow::attach( SubClient &a_sub_client )
         a_sub_client.dasmonStatus( m_dasmon_state.activeTrue() );
     }
 }
-
-
 
 
 void
@@ -268,6 +279,8 @@ MainWindow::onProcTimer()
             if ( p->first == "DASMON.0" )
                 kill_dasmon = true;
 
+            writeLog( ADARA::INFO, p->first + " is dead" );
+
             m_proc_status.erase( p++ );
             m_refresh_proc_table = true;
         }
@@ -279,6 +292,7 @@ MainWindow::onProcTimer()
                 p->second.label = "Unesponsive";
                 p->second.hl_count = PV_HIGHLIGH_DURATION;
                 m_refresh_proc_table = true;
+                writeLog( ADARA::INFO, p->first + " has become unresponsive" );
             }
             ++p;
         }
@@ -432,6 +446,25 @@ MainWindow::onTableTimer()
         }
     }
 
+    if ( m_refresh_pv_table )
+    {
+        if ( ui->pvTable->rowCount() != (int)m_pvs.size() )
+            ui->pvTable->setRowCount( m_pvs.size());
+
+        map<string,ADARA::ComBus::DASMON::ProcessVariables::PVData>::const_iterator ipv = m_pvs.begin();
+        int i = 0;
+        for ( ; ipv != m_pvs.end(); ++ipv, ++i )
+        {
+            ui->pvTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( ipv->first.c_str() )));
+            ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.value )));
+            ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
+            ui->pvTable->setItem( i, 3, new QTableWidgetItem( QDateTime::fromTime_t(ipv->second.timestamp).toString() ));
+        }
+
+        m_refresh_pv_table = false;
+    }
+
+
 #if 0
         m_monitor->getStatistics( m_stats );
         ui->statisticsTable->setRowCount( m_stats.size());
@@ -447,6 +480,15 @@ MainWindow::onTableTimer()
         }
 
 #endif
+}
+
+
+void
+MainWindow::onPvTimer()
+{
+    string id;
+    ADARA::ComBus::DASMON::GetProcessVariables cmd;
+    m_combus->sendControl( cmd, "DASMON.0", id );
 }
 
 
@@ -521,12 +563,12 @@ MainWindow::updateComBusStatusIndicator()
     if ( m_combus_state.value() )
     {
         text = "ComBus";
-        style = "QLabel { background: green }";
+        style = m_style_good;
     }
     else
     {
         text = "ComBus ?";
-        style = "QLabel { background: red }";
+        style = m_style_fatal;
     }
 
     QMetaObject::invokeMethod( ui->combusStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
@@ -543,16 +585,16 @@ MainWindow::updateDASMonStatusIndicator()
     if ( m_dasmon_state.value() )
     {
         text = "DASMON";
-        style = "QLabel { background: green }";
+        style = m_style_good;
     }
     else
     {
         text = "DASMON ?";
-        style = "QLabel { background: red }";
+        style = m_style_fatal;
     }
 
     if ( !m_combus_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->dasmonStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
     QMetaObject::invokeMethod( ui->dasmonStatusLabel, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString,style));
@@ -567,16 +609,16 @@ MainWindow::updateSMSConnStatusIndicator()
     if ( m_sms_state.value() )
     {
         text = "SMS";
-        style = "QLabel { background: green }";
+        style = m_style_good;
     }
     else
     {
         text = "SMS ?";
-        style = "QLabel { background: red }";
+        style = m_style_fatal;
     }
 
     if ( !m_dasmon_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->smsStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
     QMetaObject::invokeMethod( ui->smsStatusLabel, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString,style));
@@ -592,14 +634,14 @@ MainWindow::updateRunStatusIndicator()
     if( m_recording )
     {
         text = "Recording";
-        style = "QLabel { background: green }";
+        style = m_style_good;
 
         QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_run_number)));
     }
     else
     {
         text = "Idle";
-        style = "QLabel { background: grey }";
+        style = m_style_unlit;
 
         if ( m_prev_run_number > 0 )
             QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("(prev: %1)").arg(m_prev_run_number)));
@@ -608,7 +650,7 @@ MainWindow::updateRunStatusIndicator()
     }
 
     if ( !m_sms_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->runStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
 
@@ -625,16 +667,16 @@ MainWindow::updatePauseStatusIndicator()
     if ( m_paused )
     {
         text = "Paused";
-        style = "QLabel { background: orange }";
+        style = m_style_warn;
     }
     else
     {
         text = "------";
-        style = "QLabel { background: grey }";
+        style = m_style_unlit;
     }
 
     if ( !m_sms_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->pauseStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
     QMetaObject::invokeMethod( ui->pauseStatusLabel, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString,style));
@@ -651,20 +693,20 @@ MainWindow::updateScanStatusIndicator()
     if ( m_scanning )
     {
         text = "Scanning";
-        style = "QLabel { background: cyan }";
+        style = m_style_good;
 
         QMetaObject::invokeMethod( ui->scanNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_scan_index)));
     }
     else
     {
         text = "No Scan";
-        style = "QLabel { background: grey }";
+        style = m_style_unlit;
 
         QMetaObject::invokeMethod( ui->scanNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
 
     if ( !m_sms_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->scanStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
     QMetaObject::invokeMethod( ui->scanStatusLabel, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString,style));
@@ -683,35 +725,35 @@ MainWindow::updateSignalStatusIndicator()
         {
         case ADARA::FATAL:
             text = "Fatal";
-            style = "QLabel { background: red }";
+            style = m_style_fatal;
             break;
         case ADARA::ERROR:
             text = "Error";
-            style = "QLabel { background: orange }";
+            style = m_style_error;
             break;
         case ADARA::WARN:
             text = "Warning";
-            style = "QLabel { background: yellow }";
+            style = m_style_warn;
             break;
         case ADARA::INFO:
-            text = "Information";
-            style = "QLabel { background: cyan }";
+            text = "Info";
+            style = m_style_info;
             break;
         case ADARA::DEBUG:
         case ADARA::TRACE:
             text = "Debug";
-            style = "QLabel { background: green }";
+            style = m_style_unlit;
             break;
         }
     }
     else
     {
         text = "No Signals";
-        style = "QLabel { background: green }";
+        style = m_style_unlit;
     }
 
     if ( !m_dasmon_state.activeTrue() )
-        style = "QLabel { background: gray; color: rgb(160,160,160)  }";
+        style = m_style_disabled;
 
     QMetaObject::invokeMethod( ui->signalStatusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));
     QMetaObject::invokeMethod( ui->signalStatusLabel, "setStyleSheet", Qt::QueuedConnection, Q_ARG(QString,style));
@@ -923,7 +965,11 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         break;
 
     case ADARA::ComBus::MSG_STS_TRANS_COMPLETE:
-        // TODO - Put info in log window
+        {
+            // Leave this out until tested
+            //string txt = string("STS translation completed for run ") + boost::lexical_cast<string>( ((ADARA::ComBus::STS::TranslationCompleteMessage&)a_msg).m_run_num );
+            //writeLog( ADARA::INFO, txt );
+        }
         break;
 
     case ADARA::ComBus::MSG_SIGNAL_ASSERT:
@@ -933,14 +979,10 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             m_alerts[msg.m_sig_name] = AlertInfo( msg.m_sig_name, msg.m_sig_source, msg.m_sig_level,
                                                      msg.m_sig_message, PV_HIGHLIGH_DURATION );
 
-            if ( msg.m_sig_level  > m_highest_level || m_alerts.size() == 1 )
-            {
-                m_highest_level = msg.m_sig_level;
-                m_signalled = true;
-            }
-
-            updateSignalStatusIndicator();
+            updateHighestSignal();
             m_refresh_signal_table = true;
+
+            writeLog( ADARA::INFO, string("Signal Asserted: ") + msg.m_sig_name + " (" + msg.m_sig_message + ")");
         }
         break;
 
@@ -951,32 +993,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             map<string,AlertInfo>::iterator ia = m_alerts.find( msg.m_sig_name);
             if ( ia != m_alerts.end() )
             {
-                bool recalc = false;
-                if ( ia->second.level == m_highest_level )
-                    recalc = true;
-
                 m_alerts.erase( ia );
+
+                updateHighestSignal();
                 m_refresh_signal_table = true;
 
-                if ( recalc )
-                {
-                    if ( m_alerts.empty() )
-                    {
-                        m_signalled = false;
-                        updateSignalStatusIndicator();
-                    }
-                    else
-                    {
-                        m_highest_level = ADARA::TRACE;
-                        for ( ia = m_alerts.begin(); ia != m_alerts.end(); ++ia )
-                        {
-                            if ( ia->second.level > m_highest_level )
-                                m_highest_level = ia->second.level;
-                        }
-                        updateSignalStatusIndicator();
-                    }
-
-                }
+                writeLog( ADARA::INFO, string("Signal Retracted: ") + msg.m_sig_name );
             }
         }
         break;
@@ -1073,6 +1095,27 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 }
 
 
+void
+MainWindow::updateHighestSignal()
+{
+    if ( m_alerts.empty() )
+    {
+        m_signalled = false;
+    }
+    else
+    {
+        m_signalled = true;
+        m_highest_level = ADARA::TRACE;
+        for ( map<string,AlertInfo>::iterator ia = m_alerts.begin(); ia != m_alerts.end(); ++ia )
+        {
+            if ( ia->second.level > m_highest_level )
+                m_highest_level = ia->second.level;
+        }
+    }
+
+    updateSignalStatusIndicator();
+}
+
 ///////////////////////////////////////////////////////////
 // IControlListener methods
 
@@ -1103,7 +1146,12 @@ MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
     }
 
     // Process main thread commands here
-    // None yet...
+    if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_PVS )
+    {
+        m_pvs = ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
+        m_refresh_pv_table = true;
+        return true;
+    }
 
     return false;
 }
@@ -1162,3 +1210,19 @@ MainWindow::removeRoute( SubClient &a_sub_client, std::string &a_correlation_id 
         m_client_cids.erase( iRoute );
 }
 
+
+const char *
+MainWindow::getStatusText( int a_status )
+{
+    switch( a_status )
+    {
+    case ADARA::VariableStatus::OK: return "OK";
+    case ADARA::VariableStatus::HIHI_LIMIT: return "High-High";
+    case ADARA::VariableStatus::HIGH_LIMIT: return "High";
+    case ADARA::VariableStatus::LOLO_LIMIT: return "Low-Low";
+    case ADARA::VariableStatus::LOW_LIMIT: return "Low";
+    case ADARA::VariableStatus::NO_COMMUNICATION: return "Lost Comm";
+    case ADARA::VariableStatus::UPSTREAM_DISCONNECTED: return "Disconnected";
+    default: return "ERROR";
+    }
+}

@@ -12,7 +12,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "0.1.4"
+#define DASMON_VERSION "0.1.5"
 
 int main(int argc, char *argv[])
 {

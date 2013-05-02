@@ -88,6 +88,21 @@ ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &
     m_combus.sendControl( facts, a_src_proc, cid );
 }
 
+
+void
+ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
+{
+    string cid = a_CID;
+    ADARA::ComBus::DASMON::ProcessVariables pvs;
+
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    pvs.m_pvs = m_pvs;
+    lock.unlock();
+
+    m_combus.sendControl( pvs, a_src_proc, cid );
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IStreamListener Interface
 
@@ -95,6 +110,10 @@ void
 ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
 {
     //cout << "runStatus: " << a_recording << " (" << a_run_number << ")" << endl;
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    m_pvs.clear();
+    lock.unlock();
+
     ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
     m_combus.sendMessage( msg );
 }
@@ -164,23 +183,17 @@ ComBusRouter::pvUndefined( const std::string &a_name )
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status )
+ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
-    (void)a_name;
-    (void)a_value;
-    (void)a_status;
-    // TODO - Maybe eventually support a subscriber API for PVs?
-    // Don't want to spam the system
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( (double)a_value, a_status, a_timestamp );
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status )
+ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
 {
-    (void)a_name;
-    (void)a_value;
-    (void)a_status;
-    // TODO - Maybe eventually support a subscriber API for PVs?
-    // Don't want to spam the system
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );
 }
 
 void
@@ -255,37 +268,47 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
         switch( a_msg.getMessageType() )
         {
         case ADARA::ComBus::MSG_CMD_EMIT_STATE:
-            //cout << "Got: EMIT_STATE" << endl;
+            syslog( LOG_INFO, "Received request to emit state" );
             m_resend_state = true;
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_RULES:
-            //cout << "Got: GET_RULES" << endl;
+            syslog( LOG_INFO, "Received request for current rules" );
             sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
-            //cout << "Got: SET_RULES" << endl;
+            syslog( LOG_INFO, "Received request to set rules" );
             setRuleDefinitions( &a_msg );
             break;
 
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
-            //cout << "Got: RESTORE DEFAULT" << endl;
+            syslog( LOG_INFO, "Received request to restore default rules" );
             m_analyzer.restoreDefaultConfig();
             sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
-            //cout << "Got: GET FACTS" << endl;
+            syslog( LOG_INFO, "Received request for current facts" );
             sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
+            break;
+
+        case ADARA::ComBus::MSG_DASMON_GET_PVS:
+            syslog( LOG_INFO, "Received request for current PVs" );
+            sendPVs( a_msg.getSourceName(), a_msg.m_correlation_id );
             break;
 
         default:
             break;
         }
     }
+    catch ( exception &e )
+    {
+        syslog( LOG_ERR, "Exception while processing command: %s", e.what() );
+    }
     catch ( ... )
     {
+        syslog( LOG_ERR, "Unkown exception while processing command" );
     }
 
     return false;

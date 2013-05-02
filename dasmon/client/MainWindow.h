@@ -15,8 +15,9 @@
 #include "ComBus.h"
 #include "DASMonDefs.h"
 #include "SubClient.h"
+#include "DASMonMessages.h"
 
-#define DASMON_GUI_VERSION "1.0.1"
+#define DASMON_GUI_VERSION "1.0.2"
 
 namespace Ui {
 class MainWindow;
@@ -40,6 +41,7 @@ private slots:
 
     void onProcTimer();
     void onTableTimer();
+    void onPvTimer();
     void configActiveMQ();
     void configRules();
     void about();
@@ -127,6 +129,8 @@ private:
     void        setSMSActive( bool a_active );
 
     void        writeLog( ADARA::Level a_level, const std::string &a_msg );
+    void        updateHighestSignal();
+    const char *getStatusText( int a_status );
 
     // Methods to support SubClient command routing
     void        attach( SubClient &a_sub_client );
@@ -151,12 +155,21 @@ private:
     bool                            m_kiosk;
     QTimer                          m_table_timer;
     QTimer                          m_proc_timer;
+    QTimer                          m_pv_timer;
     std::map<uint32_t,double>       m_monitor_rate;
     std::map<std::string,ProcInfo>  m_proc_status;
     bool                            m_refresh_proc_table;
     bool                            m_refresh_signal_table;
     bool                            m_refresh_log_table;
     bool                            m_refresh_monitor_table;
+    bool                            m_refresh_pv_table;
+    QString                         m_style_unlit;
+    QString                         m_style_info;
+    QString                         m_style_good;
+    QString                         m_style_warn;
+    QString                         m_style_error;
+    QString                         m_style_fatal;
+    QString                         m_style_disabled;
     Tristate                        m_combus_state;
     Tristate                        m_dasmon_state;
     Tristate                        m_sms_state;
@@ -183,6 +196,7 @@ private:
     std::string                     m_broker_pass;
     std::vector<SubClient*>         m_sub_clients;
     std::map<std::string,SubClient*>    m_client_cids;
+    std::map<std::string,ADARA::ComBus::DASMON::ProcessVariables::PVData> m_pvs;
 
     friend class SubClient;
 };
