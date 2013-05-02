@@ -1149,7 +1149,6 @@ MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
     if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_PVS )
     {
         m_pvs = ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
-        cout << "PV size: " << m_pvs.size() << endl;
         m_refresh_pv_table = true;
         return true;
     }
