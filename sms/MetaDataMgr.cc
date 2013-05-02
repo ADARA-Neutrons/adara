@@ -66,10 +66,10 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	for (dit = m_devices.begin(); dit != dend; ) {
 		DeviceVariables &dev = dit->second;
 
-		upstreamDisconnected(dev.m_variables);
-		if (dev.m_tag == tag)
+		if (dev.m_tag == tag) {
+			upstreamDisconnected(dev.m_variables);
 			m_devices.erase(dit++);
-		else
+		} else
 			++dit;
 
 		dropped = true;
