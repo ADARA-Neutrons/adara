@@ -21,6 +21,7 @@ namespace ADARA {
 namespace DASMON {
 
 #define ADARA_IN_BUF_SIZE 0x100000
+#define REJECT_FLAG_MASK ~BankedEventPkt::PARTIAL_DATA
 
 
 /**
@@ -627,7 +628,13 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
-    rpos += 4; // Skip over pulse info
+    rpos += 3; // Skip over pulse info
+
+    // Check flags
+    if ( (*rpos) & REJECT_FLAG_MASK )
+        return false;
+
+    rpos++;
 
     uint32_t bank_count;
     uint32_t bank_id;
@@ -687,7 +694,13 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
-    rpos += 4; // Skip over pulse info
+    rpos += 3; // Skip over pulse info
+
+    // Check flags
+    if ( (*rpos) & REJECT_FLAG_MASK )
+        return false;
+
+    rpos++;
 
     uint16_t monitor_id;
     uint32_t event_count;
