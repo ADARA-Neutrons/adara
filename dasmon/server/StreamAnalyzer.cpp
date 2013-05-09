@@ -60,7 +60,9 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_RUN_PULSE_CHARGE]    = "RUN_PULSE_CHARGE";
     m_fact_name[BIF_PIX_ERR_COUNT]       = "RUN_PIXEL_ERR_COUNT";
     m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
-    m_fact_name[BIF_CYCLE_ERR_COUNT]     = "RUN_CYCLE_ERR_COUNT";
+    m_fact_name[BIF_MAP_ERROR_COUNT]     = "RUN_MAP_ERROR_COUNT";
+    m_fact_name[BIF_MISS_RTDL_COUNT]     = "RUN_MISS_RTDL_COUNT";
+    m_fact_name[BIF_PULSE_VETO_COUNT]    = "RUN_PULSE_VETO_COUNT";
     m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
     m_fact_name[BIF_GENERAL_PV_LIMIT]    = "GENERAL_PV_LIMIT";
     m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
@@ -562,7 +564,9 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
     a_facts[m_fact_name[BIF_RUN_PULSE_CHARGE]]  = "Accumulated pulse charge (Co)";
     a_facts[m_fact_name[BIF_PIX_ERR_COUNT]]     = "Accumulated pixel error count";
     a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
-    a_facts[m_fact_name[BIF_CYCLE_ERR_COUNT]]   = "Accumulated cycle error count";
+    a_facts[m_fact_name[BIF_MAP_ERROR_COUNT]]   = "Accumulated map error count";
+    a_facts[m_fact_name[BIF_MISS_RTDL_COUNT]]   = "Accumulated missing RTDL count";
+    a_facts[m_fact_name[BIF_PULSE_VETO_COUNT]]  = "Accumulated pulse veto count";
     a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
     a_facts[m_fact_name[BIF_GENERAL_PV_LIMIT]]  = "One or more PVs have limit codes set";
     a_facts[m_fact_name[BIF_GENERAL_PV_ERROR]]  = "One or more PVs have error codes set";
@@ -794,7 +798,9 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_RUN_PULSE_CHARGE], a_metrics.m_pulse_charge );
     m_engine->assert( m_fact[BIF_PIX_ERR_COUNT], a_metrics.m_pixel_error_count );
     m_engine->assert( m_fact[BIF_DUP_PULSE_COUNT], a_metrics.m_dup_pulse_count );
-    m_engine->assert( m_fact[BIF_CYCLE_ERR_COUNT], a_metrics.m_cycle_error_count );
+    m_engine->assert( m_fact[BIF_MAP_ERROR_COUNT], a_metrics.m_mapping_error_count );
+    m_engine->assert( m_fact[BIF_MISS_RTDL_COUNT], a_metrics.m_missing_rtdl_count );
+    m_engine->assert( m_fact[BIF_PULSE_VETO_COUNT], a_metrics.m_pulse_veto_count );
 }
 
 

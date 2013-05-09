@@ -124,14 +124,18 @@ public:
         m_pulse_charge          = 0.0;
         m_pixel_error_count     = 0;
         m_dup_pulse_count       = 0;
-        m_cycle_error_count     = 0;
+        m_pulse_veto_count      = 0;
+        m_mapping_error_count   = 0;
+        m_missing_rtdl_count    = 0;
     }
 
     unsigned long           m_pulse_count;
     double                  m_pulse_charge;
     unsigned long           m_pixel_error_count;
     unsigned long           m_dup_pulse_count;
-    unsigned long           m_cycle_error_count;
+    unsigned long           m_pulse_veto_count;
+    unsigned long           m_mapping_error_count;
+    unsigned long           m_missing_rtdl_count;
 };
 
 }}

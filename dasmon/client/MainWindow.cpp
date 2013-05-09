@@ -810,11 +810,11 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
     QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_count )));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_charge )));
-
-    // TODO Add this...
-    //unsigned long           m_pixel_error_count;
-    //unsigned long           m_dup_pulse_count;
-    //unsigned long           m_cycle_error_count;
+    QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
+    QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_dup_pulse_count )));
+    QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_mapping_error_count )));
+    QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_veto_count )));
+    QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_missing_rtdl_count )));
 }
 
 
@@ -845,10 +845,14 @@ MainWindow::clearRunDisplay()
     QMetaObject::invokeMethod( ui->sampleNatureEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->sampleFormulaEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->sampleEnvironmentEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 
     QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
 void
@@ -1021,7 +1025,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 m_start_time = QDateTime::fromTime_t( msg.m_timestamp );
                 updateRunStatusIndicator();
 
-                QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString())));
+                QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString("M/d/yy h:mm:ss"))));
 
                 writeLog( ADARA::INFO, string("Run started. Run number = ") + boost::lexical_cast<string>(m_run_number) );
             }
@@ -1030,6 +1034,8 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 m_recording = msg.m_recording;
                 m_run_number = msg.m_run_number;
                 m_start_time = QDateTime::fromTime_t( msg.m_timestamp );
+
+                QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString("M/d/yy h:mm:ss"))));
                 updateRunStatusIndicator();
 
                 clearRunDisplay();

@@ -569,11 +569,13 @@ protected:
     {
         MessageBase::read( a_prop_tree );
 
-        m_pulse_count = a_prop_tree.get( "pulse_count", 0 );
-        m_pulse_charge = a_prop_tree.get( "pulse_charge", 0.0 );
-        m_pixel_error_count = a_prop_tree.get( "pixel_error_count", 0 );
-        m_dup_pulse_count = a_prop_tree.get( "dup_pulse_count", 0 );
-        m_cycle_error_count = a_prop_tree.get( "cycle_error_count", 0 );
+        m_pulse_count           = a_prop_tree.get( "pulse_count", 0 );
+        m_pulse_charge          = a_prop_tree.get( "pulse_charge", 0.0 );
+        m_pixel_error_count     = a_prop_tree.get( "pixel_error_count", 0 );
+        m_dup_pulse_count       = a_prop_tree.get( "dup_pulse_count", 0 );
+        m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0 );
+        m_mapping_error_count   = a_prop_tree.get( "mapping_error_count", 0 );
+        m_missing_rtdl_count    = a_prop_tree.get( "missing_rtdl_count", 0 );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -584,7 +586,9 @@ protected:
         a_prop_tree.put( "pulse_charge", m_pulse_charge );
         a_prop_tree.put( "pixel_error_count", m_pixel_error_count );
         a_prop_tree.put( "dup_pulse_count", m_dup_pulse_count );
-        a_prop_tree.put( "cycle_error_count", m_cycle_error_count );
+        a_prop_tree.put( "pulse_veto_count", m_pulse_veto_count );
+        a_prop_tree.put( "mapping_error_count", m_mapping_error_count );
+        a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
     }
 };
 

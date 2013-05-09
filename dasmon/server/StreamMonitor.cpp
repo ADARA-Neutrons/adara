@@ -628,13 +628,29 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
-    rpos += 3; // Skip over pulse info
+    rpos += 4; // Skip over pulse info
+
+    uint32_t flags = a_pkt.flags();
 
     // Check flags
-    if ( (*rpos) & REJECT_FLAG_MASK )
-        return false;
+    if ( flags & BankedEventPkt::ERROR_PIXELS )
+         ++m_run_metrics.m_pixel_error_count;
 
-    rpos++;
+    if ( flags & BankedEventPkt::PULSE_VETO )
+         ++m_run_metrics.m_pulse_veto_count;
+
+    if ( flags & BankedEventPkt::MISSING_RTDL )
+         ++m_run_metrics.m_missing_rtdl_count;
+
+    if ( flags & BankedEventPkt::MAPPING_ERROR )
+         ++m_run_metrics.m_mapping_error_count;
+
+    if ( flags & BankedEventPkt::DUPLICATE_PULSE )
+         ++m_run_metrics.m_dup_pulse_count;
+
+    // Stop processing if rejection-level errors are set
+    if ( flags & REJECT_FLAG_MASK )
+        return false;
 
     uint32_t bank_count;
     uint32_t bank_id;
@@ -694,13 +710,11 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
-    rpos += 3; // Skip over pulse info
+    rpos += 4; // Skip over pulse info
 
     // Check flags
-    if ( (*rpos) & REJECT_FLAG_MASK )
+    if ( a_pkt.flags() & REJECT_FLAG_MASK )
         return false;
-
-    rpos++;
 
     uint16_t monitor_id;
     uint32_t event_count;
