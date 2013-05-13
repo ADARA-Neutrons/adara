@@ -834,8 +834,6 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 
 	pkt[0] = 4 * sizeof(uint32_t);
 	pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
-	pkt[2] = pulse->m_id.first >> 32;
-	pkt[3] = pulse->m_id.first;
 	pkt[6] = ADARA::VariableStatus::OK << 16;
 	pkt[6] |= ADARA::VariableSeverity::OK;
 
@@ -853,6 +851,20 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			/* Set the variable ID and the updated value */
 			pkt[5] = (val & 1) + 1;
 			pkt[7] = val >> 1;
+
+			/* Create a different timestamp for each variable
+			 * update packet by adding the TOF value to the pulse
+			 * ID, handling overflow of the nanoseconds field.
+			 */
+			uint32_t ns = pulse->m_id.first & 0xffffffff;
+			ns += val >> 1;
+
+			pkt[2] = pulse->m_id.first >> 32;
+			if (ns >= (1000U * 1000 * 1000)) {
+				ns -= 1000U * 1000 * 1000;
+				pkt[2]++;
+			}
+			pkt[3] = ns;
 
 			/* We consider chopper data as fast metadata, so
 			 * we don't keep track of the current value and just
