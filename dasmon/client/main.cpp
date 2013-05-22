@@ -16,6 +16,7 @@ int main(int argc, char *argv[])
     string  broker_user;
     string  broker_pass;
     bool    kiosk = false;
+    bool    master = false;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon options" );
@@ -26,6 +27,7 @@ int main(int argc, char *argv[])
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("kiosk,k", "run in kiosk mode" )
+            ("master,m", "run as master display instance (proc id = 0)")
             ;
 
     po::variables_map opt_map;
@@ -47,14 +49,14 @@ int main(int argc, char *argv[])
     if ( opt_map.count( "kiosk" ))
         kiosk = true;
 
-    QApplication a(argc, argv);
+    if ( opt_map.count( "master" ))
+        master = true;
 
-    //ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(),
-    //                                                                   broker_uri, broker_user, broker_pass );
+    QApplication a(argc, argv);
 
     try
     {
-        MainWindow main_window( broker_uri, broker_user, broker_pass, kiosk );
+        MainWindow main_window( broker_uri, broker_user, broker_pass, kiosk, master );
         main_window.show();
 
         res = a.exec();

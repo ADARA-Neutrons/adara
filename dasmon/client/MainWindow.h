@@ -17,7 +17,7 @@
 #include "SubClient.h"
 #include "DASMonMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.0"
+#define DASMON_GUI_VERSION "1.1.1"
 
 namespace Ui {
 class MainWindow;
@@ -30,8 +30,7 @@ class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, pub
     Q_OBJECT
 
 public:
-    //explicit MainWindow( QWidget *parent );
-    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk );
+    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master );
     ~MainWindow();
 
 signals:

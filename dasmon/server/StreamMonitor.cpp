@@ -40,7 +40,7 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
-      m_stream_rate(0)
+      m_stream_rate(0), m_ok(true)
 #ifdef USE_DB
      ,m_db_info(a_db_info)
 #endif
@@ -279,6 +279,9 @@ StreamMonitor::processThread()
         }
         catch( std::exception &e )
         {
+            // Primitive fault detection / reporting
+            m_ok = false;
+
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): std::exception caught. Dropping connection. Exception = %s", e.what() );
             // Connection lost
@@ -289,6 +292,9 @@ StreamMonitor::processThread()
         }
         catch(...)
         {
+            // Primitive fault detection / reporting
+            m_ok = false;
+
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): Unknown exception type caught. Dropping connection." );
             // Connection lost
@@ -632,9 +638,11 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 
     uint32_t flags = a_pkt.flags();
 
+#ifdef PIX_ERR_BY_PULSE
     // Check flags
     if ( flags & BankedEventPkt::ERROR_PIXELS )
          ++m_run_metrics.m_pixel_error_count;
+#endif
 
     if ( flags & BankedEventPkt::PULSE_VETO )
          ++m_run_metrics.m_pulse_veto_count;
@@ -656,6 +664,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     uint32_t bank_id;
     uint32_t event_count = 0;
     uint32_t bank_event_count;
+    const uint32_t *bank_endpos;
 
     // Process banks per-source
     while ( rpos < epos )
@@ -672,7 +681,18 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
             {
                 event_count += bank_event_count;
             }
+#ifndef PIX_ERR_BY_PULSE
+            // Check individual events for error flags
+            bank_endpos = rpos + ( bank_event_count << 1 );
+            while ( rpos < bank_endpos )
+            {
+                ++rpos; // Skip TOF value
+                if ( (*rpos++) & 0x80000000 ) // High bit of Pixel ID indicates error if set
+                    ++m_run_metrics.m_pixel_error_count;
+            }
+#else
             rpos += bank_event_count << 1;
+#endif
         }
     }
 
@@ -828,7 +848,8 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
         }
         catch( ... )
         {
-            // TODO ???
+            // Primitive fault detection / reporting
+            m_ok = false;
         }
 
         xmlFreeDoc( doc );
@@ -982,6 +1003,8 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         }
         catch( ... )
         {
+            // Primitive fault detection / reporting
+            m_ok = false;
         }
 
         xmlFreeDoc( doc );

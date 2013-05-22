@@ -8,8 +8,42 @@ using namespace std;
 namespace ADARA {
 namespace DASMON {
 
-// TODO Eventually connect to ComBus command topic to handle general commands
+/*
+The ComBusRouter class provides a number of ComBus (ActiveMQ) messaging
+functions for the dasmond service, as follows:
 
+1)  The ComBusRouter class is a listener and translator for both the
+    StreamMonitor and the StreamAnalyzer. Various notifications and
+    signals and received and broadcast onto the dasmond app topic
+    ADARA.APP.DASMON.0 (see DASMonMessages.h for details). These
+    messages deal primarily with ADARA stream status and metrics as
+    well as business rule signalling.
+
+2)  The ComBusRouter class serves as the entry-point for dasmond
+    command and control messages. The messages are received on the
+    ADARA.CONTROL.DASMON.0 topic and are typically peer-to-peer in
+    nature (i.e. a reply will usually be sent to the sender). Received
+    messages are translated into method calls to the StreamMonitor
+    and/or StreamAnalyzer.
+
+3)  The ComBusRouter class provides critical process monitoring via
+    the ComBus ADARA.STATUS.* topics. If required and important
+    processes fail to provide timely status, apppropriate ComBus signals
+    are generated for consumption by user-facing applications (i.e. GUI
+    or logging apps). A process can be in three error states: 1) "un-
+    responsive" - meaning no status has been received for some defined
+    period, and 2) "faulted" - meaning status was received indicating
+    some manner of fault, and 3) "inactive" - meaning the process has
+    been non-responsive for a prolonged period of time and is presumed
+    to be not running. Process status monitoring is implemented in the
+    run() method.
+
+4)  The ComBusRouter class provides internal health monitoring and
+    status notification for critical dasmond threads. This feature is
+    related to #3 above, except that the source if the status
+    information is internal. This feature is also implemented in the
+    run() method.
+*/
 
 ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
@@ -20,29 +54,122 @@ ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer
     m_analyzer.attach( *this );
     m_combus.attach( *this );
     m_combus.setControlListener( *this );
+    m_combus.attach( *this, "ADARA.STATUS.>" );
 }
 
 
 ComBusRouter::~ComBusRouter()
 {
-    m_combus.detach( *this );
+    m_combus.detach( (ADARA::ComBus::IStatusListener &)*this );
+    m_combus.detach( (ADARA::ComBus::ITopicListener &)*this );
     m_analyzer.detach( *this );
 }
 
+#define PROC_TIMEOUT_UNRESPONSIVE   10
+#define PROC_TIMEOUT_INACTIVE       20
 
 void
 ComBusRouter::run()
 {
+    unsigned short  count = 0;
+    unsigned long   t;
+    string          sid_pfx = "SID_PROC_";
+    string          text;
+    ADARA::Level    lev = ADARA::TRACE;
+    map<string,ProcInfo>::iterator ip;
+
+    // TODO Need to get required/critical apps from somewhere else...
+    // Start them set as "running" to give aaa start-up grace period
+    m_procs["DASMON.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
+    m_procs["DASMON-GUI.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
+    m_procs["PVSTREAMER.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, true, time(0) );
+
     while(1)
     {
-        sleep(5);
-        m_combus.sendStatus( ADARA::ComBus::STATUS_RUNNING );
+        sleep(1);
+
+        t = time(0);
+
+        // Test/send status every 5 seconds
+        if ( !(count % 5 ))
+        {
+            if ( m_monitor.isOK() && m_analyzer.isOK() )
+                m_combus.sendStatus( ADARA::ComBus::STATUS_OK );
+            else
+                m_combus.sendStatus( ADARA::ComBus::STATUS_FAULT );
+        }
+
+        // Check critical process table for unresponsive/dead processes
+
+        // Lock to avoid collisions with in-coming status messages
+        boost::lock_guard<boost::mutex> lock(m_proc_mutex);
+
+        for ( ip = m_procs.begin(); ip != m_procs.end(); ++ip )
+        {
+            if ( ip->second.status == ADARA::ComBus::STATUS_FAULT && ip->second.prev_status != ADARA::ComBus::STATUS_FAULT )
+            {
+                syslog( LOG_ERR, "Process %s reports FAULT condition.", ip->first.c_str() );
+            }
+            else if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
+            {
+                syslog( LOG_ERR, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
+                ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
+            }
+            else if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
+            {
+                syslog( LOG_ERR, "Process %s has become INACTIVE.", ip->first.c_str() );
+                ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
+            }
+            else if ( ip->second.status == ADARA::ComBus::STATUS_OK && ip->second.prev_status != ADARA::ComBus::STATUS_OK )
+            {
+                syslog( LOG_INFO, "Process %s reports status OK.", ip->first.c_str() );
+
+                ComBus::SignalRetractMessage msg( sid_pfx + ip->first );
+                m_combus.sendMessage( msg );
+            }
+
+            if (( ip->second.status != ADARA::ComBus::STATUS_OK ) && (( ip->second.prev_status != ip->second.status ) || m_resend_state ))
+            {
+                switch( ip->second.status )
+                {
+                case ADARA::ComBus::STATUS_FAULT:
+                    {
+                        text = "Process reports FAULT condition.";
+                        lev = ip->second.required?ADARA::FATAL:ADARA::ERROR;
+                        break;
+                    }
+                case ADARA::ComBus::STATUS_UNRESPONSIVE:
+                    {
+                        text = "Process has become UNRESPONSIVE.";
+                        lev = ADARA::WARN;
+                        break;
+                    }
+                case ADARA::ComBus::STATUS_INACTIVE:
+                    {
+                        text = "Process has become INACTIVE.";
+                        lev = ip->second.required?ADARA::FATAL:ADARA::ERROR;
+                        break;
+                    }
+                default:
+                    break;
+                }
+
+                ComBus::SignalAssertMessage msg( sid_pfx + ip->first, "DAS", text, lev );
+                m_combus.sendMessage( msg );
+            }
+
+            ip->second.prev_status = ip->second.status;
+        }
+
+        // See if a process has requested a state update
         if ( m_resend_state )
         {
             m_monitor.resendState( *this );
             m_analyzer.resendState();
             m_resend_state = false;
         }
+
+        ++count;
     }
 }
 
@@ -234,7 +361,6 @@ ComBusRouter::signalRetract( const std::string &a_name )
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IStatusListener Interface
 
-
 void
 ComBusRouter::comBusConnectionStatus( bool a_connected )
 {
@@ -254,8 +380,29 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 
 
 ///////////////////////////////////////////////////////////
-// IControlListener methods
+// ITopicListener methods
 
+void
+ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
+{
+    if ( a_msg.getMessageType() == ADARA::ComBus::MSG_STATUS )
+    {
+        boost::lock_guard<boost::mutex> lock(m_proc_mutex);
+
+        map<string,ProcInfo>::iterator ip = m_procs.find( a_msg.getSourceName() );
+        if ( ip != m_procs.end() )
+        {
+            if ( ip->second.status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
+                ip->second.status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
+
+            ip->second.last_updated = time(0);
+        }
+    }
+}
+
+
+///////////////////////////////////////////////////////////
+// IControlListener methods
 
 bool
 ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )

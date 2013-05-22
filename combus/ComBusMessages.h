@@ -93,11 +93,10 @@ enum MessageType
  */
 enum StatusCode
 {
-    STATUS_UNRESPONSIVE = 0,
-    STATUS_STARTING,
-    STATUS_RUNNING,
-    STATUS_STOPPING,
-    STATUS_FAULT
+    STATUS_OK = 0,
+    STATUS_FAULT,
+    STATUS_UNRESPONSIVE,
+    STATUS_INACTIVE
 };
 
 
@@ -109,10 +108,9 @@ public:
     {
         switch( a_code )
         {
+        case STATUS_INACTIVE: return "Inactive";
         case STATUS_UNRESPONSIVE: return "Unresponsive";
-        case STATUS_STARTING: return "Starting";
-        case STATUS_RUNNING: return "Running";
-        case STATUS_STOPPING: return "Stopping";
+        case STATUS_OK: return "OK";
         case STATUS_FAULT: return "Fault";
         default: return "Unknown";
         }
@@ -182,9 +180,6 @@ public:
 
     virtual void serialize( cms::TextMessage &a_msg )
     {
-        // Type must not be in payload - used by factory method
-        a_msg.setIntProperty( "type", (long) getMessageType() );
-
         boost::property_tree::ptree prop_tree;
 
         write( prop_tree );
@@ -195,6 +190,7 @@ public:
         a_msg.setText( sstr.str() );
     }
 
+#if 0
     virtual void unserialize( const cms::TextMessage &a_msg )
     {
         boost::property_tree::ptree prop_tree;
@@ -202,6 +198,13 @@ public:
         std::stringstream sstr( a_msg.getText() );
         read_json( sstr, prop_tree );
 
+        read( prop_tree );
+    }
+#endif
+
+    virtual void unserialize( const cms::TextMessage &a_msg, boost::property_tree::ptree &prop_tree )
+    {
+        (void)a_msg;
         read( prop_tree );
     }
 
@@ -235,12 +238,17 @@ public:
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
+        // Note that "msg_type" is not read here as it must be parsed out by the
+        // message receive code such that the appropriate message class can be
+        // constructed prior to calling read().
+
         m_src_name = a_prop_tree.get( "src_name", "" );
         m_timestamp = a_prop_tree.get( "timestamp", 0 );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
+        a_prop_tree.put( "msg_type", getMessageType() );
         a_prop_tree.put( "src_name", m_src_name );
         a_prop_tree.put( "timestamp", m_timestamp );
     }
@@ -284,10 +292,20 @@ public:
     {}
 
     std::string         m_correlation_id;   ///< Key identifier used to (re)associate messages
-
+/*
     virtual void unserialize( const cms::TextMessage &a_msg )
     {
         MessageBase::unserialize( a_msg );
+
+        if ( m_correlation_id.empty() )
+        {
+            m_correlation_id = a_msg.getCMSMessageID();
+        }
+    }
+*/
+    void unserialize( const cms::TextMessage &a_msg, boost::property_tree::ptree &prop_tree )
+    {
+        MessageBase::unserialize( a_msg, prop_tree );
 
         if ( m_correlation_id.empty() )
         {

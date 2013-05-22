@@ -42,6 +42,7 @@ public:
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
     void    getInputFacts( std::map<std::string,std::string> &a_facts ) const;
+    bool    isOK() const { return m_ok; }
 
 private:
     std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );
@@ -123,6 +124,7 @@ private:
     boost::thread                      *m_debounce_thread;
     unsigned long                       m_debounce_sec;
     unsigned long                       m_batch_mask;
+    bool                                m_ok;
 };
 
 }}

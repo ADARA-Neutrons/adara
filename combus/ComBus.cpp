@@ -73,7 +73,8 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
         delete msg;
     }
     catch(...)
-    {} // TODO - Should probably report exceptions somewhere
+    {
+    } // TODO - Should probably report exceptions somewhere
 }
 
 
@@ -581,8 +582,20 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
 MessageBase*
 Connection::makeMessage( const cms::TextMessage &a_msg )
 {
-    unsigned long msg_type = a_msg.getIntProperty( "type" );
+    // Due to constraints imposed by the RESTful interface, the message type
+    // must be supplied in the message body. This means that the body must be
+    // parsed here first to extract the message type (for object creation),
+    // then parsed again by the unserialization process.
+    //cout << "text = " << a_msg.getText() << endl;
+
+    boost::property_tree::ptree prop_tree;
+    std::stringstream sstr( a_msg.getText() );
+    read_json( sstr, prop_tree );
+
+    unsigned long msg_type = prop_tree.get( "msg_type", 0 );
     MessageBase *msg = 0;
+
+    //cout << "type = " << msg_type << endl;
 
     switch( msg_type )
     {
@@ -615,7 +628,7 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
         throw std::runtime_error("Unknown message type");
     }
 
-    msg->unserialize( a_msg );
+    msg->unserialize( a_msg, prop_tree );
 
     return msg;
 }

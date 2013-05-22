@@ -190,6 +190,7 @@ public:
     void            removeListener( IStreamListener &a_listener )
                     { m_notify.removeListener( a_listener ); }
     void            resendState( IStreamListener &a_listener ) const;
+    bool            isOK() const { return m_ok; }
 
 private:
     class Notifier : public IStreamListener
@@ -277,6 +278,7 @@ private:
     uint64_t                        m_stream_size;
     uint64_t                        m_stream_rate;
     std::map<PVKey,PVInfoBase*>     m_pvs;
+    bool                            m_ok;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
 #ifdef USE_DB

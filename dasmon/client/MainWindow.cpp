@@ -27,7 +27,7 @@ using namespace std;
 
 
 
-MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk )
+MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master )
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
@@ -59,7 +59,7 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     m_style_fatal = "QLabel { color: white; background: rgb(255,0,0) }";;
     m_style_disabled = "QLabel { background: gray; color: rgb(160,160,160)  }";
 
-    m_combus = new ADARA::ComBus::Connection( "DASMON-GUI", getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+    m_combus = new ADARA::ComBus::Connection( "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
 
     updateComBusStatusIndicator();
     updateDASMonStatusIndicator();
@@ -264,7 +264,7 @@ MainWindow::setSMSActive( bool a_active )
 void
 MainWindow::onProcTimer()
 {
-    m_combus->sendStatus( ADARA::ComBus::STATUS_RUNNING );
+    m_combus->sendStatus( ADARA::ComBus::STATUS_OK );
 
     QMutexLocker lock( &m_mutex );
     unsigned long t = time(0);
@@ -273,7 +273,7 @@ MainWindow::onProcTimer()
     // Scan for and remove stopped or stalled processes, also check dasmon status
     for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); )
     {
-        if ((( p->second.status == ADARA::ComBus::STATUS_STOPPING ) && ( t > p->second.last_updated + TIMEOUT_DEAD_CLEANUP )) ||
+        if ((( p->second.status == ADARA::ComBus::STATUS_INACTIVE ) && ( t > p->second.last_updated + TIMEOUT_DEAD_CLEANUP )) ||
             ( t > p->second.last_updated + TIMEOUT_DEAD ))
         {
             if ( p->first == "DASMON.0" )
@@ -289,7 +289,7 @@ MainWindow::onProcTimer()
             if ( p->second.status != ADARA::ComBus::STATUS_UNRESPONSIVE )
             {
                 p->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
-                p->second.label = "Unesponsive";
+                p->second.label = "Unresponsive";
                 p->second.hl_count = PV_HIGHLIGH_DURATION;
                 m_refresh_proc_table = true;
                 writeLog( ADARA::INFO, p->first + " has become unresponsive" );

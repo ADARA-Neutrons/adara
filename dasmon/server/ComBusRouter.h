@@ -22,8 +22,8 @@ namespace DASMON {
  * either from the re-emitted messages, or based on asserts and retracts. If retracts are used, a fail-safe timeout
  * must be employed to prevent stuck signals if the retract message is missed (due to process or broker crash).
  */
-class ComBusRouter : public IStreamListener, public ADARA::ComBus::IStatusListener,
-        public ADARA::ComBus::IControlListener, public StreamAnalyzer::ISignalListener
+class ComBusRouter : public IStreamListener, public ADARA::ComBus::IStatusListener, public ADARA::ComBus::IControlListener,
+        public StreamAnalyzer::ISignalListener, public ADARA::ComBus::ITopicListener
 {
 public:
     ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
@@ -32,6 +32,22 @@ public:
     void    run();
 
 private:
+    struct ProcInfo
+    {
+        ProcInfo()
+            : status(ADARA::ComBus::STATUS_INACTIVE), prev_status(ADARA::ComBus::STATUS_INACTIVE), required(false), last_updated(0)
+        {}
+
+        ProcInfo( ADARA::ComBus::StatusCode a_status, ADARA::ComBus::StatusCode a_prev_status, bool a_required, unsigned long a_time )
+            : status(a_status), prev_status(a_prev_status), required(a_required), last_updated(a_time)
+        {}
+
+        ADARA::ComBus::StatusCode   status;
+        ADARA::ComBus::StatusCode   prev_status;
+        bool                        required;
+        unsigned long               last_updated;
+    };
+
     void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
     void    setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg );
     void    sendInputFacts( const std::string &a_src_proc, const std::string &a_CID );
@@ -57,6 +73,9 @@ private:
     // IControlListener Interface
     bool    comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
 
+    // ITopicListener Interface
+    void    comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
+
     // ISignalListener Interface
     void    signalAssert( const SignalInfo &a_signal );
     void    signalRetract( const std::string &a_name );
@@ -70,6 +89,8 @@ private:
     bool                            m_recording;
     std::map<std::string,ComBus::DASMON::ProcessVariables::PVData> m_pvs;
     mutable boost::mutex            m_mutex;
+    std::map<std::string,ProcInfo>  m_procs;
+    mutable boost::mutex            m_proc_mutex;
 };
 
 }}
