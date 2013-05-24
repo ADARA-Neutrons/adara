@@ -9,7 +9,7 @@
 #include "PVStreamer.h"
 #include "ADARA_PVWriter.h"
 #include "afxwin.h"
-
+#include "ComBusLite.h"
 
 using namespace SNS::PVS;
 
@@ -18,7 +18,8 @@ class CPVStreamerDlg : public CDialog, public SNS::PVS::IPVConfigListener, publi
 {
 // Construction
 public:
-	CPVStreamerDlg(CWnd* pParent = NULL);	// standard constructor
+    CPVStreamerDlg( const std::string &a_topic_path, const std::string &a_broker_uri, unsigned short a_broker_port, const std::string &a_broker_user, const std::string &a_broker_pass );
+    ~CPVStreamerDlg();
 
     void                print( const std::string & a_msg );
 
@@ -61,6 +62,7 @@ protected:
     unsigned long           m_start_time;
     boost::mutex            m_mutex;
     bool                    m_update_log;
+    ComBusLite             *m_combus;
 
     // Generated message map functions
 	virtual BOOL OnInitDialog();

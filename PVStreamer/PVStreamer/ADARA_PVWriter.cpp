@@ -382,6 +382,9 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
         alarms              = a_pv_info.m_alarms;
 
 
+    a_adara_pkt.vvp.status      = None;
+    a_adara_pkt.vvp.severity    = NoAlarm;
+
     if ( alarms )
     {
         // TODO Need to revist/verify these alarm and status mappings
@@ -405,11 +408,6 @@ ADARA_PVWriter::buildVVP( ADARAPacket &a_adara_pkt, const PVInfo &a_pv_info, PVS
             a_adara_pkt.vvp.status      = Low;
             a_adara_pkt.vvp.severity    = Minor;
         }
-    }
-    else
-    {
-        a_adara_pkt.vvp.status      = None;
-        a_adara_pkt.vvp.severity    = NoAlarm;
     }
 
     switch ( a_pv_info.m_type )

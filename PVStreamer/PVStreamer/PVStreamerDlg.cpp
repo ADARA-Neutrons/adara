@@ -17,12 +17,23 @@ using namespace std;
 
 #define MAX_LOG_SIZE 500
 
-CPVStreamerDlg::CPVStreamerDlg(CWnd* pParent /*=NULL*/)
-	: CDialog(CPVStreamerDlg::IDD, pParent), m_update_log(false)
+CPVStreamerDlg::CPVStreamerDlg( const std::string &a_topic_path, const std::string &a_broker_uri, unsigned short a_broker_port, const std::string &a_broker_user, const std::string &a_broker_pass)
+	: CDialog(CPVStreamerDlg::IDD, 0), m_update_log(false), m_combus(0)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDI_MAINICON);
     m_start_time = (unsigned long)time(0);
+
+    // If ComBusLite ctor fails, no exception will be thrown, just wont work
+    m_combus = new ComBusLite( a_topic_path, "PVSTREAMER", 0, a_broker_uri, a_broker_port, a_broker_user, a_broker_pass );
 }
+
+
+CPVStreamerDlg::~CPVStreamerDlg()
+{
+    if ( m_combus )
+        delete m_combus;
+}
+
 
 void CPVStreamerDlg::DoDataExchange(CDataExchange* pDX)
 {
@@ -57,6 +68,7 @@ BOOL CPVStreamerDlg::OnInitDialog()
     m_status_edit.SetWindowText( "ADARA: Not listening" );
 
     SetTimer( 1, 1000, 0 );
+    SetTimer( 2, 4000, 0 );
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -107,6 +119,7 @@ CPVStreamerDlg::OnTimer( UINT a_timer_id )
 {
     if ( a_timer_id == 1 && m_update_log )
     {
+        // Timer ID 1 is triggered once per second, used to updated log window
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
         int visline = m_log_edit.GetFirstVisibleLine();
@@ -115,6 +128,11 @@ CPVStreamerDlg::OnTimer( UINT a_timer_id )
             m_log_edit.LineScroll((visline + 1));
 
         m_update_log = false;
+    }
+    else if ( a_timer_id == 2 )
+    {
+        // Timer ID 2 is used to send status updates
+        m_combus->sendStatus( STATUS_OK );
     }
 }
 

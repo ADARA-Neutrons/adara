@@ -22,13 +22,22 @@ using namespace std;
 class CmdLinParser : public CCommandLineInfo
 {
 public:
-    CmdLinParser() : m_port(31416),m_sat_config_file("c:\\SatelliteComputer.xml"), m_log_path("c:\\"), m_heartbeat(2000) {}
+    CmdLinParser() : 
+      m_port(31416),m_sat_config_file("c:\\SatelliteComputer.xml"),
+      m_log_path("c:\\"), m_heartbeat(2000), m_broker_port(0),
+      m_topic_path("/demo/message")
+      {}
     
     unsigned short  m_port;
     string          m_sat_config_file;
     string          m_log_path;
     unsigned long   m_heartbeat;
     string          m_pv_config_local_file;
+    string          m_broker_host;
+    unsigned short  m_broker_port;
+    string          m_broker_user;
+    string          m_broker_pass;
+    string          m_topic_path;
 
     void ParseParam(const TCHAR* pszParam,BOOL bFlag,BOOL bLast)
     {
@@ -44,6 +53,16 @@ public:
                 m_heartbeat = atoi( &pszParam[3] );
             else if ( _strnicmp( pszParam, "local=",6) == 0 )
                 m_pv_config_local_file = &pszParam[6];
+            else if ( _strnicmp( pszParam, "broker_host=",12) == 0 )
+                m_broker_host = &pszParam[12];
+            else if ( _strnicmp( pszParam, "broker_port=",12) == 0 )
+                m_broker_port = (unsigned short)atoi( &pszParam[12] );
+            else if ( _strnicmp( pszParam, "broker_user=",12) == 0 )
+                m_broker_user = &pszParam[12];
+            else if ( _strnicmp( pszParam, "broker_pass=",12) == 0 )
+                m_broker_pass = &pszParam[12];
+            else if ( _strnicmp( pszParam, "topic_path=",11) == 0 )
+                m_topic_path = &pszParam[11];
         }
     }
 };
@@ -112,7 +131,7 @@ CPVStreamerApp::InitInstance()
     }
     
     // Create main window
-    CPVStreamerDlg dlg;
+    CPVStreamerDlg dlg( cmdline.m_topic_path, cmdline.m_broker_host, cmdline.m_broker_port, cmdline.m_broker_user, cmdline.m_broker_pass );
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
@@ -136,6 +155,18 @@ CPVStreamerApp::InitInstance()
 
     sstr.str("");
     sstr << "  local pv file = " << (cmdline.m_pv_config_local_file.size()?cmdline.m_pv_config_local_file: "n/a") << " (use -local=x to change)";
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  broker host = " << cmdline.m_broker_host;
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  broker port = " << cmdline.m_broker_port;
+    dlg.print( sstr.str());
+
+    sstr.str("");
+    sstr << "  broker user = " << cmdline.m_broker_user;
     dlg.print( sstr.str());
 
     PVStreamer      *pvs = 0;
