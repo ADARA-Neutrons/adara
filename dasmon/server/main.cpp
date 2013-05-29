@@ -42,6 +42,8 @@ int main(int argc, char *argv[])
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("required,r", po::value<vector<string> >(), "specify required ComBus processes")
+            ("important,i", po::value<vector<string> >(), "specify important ComBus processes")
 #ifdef USE_DB
             ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
             ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
@@ -57,6 +59,7 @@ int main(int argc, char *argv[])
     po::notify( opt_map );
 
     // Process help / version options and exit early
+
     if ( opt_map.count( "help" ))
     {
         cout << options << endl;
@@ -67,6 +70,31 @@ int main(int argc, char *argv[])
         cout << DASMON_VERSION << endl;
         return 0;
     }
+
+    // Build list of required and important processes from options
+
+    vector<pair<string,bool> > proc_info;
+    vector<string> procs;
+    vector<string>::iterator ip;
+    if ( opt_map.count( "important" ) )
+    {
+        procs = opt_map["important"].as< vector<string> >();
+        for ( ip = procs.begin(); ip != procs.end(); ++ip )
+        {
+            proc_info.push_back( pair<string,bool>( *ip, false ) );
+        }
+    }
+
+    if ( opt_map.count( "required" ) )
+    {
+        procs = opt_map["required"].as< vector<string> >();
+        for ( ip = procs.begin(); ip != procs.end(); ++ip )
+        {
+            proc_info.push_back( pair<string,bool>( *ip, true ) );
+        }
+    }
+
+    // Initialize SysLog
 
     openlog( "dasmond", 0, LOG_DAEMON );
     syslog( LOG_INFO, "Dasmon service started." );
@@ -90,7 +118,7 @@ int main(int argc, char *argv[])
         StreamMonitor   monitor( sms_host, sms_port );
 #endif
         StreamAnalyzer  analyzer( monitor, config_dir );
-        ComBusRouter    router( monitor, analyzer );
+        ComBusRouter    router( monitor, analyzer, proc_info );
 
         // TODO This needs to change at some point - config should be from a central data source
         //analyzer.loadConfig();

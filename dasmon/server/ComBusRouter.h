@@ -26,7 +26,7 @@ class ComBusRouter : public IStreamListener, public ADARA::ComBus::IStatusListen
         public StreamAnalyzer::ISignalListener, public ADARA::ComBus::ITopicListener
 {
 public:
-    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
+    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, const std::vector<std::pair<std::string,bool> > &a_proc_info );
     virtual ~ComBusRouter();
 
     void    run();

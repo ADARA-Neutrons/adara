@@ -45,11 +45,17 @@ functions for the dasmond service, as follows:
     run() method.
 */
 
-ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
+ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, const vector<pair<string,bool> > &a_proc_info )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
       m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
 
 {
+    for ( vector<pair<string,bool> >::const_iterator p = a_proc_info.begin(); p != a_proc_info.end(); ++p )
+    {
+        // Start process status set as initially "running" to provide a start-up grace period
+        m_procs[p->first] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, p->second, time(0) );
+    }
+
     m_monitor.addListener( *this );
     m_analyzer.attach( *this );
     m_combus.attach( *this );
@@ -75,14 +81,11 @@ ComBusRouter::run()
     unsigned long   t;
     string          sid_pfx = "SID_PROC_";
     string          text;
-    ADARA::Level    lev = ADARA::TRACE;
     map<string,ProcInfo>::iterator ip;
 
-    // TODO Need to get required/critical apps from somewhere else...
-    // Start them set as "running" to give aaa start-up grace period
-    m_procs["DASMON.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
-    m_procs["DASMON-GUI.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
-    m_procs["PVSTREAMER.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, true, time(0) );
+    //m_procs["DASMON.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
+    //m_procs["DASMON-GUI.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
+    //m_procs["PVSTREAMER.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, true, time(0) );
 
     while(1)
     {
@@ -99,67 +102,25 @@ ComBusRouter::run()
                 m_combus.sendStatus( ADARA::ComBus::STATUS_FAULT );
         }
 
-        // Check critical process table for unresponsive/dead processes
-
-        // Lock to avoid collisions with in-coming status messages
-        boost::lock_guard<boost::mutex> lock(m_proc_mutex);
+        // Watch for unresponsive / inactive processes
+        boost::unique_lock<boost::mutex> lock(m_proc_mutex);
 
         for ( ip = m_procs.begin(); ip != m_procs.end(); ++ip )
         {
-            if ( ip->second.status == ADARA::ComBus::STATUS_FAULT && ip->second.prev_status != ADARA::ComBus::STATUS_FAULT )
+            if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
             {
-                syslog( LOG_ERR, "Process %s reports FAULT condition.", ip->first.c_str() );
-            }
-            else if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
-            {
-                syslog( LOG_ERR, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
+                syslog( LOG_INFO, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
                 ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
+                m_analyzer.assertFact( string("PROC_") + ip->first, (int)ip->second.status );
             }
             else if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
             {
-                syslog( LOG_ERR, "Process %s has become INACTIVE.", ip->first.c_str() );
-                ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
+                syslog( LOG_INFO, "Process %s has become INACTIVE.", ip->first.c_str() );
+                m_analyzer.retractFact( string("PROC_") + ip->first );
             }
-            else if ( ip->second.status == ADARA::ComBus::STATUS_OK && ip->second.prev_status != ADARA::ComBus::STATUS_OK )
-            {
-                syslog( LOG_INFO, "Process %s reports status OK.", ip->first.c_str() );
-
-                ComBus::SignalRetractMessage msg( sid_pfx + ip->first );
-                m_combus.sendMessage( msg );
-            }
-
-            if (( ip->second.status != ADARA::ComBus::STATUS_OK ) && (( ip->second.prev_status != ip->second.status ) || m_resend_state ))
-            {
-                switch( ip->second.status )
-                {
-                case ADARA::ComBus::STATUS_FAULT:
-                    {
-                        text = "Process reports FAULT condition.";
-                        lev = ip->second.required?ADARA::FATAL:ADARA::ERROR;
-                        break;
-                    }
-                case ADARA::ComBus::STATUS_UNRESPONSIVE:
-                    {
-                        text = "Process has become UNRESPONSIVE.";
-                        lev = ADARA::WARN;
-                        break;
-                    }
-                case ADARA::ComBus::STATUS_INACTIVE:
-                    {
-                        text = "Process has become INACTIVE.";
-                        lev = ip->second.required?ADARA::FATAL:ADARA::ERROR;
-                        break;
-                    }
-                default:
-                    break;
-                }
-
-                ComBus::SignalAssertMessage msg( sid_pfx + ip->first, "DAS", text, lev );
-                m_combus.sendMessage( msg );
-            }
-
-            ip->second.prev_status = ip->second.status;
         }
+
+        lock.unlock();
 
         // See if a process has requested a state update
         if ( m_resend_state )
@@ -387,16 +348,22 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     if ( a_msg.getMessageType() == ADARA::ComBus::MSG_STATUS )
     {
+        ADARA::ComBus::StatusCode status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
+
         boost::lock_guard<boost::mutex> lock(m_proc_mutex);
 
         map<string,ProcInfo>::iterator ip = m_procs.find( a_msg.getSourceName() );
         if ( ip != m_procs.end() )
         {
-            if ( ip->second.status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
-                ip->second.status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
-
+            ip->second.status = status;
             ip->second.last_updated = time(0);
         }
+        else
+        {
+            m_procs[a_msg.getSourceName()] = ProcInfo( status, status, false, time(0) );
+        }
+
+        m_analyzer.assertFact( string("PROC_") + a_msg.getSourceName(), (int)status );
     }
 }
 

@@ -43,6 +43,10 @@ public:
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
     void    getInputFacts( std::map<std::string,std::string> &a_facts ) const;
     bool    isOK() const { return m_ok; }
+    void    assertFact( const std::string &a_fact );
+    template<class T>
+    void    assertFact( const std::string &a_fact, T a_value );
+    void    retractFact( const std::string &a_fact );
 
 private:
     std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );

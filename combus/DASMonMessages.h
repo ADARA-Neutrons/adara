@@ -141,20 +141,23 @@ protected:
         m_facts.clear();
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("facts"))
-                m_facts[v.first] = v.second.get( "desc", "" );
+            {
+                m_facts[v.second.data()] = "";
+            }
         } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         ControlMessage::write( a_prop_tree );
+        boost::property_tree::ptree pt;
 
         for ( std::map<std::string,std::string>::iterator fact = m_facts.begin(); fact != m_facts.end(); ++fact )
         {
-            boost::property_tree::ptree pt;
-            pt.put( "desc", fact->second );
-            a_prop_tree.add_child( std::string("facts.") + fact->first, pt );
+            pt.push_back( std::make_pair( "", fact->first ));
         }
+
+        a_prop_tree.add_child( "facts", pt );
     }
 };
 

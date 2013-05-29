@@ -579,7 +579,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
         // If asserted fact is not a built-in fact, then it is a PV fact
         if ( a_facts.find( *f ) == a_facts.end())
         {
-            a_facts[*f] = "Process variable";
+            a_facts[*f] = "unknown";
         }
     }
 }
@@ -627,6 +627,38 @@ StreamAnalyzer::endBatch( unsigned long a_mask )
     }
 }
 
+
+void
+StreamAnalyzer::assertFact( const std::string &a_fact )
+{
+    m_engine->assert( a_fact );
+}
+
+template<class T>
+void
+StreamAnalyzer::assertFact( const std::string &a_fact, T a_value )
+{
+    m_engine->assert<T>( a_fact, a_value );
+}
+
+void
+StreamAnalyzer::retractFact( const std::string &a_fact )
+{
+    m_engine->retract( a_fact );
+}
+
+template void StreamAnalyzer::assertFact<bool>( const string &a_id, bool a_value );
+template void StreamAnalyzer::assertFact<char>( const string &a_id, char a_value );
+template void StreamAnalyzer::assertFact<int8_t>( const string &a_id, int8_t a_value );
+template void StreamAnalyzer::assertFact<uint8_t>( const string &a_id, uint8_t a_value );
+template void StreamAnalyzer::assertFact<int16_t>( const string &a_id, int16_t a_value );
+template void StreamAnalyzer::assertFact<uint16_t>( const string &a_id, uint16_t a_value );
+template void StreamAnalyzer::assertFact<int32_t>( const string &a_id, int32_t a_value );
+template void StreamAnalyzer::assertFact<uint32_t>( const string &a_id, uint32_t a_value );
+template void StreamAnalyzer::assertFact<int64_t>( const string &a_id, int64_t a_value );
+template void StreamAnalyzer::assertFact<uint64_t>( const string &a_id, uint64_t a_value );
+template void StreamAnalyzer::assertFact<float>( const string &a_id, float a_value );
+template void StreamAnalyzer::assertFact<double>( const string &a_id, double a_value );
 
 //////////////////////////////////////////////
 // IStreamListener
