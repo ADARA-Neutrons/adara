@@ -15,6 +15,7 @@ int main(int argc, char *argv[])
     string  broker_uri;
     string  broker_user;
     string  broker_pass;
+    string  domain;
     bool    kiosk = false;
     bool    master = false;
 
@@ -23,7 +24,8 @@ int main(int argc, char *argv[])
     options.add_options()
             ("help,h", "show help")
             ("version", "show version number")
-            ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
+            ("domain", po::value<string>( &domain )->default_value( "" ), "set communication domain prefix (EPICS/ComBus)")
+            ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "" ), "set AMQP broker URI/IP address")
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("kiosk,k", "run in kiosk mode" )
@@ -56,7 +58,7 @@ int main(int argc, char *argv[])
 
     try
     {
-        MainWindow main_window( broker_uri, broker_user, broker_pass, kiosk, master );
+        MainWindow main_window( domain, broker_uri, broker_user, broker_pass, kiosk, master );
         main_window.show();
 
         res = a.exec();
@@ -65,8 +67,6 @@ int main(int argc, char *argv[])
     {
         cout << e.what() << endl;
     }
-
-    //delete combus;
 
     return res;
 }

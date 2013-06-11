@@ -12,65 +12,97 @@
 #include <cms/Connection.h>
 #include <cms/Session.h>
 #include <activemq/transport/TransportListener.h>
-#include "ComBusMessages.h"
-
+#include "ComBusDefs.h"
 
 
 namespace ADARA {
 namespace ComBus {
 
 class MessageBase;
-class ControlMessage;
 
-class IStatusListener
+
+/** \brief Interface for ComBus connection status listeners
+  *
+  */
+class IConnectionListener
 {
 public:
     virtual void    comBusConnectionStatus( bool a_connected ) = 0;
 };
 
+
+/** \brief Interface for ComBus topic message listeners
+  *
+  */
 class ITopicListener
 {
 public:
     virtual void    comBusMessage( const MessageBase &a_msg ) = 0;
 };
 
-class IControlListener
+
+/** \brief Interface for ComBus input (command) message listeners
+  *
+  */
+class IInputListener
 {
 public:
-    virtual bool    comBusControlMessage( const ControlMessage &a_msg ) = 0;
+    virtual bool    comBusInputMessage( const MessageBase &a_msg ) = 0;
 };
 
 
+/**
+ * /class Connection
+ *
+ * The ComBus::Connection class provides access to connection management, message ouptut, and
+ * topic subscription. Incoming messages are handled by an internal Translator class that then
+ * forwards ComBus messages to subscriber objects via the various listener interfaces. There are
+ * three distinct types of listener interfaces: status, control, and topic. An arbitrary
+ * number of objects may attach to status and general topics, but only one object may be set as
+ * the control listener. Internal routing of paired messages (p2p) must currently be implemented
+ * by the client control listener object.
+ *
+ * Connection parameters may be specified in the Connection constructor, or supplied/changed later
+ * using the setConnection() method. Note that if the connection parameters are changed, all
+ * subscribed topics are dropped and must be re-established. This does not apply if the connection
+ * is lost and re-acquired; in this case, all subscriptions are maintained.
+ */
 class Connection
 {
 public:
-    Connection(  const std::string &a_proc_name, unsigned long a_inst_num,
+    Connection(  const std::string &a_base_path, const std::string &a_proc_name, unsigned long a_inst_num,
                  const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
                  const std::string &a_log_dir = "/tmp" );
 
     ~Connection() throw();
 
     static Connection&  getInst();
-    void                setBroker( const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass );
+    void                setConnection( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass );
     bool                waitForConnect( unsigned short a_timeout ) const;
-    bool                sendStatus( StatusCode a_status );
-    bool                sendLog( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
-    bool                sendMessage( MessageBase &a_msg );
-    bool                sendControl( ControlMessage &a_msg, const std::string &a_dest_proc, /*unsigned long m_dest_inst,*/ std::string &a_correlation_id );
-    void                setControlListener( IControlListener &a_ctrl_listener );
-    void                attach( IStatusListener  &a_subscriber );
-    void                detach( IStatusListener  &a_subscriber );
+    void                setInputListener( IInputListener &a_ctrl_listener );
+    void                attach( IConnectionListener  &a_subscriber );
+    void                detach( IConnectionListener  &a_subscriber );
     void                attach( ITopicListener &a_subscriber, const std::string &a_topic );
     void                detach( ITopicListener &a_subscriber, const std::string &a_topic );
     void                detach( ITopicListener &a_subscriber );
+    bool                status( StatusCode a_status );
+    bool                log( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
+    bool                broadcast( MessageBase &a_msg );
+    bool                send( MessageBase &a_msg, const std::string &a_dest_proc, const std::string *a_correlation_id = 0 );
 
 private:
 
+    /** \brief Provides inbound connection/topic message handling
+      *
+      * The Translator class is a private class that provides handling for inbound
+      * AMQ messages. Receieved messages are inspected and translated to ComBus
+      * messages, then dispatched via client interfaces.
+      */
     class Translator : public cms::MessageListener
     {
     public:
         Translator( ITopicListener &a_listener );
-        Translator( IControlListener &a_handler );
+        Translator( IInputListener &a_handler );
         virtual ~Translator() throw();
 
         void                attach( const std::string &a_topic );
@@ -83,7 +115,7 @@ private:
         void                onMessage( const cms::Message *a_msg ) throw();
 
         ITopicListener     *m_listener;
-        IControlListener   *m_handler;
+        IInputListener     *m_handler;
         std::map<std::string,std::pair<cms::Topic*,cms::MessageConsumer*> > m_topics;
 
         std::string         m_proc_name;
@@ -95,24 +127,23 @@ private:
     void                    connectionStatusNotifyThread();
     void                    disconnect();
     void                    createTopicConsumer( const std::string &a_topic_name, cms::Topic **a_topic, cms::MessageConsumer **a_consumer );
-    //bool                    sendCommandReply( MessageBase &a_msg, const std::string &a_dest_proc, bool a_command );
 
-    // Message factory methods/attribs
     static MessageBase*     makeMessage( const cms::TextMessage &a_msg );
 
     bool                                    m_running;
     bool                                    m_connected;
+    std::string                             m_domain;
     std::string                             m_proc_name;
     unsigned long                           m_inst_num;
-    IControlListener                       *m_ctrl_listener;
-    Translator                             *m_ctrl_translator;
+    IInputListener                         *m_input_listener;
+    Translator                             *m_input_translator;
     std::string                             m_broker_uri;
     std::string                             m_broker_user;
     std::string                             m_broker_pass;
     std::string                             m_log_file;
     activemq::core::ActiveMQConnection     *m_connection;
     cms::Session                           *m_session;
-    std::vector<IStatusListener*>           m_status_listeners;
+    std::vector<IConnectionListener*>       m_status_listeners;
     std::map<std::string,std::pair<cms::Topic*,cms::MessageProducer*> > m_producer_topics;
     std::map<ITopicListener*,Translator*>   m_listeners;
     boost::thread                          *m_reconnect_thread;
@@ -120,7 +151,6 @@ private:
     boost::mutex                            m_status_mutex;
     boost::condition_variable               m_status_cond;
     boost::mutex                            m_mutex;
-
     static Connection                      *g_inst;
 
     friend class Translator;

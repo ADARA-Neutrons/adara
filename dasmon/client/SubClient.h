@@ -14,10 +14,10 @@ public:
     ~SubClient();
 
     virtual void dasmonStatus( bool active ) = 0;
-    virtual bool comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg ) = 0;
+    virtual bool comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg ) = 0;
 
 protected:
-    bool createRoute( ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id );
+    bool createRoute( ADARA::ComBus::MessageBase &a_msg, const std::string &a_dest_proc );
     void removeRoute( std::string &a_correlation_id );
 
 private:

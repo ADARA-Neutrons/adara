@@ -33,7 +33,8 @@ HEADERS  += \
     AMQConfigDialog.h \
     RuleConfigDialog.h \
     SubClient.h \
-    MainWindow.h
+    MainWindow.h \
+    ../../combus/ComBusDefs.h
 
 unix:LIBS += -lboost_thread-mt -lboost_program_options -lactivemq-cpp
 

@@ -27,15 +27,16 @@ using namespace std;
 
 
 
-MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master )
+MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
+                        const std::string &a_broker_pass, bool a_kiosk, bool a_master )
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
     m_refresh_log_table(false), m_refresh_monitor_table(false), m_refresh_pv_table(false),
     m_recording(false), m_run_number(0), m_prev_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
-    m_combus(0),
-    m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ), m_broker_pass( a_broker_pass )
+    m_combus(0), m_domain( a_domain ), m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ),
+    m_broker_pass( a_broker_pass )
 {
     ui->setupUi(this);
 
@@ -46,9 +47,15 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     QSettings settings;
 
     settings.beginGroup( "ActiveMQ" );
-    m_broker_uri = settings.value( "broker_uri" ).toString().toStdString();
-    m_broker_user = settings.value( "username" ).toString().toStdString();
-    m_broker_pass = settings.value( "password" ).toString().toStdString();
+    if ( m_domain.empty() )
+        m_domain = settings.value( "domain" ).toString().toStdString();
+
+    if ( m_broker_uri.empty() )
+    {
+        m_broker_uri = settings.value( "broker_uri" ).toString().toStdString();
+        m_broker_user = settings.value( "username" ).toString().toStdString();
+        m_broker_pass = settings.value( "password" ).toString().toStdString();
+    }
     settings.endGroup();
 
     m_style_unlit = "QLabel { background: grey }";
@@ -59,7 +66,11 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     m_style_fatal = "QLabel { color: white; background: rgb(255,0,0) }";;
     m_style_disabled = "QLabel { background: gray; color: rgb(160,160,160)  }";
 
-    m_combus = new ADARA::ComBus::Connection( "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+    // Make sure domain has a "." as last character
+    if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
+        m_domain += ".";
+
+    m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
 
     updateComBusStatusIndicator();
     updateDASMonStatusIndicator();
@@ -107,10 +118,10 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
     }
 
     m_combus->attach( *this );   // Listen to ComBus connection status
-    m_combus->attach( *this, "ADARA.STATUS.>" ); // Listen to ADARA process health status (display only)
-    m_combus->attach( *this, "ADARA.SIGNAL.>" ); // Listen to ADARA signals
-    m_combus->attach( *this, "ADARA.APP.DASMON.0" );
-    m_combus->setControlListener( *this );
+    m_combus->setInputListener( *this );
+    m_combus->attach( *this, "STATUS.>" ); // Listen to ADARA process health status (display only)
+    m_combus->attach( *this, "SIGNAL.>" ); // Listen to ADARA signals
+    m_combus->attach( *this, "APP.DASMON.0" );
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -130,7 +141,7 @@ MainWindow::MainWindow(const std::string &a_broker_uri, const std::string &a_bro
 MainWindow::~MainWindow()
 {
     m_combus->detach( (ITopicListener&)*this );
-    m_combus->detach( (IStatusListener&)*this );
+    m_combus->detach( (IConnectionListener&)*this );
 
     delete m_combus;
     delete ui;
@@ -264,7 +275,7 @@ MainWindow::setSMSActive( bool a_active )
 void
 MainWindow::onProcTimer()
 {
-    m_combus->sendStatus( ADARA::ComBus::STATUS_OK );
+    m_combus->status( ADARA::ComBus::STATUS_OK );
 
     QMutexLocker lock( &m_mutex );
     unsigned long t = time(0);
@@ -279,7 +290,7 @@ MainWindow::onProcTimer()
             if ( p->first == "DASMON.0" )
                 kill_dasmon = true;
 
-            writeLog( ADARA::INFO, p->first + " is dead" );
+            writeLog( ADARA::INFO, p->first + " is inactive" );
 
             m_proc_status.erase( p++ );
             m_refresh_proc_table = true;
@@ -486,19 +497,19 @@ MainWindow::onTableTimer()
 void
 MainWindow::onPvTimer()
 {
-    string id;
     ADARA::ComBus::DASMON::GetProcessVariables cmd;
-    m_combus->sendControl( cmd, "DASMON.0", id );
+    m_combus->send( cmd, "DASMON.0" );
 }
 
 
 void
 MainWindow::configActiveMQ()
 {
-    AMQConfigDialog  dlg( this, m_broker_uri, m_broker_user, m_broker_pass );
+    AMQConfigDialog  dlg( this, m_domain, m_broker_uri, m_broker_user, m_broker_pass );
 
     if ( dlg.exec() == QDialog::Accepted )
     {
+        m_domain = dlg.getDomain();
         m_broker_uri = dlg.getBrokerURI();
         m_broker_user = dlg.getUsername();
         m_broker_pass = dlg.getPassword();
@@ -506,6 +517,7 @@ MainWindow::configActiveMQ()
         QSettings settings;
 
         settings.beginGroup( "ActiveMQ" );
+        settings.setValue( "domain", m_domain.c_str() );
         settings.setValue( "broker_uri", m_broker_uri.c_str() );
         settings.setValue( "username", m_broker_user.c_str() );
         settings.setValue( "password", m_broker_pass.c_str() );
@@ -513,7 +525,11 @@ MainWindow::configActiveMQ()
 
         // Reset m_init to send an "emit status" message to dasmond when we connect
         m_init = true;
-        ADARA::ComBus::Connection::getInst().setBroker( m_broker_uri, m_broker_user, m_broker_pass );
+        ADARA::ComBus::Connection::getInst().setConnection( m_domain, m_broker_uri, m_broker_user, m_broker_pass );
+
+        m_combus->attach( *this, "STATUS.>" );
+        m_combus->attach( *this, "SIGNAL.>" );
+        m_combus->attach( *this, "APP.DASMON.0" );
     }
 }
 
@@ -855,6 +871,7 @@ MainWindow::clearRunDisplay()
     QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
+
 void
 MainWindow::clearSignals()
 {
@@ -864,6 +881,7 @@ MainWindow::clearSignals()
 
     m_refresh_signal_table = true;
 }
+
 
 void
 MainWindow::clearMonitors()
@@ -903,9 +921,8 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
     if ( m_init && a_connected )
     {
-        string id;
         ADARA::ComBus::EmitStateCommand cmd;
-        m_combus->sendControl( cmd, "DASMON.0", id );
+        m_combus->send( cmd, "DASMON.0" );
         m_init = false;
     }
 }
@@ -918,9 +935,9 @@ MainWindow::comBusConnectionStatus( bool a_connected )
 void
 MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
-    //const string &source = a_msg.getSourceName() + "." + boost::lexical_cast<string>(a_msg.getSourceInstance());
-
     QMutexLocker lock( &m_mutex );
+
+    //cout << "got: " << hex << a_msg.getMessageType() << endl;
 
     setComBusActive( true );
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
@@ -930,7 +947,6 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     {
     case ADARA::ComBus::MSG_STATUS:
         {
-
             map<string,ProcInfo>::iterator ip = m_proc_status.find( a_msg.getSourceName() );
             if ( ip != m_proc_status.end())
             {
@@ -976,7 +992,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_SIGNAL_ASSERT:
+    case ADARA::ComBus::MSG_SIGNAL_ASSERTED:
         {
             const ADARA::ComBus::SignalAssertMessage &msg = dynamic_cast<const ADARA::ComBus::SignalAssertMessage&>(a_msg);
 
@@ -990,7 +1006,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_SIGNAL_RETRACT:
+    case ADARA::ComBus::MSG_SIGNAL_RETRACTED:
         {
             const ADARA::ComBus::SignalRetractMessage &msg = dynamic_cast<const ADARA::ComBus::SignalRetractMessage&>(a_msg);
 
@@ -1127,8 +1143,10 @@ MainWindow::updateHighestSignal()
 
 
 bool
-MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
+MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
+    //cout << "Ctrl: " << hex << a_msg.getMessageType() << ", cor: " << a_msg.getCorrelationID() << endl;
+
     QMutexLocker lock( &m_mutex );
 
     setComBusActive( true );
@@ -1139,7 +1157,7 @@ MainWindow::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
 
     // See if this message belogs to a sub client (by correlation id)
 
-    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.m_correlation_id );
+    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.getCorrelationID() );
     if ( iRoute != m_client_cids.end() )
     {
         if ( !iRoute->second->comBusControlMessage( a_msg ))
@@ -1191,15 +1209,15 @@ MainWindow::clearCIDs_nolock( SubClient &a_sub_client )
 }
 
 bool
-MainWindow::createRoute( SubClient &a_sub_client, ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id )
+MainWindow::createRoute( SubClient &a_sub_client, ADARA::ComBus::MessageBase &a_msg, const std::string &a_dest_proc )
 {
     QMutexLocker lock( &m_mutex );
-    bool res = m_combus->sendControl( a_msg, a_dest_proc, a_correlation_id );
+    bool res = m_combus->send( a_msg, a_dest_proc );
 
     if ( res )
     {
         // If send worked, add routing entry for CID
-        m_client_cids[a_correlation_id] = &a_sub_client;
+        m_client_cids[a_msg.getCorrelationID()] = &a_sub_client;
     }
 
     return res;

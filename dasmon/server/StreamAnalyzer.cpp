@@ -539,38 +539,38 @@ StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
 
 
 void
-StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) const
+StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
 {
-    a_facts[m_fact_name[BIF_RECORDING]]         = "Recording is in progress when defined";
-    a_facts[m_fact_name[BIF_RUN_NUMBER]]        = "Integer run number available when recording";
-    a_facts[m_fact_name[BIF_PAUSED]]            = "System is paused when defined";
-    a_facts[m_fact_name[BIF_SCANNING]]          = "System is scanning when defined";
-    a_facts[m_fact_name[BIF_SCAN_INDEX]]        = "Integer scan index available when scanning";
-    a_facts[m_fact_name[BIF_FAC_NAME]]          = "Facility name is present when defined";
-    a_facts[m_fact_name[BIF_BEAM_ID]]           = "Beam ID is present when defined";
-    a_facts[m_fact_name[BIF_BEAM_SNAME]]        = "Beam short name is present when defined";
-    a_facts[m_fact_name[BIF_BEAM_LNAME]]        = "Beam long name is present when defined";
-    a_facts[m_fact_name[BIF_RUN_TITLE]]         = "Run title is present when defined";
-    a_facts[m_fact_name[BIF_PROP_ID]]           = "Proposal ID is present when defined";
-    a_facts[m_fact_name[BIF_SAMPLE_ID]]         = "Sample ID is present when defined";
-    a_facts[m_fact_name[BIF_SAMPLE_NAME]]       = "Sample name is present when defined";
-    a_facts[m_fact_name[BIF_SAMPLE_NAT]]        = "Sample nature is present when defined";
-    a_facts[m_fact_name[BIF_SAMPLE_FORM]]       = "Sample formula is present when defined";
-    a_facts[m_fact_name[BIF_SAMPLE_ENV]]        = "Sample environment is present when defined";
-    a_facts[m_fact_name[BIF_USER_INFO]]         = "User info is present when defined";
-    a_facts[m_fact_name[BIF_COUNT_RATE]]        = "Event count rate (counts/sec)";
-    a_facts[m_fact_name[BIF_PULSE_CHARGE]]      = "Pulse charge (Co)";
-    a_facts[m_fact_name[BIF_PULSE_FREQ]]        = "Pulse frequency (Hz)";
-    a_facts[m_fact_name[BIF_STREAM_RATE]]       = "ADARA stream data rate (bits/sec)";
-    a_facts[m_fact_name[BIF_RUN_PULSE_CHARGE]]  = "Accumulated pulse charge (Co)";
-    a_facts[m_fact_name[BIF_PIX_ERR_COUNT]]     = "Accumulated pixel error count";
-    a_facts[m_fact_name[BIF_DUP_PULSE_COUNT]]   = "Accumulated duplicate pulse count";
-    a_facts[m_fact_name[BIF_MAP_ERROR_COUNT]]   = "Accumulated map error count";
-    a_facts[m_fact_name[BIF_MISS_RTDL_COUNT]]   = "Accumulated missing RTDL count";
-    a_facts[m_fact_name[BIF_PULSE_VETO_COUNT]]  = "Accumulated pulse veto count";
-    a_facts[m_fact_name[BIF_SMS_CONNECTED]]     = "SMS is connected when defined";
-    a_facts[m_fact_name[BIF_GENERAL_PV_LIMIT]]  = "One or more PVs have limit codes set";
-    a_facts[m_fact_name[BIF_GENERAL_PV_ERROR]]  = "One or more PVs have error codes set";
+    a_facts.insert(m_fact_name[BIF_RECORDING]);
+    a_facts.insert(m_fact_name[BIF_RUN_NUMBER]);
+    a_facts.insert(m_fact_name[BIF_PAUSED]);
+    a_facts.insert(m_fact_name[BIF_SCANNING]);
+    a_facts.insert(m_fact_name[BIF_SCAN_INDEX]);
+    a_facts.insert(m_fact_name[BIF_FAC_NAME]);
+    a_facts.insert(m_fact_name[BIF_BEAM_ID]);
+    a_facts.insert(m_fact_name[BIF_BEAM_SNAME]);
+    a_facts.insert(m_fact_name[BIF_BEAM_LNAME]);
+    a_facts.insert(m_fact_name[BIF_RUN_TITLE]);
+    a_facts.insert(m_fact_name[BIF_PROP_ID]);
+    a_facts.insert(m_fact_name[BIF_SAMPLE_ID]);
+    a_facts.insert(m_fact_name[BIF_SAMPLE_NAME]);
+    a_facts.insert(m_fact_name[BIF_SAMPLE_NAT]);
+    a_facts.insert(m_fact_name[BIF_SAMPLE_FORM]);
+    a_facts.insert(m_fact_name[BIF_SAMPLE_ENV]);
+    a_facts.insert(m_fact_name[BIF_USER_INFO]);
+    a_facts.insert(m_fact_name[BIF_COUNT_RATE]);
+    a_facts.insert(m_fact_name[BIF_PULSE_CHARGE]);
+    a_facts.insert(m_fact_name[BIF_PULSE_FREQ]);
+    a_facts.insert(m_fact_name[BIF_STREAM_RATE]);
+    a_facts.insert(m_fact_name[BIF_RUN_PULSE_CHARGE]);
+    a_facts.insert(m_fact_name[BIF_PIX_ERR_COUNT]);
+    a_facts.insert(m_fact_name[BIF_DUP_PULSE_COUNT]);
+    a_facts.insert(m_fact_name[BIF_MAP_ERROR_COUNT]);
+    a_facts.insert(m_fact_name[BIF_MISS_RTDL_COUNT]);
+    a_facts.insert(m_fact_name[BIF_PULSE_VETO_COUNT]);
+    a_facts.insert(m_fact_name[BIF_SMS_CONNECTED]);
+    a_facts.insert(m_fact_name[BIF_GENERAL_PV_LIMIT]);
+    a_facts.insert(m_fact_name[BIF_GENERAL_PV_ERROR]);
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -579,7 +579,7 @@ StreamAnalyzer::getInputFacts( std::map<std::string,std::string> &a_facts ) cons
         // If asserted fact is not a built-in fact, then it is a PV fact
         if ( a_facts.find( *f ) == a_facts.end())
         {
-            a_facts[*f] = "unknown";
+            a_facts.insert(*f);
         }
     }
 }

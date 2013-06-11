@@ -19,7 +19,7 @@ public:
     {
     }
 
-    MessageType         getMessageType() const
+    unsigned long       getMessageType() const
                         { return MSG_STS_TRANS_COMPLETE; }
 
     std::string         m_beam_sname;

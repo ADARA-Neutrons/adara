@@ -15,6 +15,7 @@ using namespace std;
 namespace ADARA {
 namespace ComBus {
 
+
 //////////////////////////////////////////////////////////////////////////////
 // ComBus Translator Class
 
@@ -26,7 +27,7 @@ Connection::Translator::Translator( ITopicListener &a_listener )
 }
 
 
-Connection::Translator::Translator( IControlListener &a_handler )
+Connection::Translator::Translator( IInputListener &a_handler )
     : m_listener(0), m_handler(&a_handler)
 {
     m_proc_name = Connection::getInst().m_proc_name;
@@ -54,21 +55,11 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
     {
         MessageBase *msg = Connection::makeMessage( *txtmsg );
 
+        // Route message to appropriate interface based on mode of translator
         if ( m_listener )
-        {
             m_listener->comBusMessage( *msg );
-        }
-        else
-        {
-            if ( msg->getMessageCategory() == CAT_CONTROL)
-            {
-                ControlMessage *control = dynamic_cast<ControlMessage*>(msg);
-
-                // Filter out Control messages sent to other instances
-                //if ( control && control->m_dest_inst == m_inst_num )
-                    m_handler->comBusControlMessage( *control );
-            }
-        }
+        else if ( msg->getMessageCategory() == CAT_INPUT )
+            m_handler->comBusInputMessage( *msg );
 
         delete msg;
     }
@@ -145,11 +136,11 @@ Connection::Translator::disconnect_all()
 Connection * Connection::g_inst = 0;
 
 
-Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_num,
+Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, unsigned long a_inst_num,
                          const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
                          const std::string &a_log_dir )
-  : m_running(true), m_connected(false), m_proc_name(a_proc_name), m_inst_num(a_inst_num),
-    m_ctrl_listener(0), m_ctrl_translator(0),
+  : m_running(true), m_connected(false), m_domain(a_domain), m_proc_name(a_proc_name), m_inst_num(a_inst_num),
+    m_input_listener(0), m_input_translator(0),
     m_broker_uri(a_broker_uri), m_broker_user(a_user), m_broker_pass(a_pass),
     m_connection(0), m_session(0), m_reconnect_thread(0), m_status_thread(0)
 {
@@ -170,7 +161,10 @@ Connection::Connection(  const std::string &a_proc_name, unsigned long a_inst_nu
         m_broker_uri += string( ":61616" );
     }
 
-    //if ( a_inst_num )
+    // If base path is specified, ensure it ends with a '.' character
+    if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
+        m_domain += ".";
+
     m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + "." + boost::lexical_cast<string>(a_inst_num) + ".txt";
@@ -192,8 +186,8 @@ Connection::~Connection() throw()
     m_status_cond.notify_one();
     m_status_thread->join();
 
-    if ( m_ctrl_translator )
-        delete m_ctrl_translator;
+    if ( m_input_translator )
+        delete m_input_translator;
 
     map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
     for( ; ilist != m_listeners.end(); ++ilist )
@@ -215,11 +209,29 @@ Connection::getInst()
 }
 
 
+/**
+ * /param a_domain - New AMQP domain prefix
+ * /param a_broker_uri - URI of amqp broker (may specify failover)
+ * /param a_user - Optional broker user name
+ * /param a_pass - Optional broker password
+ *
+ * This method allows the AMQP connection parameters to be changed. If a connection is active, it is
+ * disconnected and all topics are detached; however, status and control listeners are not detached.
+ * A new connection is started asynchronously before this method returns. All status listeners will
+ * be notified about the disconnect and subsequent connection events.
+ */
 void
-Connection::setBroker( const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass )
+Connection::setConnection( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass )
 {
     boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
+    // Drop all general topic subscriptions
+    map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
+    for( ; ilist != m_listeners.end(); ++ilist )
+        delete ilist->second;
+    m_listeners.clear();
+
+    m_domain = a_domain;
     m_broker_uri = a_broker_uri;
     m_broker_user = a_user;
     m_broker_pass = a_pass;
@@ -227,22 +239,26 @@ Connection::setBroker( const std::string &a_broker_uri, const std::string &a_use
     lock.unlock();
 
     disconnect();
+
+    // Re-establish control listener
+    if ( m_input_listener )
+        setInputListener( *m_input_listener );
 }
 
 
 void
-Connection::setControlListener( IControlListener &a_ctrl_listener )
+Connection::setInputListener( IInputListener &a_ctrl_listener )
 {
-    if ( m_ctrl_translator )
+    if ( m_input_translator )
     {
-        delete m_ctrl_translator;
-        m_ctrl_translator = 0;
-        m_ctrl_listener = 0;
+        delete m_input_translator;
+        m_input_translator = 0;
+        m_input_listener = 0;
     }
 
-    m_ctrl_listener = &a_ctrl_listener;
-    m_ctrl_translator = new Translator( *m_ctrl_listener );
-    m_ctrl_translator->attach( string("ADARA.CONTROL.") + m_proc_name );
+    m_input_listener = &a_ctrl_listener;
+    m_input_translator = new Translator( *m_input_listener );
+    m_input_translator->attach( m_domain + "INPUT." + m_proc_name );
 }
 
 
@@ -281,7 +297,6 @@ Connection::reconnectThread()
 
         try
         {
-            //cout << "retry connect" << endl;
             m_connection = dynamic_cast<activemq::core::ActiveMQConnection*>( factory.createConnection( m_broker_user, m_broker_pass ) );
             if ( !m_connection )
                 throw std::runtime_error( "Failed to create ActiveMQConnection" );
@@ -299,8 +314,8 @@ Connection::reconnectThread()
             }
 
             // Reconnect control listener, if specified
-            if ( m_ctrl_listener )
-                m_ctrl_translator->connect_all();
+            if ( m_input_listener )
+                m_input_translator->connect_all();
 
             // Notify connection status thread
             m_status_cond.notify_one();
@@ -341,7 +356,6 @@ Connection::connectionStatusNotifyThread()
 
     while( 1 )
     {
-        //cout << "chk status" << endl;
         boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
         // If Connection object is being destroyed, exit
@@ -352,7 +366,7 @@ Connection::connectionStatusNotifyThread()
         if ( last_connection_state != m_connected )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
-            for ( vector<IStatusListener*>::iterator l = m_status_listeners.begin(); l != m_status_listeners.end(); ++l )
+            for ( vector<IConnectionListener*>::iterator l = m_status_listeners.begin(); l != m_status_listeners.end(); ++l )
                 (*l)->comBusConnectionStatus( m_connected );
 
             last_connection_state = m_connected;
@@ -394,8 +408,8 @@ Connection::disconnect()
         }
 
         // Disconnect control listener, if specified
-        if ( m_ctrl_listener )
-            m_ctrl_translator->disconnect_all();
+        if ( m_input_listener )
+            m_input_translator->disconnect_all();
 
         delete m_session;
         m_session = 0;
@@ -409,22 +423,22 @@ Connection::disconnect()
 
 
 bool
-Connection::sendStatus( StatusCode a_status )
+Connection::status( StatusCode a_status )
 {
     StatusMessage msg(a_status);
-    return sendMessage( msg );
+    return broadcast( msg );
 }
 
 
 bool
-Connection::sendLog( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid )
+Connection::log( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid )
 {
     bool res = false;
 
     if ( m_connected )
     {
         LogMessage msg( a_msg, a_level, a_file, a_line, a_tid );
-        res = sendMessage( msg );
+        res = broadcast( msg );
     }
 
     // If combus fails, fallback to log file output
@@ -444,7 +458,7 @@ Connection::sendLog( const std::string &a_msg, Level a_level, const char *a_file
 
 
 bool
-Connection::sendMessage( MessageBase &a_msg )
+Connection::broadcast( MessageBase &a_msg )
 {
     bool res = false;
 
@@ -454,11 +468,8 @@ Connection::sendMessage( MessageBase &a_msg )
 
         try
         {
-            // Set source and timestamp when msg sent
-            a_msg.setSourceInfo( m_proc_name ); //, m_inst_num );
-            a_msg.setTimestamp( time(0) );
+            a_msg.setRoutingInfo( m_proc_name, time(0) );
 
-            //cmsmsg = a_msg.createCMSMessage( *m_session );
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
 
@@ -468,15 +479,13 @@ Connection::sendMessage( MessageBase &a_msg )
             {
                 // First message sent on this topic, create producer and put in "cache"
                 pair<cms::Topic*,cms::MessageProducer*> p;
-                p.first = m_session->createTopic( string("ADARA.") + topic + "." + m_proc_name );
+                p.first = m_session->createTopic( m_domain + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
                 m_producer_topics[topic] = p;
-                //cout << "send: ADARA." << topic << "." << m_proc_name  << ", ty: " << hex << a_msg.getMessageType() << endl;
                 p.second->send( cmsmsg );
             }
             else
             {
-                //cout << "--> send: ADARA." << topic << "." << m_proc_name << ", ty: " << hex << a_msg.getMessageType() << endl;
                 itop->second.second->send( cmsmsg );
             }
 
@@ -485,15 +494,10 @@ Connection::sendMessage( MessageBase &a_msg )
         }
         catch(...)
         {
-            //cout << "send failed - exception." << endl;
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
         }
-    }
-    else
-    {
-        //cout << "send failed - not connected." << endl;
     }
 
     return res;
@@ -503,7 +507,6 @@ Connection::sendMessage( MessageBase &a_msg )
 /**
  * @param a_msg - ComBus ControlMessage to send
  * @param a_dest_proc - Name of recipient process
- * @param a_dest_inst - Instance ID of recipient process
  * @param a_correlation_id - Correlation ID to use (or will be set if empty)
  *
  * This method send a ControlMessage to the CONTROL topic associated with the specified recipient. If the message
@@ -514,7 +517,7 @@ Connection::sendMessage( MessageBase &a_msg )
  * life cycle (i.e. how long correlation IDs and associated state information is maintained).
  */
 bool
-Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /*, unsigned long a_dest_inst*/, std::string &a_correlation_id  )
+Connection::send( MessageBase &a_msg, const std::string &a_dest_proc, const std::string *a_correlation_id )
 {
     bool res = false;
 
@@ -524,15 +527,8 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
 
         try
         {
-            a_msg.setSourceInfo( m_proc_name ); //, m_inst_num );
-            a_msg.setDestInfo( /*a_dest_inst,*/ a_correlation_id );
-            a_msg.setTimestamp( time(0) );
+            a_msg.setRoutingInfo( m_proc_name, time(0), a_correlation_id );
 
-            //string full_dest = a_dest_proc + "." + boost::lexical_cast<string>(a_dest_inst);
-
-            //cout << "Send Topic = " << "ADARA.CONTROL." << full_dest << endl;
-
-            //cmsmsg = a_msg.createCMSMessage( *m_session );
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
 
@@ -541,7 +537,7 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
             {
                 // First message sent on this topic, create producer and put in "cache"
                 pair<cms::Topic*,cms::MessageProducer*> p;
-                p.first = m_session->createTopic( string("ADARA.CONTROL.") + a_dest_proc );
+                p.first = m_session->createTopic( m_domain + "INPUT." + a_dest_proc );
                 p.second = m_session->createProducer( p.first );
                 m_producer_topics[a_dest_proc] = p;
 
@@ -552,11 +548,10 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
                 itop->second.second->send( cmsmsg );
             }
 
-            // If the correl ID is not set, use the current message ID (receiver will use same)
-            if ( a_correlation_id.empty() )
+            // If the correl ID is requested (not set or empty), use the current message ID (receiver will use same)
+            if ( !a_correlation_id || a_correlation_id->empty() )
             {
-                a_correlation_id = cmsmsg->getCMSMessageID();
-                //cout << "New msg assigned CID = " << a_correlation_id << endl;
+                a_msg.setCorrelationID( cmsmsg->getCMSMessageID() );
             }
 
             delete cmsmsg;
@@ -564,15 +559,10 @@ Connection::sendControl( ControlMessage &a_msg, const std::string &a_dest_proc /
         }
         catch(...)
         {
-            //cout << "send failed - exception." << endl;
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
         }
-    }
-    else
-    {
-        //cout << "send failed - not connected." << endl;
     }
 
     return res;
@@ -584,61 +574,35 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
 {
     // Due to constraints imposed by the RESTful interface, the message type
     // must be supplied in the message body. This means that the body must be
-    // parsed here first to extract the message type (for object creation),
-    // then parsed again by the unserialization process.
-    //cout << "text = " << a_msg.getText() << endl;
+    // parsed here first to extract the message type (for object creation).
 
     boost::property_tree::ptree prop_tree;
     std::stringstream sstr( a_msg.getText() );
     read_json( sstr, prop_tree );
 
-    unsigned long msg_type = prop_tree.get( "msg_type", 0 );
-    MessageBase *msg = 0;
+    unsigned long msg_type = prop_tree.get( "msg_type", 0UL );
 
-    //cout << "type = " << msg_type << endl;
+    //cout << "msg: " << hex << msg_type << endl;
+    //cout << a_msg.getText() << endl;
 
-    switch( msg_type )
-    {
-    case MSG_LOG:                           msg = new LogMessage(); break;
-    case MSG_STATUS:                        msg = new StatusMessage(); break;
-    case MSG_SIGNAL_ASSERT:                 msg = new SignalAssertMessage(); break;
-    case MSG_SIGNAL_RETRACT:                msg = new SignalRetractMessage(); break;
-    case MSG_CMD_EMIT_STATUS:               msg = new EmitStatusCommand(); break;
-    case MSG_CMD_EMIT_STATE:                msg = new EmitStateCommand(); break;
-    case MSG_REPLY_ACK:                     msg = new AckReply(); break;
-    case MSG_REPLY_NACK:                    msg = new NackReply(); break;
-    case MSG_STS_TRANS_COMPLETE:            msg = new STS::TranslationCompleteMessage(); break;
-    case MSG_DASMON_SMS_CONN_STATUS:        msg = new DASMON::ConnectionStatusMessage(); break;
-    case MSG_DASMON_RUN_STATUS:             msg = new DASMON::RunStatusMessage(); break;
-    case MSG_DASMON_PAUSE_STATUS:           msg = new DASMON::PauseStatusMessage(); break;
-    case MSG_DASMON_SCAN_STATUS:            msg = new DASMON::ScanStatusMessage(); break;
-    case MSG_DASMON_BEAM_INFO:              msg = new DASMON::BeamInfoMessage(); break;
-    case MSG_DASMON_RUN_INFO:               msg = new DASMON::RunInfoMessage(); break;
-    case MSG_DASMON_BEAM_METRICS:           msg = new DASMON::BeamMetricsMessage(); break;
-    case MSG_DASMON_RUN_METRICS:            msg = new DASMON::RunMetricsMessage(); break;
-    case MSG_DASMON_RULE_DEFINITIONS:       msg = new DASMON::RuleDefinitions(); break;
-    case MSG_DASMON_GET_RULES:              msg = new DASMON::GetRuleDefinitions(); break;
-    case MSG_DASMON_SET_RULES:              msg = new DASMON::SetRuleDefinitions(); break;
-    case MSG_DASMON_RESTORE_DEFAULT_RULES:  msg = new DASMON::RestoreDefaultRuleDefinitions(); break;
-    case MSG_DASMON_GET_INPUT_FACTS:        msg = new DASMON::GetInputFacts(); break;
-    case MSG_DASMON_INPUT_FACTS:            msg = new DASMON::InputFacts(); break;
-    case MSG_DASMON_GET_PVS:                msg = new DASMON::GetProcessVariables(); break;
-    case MSG_DASMON_PVS:                    msg = new DASMON::ProcessVariables(); break;
-    default:
-        throw std::runtime_error("Unknown message type");
-    }
+    MessageBase *msg = Factory::Inst().make( (MessageType) msg_type );
 
-    msg->unserialize( a_msg, prop_tree );
+    msg->unserialize( prop_tree );
+
+    if ( msg->getCorrelationID().empty() )
+        msg->setCorrelationID( a_msg.getCMSMessageID() );
+
+    //cout << "ok" << endl;
 
     return msg;
 }
 
 
 void
-Connection::attach( IStatusListener  &a_subscriber )
+Connection::attach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IStatusListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
+    vector<IConnectionListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
     if ( l == m_status_listeners.end() )
     {
         m_status_listeners.push_back( &a_subscriber );
@@ -648,10 +612,10 @@ Connection::attach( IStatusListener  &a_subscriber )
 
 
 void
-Connection::detach( IStatusListener  &a_subscriber )
+Connection::detach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IStatusListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
+    vector<IConnectionListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
     if ( l != m_status_listeners.end() )
     {
         m_status_listeners.erase( l );
@@ -669,11 +633,11 @@ Connection::attach( ITopicListener &a_listener, const std::string &a_topic )
     {
         Translator *trans = new Translator(a_listener);
         m_listeners[&a_listener] = trans;
-        trans->attach( a_topic );
+        trans->attach( m_domain + a_topic );
     }
     else
     {
-        l->second->attach( a_topic );
+        l->second->attach( m_domain + a_topic );
     }
 }
 
@@ -686,7 +650,7 @@ Connection::detach( ITopicListener &a_listener, const std::string &a_topic )
     map<ITopicListener*,Translator*>::iterator l = m_listeners.find( &a_listener );
     if ( l != m_listeners.end())
     {
-        l->second->detach( a_topic );
+        l->second->detach( m_domain + a_topic );
         if ( !l->second->haveTopics() )
         {
             delete l->second;

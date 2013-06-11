@@ -24,13 +24,13 @@ class MainWindow;
 }
 
 
-class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, public ADARA::ComBus::IStatusListener,
-        public ADARA::ComBus::IControlListener
+class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, public ADARA::ComBus::IConnectionListener,
+        public ADARA::ComBus::IInputListener
 {
     Q_OBJECT
 
 public:
-    MainWindow( const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master );
+    MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master );
     ~MainWindow();
 
 signals:
@@ -108,7 +108,7 @@ private:
     void        clearMonitors();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
-    bool        comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
+    bool        comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
 
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();
@@ -134,7 +134,7 @@ private:
     // Methods to support SubClient command routing
     void        attach( SubClient &a_sub_client );
     void        detach( SubClient &a_sub_client );
-    bool        createRoute( SubClient &a_sub_client, ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id );
+    bool        createRoute( SubClient &a_sub_client, ADARA::ComBus::MessageBase &a_msg, const std::string &a_dest_proc );
     void        removeRoute( SubClient &a_sub_client, std::string &a_correlation_id );
     void        clearCIDs_nolock( SubClient &a_sub_client );
 
@@ -190,6 +190,7 @@ private:
     QMutex                          m_mutex;
     QMutex                          m_log_mutex;
     ADARA::ComBus::Connection      *m_combus;
+    std::string                     m_domain;
     std::string                     m_broker_uri;
     std::string                     m_broker_user;
     std::string                     m_broker_pass;

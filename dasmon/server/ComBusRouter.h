@@ -22,11 +22,11 @@ namespace DASMON {
  * either from the re-emitted messages, or based on asserts and retracts. If retracts are used, a fail-safe timeout
  * must be employed to prevent stuck signals if the retract message is missed (due to process or broker crash).
  */
-class ComBusRouter : public IStreamListener, public ADARA::ComBus::IStatusListener, public ADARA::ComBus::IControlListener,
+class ComBusRouter : public IStreamListener, public ADARA::ComBus::IConnectionListener, public ADARA::ComBus::IInputListener,
         public StreamAnalyzer::ISignalListener, public ADARA::ComBus::ITopicListener
 {
 public:
-    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, const std::vector<std::pair<std::string,bool> > &a_proc_info );
+    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
     virtual ~ComBusRouter();
 
     void    run();
@@ -49,7 +49,7 @@ private:
     };
 
     void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
-    void    setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg );
+    void    setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg );
     void    sendInputFacts( const std::string &a_src_proc, const std::string &a_CID );
     void    sendPVs( const std::string &a_src_proc, const std::string &a_CID );
 
@@ -70,8 +70,8 @@ private:
     // IStatusListener Interface
     void    comBusConnectionStatus( bool a_connected );
 
-    // IControlListener Interface
-    bool    comBusControlMessage( const ADARA::ComBus::ControlMessage &a_cmd );
+    // IInputListener Interface
+    bool    comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
 
     // ITopicListener Interface
     void    comBusMessage( const ADARA::ComBus::MessageBase &a_msg );

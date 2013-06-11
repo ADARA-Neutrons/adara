@@ -1,6 +1,7 @@
 #include <string.h>
 #include <syslog.h>
 #include "ComBusRouter.h"
+#include "ComBusMessages.h"
 #include "DASMonMessages.h"
 
 using namespace std;
@@ -21,7 +22,7 @@ functions for the dasmond service, as follows:
 
 2)  The ComBusRouter class serves as the entry-point for dasmond
     command and control messages. The messages are received on the
-    ADARA.CONTROL.DASMON.0 topic and are typically peer-to-peer in
+    ADARA.INPUT.DASMON.0 topic and are typically peer-to-peer in
     nature (i.e. a reply will usually be sent to the sender). Received
     messages are translated into method calls to the StreamMonitor
     and/or StreamAnalyzer.
@@ -45,28 +46,22 @@ functions for the dasmond service, as follows:
     run() method.
 */
 
-ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, const vector<pair<string,bool> > &a_proc_info )
+ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
       m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
 
 {
-    for ( vector<pair<string,bool> >::const_iterator p = a_proc_info.begin(); p != a_proc_info.end(); ++p )
-    {
-        // Start process status set as initially "running" to provide a start-up grace period
-        m_procs[p->first] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, p->second, time(0) );
-    }
-
     m_monitor.addListener( *this );
     m_analyzer.attach( *this );
     m_combus.attach( *this );
-    m_combus.setControlListener( *this );
+    m_combus.setInputListener( *this );
     m_combus.attach( *this, "ADARA.STATUS.>" );
 }
 
 
 ComBusRouter::~ComBusRouter()
 {
-    m_combus.detach( (ADARA::ComBus::IStatusListener &)*this );
+    m_combus.detach( (ADARA::ComBus::IConnectionListener &)*this );
     m_combus.detach( (ADARA::ComBus::ITopicListener &)*this );
     m_analyzer.detach( *this );
 }
@@ -83,10 +78,6 @@ ComBusRouter::run()
     string          text;
     map<string,ProcInfo>::iterator ip;
 
-    //m_procs["DASMON.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
-    //m_procs["DASMON-GUI.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, false, time(0) );
-    //m_procs["PVSTREAMER.0"] = ProcInfo( ADARA::ComBus::STATUS_OK, ADARA::ComBus::STATUS_OK, true, time(0) );
-
     while(1)
     {
         sleep(1);
@@ -97,9 +88,9 @@ ComBusRouter::run()
         if ( !(count % 5 ))
         {
             if ( m_monitor.isOK() && m_analyzer.isOK() )
-                m_combus.sendStatus( ADARA::ComBus::STATUS_OK );
+                m_combus.status( ADARA::ComBus::STATUS_OK );
             else
-                m_combus.sendStatus( ADARA::ComBus::STATUS_FAULT );
+                m_combus.status( ADARA::ComBus::STATUS_FAULT );
         }
 
         // Watch for unresponsive / inactive processes
@@ -138,16 +129,15 @@ ComBusRouter::run()
 void
 ComBusRouter::sendRuleDefinitions( const string &a_src_proc, const string &a_CID )
 {
-    string cid = a_CID;
     ADARA::ComBus::DASMON::RuleDefinitions defs;
 
     m_analyzer.getDefinitions( defs.m_rules, defs.m_signals );
-    m_combus.sendControl( defs, a_src_proc, cid );
+    m_combus.send( defs, a_src_proc, &a_CID );
 }
 
 
 void
-ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
+ComBusRouter::setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg )
 {
     const ADARA::ComBus::DASMON::SetRuleDefinitions *set_msg =
             dynamic_cast<const ADARA::ComBus::DASMON::SetRuleDefinitions*>( a_msg );
@@ -161,7 +151,7 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
         if ( set_msg->m_set_default )
             m_analyzer.setDefaultConfig();
 
-        sendRuleDefinitions( a_msg->getSourceName(), a_msg->m_correlation_id );
+        sendRuleDefinitions( a_msg->getSourceName(), a_msg->getCorrelationID() );
     }
 }
 
@@ -169,25 +159,23 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::ControlMessage *a_msg )
 void
 ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &a_CID )
 {
-    string cid = a_CID;
     ADARA::ComBus::DASMON::InputFacts facts;
 
     m_analyzer.getInputFacts( facts.m_facts );
-    m_combus.sendControl( facts, a_src_proc, cid );
+    m_combus.send( facts, a_src_proc, &a_CID );
 }
 
 
 void
 ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 {
-    string cid = a_CID;
     ADARA::ComBus::DASMON::ProcessVariables pvs;
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
     pvs.m_pvs = m_pvs;
     lock.unlock();
 
-    m_combus.sendControl( pvs, a_src_proc, cid );
+    m_combus.send( pvs, a_src_proc, &a_CID );
 }
 
 
@@ -206,7 +194,7 @@ ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number, unsigned 
     }
 
     ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 
     m_recording = a_recording;
 }
@@ -215,42 +203,42 @@ void
 ComBusRouter::pauseStatus( bool a_paused )
 {
     ComBus::DASMON::PauseStatusMessage msg( a_paused );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
 ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
 {
     ComBus::DASMON::ScanStatusMessage msg( a_scanning, a_scan_number );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
 ComBusRouter::beamInfo( const BeamInfo &a_info )
 {
     ComBus::DASMON::BeamInfoMessage msg( a_info );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
 ComBusRouter::runInfo( const RunInfo &a_info )
 {
     ComBus::DASMON::RunInfoMessage msg( a_info );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
 ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 {
     ComBus::DASMON::BeamMetricsMessage msg( a_metrics );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
 ComBusRouter::runMetrics( const RunMetrics &a_metrics )
 {
     ComBus::DASMON::RunMetricsMessage msg( a_metrics );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 }
 
 void
@@ -289,7 +277,7 @@ void
 ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
     ComBus::DASMON::ConnectionStatusMessage msg( a_connected, a_host, a_port );
-    m_combus.sendMessage( msg );
+    m_combus.broadcast( msg );
 
     if ( a_connected && !m_sms_connected )
     {
@@ -306,16 +294,16 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 void
 ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
-    ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
-    m_combus.sendMessage( msg );
+    ADARA::ComBus::SignalAssertMessage msg( a_signal.name, a_signal.source, a_signal.msg, a_signal.level );
+    m_combus.broadcast( msg );
 }
 
 
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
-    ComBus::SignalRetractMessage msg( a_name );
-    m_combus.sendMessage( msg );
+    ADARA::ComBus::SignalRetractMessage msg( a_name );
+    m_combus.broadcast( msg );
 }
 
 
@@ -340,17 +328,33 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 }
 
 
-///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ITopicListener methods
 
+/**
+ * /param a_msg - Received ComBus message
+ *
+ * The comBusMessage method is the callback for all ComBus messages received
+ * on subscribed topics. TheComBusRouter class only monitor all traffic on the
+ * ADARA.STATUS.* topic in order to maintain state information for all running
+ * ComBus processess. This state information is injected into the StreamAnalyzer's
+ * rule engine which allows users to configure rules and signals pretaining to
+ * the status of important processes (using the ComBus process ID as a fact in
+ * a rule expression).
+ */
 void
 ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
+    // Only interested in Status messages
+
     if ( a_msg.getMessageType() == ADARA::ComBus::MSG_STATUS )
     {
         ADARA::ComBus::StatusCode status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
 
         boost::lock_guard<boost::mutex> lock(m_proc_mutex);
+
+        // Update time is recorded such that the run() method can detected unresponsive
+        // and inactive processes and update status accordingly.
 
         map<string,ProcInfo>::iterator ip = m_procs.find( a_msg.getSourceName() );
         if ( ip != m_procs.end() )
@@ -363,29 +367,29 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             m_procs[a_msg.getSourceName()] = ProcInfo( status, status, false, time(0) );
         }
 
+        // Inject process and state information into rule engine
+
         m_analyzer.assertFact( string("PROC_") + a_msg.getSourceName(), (int)status );
     }
 }
 
 
 ///////////////////////////////////////////////////////////
-// IControlListener methods
+// IInputListener methods
 
 bool
-ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
+ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     try
     {
         switch( a_msg.getMessageType() )
         {
-        case ADARA::ComBus::MSG_CMD_EMIT_STATE:
-            syslog( LOG_INFO, "Received request to emit state" );
+        case ADARA::ComBus::MSG_EMIT_STATE:
             m_resend_state = true;
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_RULES:
-            syslog( LOG_INFO, "Received request for current rules" );
-            sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
+            sendRuleDefinitions( a_msg.getSourceName(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
@@ -396,17 +400,15 @@ ComBusRouter::comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg )
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
             syslog( LOG_INFO, "Received request to restore default rules" );
             m_analyzer.restoreDefaultConfig();
-            sendRuleDefinitions( a_msg.getSourceName(), a_msg.m_correlation_id );
+            sendRuleDefinitions( a_msg.getSourceName(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
-            syslog( LOG_INFO, "Received request for current facts" );
-            sendInputFacts( a_msg.getSourceName(), a_msg.m_correlation_id );
+            sendInputFacts( a_msg.getSourceName(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_PVS:
-            //syslog( LOG_INFO, "Received request for current PVs" );
-            sendPVs( a_msg.getSourceName(), a_msg.m_correlation_id );
+            sendPVs( a_msg.getSourceName(), a_msg.getCorrelationID() );
             break;
 
         default:

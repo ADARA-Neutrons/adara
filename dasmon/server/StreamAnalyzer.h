@@ -37,11 +37,10 @@ public:
     void    setDefaultConfig();
     void    attach( ISignalListener &a_listener );
     void    detach( ISignalListener &a_listener );
-//    void    defineSignal( const std::string &a_expression );
     void    resendState();
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
-    void    getInputFacts( std::map<std::string,std::string> &a_facts ) const;
+    void    getInputFacts( std::set<std::string> &a_facts ) const;
     bool    isOK() const { return m_ok; }
     void    assertFact( const std::string &a_fact );
     template<class T>

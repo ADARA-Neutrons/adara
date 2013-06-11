@@ -541,7 +541,25 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
     //cout << "RunStat: " << a_pkt.status() << endl;
 
-    bool recording = (a_pkt.status() != ADARA::RunStatus::NO_RUN) && (a_pkt.runNumber() != 0);
+    bool recording = false;
+    switch (a_pkt.status())
+    {
+    case ADARA::RunStatus::RUN_BOF:
+    case ADARA::RunStatus::RUN_EOF:
+        return false;
+
+    case ADARA::RunStatus::NEW_RUN:
+        recording = true;
+        break;
+    case ADARA::RunStatus::STATE:
+        if ( a_pkt.runNumber())
+            recording = true;
+        break;
+
+    case ADARA::RunStatus::NO_RUN:
+    case ADARA::RunStatus::END_RUN:
+        break;
+    }
 
     if ( recording && !m_recording )
     {

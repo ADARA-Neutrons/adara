@@ -14,8 +14,11 @@ class AMQConfigDialog : public QDialog
 
 public:
     explicit AMQConfigDialog(QWidget *parent = 0);
-    AMQConfigDialog( QWidget *parent, const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass );
+    AMQConfigDialog( QWidget *parent, const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass );
     ~AMQConfigDialog();
+
+    const std::string &getDomain()
+    { return m_domain; }
 
     const std::string &getBrokerURI()
     { return m_broker_uri; }
@@ -31,6 +34,7 @@ private slots:
 
 private:
     Ui::AMQConfigDialog    *ui;
+    std::string             m_domain;
     std::string             m_broker_uri;
     std::string             m_username;
     std::string             m_password;

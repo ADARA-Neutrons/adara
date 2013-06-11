@@ -13,9 +13,9 @@ SubClient::~SubClient()
 
 
 bool
-SubClient::createRoute( ADARA::ComBus::ControlMessage &a_msg, const std::string &a_dest_proc, std::string &a_correlation_id )
+SubClient::createRoute( ADARA::ComBus::MessageBase &a_msg, const std::string &a_dest_proc )
 {
-    return m_parent.createRoute( *this, a_msg, a_dest_proc, a_correlation_id );
+    return m_parent.createRoute( *this, a_msg, a_dest_proc );
 }
 
 

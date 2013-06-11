@@ -1,9 +1,9 @@
 #ifndef DASMONMESSAGES_H
 #define DASMONMESSAGES_H
 
-#include <string>
-#include <boost/lexical_cast.hpp>
-#include "ComBusMessages.h"
+#include <set>
+#include <boost/foreach.hpp>
+#include "ComBusDefs.h"
 #include "RuleEngine.h"
 #include "DASMonDefs.h"
 
@@ -11,22 +11,33 @@ namespace ADARA {
 namespace ComBus {
 namespace DASMON {
 
-//////////////////////////////////////////////////////////////////////////////
-// DASMon Commands
 
-DEF_SIMPLE_CMD(GetRuleDefinitions,MSG_DASMON_GET_RULES)
-DEF_SIMPLE_CMD(RestoreDefaultRuleDefinitions,MSG_DASMON_RESTORE_DEFAULT_RULES)
-DEF_SIMPLE_CMD(GetProcessVariables,MSG_DASMON_GET_PVS)
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DASMon Command Messages - These messages related to command and control of dasmond
 
-/// Message containing current rule & signal definitions
-class RuleDefinitions : public ControlMessage
+/// GetRuleDefinitions message requests rule and signal config data from dasmond
+DEF_SIMPLE_MSG(GetRuleDefinitions,MSG_DASMON_GET_RULES)
+
+/// RestoreDefaultRuleDefinitions message requests that dasmond restore default rules and signals
+DEF_SIMPLE_MSG(RestoreDefaultRuleDefinitions,MSG_DASMON_RESTORE_DEFAULT_RULES)
+
+/// GetProcessVariables message requests dasmond to emitt all currently defined PVs
+DEF_SIMPLE_MSG(GetProcessVariables,MSG_DASMON_GET_PVS)
+
+/// GetInputFacts message requests available and/or asserted facts from rule engine
+DEF_SIMPLE_MSG(GetInputFacts,MSG_DASMON_GET_INPUT_FACTS)
+
+
+/** \brief The RulePayload class provides rule and signal configuration access.
+  *
+  * The RulePayload class is used internally by the RuleDefinitions and SetRuleDefinitions
+  * message classes to provide access to and serialization of rule and signal configuration
+  * data.
+  */
+class RulePayload
 {
 public:
-    RuleDefinitions()
-    {}
-
-    inline MessageType getMessageType() const
-    { return MSG_DASMON_RULE_DEFINITIONS; }
+    RulePayload() {}
 
     std::vector<RuleEngine::RuleInfo>       m_rules;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
@@ -34,8 +45,6 @@ public:
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::read( a_prop_tree );
-
         m_rules.clear();
         RuleEngine::RuleInfo rule;
         try {
@@ -66,8 +75,6 @@ protected:
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::write( a_prop_tree );
-
         for ( std::vector<RuleEngine::RuleInfo>::iterator r = m_rules.begin(); r != m_rules.end(); ++r )
         {
             boost::property_tree::ptree pt;
@@ -90,87 +97,126 @@ protected:
 };
 
 
-class SetRuleDefinitions : public RuleDefinitions
+/** \brief Message that describes current rules and signals configured in dasmond
+  *
+  * The RuleDefinitions message class is emitted by dasmond to describe the
+  * current configuration of rules and signals. This message can be sent in
+  * response to a GetRuleDefinitions message or as an Ack/Nack in response to a
+  * SetRuleDefinitions message.
+  */
+class RuleDefinitions :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_RULE_DEFINITIONS,RuleDefinitions>,
+        public RulePayload
+{
+public:
+    RuleDefinitions()
+    {}
+
+protected:
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+        RulePayload::read( a_prop_tree );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+        RulePayload::write( a_prop_tree );
+    }
+};
+
+/** \brief Message that sets rule and signal configuration for dasmond
+  *
+  * The SetRuleDefinitions message is sent to dasmond to configure both rules
+  * and signals. Dasmond will respond by emitting a RuleDefinitions message
+  * describing the rules and signals that are set. Note that if any errors
+  * are present in the rule or signal definitions, none of the changes will
+  * be applied by dasmond. It is the responsibility of the sender to assess
+  * the differences between what was sent/requested and what was received.
+  */
+class SetRuleDefinitions :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_SET_RULES,SetRuleDefinitions>,
+        public RulePayload
 {
 public:
     SetRuleDefinitions()
     {}
-
-    inline MessageType getMessageType() const
-    { return MSG_DASMON_SET_RULES; }
 
     bool m_set_default;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
-        RuleDefinitions::read( a_prop_tree );
+        MessageBase::read( a_prop_tree );
+        RulePayload::read( a_prop_tree );
 
         m_set_default = a_prop_tree.get( "set_default", false );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
-        RuleDefinitions::write( a_prop_tree );
+        MessageBase::write( a_prop_tree );
+        RulePayload::write( a_prop_tree );
 
         a_prop_tree.put( "set_default", m_set_default );
     }
 };
 
 
-/// Simple request message to retrieve currently defined rule (and signal) definitions
-DEF_SIMPLE_CMD(GetInputFacts,MSG_DASMON_GET_INPUT_FACTS)
 
-/// Message containing current built-in facts
-class InputFacts : public ControlMessage
+/** \brief Message sent from dasmond to describe available and asserted facts
+  *
+  * The InputFacts message is emitted by dasmond in reponse to a GetInputFacts
+  * message and contains available facts that can be used as inputs to rules.
+  * Facts that are derived from configured rules are not included, but facts
+  * that are asserted due to process variable or process status issues are
+  * included.
+  */
+class InputFacts : public ADARA::ComBus::TemplMessageBase<MSG_DASMON_INPUT_FACTS,InputFacts>
 {
 public:
     InputFacts()
     {}
 
-    inline MessageType getMessageType() const
-    { return MSG_DASMON_INPUT_FACTS; }
-
-    std::map<std::string,std::string> m_facts;
+    /// Contains facts name mapped to fact description
+    std::set<std::string> m_facts;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::read( a_prop_tree );
+        MessageBase::read( a_prop_tree );
 
         m_facts.clear();
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("facts"))
             {
-                m_facts[v.second.data()] = "";
+                m_facts.insert(v.second.data());
             }
         } catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::write( a_prop_tree );
+        MessageBase::write( a_prop_tree );
         boost::property_tree::ptree pt;
 
-        for ( std::map<std::string,std::string>::iterator fact = m_facts.begin(); fact != m_facts.end(); ++fact )
+        for ( std::set<std::string>::iterator fact = m_facts.begin(); fact != m_facts.end(); ++fact )
         {
-            pt.push_back( std::make_pair( "", fact->first ));
+            pt.push_back( std::make_pair( "", *fact ));
         }
 
         a_prop_tree.add_child( "facts", pt );
     }
 };
 
+// Note: The ProcessVariables message will be removed when direct output to db is available
 
-/// Message containing current built-in facts
-class ProcessVariables : public ControlMessage
+class ProcessVariables : public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PVS,ProcessVariables>
 {
 public:
     ProcessVariables()
     {}
-
-    inline MessageType getMessageType() const
-    { return MSG_DASMON_PVS; }
 
     struct PVData
     {
@@ -192,7 +238,8 @@ public:
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::read( a_prop_tree );
+        MessageBase::read( a_prop_tree );
+
         PVData data;
         m_pvs.clear();
         try {
@@ -200,7 +247,7 @@ protected:
             {
                 data.status = v.second.get( "status", 0 );
                 data.value = v.second.get( "value", 0.0 );
-                data.timestamp = v.second.get( "timestamp", 0 );
+                data.timestamp = v.second.get( "timestamp", 0UL );
                 m_pvs[v.first] = data;
             }
         } catch(...) {}
@@ -208,7 +255,7 @@ protected:
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
-        ControlMessage::write( a_prop_tree );
+        MessageBase::write( a_prop_tree );
 
         for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
         {
@@ -223,45 +270,12 @@ protected:
 };
 
 
-#if 0
-class SubscribeProcessVariableCommand : public Command
-{
-public:
-SubscribeProcessVariableCommand( std::string a_pv_name, bool a_subscribe, uint32_t a_update_interval )
-    : m_pv_name(a_pv_name), m_subscribe(a_subscribe), m_update_interval(a_update_interval)
-{}
-SubscribeProcessVariableCommand( const cms::Message &a_msg )
-    : Command( a_msg )
-{  translateFrom( a_msg ); }
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DASMon Application Messages - These messages related to dasmond broadcast messages
 
-inline MessageType getMessageType() const
-{ return MSG_CMD_CONFIG_LOGGING; }
-
-private:
-virtual void translateTo( cms::Message &a_msg )
-{
-    Command::translateTo( a_msg );
-
-    a_msg.setBooleanProperty( "log_enabled", m_enabled );
-    a_msg.setShortProperty( "log_level", (short)m_level );
-}
-
-void translateFrom( const cms::Message &a_msg )
-{
-    m_enabled = a_msg.getBooleanProperty( "log_enabled" );
-    m_level = (Level)a_msg.getShortProperty( "log_level" );
-}
-
-std::string     m_pv_name;
-bool            m_subscribe;
-uint32_t        m_update_interval;
-};
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
-// DASMon Application Messages
-
-class ConnectionStatusMessage : public MessageBase
+/// Indicates the current connection status and host information
+class ConnectionStatusMessage :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_SMS_CONN_STATUS,ConnectionStatusMessage>
 {
 public:
     ConnectionStatusMessage()
@@ -270,7 +284,6 @@ public:
     ConnectionStatusMessage( bool m_connected, const std::string &a_host, unsigned short a_port )
         : m_connected(m_connected), m_host(a_host), m_port(a_port) {}
 
-    inline MessageType  getMessageType() const { return MSG_DASMON_SMS_CONN_STATUS; }
 
     bool                m_connected;
     std::string         m_host;
@@ -283,7 +296,7 @@ protected:
 
         m_connected = a_prop_tree.get( "connected", false );
         m_host = a_prop_tree.get( "host", "" );
-        m_port = a_prop_tree.get( "port", 0 );
+        m_port = a_prop_tree.get( "port", 0U );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -296,8 +309,9 @@ protected:
     }
 };
 
-
-class RunStatusMessage : public MessageBase
+/// Indicates current run status, number, and start time
+class RunStatusMessage :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_RUN_STATUS,RunStatusMessage>
 {
 public:
     RunStatusMessage()
@@ -305,8 +319,6 @@ public:
 
     RunStatusMessage( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
         : m_recording(a_recording), m_run_number(a_run_number), m_timestamp(a_timestamp) {}
-
-    inline MessageType  getMessageType() const { return MSG_DASMON_RUN_STATUS; }
 
     bool                m_recording;
     unsigned long       m_run_number;
@@ -318,8 +330,8 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_recording = a_prop_tree.get( "recording", false );
-        m_run_number = a_prop_tree.get( "run_number", 0 );
-        m_timestamp = a_prop_tree.get( "timestamp", 0 );
+        m_run_number = a_prop_tree.get( "run_number", 0UL );
+        m_timestamp = a_prop_tree.get( "timestamp", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -333,7 +345,9 @@ protected:
 };
 
 
-class PauseStatusMessage : public MessageBase
+/// Indicates current pause state
+class PauseStatusMessage :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PAUSE_STATUS,PauseStatusMessage>
 {
 public:
     PauseStatusMessage()
@@ -342,7 +356,6 @@ public:
     PauseStatusMessage( bool a_paused )
         : m_paused(a_paused) {}
 
-    inline MessageType  getMessageType() const { return MSG_DASMON_PAUSE_STATUS; }
     bool                m_paused;
 
 protected:
@@ -362,7 +375,9 @@ protected:
 };
 
 
-class ScanStatusMessage : public MessageBase
+/// Indicates current scan state and scan index value
+class ScanStatusMessage :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_SCAN_STATUS,ScanStatusMessage>
 {
 public:
     ScanStatusMessage()
@@ -370,8 +385,6 @@ public:
 
     ScanStatusMessage( bool a_scaning, unsigned long a_scan_index )
         : m_scaning(a_scaning), m_scan_index(a_scan_index) {}
-
-    inline MessageType  getMessageType() const { return MSG_DASMON_SCAN_STATUS; }
 
     bool                m_scaning;
     unsigned long       m_scan_index;
@@ -382,7 +395,7 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_scaning = a_prop_tree.get( "scanning", false );
-        m_scan_index = a_prop_tree.get( "scan_index", 0 );
+        m_scan_index = a_prop_tree.get( "scan_index", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -395,7 +408,10 @@ protected:
 };
 
 
-class BeamInfoMessage : public MessageBase, public ADARA::DASMON::BeamInfo
+/// Conveys a payload of beam line information
+class BeamInfoMessage :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_BEAM_INFO,BeamInfoMessage>,
+        public ADARA::DASMON::BeamInfo
 {
 public:
     BeamInfoMessage()
@@ -404,8 +420,6 @@ public:
     BeamInfoMessage( const ADARA::DASMON::BeamInfo &a_info )
       : ADARA::DASMON::BeamInfo( a_info )
     {}
-
-    inline MessageType  getMessageType() const { return MSG_DASMON_BEAM_INFO; }
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -430,7 +444,10 @@ protected:
 };
 
 
-class RunInfoMessage : public MessageBase, public ADARA::DASMON::RunInfo
+/// Carries a payload of run information
+class RunInfoMessage :
+        public TemplMessageBase<MSG_DASMON_RUN_INFO,RunInfoMessage>,
+        public ADARA::DASMON::RunInfo
 {
 public:
     RunInfoMessage()
@@ -440,7 +457,6 @@ public:
       : ADARA::DASMON::RunInfo( a_info )
     {}
 
-    inline MessageType  getMessageType() const { return MSG_DASMON_RUN_INFO; }
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -449,7 +465,7 @@ protected:
 
         m_proposal_id = a_prop_tree.get( "proposal_id", "" );
         m_run_title = a_prop_tree.get( "run_title", "" );
-        m_run_num = a_prop_tree.get( "run_num", 0 );
+        m_run_num = a_prop_tree.get( "run_num", 0UL );
         m_sample_id = a_prop_tree.get( "sample_id", "" );
         m_sample_name = a_prop_tree.get( "sample_name", "" );
         m_sample_environ = a_prop_tree.get( "sample_environment", "" );
@@ -495,8 +511,10 @@ protected:
 };
 
 
-
-class BeamMetricsMessage : public MessageBase, public ADARA::DASMON::BeamMetrics
+/// Carries a payload of beam metrics data
+class BeamMetricsMessage :
+        public TemplMessageBase<MSG_DASMON_BEAM_METRICS,BeamMetricsMessage>,
+        public ADARA::DASMON::BeamMetrics
 {
 public:
     BeamMetricsMessage()
@@ -505,8 +523,6 @@ public:
     BeamMetricsMessage( const ADARA::DASMON::BeamMetrics &a_metrics )
       : ADARA::DASMON::BeamMetrics( a_metrics )
     {}
-
-    inline MessageType  getMessageType() const { return MSG_DASMON_BEAM_METRICS; }
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -517,7 +533,7 @@ protected:
         m_pulse_charge = a_prop_tree.get( "pulse_charge", 0.0 );
         m_pulse_freq = a_prop_tree.get( "pulse_freq", 0.0 );
         m_pixel_error_rate = a_prop_tree.get( "pixel_error_rate", 0.0 );
-        m_stream_bps = a_prop_tree.get( "stream_bps", 0 );
+        m_stream_bps = a_prop_tree.get( "stream_bps", 0UL );
 
         m_monitor_count_rate.clear();
         uint32_t id;
@@ -526,7 +542,7 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("monitors"))
             {
-                id = v.second.get( "id", 0 );
+                id = v.second.get( "id", 0UL );
                 counts = v.second.get( "counts", 0.0 );
                 m_monitor_count_rate[id] = counts;
             }
@@ -555,7 +571,10 @@ protected:
 };
 
 
-class RunMetricsMessage : public MessageBase, public ADARA::DASMON::RunMetrics
+/// Carries a payload of run metrics data
+class RunMetricsMessage :
+        public TemplMessageBase<MSG_DASMON_RUN_METRICS,RunMetricsMessage>,
+        public ADARA::DASMON::RunMetrics
 {
 public:
     RunMetricsMessage()
@@ -565,20 +584,18 @@ public:
       : ADARA::DASMON::RunMetrics( a_metrics )
     {}
 
-    inline MessageType  getMessageType() const { return MSG_DASMON_RUN_METRICS; }
-
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::read( a_prop_tree );
 
-        m_pulse_count           = a_prop_tree.get( "pulse_count", 0 );
+        m_pulse_count           = a_prop_tree.get( "pulse_count", 0UL );
         m_pulse_charge          = a_prop_tree.get( "pulse_charge", 0.0 );
-        m_pixel_error_count     = a_prop_tree.get( "pixel_error_count", 0 );
-        m_dup_pulse_count       = a_prop_tree.get( "dup_pulse_count", 0 );
-        m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0 );
-        m_mapping_error_count   = a_prop_tree.get( "mapping_error_count", 0 );
-        m_missing_rtdl_count    = a_prop_tree.get( "missing_rtdl_count", 0 );
+        m_pixel_error_count     = a_prop_tree.get( "pixel_error_count", 0UL );
+        m_dup_pulse_count       = a_prop_tree.get( "dup_pulse_count", 0UL );
+        m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0UL );
+        m_mapping_error_count   = a_prop_tree.get( "mapping_error_count", 0UL );
+        m_missing_rtdl_count    = a_prop_tree.get( "missing_rtdl_count", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -594,6 +611,7 @@ protected:
         a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
     }
 };
+
 
 }}}
 

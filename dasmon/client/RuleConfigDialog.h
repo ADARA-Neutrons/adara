@@ -2,6 +2,7 @@
 #define RULECONFIGDIALOG_H
 
 #include <vector>
+#include <set>
 #include <QDialog>
 #include <QTimer>
 #include "MainWindow.h"
@@ -75,7 +76,7 @@ private:
 
     void updateStatusIndicator();
     void dasmonStatus( bool active );
-    bool comBusControlMessage( const ADARA::ComBus::ControlMessage &a_msg );
+    bool comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg );
     void setupRuleTableRow( int a_row, ItemStatus a_status = ItemOK );
     void setupSignalTableRow( int a_row, ItemStatus a_status = ItemOK );
     void setRules( bool a_set_default );
@@ -96,7 +97,7 @@ private:
     std::vector<ItemStatus>                 m_rule_status;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
     std::vector<ItemStatus>                 m_signal_status;
-    std::map<std::string,std::string>       m_fact_list;
+    std::set<std::string>                   m_fact_list;
 };
 
 #endif // RULECONFIGDIALOG_H

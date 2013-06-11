@@ -6,9 +6,6 @@
 #include <boost/program_options.hpp>
 #include <syslog.h>
 
-//#include <log4cxx/logger.h>
-//#include "ComBusAppender.h"
-
 using namespace std;
 using namespace ADARA::DASMON;
 
@@ -25,6 +22,7 @@ int main(int argc, char *argv[])
     string          broker_pass;
     unsigned short  log_level;
     string          config_dir;
+    string          domain;
 
 #ifdef USE_DB
     DBConnectInfo   db_info;
@@ -39,11 +37,10 @@ int main(int argc, char *argv[])
             ("cfg_dir,c", po::value<string>( &config_dir )->default_value( "" ), "App configuration directory")
             ("sms_host", po::value<string>( &sms_host )->default_value( "localhost" ), "set sms hostname/ip")
             ("sms_port", po::value<unsigned short>( &sms_port )->default_value( 31415 ), "set sms port")
+            ("domain", po::value<string>( &domain )->default_value( "" ), "set communication domain prefix (EPICS/ComBus)")
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
-            ("required,r", po::value<vector<string> >(), "specify required ComBus processes")
-            ("important,i", po::value<vector<string> >(), "specify important ComBus processes")
 #ifdef USE_DB
             ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
             ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
@@ -71,35 +68,18 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Build list of required and important processes from options
-
-    vector<pair<string,bool> > proc_info;
-    vector<string> procs;
-    vector<string>::iterator ip;
-    if ( opt_map.count( "important" ) )
-    {
-        procs = opt_map["important"].as< vector<string> >();
-        for ( ip = procs.begin(); ip != procs.end(); ++ip )
-        {
-            proc_info.push_back( pair<string,bool>( *ip, false ) );
-        }
-    }
-
-    if ( opt_map.count( "required" ) )
-    {
-        procs = opt_map["required"].as< vector<string> >();
-        for ( ip = procs.begin(); ip != procs.end(); ++ip )
-        {
-            proc_info.push_back( pair<string,bool>( *ip, true ) );
-        }
-    }
-
     // Initialize SysLog
 
     openlog( "dasmond", 0, LOG_DAEMON );
     syslog( LOG_INFO, "Dasmon service started." );
 
-    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( "DASMON", 0, broker_uri, broker_user, broker_pass );
+    if ( !opt_map.count( "domain" ))
+    {
+        syslog( LOG_WARNING, "No communication domain specified - probably an error." );
+        cout << "No communication domain specified - probably an error."  << endl;
+    }
+
+    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( domain, "DASMON", 0, broker_uri, broker_user, broker_pass );
 
 #if 0
     ADARA::ComBus::Log4cxxAppender *combus_appender = new ADARA::ComBus::Log4cxxAppender();
@@ -118,10 +98,7 @@ int main(int argc, char *argv[])
         StreamMonitor   monitor( sms_host, sms_port );
 #endif
         StreamAnalyzer  analyzer( monitor, config_dir );
-        ComBusRouter    router( monitor, analyzer, proc_info );
-
-        // TODO This needs to change at some point - config should be from a central data source
-        //analyzer.loadConfig();
+        ComBusRouter    router( monitor, analyzer );
 
         // Connect to and process the stream
         monitor.start();
@@ -136,8 +113,6 @@ int main(int argc, char *argv[])
     {
         syslog( LOG_ERR, "Unhandled exception: %s", e.what());
     }
-
-    //LOG4CXX_INFO(logger,"DASMON exiting");
 
     delete combus;
 
