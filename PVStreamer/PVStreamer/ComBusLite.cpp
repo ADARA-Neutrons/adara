@@ -13,14 +13,14 @@ ComBusLite::ComBusLite( const std::string &a_topic_path, const std::string &a_pr
     try
     {
         stringstream ss;
-        ss << a_topic_path << "/ADARA.STATUS." << a_proc_name << "." << a_proc_id << "?type=topic";
+        ss << a_topic_path << ".STATUS." << a_proc_name << "." << a_proc_id << "?type=topic";
         m_topic = ss.str();
 
         m_conn = m_session.GetHttpConnection( m_broker_host.c_str(), a_port, m_broker_user.c_str(), m_broker_pass.c_str() );
     }
     catch(...)
     {
-        DebugBreak();
+		MessageBox( 0, "Unknown exception", "ComBusLite init failed", MB_OK );
     }
 }
 
@@ -50,17 +50,19 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
             data << "    \"status\":\"0\"\r\n}";
 
             CHttpFile *file = m_conn->OpenRequest( CHttpConnection::HTTP_VERB_POST, m_topic.c_str() );
-            file->SendRequest( headers.c_str(), (DWORD)headers.length(), (LPVOID)data.str().c_str(), (DWORD)data.str().length() );
-            file->QueryInfoStatusCode( ret );
+			if ( file )
+			{
+				file->SendRequest( headers.c_str(), (DWORD)headers.length(), (LPVOID)data.str().c_str(), (DWORD)data.str().length() );
+				file->QueryInfoStatusCode( ret );
 
-            if ( ret == HTTP_STATUS_OK )
-                result = false;
+				if ( ret == HTTP_STATUS_OK )
+					result = false;
 
-            delete file;
+				delete file;
+			}
         }
         catch(...)
         {
-            DebugBreak();
         }
     }
 

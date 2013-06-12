@@ -24,7 +24,10 @@ CPVStreamerDlg::CPVStreamerDlg( const std::string &a_topic_path, const std::stri
     m_start_time = (unsigned long)time(0);
 
     // If ComBusLite ctor fails, no exception will be thrown, just wont work
-    m_combus = new ComBusLite( a_topic_path, "PVSTREAMER", 0, a_broker_uri, a_broker_port, a_broker_user, a_broker_pass );
+	if ( !a_broker_uri.empty() && !a_topic_path.empty() )
+	{
+		m_combus = new ComBusLite( a_topic_path, "PVSTREAMER", 0, a_broker_uri, a_broker_port, a_broker_user, a_broker_pass );
+	}
 }
 
 
@@ -132,7 +135,8 @@ CPVStreamerDlg::OnTimer( UINT a_timer_id )
     else if ( a_timer_id == 2 )
     {
         // Timer ID 2 is used to send status updates
-        m_combus->sendStatus( STATUS_OK );
+		if ( m_combus )
+			m_combus->sendStatus( STATUS_OK );
     }
 }
 
