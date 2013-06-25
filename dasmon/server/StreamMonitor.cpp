@@ -1195,7 +1195,7 @@ StreamMonitor::dbThread()
                     else
                         value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
 
-                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%lu)", m_beam_info.m_beam_id.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%lu)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
