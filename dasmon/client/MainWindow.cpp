@@ -937,7 +937,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     QMutexLocker lock( &m_mutex );
 
-    //cout << "got: " << hex << a_msg.getMessageType() << endl;
+    //cout << "got: " << hex << a_msg.getMessageType() << " from " << a_msg.getSourceName() << endl;
 
     setComBusActive( true );
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
