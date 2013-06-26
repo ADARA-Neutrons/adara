@@ -110,7 +110,7 @@ LDAS_DeviceMonitor::notifySocketData( CNiDataSocketData &a_data )
                     }
                     else
                     {
-                        LOG_WARNING( "Received activation notice for unknown application ID: " << app_id );
+                        LOG_WARNING( ">>> DevMon(" << m_hostname << ") - unknown App ID: " << app_id );
 
                         // This REALLY needs to be put in the GUI log window
                         ((CPVStreamerDlg*)theApp.m_pMainWnd)->print( "***** Received activation notice from UNKNOWN APPLICATION *****" );
@@ -118,6 +118,15 @@ LDAS_DeviceMonitor::notifySocketData( CNiDataSocketData &a_data )
                     }
                 }
             }
+            else
+            {
+                // Log unknown msg types
+                LOG_WARNING( ">>> DevMon(" << m_hostname << ") - unknown msg type: " << msg_type );
+            }
+        }
+        else
+        {
+            LOG_WARNING( ">>> DevMon(" << m_hostname << ") - unknown msg element: " << eStruct.csName );
         }
     }
 }

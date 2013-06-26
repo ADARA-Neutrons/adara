@@ -44,10 +44,10 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
             stringstream data;
             string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
 
-            data << "body={\r\n\"msg_type\":\"33554432\",\r\n";
+            data << "body={\r\n\"msg_type\":\"1073741824\",\r\n";
             data << "    \"src_name\":\"" << m_proc_name << "." << m_proc_id << "\",\r\n";
             data << "    \"timestamp\":\"" << time(0) << "\",\r\n";
-            data << "    \"status\":\"0\"\r\n}";
+            data << "    \"status\":\"" << a_status << "\"\r\n}";
 
             CHttpFile *file = m_conn->OpenRequest( CHttpConnection::HTTP_VERB_POST, m_topic.c_str() );
 			if ( file )

@@ -175,7 +175,7 @@ CPVStreamerApp::InitInstance()
     try
     {
         // Initialize PVStreamer objects
-        pvs = new PVStreamer(500,250);
+        pvs = new PVStreamer(500,260);
 
         pvs->attachConfigListener( dlg );
         pvs->attachStreamListener( dlg );
