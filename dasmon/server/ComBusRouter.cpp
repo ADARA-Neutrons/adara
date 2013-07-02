@@ -16,19 +16,19 @@ functions for the dasmond service, as follows:
 1)  The ComBusRouter class is a listener and translator for both the
     StreamMonitor and the StreamAnalyzer. Various notifications and
     signals and received and broadcast onto the dasmond app topic
-    ADARA.APP.DASMON.0 (see DASMonMessages.h for details). These
+    [domain].APP.DASMON.0 (see DASMonMessages.h for details). These
     messages deal primarily with ADARA stream status and metrics as
     well as business rule signalling.
 
 2)  The ComBusRouter class serves as the entry-point for dasmond
     command and control messages. The messages are received on the
-    ADARA.INPUT.DASMON.0 topic and are typically peer-to-peer in
+    [domain].INPUT.DASMON.0 topic and are typically peer-to-peer in
     nature (i.e. a reply will usually be sent to the sender). Received
     messages are translated into method calls to the StreamMonitor
     and/or StreamAnalyzer.
 
 3)  The ComBusRouter class provides critical process monitoring via
-    the ComBus ADARA.STATUS.* topics. If required and important
+    the ComBus [domain].STATUS.* topics. If required and important
     processes fail to provide timely status, apppropriate ComBus signals
     are generated for consumption by user-facing applications (i.e. GUI
     or logging apps). A process can be in three error states: 1) "un-
@@ -55,7 +55,7 @@ ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer
     m_analyzer.attach( *this );
     m_combus.attach( *this );
     m_combus.setInputListener( *this );
-    m_combus.attach( *this, "ADARA.STATUS.>" );
+    m_combus.attach( *this, "STATUS.>" );
 }
 
 
@@ -336,7 +336,7 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
  *
  * The comBusMessage method is the callback for all ComBus messages received
  * on subscribed topics. TheComBusRouter class only monitor all traffic on the
- * ADARA.STATUS.* topic in order to maintain state information for all running
+ * [domain].STATUS.* topic in order to maintain state information for all running
  * ComBus processess. This state information is injected into the StreamAnalyzer's
  * rule engine which allows users to configure rules and signals pretaining to
  * the status of important processes (using the ComBus process ID as a fact in
