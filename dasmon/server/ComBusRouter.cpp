@@ -107,6 +107,7 @@ ComBusRouter::run()
             else if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
             {
                 syslog( LOG_INFO, "Process %s has become INACTIVE.", ip->first.c_str() );
+                ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
                 m_analyzer.retractFact( string("PROC_") + ip->first );
             }
         }
