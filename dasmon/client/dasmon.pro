@@ -34,7 +34,8 @@ HEADERS  += \
     RuleConfigDialog.h \
     SubClient.h \
     MainWindow.h \
-    ../../combus/ComBusDefs.h
+    ../../combus/ComBusDefs.h \
+    style.h
 
 unix:LIBS += -lboost_thread-mt -lboost_program_options -lactivemq-cpp
 

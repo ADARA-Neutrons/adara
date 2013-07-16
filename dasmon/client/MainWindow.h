@@ -17,7 +17,7 @@
 #include "SubClient.h"
 #include "DASMonMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.1"
+#define DASMON_GUI_VERSION "1.1.2"
 
 namespace Ui {
 class MainWindow;
@@ -71,6 +71,12 @@ private:
         unsigned short              hl_count;
     };
 
+    struct MonitorInfo
+    {
+        double                      rate;
+        unsigned long               last_updated;
+    };
+
     class Tristate
     {
     public:
@@ -105,7 +111,6 @@ private:
     void        clearRunDisplay();
     void        clearBeamDisplay();
     void        clearSignals();
-    void        clearMonitors();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
     bool        comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
@@ -155,7 +160,8 @@ private:
     QTimer                          m_table_timer;
     QTimer                          m_proc_timer;
     QTimer                          m_pv_timer;
-    std::map<uint32_t,double>       m_monitor_rate;
+    //std::map<uint32_t,double>       m_monitor_rate;
+    std::map<uint32_t,MonitorInfo>  m_monitor_rate;
     std::map<std::string,ProcInfo>  m_proc_status;
     bool                            m_refresh_proc_table;
     bool                            m_refresh_signal_table;

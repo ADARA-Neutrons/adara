@@ -11,7 +11,7 @@
 #include "Utils.h"
 #include <syslog.h>
 
-#ifdef USE_DB
+#ifndef NO_DB
 #include "libpq-fe.h"
 #endif
 
@@ -32,7 +32,7 @@ namespace DASMON {
  * The StreamMonitor constructor performs limited initialization. Full initialization is not
  * performed until the start() method is called.
  */
-#ifdef USE_DB
+#ifndef NO_DB
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info )
 #else
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
@@ -41,11 +41,11 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
       m_stream_rate(0), m_ok(true)
-#ifdef USE_DB
+#ifndef NO_DB
      ,m_db_info(a_db_info)
 #endif
 {
-#ifdef USE_DB
+#ifndef NO_DB
     if ( m_db_info )
         m_db_thread = new boost::thread( boost::bind( &StreamMonitor::dbThread, this ));
 #endif
@@ -1126,7 +1126,7 @@ StreamMonitor::clearPVs()
 }
 
 
-#ifdef USE_DB
+#ifndef NO_DB
 void
 StreamMonitor::dbThread()
 {

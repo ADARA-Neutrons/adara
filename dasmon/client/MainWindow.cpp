@@ -17,6 +17,7 @@
 #include "RuleConfigDialog.h"
 #include "DASMonMessages.h"
 #include "STSMessages.h"
+#include "style.h"
 
 using namespace std;
 
@@ -24,7 +25,8 @@ using namespace std;
 #define TIMEOUT_UNRESPONSIVE 10
 #define TIMEOUT_DEAD 20
 #define TIMEOUT_DEAD_CLEANUP 5
-
+#define MONITOR_ID_INACTIVE_TIMEOUT 86400 // 24 hours
+#define MONITOR_ID_DATA_TIMEOUT 4
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
@@ -32,7 +34,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
-    m_refresh_log_table(false), m_refresh_monitor_table(false), m_refresh_pv_table(false),
+    m_refresh_log_table(false), m_refresh_pv_table(false),
     m_recording(false), m_run_number(0), m_prev_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0), m_domain( a_domain ), m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ),
@@ -58,13 +60,13 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     }
     settings.endGroup();
 
-    m_style_unlit = "QLabel { background: grey }";
-    m_style_info = "QLabel { background: rgb(150,150,255) }";
-    m_style_good = "QLabel { background: rgb(100,255,100) }";
-    m_style_warn = "QLabel { background: rgb(255,255,100) }";;
-    m_style_error = "QLabel { background: rgb(255,160,70) }";;
-    m_style_fatal = "QLabel { color: white; background: rgb(255,0,0) }";;
-    m_style_disabled = "QLabel { background: gray; color: rgb(160,160,160)  }";
+    m_style_unlit    = TEXT_STYLE_UNLIT;
+    m_style_info     = TEXT_STYLE_INFO;
+    m_style_good     = TEXT_STYLE_OK;
+    m_style_warn     = TEXT_STYLE_WARN;
+    m_style_error    = TEXT_STYLE_ERROR;
+    m_style_fatal    = TEXT_STYLE_FATAL;
+    m_style_disabled = TEXT_STYLE_DISABLED;
 
     // Make sure domain has a "." as last character
     if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
@@ -84,21 +86,25 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     QStringList headers;
     headers << "Monitor ID" << "Count Rate";
     ui->monitorTable->setHorizontalHeaderLabels( headers );
+    ui->monitorTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->monitorTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Name" << "Source" << "Level" << "Message";
     ui->alertTable->setHorizontalHeaderLabels( headers );
+    ui->alertTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->alertTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Process" << "Status";
     ui->procStatusTable->setHorizontalHeaderLabels( headers );
+    ui->procStatusTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->procStatusTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "PV" << "Value" << "Status" << "Timestamp";
     ui->pvTable->setHorizontalHeaderLabels( headers );
+    ui->pvTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->pvTable->horizontalHeader()->show();
 
     QPalette pal = this->palette();
@@ -188,7 +194,6 @@ MainWindow::setComBusActive( bool a_active )
         clearBeamDisplay();
         clearRunDisplay();
         clearSignals();
-        clearMonitors();
 
         updateAllStatusIndicators();
 
@@ -229,7 +234,6 @@ MainWindow::setDASMonActive( bool a_active )
         clearBeamDisplay();
         clearRunDisplay();
         clearSignals();
-        clearMonitors();
 
         updateAllStatusIndicators();
 
@@ -263,7 +267,6 @@ MainWindow::setSMSActive( bool a_active )
 
         clearBeamDisplay();
         clearRunDisplay();
-        clearMonitors();
 
         updateAllStatusIndicators();
 
@@ -331,6 +334,7 @@ MainWindow::onTableTimer()
 {
     int row;
     QTableWidgetItem *item[4];
+    unsigned long now = time(0);
 
     if ( m_refresh_log_table )
     {
@@ -420,20 +424,31 @@ MainWindow::onTableTimer()
         }
     }
 
-    if ( m_refresh_monitor_table )
+
+    // Update beam monitor display
+    if ( ui->monitorTable->rowCount() != (int)m_monitor_rate.size() )
     {
-        if ( ui->monitorTable->rowCount() != (int)m_monitor_rate.size() )
-            ui->monitorTable->setRowCount( m_monitor_rate.size());
+        ui->monitorTable->setRowCount( m_monitor_rate.size());
+    }
 
-        map<uint32_t,double>::const_iterator im = m_monitor_rate.begin();
-        int i = 0;
-        for ( ; im != m_monitor_rate.end(); ++im, ++i )
+    row = 0;
+    for ( map<uint32_t,MonitorInfo>::iterator im = m_monitor_rate.begin(); im != m_monitor_rate.end(); )
+    {
+        if (( im->second.last_updated + MONITOR_ID_INACTIVE_TIMEOUT ) < now ) // After timeout, remove monitor ID entry
         {
-            ui->monitorTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( im->first )));
-            ui->monitorTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( im->second )));
+            m_monitor_rate.erase( im++ );
+            ui->monitorTable->removeRow( row );
         }
+        else
+        {
+            if (( im->second.last_updated + MONITOR_ID_DATA_TIMEOUT ) < now ) // After no data timeout, zero rate
+                im->second.rate = 0;
 
-        m_refresh_monitor_table = false;
+            ui->monitorTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( im->first )));
+            ui->monitorTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( im->second.rate )));
+            ++row;
+            ++im;
+        }
     }
 
     // Not a table, but use this timer callback to update duration field on mainwindow
@@ -812,12 +827,14 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_freq )));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_stream_bps/1024 )));
 
-    m_monitor_rate = a_metrics.m_monitor_count_rate;
-    m_refresh_monitor_table = true;
+    MonitorInfo info;
+    info.last_updated = time(0);
 
-    // TODO add pix error rate
-    //double                  m_pixel_error_rate;
-
+    for ( map<uint32_t,double>::const_iterator im = a_metrics.m_monitor_count_rate.begin(); im != a_metrics.m_monitor_count_rate.end(); ++im )
+    {
+        info.rate = im->second;
+        m_monitor_rate[im->first] = info;
+    }
 }
 
 
@@ -880,14 +897,6 @@ MainWindow::clearSignals()
     m_highest_level = ADARA::TRACE;
 
     m_refresh_signal_table = true;
-}
-
-
-void
-MainWindow::clearMonitors()
-{
-    m_monitor_rate.clear();
-    m_refresh_monitor_table = true;
 }
 
 

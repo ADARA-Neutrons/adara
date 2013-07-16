@@ -159,7 +159,7 @@ public:
     uint16_t    idx;
 };
 
-#ifdef USE_DB
+#ifndef NO_DB
 struct DBConnectInfo
 {
     std::string     host;
@@ -174,7 +174,7 @@ struct DBConnectInfo
 class StreamMonitor : public ADARA::Parser
 {
 public:
-#ifdef USE_DB
+#ifndef NO_DB
     StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415, DBConnectInfo *a_db_info = 0 );
 #else
     StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415 );
@@ -281,7 +281,7 @@ private:
     bool                            m_ok;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
-#ifdef USE_DB
+#ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;
 #endif

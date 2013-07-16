@@ -8,6 +8,7 @@
 #include "DASMonMessages.h"
 #include "RuleConfigDialog.h"
 #include "ui_RuleConfigDialog.h"
+#include "style.h"
 
 using namespace std;
 
@@ -64,10 +65,10 @@ RuleConfigDialog::updateStatusIndicator()
 
     switch ( m_comm_status )
     {
-    case Disconnected: text = "Disconnected"; style = "QLabel { background: red }"; break;
-    case Idle: text = "Idle"; style = "QLabel { background: green }"; break;
-    case Setting: text = "Sending"; style = "QLabel { background: yellow }"; break;
-    case Getting: text = "Receiving"; style = "QLabel { background: yellow }"; break;
+    case Disconnected: text = "Disconnected"; style = TEXT_STYLE_ERROR; break;
+    case Idle: text = "Idle"; style = TEXT_STYLE_OK; break;
+    case Setting: text = "Sending"; style = TEXT_STYLE_INFO; break;
+    case Getting: text = "Receiving"; style = TEXT_STYLE_INFO; break;
     }
 
     QMetaObject::invokeMethod( ui->statusLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,text));

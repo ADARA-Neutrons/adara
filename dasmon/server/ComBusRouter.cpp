@@ -96,19 +96,26 @@ ComBusRouter::run()
         // Watch for unresponsive / inactive processes
         boost::unique_lock<boost::mutex> lock(m_proc_mutex);
 
-        for ( ip = m_procs.begin(); ip != m_procs.end(); ++ip )
+        for ( ip = m_procs.begin(); ip != m_procs.end();  )
         {
-            if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
-            {
-                syslog( LOG_INFO, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
-                ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
-                m_analyzer.assertFact( string("PROC_") + ip->first, (int)ip->second.status );
-            }
-            else if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
+            if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
             {
                 syslog( LOG_INFO, "Process %s has become INACTIVE.", ip->first.c_str() );
                 ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
                 m_analyzer.retractFact( string("PROC_") + ip->first );
+
+                m_procs.erase( ip++ );
+            }
+            else
+            {
+                if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
+                {
+                    syslog( LOG_INFO, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
+                    ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
+                    m_analyzer.assertFact( string("PROC_") + ip->first, (int)ip->second.status );
+                }
+
+                ++ip;
             }
         }
 

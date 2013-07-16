@@ -9,7 +9,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.1.4"
+#define DASMON_VERSION "1.1.5"
 
 int main(int argc, char *argv[])
 {
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     string          config_dir;
     string          domain;
 
-#ifdef USE_DB
+#ifndef NO_DB
     DBConnectInfo   db_info;
 #endif
 
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
-#ifdef USE_DB
+#ifndef NO_DB
             ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
             ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
             ("db_name", po::value<string>( &db_info.name )->default_value( "" ), "set database name")
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     try
     {
         combus->waitForConnect( 10 );
-#ifdef USE_DB
+#ifndef NO_DB
         StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info );
 #else
         StreamMonitor   monitor( sms_host, sms_port );

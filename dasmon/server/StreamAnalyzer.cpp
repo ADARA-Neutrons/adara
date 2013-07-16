@@ -810,10 +810,10 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 
     m_engine->assert( m_fact[BIF_COUNT_RATE], a_metrics.m_count_rate );
 
-    m_engine->retractPrefix( "MONITOR_" );
+    m_engine->retractPrefix( "MONITOR_RATE_" );
 
     for ( map<uint32_t,double>::const_iterator im = a_metrics.m_monitor_count_rate.begin(); im != a_metrics.m_monitor_count_rate.end(); ++im )
-        m_engine->assert( string("MONITOR_") + boost::lexical_cast<std::string>(im->first), im->second );
+        m_engine->assert( string("MONITOR_RATE_") + boost::lexical_cast<std::string>(im->first), im->second );
 
     m_engine->assert( m_fact[BIF_PULSE_CHARGE], a_metrics.m_pulse_charge );
     m_engine->assert( m_fact[BIF_PULSE_FREQ], a_metrics.m_pulse_freq );

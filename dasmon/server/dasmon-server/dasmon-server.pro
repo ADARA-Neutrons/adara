@@ -34,7 +34,7 @@ HEADERS += \
 
 LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
 
-contains( DEFINES, USE_DB )
+!contains( DEFINES, NO_DB )
 {
 LIBS += -lpq
 }
