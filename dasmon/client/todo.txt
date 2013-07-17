@@ -1,0 +1,21 @@
+To Do
+------
+
+Server
+------
+- Impl pixel error metric
+- Impl dup pulse metric
+- Impl cycle error metric
+- Add timestamp to Rule class for assertion
+- Add support for cetralized configuration when data source is defined
+
+Client
+-------
+
+- Add a "Stale" GUI state to provide last-known info when disconnected or non-responsive
+- New Qt label widget with change-triggered highlighting
+- Highlight tabs on change (i.e. Signal tab shows alert level)
+- Add pick box for signal level
+- Add show built-in facts feature
+- Add show active PVs feature
+

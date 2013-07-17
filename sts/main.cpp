@@ -5,14 +5,62 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <boost/thread.hpp>
 #include "ADARA.h"
 #include "TransCompletePkt.h"
 #include "TraceException.h"
 #include "NxGen.h"
+#include "ComBus.h"
+#include "ComBusMessages.h"
 
 using namespace std;
 
-#define STS_VERSION "0.1.8"
+#define STS_VERSION "0.2.0"
+#define STATUS_PERIOD 5
+
+bool                        g_run_monitor = true;
+ADARA::ComBus::Connection*  g_combus = 0;
+
+
+void
+streamMonitorThread( void *a_data )
+{
+    STS::StreamParser *parser = (STS::StreamParser*)a_data;
+
+    uint64_t    pcount;
+    uint64_t    pcount_last = 0;
+    short       iter = 0;
+    short       fault = 0;  // Num contiguous iterations with no data
+
+    while( g_run_monitor )
+    {
+        // Watch for stalled stream
+        pcount = parser->getPulseCount();
+
+        if ( pcount == pcount_last )
+            ++fault;
+        else
+        {
+            pcount_last = pcount;
+            fault = 0;
+        }
+
+        if ( g_combus )
+        {
+            if ( ++iter == STATUS_PERIOD )
+            {
+                if ( fault >= iter )
+                    g_combus->sendStatus( ADARA::ComBus::STATUS_FAULT );
+                else
+                    g_combus->sendStatus( ADARA::ComBus::STATUS_RUNNING );
+                iter = 0;
+            }
+        }
+
+        sleep(1);
+    }
+}
+
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
@@ -39,12 +87,16 @@ int main(int argc, char** argv)
     bool                        interact;
     string                      work_path;
     string                      base_path;
+    string                      broker_uri;
+    string                      broker_user;
+    string                      broker_pass;
     unsigned long               chunk_size;
     unsigned short              evt_buf_size;
     unsigned short              anc_buf_size;
     unsigned long               cache_size;
     unsigned short              compression_level;
     unsigned long               run_no = 0;
+    boost::thread              *mon_thread = 0;
 
     try
     {
@@ -55,15 +107,19 @@ int main(int argc, char** argv)
         bool suppress_adara;
         bool suppress_nexus;
 
+        // Process command line options
         namespace po = boost::program_options;
         po::options_description options( "sts program options" );
         options.add_options()
                 ("help,h", "show help")
                 ("version", "show version number")
-                ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
+                ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode (disables SMS Ack/Nack, ComBus)")
                 ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output (interactive mode only)")
                 ("strict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
                 ("move,m", po::bool_switch( &move )->default_value( false ), "move output nexus file to cataloging location (forces strict parsing)")
+                ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
+                ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
+                ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("report,r", po::bool_switch( &gather_stats )->default_value( false ), "report stream statistics")
                 ("no-nexus,n", po::bool_switch( &suppress_nexus )->default_value( false ), "suppress nexus output file generation")
                 ("no-adara,a", po::bool_switch( &suppress_adara )->default_value( false ), "suppress adara output stream generation")
@@ -81,6 +137,7 @@ int main(int argc, char** argv)
         po::store( po::parse_command_line(argc,argv,options), opt_map );
         po::notify( opt_map );
 
+        // Process help / version options and exit early
         if ( opt_map.count( "help" ))
         {
             cout << options << endl;
@@ -90,6 +147,20 @@ int main(int argc, char** argv)
         {
             cout << STS_VERSION << endl;
             return STS::TS_TRANSIENT_ERROR;
+        }
+
+        // Initialize ComBus only if in non-interactive mode
+        // For now use pid for uniq ID - this will be safe until/unless a server farm is employed
+        if ( !interact )
+        {
+            try
+            {
+                g_combus = new ADARA::ComBus::Connection( "STS", getpid(), broker_uri, broker_user, broker_pass );
+            }
+            catch( std::exception &e )
+            {
+                THROW_TRACE( STS::ERR_GENERAL_ERROR, "ComBus initialize failed: " << e.what() )
+            }
         }
 
         // If user has requested cataloging, force sane options
@@ -128,6 +199,7 @@ int main(int argc, char** argv)
             cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
             cout << "  work path    : " << work_path << endl;
             cout << "  base path    : " << base_path << endl;
+            cout << "  broker       : " << broker_uri << endl;
             cout << "  move nexus   : " << ( move ? "yes" : "no" ) << endl;
             cout << "  chunk size   : " << chunk_size << " (bytes)" << endl;
             cout << "  cache size   : " << cache_size << " (bytes)" << endl;
@@ -136,6 +208,9 @@ int main(int argc, char** argv)
             cout << "  comp lev     : " << compression_level <<  endl;
             cout << "  gather stats : " << ( gather_stats ? "yes" : "no" ) << endl;
         }
+
+        if ( g_combus )
+            g_combus->sendStatus( ADARA::ComBus::STATUS_STARTING );
 
         if ( opt_map.count( "file" ))
         {
@@ -146,6 +221,7 @@ int main(int argc, char** argv)
 
         if ( infd >= 0 )
         {
+#if 0
             if ( !interact )
             {
                 // In non-interactive mode, must hack around chatty HDF5 library: remap stdout and stderr to /dev/null
@@ -154,11 +230,26 @@ int main(int argc, char** argv)
                 dup2( nullfd, 1 );
                 dup2( nullfd, 2 );
             }
+#endif
 
             NxGen    nxgen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
                             anc_buf_size, cache_size, compression_level );
 
+            // In non-intarective mode, start monitor thread to emit ComBus status messages
+            if ( !interact )
+            {
+                mon_thread = new boost::thread( streamMonitorThread, &nxgen );
+            }
+
             nxgen.processStream();
+
+            // Shutdown monitor thread
+            if ( !interact )
+            {
+                g_run_monitor = false;
+                mon_thread->join();
+                delete mon_thread;
+            }
 
             run_no = nxgen.getRunNumber();
 
@@ -207,6 +298,14 @@ int main(int argc, char** argv)
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( outfd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
 
+        if ( g_combus )
+        {
+            if ( sms_code != STS::TS_SUCCESS )
+                g_combus->sendStatus( ADARA::ComBus::STATUS_FAULT );
+            else
+                g_combus->sendStatus( ADARA::ComBus::STATUS_STOPPING );
+        }
+#if 0
         // TODO If code is not success, write reason to a log file somewhere?
         ofstream outf("/tmp/sts.log", ios_base::app );
         if (outf.good())
@@ -220,11 +319,15 @@ int main(int argc, char** argv)
             }
             outf.close();
         }
+#endif
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
         cout << sms_reason << endl;
     }
+
+    if ( g_combus )
+        delete g_combus;
 
     return sms_code != STS::TS_SUCCESS;
 }
