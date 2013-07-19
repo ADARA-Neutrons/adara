@@ -447,7 +447,10 @@ fast metadata pixel ID formats.}
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
     \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
-    \wordbox{1}{Ring Period (picoseconds, u32)} \\
+    \bitbox{8}{4} &
+    \bitbox{24}{Ring Period (picoseconds)} \\
+    \bitbox{8}{FNA 0} &
+    \bitbox{24}{Frame Data 0} \\
     \bitbox{8}{FNA 0} &
     \bitbox{24}{Frame Data 0} \\
     \wordbox{1}{$\cdots$} \\
@@ -489,7 +492,7 @@ been corrected for frame skew.
 is not set) added to these events to correct for frame skew.
 \item{\bf Ring Period} indicates the number of picoseconds the proton beam
 takes to travel the circumference of the accumulator ring. This is used
-to calculate beam energy.
+to calculate beam energy. The FNA for this field is fixed at 4.
 \item{\bf FNA $X$} indicates the source RTDL Frame number for
 {\bf Frame Data $X$}. A zero in this field indicates no data in
 the corresponding frame data field.
