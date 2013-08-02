@@ -9,10 +9,11 @@
 #include "TransCompletePkt.h"
 #include "TraceException.h"
 #include "NxGen.h"
+#include "ComBusTransMon.h"
 
 using namespace std;
 
-#define STS_VERSION "0.1.8"
+#define STS_VERSION "1.0.0"
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
@@ -45,6 +46,7 @@ int main(int argc, char** argv)
     unsigned long               cache_size;
     unsigned short              compression_level;
     unsigned long               run_no = 0;
+    ComBusTransMon              monitor;
 
     try
     {
@@ -54,6 +56,10 @@ int main(int argc, char** argv)
         bool gather_stats;
         bool suppress_adara;
         bool suppress_nexus;
+        string broker_uri;
+        string broker_user;
+        string broker_pass;
+        string domain;
 
         namespace po = boost::program_options;
         po::options_description options( "sts program options" );
@@ -75,7 +81,12 @@ int main(int argc, char** argv)
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
                 ("event-buf-size", po::value<unsigned short>( &evt_buf_size )->default_value( 20 ),"set event buffers to (in chunks)")
                 ("anc-buf-size", po::value<unsigned short>( &anc_buf_size )->default_value( 2 ),"set ancillary buffers (in chunks)")
+                ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "" ), "set AMQP broker URI/IP address")
+                ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
+                ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+                ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
                 ;
+
 
         po::variables_map opt_map;
         po::store( po::parse_command_line(argc,argv,options), opt_map );
@@ -158,6 +169,10 @@ int main(int argc, char** argv)
             NxGen    nxgen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
                             anc_buf_size, cache_size, compression_level );
 
+            // Start ComBus monitor thread
+            monitor.start( nxgen, broker_uri, broker_user, broker_pass, domain );
+
+            // Begin ADARA stream processing - does not return until recording ends
             nxgen.processStream();
 
             run_no = nxgen.getRunNumber();
@@ -174,6 +189,14 @@ int main(int argc, char** argv)
 
                 moveFile( adara_outfile, cat_path + "adara", cat_name + ".adara" );
                 moveFile( nexus_outfile, cat_path + "nexus", cat_name + ".nxs.h5" );
+
+                // Send finished messages to ComBus AND workflow manager
+                monitor.success( true, cat_path + "nexus/" + cat_name + ".nxs.h5" );
+            }
+            else
+            {
+                // Send finished messages to ComBus only
+                monitor.success( false, nexus_outfile );
             }
 
             if ( gather_stats )
@@ -188,38 +211,30 @@ int main(int argc, char** argv)
         else
             sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.toString( true, true );
+
+        monitor.failure( sms_code, sms_reason );
     }
     catch( exception &e )
     {
         // Unexpected exception
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
+
+        monitor.failure( sms_code, sms_reason );
     }
     catch( ... )
     {
         // Really unexpected exception
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
+
+        monitor.failure( sms_code, sms_reason );
     }
 
     if ( !interact )
     {
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( outfd, ack_pkt.getBuffer(), ack_pkt.getBufferLength());
-
-        // TODO If code is not success, write reason to a log file somewhere?
-        ofstream outf("/tmp/sts.log", ios_base::app );
-        if (outf.good())
-        {
-            if ( sms_code == STS::TS_SUCCESS )
-                outf << "Run " << run_no << " OK" << endl;
-            else
-            {
-                outf << "Run " << run_no << " error:" << endl;
-                outf << sms_reason << endl;
-            }
-            outf.close();
-        }
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {

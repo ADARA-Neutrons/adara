@@ -16,8 +16,10 @@
 #include "DASMonDefs.h"
 #include "SubClient.h"
 #include "DASMonMessages.h"
+#include "STSMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.2"
+#define DASMON_GUI_VERSION "1.1.3"
+
 
 namespace Ui {
 class MainWindow;
@@ -74,6 +76,16 @@ private:
     struct MonitorInfo
     {
         double                      rate;
+        unsigned long               last_updated;
+    };
+
+    struct TransStatus
+    {
+        unsigned long               run_num;
+        std::string                 sts_pid;
+        bool                        running;
+        ADARA::ComBus::StatusCode   run_status;
+        STS::TranslationStatusCode  trans_status;
         unsigned long               last_updated;
     };
 
@@ -135,6 +147,7 @@ private:
     void        writeLog( ADARA::Level a_level, const std::string &a_msg );
     void        updateHighestSignal();
     const char *getStatusText( int a_status );
+    const char *getTransStatusText( STS::TranslationStatusCode &a_status );
 
     // Methods to support SubClient command routing
     void        attach( SubClient &a_sub_client );
@@ -160,13 +173,13 @@ private:
     QTimer                          m_table_timer;
     QTimer                          m_proc_timer;
     QTimer                          m_pv_timer;
-    //std::map<uint32_t,double>       m_monitor_rate;
     std::map<uint32_t,MonitorInfo>  m_monitor_rate;
     std::map<std::string,ProcInfo>  m_proc_status;
+    std::map<unsigned long,TransStatus> m_trans_status;
     bool                            m_refresh_proc_table;
     bool                            m_refresh_signal_table;
     bool                            m_refresh_log_table;
-    bool                            m_refresh_monitor_table;
+    bool                            m_refresh_trans_table;
     bool                            m_refresh_pv_table;
     QString                         m_style_unlit;
     QString                         m_style_info;

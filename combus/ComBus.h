@@ -89,6 +89,7 @@ public:
     bool                log( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
     bool                broadcast( MessageBase &a_msg );
     bool                send( MessageBase &a_msg, const std::string &a_dest_proc, const std::string *a_correlation_id = 0 );
+    bool                postWorkflow( MessageBase &a_msg );
 
 private:
 

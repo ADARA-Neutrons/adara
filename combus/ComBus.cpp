@@ -7,8 +7,6 @@
 #include <time.h>
 #include "ComBus.h"
 #include "ComBusMessages.h"
-#include "STSMessages.h"
-#include "DASMonMessages.h"
 
 using namespace std;
 
@@ -555,6 +553,39 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc, const std:
             }
 
             delete cmsmsg;
+            res = true;
+        }
+        catch(...)
+        {
+            // An exception indicates a loss of connection
+            delete cmsmsg;
+            disconnect();
+        }
+    }
+
+    return res;
+}
+
+
+bool
+Connection::postWorkflow( MessageBase &a_msg )
+{
+    bool res = false;
+
+    if ( m_connected )
+    {
+        cms::TextMessage *cmsmsg = 0;
+
+        try
+        {
+            auto_ptr<cms::Queue>                q( m_session->createQueue( "POSTPROCESS.DATA_READY" ));
+            auto_ptr<cms::MessageProducer>      producer( m_session->createProducer( q.get()) );
+
+            cmsmsg = m_session->createTextMessage();
+            a_msg.serialize( *cmsmsg );
+
+            producer->send( cmsmsg );
+
             res = true;
         }
         catch(...)

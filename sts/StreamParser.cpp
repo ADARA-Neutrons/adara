@@ -1194,7 +1194,7 @@ StreamParser::finalizeStreamProcessing()
 
         monitorFinalize( *imi->second );
     }
-    
+
 
     // Write remaining pulse info and statistics
 

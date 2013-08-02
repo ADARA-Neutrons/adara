@@ -15,6 +15,7 @@
 #include "ADARA.h"
 #include "AMQConfigDialog.h"
 #include "RuleConfigDialog.h"
+#include "ComBusMessages.h"
 #include "DASMonMessages.h"
 #include "STSMessages.h"
 #include "style.h"
@@ -34,7 +35,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
-    m_refresh_log_table(false), m_refresh_pv_table(false),
+    m_refresh_log_table(false), m_refresh_trans_table(false), m_refresh_pv_table(false),
     m_recording(false), m_run_number(0), m_prev_run_number(0), m_paused(false), m_scanning(false), m_scan_index(0),
     m_signalled(false), m_highest_level(ADARA::TRACE), m_event_scrollback(5),
     m_combus(0), m_domain( a_domain ), m_broker_uri( a_broker_uri ), m_broker_user( a_broker_user ),
@@ -90,6 +91,12 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     ui->monitorTable->horizontalHeader()->show();
 
     headers.clear();
+    headers << "Run No." << "Process" << "Status";
+    ui->transTable->setHorizontalHeaderLabels( headers );
+    ui->transTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+    ui->transTable->horizontalHeader()->show();
+
+    headers.clear();
     headers << "Name" << "Source" << "Level" << "Message";
     ui->alertTable->setHorizontalHeaderLabels( headers );
     ui->alertTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
@@ -127,7 +134,8 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     m_combus->setInputListener( *this );
     m_combus->attach( *this, "STATUS.>" ); // Listen to ADARA process health status (display only)
     m_combus->attach( *this, "SIGNAL.>" ); // Listen to ADARA signals
-    m_combus->attach( *this, "APP.DASMON.0" );
+    m_combus->attach( *this, "APP.DASMON.0" ); // Listen to dasmon service
+    m_combus->attach( *this, "APP.STS.>" ); // Listen to (local) STS translation messages
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -489,7 +497,46 @@ MainWindow::onTableTimer()
 
         m_refresh_pv_table = false;
     }
+    map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin();
 
+    // Examine translation status for unresponsive or stale information
+    for ( ; ts != m_trans_status.end();  )
+    {
+        // Maybe leave finished info up for a diff time than unresponsive?
+        if ( ts->second.last_updated + 30 < now )
+        {
+            m_trans_status.erase( ts++ );
+            m_refresh_trans_table = true;
+        }
+        else
+            ++ts;
+    }
+
+    if ( m_refresh_trans_table )
+    {
+        m_refresh_trans_table = false;
+
+        if ( ui->transTable->rowCount() != (int)m_trans_status.size() )
+            ui->transTable->setRowCount( m_trans_status.size());
+
+        ts = m_trans_status.begin();
+        row = 0;
+        for ( ; ts != m_trans_status.end(); ++ts, ++row )
+        {
+            ui->transTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( ts->first )));
+            ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( ts->second.sts_pid.c_str() )));
+
+            if ( ts->second.running )
+            {
+                if ( ts->second.last_updated + 9 < now )
+                    ui->transTable->setItem( row, 2, new QTableWidgetItem( "Unresponsive" ));
+                else
+                    ui->transTable->setItem( row, 2, new QTableWidgetItem( QString("Running - %1").arg( getStatusText( ts->second.run_status ))));
+            }
+            else
+                ui->transTable->setItem( row, 2, new QTableWidgetItem(QString("%1").arg( getTransStatusText( ts->second.trans_status ))));
+        }
+    }
 
 #if 0
         m_monitor->getStatistics( m_stats );
@@ -978,6 +1025,24 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 info.last_updated = time(0);
                 m_refresh_proc_table = true;
             }
+
+            if ( a_msg.getSourceName().compare( 0, 3, "STS" ) == 0 )
+            {
+                for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
+                {
+                    if ( ts->second.sts_pid == a_msg.getSourceName() )
+                    {
+                        if ( ts->second.run_status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
+                        {
+                            ts->second.run_status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
+                            m_refresh_trans_table = true;
+                        }
+                        ts->second.last_updated = time(0);
+                        break;
+                    }
+                }
+            }
+
         }
         break;
 
@@ -990,14 +1055,6 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSourceName().c_str())
                                      .arg(logmsg.getLevelText().c_str()).arg(logmsg.m_msg.c_str()));
             m_refresh_log_table = true;
-        }
-        break;
-
-    case ADARA::ComBus::MSG_STS_TRANS_COMPLETE:
-        {
-            // Leave this out until tested
-            //string txt = string("STS translation completed for run ") + boost::lexical_cast<string>( ((ADARA::ComBus::STS::TranslationCompleteMessage&)a_msg).m_run_num );
-            //writeLog( ADARA::INFO, txt );
         }
         break;
 
@@ -1117,6 +1174,53 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         {
             const ADARA::ComBus::DASMON::RunMetricsMessage &msg = (const ADARA::ComBus::DASMON::RunMetricsMessage&)a_msg;
             updateRunMetrics( msg );
+        }
+        break;
+
+    case ADARA::ComBus::MSG_STS_TRANS_STARTED:
+        {
+            const ADARA::ComBus::STS::TranslationStartedMsg &msg = (const ADARA::ComBus::STS::TranslationStartedMsg&)a_msg;
+
+            TransStatus status;
+            status.running = true;
+            status.run_num = msg.m_run_num;
+            status.sts_pid = msg.getSourceName();
+            status.run_status = ADARA::ComBus::STATUS_OK;
+            status.last_updated = time(0);
+            m_trans_status[status.run_num] = status;
+            m_refresh_trans_table = true;
+
+            cout << "Run " << status.run_num << " started." << endl;
+        }
+        break;
+
+    case ADARA::ComBus::MSG_STS_TRANS_FINISHED:
+        {
+            const ADARA::ComBus::STS::TranslationFinishedMsg &msg = (const ADARA::ComBus::STS::TranslationFinishedMsg&)a_msg;
+
+            TransStatus status;
+            status.running = false;
+            status.run_num = msg.m_run_num;
+            status.sts_pid = msg.getSourceName();
+            status.trans_status = STS::TS_SUCCESS;
+            status.last_updated = time(0);
+            m_trans_status[status.run_num] = status;
+            m_refresh_trans_table = true;
+        }
+        break;
+
+    case ADARA::ComBus::MSG_STS_TRANS_FAILED:
+        {
+            const ADARA::ComBus::STS::TranslationFailedMsg &msg = (const ADARA::ComBus::STS::TranslationFailedMsg&)a_msg;
+
+            TransStatus status;
+            status.running = false;
+            status.run_num = msg.m_run_num;
+            status.sts_pid = msg.getSourceName();
+            status.trans_status = msg.m_code;
+            status.last_updated = time(0);
+            m_trans_status[status.run_num] = status;
+            m_refresh_trans_table = true;
         }
         break;
 
@@ -1259,3 +1363,17 @@ MainWindow::getStatusText( int a_status )
     default: return "ERROR";
     }
 }
+
+
+const char *
+MainWindow::getTransStatusText( STS::TranslationStatusCode &a_status )
+{
+    switch( a_status )
+    {
+    case STS::TS_SUCCESS: return "Completed Successfully";
+    case STS::TS_PERM_ERROR: return "Critical Error";
+    case STS::TS_TRANSIENT_ERROR: return "Transient Error";
+    default: return "ERROR";
+    }
+}
+

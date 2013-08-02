@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   Utils.h
  * Author: d3s
  *
@@ -13,7 +13,8 @@
 #include <unistd.h>
 #include <vector>
 #include <time.h>
-
+#include <stdint.h>
+#include <string.h>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
