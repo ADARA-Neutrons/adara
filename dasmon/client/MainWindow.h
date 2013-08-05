@@ -9,9 +9,7 @@
 #include <QTableWidgetItem>
 #include <QDateTime>
 #include <QMutex>
-//#include <boost/thread/mutex.hpp>
-//#include <boost/thread/locks.hpp>
-
+#include <QLineEdit>
 #include "ComBus.h"
 #include "DASMonDefs.h"
 #include "SubClient.h"
@@ -120,7 +118,7 @@ private:
     };
 
 
-    void        clearRunDisplay();
+    void        clearRunDisplay( bool a_lost_comm );
     void        clearBeamDisplay();
     void        clearSignals();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
@@ -139,6 +137,7 @@ private:
     void        updateRunInfo( const ADARA::DASMON::RunInfo &a_run_info );
     void        updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics );
     void        updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics );
+    void        setStaleText( QLineEdit *a_edit );
 
     void        setComBusActive( bool a_active );
     void        setDASMonActive( bool a_active );

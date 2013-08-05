@@ -22,12 +22,14 @@
 
 using namespace std;
 
-#define PV_HIGHLIGH_DURATION    30 // poll iterations
-#define TIMEOUT_UNRESPONSIVE 10
-#define TIMEOUT_DEAD 20
-#define TIMEOUT_DEAD_CLEANUP 5
+#define PV_HIGHLIGH_DURATION        30 // poll iterations
+#define TIMEOUT_PROC_UNRESPONSIVE   10
+#define TIMEOUT_PROC_DEAD           30
+#define TIMEOUT_PROC_DEAD_CLEANUP   30
+#define TIMEOUT_STS_INACTIVE        30
+#define TIMEOUT_STS_UNRESPONSIVE    10
 #define MONITOR_ID_INACTIVE_TIMEOUT 86400 // 24 hours
-#define MONITOR_ID_DATA_TIMEOUT 4
+#define MONITOR_ID_DATA_TIMEOUT     5
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
@@ -200,7 +202,7 @@ MainWindow::setComBusActive( bool a_active )
         m_signalled = false;
 
         clearBeamDisplay();
-        clearRunDisplay();
+        clearRunDisplay( true );
         clearSignals();
 
         updateAllStatusIndicators();
@@ -240,7 +242,7 @@ MainWindow::setDASMonActive( bool a_active )
         m_signalled = false;
 
         clearBeamDisplay();
-        clearRunDisplay();
+        clearRunDisplay( true );
         clearSignals();
 
         updateAllStatusIndicators();
@@ -274,7 +276,7 @@ MainWindow::setSMSActive( bool a_active )
         m_scan_index = 0;
 
         clearBeamDisplay();
-        clearRunDisplay();
+        clearRunDisplay( true );
 
         updateAllStatusIndicators();
 
@@ -295,8 +297,8 @@ MainWindow::onProcTimer()
     // Scan for and remove stopped or stalled processes, also check dasmon status
     for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); )
     {
-        if ((( p->second.status == ADARA::ComBus::STATUS_INACTIVE ) && ( t > p->second.last_updated + TIMEOUT_DEAD_CLEANUP )) ||
-            ( t > p->second.last_updated + TIMEOUT_DEAD ))
+        if ((( p->second.status == ADARA::ComBus::STATUS_INACTIVE ) && ( t > p->second.last_updated + TIMEOUT_PROC_DEAD_CLEANUP )) ||
+            ( t > p->second.last_updated + TIMEOUT_PROC_DEAD ))
         {
             if ( p->first == "DASMON.0" )
                 kill_dasmon = true;
@@ -306,7 +308,7 @@ MainWindow::onProcTimer()
             m_proc_status.erase( p++ );
             m_refresh_proc_table = true;
         }
-        else if ( t > p->second.last_updated + TIMEOUT_UNRESPONSIVE ) // Unresponsive processes
+        else if ( t > p->second.last_updated + TIMEOUT_PROC_UNRESPONSIVE ) // Unresponsive processes
         {
             if ( p->second.status != ADARA::ComBus::STATUS_UNRESPONSIVE )
             {
@@ -497,19 +499,24 @@ MainWindow::onTableTimer()
 
         m_refresh_pv_table = false;
     }
-    map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin();
+
 
     // Examine translation status for unresponsive or stale information
-    for ( ; ts != m_trans_status.end();  )
+    for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end();  )
     {
         // Maybe leave finished info up for a diff time than unresponsive?
-        if ( ts->second.last_updated + 30 < now )
+        if ( ts->second.last_updated + TIMEOUT_STS_INACTIVE < now )
         {
             m_trans_status.erase( ts++ );
             m_refresh_trans_table = true;
         }
         else
+        {
+            if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
+                m_refresh_trans_table = true;
+
             ++ts;
+        }
     }
 
     if ( m_refresh_trans_table )
@@ -519,16 +526,16 @@ MainWindow::onTableTimer()
         if ( ui->transTable->rowCount() != (int)m_trans_status.size() )
             ui->transTable->setRowCount( m_trans_status.size());
 
-        ts = m_trans_status.begin();
+        map<unsigned long,TransStatus>::reverse_iterator ts = m_trans_status.rbegin();
         row = 0;
-        for ( ; ts != m_trans_status.end(); ++ts, ++row )
+        for ( ; ts != m_trans_status.rend(); ++ts, ++row )
         {
             ui->transTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( ts->first )));
             ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( ts->second.sts_pid.c_str() )));
 
             if ( ts->second.running )
             {
-                if ( ts->second.last_updated + 9 < now )
+                if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
                     ui->transTable->setItem( row, 2, new QTableWidgetItem( "Unresponsive" ));
                 else
                     ui->transTable->setItem( row, 2, new QTableWidgetItem( QString("Running - %1").arg( getStatusText( ts->second.run_status ))));
@@ -592,6 +599,7 @@ MainWindow::configActiveMQ()
         m_combus->attach( *this, "STATUS.>" );
         m_combus->attach( *this, "SIGNAL.>" );
         m_combus->attach( *this, "APP.DASMON.0" );
+        m_combus->attach( *this, "APP.STS.>" ); // Listen to (local) STS translation messages
     }
 }
 
@@ -722,7 +730,7 @@ MainWindow::updateRunStatusIndicator()
         style = m_style_unlit;
 
         if ( m_prev_run_number > 0 )
-            QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("(prev: %1)").arg(m_prev_run_number)));
+            QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("(%1)").arg(m_prev_run_number)));
         else
             QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
@@ -915,24 +923,56 @@ MainWindow::clearBeamDisplay()
 
 
 void
-MainWindow::clearRunDisplay()
+MainWindow::setStaleText( QLineEdit *a_edit )
 {
-    //QMetaObject::invokeMethod( ui->runNumLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->propIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->runTitleEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->sampleIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->sampleNameEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->sampleNatureEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->sampleFormulaEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->sampleEnvironmentEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    QString temp = a_edit->text();
+    if ( !temp.isEmpty() && !temp.startsWith("(") )
+    {
+        temp = QString("(") + temp + QString(")");
+        QMetaObject::invokeMethod( a_edit, "setText", Qt::QueuedConnection, Q_ARG(QString,temp));
+    }
+}
 
-    QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+
+void
+MainWindow::clearRunDisplay( bool a_lost_comm )
+{
+    if ( a_lost_comm )
+    {
+        QMetaObject::invokeMethod( ui->propIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->runTitleEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->sampleIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->sampleNameEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->sampleNatureEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->sampleFormulaEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->sampleEnvironmentEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+
+        QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    }
+    else
+    {
+        setStaleText( ui->propIdEdit );
+        setStaleText( ui->propIdEdit );
+        setStaleText( ui->runTitleEdit );
+        setStaleText( ui->sampleIdEdit );
+        setStaleText( ui->sampleNameEdit );
+        setStaleText( ui->sampleNatureEdit );
+        setStaleText( ui->sampleFormulaEdit );
+        setStaleText( ui->sampleEnvironmentEdit );
+        setStaleText( ui->totalCountsEdit );
+        setStaleText( ui->totalChargeEdit );
+        setStaleText( ui->pixErrorLabel );
+        setStaleText( ui->dupPulseLabel );
+        setStaleText( ui->mapErrorLabel );
+        setStaleText( ui->pulseVetoLabel );
+        setStaleText( ui->missRTDLLabel );
+    }
 }
 
 
@@ -1120,7 +1160,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 QMetaObject::invokeMethod( ui->startTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg(m_start_time.toString("M/d/yy h:mm:ss"))));
                 updateRunStatusIndicator();
 
-                clearRunDisplay();
+                clearRunDisplay( false );
                 writeLog( ADARA::INFO, "Run stopped." );
             }
         }

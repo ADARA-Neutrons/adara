@@ -46,7 +46,8 @@ int main(int argc, char** argv)
     unsigned long               cache_size;
     unsigned short              compression_level;
     unsigned long               run_no = 0;
-    ComBusTransMon              monitor;
+    NxGen                      *nxgen = 0;
+    ComBusTransMon             *monitor = 0;
 
     try
     {
@@ -166,16 +167,17 @@ int main(int argc, char** argv)
                 dup2( nullfd, 2 );
             }
 
-            NxGen    nxgen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
+            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
                             anc_buf_size, cache_size, compression_level );
 
             // Start ComBus monitor thread
-            monitor.start( nxgen, broker_uri, broker_user, broker_pass, domain );
+            monitor = new ComBusTransMon();
+            monitor->start( *nxgen, broker_uri, broker_user, broker_pass, domain );
 
             // Begin ADARA stream processing - does not return until recording ends
-            nxgen.processStream();
+            nxgen->processStream();
 
-            run_no = nxgen.getRunNumber();
+            run_no = nxgen->getRunNumber();
 
             if ( move )
             {
@@ -184,23 +186,23 @@ int main(int argc, char** argv)
                 else if ( base_path[base_path.length()-1] != '/')
                     base_path += "/";
 
-                string cat_path = base_path + nxgen.getFacilityName() + "/" + nxgen.getBeamShortName() + "/" + nxgen.getProposalID() + "/";
-                string cat_name = nxgen.getBeamShortName() + "_" + boost::lexical_cast<string>(nxgen.getRunNumber());
+                string cat_path = base_path + nxgen->getFacilityName() + "/" + nxgen->getBeamShortName() + "/" + nxgen->getProposalID() + "/";
+                string cat_name = nxgen->getBeamShortName() + "_" + boost::lexical_cast<string>(nxgen->getRunNumber());
 
                 moveFile( adara_outfile, cat_path + "adara", cat_name + ".adara" );
                 moveFile( nexus_outfile, cat_path + "nexus", cat_name + ".nxs.h5" );
 
                 // Send finished messages to ComBus AND workflow manager
-                monitor.success( true, cat_path + "nexus/" + cat_name + ".nxs.h5" );
+                monitor->success( true, cat_path + "nexus/" + cat_name + ".nxs.h5" );
             }
             else
             {
                 // Send finished messages to ComBus only
-                monitor.success( false, nexus_outfile );
+                monitor->success( false, nexus_outfile );
             }
 
             if ( gather_stats )
-                nxgen.printStats( cout );
+                nxgen->printStats( cout );
         }
     }
     catch( TraceException &e )
@@ -212,7 +214,7 @@ int main(int argc, char** argv)
             sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.toString( true, true );
 
-        monitor.failure( sms_code, sms_reason );
+        monitor->failure( sms_code, sms_reason );
     }
     catch( exception &e )
     {
@@ -220,7 +222,7 @@ int main(int argc, char** argv)
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        monitor.failure( sms_code, sms_reason );
+        monitor->failure( sms_code, sms_reason );
     }
     catch( ... )
     {
@@ -228,7 +230,7 @@ int main(int argc, char** argv)
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
 
-        monitor.failure( sms_code, sms_reason );
+        monitor->failure( sms_code, sms_reason );
     }
 
     if ( !interact )
@@ -240,6 +242,9 @@ int main(int argc, char** argv)
     {
         cout << sms_reason << endl;
     }
+
+    delete monitor;
+    delete nxgen;
 
     return sms_code != STS::TS_SUCCESS;
 }
