@@ -95,8 +95,9 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
     if ( m_terminal_msg )
         return;
 
-    m_terminal_msg = new ADARA::ComBus::STS::TranslationFinishedMsg( m_stream_parser->getBeamShortName(),
-        m_stream_parser->getProposalID(), m_stream_parser->getRunNumber(), a_nexus_file );
+    m_terminal_msg = new ADARA::ComBus::STS::TranslationFinishedMsg( m_stream_parser->getFacilityName(),
+        m_stream_parser->getBeamShortName(), m_stream_parser->getProposalID(),
+        m_stream_parser->getRunNumber(), a_nexus_file );
 
     m_send_to_workflow = a_moved;
 }

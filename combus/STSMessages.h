@@ -46,11 +46,14 @@ public:
         : m_run_num(0)
     {}
 
-    TranslationFinishedMsg( const std::string &a_beam_sname, const std::string &a_proposal_id,
-                                unsigned long a_run_num, const std::string &a_nexus_file )
-        : m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id), m_run_num(a_run_num), m_nexus_file(a_nexus_file)
+    TranslationFinishedMsg( const std::string &a_facility, const std::string &a_beam_sname,
+                            const std::string &a_proposal_id, unsigned long a_run_num,
+                            const std::string &a_nexus_file )
+        : m_facility(a_facility), m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id),
+          m_run_num(a_run_num), m_nexus_file(a_nexus_file)
     {}
 
+    std::string         m_facility;
     std::string         m_beam_sname;
     std::string         m_proposal_id;
     unsigned long       m_run_num;
@@ -64,6 +67,7 @@ protected:
         // Note: the JSON property names here were selected for compatibility with the
         // existing workflow manager "data ready" message definition.
 
+        m_facility = a_prop_tree.get( "facility", "" );
         m_beam_sname = a_prop_tree.get( "instrument", "" );
         m_proposal_id = a_prop_tree.get( "ipts", "" );
         m_run_num = a_prop_tree.get( "run_number", 0 );
@@ -74,6 +78,7 @@ protected:
     {
         MessageBase::write( a_prop_tree );
 
+        a_prop_tree.put( "facility", m_facility );
         a_prop_tree.put( "instrument", m_beam_sname );
         a_prop_tree.put( "ipts", m_proposal_id );
         a_prop_tree.put( "run_number", m_run_num );
