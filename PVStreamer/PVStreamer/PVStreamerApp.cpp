@@ -135,7 +135,7 @@ CPVStreamerApp::InitInstance()
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
-    dlg.print( "PVStreamer starting." );
+    dlg.print( "PVStreamer starting..." );
 
     stringstream   sstr;
     sstr << "  config file = " << cmdline.m_sat_config_file << " (use -cfg=x to change)";

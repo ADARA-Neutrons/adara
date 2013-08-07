@@ -80,12 +80,9 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	DECLARE_MESSAGE_MAP()
-public:
-//    afx_msg void OnBnClickedOk();
-//    afx_msg void OnEnChangeLogEdit();
+
 protected:
     CEdit m_log_edit;
-public:
-//    afx_msg void OnBnClickedOk();
     CEdit m_status_edit;
+    CEdit m_version_edit;
 };

@@ -13,6 +13,8 @@
 #define new DEBUG_NEW
 #endif
 
+#define VERSION "1.0.0"
+
 using namespace std;
 
 #define MAX_LOG_SIZE 500
@@ -65,6 +67,7 @@ void CPVStreamerDlg::DoDataExchange(CDataExchange* pDX)
     CDialog::DoDataExchange(pDX);
     DDX_Control(pDX, IDC_LOG_EDIT, m_log_edit);
     DDX_Control(pDX, IDC_STATUS_EDIT, m_status_edit);
+    DDX_Control(pDX, IDC_VERSION_EDIT, m_version_edit);
 }
 
 BEGIN_MESSAGE_MAP(CPVStreamerDlg, CDialog)
@@ -72,10 +75,6 @@ BEGIN_MESSAGE_MAP(CPVStreamerDlg, CDialog)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
     ON_WM_TIMER()
-	//}}AFX_MSG_MAP
-//    ON_BN_CLICKED(IDOK, &CPVStreamerDlg::OnBnClickedOk)
-//ON_EN_CHANGE(IDC_LOG_EDIT, &CPVStreamerDlg::OnEnChangeLogEdit)
-//ON_BN_CLICKED(IDOK, &CPVStreamerDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
 
 
@@ -91,6 +90,9 @@ BOOL CPVStreamerDlg::OnInitDialog()
     SetIcon(m_hIcon, FALSE);		// Set small icon
 
     m_status_edit.SetWindowText( "ADARA: Not listening" );
+    stringstream tmp;
+    tmp << "Version " << VERSION;
+    m_version_edit.SetWindowText( tmp.str().c_str() );
 
     updateLogText();
     m_update_log = false;
@@ -344,6 +346,7 @@ CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
 
     updateLogText();
 }
+
 
 void
 CPVStreamerDlg::print( const std::string & a_msg )
