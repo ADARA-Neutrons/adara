@@ -339,7 +339,7 @@ CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    if ( m_log_entries.size() > MAX_LOG_SIZE )
+    if ( m_log_entries.size() >= MAX_LOG_SIZE )
         m_log_entries.pop_front();
 
     m_log_entries.push_back( timeString(ts) + " - " + entry );
@@ -353,7 +353,7 @@ CPVStreamerDlg::print( const std::string & a_msg )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    if ( m_log_entries.size() > MAX_LOG_SIZE )
+    if ( m_log_entries.size() >= MAX_LOG_SIZE )
         m_log_entries.pop_front();
 
     m_log_entries.push_back( a_msg );
