@@ -8,8 +8,6 @@
 #include "stdafx.h"
 
 #include <sstream>
-//#include <strstream>
-
 #include "ADARA_PVWriter.h"
 
 using namespace std;

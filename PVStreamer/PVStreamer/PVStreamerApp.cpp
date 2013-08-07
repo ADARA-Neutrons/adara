@@ -95,7 +95,7 @@ CPVStreamerApp::InitApplication()
             CWnd *pWndPrev, *pWndChild;
 
             // Determine if a window with the class name exists...
-            if (( pWndPrev = CWnd::FindWindow(0,"SNS-SMS Process Variable Streamer")) != 0 )
+            if (( pWndPrev = CWnd::FindWindow(0,"ADARA Process Variable Streamer")) != 0 )
             {
                 // If so, does it have any popups?
                 pWndChild = pWndPrev->GetLastActivePopup();

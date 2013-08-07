@@ -9,6 +9,7 @@
 #include "PVStreamer.h"
 #include "ADARA_PVWriter.h"
 #include "afxwin.h"
+#include <boost/thread.hpp>
 #include "ComBusLite.h"
 
 using namespace SNS::PVS;
@@ -53,16 +54,25 @@ protected:
 
     std::string         timeString( Timestamp *ts ) const;
     void                addLogEntry( Timestamp *ts, std::string &entry );
+    void                updateLogText();
 
     void                OnCancel();
     void                OnTimer( UINT a_timer_id );
+    void                statusThread();
 
     std::string             m_log_text;
     std::list<std::string>  m_log_entries;
     unsigned long           m_start_time;
     boost::mutex            m_mutex;
     bool                    m_update_log;
+    std::string             m_topic_path;
+    std::string             m_broker_uri;
+    unsigned short          m_broker_port;
+    std::string             m_broker_user;
+    std::string             m_broker_pass;
     ComBusLite             *m_combus;
+    boost::thread          *m_status_thread;
+    bool                    m_running;
 
     // Generated message map functions
 	virtual BOOL OnInitDialog();
