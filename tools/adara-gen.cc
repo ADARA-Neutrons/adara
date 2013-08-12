@@ -220,7 +220,7 @@ public:
 				/* Fake TOF at a quarter of the detectors. */
 				p.mevents--;
 				*field++ = genTOF() / 4;
-				*field++ = (p.mon_index << 16) | (4 << 28);
+				*field++ = (p.mon_index << 16) | (4 << 28) | 1;
 				pktlen += 8;
 				*payload_len += 8;
 

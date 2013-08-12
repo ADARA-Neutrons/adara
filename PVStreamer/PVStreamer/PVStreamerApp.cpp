@@ -95,7 +95,7 @@ CPVStreamerApp::InitApplication()
             CWnd *pWndPrev, *pWndChild;
 
             // Determine if a window with the class name exists...
-            if (( pWndPrev = CWnd::FindWindow(0,"SNS-SMS Process Variable Streamer")) != 0 )
+            if (( pWndPrev = CWnd::FindWindow(0,"ADARA Process Variable Streamer")) != 0 )
             {
                 // If so, does it have any popups?
                 pWndChild = pWndPrev->GetLastActivePopup();
@@ -135,7 +135,7 @@ CPVStreamerApp::InitInstance()
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
 
-    dlg.print( "PVStreamer starting." );
+    dlg.print( "PVStreamer starting..." );
 
     stringstream   sstr;
     sstr << "  config file = " << cmdline.m_sat_config_file << " (use -cfg=x to change)";

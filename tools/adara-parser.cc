@@ -427,8 +427,8 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 
 			for (uint32_t i = 0; i < nEvents; p++, i++) {
 				printf("\t  %u: %0.7f seconds%s\n", i,
-				       1e-9 * 100 * (*p & ~(1U << 31)),
-				       (*p & (1U << 31)) ? " (trailing)" : "");
+				       1e-9 * 100 * (*p & ((1U << 21) - 1)),
+				       (*p & (1U << 31)) ? "" : " (trailing)");
 			}
 
 			len -= nEvents * sizeof(uint32_t);

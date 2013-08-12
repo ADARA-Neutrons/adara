@@ -382,8 +382,8 @@ void SMSControl::sourceDown(uint32_t id)
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				 uint32_t pixel, uint32_t tof)
 {
-	uint32_t trailing = (pixel & 1) << 31;
-	tof |= trailing;
+	uint32_t rising = (pixel & 1) << 31;
+	tof |= rising;
 
 	pixel >>= 16;
 	pixel &= 0xff;

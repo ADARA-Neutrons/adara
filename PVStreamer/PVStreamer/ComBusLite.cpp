@@ -16,6 +16,10 @@ ComBusLite::ComBusLite( const std::string &a_topic_path, const std::string &a_pr
         ss << a_topic_path << ".STATUS." << a_proc_name << "." << a_proc_id << "?type=topic";
         m_topic = ss.str();
 
+        // Set reasonable timeouts (defaults are very long)
+        m_session.SetOption( INTERNET_OPTION_CONNECT_TIMEOUT, 10000 );
+        m_session.SetOption( INTERNET_OPTION_RECEIVE_TIMEOUT, 10000 );
+
         m_conn = m_session.GetHttpConnection( m_broker_host.c_str(), a_port, m_broker_user.c_str(), m_broker_pass.c_str() );
     }
     catch(...)
@@ -38,6 +42,8 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
 
     if ( m_conn )
     {
+        CHttpFile *file = 0;
+
         try
         {
             DWORD ret = 0;
@@ -49,7 +55,7 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
             data << "    \"timestamp\":\"" << time(0) << "\",\r\n";
             data << "    \"status\":\"" << a_status << "\"\r\n}";
 
-            CHttpFile *file = m_conn->OpenRequest( CHttpConnection::HTTP_VERB_POST, m_topic.c_str() );
+            file = m_conn->OpenRequest( CHttpConnection::HTTP_VERB_POST, m_topic.c_str() );
 			if ( file )
 			{
 				file->SendRequest( headers.c_str(), (DWORD)headers.length(), (LPVOID)data.str().c_str(), (DWORD)data.str().length() );
@@ -61,8 +67,25 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
 				delete file;
 			}
         }
-        catch(...)
+        catch( CInternetException *e )
         {
+            if ( file )
+            {
+                file->Close();
+                delete file;
+            }
+
+            // The need to call "Delete" seems to be an undocumented requrirement for using WinINet!
+            // Without this call, we will leak memory for every exception thrown!
+            e->Delete();
+        }
+        catch(...) // Just in case
+        {
+            if ( file )
+            {
+                file->Close();
+                delete file;
+            }
         }
     }
 

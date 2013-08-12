@@ -13,12 +13,29 @@
 #define new DEBUG_NEW
 #endif
 
+#define VERSION "1.0.0"
+
 using namespace std;
 
 #define MAX_LOG_SIZE 500
 
-CPVStreamerDlg::CPVStreamerDlg( const std::string &a_topic_path, const std::string &a_broker_uri, unsigned short a_broker_port, const std::string &a_broker_user, const std::string &a_broker_pass)
-	: CDialog(CPVStreamerDlg::IDD, 0), m_update_log(false), m_combus(0)
+CPVStreamerDlg::CPVStreamerDlg
+(
+    const std::string &a_topic_path,
+    const std::string &a_broker_uri,
+    unsigned short a_broker_port,
+    const std::string &a_broker_user,
+    const std::string &a_broker_pass
+):
+    CDialog(CPVStreamerDlg::IDD, 0),
+    m_update_log(false),
+    m_topic_path(a_topic_path),
+    m_broker_uri(a_broker_uri),
+    m_broker_port(a_broker_port),
+    m_broker_user(a_broker_user),
+    m_broker_pass(a_broker_pass),
+    m_combus(0),
+    m_running(true)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDI_MAINICON);
     m_start_time = (unsigned long)time(0);
@@ -26,15 +43,22 @@ CPVStreamerDlg::CPVStreamerDlg( const std::string &a_topic_path, const std::stri
     // If ComBusLite ctor fails, no exception will be thrown, just wont work
 	if ( !a_broker_uri.empty() && !a_topic_path.empty() )
 	{
-		m_combus = new ComBusLite( a_topic_path, "PVSTREAMER", 0, a_broker_uri, a_broker_port, a_broker_user, a_broker_pass );
+        // Create a thread to emit ComBus status
+        m_status_thread = new boost::thread( boost::bind(&CPVStreamerDlg::statusThread, this));
 	}
 }
 
 
 CPVStreamerDlg::~CPVStreamerDlg()
 {
+    m_running = false;
+
     if ( m_combus )
-        delete m_combus;
+    {
+        m_status_thread->join();
+
+        delete m_status_thread;
+    }
 }
 
 
@@ -43,6 +67,7 @@ void CPVStreamerDlg::DoDataExchange(CDataExchange* pDX)
     CDialog::DoDataExchange(pDX);
     DDX_Control(pDX, IDC_LOG_EDIT, m_log_edit);
     DDX_Control(pDX, IDC_STATUS_EDIT, m_status_edit);
+    DDX_Control(pDX, IDC_VERSION_EDIT, m_version_edit);
 }
 
 BEGIN_MESSAGE_MAP(CPVStreamerDlg, CDialog)
@@ -50,10 +75,6 @@ BEGIN_MESSAGE_MAP(CPVStreamerDlg, CDialog)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
     ON_WM_TIMER()
-	//}}AFX_MSG_MAP
-//    ON_BN_CLICKED(IDOK, &CPVStreamerDlg::OnBnClickedOk)
-//ON_EN_CHANGE(IDC_LOG_EDIT, &CPVStreamerDlg::OnEnChangeLogEdit)
-//ON_BN_CLICKED(IDOK, &CPVStreamerDlg::OnBnClickedOk)
 END_MESSAGE_MAP()
 
 
@@ -69,9 +90,16 @@ BOOL CPVStreamerDlg::OnInitDialog()
     SetIcon(m_hIcon, FALSE);		// Set small icon
 
     m_status_edit.SetWindowText( "ADARA: Not listening" );
+    stringstream tmp;
+    tmp << "Version " << VERSION;
+    m_version_edit.SetWindowText( tmp.str().c_str() );
+
+    updateLogText();
+    m_update_log = false;
+    m_log_edit.SetWindowText( m_log_text.c_str() );
+    m_log_edit.LineScroll( MAX_LOG_SIZE, 0 );
 
     SetTimer( 1, 1000, 0 );
-    SetTimer( 2, 4000, 0 );
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -125,21 +153,61 @@ CPVStreamerDlg::OnTimer( UINT a_timer_id )
         // Timer ID 1 is triggered once per second, used to updated log window
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
+        m_log_edit.SetRedraw( false );
         int visline = m_log_edit.GetFirstVisibleLine();
         m_log_edit.SetWindowText( m_log_text.c_str() );
-        if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
-            m_log_edit.LineScroll((visline + 1));
+        m_log_edit.LineScroll( visline );
+        m_log_edit.SetRedraw( true );
+        m_log_edit.Invalidate();
+        m_log_edit.UpdateWindow();
 
         m_update_log = false;
     }
-    else if ( a_timer_id == 2 )
-    {
-        // Timer ID 2 is used to send status updates
-		if ( m_combus )
-			m_combus->sendStatus( STATUS_OK );
-    }
 }
 
+void
+CPVStreamerDlg::statusThread()
+{
+    unsigned long count = 0;
+    time_t error = 0;
+    time_t now;
+
+    m_combus = new ComBusLite( m_topic_path, "PVSTREAMER", 0, m_broker_uri, m_broker_port, m_broker_user, m_broker_pass );
+
+    while( m_running )
+    {
+		if ( m_combus && !( count % 4 ))
+        {
+			if ( m_combus->sendStatus( STATUS_OK ))
+            {
+                now = time(0);
+
+                if ( error == 0 )
+                {
+                    // Print a message in log window (first error)
+                    print( "Warning! ComBus::sendStatus() failed. Check broker settings." );
+                    LOG_WARNING( "ComBus::sendStatus() failed." );
+
+                    error = now + 30; // Mask send errors for some time
+                }
+                else if ( error <= now )
+                {
+                    // Subsequent errors (max one per 30 seconds)
+                    print( "Warning! ComBus::sendStatus() failed." );
+                    LOG_WARNING( "ComBus::sendStatus() failed." );
+
+                    error = now + 30; // Mask send errors for some time
+                }
+            }
+        }
+
+        Sleep( 1000 );
+        ++count;
+    }
+
+    delete m_combus;
+    m_combus = 0;
+}
 
 void
 CPVStreamerDlg::listening( const std::string & a_address, unsigned short a_port )
@@ -271,47 +339,44 @@ CPVStreamerDlg::addLogEntry( Timestamp *ts, string &entry )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    if ( m_log_entries.size() > MAX_LOG_SIZE )
+    if ( m_log_entries.size() >= MAX_LOG_SIZE )
         m_log_entries.pop_front();
 
-    //char ts[20];
-    //sprintf_s( ts, "[%06i] ", 20, sec - m_start_time );
-    //m_log_entries.push_back( string(ts) + entry );
-
     m_log_entries.push_back( timeString(ts) + " - " + entry );
-    m_log_text.clear();
 
-    for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
-    {
-        m_log_text += *e + "\r\n";
-    }
-
-    m_update_log = true;
-
-    //int visline = m_log_edit.GetFirstVisibleLine();
-    //m_log_edit.SetWindowText( m_log_text.c_str() );
-    //if ( m_log_entries.size() > 30 ) // Estimate of how many lines fit on screen
-    //    m_log_edit.LineScroll((visline + 1));
+    updateLogText();
 }
+
 
 void
 CPVStreamerDlg::print( const std::string & a_msg )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    if ( m_log_entries.size() > MAX_LOG_SIZE )
+    if ( m_log_entries.size() >= MAX_LOG_SIZE )
         m_log_entries.pop_front();
 
     m_log_entries.push_back( a_msg );
+
+    updateLogText();
+}
+
+
+void
+CPVStreamerDlg::updateLogText()
+{
     m_log_text.clear();
 
+    // Back-fill with empty lines
+    for ( size_t i = 0; i < (MAX_LOG_SIZE - m_log_entries.size()); ++i )
+        m_log_text += "\r\n";
+
     for ( list<string>::iterator e = m_log_entries.begin(); e != m_log_entries.end(); ++e )
-    {
         m_log_text += *e + "\r\n";
-    }
 
     m_update_log = true;
 }
+
 
 void
 CPVStreamerDlg::unhandledException( const TraceException &e )
