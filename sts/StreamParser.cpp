@@ -103,7 +103,17 @@ StreamParser::processStream()
             if ( !read( m_fd, ADARA_IN_BUF_SIZE ))
             {
               if ( m_processing_state != DONE_PROCESSING )
+              {
+                  if ( m_processing_state == PROCESSING_EVENTS )
+                  {
+                      // On fatal error, flush buffers to Nexus before terminating
+                      markerComment( m_pulse_info.last_time, "Stream processing terminated abnormally." );
+                      m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
+                      finalizeStreamProcessing();
+                  }
+
                   THROW_TRACE( ERR_GENERAL_ERROR, "ADARA parser stopped unexpectedly." );
+              }
             }
         }
     }

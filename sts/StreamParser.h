@@ -168,32 +168,48 @@ StreamParser::pvValueUpdate
     if ( !pvinfo )
         THROW_TRACE( ERR_CAST_FAILED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not of correct type." )
 
-    float t = 0;
+    uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
-    // Note: if first pulse has not arrived, truncate all PV times to 0
-    if ( m_pulse_info.start_time )
+    // Only process this update if the timestamp is newer than the last time. (m_last_time
+    // is initialized to 0, so first real update will succeed.) This will reject PV updates
+    // that are at negative time displacements and filter-out duplicate updates caused by
+    // SMS file boundary crossings.
+    if ( ts_nano > pvinfo->m_last_time )
     {
-        uint64_t t1 = timespec_to_nsec( a_timestamp );
+        float t = 0; // Relative time of update in seconds from first pulse of run
 
-        // Truncate negative time offsets to 0
-        if ( t1 > m_pulse_info.start_time )
-            t = (t1 - m_pulse_info.start_time)/1000000000.0;
+        // Note: if first pulse has not arrived, truncate all PV times to 0
+        if ( m_pulse_info.start_time )
+        {
+            // Truncate negative time offsets to 0
+            if ( ts_nano > m_pulse_info.start_time )
+                t = (ts_nano - m_pulse_info.start_time)/1000000000.0;
+            else if ( pvinfo->m_value_buffer.size() )
+            {
+                // Because the time value is 0, erase any values recvd before now
+                // to avoid duplicate time entries.
+                pvinfo->m_value_buffer.clear();
+                pvinfo->m_time_buffer.clear();
+                pvinfo->m_stats.reset();
+            }
+        }
+        else if ( pvinfo->m_value_buffer.size() )
+        {
+            // If we recv multiple value updates before first pulse, keep only latest
+            pvinfo->m_value_buffer.clear();
+            pvinfo->m_time_buffer.clear();
+            pvinfo->m_stats.reset();
+        }
+
+        pvinfo->m_last_time = ts_nano;
+        pvinfo->m_value_buffer.push_back(a_value);
+        pvinfo->m_time_buffer.push_back(t);
+        pvinfo->m_stats.push(a_value);
+
+        // Check for buffer write
+        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+            pvinfo->flushBuffers();
     }
-    else if ( pvinfo->m_value_buffer.size() )
-    {
-        // If we recv multiple value updates before first pulse, keep only latest
-        pvinfo->m_value_buffer.clear();
-        pvinfo->m_time_buffer.clear();
-        pvinfo->m_stats.reset();
-    }
-
-    pvinfo->m_value_buffer.push_back(a_value);
-    pvinfo->m_time_buffer.push_back(t);
-    pvinfo->m_stats.push(a_value);
-
-    // Check for buffer write
-    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-        pvinfo->flushBuffers();
 }
 
 /*! \brief Gathers statistics from the specified ADARA packet.

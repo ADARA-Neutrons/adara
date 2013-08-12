@@ -185,7 +185,8 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
-        m_units(a_units)
+        m_units(a_units),
+        m_last_time(0)
     {}
 
     /// PVInfoBase destructor
@@ -201,6 +202,7 @@ public:
     PVType              m_type;         ///< Type of PV
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
+    uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
     std::vector<float>  m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
 };
 
