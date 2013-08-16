@@ -57,7 +57,8 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_PULSE_CHARGE]        = "PULSE_CHARGE";
     m_fact_name[BIF_PULSE_FREQ]          = "PULSE_FREQ";
     m_fact_name[BIF_STREAM_RATE]         = "STREAM_RATE";
-    m_fact_name[BIF_RUN_PULSE_CHARGE]    = "RUN_PULSE_CHARGE";
+    m_fact_name[BIF_RUN_TOTAL_CHARGE]    = "RUN_TOTAL_CHARGE";
+    m_fact_name[BIF_RUN_TOTAL_COUNTS]    = "RUN_TOTAL_COUNTS";
     m_fact_name[BIF_PIX_ERR_COUNT]       = "RUN_PIXEL_ERR_COUNT";
     m_fact_name[BIF_DUP_PULSE_COUNT]     = "RUN_DUP_PULSE_COUNT";
     m_fact_name[BIF_MAP_ERROR_COUNT]     = "RUN_MAP_ERROR_COUNT";
@@ -562,7 +563,8 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_PULSE_CHARGE]);
     a_facts.insert(m_fact_name[BIF_PULSE_FREQ]);
     a_facts.insert(m_fact_name[BIF_STREAM_RATE]);
-    a_facts.insert(m_fact_name[BIF_RUN_PULSE_CHARGE]);
+    a_facts.insert(m_fact_name[BIF_RUN_TOTAL_CHARGE]);
+    a_facts.insert(m_fact_name[BIF_RUN_TOTAL_COUNTS]);
     a_facts.insert(m_fact_name[BIF_PIX_ERR_COUNT]);
     a_facts.insert(m_fact_name[BIF_DUP_PULSE_COUNT]);
     a_facts.insert(m_fact_name[BIF_MAP_ERROR_COUNT]);
@@ -828,7 +830,8 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_engine->assert( m_fact[BIF_RUN_PULSE_CHARGE], a_metrics.m_pulse_charge );
+    m_engine->assert( m_fact[BIF_RUN_TOTAL_CHARGE], a_metrics.m_total_charge );
+    m_engine->assert( m_fact[BIF_RUN_TOTAL_COUNTS], a_metrics.m_total_counts );
     m_engine->assert( m_fact[BIF_PIX_ERR_COUNT], a_metrics.m_pixel_error_count );
     m_engine->assert( m_fact[BIF_DUP_PULSE_COUNT], a_metrics.m_dup_pulse_count );
     m_engine->assert( m_fact[BIF_MAP_ERROR_COUNT], a_metrics.m_mapping_error_count );

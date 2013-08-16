@@ -11,6 +11,11 @@
 #include "Utils.h"
 #include <syslog.h>
 
+#define DIAGNOSTICS
+
+// Only count pulses with pixel errors - not individual pixel errors
+#define PIX_ERR_BY_PULSE
+
 #ifndef NO_DB
 #include "libpq-fe.h"
 #endif
@@ -146,10 +151,8 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    //cout << "resend stat: ";
     if ( m_fd_in > -1 )
     {
-        //cout << " connected" << endl;
         a_listener.connectionStatus( true, m_sms_host, m_sms_port );
         a_listener.runStatus( m_recording, m_run_num, m_run_timestamp );
         a_listener.pauseStatus( m_paused );
@@ -163,7 +166,6 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
     }
     else
     {
-        //cout << " not connected" << endl;
         a_listener.connectionStatus( false, m_sms_host, m_sms_port );
     }
 }
@@ -430,7 +432,7 @@ StreamMonitor::metricsThread()
 {
     syslog( LOG_INFO, "Stream metrics thread started." );
 
-    unsigned long last_pulse_count = 0;
+    unsigned long last_count = 0;
     bool    stalled = false;
 
     while( m_process_stream )
@@ -443,7 +445,7 @@ StreamMonitor::metricsThread()
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             // Check for stalled stream
-            if ( last_pulse_count && ( m_run_metrics.m_pulse_count == last_pulse_count ))
+            if ( last_count && ( m_run_metrics.m_total_counts == last_count ))
             {
                 if ( !stalled )
                 {
@@ -454,7 +456,7 @@ StreamMonitor::metricsThread()
             }
             else
             {
-                last_pulse_count = m_run_metrics.m_pulse_count;
+                last_count = m_run_metrics.m_total_counts;
                 if ( stalled )
                 {
                     stalled = false;
@@ -476,7 +478,7 @@ StreamMonitor::metricsThread()
             // If recording, send run info and run metrics
             if ( m_recording )
             {
-                m_run_metrics.m_pulse_charge = m_pcharge.total;
+                m_run_metrics.m_total_charge = m_pcharge.total;
                 m_notify.runMetrics( m_run_metrics );
             }
         }
@@ -539,8 +541,6 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
-    //cout << "RunStat: " << a_pkt.status() << endl;
-
     bool recording = false;
     switch (a_pkt.status())
     {
@@ -610,8 +610,6 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 {
-//    cout << "PixelMappingPkt" << endl;
-
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
@@ -628,13 +626,9 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
-        //cout << "  bank ID: " << bank_id << ", pix count: " << pix_count << endl;
-
         rpos += pix_count;
         m_bank_count++;
     }
-
-    //cout << "  bank count: " << m_bank_count << endl;
 
     return false;
 }
@@ -646,7 +640,39 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
-    //cout << "BankedEventPkt" << endl;
+#ifdef DIAGNOSTICS
+    static uint32_t last_cycle = 0;
+    static uint64_t last_time = 0;
+    static uint64_t this_time = 0;
+    static bool inited = false;
+
+    if ( inited )
+    {
+        if ((( last_cycle < 599 ) && ( a_pkt.cycle() != last_cycle + 1 )) ||
+            ( last_cycle == 599 && a_pkt.cycle() != 0 ))
+        {
+            syslog( LOG_ERR, "Cycle number error: %lu -> %lu", last_cycle, a_pkt.cycle() );
+        }
+
+        this_time = timespec_to_nsec(a_pkt.timestamp());
+        if ( last_time > this_time )
+        {
+            syslog( LOG_ERR, "Pulse time went backwards %lu nsec", last_time - this_time );
+        }
+        else if ( fabs((this_time-last_time) - 16666666 ) > 2000000 )
+        {
+            syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", this_time - last_time );
+        }
+    }
+    else
+    {
+        this_time = timespec_to_nsec(a_pkt.timestamp());
+    }
+
+    last_cycle = a_pkt.cycle();
+    last_time = this_time;
+    inited = true;
+#endif
 
     // Parse banked event packet to calulate pulse info, event count, and event rate
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
@@ -682,7 +708,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     uint32_t bank_id;
     uint32_t event_count = 0;
     uint32_t bank_event_count;
-    const uint32_t *bank_endpos;
+    //const uint32_t *bank_endpos;
 
     // Process banks per-source
     while ( rpos < epos )
@@ -717,14 +743,12 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     m_pcharge.addSample( a_pkt.pulseCharge() * 10.0 );
-    m_run_metrics.m_pulse_count++;
 
     uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
 
     if ( !m_first_pulse_time )
     {
         m_first_pulse_time = pulse_time;
-        //cout << "Got first pulse: t = " << m_first_pulse_time << endl;
     }
 
     if ( m_last_pulse_time )
@@ -732,6 +756,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 
     m_last_pulse_time = pulse_time;
     m_bank_count_info.addSample( event_count );
+    m_run_metrics.m_total_counts += event_count;
 
     return false;
 }
@@ -743,8 +768,6 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
-    //cout << "BeamMonitorPkt" << endl;
-
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
@@ -1084,9 +1107,6 @@ StreamMonitor::pvValueUpdate
     // TODO Alert - bad stream packet (got value w/o ddp)
     if ( ipv == m_pvs.end() )
         return;
-
-    //if ( a_device_id < 100 )
-    //    cout << "PV " << a_device_id << "." << a_pv_id << " stat: " << hex << a_status << endl;
 
     // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
     // Don't rate limit status changes

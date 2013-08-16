@@ -120,8 +120,8 @@ public:
 
     void clear()
     {
-        m_pulse_count           = 0;
-        m_pulse_charge          = 0.0;
+        m_total_counts          = 0;
+        m_total_charge          = 0.0;
         m_pixel_error_count     = 0;
         m_dup_pulse_count       = 0;
         m_pulse_veto_count      = 0;
@@ -129,8 +129,8 @@ public:
         m_missing_rtdl_count    = 0;
     }
 
-    unsigned long           m_pulse_count;
-    double                  m_pulse_charge;
+    unsigned long           m_total_counts;      ///< Sum of counts over all banks, excluding monitors
+    double                  m_total_charge;
     unsigned long           m_pixel_error_count;
     unsigned long           m_dup_pulse_count;
     unsigned long           m_pulse_veto_count;

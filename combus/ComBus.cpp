@@ -613,16 +613,12 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
 
     unsigned long msg_type = prop_tree.get( "msg_type", 0UL );
 
-    //cout << "msg_type: " << hex << msg_type << endl;
-
     MessageBase *msg = Factory::Inst().make( (MessageType) msg_type );
 
     msg->unserialize( prop_tree );
 
     if ( msg->getCorrelationID().empty() )
         msg->setCorrelationID( a_msg.getCMSMessageID() );
-
-    //cout << "ok" << endl;
 
     return msg;
 }

@@ -194,7 +194,7 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="5">
+        <item row="3" column="5">
          <widget class="QLabel" name="label_14">
           <property name="text">
            <string>Dup. Pulses:</string>
@@ -217,7 +217,7 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="6">
+        <item row="3" column="6">
          <widget class="QLineEdit" name="dupPulseLabel">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -230,7 +230,7 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="5">
+        <item row="5" column="5">
          <widget class="QLabel" name="label_15">
           <property name="text">
            <string>Map Errors:</string>
@@ -240,7 +240,7 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="6">
+        <item row="5" column="6">
          <widget class="QLineEdit" name="mapErrorLabel">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -253,7 +253,7 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="5">
+        <item row="6" column="5">
          <widget class="QLabel" name="label_16">
           <property name="text">
            <string>Missing RTDL:</string>
@@ -263,7 +263,7 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="6">
+        <item row="6" column="6">
          <widget class="QLineEdit" name="missRTDLLabel">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -276,7 +276,7 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="3">
+        <item row="6" column="3">
          <widget class="QLabel" name="label_21">
           <property name="text">
            <string>Pulse Freq.:</string>
@@ -286,42 +286,8 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="3">
-         <widget class="QLabel" name="label_19">
-          <property name="text">
-           <string>Counts:</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="3">
-         <widget class="QLabel" name="label_17">
-          <property name="text">
-           <string>Charge:</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="4">
+        <item row="6" column="4">
          <widget class="QLineEdit" name="pfreqLabel">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="4">
-         <widget class="QLineEdit" name="countRateLabel">
-          <property name="readOnly">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="4">
-         <widget class="QLineEdit" name="pchargeLabel">
           <property name="readOnly">
            <bool>true</bool>
           </property>
@@ -361,7 +327,7 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="0">
+        <item row="5" column="0">
          <widget class="QLabel" name="label_23">
           <property name="text">
            <string>Elapsed:</string>
@@ -371,7 +337,7 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="0">
+        <item row="3" column="0">
          <widget class="QLabel" name="label_29">
           <property name="text">
            <string>Start/Stop:</string>
@@ -381,14 +347,14 @@
           </property>
          </widget>
         </item>
-        <item row="3" column="2">
+        <item row="5" column="2">
          <widget class="QLineEdit" name="durationLabel">
           <property name="readOnly">
            <bool>true</bool>
           </property>
          </widget>
         </item>
-        <item row="2" column="2">
+        <item row="3" column="2">
          <widget class="QLineEdit" name="startTimeEdit">
           <property name="readOnly">
            <bool>true</bool>
@@ -407,6 +373,40 @@
         </item>
         <item row="1" column="2">
          <widget class="QLineEdit" name="scanNumLabel"/>
+        </item>
+        <item row="5" column="3">
+         <widget class="QLabel" name="label_17">
+          <property name="text">
+           <string>Pulse Charge:</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="3">
+         <widget class="QLabel" name="label_19">
+          <property name="text">
+           <string>Counts/sec:</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="4">
+         <widget class="QLineEdit" name="countRateLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="4">
+         <widget class="QLineEdit" name="pchargeLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -788,7 +788,7 @@
            </layout>
           </widget>
          </widget>
-         <widget class="QWidget" name="">
+         <widget class="QWidget" name="layoutWidget">
           <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,2">
            <item>
             <widget class="QTableWidget" name="monitorTable">
@@ -942,7 +942,7 @@
       <item>
        <widget class="QLabel" name="label_12">
         <property name="text">
-         <string>Stream (KB/s):</string>
+         <string>Stream (Bps):</string>
         </property>
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>

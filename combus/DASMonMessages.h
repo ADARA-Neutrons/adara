@@ -589,8 +589,8 @@ protected:
     {
         MessageBase::read( a_prop_tree );
 
-        m_pulse_count           = a_prop_tree.get( "pulse_count", 0UL );
-        m_pulse_charge          = a_prop_tree.get( "pulse_charge", 0.0 );
+        m_total_counts          = a_prop_tree.get( "total_counts", 0UL );
+        m_total_charge          = a_prop_tree.get( "total_charge", 0.0 );
         m_pixel_error_count     = a_prop_tree.get( "pixel_error_count", 0UL );
         m_dup_pulse_count       = a_prop_tree.get( "dup_pulse_count", 0UL );
         m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0UL );
@@ -602,8 +602,8 @@ protected:
     {
         MessageBase::write( a_prop_tree );
 
-        a_prop_tree.put( "pulse_count", m_pulse_count );
-        a_prop_tree.put( "pulse_charge", m_pulse_charge );
+        a_prop_tree.put( "total_counts", m_total_counts );
+        a_prop_tree.put( "total_charge", m_total_charge );
         a_prop_tree.put( "pixel_error_count", m_pixel_error_count );
         a_prop_tree.put( "dup_pulse_count", m_dup_pulse_count );
         a_prop_tree.put( "pulse_veto_count", m_pulse_veto_count );

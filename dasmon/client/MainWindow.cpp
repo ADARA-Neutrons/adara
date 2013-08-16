@@ -880,7 +880,7 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->countRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_count_rate )));
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_charge )));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_freq )));
-    QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_stream_bps/1024 )));
+    QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_stream_bps )));
 
     MonitorInfo info;
     info.last_updated = time(0);
@@ -896,8 +896,8 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 void
 MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
-    QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_count )));
-    QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_charge )));
+    QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_counts )));
+    QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_charge )));
     QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
     QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_dup_pulse_count )));
     QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_mapping_error_count )));
@@ -1032,8 +1032,6 @@ void
 MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     QMutexLocker lock( &m_mutex );
-
-    //cout << "got: " << hex << a_msg.getMessageType() << " from " << a_msg.getSourceName() << endl;
 
     setComBusActive( true );
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
@@ -1229,8 +1227,6 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
             m_refresh_trans_table = true;
-
-            cout << "Run " << status.run_num << " started." << endl;
         }
         break;
 
@@ -1298,15 +1294,11 @@ MainWindow::updateHighestSignal()
 bool
 MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
-    //cout << "Ctrl: " << hex << a_msg.getMessageType() << ", cor: " << a_msg.getCorrelationID() << endl;
-
     QMutexLocker lock( &m_mutex );
 
     setComBusActive( true );
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
-
-    //cout << "Control Msg: " << a_msg.getMessageType() << endl;
 
     // See if this message belogs to a sub client (by correlation id)
 
