@@ -659,7 +659,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
         {
             syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( last_time - this_time ));
         }
-        else if ( fabs((this_time-last_time) - 16666666 ) > 2000000 )
+        else if ( fabs((this_time-last_time) - 16666666.0 ) > 1000000 )
         {
             syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( this_time - last_time ));
         }
