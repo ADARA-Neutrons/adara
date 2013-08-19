@@ -16,7 +16,7 @@
 #include "DASMonMessages.h"
 #include "STSMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.4"
+#define DASMON_GUI_VERSION "1.1.5"
 
 
 namespace Ui {
@@ -187,6 +187,7 @@ private:
     QString                         m_style_error;
     QString                         m_style_fatal;
     QString                         m_style_disabled;
+    QLocale                         m_locale;
     Tristate                        m_combus_state;
     Tristate                        m_dasmon_state;
     Tristate                        m_sms_state;

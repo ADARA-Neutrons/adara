@@ -2,7 +2,6 @@
 
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
-//#include "ConfigureSMSConnectionDlg.h"
 #include <iostream>
 #include <algorithm>
 #include <QMetaObject>
@@ -10,7 +9,6 @@
 #include <QSettings>
 #include <QMessageBox>
 #include <QMutexLocker>
-//#include <log4cxx/logger.h>
 
 #include "ADARA.h"
 #include "AMQConfigDialog.h"
@@ -877,10 +875,10 @@ MainWindow::updateRunInfo( const ADARA::DASMON::RunInfo &a_run_info )
 void
 MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 {
-    QMetaObject::invokeMethod( ui->countRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_count_rate )));
+    QMetaObject::invokeMethod( ui->countRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,m_locale.toString( a_metrics.m_count_rate )));
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_charge )));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_freq )));
-    QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_stream_bps )));
+    QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,m_locale.toString( (uint)a_metrics.m_stream_bps )));
 
     MonitorInfo info;
     info.last_updated = time(0);
@@ -896,7 +894,7 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 void
 MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
-    QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_counts )));
+    QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_counts )));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_charge )));
     QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
     QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_dup_pulse_count )));

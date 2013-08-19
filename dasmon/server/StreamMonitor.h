@@ -119,7 +119,7 @@ class CountInfo
 {
 public:
     CountInfo()
-        : total(0), window_total(0), window_average(0.0), idx(0)
+        : total(0), idx(0)
     {
         for ( int i = 0; i < WIN_AVG_SIZE; ++i )
             samples[i] = 0;
@@ -128,34 +128,33 @@ public:
     void addSample( T sample )
     {
         total += sample;
-        window_total += sample;
-        window_total -= samples[idx];
         samples[idx++] = sample;
 
-        if ( idx >= WIN_AVG_SIZE )
+        if ( idx == WIN_AVG_SIZE )
             idx = 0;
-
-        //average += ((double)sample)/WIN_AVG_SIZE;
-        window_average = ((double)window_total)/WIN_AVG_SIZE;
     }
 
     void reset()
     {
         total = 0;
-        window_total = 0;
-        window_average = 0.0;
         idx = 0;
 
         for ( int i = 0; i < WIN_AVG_SIZE; ++i )
             samples[i] = 0;
     }
 
-    inline double average() { return window_average; }
+    double average()
+    {
+        double avg = 0.0;
+
+        for ( int i = 0; i < WIN_AVG_SIZE; ++i )
+            avg += samples[i];
+
+        return avg/WIN_AVG_SIZE;
+    }
 
     T           samples[WIN_AVG_SIZE];
     T           total;
-    T           window_total;
-    double      window_average;
     uint16_t    idx;
 };
 

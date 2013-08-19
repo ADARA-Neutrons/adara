@@ -651,17 +651,17 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
         if ((( last_cycle < 599 ) && ( a_pkt.cycle() != last_cycle + 1 )) ||
             ( last_cycle == 599 && a_pkt.cycle() != 0 ))
         {
-            syslog( LOG_ERR, "Cycle number error: %lu -> %lu", last_cycle, a_pkt.cycle() );
+            syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) last_cycle, (unsigned long) a_pkt.cycle() );
         }
 
         this_time = timespec_to_nsec(a_pkt.timestamp());
         if ( last_time > this_time )
         {
-            syslog( LOG_ERR, "Pulse time went backwards %lu nsec", last_time - this_time );
+            syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( last_time - this_time ));
         }
         else if ( fabs((this_time-last_time) - 16666666 ) > 2000000 )
         {
-            syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", this_time - last_time );
+            syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( this_time - last_time ));
         }
     }
     else
@@ -1286,8 +1286,8 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 void
 StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
 {
-    static uint64_t next_time = 0;
-    static uint64_t last_time = 0;
+    static uint64_t last_time = timespec_to_nsec( a_pkt.timestamp() );
+    static long pulses = 0;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -1307,19 +1307,28 @@ StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
     */
 
     m_stream_size += a_pkt.packet_length();
-    uint64_t t = timespec_to_nsec( a_pkt.timestamp() );
 
-    if ( !next_time )
+    if ( a_pkt.type() == ADARA::PacketType::BANKED_EVENT_V0 )
+        ++pulses;
+
+    if ( pulses == 30 )
     {
-        last_time = t;
-        next_time = t + 1000000000;
-    }
-    else if ( t >= next_time )
-    {
-        m_stream_rate = 1000000000*m_stream_size/(t-last_time);
-        last_time = t;
-        next_time = t + 1000000000;
+        uint64_t t = timespec_to_nsec( a_pkt.timestamp() );
+
+        // Timestamps are sometimes unreliable (jump backwards, large offsets)
+        // See if time diff is reasonable, if not wait till it is
+
+        if ( t > last_time )
+        {
+            double diff = ( t - last_time )*1.0e-9;
+            m_stream_rate = (uint64_t)( m_stream_size / diff );
+        }
+        else
+            m_stream_rate = 0;
+
         m_stream_size = 0;
+        last_time = t;
+        pulses = 0;
     }
 }
 
