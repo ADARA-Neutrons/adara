@@ -1212,6 +1212,7 @@ StreamMonitor::dbThread()
                     {
                         syslog( LOG_ERR, "Database update call failed." );
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        syslog( LOG_ERR, buf );
 
                         update = false;
                         break;

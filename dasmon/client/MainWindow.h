@@ -16,7 +16,7 @@
 #include "DASMonMessages.h"
 #include "STSMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.5"
+#define DASMON_GUI_VERSION "1.1.6"
 
 
 namespace Ui {

@@ -538,12 +538,13 @@ protected:
         m_monitor_count_rate.clear();
         uint32_t id;
         double counts;
-
         try {
-            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("monitors"))
+            // Throws id monitors doesn't exist
+            boost::property_tree::ptree pt = a_prop_tree.get_child("monitors");
+            for ( boost::property_tree::ptree::const_iterator i = pt.begin(); i != pt.end(); i++ )
             {
-                id = v.second.get( "id", 0UL );
-                counts = v.second.get( "counts", 0.0 );
+                id = boost::lexical_cast<uint32_t>( i->first );
+                counts = boost::lexical_cast<double>( i->second.data() );
                 m_monitor_count_rate[id] = counts;
             }
         } catch(...) {}
@@ -559,14 +560,12 @@ protected:
         a_prop_tree.put( "pixel_error_rate", m_pixel_error_rate );
         a_prop_tree.put( "stream_bps", m_stream_bps );
 
+        boost::property_tree::ptree sub;
         std::map<uint32_t,double>::const_iterator im = m_monitor_count_rate.begin();
         for ( ; im != m_monitor_count_rate.end(); ++im )
-        {
-            boost::property_tree::ptree sub;
-            sub.put( "id", im->first );
-            sub.put( "counts", im->second );
-            a_prop_tree.add_child( "monitors.monitor", sub );
-        }
+            sub.put( boost::lexical_cast<std::string>(im->first), im->second );
+
+        a_prop_tree.put_child( "monitors", sub );
     }
 };
 
