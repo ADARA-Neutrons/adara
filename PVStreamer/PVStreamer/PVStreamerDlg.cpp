@@ -13,7 +13,7 @@
 #define new DEBUG_NEW
 #endif
 
-#define VERSION "1.0.0"
+#define VERSION "1.1.0"
 
 using namespace std;
 
@@ -180,6 +180,9 @@ CPVStreamerDlg::statusThread()
         {
 			if ( m_combus->sendStatus( STATUS_OK ))
             {
+                if ( ! m_running )
+                    break;
+
                 now = time(0);
 
                 if ( error == 0 )

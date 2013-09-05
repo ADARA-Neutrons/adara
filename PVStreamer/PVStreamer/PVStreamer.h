@@ -71,6 +71,9 @@ public:
     bool                            isDeviceDefined( Identifier a_dev_id ) const;
     std::string                     getDeviceName( Identifier a_dev_id ) const;
     bool                            isAppDefined( Identifier a_app_id ) const;
+    void                            appActive( Identifier a_app_id ) const;
+    void                            appInactive( Identifier a_app_id ) const;
+    bool                            isAppActive( Identifier a_app_id ) const;
     const std::vector<Identifier>&  getAppDevices( Identifier a_app_id ) const;
 
     void                            attachConfigListener( IPVConfigListener &a_listener );
@@ -94,6 +97,7 @@ private:
         Protocol                    protocol;   /// Protocol
         std::string                 source;     /// Source (i.e. hostname)
         std::vector<Identifier>     devices;    /// Configured devices associated with app
+        bool                        active;     /// Is active?
     };
 
     /// Device information structure

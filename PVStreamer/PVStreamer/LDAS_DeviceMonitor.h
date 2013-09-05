@@ -9,10 +9,13 @@
 #define LDAS_DEVICEMONITOR
 
 #include <string>
+#include <set>
 
 #include "LegacyDAS.h"
 #include "NiCommonComponent.h"
 #include "NiDataSocketComponent.h"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 
 namespace SNS { namespace PVS {
     
@@ -41,16 +44,28 @@ public:
     LDAS_DeviceMonitor( LDAS_IDevMonitorMgr &a_reader, PVStreamer &a_streamer, const std::string &a_hostname );
     ~LDAS_DeviceMonitor();
 
-    void                    connect();
+    void        connect();
+    void        disconnect();
 
 private:
 
-    void                    notifySocketData( NI::CNiDataSocketData &a_data );
+    void        notifySocketData( NI::CNiDataSocketData &a_data );
+    void        reqreplySocketData( NI::CNiDataSocketData &a_data );
 
-    LDAS_IDevMonitorMgr    &m_mgr;
-    PVStreamer             &m_streamer;
-    std::string             m_hostname;
-    NI::CNiDataSocket       m_notify_socket;
+    LDAS_IDevMonitorMgr            &m_mgr;
+    PVStreamer                     &m_streamer;
+    std::string                     m_hostname;
+    NI::CNiDataSocket               m_notify_socket;
+    NI::CNiDataSocket               m_reqreply_socket;
+    boost::thread                  *m_appmon_thread;
+    boost::mutex                    m_mutex;
+    bool                            m_running;
+    std::map<unsigned long,long>    m_app_activity;
+
+    static VOID CALLBACK                    appMonTimer( HWND a_hwnd, UINT a_msg, UINT_PTR a_id, DWORD a_time );
+    static bool                             g_init;
+    static boost::mutex                     g_mutex;
+    static std::set<LDAS_DeviceMonitor*>    g_inst;
 };
 
 }}}

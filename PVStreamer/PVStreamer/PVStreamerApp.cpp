@@ -43,25 +43,25 @@ public:
     {
         if ( bFlag )
         {
-            if ( _strnicmp( pszParam, "port=",5) == 0 )
+            if ( _strnicmp( pszParam, "port=",5) == 0 )             // Port for SMS to read from
                 m_port = (unsigned short)atoi( &pszParam[5] );
-            else if ( _strnicmp( pszParam, "cfg=",4) == 0 )
+            else if ( _strnicmp( pszParam, "cfg=",4) == 0 )         // Path to satellite computer configuration file
                 m_sat_config_file = &pszParam[4];
-            else if ( _strnicmp( pszParam, "log=",4) == 0 )
+            else if ( _strnicmp( pszParam, "log=",4) == 0 )         // Path to log files
                 m_log_path = &pszParam[4];
-            else if ( _strnicmp( pszParam, "hb=",3) == 0 )
+            else if ( _strnicmp( pszParam, "hb=",3) == 0 )          // ADARA heartbeat period
                 m_heartbeat = atoi( &pszParam[3] );
-            else if ( _strnicmp( pszParam, "local=",6) == 0 )
+            else if ( _strnicmp( pszParam, "local=",6) == 0 )       // Optional PV config file
                 m_pv_config_local_file = &pszParam[6];
-            else if ( _strnicmp( pszParam, "broker_host=",12) == 0 )
+            else if ( _strnicmp( pszParam, "broker_host=",12) == 0 )// AMQ broker hostname
                 m_broker_host = &pszParam[12];
-            else if ( _strnicmp( pszParam, "broker_port=",12) == 0 )
+            else if ( _strnicmp( pszParam, "broker_port=",12) == 0 )// AMQ broker port
                 m_broker_port = (unsigned short)atoi( &pszParam[12] );
-            else if ( _strnicmp( pszParam, "broker_user=",12) == 0 )
+            else if ( _strnicmp( pszParam, "broker_user=",12) == 0 )// AMQ broker user name
                 m_broker_user = &pszParam[12];
-            else if ( _strnicmp( pszParam, "broker_pass=",12) == 0 )
+            else if ( _strnicmp( pszParam, "broker_pass=",12) == 0 )// AMQ broker password
                 m_broker_pass = &pszParam[12];
-            else if ( _strnicmp( pszParam, "topic_path=",11) == 0 )
+            else if ( _strnicmp( pszParam, "topic_path=",11) == 0 ) // AMQ beam-line specific topic prefix (i.e. SNS.SEQ)
                 m_topic_path = &pszParam[11];
         }
     }
@@ -130,7 +130,7 @@ CPVStreamerApp::InitInstance()
         return FALSE;
     }
     
-    // Create main window
+    // Create main Window of the app (a dialog)
     CPVStreamerDlg dlg( cmdline.m_topic_path, cmdline.m_broker_host, cmdline.m_broker_port, cmdline.m_broker_user, cmdline.m_broker_pass );
     m_pMainWnd = &dlg;
     dlg.Create(IDD_PVSTREAMER_DIALOG,0);
@@ -175,21 +175,32 @@ CPVStreamerApp::InitInstance()
     try
     {
         // Initialize PVStreamer objects
+        // The following code inits legacy DAS readers and an ADARA writer. If new input protocols
+        // are added, the appropriate readers and configuration monitors would be added here. Any
+        // number of input protocols as supported, but only one output protocol can be set.
+
+        // Create the top-level PVStreamer object (not a singleton, but no use case for more than one)
         pvs = new PVStreamer(500,260);
 
+        // Attach the Windows GUI dialog as a listener (it displays status and logs)
         pvs->attachConfigListener( dlg );
         pvs->attachStreamListener( dlg );
         pvs->attachStatusListener( dlg );
 
+        // Create a logger object and attach to PVStreamer feeds
         logger = new PVStreamLogger(cmdline.m_log_path);
         pvs->attachConfigListener( *logger );
         pvs->attachStreamListener( *logger );
 
+        // Create an ADARA PV Writer and attach to PVStreamer object
         ADARA_PVWriter*     adara_writer = new ADARA_PVWriter(*pvs,cmdline.m_port,cmdline.m_heartbeat);
         adara_writer->attachListener( dlg );
         adara_writer->attachListener( *logger );
 
+        // Create a legacy DAS PV reader
         LDAS_PVReader*      ldas_reader = new LDAS_PVReader(*pvs);
+
+        // Create a legacy DAS configuration reader (listens to satellite app notifications)
         LDAS_PVConfigMgr*   ldas_cfg = new LDAS_PVConfigMgr(*pvs);
 
         // Load the list of disabled process variables, if specified

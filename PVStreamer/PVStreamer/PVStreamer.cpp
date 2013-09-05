@@ -376,8 +376,49 @@ bool
 PVStreamer::isAppDefined( Identifier a_app_id ) const
 {
     boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
-
     return m_apps.find(a_app_id) != m_apps.end();
+}
+
+/**
+ * \brief Sets an application as active
+ * \param a_app_id - ID of application
+ */
+void
+PVStreamer::appActive( Identifier a_app_id ) const
+{
+    boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
+    map<Identifier,AppInfo*>::const_iterator iapp = m_apps.find(a_app_id);
+    if ( iapp != m_apps.end())
+        iapp->second->active = true;
+}
+
+/**
+ * \brief Sets an application as inactive
+ * \param a_app_id - ID of application
+ */
+void
+PVStreamer::appInactive( Identifier a_app_id ) const
+{
+    boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
+    map<Identifier,AppInfo*>::const_iterator iapp = m_apps.find(a_app_id);
+    if ( iapp != m_apps.end())
+        iapp->second->active = false;
+}
+
+/**
+ * \brief Determines if an application is active
+ * \param a_app_id - ID of application
+ * \return True if app is active; false if not active or undefined
+ */
+bool
+PVStreamer::isAppActive( Identifier a_app_id ) const
+{
+    boost::lock_guard<boost::mutex> lock(m_cfg_mutex);
+    map<Identifier,AppInfo*>::const_iterator iapp = m_apps.find(a_app_id);
+    if ( iapp != m_apps.end())
+        return iapp->second->active;
+
+    return false;
 }
 
 /**
@@ -441,6 +482,7 @@ PVStreamer::defineApp( Protocol a_protocol, Identifier a_app_id, const std::stri
         info->app_id = a_app_id;
         info->protocol = a_protocol;
         info->source = a_source;
+        info->active = false;
 
         m_apps[a_app_id] = info;
     }
