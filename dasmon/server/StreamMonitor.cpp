@@ -966,6 +966,7 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         short       found;
         string      tag;
         string      value;
+        map<PVKey,PVInfoBase*>::iterator ipv;
 
         try
         {
@@ -1011,22 +1012,32 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                             {
                                 PVKey   key(a_pkt.devId(),pv_id);
 
-                                if ( m_pvs.find(key) == m_pvs.end() )
+                                ipv = m_pvs.find(key);
+                                if ( ipv != m_pvs.end() )
                                 {
-                                    switch ( pv_type )
-                                    {
-                                    case PVT_INT:
-                                    case PVT_UINT:
-                                    case PVT_ENUM:
-                                        m_pvs[key] = new PVInfo<uint32_t>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
-                                        break;
-                                    case PVT_FLOAT:
-                                    case PVT_DOUBLE:
-                                        m_pvs[key] = new PVInfo<double>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
-                                        break;
-                                    }
-                                    m_notify.pvDefined( pv_name );
+                                    // This code will only be executed if a PV is redefined during
+                                    // a run (or while idle). At the start of a run, all pvs are cleared
+                                    // before DDP are processed, so they won't be found in the m_pvs map.
+                                    m_notify.pvUndefined( ipv->second->m_name );
+
+                                    delete ipv->second;
+                                    m_pvs.erase( ipv );
                                 }
+
+                                switch ( pv_type )
+                                {
+                                case PVT_INT:
+                                case PVT_UINT:
+                                case PVT_ENUM:
+                                    m_pvs[key] = new PVInfo<uint32_t>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                    break;
+                                case PVT_FLOAT:
+                                case PVT_DOUBLE:
+                                    m_pvs[key] = new PVInfo<double>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                    break;
+                                }
+
+                                m_notify.pvDefined( pv_name );
                             }
                         }
                     }

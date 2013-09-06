@@ -261,10 +261,10 @@ ComBusRouter::pvDefined( const std::string &a_name )
 void
 ComBusRouter::pvUndefined( const std::string &a_name )
 {
-    (void)a_name;
-
-    // TODO - Maybe eventually support a subscriber API for PVs?
-    // Don't want to spam the system
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    map<string,ComBus::DASMON::ProcessVariables::PVData>::iterator ipv = m_pvs.find(a_name);
+    if ( ipv != m_pvs.end())
+        m_pvs.erase(ipv);
 }
 
 void
