@@ -17,7 +17,7 @@
 using namespace std;
 using namespace NI;
 
-#define MAX_APP_QUIET_TIME 30
+#define MAX_APP_QUIET_TIME 120
 
 namespace SNS { namespace PVS { namespace LDAS {
 
@@ -252,7 +252,7 @@ LDAS_DeviceMonitor::reqreplySocketData( CNiDataSocketData &a_data )
                         for ( vector<Identifier>::const_iterator d = devices.begin(); d != devices.end(); ++d )
                             m_mgr.deviceActive( *d, time );
 
-                        LOG_WARNING( "DevMon(" << m_hostname << ") - app " << app_id << " started from echo" );
+                        LOG_INFO( "DevMon(" << m_hostname << ") - app " << app_id << " started from echo" );
                     }
                 }
                 else
