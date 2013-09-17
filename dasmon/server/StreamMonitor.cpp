@@ -431,8 +431,8 @@ StreamMonitor::metricsThread()
 {
     syslog( LOG_INFO, "Stream metrics thread started." );
 
-    unsigned long last_count = 0;
-    bool    stalled = false;
+    uint32_t    last_count = 0;
+    bool        stalled = false;
 
     while( m_process_stream )
     {
@@ -821,7 +821,7 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
                 getXmlNodeValue( node, value );
 
                 if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
-                    m_run_info.m_run_num = boost::lexical_cast<unsigned long>( value );
+                    m_run_info.m_run_num = boost::lexical_cast<uint32_t>( value );
                 else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
                     m_run_info.m_proposal_id = value;
                 else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
@@ -1217,7 +1217,7 @@ StreamMonitor::dbThread()
                     else
                         value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
 
-                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%lu)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
@@ -1290,7 +1290,7 @@ void
 StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
 {
     static uint64_t last_time = timespec_to_nsec( a_pkt.timestamp() );
-    static long pulses = 0;
+    static uint32_t pulses = 0;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -1433,7 +1433,7 @@ StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 }
 
 void
-StreamMonitor::Notifier::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
+StreamMonitor::Notifier::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->runStatus( a_recording, a_run_number, a_timestamp );
@@ -1447,7 +1447,7 @@ StreamMonitor::Notifier::pauseStatus( bool a_paused )
 }
 
 void
-StreamMonitor::Notifier::scanStatus( bool a_scanning, unsigned long a_scan_number )
+StreamMonitor::Notifier::scanStatus( bool a_scanning, uint32_t a_scan_number )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->scanStatus( a_scanning, a_scan_number );
@@ -1497,14 +1497,14 @@ StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );

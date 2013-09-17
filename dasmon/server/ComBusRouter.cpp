@@ -73,9 +73,7 @@ void
 ComBusRouter::run()
 {
     unsigned short  count = 0;
-    unsigned long   t;
-    string          sid_pfx = "SID_PROC_";
-    string          text;
+    uint32_t        t;
     map<string,ProcInfo>::iterator ip;
 
     while(1)
@@ -191,7 +189,7 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 // IStreamListener Interface
 
 void
-ComBusRouter::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
+ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
     if ( a_recording != m_recording )
     {
@@ -215,7 +213,7 @@ ComBusRouter::pauseStatus( bool a_paused )
 }
 
 void
-ComBusRouter::scanStatus( bool a_scanning, unsigned long a_scan_number )
+ComBusRouter::scanStatus( bool a_scanning, uint32_t a_scan_number )
 {
     ComBus::DASMON::ScanStatusMessage msg( a_scanning, a_scan_number );
     m_combus.broadcast( msg );
@@ -268,14 +266,14 @@ ComBusRouter::pvUndefined( const std::string &a_name )
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( (double)a_value, a_status, a_timestamp );
 }
 
 void
-ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );

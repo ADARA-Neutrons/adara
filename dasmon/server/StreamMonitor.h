@@ -29,17 +29,17 @@ class IStreamListener
 {
 public:
     virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
-    virtual void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp ) = 0;
+    virtual void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp ) = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
-    virtual void scanStatus( bool a_scanning, unsigned long a_scan_number ) = 0;
+    virtual void scanStatus( bool a_scanning, uint32_t a_scan_number ) = 0;
     virtual void beamInfo( const BeamInfo &a_info ) = 0;
     virtual void runInfo( const RunInfo &a_info ) = 0;
     virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvUndefined( const std::string &a_name ) = 0;
-    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp ) = 0;
-    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -88,7 +88,7 @@ public:
     Identifier              m_device_id;    ///< ID of device that owns the PV
     Identifier              m_pv_id;        ///< ID of the PV
     PVType                  m_type;         ///< Type of PV
-    unsigned long           m_time;
+    uint32_t                m_time;
     VariableStatus::Enum    m_status;
     bool                    m_updated;
 };
@@ -198,17 +198,17 @@ private:
         void addListener( IStreamListener &a_listener );
         void removeListener( IStreamListener &a_listener );
 
-        void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp  );
+        void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp  );
         void pauseStatus( bool a_paused );
-        void scanStatus( bool a_scanning, unsigned long a_scan_number );
+        void scanStatus( bool a_scanning, uint32_t a_scan_number );
         void beamInfo( const BeamInfo &a_info );
         void runInfo( const RunInfo &a_info );
         void beamMetrics( const BeamMetrics &a_metrics );
         void runMetrics( const RunMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
         void pvUndefined( const std::string &a_name );
-        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
-        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     private:
@@ -260,8 +260,8 @@ private:
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
     std::map<uint32_t,uint64_t>     m_mon_last_pulse;
     bool                            m_recording;
-    unsigned long                   m_run_num;
-    unsigned long                   m_run_timestamp;
+    uint32_t                        m_run_num;
+    uint32_t                        m_run_timestamp;
     bool                            m_paused;
     short                           m_info_rcv;
     BeamInfo                        m_beam_info;
@@ -269,7 +269,7 @@ private:
     RunInfo                         m_run_info;
     RunMetrics                      m_run_metrics;
     bool                            m_scanning;
-    unsigned long                   m_scan_index;
+    uint32_t                        m_scan_index;
     CountInfo<double>               m_pcharge;
     CountInfo<double>               m_pfreq;
     uint64_t                        m_first_pulse_time;

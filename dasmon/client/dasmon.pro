@@ -12,6 +12,7 @@ TEMPLATE = app
 INCLUDEPATH +=  ../common \
                 ../../combus \
                 ../../sts \
+                ../server/engine \
                 ../../common
 
 unix:INCLUDEPATH += /usr/include/activemq-cpp-3.4.0 \

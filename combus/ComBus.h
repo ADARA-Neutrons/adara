@@ -70,7 +70,7 @@ public:
 class Connection
 {
 public:
-    Connection(  const std::string &a_base_path, const std::string &a_proc_name, unsigned long a_inst_num,
+    Connection(  const std::string &a_base_path, const std::string &a_proc_name, uint32_t a_inst_num,
                  const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
                  const std::string &a_log_dir = "/tmp" );
 
@@ -86,7 +86,7 @@ public:
     void                detach( ITopicListener &a_subscriber, const std::string &a_topic );
     void                detach( ITopicListener &a_subscriber );
     bool                status( StatusCode a_status );
-    bool                log( const std::string &a_msg, Level a_level, const char *a_file = "", unsigned long a_line = 0, unsigned long a_tid = 0 );
+    bool                log( const std::string &a_msg, Level a_level, const char *a_file = "", uint32_t a_line = 0, uint32_t a_tid = 0 );
     bool                broadcast( MessageBase &a_msg );
     bool                send( MessageBase &a_msg, const std::string &a_dest_proc, const std::string *a_correlation_id = 0 );
     bool                postWorkflow( MessageBase &a_msg );
@@ -120,7 +120,7 @@ private:
         std::map<std::string,std::pair<cms::Topic*,cms::MessageConsumer*> > m_topics;
 
         std::string         m_proc_name;
-        unsigned long       m_inst_num;
+        uint32_t            m_inst_num;
         friend class Connection;
     };
 
@@ -135,7 +135,7 @@ private:
     bool                                    m_connected;
     std::string                             m_domain;
     std::string                             m_proc_name;
-    unsigned long                           m_inst_num;
+    uint32_t                                m_inst_num;
     IInputListener                         *m_input_listener;
     Translator                             *m_input_translator;
     std::string                             m_broker_uri;

@@ -73,7 +73,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
 
     loadConfig();
 
-    m_debounce_thread = new boost::thread( boost::bind( &StreamAnalyzer::debounceThread, this ));
+    m_debounce_thread = new boost::thread( boost::bind( &StreamAnalyzer::runDebounceThread, this ));
 }
 
 
@@ -96,7 +96,8 @@ StreamAnalyzer::loadConfig()
     vector<SignalInfo>              loaded_signals;
 
     //string upper_expr = boost::to_upper_copy( a_expression );
-    boost::char_separator<char> sep(",");
+    boost::char_separator<char> sep1(":");
+    boost::char_separator<char> sep2(",");
     boost::tokenizer<boost::char_separator<char> >::iterator tok; // = tokens.begin();
 
     string cfg = m_cfg_dir + "dasmond.cfg";
@@ -125,11 +126,12 @@ StreamAnalyzer::loadConfig()
                     mode = 2;
                 else
                 {
-                    boost::tokenizer<boost::char_separator<char> > tokens( line, sep );
-                    tok = tokens.begin();
 
                     if ( mode == 1 )
                     {
+                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
+                        tok = tokens.begin();
+
                         if ( tok == tokens.end())
                             throw -1;
                         rule.fact = *tok++;
@@ -140,6 +142,9 @@ StreamAnalyzer::loadConfig()
                     }
                     else if ( mode == 2 )
                     {
+                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep2 );
+                        tok = tokens.begin();
+
                         if ( tok == tokens.end())
                             throw -1;
                         signal.name = *tok++;
@@ -197,7 +202,7 @@ StreamAnalyzer::saveConfig()
 
     for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
     {
-        outf << rule->fact << "," << rule->expr << endl;
+        outf << rule->fact << ":" << rule->expr << endl;
     }
 
     // SIGNAL_ID,FACT_ID,SOURCE,LEVEL,Message
@@ -365,18 +370,18 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     RuleEngine *engine = new RuleEngine();
     vector<RuleEngine::RuleInfo>::const_iterator r;
-    string tmp;
+
     try
     {
         for ( r = a_rules.begin(); r != a_rules.end(); ++r )
         {
-            tmp = r->fact + " " + r->expr;
-            engine->defineRule( tmp );
+            engine->defineRule( r->fact, r->expr );
         }
     }
     catch ( ... )
     {
         // Rule failed to parse, abort
+        // TODO Would be nice to provide some feedback as to what went wrong
         return false;
     }
 
@@ -586,9 +591,16 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     }
 }
 
-
+/** \brief This method debounces fact "noise" at run boundaries
+  *
+  * When a run is started or stopped, many facts in the rule engine must be retracted due
+  * to PVs being redefined. The PVs that are unchanged will be asserted again very quickly
+  * and would causes the associated rules or signals to flicker. To avoid this, the rule
+  * engine is place in batch mode on run transition, and this thread is used to end the
+  * batch mode after a specified debounce time.
+  */
 void
-StreamAnalyzer::debounceThread()
+StreamAnalyzer::runDebounceThread()
 {
     while ( 1 )
     {
@@ -608,7 +620,7 @@ StreamAnalyzer::debounceThread()
 
 
 void
-StreamAnalyzer::beginBatch( unsigned long a_mask )
+StreamAnalyzer::beginBatch( uint32_t a_mask )
 {
     if ( !m_batch_mask )
         m_engine->beginBatch();
@@ -618,7 +630,7 @@ StreamAnalyzer::beginBatch( unsigned long a_mask )
 
 
 void
-StreamAnalyzer::endBatch( unsigned long a_mask )
+StreamAnalyzer::endBatch( uint32_t a_mask )
 {
     if ( m_batch_mask )
     {
@@ -657,8 +669,6 @@ template void StreamAnalyzer::assertFact<int16_t>( const string &a_id, int16_t a
 template void StreamAnalyzer::assertFact<uint16_t>( const string &a_id, uint16_t a_value );
 template void StreamAnalyzer::assertFact<int32_t>( const string &a_id, int32_t a_value );
 template void StreamAnalyzer::assertFact<uint32_t>( const string &a_id, uint32_t a_value );
-template void StreamAnalyzer::assertFact<int64_t>( const string &a_id, int64_t a_value );
-template void StreamAnalyzer::assertFact<uint64_t>( const string &a_id, uint64_t a_value );
 template void StreamAnalyzer::assertFact<float>( const string &a_id, float a_value );
 template void StreamAnalyzer::assertFact<double>( const string &a_id, double a_value );
 
@@ -667,7 +677,7 @@ template void StreamAnalyzer::assertFact<double>( const string &a_id, double a_v
 
 
 void
-StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
+StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
     (void)a_timestamp;  // Don't use timestamp
 
@@ -683,19 +693,12 @@ StreamAnalyzer::runStatus( bool a_recording, unsigned long a_run_number, unsigne
     // caused by the clear and reassertion of facts.
 
     beginBatch( RUN_BATCH_MASK );
-    m_debounce_sec = 3;
+    m_debounce_sec = 2;
 
-    vector<string> asserted;
-    m_engine->getAsserted( asserted );
-    for ( vector<string>::iterator fact = asserted.begin(); fact != asserted.end(); ++fact )
-    {
-        if ( boost::istarts_with( *fact, m_pv_prefix ) ||
-             boost::istarts_with( *fact, m_pv_lim_prefix ) ||
-             boost::istarts_with( *fact, m_pv_err_prefix ))
-        {
-            m_engine->retract( *fact );
-        }
-    }
+    // Retract all PV facts
+    m_engine->retractPrefix( m_pv_prefix );
+    m_engine->retractPrefix( m_pv_lim_prefix );
+    m_engine->retractPrefix( m_pv_err_prefix );
 
     // Reset PVS at each run start boundary
     m_engine->retract( m_fact[BIF_GENERAL_PV_ERROR] );
@@ -746,7 +749,7 @@ StreamAnalyzer::pauseStatus( bool a_paused )
 
 
 void
-StreamAnalyzer::scanStatus( bool a_scanning, unsigned long a_scan_index )
+StreamAnalyzer::scanStatus( bool a_scanning, uint32_t a_scan_index )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -859,7 +862,7 @@ StreamAnalyzer::pvUndefined( const std::string &a_name )
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 
@@ -876,7 +879,7 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
 
 
 void
-StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 

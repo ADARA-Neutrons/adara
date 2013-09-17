@@ -134,7 +134,7 @@ Connection::Translator::disconnect_all()
 Connection * Connection::g_inst = 0;
 
 
-Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, unsigned long a_inst_num,
+Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, uint32_t a_inst_num,
                          const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
                          const std::string &a_log_dir )
   : m_running(true), m_connected(false), m_domain(a_domain), m_proc_name(a_proc_name), m_inst_num(a_inst_num),
@@ -152,7 +152,7 @@ Connection::Connection(  const std::string &a_domain, const std::string &a_proc_
     size_t pos = m_broker_uri.find_last_of(":"); // Will always return a valid pos b/c of code above
     try
     {
-        boost::lexical_cast<unsigned long>( m_broker_uri.substr( pos + 1 ));
+        boost::lexical_cast<uint32_t>( m_broker_uri.substr( pos + 1 ));
     }
     catch ( boost::bad_lexical_cast &e )
     {
@@ -429,7 +429,7 @@ Connection::status( StatusCode a_status )
 
 
 bool
-Connection::log( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid )
+Connection::log( const std::string &a_msg, Level a_level, const char *a_file, uint32_t a_line, uint32_t a_tid )
 {
     bool res = false;
 
@@ -611,7 +611,7 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
     std::stringstream sstr( a_msg.getText() );
     read_json( sstr, prop_tree );
 
-    unsigned long msg_type = prop_tree.get( "msg_type", 0UL );
+    uint32_t msg_type = prop_tree.get( "msg_type", 0UL );
 
     MessageBase *msg = Factory::Inst().make( (MessageType) msg_type );
 

@@ -38,14 +38,14 @@ private:
             : status(ADARA::ComBus::STATUS_INACTIVE), prev_status(ADARA::ComBus::STATUS_INACTIVE), required(false), last_updated(0)
         {}
 
-        ProcInfo( ADARA::ComBus::StatusCode a_status, ADARA::ComBus::StatusCode a_prev_status, bool a_required, unsigned long a_time )
+        ProcInfo( ADARA::ComBus::StatusCode a_status, ADARA::ComBus::StatusCode a_prev_status, bool a_required, uint32_t a_time )
             : status(a_status), prev_status(a_prev_status), required(a_required), last_updated(a_time)
         {}
 
         ADARA::ComBus::StatusCode   status;
         ADARA::ComBus::StatusCode   prev_status;
         bool                        required;
-        unsigned long               last_updated;
+        uint32_t                    last_updated;
     };
 
     void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
@@ -54,17 +54,17 @@ private:
     void    sendPVs( const std::string &a_src_proc, const std::string &a_CID );
 
     // IStreamListener Interface
-    void    runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp );
+    void    runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
     void    pauseStatus( bool a_paused );
-    void    scanStatus( bool a_scanning, unsigned long a_scan_number );
+    void    scanStatus( bool a_scanning, uint32_t a_scan_number );
     void    beamInfo( const BeamInfo &a_info );
     void    runInfo( const RunInfo &a_info );
     void    beamMetrics( const BeamMetrics &a_metrics );
     void    runMetrics( const RunMetrics &a_metrics );
     void    pvDefined( const std::string &a_name );
     void    pvUndefined( const std::string &a_name );
-    void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
-    void    pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+    void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void    pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
     void    connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IStatusListener Interface

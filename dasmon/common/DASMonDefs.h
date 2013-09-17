@@ -79,7 +79,7 @@ public:
 
     std::string             m_proposal_id;
     std::string             m_run_title;
-    unsigned long           m_run_num;
+    uint32_t                m_run_num;
     std::string             m_sample_id;
     std::string             m_sample_name;
     std::string             m_sample_environ;
@@ -109,7 +109,7 @@ public:
     double                      m_pulse_charge;
     double                      m_pulse_freq;
     double                      m_pixel_error_rate;
-    unsigned long               m_stream_bps;
+    uint32_t                    m_stream_bps;
 };
 
 
@@ -129,13 +129,13 @@ public:
         m_missing_rtdl_count    = 0;
     }
 
-    unsigned long           m_total_counts;      ///< Sum of counts over all banks, excluding monitors
-    double                  m_total_charge;
-    unsigned long           m_pixel_error_count;
-    unsigned long           m_dup_pulse_count;
-    unsigned long           m_pulse_veto_count;
-    unsigned long           m_mapping_error_count;
-    unsigned long           m_missing_rtdl_count;
+    uint32_t        m_total_counts;      ///< Sum of counts over all banks, excluding monitors
+    double          m_total_charge;
+    uint32_t        m_pixel_error_count;
+    uint32_t        m_dup_pulse_count;
+    uint32_t        m_pulse_veto_count;
+    uint32_t        m_mapping_error_count;
+    uint32_t        m_missing_rtdl_count;
 };
 
 }}

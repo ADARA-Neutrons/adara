@@ -55,7 +55,7 @@ public:
         : m_level(TRACE), m_line(0), m_tid(0)
     {}
 
-    LogMessage( const std::string &a_msg, Level a_level, const char *a_file, unsigned long a_line, unsigned long a_tid = 0 )
+    LogMessage( const std::string &a_msg, Level a_level, const char *a_file, uint32_t a_line, uint32_t a_tid = 0 )
         : m_msg(a_msg), m_level(a_level), m_file(a_file), m_line(a_line), m_tid(a_tid)
     {}
 
@@ -83,8 +83,8 @@ public:
     std::string         m_msg;
     Level               m_level;
     std::string         m_file;
-    unsigned long       m_line;
-    unsigned long       m_tid;
+    uint32_t            m_line;
+    uint32_t            m_tid;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )

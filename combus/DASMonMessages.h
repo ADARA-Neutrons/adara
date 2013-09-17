@@ -224,13 +224,13 @@ public:
             : value(0.0), status(0), timestamp(0)
         {}
 
-        PVData( double a_value, int a_status, unsigned long a_timestamp )
+        PVData( double a_value, int a_status, uint32_t a_timestamp )
             : value(a_value), status(a_status), timestamp(a_timestamp)
         {}
 
         double          value;
         int             status;
-        unsigned long   timestamp;
+        uint32_t        timestamp;
     };
 
     std::map<std::string,PVData> m_pvs;
@@ -317,12 +317,12 @@ public:
     RunStatusMessage()
     {}
 
-    RunStatusMessage( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp )
+    RunStatusMessage( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
         : m_recording(a_recording), m_run_number(a_run_number), m_timestamp(a_timestamp) {}
 
-    bool                m_recording;
-    unsigned long       m_run_number;
-    unsigned long       m_timestamp;
+    bool        m_recording;
+    uint32_t    m_run_number;
+    uint32_t    m_timestamp;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -383,11 +383,11 @@ public:
     ScanStatusMessage()
     {}
 
-    ScanStatusMessage( bool a_scaning, unsigned long a_scan_index )
+    ScanStatusMessage( bool a_scaning, uint32_t a_scan_index )
         : m_scaning(a_scaning), m_scan_index(a_scan_index) {}
 
-    bool                m_scaning;
-    unsigned long       m_scan_index;
+    bool        m_scaning;
+    uint32_t    m_scan_index;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )

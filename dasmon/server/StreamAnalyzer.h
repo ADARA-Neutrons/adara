@@ -87,17 +87,17 @@ private:
     };
 
     // IStreamListener Interface
-    void runStatus( bool a_recording, unsigned long a_run_number, unsigned long a_timestamp );
+    void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
     void pauseStatus( bool a_paused );
-    void scanStatus( bool a_scanning, unsigned long a_scan_number );
+    void scanStatus( bool a_scanning, uint32_t a_scan_number );
     void beamInfo( const BeamInfo &a_info );
     void runInfo( const RunInfo &a_run_info );
     void beamMetrics( const BeamMetrics &a_metrics );
     void runMetrics( const RunMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvUndefined( const std::string &a_name );
-    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
-    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, unsigned long a_timestamp );
+    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
     void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface
@@ -105,14 +105,12 @@ private:
     void onRetract( const std::string &a_fact );
 
     void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
-    void debounceThread();
-    void beginBatch( unsigned long a_mask );
-    void endBatch( unsigned long a_mask );
+    void runDebounceThread();
+    void beginBatch( uint32_t a_mask );
+    void endBatch( uint32_t a_mask );
 
     ADARA::DASMON::StreamMonitor       &m_monitor;
     RuleEngine                         *m_engine;
-    std::map<uint32_t,uint64_t>         m_monitor_rate;
-    bool                                m_monitorx_rate;
     std::vector<ISignalListener*>       m_listeners;
     std::map<std::string,SignalInfo>    m_signals;
     std::string                         m_pv_prefix;
@@ -126,8 +124,8 @@ private:
     RuleEngine::HFACT                   m_fact[BIF_COUNT];
     std::string                         m_fact_name[BIF_COUNT];
     boost::thread                      *m_debounce_thread;
-    unsigned long                       m_debounce_sec;
-    unsigned long                       m_batch_mask;
+    uint32_t                            m_debounce_sec;
+    uint32_t                            m_batch_mask;
     bool                                m_ok;
 };
 

@@ -11,136 +11,78 @@
 
 using namespace std;
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Value Class
 
-
+/// Void Value instances have an immutable integer value of 1 (value is meaningless if retracted)
 RuleEngine::Value::Value()
-    : m_type( VT_VOID ), m_int_value( 0 )
+    : m_type( VT_VOID ), m_int_value( 1 )
 {}
 
-//RuleEngine::Value( const Value &a_src )
-//    : m_type( a_src.m_type ), m_int_value( a_src.m_int_value )
-//{}
+RuleEngine::Value::Value( const RuleEngine::Value &a_src )
+    : m_type( a_src.m_type ), m_int_value( a_src.m_int_value )
+{}
 
 RuleEngine::Value::Value( bool a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
 
 RuleEngine::Value::Value( int8_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
 
 RuleEngine::Value::Value( int16_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
 
 RuleEngine::Value::Value( int32_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
-{}
-
-RuleEngine::Value::Value( int64_t a_value )
     : m_type( VT_INT ), m_int_value( a_value )
 {}
 
 RuleEngine::Value::Value( uint8_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
 
 RuleEngine::Value::Value( uint16_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
 
 RuleEngine::Value::Value( uint32_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
+    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
 {}
-
-RuleEngine::Value::Value( uint64_t a_value )
-    : m_type( VT_INT ), m_int_value( (int64_t)a_value )
-{}
-
 
 RuleEngine::Value::Value( float a_value )
     : m_type( VT_REAL ), m_real_value( (double)a_value )
 {}
 
-
 RuleEngine::Value::Value( double a_value )
     : m_type( VT_REAL ), m_real_value( a_value )
 {}
 
-bool
-RuleEngine::Value::operator==( const Value &a_value ) const
-{
-    return (m_type == a_value.m_type) && (m_int_value == a_value.m_int_value);
-}
 
+/** \brief Determines if a Value differs in content
+  * \param a_value - Value to compare to
+  * \return True if content is different; false otherwise
+  *
+  * This method determines if the provided Value instance has different content
+  * from the called instance. Differences are checked between type and value.
+  * No epsilon value is used for real values.
+  */
 bool
 RuleEngine::Value::operator!=( const Value &a_value ) const
 {
-    return !(*this == a_value);
-}
+    if ( m_type != a_value.m_type )
+        return true;
 
+    if ( m_type == VT_INT && m_int_value != a_value.m_int_value)
+        return true;
 
-bool
-RuleEngine::Value::evaluate( Operator a_op, const Value &a_value ) const
-{
-    switch ( m_type )
-    {
-    case VT_INT:
-        switch( a_value.m_type )
-        {
-        case VT_INT:
-            return evaluate<int64_t,int64_t>( a_op, m_int_value, a_value.m_int_value );
-        case VT_REAL:
-            return evaluate<int64_t,double>( a_op, m_int_value, a_value.m_real_value );
-        default:
-            break;
-        }
-        break;
-    case VT_REAL:
-        switch( a_value.m_type )
-        {
-        case VT_INT:
-            return evaluate<double,int64_t>( a_op, m_real_value, a_value.m_int_value );
-        case VT_REAL:
-            return evaluate<double,double>( a_op, m_real_value, a_value.m_real_value );
-        default:
-            break;
-        }
-        break;
-    default:
-        break;
-    }
+    if ( m_type == VT_REAL && m_real_value != a_value.m_real_value)
+        return true;
 
     return false;
 }
-
-
-template<class A, class B>
-bool
-RuleEngine::Value::evaluate( Operator a_op, A a_val1, B a_val2 ) const
-{
-    switch ( a_op )
-    {
-    case OP_LT:  return a_val1 < a_val2;
-    case OP_LTE: return a_val1 <= a_val2;
-    case OP_EQ:  return a_val1 == a_val2;
-    case OP_NEQ: return a_val1 != a_val2;
-    case OP_GTE: return a_val1 >= a_val2;
-    case OP_GT:  return a_val1 > a_val2;
-    case OP_OR:  return (a_val1 != 0) || (a_val2 != 0);
-    case OP_NOR: return !((a_val1 != 0) || (a_val2 != 0));
-    case OP_AND: return (a_val1 != 0) && (a_val2 != 0);
-    case OP_NAND:return !((a_val1 != 0) && (a_val2 != 0));
-    case OP_XOR: return ((a_val1 != 0) ^ (a_val2 != 0));
-    default:
-        break;
-    }
-
-    return false;
-}
-
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,8 +94,8 @@ RuleEngine::Value::evaluate( Operator a_op, A a_val1, B a_val2 ) const
  *
  * Creates a new fact object of type VOID
  */
-RuleEngine::Fact::Fact( const std::string& a_id, bool a_asserted )
-    : m_id(a_id), m_asserted(a_asserted), m_rule_fact(false)
+RuleEngine::Fact::Fact( const std::string& a_id, bool a_asserted, bool a_implicit )
+    : m_id(a_id), m_asserted(a_asserted), m_implicit(a_implicit), m_rule_output(false)
 {}
 
 
@@ -165,7 +107,7 @@ RuleEngine::Fact::Fact( const std::string& a_id, bool a_asserted )
  * Creates a new fact object of specified type and value.
  */
 RuleEngine::Fact::Fact( const std::string& a_id, bool a_asserted, const Value &a_value )
-    : m_id(a_id), m_asserted(a_asserted), m_rule_fact(false), m_value(a_value)
+    : m_id(a_id), m_asserted(a_asserted), m_implicit(false), m_rule_output(false), m_value(a_value)
 {}
 
 
@@ -175,7 +117,7 @@ RuleEngine::Fact::Fact( const std::string& a_id, bool a_asserted, const Value &a
  * Adds a forward dependency on the specified Rule to this fact.
  */
 void
-RuleEngine::Fact::addDep( Rule *a_rule )
+RuleEngine::Fact::addRuleDependency( Rule *a_rule )
 {
     if ( find( m_rule_deps.begin(), m_rule_deps.end(), a_rule ) == m_rule_deps.end())
         m_rule_deps.push_back( a_rule );
@@ -187,11 +129,177 @@ RuleEngine::Fact::addDep( Rule *a_rule )
  * Removes a forward dependency on the specified Rule from this fact.
  */
 void
-RuleEngine::Fact::removeDep( Rule *a_rule )
+RuleEngine::Fact::removeRuleDependency( Rule *a_rule )
 {
     vector<Rule*>::iterator r = find( m_rule_deps.begin(), m_rule_deps.end(), a_rule );
     if ( r != m_rule_deps.end())
         m_rule_deps.erase( r );
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Rule Class
+
+
+RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr )
+: m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_rule_fact(0), m_rule_value(0.0), m_valid(false)
+{
+    m_rule_fact = m_engine.getFact( a_id );
+    m_rule_fact->m_rule_output = true;
+    m_rule_fact->m_implicit = false;
+
+    m_parser.SetVarFactory( parserVarFactory, this );
+    m_parser.SetExpr( a_expr );
+    m_parser.Eval(); // This call is to force compilation of the new expression and to throw any errors now
+}
+
+
+RuleEngine::Rule::~Rule()
+{
+    for ( std::map<Fact*,FactInfo>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+        f->first->removeRuleDependency( this );
+}
+
+/** \param a_var_name - New variable found by expression parser
+  * \parama_data - Rule instance associated with parser
+  *
+  * This static method is a callback used by muParser to implicitly define variables found
+  * in a parsed epression. These variables are automatically mapped to Facts in the rule
+  * engine fact space (or new Facts are created and mapped). There are two special cases
+  * for variables: a variable prefixed with "@" is mapped to the output value of the rule,
+  * and any variable with an underscore prefix is treated as an "assertion" test for a
+  * Fact. Fact "assertion" inputs are assigned a value of 1 if the associated fact is
+  * asserted, and a value of 0 if it is not asserted.
+  */
+double *
+RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
+{
+    RuleEngine::Rule *m_inst = (RuleEngine::Rule *)a_data;
+
+    // Check for Rule output variable "@"
+    if ( a_var_name[0] == '@' )
+        return &m_inst->m_rule_value;
+
+    Fact *fact;
+
+    if ( a_var_name[0] == '_' )
+    {
+        // Variable is an assertion test
+        fact = m_inst->m_engine.getFact( &a_var_name[1] );
+        m_inst->m_facts[fact] = FactInfo( 0, true );
+    }
+    else
+    {
+        // Variable is a normal fact input
+        fact = m_inst->m_engine.getFact( a_var_name );
+        m_inst->m_facts[fact] = FactInfo( 0, false );
+    }
+
+    // Add this rule as a dependency on fact
+    fact->addRuleDependency( m_inst );
+
+    return &m_inst->m_facts[fact].m_value;
+}
+
+
+/** \param a_updated_fact - Pointer to a fact that was changed (optional)
+  *
+  * This method is called whenever any input fact associated with a rule is changed
+  * (asserted, new value, or retracted). If not null, the "a_updated_fact" parameter
+  * identifies a input fact that has changed state or value and resulted in the
+  * rule being reevaluated. Note that the expression is only evaluated if all value
+  * inputs are valid (asserted).
+  */
+void
+RuleEngine::Rule::evaluate( Fact *a_updated_fact )
+{
+    if ( a_updated_fact )
+    {
+        map<Fact*,FactInfo>::iterator f = m_facts.find( a_updated_fact );
+        if ( f == m_facts.end())
+            return; // TODO Should probably throw an exception - this should NOT happen!
+
+        if ( a_updated_fact->m_asserted )
+        {
+            // Update fact info for changed fact
+            if ( f->second.m_assert_type )
+                f->second.m_value = 1;
+            else
+                f->second.m_value = (double)f->first->m_value;
+
+            // See if rule has become valid
+            if ( !m_valid )
+            {
+                m_valid = true;
+                for ( f = m_facts.begin(); f != m_facts.end(); ++f )
+                {
+                    if ( !f->second.m_assert_type && !f->first->m_asserted )
+                        m_valid = false;
+                }
+            }
+        }
+        else
+        {
+            if ( f->second.m_assert_type )
+                f->second.m_value = 0;
+            else
+                m_valid = false;
+        }
+    }
+    else
+    {
+        // If evaluate is called without a fact change (absolute vs relative eval), then
+        // must explicitly (re)determine validity state. This happens at least once when
+        // a new rule is defined.
+
+        m_valid = true;
+
+        for ( map<Fact*,FactInfo>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+        {
+            if ( f->second.m_assert_type )
+            {
+                if ( f->first->m_asserted )
+                    f->second.m_value = 1;
+                else
+                    f->second.m_value = 0;
+            }
+            else
+            {
+                if ( f->first->m_asserted )
+                    f->second.m_value = (double)f->first->m_value;
+                else
+                    m_valid = false;
+            }
+        }
+    }
+
+    if ( m_valid )
+    {
+        // All required inputs are asserted, OK to evaluate expression
+
+        //cout << "Eval rule " << m_id;
+        if ( m_parser.Eval() > 0.5 )
+        {
+            // Expression evaluated as "fired" (output is 1)
+            //cout << " FIRED";
+            if ( !m_rule_fact->m_asserted || m_rule_fact->m_value.m_real_value != m_rule_value )
+            {
+                //cout << " asserting" << endl;
+                m_engine.assert( m_rule_fact, m_rule_value );
+            }
+            //else cout << endl;
+        }
+        else
+        {
+            // Expression evaluated as "not fired" (output is 0)
+            //cout << " DUD";
+            if ( m_rule_fact->m_asserted )
+            {
+                //cout << " retracting" << endl;
+                m_engine.retract( m_rule_fact );
+            }
+            //else cout << endl;
+        }
+    }
 }
 
 
@@ -221,7 +329,13 @@ RuleEngine::~RuleEngine()
         delete f->second;
 }
 
-
+/** \param a_source - RuleEngine class to synchronize from
+  *
+  * This method is used to transfer internal state from the source RuleEngine insstance
+  * to the called instance. This method is needed to support defining a new set of rules
+  * on a RuleEngine instance atomically - while still being able to retain the current
+  * state if any rule definitions are invalid.
+  */
 void
 RuleEngine::synchronize( const RuleEngine &a_source )
 {
@@ -235,7 +349,7 @@ RuleEngine::synchronize( const RuleEngine &a_source )
     // Transfer asserted, non-rule facts
     for ( map<string,Fact*>::const_iterator f = a_source.m_facts.begin(); f != a_source.m_facts.end(); ++f )
     {
-        if ( f->second->m_asserted && !f->second->m_rule_fact )
+        if ( f->second->m_asserted && !f->second->m_rule_output )
             assert( f->first, f->second->m_value );
     }
 
@@ -285,128 +399,42 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
     }
 }
 
-
-/**
- * @param a_expression - String that defines the rule name and conditions (see description)
- *
- * This method defines a new rule using the following syntax:
- *
- *   RULE_ID COND_EXPR [COND_OP COND_EXP] [COND_OP COND_EXP] [...]
- *
- * where COND_EXPR is defined as either a unary or binary condition as follows:
- *
- *   LVAL OPR [RVAL]
- *
- * where LVAL must be a FACT_ID, opr can be one of [<,<=,=,!=,>=,>,&,!&,|,!|,^,DEF,UNDEF],
- * and RVAL can be a numeric value (integer or float) or a FACT_ID (note that DEF and UNDEF
- * operators are unary). If a FACT_ID of type VOID is used as an rval, then the condition
- * expression will always evaluate as false.
- *
- * For subsequent conditions, a boolean condition operator (COND_OP) must be specified (i.e.
- * one of [&,!&,|,!|,^]). It is not possible to define subgroupings within an expression
- * (parenthesis are not supported), however child-rules may be defined to construct arbitrarily
- * complex rules.
- *
- * When a rule is defined, an associated fact of the same name and type VOID is also defined.
- * This fact is asserted when the rule fires, and is retracted when the rule ceases to fire.
- * The RuleEngine class ensures that rule and fact IDs do not collide, and also ensure that
- * circular rule definitions are not created (exceptions will be thrown).
- */
 void
-RuleEngine::defineRule( const std::string &a_expression )
+RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression )
 {
-    string upper_expr = boost::to_upper_copy( a_expression );
-    boost::char_separator<char> sep(" ");
-    boost::tokenizer<boost::char_separator<char> > tokens( upper_expr, sep );
-    boost::tokenizer<boost::char_separator<char> >::iterator tok = tokens.begin();
-    Condition cond;
     Rule *rule = 0;
-
-    if ( tok == tokens.end())
-        throw std::runtime_error( "Syntax error (empty expression)." );
 
     try
     {
-        if ( idInUse( *tok ))
+        string id( boost::to_upper_copy( a_id ));
+        string expr( boost::to_upper_copy( a_expression ));
+        boost::algorithm::trim( id );
+        boost::algorithm::trim( expr );
+
+        if ( idInUse( id ))
             throw std::runtime_error( "Rule ID is already in use." );
 
-        rule = new Rule();
-        rule->m_id = *tok;
-
-        size_t p = upper_expr.find_first_of( " " );
-        if ( p == string::npos )
-            throw std::runtime_error( "Syntax error." );
-
-        rule->m_expr = upper_expr.substr( p );
-        boost::algorithm::trim(rule->m_expr);
-
-        rule->m_rule_fact = getFact( *tok );
-        rule->m_rule_fact->m_rule_fact = true;
-
-        // First condition is always AND
-        cond.m_cond_op = OP_AND;
-
-        while ( tok != tokens.end() )
-        {
-            if ( ++tok == tokens.end())
-                throw std::runtime_error( "Syntax error (missing lval)." );
-
-            cond.m_left = getFact( *tok );
-
-            if ( ++tok == tokens.end())
-                throw std::runtime_error( "Syntax error (missing operator)." );
-
-            cond.m_op = toOperator( *tok );
-
-            cond.m_right = 0;
-            cond.m_value = Value();
-
-            if (( cond.m_op & OP_UNARY ) == 0 )
-            {
-                if ( ++tok == tokens.end())
-                    throw std::runtime_error( "Syntax error (missing rval)." );
-
-                // Is tok2 an int, double, or fact?
-                try
-                {
-                    cond.m_value = Value( boost::lexical_cast<int64_t>(*tok) );
-                }
-                catch ( boost::bad_lexical_cast &e )
-                {
-                    try
-                    {
-                        cond.m_value = Value( boost::lexical_cast<double>(*tok) );
-                    }
-                    catch ( boost::bad_lexical_cast &e )
-                    {
-                        cond.m_right = getFact( *tok );
-                    }
-                }
-            }
-
-            rule->addCondition( cond );
-
-            if ( ++tok != tokens.end())
-            {
-                cond.m_cond_op = toOperator( *tok );
-                if (( cond.m_cond_op & OP_BOOLEAN ) == 0 )
-                    throw std::runtime_error( "Syntax error (non-boolean condition operator)." );
-            }
-        }
+        rule = new Rule( *this, id, expr );
 
         if ( isCircular( rule ))
             throw std::runtime_error( "Circular rule definition" );
 
         m_rules[rule->m_id] = rule;
 
-        evaluate( rule );
+        rule->evaluate();
     }
     catch( std::exception &e )
     {
         if ( rule )
             delete rule;
+        cout << e.what() << endl;
+        throw;
+    }
+    catch(...)
+    {
+        if ( rule )
+            delete rule;
 
-        //cout << "Failed parsing rule [" << a_expression << "]: " << e.what() << endl;
         throw;
     }
 }
@@ -472,15 +500,20 @@ RuleEngine::assert( const std::string &a_id )
     map<string,Fact*>::iterator f = m_facts.find( a_id );
     if ( f != m_facts.end())
     {
-        if ( !f->second->m_asserted && !f->second->m_rule_fact )
+        // Rule facts can not be manipulated via public RuleEngine API
+        if ( f->second->m_rule_output )
+            return;
+
+        // Assert not asserted, or re-assert if type has changed
+        if ( !f->second->m_asserted || f->second->m_value.m_type != VT_VOID )
             assert( f->second );
     }
     else
     {
-        Fact *fact = new Fact( a_id, true );
+        Fact *fact = new Fact( a_id, true, false );
         m_facts[a_id] = fact;
 
-        assert( fact );
+        assert( fact, false );
     }
 }
 
@@ -502,7 +535,11 @@ RuleEngine::assert( const std::string &a_id, T a_value )
     map<string,Fact*>::iterator f = m_facts.find( a_id );
     if ( f != m_facts.end())
     {
-        if (( !f->second->m_asserted || f->second->m_value != value ) && !f->second->m_rule_fact )
+        // Rule facts can not be manipulated via public RuleEngine API
+        if ( f->second->m_rule_output )
+            return;
+
+        if ( !f->second->m_asserted || f->second->m_value != value )
             assert( f->second, value );
     }
     else
@@ -522,8 +559,6 @@ template void RuleEngine::assert<int16_t>( const string &a_id, int16_t a_value )
 template void RuleEngine::assert<uint16_t>( const string &a_id, uint16_t a_value );
 template void RuleEngine::assert<int32_t>( const string &a_id, int32_t a_value );
 template void RuleEngine::assert<uint32_t>( const string &a_id, uint32_t a_value );
-template void RuleEngine::assert<int64_t>( const string &a_id, int64_t a_value );
-template void RuleEngine::assert<uint64_t>( const string &a_id, uint64_t a_value );
 template void RuleEngine::assert<float>( const string &a_id, float a_value );
 template void RuleEngine::assert<double>( const string &a_id, double a_value );
 template void RuleEngine::assert<RuleEngine::Value>( const string &a_id, RuleEngine::Value a_value ); // Used internally only
@@ -541,7 +576,7 @@ RuleEngine::retract( const std::string &a_id )
     map<string,Fact*>::iterator f = m_facts.find( a_id );
     if ( f != m_facts.end())
     {
-        if ( f->second->m_asserted && !f->second->m_rule_fact )
+        if ( f->second->m_asserted && !f->second->m_rule_output )
             retract( f->second );
     }
 }
@@ -558,7 +593,7 @@ RuleEngine::retractPrefix( const std::string &a_prefix )
 {
     for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
     {
-        if ( boost::istarts_with( f->first, a_prefix ) && f->second->m_asserted && !f->second->m_rule_fact )
+        if ( f->second->m_asserted && !f->second->m_rule_output &&  boost::istarts_with( f->first, a_prefix ))
             retract( f->second );
     }
 }
@@ -572,7 +607,7 @@ RuleEngine::retractAllFacts()
 {
     for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
     {
-        if ( f->second->m_asserted && !f->second->m_rule_fact )
+        if ( f->second->m_asserted && !f->second->m_rule_output )
             retract( f->second );
     }
 }
@@ -594,7 +629,7 @@ RuleEngine::HFACT
 RuleEngine::getFactHandle( const std::string &a_id )
 {
     Fact *fact = getFact( a_id );
-    if ( !fact->m_rule_fact )
+    if ( !fact->m_rule_output )
         return (HFACT)fact;
 
     throw std::runtime_error("Fact associated with a rule.");
@@ -631,8 +666,6 @@ template void RuleEngine::assert<int16_t>( HFACT a_fact, int16_t a_value );
 template void RuleEngine::assert<uint16_t>( HFACT a_fact, uint16_t a_value );
 template void RuleEngine::assert<int32_t>( HFACT a_fact, int32_t a_value );
 template void RuleEngine::assert<uint32_t>( HFACT a_fact, uint32_t a_value );
-template void RuleEngine::assert<int64_t>( HFACT a_fact, int64_t a_value );
-template void RuleEngine::assert<uint64_t>( HFACT a_fact, uint64_t a_value );
 template void RuleEngine::assert<float>( HFACT a_fact, float a_value );
 template void RuleEngine::assert<double>( HFACT a_fact, double a_value );
 
@@ -717,17 +750,24 @@ RuleEngine::endBatch()
 // ================================ Private Methods ===================================================================
 
 /**
- * @param a_id - ID to test
- *
- * Tests to determine if the specified ID is in use as a rule or fact ID.
- */
+  * @param a_id - ID to test
+  *
+  * Tests to determine if the specified ID is in use as a rule or fact ID. If a fact
+  * exists, but was implicitly defined, it is not considered in-use.
+  */
 bool
 RuleEngine::idInUse( const std::string &a_id ) const
 {
-    if ( m_rules.find( a_id ) != m_rules.end() || m_facts.find( a_id ) != m_facts.end() )
+    if ( m_rules.find( a_id ) != m_rules.end() )
         return true;
     else
-        return false;
+    {
+        map<std::string,Fact*>::const_iterator f = m_facts.find( a_id );
+        if ( f != m_facts.end() )
+            return !f->second->m_implicit;
+        else
+            return false;
+    }
 }
 
 
@@ -769,6 +809,7 @@ RuleEngine::isCircular( Rule *a_target_rule, Rule *a_rule )
 bool
 RuleEngine::isCircular( Rule *a_target_rule, Fact *a_fact )
 {
+
     // On Fact node, follow all rule dependencies
     for ( vector<Rule*>::iterator r = a_fact->m_rule_deps.begin(); r != a_fact->m_rule_deps.end(); ++r )
         if ( isCircular( a_target_rule, *r ))
@@ -787,8 +828,12 @@ RuleEngine::isCircular( Rule *a_target_rule, Fact *a_fact )
 void
 RuleEngine::assert( Fact *a_fact )
 {
+    //cout << "assert " << a_fact->m_id << " ()" << endl;
+
     a_fact->m_asserted = true;
+    a_fact->m_implicit = false;
     a_fact->m_value.m_type = VT_VOID;
+    a_fact->m_value.m_int_value = 1;
 
     notify_assert( a_fact );
     update( a_fact );
@@ -805,8 +850,10 @@ RuleEngine::assert( Fact *a_fact )
 void
 RuleEngine::assert( Fact *a_fact, Value &a_value )
 {
-    //cout << "engine.assert " << a_fact->m_id << endl;
+    //cout << "assert " << a_fact->m_id << " (" << a_value << ")" << endl;
+
     a_fact->m_asserted = true;
+    a_fact->m_implicit = false;
     a_fact->m_value = a_value;
 
     notify_assert( a_fact );
@@ -823,6 +870,8 @@ RuleEngine::assert( Fact *a_fact, Value &a_value )
 void
 RuleEngine::retract( Fact *a_fact )
 {
+    //cout << "retract " << a_fact->m_id << endl;
+
     a_fact->m_asserted = false;
 
     notify_retract( a_fact );
@@ -847,7 +896,7 @@ RuleEngine::getFact( const std::string &a_id )
     }
     else
     {
-        fact = new Fact( a_id, false );
+        fact = new Fact( a_id, false, true );
         m_facts[a_id] = fact;
     }
 
@@ -864,121 +913,7 @@ void
 RuleEngine::update( Fact *a_fact )
 {
     for ( vector<Rule*>::iterator r = a_fact->m_rule_deps.begin(); r != a_fact->m_rule_deps.end(); ++r )
-        evaluate( *r );
-}
-
-
-/**
- * @param a_rule - The rule that has been updated/changed
- *
- * This is a dependency-driven rule-update method.
- */
-void
-RuleEngine::evaluate( Rule *a_rule )
-{
-    bool asserted = true;
-
-    for ( vector<Condition>::iterator c = a_rule->m_conditions.begin(); c != a_rule->m_conditions.end(); ++c )
-        evaluateCondition( asserted, *c );
-
-    if ( asserted && !a_rule->m_rule_fact->m_asserted )
-        assert( a_rule->m_rule_fact );
-    else if ( !asserted && a_rule->m_rule_fact->m_asserted )
-        retract( a_rule->m_rule_fact );
-}
-
-
-/**
- * @param a_asserted - Boolean value to accumulate result
- * @param a_condition - Condition to evaluate
- *
- * This method evalutes (computes) the specified condition from the associated LVAL, operators,
- * and optional RVAL. The result is accumulated in the passed-in a_asserted parameter.
- */
-void
-RuleEngine::evaluateCondition( bool &a_asserted, const Condition &a_condition )
-{
-    bool cond = false;
-
-    switch ( a_condition.m_op )
-    {
-    case OP_ASSERTED:
-        cond = a_condition.m_left->m_asserted;
-        break;
-    case OP_RETRACTED:
-        cond = !a_condition.m_left->m_asserted;
-        break;
-    default:
-        if ( a_condition.m_left->m_asserted )
-        {
-            if ( a_condition.m_right && a_condition.m_right->m_asserted )
-                cond = a_condition.m_left->m_value.evaluate( a_condition.m_op, a_condition.m_right->m_value );
-            else
-                cond = a_condition.m_left->m_value.evaluate( a_condition.m_op, a_condition.m_value );
-        }
-        break;
-    }
-
-    switch ( a_condition.m_cond_op )
-    {
-    case OP_AND:
-        a_asserted &= cond;
-        break;
-    case OP_OR:
-        a_asserted |= cond;
-        break;
-    case OP_NAND:
-        a_asserted = !(a_asserted & cond);
-        break;
-    case OP_NOR:
-        a_asserted = !(a_asserted | cond);
-        break;
-    case OP_XOR:
-        a_asserted ^= cond;
-        break;
-    default:
-        break;
-    }
-}
-
-
-/**
- * @param a_opr - String representation of an operator
- *
- * This method converts a string representation of an operator to the associated enum value. If no
- * conversion is possible, an exception is thrown.
- */
-RuleEngine::Operator
-RuleEngine::toOperator( const std::string &a_opr )
-{
-    if ( boost::iequals( a_opr, "DEF" ))
-        return OP_ASSERTED;
-    else if ( boost::iequals( a_opr, "UNDEF" ))
-        return OP_RETRACTED;
-    else if ( a_opr == "<" )
-        return OP_LT;
-    else if ( a_opr == "<=" )
-        return OP_LTE;
-    else if ( a_opr == "=" )
-        return OP_EQ;
-    else if ( a_opr == "!=" )
-        return OP_NEQ;
-    else if ( a_opr == ">=" )
-        return OP_GTE;
-    else if ( a_opr == ">" )
-        return OP_GT;
-    else if ( a_opr == "|" )
-        return OP_OR;
-    else if ( a_opr == "!|" )
-        return OP_NOR;
-    else if ( a_opr == "&" )
-        return OP_AND;
-    else if ( a_opr == "!&" )
-        return OP_NAND;
-    else if ( a_opr == "^" )
-        return OP_XOR;
-
-    throw std::runtime_error( string( "Bad operator: " ) + a_opr );
+        (*r)->evaluate( a_fact );
 }
 
 
