@@ -58,13 +58,6 @@ private:
         Setting
     };
 
-    enum ItemStatus
-    {
-        ItemOK,
-        ItemMissing,
-        ItemNew
-    };
-
     enum FactFilter
     {
         FilterAll = 0,
@@ -77,8 +70,8 @@ private:
     void updateStatusIndicator();
     void dasmonStatus( bool active );
     bool comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg );
-    void setupRuleTableRow( int a_row, ItemStatus a_status = ItemOK );
-    void setupSignalTableRow( int a_row, ItemStatus a_status = ItemOK );
+    void setupRuleTableRow( int a_row, bool a_error );
+    void setupSignalTableRow( int a_row, bool a_error );
     void setRules( bool a_set_default );
     void updateGUIState();
 
@@ -94,10 +87,9 @@ private:
     QColor          m_def_color;
     FactFilter      m_fact_filter;
     std::vector<RuleEngine::RuleInfo>       m_rules;
-    std::vector<ItemStatus>                 m_rule_status;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
-    std::vector<ItemStatus>                 m_signal_status;
     std::set<std::string>                   m_fact_list;
+    std::map<std::string,std::string>       m_errors;
 };
 
 #endif // RULECONFIGDIALOG_H

@@ -100,165 +100,7 @@ RuleConfigDialog::dasmonStatus( bool active )
 bool
 RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
-    if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_RULE_DEFINITIONS )
-    {
-        if ( m_comm_status == Setting )
-        {
-            // Response to set command, compare what was sent (current data) to what was
-            // received. Highlight differences (syntax errors will cause items to be
-            // missing from received list.
-
-            m_com_timer.stop();
-
-            using namespace ADARA::ComBus::DASMON;
-            const RuleDefinitions *defs = dynamic_cast<const RuleDefinitions *>( &a_msg );
-            if ( defs )
-            {
-                bool err = false;
-
-                // Compare received with curent and mark differences in diif-vectors
-
-                // Analyze rules
-                vector<RuleEngine::RuleInfo>::iterator rule_cur;
-                vector<RuleEngine::RuleInfo>::const_iterator rule_recv;
-
-                m_rule_status.clear();
-                for ( rule_cur = m_rules.begin(); rule_cur != m_rules.end(); ++rule_cur )
-                {
-                    for ( rule_recv = defs->m_rules.begin(); rule_recv != defs->m_rules.end(); ++rule_recv )
-                    {
-                        if ( rule_recv->fact == rule_cur->fact )
-                        {
-                            if ( rule_recv->expr == rule_cur->expr )
-                                m_rule_status.push_back( ItemOK );
-                            else
-                            {
-                                err = true;
-                                m_rule_status.push_back( ItemMissing );
-                            }
-                            break;
-                        }
-                    }
-
-                    if ( rule_recv == defs->m_rules.end() )
-                    {
-                        err = true;
-                        m_rule_status.push_back( ItemMissing );
-                    }
-                }
-
-                // See if the recv rules have extra that aren't in the local data - add if so
-                for ( rule_recv = defs->m_rules.begin(); rule_recv != defs->m_rules.end(); ++rule_recv )
-                {
-                    for ( rule_cur = m_rules.begin(); rule_cur != m_rules.end(); ++rule_cur )
-                    {
-                        if ( rule_recv->fact == rule_cur->fact )
-                            break;
-                    }
-                    if ( rule_cur == m_rules.end())
-                    {
-                        err = true;
-                        m_rules.push_back( *rule_recv );
-                        m_rule_status.push_back( ItemNew );
-                    }
-                }
-
-                // Analyze signals
-                vector<ADARA::DASMON::SignalInfo>::iterator sig_cur;
-                vector<ADARA::DASMON::SignalInfo>::const_iterator sig_recv;
-
-                m_signal_status.clear();
-                for ( sig_cur = m_signals.begin(); sig_cur != m_signals.end(); ++sig_cur )
-                {
-                    for ( sig_recv = defs->m_signals.begin(); sig_recv != defs->m_signals.end(); ++sig_recv )
-                    {
-                        if ( sig_recv->name == sig_cur->name )
-                        {
-                            if ( sig_recv->fact == sig_cur->fact &&
-                                 sig_recv->source == sig_cur->source &&
-                                 sig_recv->level == sig_cur->level &&
-                                 boost::iequals( sig_recv->msg, sig_cur->msg ))
-                                m_signal_status.push_back( ItemOK );
-                            else
-                            {
-                                err = true;
-                                m_signal_status.push_back( ItemMissing );
-                            }
-                            break;
-                        }
-                    }
-
-                    if ( sig_recv == defs->m_signals.end() )
-                    {
-                        err = true;
-                        m_signal_status.push_back( ItemMissing );
-                    }
-                }
-
-                // See if the recv signals have extra that aren't in the local data - add if so
-                for ( sig_recv = defs->m_signals.begin(); sig_recv != defs->m_signals.end(); ++sig_recv )
-                {
-                    for ( sig_cur = m_signals.begin(); sig_cur != m_signals.end(); ++sig_cur )
-                    {
-                        if ( sig_recv->name == sig_cur->name )
-                            break;
-                    }
-                    if ( sig_cur == m_signals.end())
-                    {
-                        err = true;
-                        m_signals.push_back( *sig_recv );
-                        m_signal_status.push_back( ItemNew );
-                    }
-                }
-
-                QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
-
-                // If no errors, then reset dirty/apply
-                if ( !err )
-                {
-                    m_dirty = false;
-
-                    if ( m_quit_on_set )
-                        QMetaObject::invokeMethod( this, "accept", Qt::QueuedConnection );
-                }
-                else
-                {
-                    m_quit_on_set = false;
-                }
-
-                m_last_cid.clear();
-                m_comm_status = Idle;
-                updateGUIState();
-            }
-        }
-        else if ( m_comm_status == Getting )
-        {
-            // Response to get command, just copy received data into object and refresh tables
-
-            m_com_timer.stop();
-
-            using namespace ADARA::ComBus::DASMON;
-            const RuleDefinitions *defs = dynamic_cast<const RuleDefinitions *>( &a_msg );
-            if ( defs )
-            {
-                // Make copy of data, then trigger UI refresh
-                m_rules = defs->m_rules;
-                m_rule_status.clear();
-                m_rule_status.resize( m_rules.size(), ItemOK );
-
-                m_signals = defs->m_signals;
-                m_signal_status.clear();
-                m_signal_status.resize( m_signals.size(), ItemOK );
-
-                QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
-            }
-            m_last_cid.clear();
-            m_comm_status = Idle;
-            m_dirty = false;
-            updateGUIState();
-        }
-    }
-    else if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_INPUT_FACTS )
+    if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_INPUT_FACTS )
     {
         using namespace ADARA::ComBus::DASMON;
         const InputFacts *in_facts = dynamic_cast<const InputFacts *>( &a_msg );
@@ -267,6 +109,68 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg 
             m_fact_list = in_facts->m_facts;
             QMetaObject::invokeMethod( this, "updateFactList", Qt::QueuedConnection );
         }
+    }
+    else if ( a_msg.getMessageType() ==  ADARA::ComBus::MSG_ACK && m_comm_status == Setting )
+    {
+        // Response to set command, compare what was sent (current data) to what was
+        // received. Highlight differences (syntax errors will cause items to be
+        // missing from received list.
+
+        m_com_timer.stop();
+
+        // Set was OK, no errors
+        m_dirty = false;
+        m_errors.clear();
+
+        if ( m_quit_on_set )
+            QMetaObject::invokeMethod( this, "accept", Qt::QueuedConnection );
+
+        m_last_cid.clear();
+        m_comm_status = Idle;
+
+        QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
+        updateGUIState();
+    }
+    else if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_RULE_ERRORS && m_comm_status == Setting )
+    {
+        m_com_timer.stop();
+        m_quit_on_set = false;
+
+        const ADARA::ComBus::DASMON::RuleErrors *errs = dynamic_cast<const ADARA::ComBus::DASMON::RuleErrors *>( &a_msg );
+        if ( errs )
+            m_errors = errs->m_errors;
+        else
+            m_errors.clear();
+
+        m_last_cid.clear();
+        m_comm_status = Idle;
+
+        QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
+        updateGUIState();
+    }
+    else if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_RULE_DEFINITIONS && m_comm_status == Getting )
+    {
+        // Response to get command, just copy received data into object and refresh tables
+
+        m_com_timer.stop();
+
+        using namespace ADARA::ComBus::DASMON;
+        const RuleDefinitions *defs = dynamic_cast<const RuleDefinitions *>( &a_msg );
+        if ( defs )
+        {
+
+            // Make copy of data, then trigger UI refresh
+            m_rules = defs->m_rules;
+            m_signals = defs->m_signals;
+            m_errors.clear();
+
+            QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
+        }
+
+        m_last_cid.clear();
+        m_comm_status = Idle;
+        m_dirty = false;
+        updateGUIState();
     }
 
     // Returning false here will remove the sub route created by the client
@@ -292,6 +196,8 @@ RuleConfigDialog::updateRuleTables()
     static bool first_time = true;
 
     QTableWidgetItem *item;
+    QString tip;
+    map<string,string>::iterator ie;
 
     ui->ruleTable->disconnect( this );
     ui->signalTable->disconnect( this );
@@ -320,10 +226,17 @@ RuleConfigDialog::updateRuleTables()
     row = 0;
     for ( vector<RuleEngine::RuleInfo>::const_iterator r = m_rules.begin(); r != m_rules.end(); ++r, ++row )
     {
-        ui->ruleTable->item( row, 1 )->setText( r->fact.c_str() );
-        ui->ruleTable->item( row, 2 )->setText( r->expr.c_str() );
+        if (( ie = m_errors.find( r->fact )) != m_errors.end())
+            tip = ie->second.c_str();
+        else
+            tip.clear();
 
-        setupRuleTableRow( row, m_rule_status[row] );
+        ui->ruleTable->item( row, 1 )->setText( r->fact.c_str() );
+        ui->ruleTable->item( row, 1 )->setToolTip( tip );
+        ui->ruleTable->item( row, 2 )->setText( r->expr.c_str() );
+        ui->ruleTable->item( row, 2 )->setToolTip( tip );
+
+        setupRuleTableRow( row, ie != m_errors.end());
     }
 
     cur_count = ui->signalTable->rowCount();
@@ -343,17 +256,24 @@ RuleConfigDialog::updateRuleTables()
     row = 0;
     for ( vector<ADARA::DASMON::SignalInfo>::const_iterator s = m_signals.begin(); s != m_signals.end(); ++s, ++row )
     {
+        if (( ie = m_errors.find( s->name )) != m_errors.end())
+            tip = ie->second.c_str();
+        else
+            tip.clear();
+
         ui->signalTable->item( row, 1 )->setText( s->name.c_str() );
+        ui->signalTable->item( row, 1 )->setToolTip( tip );
         ui->signalTable->item( row, 2 )->setText( s->fact.c_str() );
+        ui->signalTable->item( row, 2 )->setToolTip( tip );
         ui->signalTable->item( row, 3 )->setText( s->source.c_str() );
+        ui->signalTable->item( row, 3 )->setToolTip( tip );
         ui->signalTable->item( row, 4 )->setText( ADARA::ComBus::ComBusHelper::toText( s->level ) );
+        ui->signalTable->item( row, 4 )->setToolTip( tip );
         ui->signalTable->item( row, 5 )->setText( s->msg.c_str() );
+        ui->signalTable->item( row, 5 )->setToolTip( tip );
 
-        setupSignalTableRow( row, m_signal_status[row] );
+        setupSignalTableRow( row, ie != m_errors.end());
     }
-
-    m_rule_status.clear();
-    m_signal_status.clear();
 
     connect( ui->ruleTable, SIGNAL(cellChanged(int,int)), this, SLOT(ruleCellChanged(int,int)));
     connect( ui->signalTable, SIGNAL(cellChanged(int,int)), this, SLOT(signalCellChanged(int,int)));
@@ -529,7 +449,8 @@ RuleConfigDialog::setRules( bool a_set_default )
             for ( row = 0; row < count; ++row )
             {
                 rule.fact = ui->ruleTable->item( row, 1 )->text().toUpper().toStdString();
-                rule.expr = ui->ruleTable->item( row, 2 )->text().toUpper().toStdString();
+                //rule.expr = ui->ruleTable->item( row, 2 )->text().toUpper().toStdString();
+                rule.expr = ui->ruleTable->item( row, 2 )->text().toStdString();
                 m_rules.push_back( rule );
             }
 
@@ -626,7 +547,7 @@ RuleConfigDialog::addRule()
     ui->ruleTable->setItem( row, 0, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 2, new QTableWidgetItem(""));
-    setupRuleTableRow( ui->ruleTable->rowCount() - 1 );
+    setupRuleTableRow( ui->ruleTable->rowCount() - 1, false );
 
     ui->ruleTable->scrollToBottom();
     ui->ruleTable->setCurrentCell( ui->ruleTable->rowCount() - 1, 1 );
@@ -661,7 +582,7 @@ RuleConfigDialog::addSignal()
     ui->signalTable->setItem( row, 3, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 4, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 5, new QTableWidgetItem(""));
-    setupSignalTableRow( ui->signalTable->rowCount() - 1 );
+    setupSignalTableRow( ui->signalTable->rowCount() - 1, false );
 
     ui->signalTable->scrollToBottom();
     ui->signalTable->setCurrentCell( ui->signalTable->rowCount() - 1, 1 );
@@ -687,20 +608,15 @@ RuleConfigDialog::removeSelectedSignal()
 
 
 void
-RuleConfigDialog::setupRuleTableRow( int a_row, ItemStatus a_status  )
+RuleConfigDialog::setupRuleTableRow( int a_row, bool a_error  )
 {
     QTableWidgetItem *item = ui->ruleTable->item( a_row, 0 );
     QColor color = m_def_color;
 
-    if ( a_status == ItemMissing )
+    if ( a_error )
     {
         item->setText( "X" );
         color = Qt::red;
-    }
-    else if ( a_status == ItemNew )
-    {
-        item->setText( "?" );
-        color = Qt::blue;
     }
     else
     {
@@ -716,20 +632,15 @@ RuleConfigDialog::setupRuleTableRow( int a_row, ItemStatus a_status  )
 
 
 void
-RuleConfigDialog::setupSignalTableRow( int a_row, ItemStatus a_status )
+RuleConfigDialog::setupSignalTableRow( int a_row, bool a_error )
 {
     QTableWidgetItem *item = ui->signalTable->item( a_row, 0 );
     QColor color = m_def_color;
 
-    if ( a_status == ItemMissing )
+    if ( a_error )
     {
         item->setText( "X" );
         color = Qt::red;
-    }
-    else if ( a_status == ItemNew )
-    {
-        item->setText( "?" );
-        color = Qt::blue;
     }
     else
     {

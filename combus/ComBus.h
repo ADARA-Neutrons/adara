@@ -47,7 +47,7 @@ public:
 class IInputListener
 {
 public:
-    virtual bool    comBusInputMessage( const MessageBase &a_msg ) = 0;
+    virtual void    comBusInputMessage( const MessageBase &a_msg ) = 0;
 };
 
 

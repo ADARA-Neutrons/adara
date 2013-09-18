@@ -1289,7 +1289,7 @@ MainWindow::updateHighestSignal()
 // IControlListener methods
 
 
-bool
+void
 MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     QMutexLocker lock( &m_mutex );
@@ -1309,7 +1309,7 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
             m_client_cids.erase( iRoute );
         }
 
-        return true;
+        return;
     }
 
     // Process main thread commands here
@@ -1317,10 +1317,7 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     {
         m_pvs = ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
         m_refresh_pv_table = true;
-        return true;
     }
-
-    return false;
 }
 
 ///////////////////////////////////////////////////////////

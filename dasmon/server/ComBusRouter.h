@@ -71,7 +71,7 @@ private:
     void    comBusConnectionStatus( bool a_connected );
 
     // IInputListener Interface
-    bool    comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
+    void    comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
 
     // ITopicListener Interface
     void    comBusMessage( const ADARA::ComBus::MessageBase &a_msg );

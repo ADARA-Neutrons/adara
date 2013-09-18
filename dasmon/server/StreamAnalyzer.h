@@ -39,7 +39,7 @@ public:
     void    detach( ISignalListener &a_listener );
     void    resendState();
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
-    bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals );
+    bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals, std::map<std::string,std::string> &a_errors );
     void    getInputFacts( std::set<std::string> &a_facts ) const;
     bool    isOK() const { return m_ok; }
     void    assertFact( const std::string &a_fact );

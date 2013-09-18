@@ -141,7 +141,7 @@ RuleEngine::Fact::removeRuleDependency( Rule *a_rule )
 
 
 RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr )
-: m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_rule_fact(0), m_rule_value(0.0), m_valid(false)
+: m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_rule_fact(0), m_rule_value(0.0), m_valid(false), m_tmp_count(0)
 {
     m_rule_fact = m_engine.getFact( a_id );
     m_rule_fact->m_rule_output = true;
@@ -175,6 +175,10 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
 {
     RuleEngine::Rule *m_inst = (RuleEngine::Rule *)a_data;
 
+    // Note: variable names may vary in case, but facts are always upper case
+    // so, force vars to upper case here (can't do this to entire expression
+    // because muParser functions are case sensitive)
+
     // Check for Rule output variable "@"
     if ( a_var_name[0] == '@' )
         return &m_inst->m_rule_value;
@@ -184,20 +188,31 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
     if ( a_var_name[0] == '_' )
     {
         // Variable is an assertion test
-        fact = m_inst->m_engine.getFact( &a_var_name[1] );
+        string var = &a_var_name[1];
+        boost::to_upper( var );
+        fact = m_inst->m_engine.getFact( var );
         m_inst->m_facts[fact] = FactInfo( 0, true );
+    }
+    else if ( strlen( a_var_name ) > 2 )
+    {
+        // Variable is a normal fact input
+        string var = a_var_name;
+        boost::to_upper( var );
+        fact = m_inst->m_engine.getFact( var );
+        m_inst->m_facts[fact] = FactInfo( 0, false );
     }
     else
     {
-        // Variable is a normal fact input
-        fact = m_inst->m_engine.getFact( a_var_name );
-        m_inst->m_facts[fact] = FactInfo( 0, false );
+        if ( m_inst->m_tmp_count < 10 )
+            return &m_inst->m_tmp_values[m_inst->m_tmp_count++];
+        else
+            throw std::runtime_error("Too many temporary variables (10 max)");
     }
 
     // Add this rule as a dependency on fact
     fact->addRuleDependency( m_inst );
 
-    return &m_inst->m_facts[fact].m_value;
+    return &(m_inst->m_facts[fact].m_value);
 }
 
 
@@ -407,7 +422,7 @@ RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression
     try
     {
         string id( boost::to_upper_copy( a_id ));
-        string expr( boost::to_upper_copy( a_expression ));
+        string expr = a_expression;
         boost::algorithm::trim( id );
         boost::algorithm::trim( expr );
 
@@ -423,11 +438,18 @@ RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression
 
         rule->evaluate();
     }
+    catch ( mu::Parser::exception_type &e )
+    {
+        if ( rule )
+            delete rule;
+
+        throw std::runtime_error( e.GetMsg() );
+    }
     catch( std::exception &e )
     {
         if ( rule )
             delete rule;
-        cout << e.what() << endl;
+
         throw;
     }
     catch(...)

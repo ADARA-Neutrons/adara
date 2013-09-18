@@ -9,6 +9,10 @@ using namespace std;
 namespace ADARA {
 namespace DASMON {
 
+#define COMBUS_STATUS_PERIOD        5   ///< Period of ComBus status messages in seconds
+#define PROC_TIMEOUT_UNRESPONSIVE   10  ///< Time (sec) before a ComBus proc is declared unresponsive
+#define PROC_TIMEOUT_INACTIVE       20  ///< Time (sec) before a ComBus proc is declared inactive
+
 /*
 The ComBusRouter class provides a number of ComBus (ActiveMQ) messaging
 functions for the dasmond service, as follows:
@@ -46,6 +50,14 @@ functions for the dasmond service, as follows:
     run() method.
 */
 
+/** \param a_monitor - The StreamMonitor that will be handled
+  * \param a_analyzer - The StreamAnalyser that will be used
+  *
+  * Constructor for ComBusRouter class. The StreamMonitor and StreamAnalyzer instance
+  * must be paired (the analyzer must be attached to the monitor); otherwise unexpected
+  * behavior will result. This constructor causes the new ComBusRouter to attach itself
+  * to the provided stream instances and initializes the ComBus interface.
+  */
 ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
       m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
@@ -59,6 +71,8 @@ ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer
 }
 
 
+/** ComBusRouter destructor.
+  */
 ComBusRouter::~ComBusRouter()
 {
     m_combus.detach( (ADARA::ComBus::IConnectionListener &)*this );
@@ -66,9 +80,14 @@ ComBusRouter::~ComBusRouter()
     m_analyzer.detach( *this );
 }
 
-#define PROC_TIMEOUT_UNRESPONSIVE   10
-#define PROC_TIMEOUT_INACTIVE       20
 
+/** This method provides a number of dasmon/ComBus oversight features including
+  * sending ComBus status messages, monitoring other ComBus processing for
+  * activity, and re-emitting current dasmon state when requested by an external
+  * ComBus process. This method never returns and is the last method called by the
+  * main thread of the dasmon process (dasmon does not provide an orderly shutdown
+  * mechanism).
+  */
 void
 ComBusRouter::run()
 {
@@ -83,7 +102,8 @@ ComBusRouter::run()
         t = time(0);
 
         // Test/send status every 5 seconds
-        if ( !(count % 5 ))
+
+        if ( !(count % COMBUS_STATUS_PERIOD ))
         {
             if ( m_monitor.isOK() && m_analyzer.isOK() )
                 m_combus.status( ADARA::ComBus::STATUS_OK );
@@ -132,6 +152,12 @@ ComBusRouter::run()
 }
 
 
+/** \param a_src_proc - The client ComBus process
+  * \param a_CID - The ComBus context ID for the request
+  *
+  * This method sends the current rule and signal definitions to the specified
+  * client process.
+  */
 void
 ComBusRouter::sendRuleDefinitions( const string &a_src_proc, const string &a_CID )
 {
@@ -142,6 +168,14 @@ ComBusRouter::sendRuleDefinitions( const string &a_src_proc, const string &a_CID
 }
 
 
+/** \param a_msg - A message containing new rule and signal definitions
+  *
+  * This method sets the current rule and signal definitions. If the
+  * StreamAnalyzer successfully sets the rules and signals, the new settings
+  * are saved to the current config file, and if requested, set as the defaults
+  * as well. The new (or unchanged) rules and signals are sent back to the
+  * originating process as an acknowledgement (or nack).
+  */
 void
 ComBusRouter::setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg )
 {
@@ -151,17 +185,30 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg )
     {
         // If this succeeds, current rules will be set to specified;
         // otherwise, current rules will remain unchanged
-        m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals );
-        m_analyzer.saveConfig();
 
-        if ( set_msg->m_set_default )
-            m_analyzer.setDefaultConfig();
+        ADARA::ComBus::DASMON::RuleErrors err_msg;
 
-        sendRuleDefinitions( a_msg->getSourceName(), a_msg->getCorrelationID() );
+        if ( m_analyzer.setDefinitions( set_msg->m_rules, set_msg->m_signals, err_msg.m_errors ))
+        {
+            m_analyzer.saveConfig();
+
+            if ( set_msg->m_set_default )
+                m_analyzer.setDefaultConfig();
+
+            ADARA::ComBus::AckReply ack;
+            m_combus.send( ack, a_msg->getSourceName(), &a_msg->getCorrelationID());
+        }
+        else
+        {
+            m_combus.send( err_msg, a_msg->getSourceName(), &a_msg->getCorrelationID());
+        }
     }
 }
 
 
+/**
+  *
+  */
 void
 ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &a_CID )
 {
@@ -172,6 +219,9 @@ ComBusRouter::sendInputFacts( const std::string &a_src_proc, const std::string &
 }
 
 
+/**
+  *
+  */
 void
 ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 {
@@ -188,6 +238,9 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IStreamListener Interface
 
+/**
+  *
+  */
 void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
@@ -205,6 +258,9 @@ ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_tim
     m_recording = a_recording;
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::pauseStatus( bool a_paused )
 {
@@ -212,6 +268,9 @@ ComBusRouter::pauseStatus( bool a_paused )
     m_combus.broadcast( msg );
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::scanStatus( bool a_scanning, uint32_t a_scan_number )
 {
@@ -219,6 +278,9 @@ ComBusRouter::scanStatus( bool a_scanning, uint32_t a_scan_number )
     m_combus.broadcast( msg );
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::beamInfo( const BeamInfo &a_info )
 {
@@ -226,6 +288,9 @@ ComBusRouter::beamInfo( const BeamInfo &a_info )
     m_combus.broadcast( msg );
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::runInfo( const RunInfo &a_info )
 {
@@ -233,6 +298,9 @@ ComBusRouter::runInfo( const RunInfo &a_info )
     m_combus.broadcast( msg );
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 {
@@ -240,6 +308,9 @@ ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
     m_combus.broadcast( msg );
 }
 
+/**
+  *
+  */
 void
 ComBusRouter::runMetrics( const RunMetrics &a_metrics )
 {
@@ -247,15 +318,25 @@ ComBusRouter::runMetrics( const RunMetrics &a_metrics )
     m_combus.broadcast( msg );
 }
 
+
+/** \param a_name - Name of process variable
+  *
+  * This method is a callback from the StreamMonitor to indicate that a process
+  * variable has been defined. The ComBusRouter does not use this callback.
+  */
 void
 ComBusRouter::pvDefined( const std::string &a_name )
 {
     (void)a_name;
-
-    // TODO - Maybe eventually support a subscriber API for PVs?
-    // Don't want to spam the system
 }
 
+
+/** \param a_name - Name of process variable
+  *
+  * This method is a callback from the StreamMonitor to indicate that a process
+  * variable has been undefined. The ComBusRouter removes the PV from the cached
+  * PV informations for subsequent client requests.
+  */
 void
 ComBusRouter::pvUndefined( const std::string &a_name )
 {
@@ -265,6 +346,16 @@ ComBusRouter::pvUndefined( const std::string &a_name )
         m_pvs.erase(ipv);
 }
 
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes in the
+  * value or status of an unsigned integer process variable in the data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
 void
 ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
@@ -272,6 +363,16 @@ ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStat
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( (double)a_value, a_status, a_timestamp );
 }
 
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes in the
+  * value or status of a double precision process variable in the data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
 void
 ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
@@ -279,6 +380,15 @@ ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );
 }
 
+
+/** \param a_connected - Flag indicating SMS connection state
+  * \param a_host - Host name of SMS
+  * \param a_port - Port number of SMS
+  *
+  * This method is a callback from the StreamMonitor to indicate changes in
+  * the SMS connection state. Dasmon must resend its state when the
+  * StreamMonitor connects (or reconnects) to the SMS.
+  */
 void
 ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
@@ -294,9 +404,17 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
     m_sms_connected = a_connected;
 }
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ISignalListener Interface
 
+
+/** \param a_signal - Information structure for signal that was asserted
+  *
+  * This method is a callback from the StreamAnalyzer indicating that the
+  * specified signal was asserted. The ComBusRouter broadcasts this
+  * information on the [domain].APP.DASMON topic.
+  */
 void
 ComBusRouter::signalAssert( const SignalInfo &a_signal )
 {
@@ -305,6 +423,12 @@ ComBusRouter::signalAssert( const SignalInfo &a_signal )
 }
 
 
+/** \param a_name - Name of signal that was retracted
+  *
+  * This method is a callback from the StreamAnalyzer indicating that the
+  * specified signal was retracted. The ComBusRouter broadcasts this
+  * information on the [domain].APP.DASMON topic.
+  */
 void
 ComBusRouter::signalRetract( const std::string &a_name )
 {
@@ -316,6 +440,12 @@ ComBusRouter::signalRetract( const std::string &a_name )
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // IStatusListener Interface
 
+/** \param a_connected - Flag indicating ComBus connection state
+  *
+  * This method is a callback from the ComBus library to indicate changes in
+  * the connection state. Dasmon must resend its state when it connects (or
+  * reconnects) to ComBus.
+  */
 void
 ComBusRouter::comBusConnectionStatus( bool a_connected )
 {
@@ -337,17 +467,16 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ITopicListener methods
 
-/**
- * /param a_msg - Received ComBus message
- *
- * The comBusMessage method is the callback for all ComBus messages received
- * on subscribed topics. TheComBusRouter class only monitor all traffic on the
- * [domain].STATUS.* topic in order to maintain state information for all running
- * ComBus processess. This state information is injected into the StreamAnalyzer's
- * rule engine which allows users to configure rules and signals pretaining to
- * the status of important processes (using the ComBus process ID as a fact in
- * a rule expression).
- */
+/** /param a_msg - Received ComBus message
+  *
+  * The comBusMessage method is the callback for all ComBus messages received
+  * on subscribed topics. The ComBusRouter class monitors all traffic on the
+  * [domain].STATUS.* topic in order to maintain state information for all running
+  * ComBus processess. This state information is injected into the StreamAnalyzer's
+  * rule engine which allows users to configure rules and signals pretaining to
+  * the status of important processes (using the ComBus process ID as a fact in
+  * a rule expression).
+  */
 void
 ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
@@ -380,10 +509,19 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 }
 
 
-///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // IInputListener methods
 
-bool
+
+/** \param a_msg - A received ComBus message
+  *
+  * This method is called by the ComBus library when a message is received on
+  * the [domain].INPUT.DASMON topic. This topic represents the public API of
+  * the dasmon service and supports rule management, state queries, and process
+  * variable queries. The state and PV queries are to support late-joining
+  * ComBus processes.
+  */
+void
 ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 {
     try
@@ -429,8 +567,6 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     {
         syslog( LOG_ERR, "Unkown exception while processing command" );
     }
-
-    return false;
 }
 
 

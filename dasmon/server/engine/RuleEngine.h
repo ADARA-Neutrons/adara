@@ -178,6 +178,8 @@ private:
         bool                        m_valid;        ///< Flag indicates if all value inputs are valid (asserted)
         std::map<Fact*,FactInfo>    m_facts;        ///< Maps input facts to muParser value variables
         mu::Parser                  m_parser;       ///< Expression parser and evaluator
+        double                      m_tmp_values[10];
+        unsigned short              m_tmp_count;
     };
 
     bool        idInUse( const std::string &a_id ) const;

@@ -123,7 +123,7 @@ private:
     void        clearSignals();
     void        comBusMessage( const ADARA::ComBus::MessageBase &a_msg );
     void        comBusConnectionStatus( bool a_connected );
-    bool        comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
+    void        comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
 
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();

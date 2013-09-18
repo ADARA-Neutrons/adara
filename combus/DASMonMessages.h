@@ -164,6 +164,46 @@ protected:
 };
 
 
+class RuleErrors :
+        public ADARA::ComBus::TemplMessageBase<MSG_DASMON_RULE_ERRORS,RuleErrors>
+{
+public:
+    RuleErrors()
+    {}
+
+    std::map<std::string,std::string> m_errors;
+
+protected:
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        try {
+            m_errors.clear();
+
+            // Throws if erros doesn't exist
+            boost::property_tree::ptree pt = a_prop_tree.get_child("errors");
+            for ( boost::property_tree::ptree::const_iterator i = pt.begin(); i != pt.end(); i++ )
+            {
+                m_errors[i->first] = i->second.data();
+            }
+        } catch(...) {}
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        boost::property_tree::ptree sub;
+        std::map<std::string,std::string>::const_iterator ie = m_errors.begin();
+        for ( ; ie != m_errors.end(); ++ie )
+            sub.put( ie->first, ie->second );
+
+        a_prop_tree.put_child( "errors", sub );
+    }
+};
+
+
 
 /** \brief Message sent from dasmond to describe available and asserted facts
   *

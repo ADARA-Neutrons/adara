@@ -169,7 +169,14 @@ StreamAnalyzer::loadConfig()
             inf.close();
 
             // Push rules and signals into engine
-            setDefinitions( loaded_rules, loaded_signals );
+            map<string,string> errors;
+            if ( !setDefinitions( loaded_rules, loaded_signals, errors ))
+            {
+                syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+
+                for ( map<string,string>::iterator ie = errors.begin(); ie != errors.end(); ++ie )
+                    syslog( LOG_ERR, "Config error on %s: %s", ie->first.c_str(), ie->second.c_str() );
+            }
         }
         catch ( ... )
         {
@@ -360,7 +367,7 @@ StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std:
 
 
 bool
-StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, const vector<SignalInfo> &a_signals )
+StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, const vector<SignalInfo> &a_signals, map<string,string> &a_errors )
 {
     // The process for setting new rules is to create a new RuleEngine instance and
     // attempt to initizlize it with the provided rules. If this succeeds, then the
@@ -368,21 +375,28 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     // transferred. Next, old/invalid signals will be retracted, and new/updated signals
     // will be asserted.
 
+    bool res = true;
     RuleEngine *engine = new RuleEngine();
     vector<RuleEngine::RuleInfo>::const_iterator r;
 
-    try
+    for ( r = a_rules.begin(); r != a_rules.end(); ++r )
     {
-        for ( r = a_rules.begin(); r != a_rules.end(); ++r )
+        try
         {
             engine->defineRule( r->fact, r->expr );
         }
-    }
-    catch ( ... )
-    {
-        // Rule failed to parse, abort
-        // TODO Would be nice to provide some feedback as to what went wrong
-        return false;
+        catch ( std::exception &e )
+        {
+            // Rule failed to parse
+            a_errors[r->fact] = e.what();
+            res = false;
+        }
+        catch ( ... )
+        {
+            // Rule failed to parse
+            a_errors[r->fact] = "Unknown exception";
+            res = false;
+        }
     }
 
     // Engine has been initialized successfully, now validate signals
@@ -415,9 +429,16 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
             // If unassociated signal found, abort (probably a mistake)
             if ( i == BIF_COUNT )
-                return false;
+            {
+                a_errors[sig->name] = "References undefined rule";
+                res = false;
+            }
         }
     }
+
+    // If any errors in rules or signals, abort now
+    if ( !res )
+        return false;
 
     // Rules & signals are OK, now perform swap-out of engine and updating of listeners
 
