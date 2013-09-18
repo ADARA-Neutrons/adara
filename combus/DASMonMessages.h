@@ -628,6 +628,7 @@ protected:
     {
         MessageBase::read( a_prop_tree );
 
+        m_time                  = a_prop_tree.get( "total_time", 0.0 );
         m_total_counts          = a_prop_tree.get( "total_counts", 0UL );
         m_total_charge          = a_prop_tree.get( "total_charge", 0.0 );
         m_pixel_error_count     = a_prop_tree.get( "pixel_error_count", 0UL );
@@ -641,6 +642,7 @@ protected:
     {
         MessageBase::write( a_prop_tree );
 
+        a_prop_tree.put( "total_time", m_time );
         a_prop_tree.put( "total_counts", m_total_counts );
         a_prop_tree.put( "total_charge", m_total_charge );
         a_prop_tree.put( "pixel_error_count", m_pixel_error_count );

@@ -13,52 +13,21 @@ using namespace std;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Value Class
+// ================================ Value Class =======================================================================
 
-/// Void Value instances have an immutable integer value of 1 (value is meaningless if retracted)
-RuleEngine::Value::Value()
-    : m_type( VT_VOID ), m_int_value( 1 )
-{}
 
-RuleEngine::Value::Value( const RuleEngine::Value &a_src )
-    : m_type( a_src.m_type ), m_int_value( a_src.m_int_value )
-{}
-
-RuleEngine::Value::Value( bool a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( int8_t a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( int16_t a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( int32_t a_value )
-    : m_type( VT_INT ), m_int_value( a_value )
-{}
-
-RuleEngine::Value::Value( uint8_t a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( uint16_t a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( uint32_t a_value )
-    : m_type( VT_INT ), m_int_value( (int32_t)a_value )
-{}
-
-RuleEngine::Value::Value( float a_value )
-    : m_type( VT_REAL ), m_real_value( (double)a_value )
-{}
-
-RuleEngine::Value::Value( double a_value )
-    : m_type( VT_REAL ), m_real_value( a_value )
-{}
+// Value constructors for support native types
+RuleEngine::Value::Value() : m_type( VT_VOID ), m_int_value( 1 ) {}
+RuleEngine::Value::Value( const RuleEngine::Value &a_src ) : m_type( a_src.m_type ), m_int_value( a_src.m_int_value ) {}
+RuleEngine::Value::Value( bool a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( int8_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( int16_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( int32_t a_value ) : m_type( VT_INT ), m_int_value( a_value ) {}
+RuleEngine::Value::Value( uint8_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( uint16_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( uint32_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( float a_value ) : m_type( VT_REAL ), m_real_value( (double)a_value ) {}
+RuleEngine::Value::Value( double a_value ) : m_type( VT_REAL ), m_real_value( a_value ) {}
 
 
 /** \brief Determines if a Value differs in content
@@ -86,7 +55,7 @@ RuleEngine::Value::operator!=( const Value &a_value ) const
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Fact Class
+// ================================ Fact Class ========================================================================
 
 /**
  * @param a_id - ID of new Fact
@@ -136,23 +105,42 @@ RuleEngine::Fact::removeRuleDependency( Rule *a_rule )
         m_rule_deps.erase( r );
 }
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Rule Class
+// ================================ Rule Class ========================================================================
 
 
+/** \param a_engine - Owngin RuleEngine instance
+  * \param a_id - Rule ID
+  * \param a_expr - Rule expression
+  *
+  * Constructs a new Rule. Throws if expression has errors.
+  */
 RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr )
 : m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_rule_fact(0), m_rule_value(0.0), m_valid(false), m_tmp_count(0)
 {
-    m_rule_fact = m_engine.getFact( a_id );
+    string id = boost::to_upper_copy( a_id );
+    boost::algorithm::trim( id );
+
+    if ( m_engine.idInUse( id ))
+        throw std::runtime_error( "Rule ID is already in use." );
+
+    m_rule_fact = m_engine.getFact( id );
     m_rule_fact->m_rule_output = true;
     m_rule_fact->m_implicit = false;
 
     m_parser.SetVarFactory( parserVarFactory, this );
     m_parser.SetExpr( a_expr );
     m_parser.Eval(); // This call is to force compilation of the new expression and to throw any errors now
+
+    if ( isCircular( this ))
+        throw std::runtime_error( "Circular rule definition" );
 }
 
 
+/**
+  * Rule destructor.
+  */
 RuleEngine::Rule::~Rule()
 {
     for ( std::map<Fact*,FactInfo>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
@@ -164,11 +152,15 @@ RuleEngine::Rule::~Rule()
   *
   * This static method is a callback used by muParser to implicitly define variables found
   * in a parsed epression. These variables are automatically mapped to Facts in the rule
-  * engine fact space (or new Facts are created and mapped). There are two special cases
-  * for variables: a variable prefixed with "@" is mapped to the output value of the rule,
-  * and any variable with an underscore prefix is treated as an "assertion" test for a
-  * Fact. Fact "assertion" inputs are assigned a value of 1 if the associated fact is
-  * asserted, and a value of 0 if it is not asserted.
+  * engine fact space (or new Facts are created and mapped). There are three special cases
+  * for variables:
+  *
+  * 1) A variable prefixed with "@" is mapped to the output value of the rule,
+  * 2) Any variable with an underscore prefix is treated as an "assertion" test for a
+  *    Fact. Fact "assertion" inputs are assigned a value of 1 if the associated fact is
+  *    asserted, and a value of 0 if it is not asserted.
+  * 3) Variables names of 1 or 2 characters in length are treated as temporaries and are
+  *    not mapped to facts.. A maximum of 10 temporaries per rule are allowed.
   */
 double *
 RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
@@ -317,11 +309,57 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
     }
 }
 
+/**
+ * @param a_rule - Rule to test
+ *
+ * Tests if the specified Rule is part of a circular definition.
+ */
+bool
+RuleEngine::Rule::isCircular( Rule *a_rule )
+{
+    return isCircular( a_rule, m_engine.getFact( a_rule->m_id ));
+}
+
+
+/**
+ * @param a_target_rule - Rule to test for
+ * @param a_rule - Current rule to evaluate
+ *
+ * Recursive function that traverses the rule graph seeking circular definitions.
+ */
+bool
+RuleEngine::Rule::isCircular( Rule *a_target_rule, Rule *a_rule )
+{
+    // If we land on the target rule, then there is a circular definition
+    if ( a_target_rule == a_rule )
+        return true;
+
+    // On a rule node, only follow forward fact dependencies (which is the rule-fact only)
+    return isCircular( a_target_rule, m_engine.getFact( a_rule->m_id ));
+}
+
+/**
+ * @param a_target_rule - Rule to test for
+ * @param a_fact - Current fact to evaluate
+ *
+ * Recursive function that traverses the rule graph seeking circular definitions.
+ */
+bool
+RuleEngine::Rule::isCircular( Rule *a_target_rule, Fact *a_fact )
+{
+
+    // On Fact node, follow all rule dependencies
+    for ( vector<Rule*>::iterator r = a_fact->m_rule_deps.begin(); r != a_fact->m_rule_deps.end(); ++r )
+        if ( isCircular( a_target_rule, *r ))
+            return true;
+
+    return false;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// RuleEngine Class
+// ================================ RuleEngine Class ==================================================================
 
-// ================================ Public Methods ====================================================================
 
 /**
  * RuleEngine construtcor.
@@ -343,6 +381,7 @@ RuleEngine::~RuleEngine()
     for ( map<string,Fact*>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
         delete f->second;
 }
+
 
 /** \param a_source - RuleEngine class to synchronize from
   *
@@ -373,12 +412,11 @@ RuleEngine::synchronize( const RuleEngine &a_source )
 }
 
 
-/**
- * @param a_listener - Listener to attach
- *
- * Attaches an IFactListener instance to this RuleEngine. All currently asserted facts are
- * sent to the new listener.
- */
+/** \param a_listener - Listener to attach
+  *
+  * Attaches an IFactListener instance to this RuleEngine. All currently asserted facts are
+  * sent to the new listener.
+  */
 void
 RuleEngine::attach( IFactListener &a_listener )
 {
@@ -390,11 +428,10 @@ RuleEngine::attach( IFactListener &a_listener )
 }
 
 
-/**
- * @param a_listener - Listener to detach
- *
- * Detaches an IFactListener instance from this RuleEngine.
- */
+/** \param a_listener - Listener to detach
+  *
+  * Detaches an IFactListener instance from this RuleEngine.
+  */
 void
 RuleEngine::detach( IFactListener &a_listener )
 {
@@ -404,6 +441,10 @@ RuleEngine::detach( IFactListener &a_listener )
 }
 
 
+/** \param a_listener - Listener to receive signals
+  *
+  * Sends all currently asserted facts to specified listener.
+  */
 void
 RuleEngine::sendAsserted( IFactListener &a_listener )
 {
@@ -414,6 +455,12 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
     }
 }
 
+
+/** \param a_id - ID of rule to define
+  * \param a_expression - Expression of new rule
+  *
+  * Defines a new rule. Throws if ID is in use or expression is invalid.
+  */
 void
 RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression )
 {
@@ -421,20 +468,9 @@ RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression
 
     try
     {
-        string id( boost::to_upper_copy( a_id ));
-        string expr = a_expression;
-        boost::algorithm::trim( id );
-        boost::algorithm::trim( expr );
+        rule = new Rule( *this, a_id, a_expression );
 
-        if ( idInUse( id ))
-            throw std::runtime_error( "Rule ID is already in use." );
-
-        rule = new Rule( *this, id, expr );
-
-        if ( isCircular( rule ))
-            throw std::runtime_error( "Circular rule definition" );
-
-        m_rules[rule->m_id] = rule;
+        m_rules[rule->getID()] = rule;
 
         rule->evaluate();
     }
@@ -473,7 +509,7 @@ RuleEngine::undefineRule( const std::string &a_rule_id )
     map<string,Rule*>::iterator r = m_rules.find( a_rule_id );
     if ( r != m_rules.end())
     {
-        retract( r->second->m_rule_fact );
+        retract( r->second->getFact() );
         delete( r->second );
         m_rules.erase( r );
     }
@@ -488,7 +524,7 @@ RuleEngine::undefineAllRules()
 {
     for ( map<string,Rule*>::iterator r = m_rules.begin(); r != m_rules.end(); ++r )
     {
-        retract( r->second->m_rule_fact );
+        retract( r->second->getFact() );
         delete( r->second );
     }
 
@@ -504,7 +540,7 @@ RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
     for ( map<string,Rule*>::const_iterator r = m_rules.begin(); r != m_rules.end(); ++r )
     {
         info.fact = r->first;
-        info.expr = r->second->m_expr;
+        info.expr = r->second->getExpr();
         a_rules.push_back( info );
     }
 }
@@ -793,52 +829,6 @@ RuleEngine::idInUse( const std::string &a_id ) const
 }
 
 
-/**
- * @param a_rule - Rule to test
- *
- * Tests if the specified Rule is part of a circular definition.
- */
-bool
-RuleEngine::isCircular( Rule *a_rule )
-{
-    return isCircular( a_rule, getFact( a_rule->m_id ));
-}
-
-
-/**
- * @param a_target_rule - Rule to test for
- * @param a_rule - Current rule to evaluate
- *
- * Recursive function that traverses the rule graph seeking circular definitions.
- */
-bool
-RuleEngine::isCircular( Rule *a_target_rule, Rule *a_rule )
-{
-    // If we land on the target rule, then there is a circular definition
-    if ( a_target_rule == a_rule )
-        return true;
-
-    // On a rule node, only follow forward fact dependencies (which is the rule-fact only)
-    return isCircular( a_target_rule, getFact( a_rule->m_id ));
-}
-
-/**
- * @param a_target_rule - Rule to test for
- * @param a_fact - Current fact to evaluate
- *
- * Recursive function that traverses the rule graph seeking circular definitions.
- */
-bool
-RuleEngine::isCircular( Rule *a_target_rule, Fact *a_fact )
-{
-
-    // On Fact node, follow all rule dependencies
-    for ( vector<Rule*>::iterator r = a_fact->m_rule_deps.begin(); r != a_fact->m_rule_deps.end(); ++r )
-        if ( isCircular( a_target_rule, *r ))
-            return true;
-
-    return false;
-}
 
 
 /**

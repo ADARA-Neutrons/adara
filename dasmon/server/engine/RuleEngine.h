@@ -11,6 +11,7 @@
 
 #undef assert
 
+
 /** \class RuleEngine
   *
   * The RuleEngine class implements a lightweight, single-threaded "business rule engine" or
@@ -151,10 +152,18 @@ private:
     class Rule
     {
     public:
-                        Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr );
-                       ~Rule();
-        void            evaluate( Fact *a_updated_fact = 0 );
+                                    Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr );
+                                   ~Rule();
+        void                        evaluate( Fact *a_updated_fact = 0 );
+        inline const std::string&   getID() { return m_id; }
+        inline const std::string&   getExpr() { return m_expr; }
+        inline Fact*                getFact() { return m_rule_fact; }
+
+    private:
         static double  *parserVarFactory( const char *a_var_name, void *a_data );
+        bool            isCircular( Rule *a_rule );
+        bool            isCircular( Rule *a_target_rule, Rule *a_rule );
+        bool            isCircular( Rule *a_target_rule, Fact *a_fact );
 
         struct FactInfo
         {
@@ -183,9 +192,6 @@ private:
     };
 
     bool        idInUse( const std::string &a_id ) const;
-    bool        isCircular( Rule *a_rule );
-    bool        isCircular( Rule *a_target_rule, Rule *a_rule );
-    bool        isCircular( Rule *a_target_rule, Fact *a_fact );
     void        assert( Fact *a_fact );
     void        assert( Fact *a_fact, Value &a_value );
     void        retract( Fact *a_fact );

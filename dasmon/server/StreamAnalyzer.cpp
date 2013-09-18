@@ -20,14 +20,14 @@ namespace DASMON {
 #define METRICS_BATCH_MASK  0x0002
 #define CONN_BATCH_MASK     0x0004
 
-/**
- * \brief StreamAnalyser constructor.
- * \param a_monitor - StreamMonitor that will feed this analyzer
- * \param a_cfg_dir - Path to configuration files
- *
- * Constructs a new StreamAnalyzer and attaches to the specified monitor. Rule
- * configuration file is loaded and rule engine setup.
- */
+
+/** \brief StreamAnalyser constructor.
+  * \param a_monitor - StreamMonitor that will feed this analyzer
+  * \param a_cfg_dir - Path to configuration files
+  *
+  * Constructs a new StreamAnalyzer and attaches to the specified monitor. Rule
+  * configuration file is loaded and rule engine setup.
+  */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
       m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0), m_ok(true)
@@ -57,6 +57,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_PULSE_CHARGE]        = "PULSE_CHARGE";
     m_fact_name[BIF_PULSE_FREQ]          = "PULSE_FREQ";
     m_fact_name[BIF_STREAM_RATE]         = "STREAM_RATE";
+    m_fact_name[BIF_RUN_TIME]            = "RUN_TIME";
     m_fact_name[BIF_RUN_TOTAL_CHARGE]    = "RUN_TOTAL_CHARGE";
     m_fact_name[BIF_RUN_TOTAL_COUNTS]    = "RUN_TOTAL_COUNTS";
     m_fact_name[BIF_PIX_ERR_COUNT]       = "RUN_PIXEL_ERR_COUNT";
@@ -77,9 +78,9 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
 }
 
 
-/**
- * StreamAnalyzer destructor.
- */
+/** \brief StreamAnalyzer destructor.
+  *
+  */
 StreamAnalyzer::~StreamAnalyzer()
 {
     m_monitor.removeListener( *this );
@@ -87,6 +88,12 @@ StreamAnalyzer::~StreamAnalyzer()
 }
 
 
+/**
+  * This method loads rule and signal definitions from the dasmon configuration
+  * file (dasmond.cfg) in the configuration directory (specified from command
+  * line arg). If errors are found in the config file, they will be logged, but
+  * dasmond will start regardless.
+  */
 void
 StreamAnalyzer::loadConfig()
 {
@@ -95,10 +102,9 @@ StreamAnalyzer::loadConfig()
     SignalInfo                      signal;
     vector<SignalInfo>              loaded_signals;
 
-    //string upper_expr = boost::to_upper_copy( a_expression );
     boost::char_separator<char> sep1(":");
     boost::char_separator<char> sep2(",");
-    boost::tokenizer<boost::char_separator<char> >::iterator tok; // = tokens.begin();
+    boost::tokenizer<boost::char_separator<char> >::iterator tok;
 
     string cfg = m_cfg_dir + "dasmond.cfg";
 
@@ -187,6 +193,10 @@ StreamAnalyzer::loadConfig()
 }
 
 
+/**
+  * This method saves the current rule and signal configuration to the dasmond
+  * config file (dasmond.cfg) in the configuration directory.
+  */
 void
 StreamAnalyzer::saveConfig()
 {
@@ -226,6 +236,11 @@ StreamAnalyzer::saveConfig()
 }
 
 
+/**
+  * This method restores default configuration by copying the default config
+  * file (dasmond_def.cfg) over the current config file (dasmond.cfg), then
+  * reloads the configuration file.
+  */
 void
 StreamAnalyzer::restoreDefaultConfig()
 {
@@ -252,6 +267,10 @@ StreamAnalyzer::restoreDefaultConfig()
 }
 
 
+/**
+  * This method sets the default configuration by copying the current config
+  * file (dasmond.cfg) over the default config file (dasmond_def.cfg).
+  */
 void
 StreamAnalyzer::setDefaultConfig()
 {
@@ -273,6 +292,13 @@ StreamAnalyzer::setDefaultConfig()
     }
 }
 
+
+/** \param a_listener - ISignalListener to attach
+  *
+  * This method attaches a signal listener to the StreamAnalyzer. Asserted
+  * signals are NOT sent to the newly atached listener - an explicit call
+  * must be made for that.
+  */
 void
 StreamAnalyzer::attach( ISignalListener &a_listener )
 {
@@ -283,6 +309,10 @@ StreamAnalyzer::attach( ISignalListener &a_listener )
 }
 
 
+/** \param a_listener - ISignalListener to detach
+  *
+  * This method detaches a signal listener from the StreamAnalyzer.
+  */
 void
 StreamAnalyzer::detach( ISignalListener &a_listener )
 {
@@ -294,58 +324,10 @@ StreamAnalyzer::detach( ISignalListener &a_listener )
 }
 
 
-#if 0
-
-void
-StreamAnalyzer::defineSignal( const std::string &a_expression )
-{
-    boost::char_separator<char> sep(",");
-    boost::tokenizer<boost::char_separator<char> > tokens(a_expression, sep);
-    boost::tokenizer<boost::char_separator<char> >::iterator tok = tokens.begin();
-    SignalInfo info;
-
-    if ( tok == tokens.end())
-        throw "Syntax error";
-
-    info.name = *tok;
-
-    if ( ++tok == tokens.end())
-        throw "Syntax error";
-
-    info.fact = *tok;
-
-    if ( ++tok == tokens.end())
-        throw "Syntax error";
-
-    info.source = *tok;
-
-    if ( ++tok == tokens.end())
-        throw "Syntax error";
-
-    // Level can be a number from 0 to 6, or a symbol
-    try
-    {
-        unsigned short tmp = boost::lexical_cast<unsigned short>( *tok );
-        if ( tmp > 6 )
-            throw "Syntax error (bad level)";
-        info.level = (ADARA::Level)tmp;
-    }
-    catch(...)
-    {
-        // May also throw an exception (which is OK)
-        info.level = ADARA::ComBus::ComBusHelper::toLevel( *tok );
-    }
-
-    if ( ++tok == tokens.end())
-        throw "Syntax error";
-
-    info.msg = *tok;
-
-    m_signals[info.fact] = info;
-}
-#endif
-
-
+/**
+  * This method resends StreamAnalyzer state (asserted signals) to all attached
+  * listeners.
+  */
 void
 StreamAnalyzer::resendState()
 {
@@ -355,6 +337,11 @@ StreamAnalyzer::resendState()
 }
 
 
+/** \param a_rules - Vector to receive rule definitions
+  * \param a_signals - Vector to receive signal definitions
+  *
+  * This method returns the current rule and signal definitions.
+  */
 void
 StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals )
 {
@@ -366,6 +353,16 @@ StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std:
 }
 
 
+/** \param a_rules - New rules to be defined
+  * \param a_signals - New signals to be defined
+  * \param a_errors - Outputs per-rule/signal error messages
+  *
+  * This method attemps to set new rules and signals for the RuleEngine within the
+  * StreamAnalyzer. If any errors are encountered while setting the new rules and
+  * signals, the entire process will fail and the RuleEngine will retain it's state
+  * prior to this call. This call replaces all current rules and signals with the
+  * specified new rules and signals.
+  */
 bool
 StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, const vector<SignalInfo> &a_signals, map<string,string> &a_errors )
 {
@@ -403,14 +400,24 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     std::map<std::string,SignalInfo>  tmp_signals;
     int  i;
+    string sig_fact, tmp;
+
     for ( vector<SignalInfo>::const_iterator sig = a_signals.begin(); sig != a_signals.end(); ++sig )
     {
+        // Rule engine converts facts to upper case and trims spaces
+        sig_fact = boost::to_upper_copy( sig->fact );
+        boost::algorithm::trim( sig_fact );
+
         // The only real check to do here is to ensure referential integrity
         for ( r = a_rules.begin(); r != a_rules.end(); ++r )
         {
-            if ( sig->fact == r->fact )
+            // Rule engine converts facts to upper case and trims spaces
+            tmp = boost::to_upper_copy( r->fact );
+            boost::algorithm::trim( tmp );
+
+            if ( sig_fact == tmp )
             {
-                tmp_signals[sig->fact] = *sig;
+                tmp_signals[sig_fact] = *sig;
                 break;
             }
         }
@@ -420,9 +427,9 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
             // Is this a built-in fact?
             for ( i = 0; i < BIF_COUNT; ++i )
             {
-                if ( m_fact_name[i] == sig->fact )
+                if ( m_fact_name[i] == sig_fact )
                 {
-                    tmp_signals[sig->fact] = *sig;
+                    tmp_signals[sig_fact] = *sig;
                     break;
                 }
             }
@@ -551,6 +558,14 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     return true;
 }
 
+
+/** \param a_map - Signal map to search
+  * \param a_name - Signal name to search for
+  *
+  * This is a support method to search the signal map for a given signal name.
+  * The signal map is indexed by signal fact (rule id) instead of signal name,
+  * so a linear search must be performed.
+  */
 map<string,SignalInfo>::iterator
 StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
 {
@@ -564,7 +579,12 @@ StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
     return i;
 }
 
-
+/** \param a_fact - Set to receive all available facts
+  *
+  * This method returns all available facts (asserted or not) that can be used
+  * in a rule expression. It is acceptable to compose rules that reference
+  * undefined facts as they may be asserted in the future.
+  */
 void
 StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
 {
@@ -589,6 +609,7 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_PULSE_CHARGE]);
     a_facts.insert(m_fact_name[BIF_PULSE_FREQ]);
     a_facts.insert(m_fact_name[BIF_STREAM_RATE]);
+    a_facts.insert(m_fact_name[BIF_RUN_TIME]);
     a_facts.insert(m_fact_name[BIF_RUN_TOTAL_CHARGE]);
     a_facts.insert(m_fact_name[BIF_RUN_TOTAL_COUNTS]);
     a_facts.insert(m_fact_name[BIF_PIX_ERR_COUNT]);
@@ -854,6 +875,7 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    m_engine->assert( m_fact[BIF_RUN_TIME], a_metrics.m_time );
     m_engine->assert( m_fact[BIF_RUN_TOTAL_CHARGE], a_metrics.m_total_charge );
     m_engine->assert( m_fact[BIF_RUN_TOTAL_COUNTS], a_metrics.m_total_counts );
     m_engine->assert( m_fact[BIF_PIX_ERR_COUNT], a_metrics.m_pixel_error_count );

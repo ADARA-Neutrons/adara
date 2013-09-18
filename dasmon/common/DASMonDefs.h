@@ -120,6 +120,7 @@ public:
 
     void clear()
     {
+        m_time                  = 0.0;
         m_total_counts          = 0;
         m_total_charge          = 0.0;
         m_pixel_error_count     = 0;
@@ -129,8 +130,9 @@ public:
         m_missing_rtdl_count    = 0;
     }
 
-    uint32_t        m_total_counts;      ///< Sum of counts over all banks, excluding monitors
-    double          m_total_charge;
+    double          m_time;                 ///< Run time (seconds)
+    uint32_t        m_total_counts;         ///< Sum of counts over all banks, excluding monitors
+    double          m_total_charge;         ///< Accumulated charge
     uint32_t        m_pixel_error_count;
     uint32_t        m_dup_pulse_count;
     uint32_t        m_pulse_veto_count;

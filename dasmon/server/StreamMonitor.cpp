@@ -436,7 +436,7 @@ StreamMonitor::metricsThread()
 
     while( m_process_stream )
     {
-        sleep(2);
+        sleep(1);
 
         // If connected, send beam info and beam metrics
         if ( m_fd_in > -1 )
@@ -752,6 +752,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     m_last_pulse_time = pulse_time;
     m_bank_count_info.addSample( event_count );
     m_run_metrics.m_total_counts += event_count;
+    m_run_metrics.m_time = (pulse_time - m_first_pulse_time)/1000000000.0;
 
     return false;
 }

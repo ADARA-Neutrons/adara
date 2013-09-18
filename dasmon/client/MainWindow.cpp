@@ -459,27 +459,6 @@ MainWindow::onTableTimer()
         }
     }
 
-    // Not a table, but use this timer callback to update duration field on mainwindow
-    if ( m_sms_state.activeTrue() )
-    {
-        uint now = QDateTime::currentDateTime().toTime_t();
-        if (( now + 2 ) >= m_start_time.toTime_t() ) // Allow for 2 seconds of clock skew
-        {
-            uint t = 0;
-            if ( now > m_start_time.toTime_t() )
-                t = now - m_start_time.toTime_t();
-
-            uint hour = t / 3600;
-            uint min = (t % 3600) / 60;
-            uint sec = t % 60;
-            ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
-        }
-        else
-        {
-            ui->durationLabel->setText( "[clock skew]" );
-        }
-    }
-
     if ( m_refresh_pv_table )
     {
         if ( ui->pvTable->rowCount() != (int)m_pvs.size() )
@@ -894,6 +873,11 @@ MainWindow::updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 void
 MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
+    uint hour = a_metrics.m_time / 3600;
+    uint min = ((uint32_t)(a_metrics.m_time) % 3600) / 60;
+    uint sec = (uint32_t)(a_metrics.m_time) % 60;
+    ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
+
     QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_counts )));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_charge )));
     QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
@@ -916,7 +900,7 @@ MainWindow::clearBeamDisplay()
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+    //QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
 

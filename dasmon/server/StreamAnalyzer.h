@@ -73,6 +73,7 @@ private:
         BIF_PULSE_CHARGE,
         BIF_PULSE_FREQ,
         BIF_STREAM_RATE,
+        BIF_RUN_TIME,
         BIF_RUN_TOTAL_CHARGE,
         BIF_RUN_TOTAL_COUNTS,
         BIF_PIX_ERR_COUNT,
