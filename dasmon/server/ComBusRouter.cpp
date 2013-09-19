@@ -196,11 +196,11 @@ ComBusRouter::setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg )
                 m_analyzer.setDefaultConfig();
 
             ADARA::ComBus::AckReply ack;
-            m_combus.send( ack, a_msg->getSourceName(), &a_msg->getCorrelationID());
+            m_combus.send( ack, a_msg->getSourceID(), &a_msg->getCorrelationID());
         }
         else
         {
-            m_combus.send( err_msg, a_msg->getSourceName(), &a_msg->getCorrelationID());
+            m_combus.send( err_msg, a_msg->getSourceID(), &a_msg->getCorrelationID());
         }
     }
 }
@@ -491,7 +491,7 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         // Update time is recorded such that the run() method can detected unresponsive
         // and inactive processes and update status accordingly.
 
-        map<string,ProcInfo>::iterator ip = m_procs.find( a_msg.getSourceName() );
+        map<string,ProcInfo>::iterator ip = m_procs.find( a_msg.getSourceID() );
         if ( ip != m_procs.end() )
         {
             ip->second.status = status;
@@ -499,12 +499,12 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         else
         {
-            m_procs[a_msg.getSourceName()] = ProcInfo( status, status, false, time(0) );
+            m_procs[a_msg.getSourceID()] = ProcInfo( status, status, false, time(0) );
         }
 
         // Inject process and state information into rule engine
 
-        m_analyzer.assertFact( string("PROC_") + a_msg.getSourceName(), (int)status );
+        m_analyzer.assertFact( string("PROC_") + a_msg.getSourceID(), (int)status );
     }
 }
 
@@ -533,7 +533,7 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_RULES:
-            sendRuleDefinitions( a_msg.getSourceName(), a_msg.getCorrelationID() );
+            sendRuleDefinitions( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
@@ -544,15 +544,15 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
             syslog( LOG_INFO, "Received request to restore default rules" );
             m_analyzer.restoreDefaultConfig();
-            sendRuleDefinitions( a_msg.getSourceName(), a_msg.getCorrelationID() );
+            sendRuleDefinitions( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_INPUT_FACTS:
-            sendInputFacts( a_msg.getSourceName(), a_msg.getCorrelationID() );
+            sendInputFacts( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
 
         case ADARA::ComBus::MSG_DASMON_GET_PVS:
-            sendPVs( a_msg.getSourceName(), a_msg.getCorrelationID() );
+            sendPVs( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
 
         default:

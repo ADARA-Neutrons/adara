@@ -28,6 +28,10 @@ using namespace std;
 #define TIMEOUT_STS_UNRESPONSIVE    10
 #define MONITOR_ID_INACTIVE_TIMEOUT 86400 // 24 hours
 #define MONITOR_ID_DATA_TIMEOUT     5
+#define TOPIC_STATUS                "STATUS.>"
+#define TOPIC_SIGNALS               "SIGNAL.>"
+#define TOPIC_DASMON                "APP.DASMON"
+#define TOPIC_STS                   "APP.STS"
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
@@ -132,10 +136,10 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
 
     m_combus->attach( *this );   // Listen to ComBus connection status
     m_combus->setInputListener( *this );
-    m_combus->attach( *this, "STATUS.>" ); // Listen to ADARA process health status (display only)
-    m_combus->attach( *this, "SIGNAL.>" ); // Listen to ADARA signals
-    m_combus->attach( *this, "APP.DASMON.0" ); // Listen to dasmon service
-    m_combus->attach( *this, "APP.STS.>" ); // Listen to (local) STS translation messages
+    m_combus->attach( *this, TOPIC_STATUS ); // Listen to ADARA process health status (display only)
+    m_combus->attach( *this, TOPIC_SIGNALS ); // Listen to ADARA signals
+    m_combus->attach( *this, TOPIC_DASMON ); // Listen to dasmon service
+    m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -573,10 +577,10 @@ MainWindow::configActiveMQ()
         m_init = true;
         ADARA::ComBus::Connection::getInst().setConnection( m_domain, m_broker_uri, m_broker_user, m_broker_pass );
 
-        m_combus->attach( *this, "STATUS.>" );
-        m_combus->attach( *this, "SIGNAL.>" );
-        m_combus->attach( *this, "APP.DASMON.0" );
-        m_combus->attach( *this, "APP.STS.>" ); // Listen to (local) STS translation messages
+        m_combus->attach( *this, TOPIC_STATUS );
+        m_combus->attach( *this, TOPIC_SIGNALS );
+        m_combus->attach( *this, TOPIC_DASMON );
+        m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
     }
 }
 
@@ -1023,7 +1027,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
     {
     case ADARA::ComBus::MSG_STATUS:
         {
-            map<string,ProcInfo>::iterator ip = m_proc_status.find( a_msg.getSourceName() );
+            map<string,ProcInfo>::iterator ip = m_proc_status.find( a_msg.getSourceID() );
             if ( ip != m_proc_status.end())
             {
                 if ( ip->second.status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
@@ -1037,8 +1041,8 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             }
             else
             {
-                ProcInfo &info = m_proc_status[a_msg.getSourceName()];
-                info.name = QString( a_msg.getSourceName().c_str() );
+                ProcInfo &info = m_proc_status[a_msg.getSourceID()];
+                info.name = QString( a_msg.getSourceID().c_str() );
                 info.status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
                 info.label = QString( ADARA::ComBus::ComBusHelper::toText( info.status ));
                 info.hl_count = PV_HIGHLIGH_DURATION;
@@ -1046,11 +1050,11 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 m_refresh_proc_table = true;
             }
 
-            if ( a_msg.getSourceName().compare( 0, 3, "STS" ) == 0 )
+            if ( a_msg.getSourceID().compare( 0, 3, "STS" ) == 0 )
             {
                 for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
                 {
-                    if ( ts->second.sts_pid == a_msg.getSourceName() )
+                    if ( ts->second.sts_pid == a_msg.getSourceID() )
                     {
                         if ( ts->second.run_status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
                         {
@@ -1072,7 +1076,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
             if ( m_log_entries.size() == 1000 )
                 m_log_entries.pop_front();
-            m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSourceName().c_str())
+            m_log_entries.push_back( QString("%1 [%2:%3] %4 ").arg(logmsg.getTimestamp()).arg(logmsg.getSourceID().c_str())
                                      .arg(logmsg.getLevelText().c_str()).arg(logmsg.m_msg.c_str()));
             m_refresh_log_table = true;
         }
@@ -1204,7 +1208,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             TransStatus status;
             status.running = true;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceName();
+            status.sts_pid = msg.getSourceID();
             status.run_status = ADARA::ComBus::STATUS_OK;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1219,7 +1223,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceName();
+            status.sts_pid = msg.getSourceID();
             status.trans_status = STS::TS_SUCCESS;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1234,7 +1238,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceName();
+            status.sts_pid = msg.getSourceID();
             status.trans_status = msg.m_code;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;

@@ -14,22 +14,21 @@ namespace ADARA {
 namespace ComBus {
 
 
-//////////////////////////////////////////////////////////////////////////////
-// ComBus Translator Class
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//================= Translator Class ==================================================================================
+
 
 Connection::Translator::Translator( ITopicListener &a_listener )
     : m_listener(&a_listener), m_handler(0)
 {
-    m_proc_name = Connection::getInst().m_proc_name;
-    m_inst_num = Connection::getInst().m_inst_num;
+    m_proc_id = Connection::getInst().m_proc_id;
 }
 
 
 Connection::Translator::Translator( IInputListener &a_handler )
     : m_listener(0), m_handler(&a_handler)
 {
-    m_proc_name = Connection::getInst().m_proc_name;
-    m_inst_num = Connection::getInst().m_inst_num;
+    m_proc_id = Connection::getInst().m_proc_id;
 }
 
 
@@ -39,6 +38,12 @@ Connection::Translator::~Translator() throw()
 }
 
 
+/** \param a_msg - Received activemq message
+  *
+  * This method translates the received message into a ComBus message and
+  * routes it to the appropriate interface based on mode of translator
+  * (listener or input handler).
+  */
 void
 Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 {
@@ -53,10 +58,15 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
     {
         MessageBase *msg = Connection::makeMessage( *txtmsg );
 
-        // Route message to appropriate interface based on mode of translator
+        // Generic ComBus messages are always broadcast, so are never directed
+        // at a particular process. If filtering is desired, it must be
+        // performed by the receiving process (in the comBusMessage callback).
+        // Input messages are always directed at a particular process, so no
+        // filtering is required.
+
         if ( m_listener )
             m_listener->comBusMessage( *msg );
-        else if ( msg->getMessageCategory() == CAT_INPUT )
+        else if ( msg->getMessageCategory() == CAT_INPUT && msg->getDestID() == m_proc_id )
             m_handler->comBusInputMessage( *msg );
 
         delete msg;
@@ -127,17 +137,17 @@ Connection::Translator::disconnect_all()
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//================= Connection Class ==================================================================================
 
-//////////////////////////////////////////////////////////////////////////////
-// ComBus Connection Class
 
 Connection * Connection::g_inst = 0;
 
 
-Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, uint32_t a_inst_num,
+Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, uint32_t a_proc_inst,
                          const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
                          const std::string &a_log_dir )
-  : m_running(true), m_connected(false), m_domain(a_domain), m_proc_name(a_proc_name), m_inst_num(a_inst_num),
+  : m_running(true), m_connected(false), m_domain(a_domain), m_proc_name(a_proc_name), m_proc_inst(a_proc_inst),
     m_input_listener(0), m_input_translator(0),
     m_broker_uri(a_broker_uri), m_broker_user(a_user), m_broker_pass(a_pass),
     m_connection(0), m_session(0), m_reconnect_thread(0), m_status_thread(0)
@@ -163,9 +173,9 @@ Connection::Connection(  const std::string &a_domain, const std::string &a_proc_
     if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
         m_domain += ".";
 
-    m_proc_name += string(".") + boost::lexical_cast<string>(a_inst_num);
+    m_proc_id += m_proc_name + "." + boost::lexical_cast<string>(m_proc_inst);
 
-    m_log_file += a_log_dir + "/ComBus.Log." + m_proc_name + "." + boost::lexical_cast<string>(a_inst_num) + ".txt";
+    m_log_file += a_log_dir + "/ComBus.Log." + m_proc_id + ".txt";
 
     activemq::library::ActiveMQCPP::initializeLibrary();
 
@@ -466,7 +476,7 @@ Connection::broadcast( MessageBase &a_msg )
 
         try
         {
-            a_msg.setRoutingInfo( m_proc_name, time(0) );
+            a_msg.setRoutingInfo( m_proc_id, "", time(0) );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
@@ -515,7 +525,7 @@ Connection::broadcast( MessageBase &a_msg )
  * life cycle (i.e. how long correlation IDs and associated state information is maintained).
  */
 bool
-Connection::send( MessageBase &a_msg, const std::string &a_dest_proc, const std::string *a_correlation_id )
+Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const std::string *a_correlation_id )
 {
     bool res = false;
 
@@ -523,43 +533,49 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc, const std:
     {
         cms::TextMessage *cmsmsg = 0;
 
-        try
+        size_t pos = a_dest_proc_id.find_first_of('.');
+        if ( pos != string::npos )
         {
-            a_msg.setRoutingInfo( m_proc_name, time(0), a_correlation_id );
-
-            cmsmsg = m_session->createTextMessage();
-            a_msg.serialize( *cmsmsg );
-
-            map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( a_dest_proc );
-            if ( itop == m_producer_topics.end())
+            try
             {
-                // First message sent on this topic, create producer and put in "cache"
-                pair<cms::Topic*,cms::MessageProducer*> p;
-                p.first = m_session->createTopic( m_domain + "INPUT." + a_dest_proc );
-                p.second = m_session->createProducer( p.first );
-                m_producer_topics[a_dest_proc] = p;
+                a_msg.setRoutingInfo( m_proc_id, a_dest_proc_id, time(0), a_correlation_id );
 
-                p.second->send( cmsmsg );
+                cmsmsg = m_session->createTextMessage();
+                a_msg.serialize( *cmsmsg );
+
+                string dest_proc_name( a_dest_proc_id.substr( 0, pos ));
+
+                map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( dest_proc_name );
+                if ( itop == m_producer_topics.end())
+                {
+                    // First message sent on this topic, create producer and put in "cache"
+                    pair<cms::Topic*,cms::MessageProducer*> pr;
+                    pr.first = m_session->createTopic( m_domain + "INPUT." + dest_proc_name );
+                    pr.second = m_session->createProducer( pr.first );
+                    m_producer_topics[dest_proc_name] = pr;
+
+                    pr.second->send( cmsmsg );
+                }
+                else
+                {
+                    itop->second.second->send( cmsmsg );
+                }
+
+                // If the correl ID is requested (not set or empty), use the current message ID (receiver will use same)
+                if ( !a_correlation_id || a_correlation_id->empty() )
+                {
+                    a_msg.setCorrelationID( cmsmsg->getCMSMessageID() );
+                }
+
+                delete cmsmsg;
+                res = true;
             }
-            else
+            catch(...)
             {
-                itop->second.second->send( cmsmsg );
+                // An exception indicates a loss of connection
+                delete cmsmsg;
+                disconnect();
             }
-
-            // If the correl ID is requested (not set or empty), use the current message ID (receiver will use same)
-            if ( !a_correlation_id || a_correlation_id->empty() )
-            {
-                a_msg.setCorrelationID( cmsmsg->getCMSMessageID() );
-            }
-
-            delete cmsmsg;
-            res = true;
-        }
-        catch(...)
-        {
-            // An exception indicates a loss of connection
-            delete cmsmsg;
-            disconnect();
         }
     }
 

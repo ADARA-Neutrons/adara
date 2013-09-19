@@ -61,7 +61,7 @@ public:
 
     std::string getFormattedMessage( bool a_debug_info ) const
     {
-        std::string formatted_msg = getSourceName() + ":" + ComBusHelper::toText(m_level)
+        std::string formatted_msg = getSourceID() + ":" + ComBusHelper::toText(m_level)
                     + " [" + boost::lexical_cast<std::string>(getTimestamp()) + "] "
                     + m_msg;
 //        std::string formatted_msg = getSourceName() + "." + boost::lexical_cast<std::string>(getSourceInstance()) + ":" + ComBusHelper::toText(m_level)

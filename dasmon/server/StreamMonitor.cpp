@@ -11,7 +11,7 @@
 #include "Utils.h"
 #include <syslog.h>
 
-#define DIAGNOSTICS
+//#define DIAGNOSTICS
 
 // Only count pulses with pixel errors - not individual pixel errors
 #define PIX_ERR_BY_PULSE

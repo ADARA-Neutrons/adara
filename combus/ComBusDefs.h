@@ -249,9 +249,13 @@ public:
         throw std::runtime_error("bad message category");
     }
 
-    /// Gets source process name (include process ID suffix)
-    inline const std::string &getSourceName() const
-    { return m_src_name; }
+    /// Gets source process ID
+    inline const std::string &getSourceID() const
+    { return m_src_id; }
+
+    /// Gets destination process ID
+    inline const std::string &getDestID() const
+    { return m_dest_id; }
 
     /// Gets correlation ID of message
     inline const std::string& getCorrelationID() const
@@ -276,7 +280,8 @@ protected:
         // message receive code such that the appropriate message class can be
         // constructed prior to calling read().
 
-        m_src_name = a_prop_tree.get( "src_name", "" );
+        m_src_id = a_prop_tree.get( "src_id", "" );
+        m_dest_id = a_prop_tree.get( "dest_id", "" );
         m_correlation_id = a_prop_tree.get( "correl_id", "" );
         m_timestamp = a_prop_tree.get( "timestamp", 0UL );
     }
@@ -292,7 +297,8 @@ protected:
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         a_prop_tree.put( "msg_type", getMessageType() );
-        a_prop_tree.put( "src_name", m_src_name );
+        a_prop_tree.put( "src_id", m_src_id );
+        a_prop_tree.put( "dest_id", m_dest_id );
         if ( !m_correlation_id.empty())
             a_prop_tree.put( "correl_id", m_correlation_id );
         a_prop_tree.put( "timestamp", m_timestamp );
@@ -304,9 +310,10 @@ private:
       * \param a_timestamp - Time message was/will be sent
       * \param a_correlation_id - Optional correlation ID (unique string)
       */
-    void setRoutingInfo( const std::string &a_src_name, unsigned long a_timestamp, const std::string *a_correlation_id = 0 )
+    void setRoutingInfo( const std::string &a_src_id, const std::string &a_dest_id, unsigned long a_timestamp, const std::string *a_correlation_id = 0 )
     {
-        m_src_name = a_src_name;
+        m_src_id = a_src_id;
+        m_dest_id = a_dest_id;
         m_timestamp = a_timestamp;
         if ( a_correlation_id )
             m_correlation_id = *a_correlation_id;
@@ -322,7 +329,8 @@ private:
         m_correlation_id = a_correlation_id;
     }
 
-    std::string         m_src_name;         ///< Name (with proc ID) of sender
+    std::string         m_src_id;           ///< Name (with proc ID) of sender
+    std::string         m_dest_id;          ///< Name (with proc ID) of destination
     std::string         m_correlation_id;   ///< Identifier used to (re)associate messages
     unsigned long       m_timestamp;        ///< Unix time when message was sent
 
