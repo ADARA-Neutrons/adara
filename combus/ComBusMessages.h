@@ -6,15 +6,21 @@
 namespace ADARA {
 namespace ComBus {
 
-
+/// Requests a process to (re)emit its status (StatusCode)
 DEF_SIMPLE_MSG(EmitStatusCommand,MSG_EMIT_STATUS)
+/// Requests a process to (re)emit it's state (application defined)
 DEF_SIMPLE_MSG(EmitStateCommand,MSG_EMIT_STATE)
+/// Requests a process to reinitialize (configuration has changed)
 DEF_SIMPLE_MSG(ReinitCommand,MSG_REINIT)
+/// Requests a process to shutdown
 DEF_SIMPLE_MSG(ShutdownCommand,MSG_SHUTDOWN)
+/// Generic acknowledge message
 DEF_SIMPLE_MSG(AckReply,MSG_ACK)
+/// Generic negative acknowledge message
 DEF_SIMPLE_MSG(NackReply,MSG_NACK)
 
 
+/// Logging not currently used
 class ConfigureLoggingCommand: public TemplMessageBase<MSG_CONFIG_LOGGING,ConfigureLoggingCommand>
 {
 public:
@@ -47,7 +53,7 @@ protected:
     }
 };
 
-
+/// Logging is not currently used
 class LogMessage : public TemplMessageBase<MSG_LOG,LogMessage>
 {
 public:
@@ -111,7 +117,7 @@ protected:
 };
 
 
-/** \brief Used to broadcast process status on STATUS topic
+/** \brief The StatusMessage class is used to broadcast process status on the STATUS topic.
   *
   */
 class StatusMessage : public TemplMessageBase<MSG_STATUS,StatusMessage>
@@ -144,7 +150,7 @@ protected:
 };
 
 
-/** \brief Used to broadcast a signal retracted alert on SIGNAL topic
+/** \brief The SignalRetractMessage message is used to broadcast a signal retracted notice on the SIGNAL topic.
   *
   */
 class SignalRetractMessage : public TemplMessageBase<MSG_SIGNAL_RETRACTED,SignalRetractMessage>
