@@ -190,6 +190,7 @@ public:
                     { m_notify.removeListener( a_listener ); }
     void            resendState( IStreamListener &a_listener ) const;
     bool            isOK() const { return m_ok; }
+    void            enableDiagnostics( bool a_diagnostics ) { m_diagnostics = a_diagnostics; }
 
 private:
     class Notifier : public IStreamListener
@@ -280,6 +281,10 @@ private:
     bool                            m_ok;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
+    bool                            m_diagnostics;
+    uint32_t                        m_last_cycle;
+    uint64_t                        m_last_time;
+    uint64_t                        m_this_time;
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;

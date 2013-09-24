@@ -21,6 +21,9 @@ namespace DASMON {
 #define CONN_BATCH_MASK     0x0004
 
 
+// Public Methods ------------------------------------------------------------
+
+
 /** \brief StreamAnalyser constructor.
   * \param a_monitor - StreamMonitor that will feed this analyzer
   * \param a_cfg_dir - Path to configuration files
@@ -324,9 +327,7 @@ StreamAnalyzer::detach( ISignalListener &a_listener )
 }
 
 
-/**
-  * This method resends StreamAnalyzer state (asserted signals) to all attached
-  * listeners.
+/** \brief Resends StreamAnalyzer state (asserted signals) to all attached listeners.
   */
 void
 StreamAnalyzer::resendState()
@@ -559,26 +560,6 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 }
 
 
-/** \param a_map - Signal map to search
-  * \param a_name - Signal name to search for
-  *
-  * This is a support method to search the signal map for a given signal name.
-  * The signal map is indexed by signal fact (rule id) instead of signal name,
-  * so a linear search must be performed.
-  */
-map<string,SignalInfo>::iterator
-StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
-{
-    map<string,SignalInfo>::iterator i;
-    for ( i = a_map.begin(); i != a_map.end(); ++i )
-    {
-        if ( i->second.name == a_name )
-            break;
-    }
-
-    return i;
-}
-
 /** \param a_fact - Set to receive all available facts
   *
   * This method returns all available facts (asserted or not) that can be used
@@ -633,13 +614,91 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     }
 }
 
+
+/** \brief This method asserts a fact (void type) by name
+  * \param a_fact - Name of fact to assert
+  *
+  * This method is provided for use by other classes to assert a fact into the
+  * rule engine contained within the StreamAnalyzer class.
+  */
+void
+StreamAnalyzer::assertFact( const std::string &a_fact )
+{
+    m_engine->assert( a_fact );
+}
+
+
+/** \brief This method asserts a fact by name
+  * \param a_fact - Name of fact to assert
+  * \param a_value - New value of fact
+  *
+  * This method is provided for use by other classes to assert a fact with a
+  * value into the rule engine contained within the StreamAnalyzer class.
+  */
+template<class T>
+void
+StreamAnalyzer::assertFact( const std::string &a_fact, T a_value )
+{
+    m_engine->assert<T>( a_fact, a_value );
+}
+
+
+/** \brief This method retracts a fact by name
+  * \param a_fact - Name of fact to retract
+  *
+  * This method is provided for use by other classes to retract a fact from the
+  * rule engine contained within the StreamAnalyzer class.
+  */
+void
+StreamAnalyzer::retractFact( const std::string &a_fact )
+{
+    m_engine->retract( a_fact );
+}
+
+template void StreamAnalyzer::assertFact<bool>( const string &a_id, bool a_value );
+template void StreamAnalyzer::assertFact<char>( const string &a_id, char a_value );
+template void StreamAnalyzer::assertFact<int8_t>( const string &a_id, int8_t a_value );
+template void StreamAnalyzer::assertFact<uint8_t>( const string &a_id, uint8_t a_value );
+template void StreamAnalyzer::assertFact<int16_t>( const string &a_id, int16_t a_value );
+template void StreamAnalyzer::assertFact<uint16_t>( const string &a_id, uint16_t a_value );
+template void StreamAnalyzer::assertFact<int32_t>( const string &a_id, int32_t a_value );
+template void StreamAnalyzer::assertFact<uint32_t>( const string &a_id, uint32_t a_value );
+template void StreamAnalyzer::assertFact<float>( const string &a_id, float a_value );
+template void StreamAnalyzer::assertFact<double>( const string &a_id, double a_value );
+
+
+// Private Methods ------------------------------------------------------------
+
+
+/** \param a_map - Signal map to search
+  * \param a_name - Signal name to search for
+  *
+  * This is a support method to search the signal map for a given signal name.
+  * The signal map is indexed by signal fact (rule id) instead of signal name,
+  * so a linear search must be performed.
+  */
+map<string,SignalInfo>::iterator
+StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
+{
+    map<string,SignalInfo>::iterator i;
+    for ( i = a_map.begin(); i != a_map.end(); ++i )
+    {
+        if ( i->second.name == a_name )
+            break;
+    }
+
+    return i;
+}
+
+
 /** \brief This method debounces fact "noise" at run boundaries
   *
-  * When a run is started or stopped, many facts in the rule engine must be retracted due
-  * to PVs being redefined. The PVs that are unchanged will be asserted again very quickly
-  * and would causes the associated rules or signals to flicker. To avoid this, the rule
-  * engine is place in batch mode on run transition, and this thread is used to end the
-  * batch mode after a specified debounce time.
+  * When a run is started or stopped, many facts in the rule engine must be
+  * retracted due to PVs being redefined. The PVs that are unchanged will be
+  * asserted again very quickly and would causes the associated rules or signals
+  * to flicker. To avoid this, the rule engine is place in batch mode on run
+  * transition, and this thread is used to end the batch mode after a specified
+  * debounce time.
   */
 void
 StreamAnalyzer::runDebounceThread()
@@ -661,6 +720,13 @@ StreamAnalyzer::runDebounceThread()
 }
 
 
+/** \brief This method starts batch mode for the rule engine
+  * \param a_mask - Bitmask for batch context
+  *
+  * This method starts batch mode and applies a batch context mask. If multiple
+  * contexts have started batch mode, batch mode will not be stopped until all
+  * contexts have stopped.
+  */
 void
 StreamAnalyzer::beginBatch( uint32_t a_mask )
 {
@@ -671,6 +737,13 @@ StreamAnalyzer::beginBatch( uint32_t a_mask )
 }
 
 
+/** \brief This method stops batch mode for the rule engine
+  * \param a_mask - Bitmask for batch context
+  *
+  * This method stops batch mode and removes the batch context mask. If multiple
+  * contexts have started batch mode, batch mode will not be stopped until all
+  * contexts have stopped.
+  */
 void
 StreamAnalyzer::endBatch( uint32_t a_mask )
 {
@@ -684,40 +757,20 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
 }
 
 
-void
-StreamAnalyzer::assertFact( const std::string &a_fact )
-{
-    m_engine->assert( a_fact );
-}
-
-template<class T>
-void
-StreamAnalyzer::assertFact( const std::string &a_fact, T a_value )
-{
-    m_engine->assert<T>( a_fact, a_value );
-}
-
-void
-StreamAnalyzer::retractFact( const std::string &a_fact )
-{
-    m_engine->retract( a_fact );
-}
-
-template void StreamAnalyzer::assertFact<bool>( const string &a_id, bool a_value );
-template void StreamAnalyzer::assertFact<char>( const string &a_id, char a_value );
-template void StreamAnalyzer::assertFact<int8_t>( const string &a_id, int8_t a_value );
-template void StreamAnalyzer::assertFact<uint8_t>( const string &a_id, uint8_t a_value );
-template void StreamAnalyzer::assertFact<int16_t>( const string &a_id, int16_t a_value );
-template void StreamAnalyzer::assertFact<uint16_t>( const string &a_id, uint16_t a_value );
-template void StreamAnalyzer::assertFact<int32_t>( const string &a_id, int32_t a_value );
-template void StreamAnalyzer::assertFact<uint32_t>( const string &a_id, uint32_t a_value );
-template void StreamAnalyzer::assertFact<float>( const string &a_id, float a_value );
-template void StreamAnalyzer::assertFact<double>( const string &a_id, double a_value );
-
-//////////////////////////////////////////////
-// IStreamListener
+// IStreamListener Interface --------------------------------------------------
 
 
+/** \brief Callback for run status updates
+  * \param a_recording - When true, indicates system is recording
+  * \param a_run_number - Run number of recording (0 when no recording)
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called by the StreamMonitor instance whenever the system
+  * starts or stops recording a run. The recording state and run number are
+  * asserted and retracted accordingly. Beam and run info are retracted when
+  * a run stops, and PVs are retracted at both starts and stops as the SMS
+  * resends device descriptors after each transition.
+  */
 void
 StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
@@ -774,6 +827,12 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
 }
 
 
+/** \brief Callback for pause status updates
+  * \param a_paused - When true, indicates system is paused
+  *
+  * This method is called by the StreamMonitor instance whenever the system
+  * is paused or resumes. The pause state is asserted and retracted accordingly.
+  */
 void
 StreamAnalyzer::pauseStatus( bool a_paused )
 {
@@ -790,6 +849,14 @@ StreamAnalyzer::pauseStatus( bool a_paused )
 }
 
 
+/** \brief Callback for scan status updates
+  * \param a_scanning - When true, indicates scanning is in progress
+  * \param a_scan_index - Scan index (when scanning)
+  *
+  * This method is called by the StreamMonitor instance whenever the system
+  * starts or stops a scan. The scan status and index are asserted when
+  * a scan starts and retracted when a scan stops.
+  */
 void
 StreamAnalyzer::scanStatus( bool a_scanning, uint32_t a_scan_index )
 {
@@ -808,6 +875,14 @@ StreamAnalyzer::scanStatus( bool a_scanning, uint32_t a_scan_index )
 }
 
 
+/** \brief Callback for updated beam info.
+  * \param a_info - Updated beam information
+  *
+  * This method is called on run starts and stops by the StreamMonitor instance
+  * to update stream listeners with beam information. This presence of
+  * individual items (being non-empty) is asserted into the rule engine as a
+  * flag.
+  */
 void
 StreamAnalyzer::beamInfo( const ADARA::DASMON::BeamInfo &a_info )
 {
@@ -824,6 +899,14 @@ StreamAnalyzer::beamInfo( const ADARA::DASMON::BeamInfo &a_info )
 }
 
 
+/** \brief Callback for updated run info.
+  * \param a_info - Updated run information
+  *
+  * This method is called on run starts and stops by the StreamMonitor instance
+  * to update stream listeners with run information. This presence of
+  * individual items (being non-empty) is asserted into the rule engine as a
+  * flag.
+  */
 void
 StreamAnalyzer::runInfo( const ADARA::DASMON::RunInfo &a_info )
 {
@@ -848,11 +931,21 @@ StreamAnalyzer::runInfo( const ADARA::DASMON::RunInfo &a_info )
 }
 
 
+/** \brief Callback for updated beam metrics.
+  * \param a_metrics - Updated beam metrics
+  *
+  * This method is called periodically by the StreamMonitor instance to update
+  * stream listeners with various beam metrics. Metrics are asserted into the
+  * rule engine (in batch mode to prevent flicker due to retracting monitor
+  * count rates).
+  */
 void
 StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    // Batch mode is needed beause monitor rates must be retracted first to
+    // clear-out stale values.
     beginBatch( METRICS_BATCH_MASK );
 
     m_engine->assert( m_fact[BIF_COUNT_RATE], a_metrics.m_count_rate );
@@ -870,6 +963,13 @@ StreamAnalyzer::beamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics )
 }
 
 
+/** \brief Callback for updated run metrics.
+  * \param a_metrics - Updated run metrics
+  *
+  * This method is called periodically by the StreamMonitor instance to update
+  * stream listeners with various run metrics. Metrics are asserted into the
+  * rule engine.
+  */
 void
 StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 {
@@ -886,6 +986,11 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 }
 
 
+/** \brief Callback to indicate PV has been defined
+  * \param a_pv_name - Name of defined PV
+  *
+  * This method is called when a PV is defined. Not currently used.
+  */
 void
 StreamAnalyzer::pvDefined( const std::string &a_name )
 {
@@ -893,17 +998,33 @@ StreamAnalyzer::pvDefined( const std::string &a_name )
 }
 
 
+/** \brief Callback to indicate PV has been undefined
+  * \param a_pv_name - Name of undefined PV
+  *
+  * This method is called when a PV is undefined. Associated facts are
+  * retracted and general limit/error facts are updated.
+  */
 void
-StreamAnalyzer::pvUndefined( const std::string &a_name )
+StreamAnalyzer::pvUndefined( const std::string &a_pv_name )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    string pv_name = boost::to_upper_copy( a_name );
+    string pv_name = boost::to_upper_copy( a_pv_name );
 
     m_engine->retract( m_pv_prefix + pv_name );
     processPvStatus( pv_name, VariableStatus::OK, true ); // Needed to clean-up PV errors & limits
 }
 
 
+/** \brief Callback to update the value and status of a integer PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status is
+  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
+  * with associated value. Status is processed by a call to porcessPVStatus().
+  */
 void
 StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
@@ -921,13 +1042,23 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
 }
 
 
+/** \brief Callback to update the value and status of a double PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status is
+  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
+  * with associated value. Status is processed by a call to porcessPVStatus().
+  */
 void
-StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_pv_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    string pv_name = boost::to_upper_copy( a_name );
+    string pv_name = boost::to_upper_copy( a_pv_name );
 
     if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
         m_engine->retract( m_pv_prefix + pv_name );
@@ -938,39 +1069,48 @@ StreamAnalyzer::pvValue( const std::string &a_name, double a_value, VariableStat
 }
 
 
+/** \brief Updates facts based on PV limits and errors
+  * \param a_pv_name - Name of PV to update from
+  * \param a_status - Status code associated with PV
+  * \param a_retracted - Indicates PV has been undefined
+  *
+  * This method updates the assertion state of the limit and error facts
+  * associated with a PV based on the provided PV status. This method also
+  * updates the GENERAL_PV_ERROR and GENERAL_PV_LIMIT facts as needed.
+  */
 void
-StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_status, bool a_retracted )
+StreamAnalyzer::processPvStatus( const string &a_pv_name, VariableStatus::Enum a_status, bool a_retracted )
 {
     if ( !a_retracted && a_status != VariableStatus::OK )
     {
         // TODO Surely there is a better way to define PV status so code like the following can be avoided?
         if (( a_status >= VariableStatus::HIHI_LIMIT && a_status <= VariableStatus::LOW_LIMIT ) || a_status == VariableStatus::HARDWARE_LIMIT )
         {
-            m_engine->assert( m_pv_lim_prefix + pv_name, (uint32_t)PV_LIMIT );
+            m_engine->assert( m_pv_lim_prefix + a_pv_name, (uint32_t)PV_LIMIT );
 
             if ( m_limit_pvs.empty())
                 m_engine->assert( m_fact[BIF_GENERAL_PV_LIMIT] );
 
-            m_limit_pvs.insert( pv_name );
+            m_limit_pvs.insert( a_pv_name );
         }
         else
         {
-            m_engine->assert( m_pv_err_prefix + pv_name, (uint32_t)PV_ERROR );
+            m_engine->assert( m_pv_err_prefix + a_pv_name, (uint32_t)PV_ERROR );
 
             if ( m_error_pvs.empty())
                 m_engine->assert( m_fact[BIF_GENERAL_PV_ERROR] );
 
-            m_error_pvs.insert( pv_name );
+            m_error_pvs.insert( a_pv_name );
         }
     }
     else
     {
         // Did this PV previously have an error or limit status?
         // If so, clean-up associated facts
-        set<string>::iterator ipv = m_error_pvs.find( pv_name );
+        set<string>::iterator ipv = m_error_pvs.find( a_pv_name );
         if ( ipv != m_error_pvs.end() )
         {
-            m_engine->retract( m_pv_err_prefix + pv_name );
+            m_engine->retract( m_pv_err_prefix + a_pv_name );
 
             m_error_pvs.erase( ipv );
             if ( m_error_pvs.empty())
@@ -978,10 +1118,10 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
         }
         else
         {
-            ipv = m_limit_pvs.find( pv_name );
+            ipv = m_limit_pvs.find( a_pv_name );
             if ( ipv != m_limit_pvs.end() )
             {
-                m_engine->retract( m_pv_lim_prefix + pv_name );
+                m_engine->retract( m_pv_lim_prefix + a_pv_name );
 
                 m_limit_pvs.erase( ipv );
                 if ( m_limit_pvs.empty())
@@ -992,6 +1132,17 @@ StreamAnalyzer::processPvStatus( const string &pv_name, VariableStatus::Enum a_s
 }
 
 
+/** \brief Callback to update SMS connection state
+  * \param a_connected - True if connected; false otherwise
+  * \param a_host - New SMS hostname
+  * \param a_port - New SMS port number
+  *
+  * This method is a callback from the StreamMonitor to indicate changes in the
+  * connection state with the SMS. When the connection is made, a
+  * "SMS_CONNECTED" fact is asserted into the rule engine. When the connection
+  * is lost, all asserted facts are retracted (the SMS is the source for all
+  * facts).
+  */
 void
 StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
@@ -1010,8 +1161,15 @@ StreamAnalyzer::connectionStatus( bool a_connected, const std::string &a_host, u
     }
 }
 
-// IFactListener Interface
+// IFactListener Interface ----------------------------------------------------
 
+/** \param a_fact - Name of fact that was asserted
+  *
+  * This method is a callback from the RuleEngine indicating that the specified
+  * fact has been asserted. If a signal is associated with the given fact, then
+  * the StreamAnalyzer notifies all signal listeners that the associated signal
+  * is also asserted.
+  */
 void
 StreamAnalyzer::onAssert( const std::string &a_fact )
 {
@@ -1024,6 +1182,13 @@ StreamAnalyzer::onAssert( const std::string &a_fact )
 }
 
 
+/** \param a_fact - Name of fact that was retracted
+  *
+  * This method is a callback from the RuleEngine indicating that the specified
+  * fact was retracted. If a signal is associated with the given fact, then the
+  * StreamAnalyzer notifies all signal listeners that the associated signal is
+  * also retracted.
+  */
 void
 StreamAnalyzer::onRetract( const std::string &a_fact )
 {

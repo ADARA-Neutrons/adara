@@ -3,11 +3,15 @@ noinst_PROGRAMS += dasmon/server/dasmond
 
 dasmon_server_dasmond_SOURCES = dasmon/server/main.cpp dasmon/server/StreamAnalyzer.cpp \
         dasmon/server/StreamMonitor.cpp dasmon/server/ComBusRouter.cpp \
-        combus/ComBus.cpp common/RuleEngine.cpp $(COMMON_PARSER)
+        combus/ComBus.cpp dasmon/server/engine/RuleEngine.cpp \
+        dasmon/server/engine/muParser.cpp dasmon/server/engine/muParserTokenReader.cpp \
+        dasmon/server/engine/muParserError.cpp dasmon/server/engine/muParserCallback.cpp \
+        dasmon/server/engine/muParserBytecode.cpp dasmon/server/engine/muParserBase.cpp \
+        $(COMMON_PARSER)
 
 # TODO pick up the libxml2 include from autoconf/pkgconfig
 dasmon_server_dasmond_CPPFLAGS = -I/usr/include/libxml2 -I/usr/include/activemq-cpp-3.4.0 \
-        -I/usr/include/apr-1 -Idasmon/common -Icombus $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
+        -I/usr/include/apr-1 -Idasmon/common -Icombus -Idasmon/server/engine $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
 
 # TODO clean this up to compile with these warnings enabled
 dasmon_server_dasmond_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable

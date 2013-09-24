@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("nodiag", "Disable low-level stream diagnostics (test only)")
 #ifndef NO_DB
             ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
             ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
@@ -97,6 +98,9 @@ int main(int argc, char *argv[])
 #else
         StreamMonitor   monitor( sms_host, sms_port );
 #endif
+        if ( opt_map.count( "nodiag" ))
+            monitor.enableDiagnostics(false);
+
         StreamAnalyzer  analyzer( monitor, config_dir );
         ComBusRouter    router( monitor, analyzer );
 

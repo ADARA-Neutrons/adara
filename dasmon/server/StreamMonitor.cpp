@@ -11,7 +11,6 @@
 #include "Utils.h"
 #include <syslog.h>
 
-//#define DIAGNOSTICS
 
 // Only count pulses with pixel errors - not individual pixel errors
 #define PIX_ERR_BY_PULSE
@@ -44,7 +43,7 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
       m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
-      m_stream_rate(0), m_ok(true)
+      m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0)
 #ifndef NO_DB
      ,m_db_info(a_db_info)
 #endif
@@ -639,39 +638,38 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
-#ifdef DIAGNOSTICS
-    static uint32_t last_cycle = 0;
-    static uint64_t last_time = 0;
-    static uint64_t this_time = 0;
-    static bool inited = false;
-
-    if ( inited )
+    if ( m_diagnostics )
     {
-        if ((( last_cycle < 599 ) && ( a_pkt.cycle() != last_cycle + 1 )) ||
-            ( last_cycle == 599 && a_pkt.cycle() != 0 ))
+        if ( m_last_time )
         {
-            syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) last_cycle, (unsigned long) a_pkt.cycle() );
+            if ((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
+                ( m_last_cycle == 599 && a_pkt.cycle() != 0 ))
+            {
+                syslog( LOG_ERR, "Cycle error" );
+                //syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) last_cycle, (unsigned long) a_pkt.cycle() );
+            }
+
+            m_this_time = timespec_to_nsec(a_pkt.timestamp());
+            if ( m_last_time > m_this_time )
+            {
+                syslog( LOG_ERR, "Pulse time went backwards" );
+                //syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( last_time - this_time ));
+            }
+            else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
+            {
+                syslog( LOG_ERR, "Pulse time interval is inaccurate" );
+                //syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( this_time - last_time ));
+            }
+
+            m_last_time = m_this_time;
+        }
+        else
+        {
+            m_last_time = timespec_to_nsec(a_pkt.timestamp());
         }
 
-        this_time = timespec_to_nsec(a_pkt.timestamp());
-        if ( last_time > this_time )
-        {
-            syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( last_time - this_time ));
-        }
-        else if ( fabs((this_time-last_time) - 16666666.0 ) > 1000000 )
-        {
-            syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( this_time - last_time ));
-        }
+        m_last_cycle = a_pkt.cycle();
     }
-    else
-    {
-        this_time = timespec_to_nsec(a_pkt.timestamp());
-    }
-
-    last_cycle = a_pkt.cycle();
-    last_time = this_time;
-    inited = true;
-#endif
 
     // Parse banked event packet to calulate pulse info, event count, and event rate
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();

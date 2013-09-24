@@ -235,11 +235,17 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// IStreamListener Interface
+// IStreamListener Interface --------------------------------------------------
 
-/**
+
+/** \brief Callback for run status updates
+  * \param a_recording - When true, indicates system is recording
+  * \param a_run_number - Run number of recording (0 when no recording)
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
   *
+  * This method is called by the StreamMonitor instance whenever the system
+  * starts or stops recording a run. The received information is broadcast
+  * in a RunStatusMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
@@ -258,8 +264,13 @@ ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_tim
     m_recording = a_recording;
 }
 
-/**
+
+/** \brief Callback for pause status updates
+  * \param a_paused - When true, indicates system is paused
   *
+  * This method is called by the StreamMonitor instance whenever the system
+  * is paused or resumes. The received information is broadcast in a
+  * PauseStatusMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::pauseStatus( bool a_paused )
@@ -268,8 +279,14 @@ ComBusRouter::pauseStatus( bool a_paused )
     m_combus.broadcast( msg );
 }
 
-/**
+
+/** \brief Callback for scan status updates
+  * \param a_scanning - When true, indicates scanning is in progress
+  * \param a_scan_index - Scan index (when scanning)
   *
+  * This method is called by the StreamMonitor instance whenever the system
+  * starts or stops a scan. The received information is broadcast in a
+  * ScanStatusMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::scanStatus( bool a_scanning, uint32_t a_scan_number )
@@ -278,8 +295,13 @@ ComBusRouter::scanStatus( bool a_scanning, uint32_t a_scan_number )
     m_combus.broadcast( msg );
 }
 
-/**
+
+/** \brief Callback for updated beam info.
+  * \param a_info - Updated beam information
   *
+  * This method is called on run starts and stops by the StreamMonitor instance
+  * to update stream listeners with beam information. The received information
+  * is broadcast in a BeamInfoMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::beamInfo( const BeamInfo &a_info )
@@ -288,8 +310,13 @@ ComBusRouter::beamInfo( const BeamInfo &a_info )
     m_combus.broadcast( msg );
 }
 
-/**
+
+/** \brief Callback for updated run info.
+  * \param a_info - Updated run information
   *
+  * This method is called on run starts and stops by the StreamMonitor instance
+  * to update stream listeners with run information. The received information
+  * is broadcast in a RunInfoMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::runInfo( const RunInfo &a_info )
@@ -298,8 +325,13 @@ ComBusRouter::runInfo( const RunInfo &a_info )
     m_combus.broadcast( msg );
 }
 
-/**
+
+/** \brief Callback for updated beam metrics.
+  * \param a_metrics - Updated beam metrics
   *
+  * This method is called periodically by the StreamMonitor instance to update
+  * stream listeners with various beam metrics. The received information
+  * is broadcast in a BeamMetricsMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
@@ -308,8 +340,13 @@ ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
     m_combus.broadcast( msg );
 }
 
-/**
+
+/** \brief Callback for updated run metrics.
+  * \param a_metrics - Updated run metrics
   *
+  * This method is called periodically by the StreamMonitor instance to update
+  * stream listeners with various run metrics. The received information
+  * is broadcast in a RunMetricsMessage on the APP.DASMON topic.
   */
 void
 ComBusRouter::runMetrics( const RunMetrics &a_metrics )
@@ -405,8 +442,7 @@ ComBusRouter::connectionStatus( bool a_connected, const std::string &a_host, uns
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ISignalListener Interface
+// ISignalListener Interface --------------------------------------------------
 
 
 /** \param a_signal - Information structure for signal that was asserted
@@ -437,8 +473,7 @@ ComBusRouter::signalRetract( const std::string &a_name )
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// IStatusListener Interface
+// IStatusListener Interface --------------------------------------------------
 
 /** \param a_connected - Flag indicating ComBus connection state
   *
@@ -464,8 +499,7 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ITopicListener methods
+// ITopicListener methods -----------------------------------------------------
 
 /** /param a_msg - Received ComBus message
   *
@@ -509,8 +543,7 @@ ComBusRouter::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 }
 
 
-///////////////////////////////////////////////////////////////////////////////
-// IInputListener methods
+// IInputListener methods -----------------------------------------------------
 
 
 /** \param a_msg - A received ComBus message
@@ -568,7 +601,5 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
         syslog( LOG_ERR, "Unkown exception while processing command" );
     }
 }
-
-
 
 }}
