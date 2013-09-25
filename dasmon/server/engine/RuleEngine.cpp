@@ -283,28 +283,17 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
     {
         // All required inputs are asserted, OK to evaluate expression
 
-        //cout << "Eval rule " << m_id;
         if ( m_parser.Eval() > 0.5 )
         {
             // Expression evaluated as "fired" (output is 1)
-            //cout << " FIRED";
             if ( !m_rule_fact->m_asserted || m_rule_fact->m_value.m_real_value != m_rule_value )
-            {
-                //cout << " asserting" << endl;
                 m_engine.assert( m_rule_fact, m_rule_value );
-            }
-            //else cout << endl;
         }
         else
         {
             // Expression evaluated as "not fired" (output is 0)
-            //cout << " DUD";
             if ( m_rule_fact->m_asserted )
-            {
-                //cout << " retracting" << endl;
                 m_engine.retract( m_rule_fact );
-            }
-            //else cout << endl;
         }
     }
 }
@@ -516,9 +505,8 @@ RuleEngine::undefineRule( const std::string &a_rule_id )
 }
 
 
-/**
- * Undefines (removes) all currently defined rules and retracts all associated facts.
- */
+/** \brief Undefines (removes) all currently defined rules and retracts all associated facts.
+  */
 void
 RuleEngine::undefineAllRules()
 {
@@ -532,6 +520,9 @@ RuleEngine::undefineAllRules()
 }
 
 
+/** \brief Retrieves all currently defined rules.
+  * \param a_rules - Receives rule definitions
+  */
 void
 RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
 {
@@ -546,11 +537,9 @@ RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
 }
 
 
-/**
- * @param
- *
- *
- */
+/** \brief Asserts a void type fact by identifier
+  * \param a_id - Identifier of fact
+  */
 void
 RuleEngine::assert( const std::string &a_id )
 {
@@ -576,17 +565,14 @@ RuleEngine::assert( const std::string &a_id )
 }
 
 
-/**
- * @param
- *
- *
- */
+/** \brief Asserts a numeric type fact by identifier
+  * \param a_id - Identifier of fact
+  * \param a_value - Value of fact
+  */
 template<class T>
 void
 RuleEngine::assert( const std::string &a_id, T a_value )
 {
-    //cout << "engine.assert(str) " << a_id << endl;
-
     Value value(a_value);
 
     // If fact is not in fact space, then there are no dependencies no it yet
@@ -657,9 +643,8 @@ RuleEngine::retractPrefix( const std::string &a_prefix )
 }
 
 
-/**
- * This method retracts all user-asserted facts (rule asserted facts may remain asserted)
- */
+/** \brief Retracts all user-asserted facts (rule asserted facts may remain asserted)
+  */
 void
 RuleEngine::retractAllFacts()
 {
@@ -671,6 +656,9 @@ RuleEngine::retractAllFacts()
 }
 
 
+/** \brief Retrieves all asserted facts
+  * \param a_asserted_facts - Receives IDs of asserted facts
+  */
 void
 RuleEngine::getAsserted( std::vector<std::string> &a_asserted_facts )
 {
@@ -683,6 +671,15 @@ RuleEngine::getAsserted( std::vector<std::string> &a_asserted_facts )
 }
 
 
+/** \brief Gets a handle to a fact
+  * \param a_id - Identifier of fact
+  * \return Fact handle
+  *
+  * This method retrieves a handle to a fact given the fact identifier. Handles
+  * to rule output facts can not be returned (an exception will be thrown if
+  * tried). Using handles for external assertion/retraction is faster than
+  * using identifiers.
+  */
 RuleEngine::HFACT
 RuleEngine::getFactHandle( const std::string &a_id )
 {
@@ -693,12 +690,21 @@ RuleEngine::getFactHandle( const std::string &a_id )
     throw std::runtime_error("Fact associated with a rule.");
 }
 
+
+/** \brief Gets a fact identifier given fact handle
+  * \param a_fact - Handle of fact
+  * \return Fact identifier
+  */
 std::string
 RuleEngine::getNameHFACT( HFACT a_fact ) const
 {
     return ((Fact*)a_fact)->m_id;
 }
 
+
+/** \brief Asserts a fact given a fact handle
+  * \param a_fact - Handle of fact to assert
+  */
 void
 RuleEngine::assert( HFACT a_fact )
 {
@@ -706,6 +712,11 @@ RuleEngine::assert( HFACT a_fact )
         assert( ((Fact*)a_fact) );
 }
 
+
+/** \brief Asserts a fact with a value given a fact handle
+  * \param a_fact - Handle of fact to assert
+  * \param a_value - New value of fact
+  */
 template<class T>
 void
 RuleEngine::assert( HFACT a_fact, T a_value )
@@ -727,12 +738,17 @@ template void RuleEngine::assert<uint32_t>( HFACT a_fact, uint32_t a_value );
 template void RuleEngine::assert<float>( HFACT a_fact, float a_value );
 template void RuleEngine::assert<double>( HFACT a_fact, double a_value );
 
+
+/** \brief Retracts a fact given a fact handle
+  * \param a_fact - Handle of fact to retract
+  */
 void
 RuleEngine::retract( HFACT a_fact )
 {
     if ( ((Fact*)a_fact)->m_asserted )
         retract( ((Fact*)a_fact) );
 }
+
 
 /**
  * This method initiates batch-mode. During batch mode, facts may be asserted or retracted, and rules
@@ -807,8 +823,8 @@ RuleEngine::endBatch()
 
 // ================================ Private Methods ===================================================================
 
-/**
-  * @param a_id - ID to test
+/** \brief Tests if fact/rule identifier is in use
+  * \param a_id - ID to test
   *
   * Tests to determine if the specified ID is in use as a rule or fact ID. If a fact
   * exists, but was implicitly defined, it is not considered in-use.
@@ -831,17 +847,15 @@ RuleEngine::idInUse( const std::string &a_id ) const
 
 
 
-/**
- * @param a_fact - Fact to be asserted
- *
- * This is an internal fact assert method. Dependencies are traced and forward rules re-evaluated.
- * Note that this method des not check if the specified fact is already asserted (this is an optimization).
- */
+/** \brief Asserts a fact given Fact instance
+  * \param a_fact - Fact to be asserted
+  *
+  * This is an internal fact assert method. Dependencies are traced and forward rules re-evaluated.
+  * Note that this method des not check if the specified fact is already asserted (this is an optimization).
+  */
 void
 RuleEngine::assert( Fact *a_fact )
 {
-    //cout << "assert " << a_fact->m_id << " ()" << endl;
-
     a_fact->m_asserted = true;
     a_fact->m_implicit = false;
     a_fact->m_value.m_type = VT_VOID;
@@ -852,18 +866,16 @@ RuleEngine::assert( Fact *a_fact )
 }
 
 
-/**
- * @param a_fact - Fact to be asserted
- * @param a_value - Value to be asserted
- *
- * This is an internal fact assert method. Dependencies are traced and forward rules re-evaluated.
- * Note that this method des not check if the specified fact is already asserted (this is an optimization).
- */
+/** \brief Asserts a fact with a value given Fact instance
+  * \param a_fact - Fact to be asserted
+  * \param a_value - Value to be asserted
+  *
+  * This is an internal fact assert method. Dependencies are traced and forward rules re-evaluated.
+  * Note that this method des not check if the specified fact is already asserted (this is an optimization).
+  */
 void
 RuleEngine::assert( Fact *a_fact, Value &a_value )
 {
-    //cout << "assert " << a_fact->m_id << " (" << a_value << ")" << endl;
-
     a_fact->m_asserted = true;
     a_fact->m_implicit = false;
     a_fact->m_value = a_value;
@@ -873,17 +885,15 @@ RuleEngine::assert( Fact *a_fact, Value &a_value )
 }
 
 
-/**
- * @param a_fact - Fact to be retracted
- *
- * This is an internal fact retract method. Dependencies are traced and forward rules re-evaluated.
- * Note that this method des not check if the specified fact is already retracted (this is an optimization).
- */
+/** \brief Retracts a fact given Fact instance
+  * \param a_fact - Fact to be retracted
+  *
+  * This is an internal fact retract method. Dependencies are traced and forward rules re-evaluated.
+  * Note that this method des not check if the specified fact is already retracted (this is an optimization).
+  */
 void
 RuleEngine::retract( Fact *a_fact )
 {
-    //cout << "retract " << a_fact->m_id << endl;
-
     a_fact->m_asserted = false;
 
     notify_retract( a_fact );
@@ -891,11 +901,11 @@ RuleEngine::retract( Fact *a_fact )
 }
 
 
-/**
- * @param a_id - ID of Fact to retieve
- *
- * This method finds, or creates if not found, the specified fact.
- */
+/** \brief Retrieves a Fact instance given identifier
+  * \param a_id - ID of Fact to retieve
+  *
+  * This method finds, or creates if not found, the specified fact.
+  */
 RuleEngine::Fact*
 RuleEngine::getFact( const std::string &a_id )
 {
@@ -916,11 +926,13 @@ RuleEngine::getFact( const std::string &a_id )
 }
 
 
-/**
- * @param a_fact - The ancestor fact that has been updated
- *
- * This is a dependency-driven rule-update method.
- */
+/** \brief Updates rules dependent on given fact
+  * \param a_fact - A fact that has been updated
+  *
+  * This method recursively updates all rules that are dependent on the
+  * specified fact. If dependent rule output facts change state, then their
+  * dependencies are also updated.
+  */
 void
 RuleEngine::update( Fact *a_fact )
 {
@@ -929,15 +941,15 @@ RuleEngine::update( Fact *a_fact )
 }
 
 
-/**
- * @param a_fact - Asserted Fact to notify listeners about
- *
- * This method notifies listeners of a newly asserted fact.
- */
+/** \brief Notify listeners of fact assertion
+  * \param a_fact - Asserted Fact
+  *
+  * This method notifies listeners of a newly asserted fact. If batch mode is
+  * active, assertion is buffered for later use.
+  */
 void
 RuleEngine::notify_assert( Fact *a_fact )
 {
-    //cout << "RuleEng assert: " << a_fact->m_id << endl;
     if ( m_batch )
     {
         m_new_facts.insert( a_fact );
@@ -950,16 +962,15 @@ RuleEngine::notify_assert( Fact *a_fact )
 }
 
 
-/**
- * @param a_fact - Retracted Fact to notify listeners about
- *
- * This method notifies listeners of a newly retracted fact.
- */
+/** \brief Notify listeners of fact retraction
+  * \param a_fact - Retracted Fact
+  *
+  * This method notifies listeners of a newly retracted fact. If batch mode is
+  * active, retraction is buffered for later use.
+  */
 void
 RuleEngine::notify_retract( Fact *a_fact )
 {
-    //cout << "RuleEng retract: " << a_fact->m_id << endl;
-
     if ( m_batch )
     {
         m_new_facts.erase( a_fact );
