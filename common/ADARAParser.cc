@@ -135,7 +135,7 @@ bool Parser::parseBuffer(void)
 			new_buffer = new uint8_t[new_size];
 			memcpy(new_buffer, p, m_len);
 
-			delete m_buffer;
+			delete [] m_buffer;
 			m_buffer = new_buffer;
 			m_size = new_size;
 
