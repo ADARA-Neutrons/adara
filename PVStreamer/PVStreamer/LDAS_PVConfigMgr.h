@@ -32,16 +32,12 @@ class LDAS_PVConfigAgent;
 class LDAS_PVConfigMgr : public PVConfig
 {
 public:
-
-    LDAS_PVConfigMgr( PVStreamer & a_streamer );
+    LDAS_PVConfigMgr( PVStreamer & a_streamer, const std::string &a_file );
     ~LDAS_PVConfigMgr();
 
-    void            connectSatCompFile( const std::string &a_file );
-    void            connectHost( const std::string &a_hostname );
-
 private:
-
-    void            parseSatCompFile( const std::string & a_file, std::vector<std::string> &a_hostnames );
+    void            readLDASConfigFile( const std::string & a_file, std::vector<std::string> &a_hostnames );
+    void            connectHost( const std::string &a_hostname );
 
     boost::mutex                                m_agent_mutex;  ///< Mutex used to protect public API
     std::map<std::string,LDAS_PVConfigAgent*>   m_agents;       ///< Active configuration agents
