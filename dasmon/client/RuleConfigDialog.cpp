@@ -386,7 +386,7 @@ RuleConfigDialog::getFacts()
     {
         // Send GetRuleDefinitions message to DASMON service
         ADARA::ComBus::DASMON::GetInputFacts cmd;
-        createRoute( cmd, "DASMON.0" );
+        createRoute( cmd, "DASMON_0" );
     }
 }
 
@@ -407,7 +407,7 @@ RuleConfigDialog::getRules()
         ADARA::ComBus::DASMON::GetRuleDefinitions cmd;
 
         m_comm_status = Getting;
-        if ( createRoute( cmd, "DASMON.0" ))
+        if ( createRoute( cmd, "DASMON_0" ))
         {
             m_last_cid = cmd.getCorrelationID();
             m_com_timer.start( 10000 );
@@ -484,7 +484,7 @@ RuleConfigDialog::setRules( bool a_set_default )
             cmd.m_rules = m_rules;
             cmd.m_signals = m_signals;
 
-            if ( createRoute( cmd, "DASMON.0" ))
+            if ( createRoute( cmd, "DASMON_0" ))
             {
                 m_last_cid = cmd.getCorrelationID();
                 m_comm_status = Setting;
@@ -523,7 +523,7 @@ RuleConfigDialog::getDefaultRules()
         ADARA::ComBus::DASMON::RestoreDefaultRuleDefinitions cmd;
 
         m_comm_status = Getting;
-        if ( createRoute( cmd, "DASMON.0" ))
+        if ( createRoute( cmd, "DASMON_0" ))
         {
             m_last_cid = cmd.getCorrelationID();
             m_com_timer.start( 10000 );

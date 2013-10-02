@@ -302,7 +302,7 @@ MainWindow::onProcTimer()
         if ((( p->second.status == ADARA::ComBus::STATUS_INACTIVE ) && ( t > p->second.last_updated + TIMEOUT_PROC_DEAD_CLEANUP )) ||
             ( t > p->second.last_updated + TIMEOUT_PROC_DEAD ))
         {
-            if ( p->first == "DASMON.0" )
+            if ( p->first == "DASMON_0" )
                 kill_dasmon = true;
 
             writeLog( ADARA::INFO, p->first + " is inactive" );
@@ -548,7 +548,7 @@ void
 MainWindow::onPvTimer()
 {
     ADARA::ComBus::DASMON::GetProcessVariables cmd;
-    m_combus->send( cmd, "DASMON.0" );
+    m_combus->send( cmd, "DASMON_0" );
 }
 
 
@@ -1004,7 +1004,7 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     if ( m_init && a_connected )
     {
         ADARA::ComBus::EmitStateCommand cmd;
-        m_combus->send( cmd, "DASMON.0" );
+        m_combus->send( cmd, "DASMON_0" );
         m_init = false;
     }
 }

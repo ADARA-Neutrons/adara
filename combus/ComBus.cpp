@@ -243,7 +243,7 @@ Connection::Connection(  const std::string &a_domain, const std::string &a_proc_
     if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
         m_domain += ".";
 
-    m_proc_id += m_proc_name + "." + boost::lexical_cast<string>(m_proc_inst);
+    m_proc_id += m_proc_name + "_" + boost::lexical_cast<string>(m_proc_inst);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_id + ".txt";
 
@@ -670,7 +670,7 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const s
     {
         cms::TextMessage *cmsmsg = 0;
 
-        size_t pos = a_dest_proc_id.find_first_of('.');
+        size_t pos = a_dest_proc_id.find_last_of('_');
         if ( pos != string::npos )
         {
             try

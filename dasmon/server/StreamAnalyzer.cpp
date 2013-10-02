@@ -805,12 +805,8 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
     {
         m_engine->assert( m_fact[BIF_RECORDING] );
         m_engine->assert( m_fact[BIF_RUN_NUMBER], a_run_number );
-    }
-    else
-    {
-        m_engine->retract( m_fact[BIF_RECORDING] );
-        m_engine->retract( m_fact[BIF_RUN_NUMBER] );
 
+        // Retract now such that new values (or not) can be asserted from beam and run info packets
         m_engine->retract( m_fact[BIF_FAC_NAME] );
         m_engine->retract( m_fact[BIF_BEAM_ID] );
         m_engine->retract( m_fact[BIF_BEAM_SNAME] );
@@ -823,6 +819,13 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
         m_engine->retract( m_fact[BIF_SAMPLE_FORM] );
         m_engine->retract( m_fact[BIF_SAMPLE_ENV] );
         m_engine->retract( m_fact[BIF_USER_INFO] );
+    }
+    else
+    {
+        m_engine->retract( m_fact[BIF_RECORDING] );
+        m_engine->retract( m_fact[BIF_RUN_NUMBER] );
+
+        //TODO Add retraction of beam and run info when protocol is changed
     }
 }
 
