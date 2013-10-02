@@ -13,7 +13,7 @@ ComBusLite::ComBusLite( const std::string &a_topic_path, const std::string &a_pr
     try
     {
         stringstream ss;
-        ss << a_topic_path << ".STATUS." << a_proc_name << "." << a_proc_id << "?type=topic";
+        ss << a_topic_path << ".STATUS." << a_proc_name << "?type=topic";
         m_topic = ss.str();
 
         // Set reasonable timeouts (defaults are very long)
@@ -51,7 +51,8 @@ ComBusLite::sendStatus( ADARA_STATUS a_status )
             string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
 
             data << "body={\r\n\"msg_type\":\"1073741824\",\r\n";
-            data << "    \"src_name\":\"" << m_proc_name << "." << m_proc_id << "\",\r\n";
+            data << "    \"src_id\":\"" << m_proc_name << "_" << m_proc_id << "\",\r\n";
+            data << "    \"dest_id\":\"0\",\r\n";
             data << "    \"timestamp\":\"" << time(0) << "\",\r\n";
             data << "    \"status\":\"" << a_status << "\"\r\n}";
 
