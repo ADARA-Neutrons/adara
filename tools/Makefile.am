@@ -1,5 +1,6 @@
 
 noinst_PROGRAMS += tools/adara-parser tools/adara-gen tools/adara-pvgen
+noinst_PROGRAMS += tools/adara-dump
 
 tools_adara_parser_SOURCES = tools/adara-parser.cc $(COMMON_PARSER)
 tools_adara_parser_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
@@ -14,3 +15,6 @@ tools_adara_pvgen_SOURCES = tools/adara-pvgen.cc
 tools_adara_pvgen_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
 tools_adara_pvgen_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
 tools_adara_pvgen_LDADD = $(EPICS_LIBS) -lboost_program_options -lpthread
+
+tools_adara_dump_SOURCES = tools/adara-dump.cc $(COMMON_PARSER)
+tools_adara_dump_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)

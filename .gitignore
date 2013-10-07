@@ -9,6 +9,7 @@ common/test/parser-test
 tools/adara-gen
 tools/adara-pvgen
 tools/adara-parser
+tools/adara-dump
 
 sms/smsd
 sms/test/storage-test
