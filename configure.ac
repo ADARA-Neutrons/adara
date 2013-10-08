@@ -14,6 +14,8 @@ dnl AM_PROG_CC_C_O
 AC_SEARCH_LIBS([clock_gettime], [rt])
 AC_SEARCH_LIBS([getaddrinfo_a], [anl], )
 PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
+PKG_CHECK_MODULES([activemq], [activemq-cpp >= 3.4.0])
+PKG_CHECK_MODULES([apr], [apr-1 >= 1.3.9])
 
 tryepicsdir=""
 AC_ARG_WITH(epics,
