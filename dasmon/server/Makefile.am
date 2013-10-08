@@ -9,9 +9,8 @@ dasmon_server_dasmond_SOURCES = dasmon/server/main.cpp dasmon/server/StreamAnaly
         dasmon/server/engine/muParserBytecode.cpp dasmon/server/engine/muParserBase.cpp \
         $(COMMON_PARSER)
 
-# TODO pick up the libxml2 include from autoconf/pkgconfig
-dasmon_server_dasmond_CPPFLAGS = -I/usr/include/libxml2 -Idasmon/common \
-			-Icombus -Idasmon/server/engine \
+dasmon_server_dasmond_CPPFLAGS = -Idasmon/common -Icombus \
+			-Idasmon/server/engine $(libxml_CPPFLAGS) \
 			$(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
 			$(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
 
@@ -19,5 +18,6 @@ dasmon_server_dasmond_CPPFLAGS = -I/usr/include/libxml2 -Idasmon/common \
 dasmon_server_dasmond_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 
 # TODO pick up most of these from autoconf
-dasmon_server_dasmond_LDADD = -lxml2 -lboost_program_options -lboost_thread-mt \
-			-lboost_filesystem -lpq $(activemq_LIBS) $(apr_LIBS)
+dasmon_server_dasmond_LDADD = -lboost_program_options -lboost_thread-mt \
+			-lboost_filesystem -lpq $(activemq_LIBS) $(apr_LIBS) \
+			$(libxml_LIBS)

@@ -15,11 +15,12 @@ EPICS_LIBS = -lcas -lca -lCom -lgdd
 EPICS_LDFLAGS = @EPICS_LDFLAGS@
 EPICS_CPPFLAGS = @EPICS_CPPFLAGS@
 
-# ActiveMQ and APR (on Fedora 19 at least) puts their include path in
+# ActiveMQ, APR, and libxml2 (on Fedora 19 at least) put their include path in
 # CFLAGS instead of CPPFLAGS, so fix that up
 #
 activemq_CPPFLAGS ?= $(activemq_CFLAGS)
 apr_CPPFLAGS ?= $(apr_CFLAGS)
+libxml_CPPFLAGS ?= $(libxml_CFLAGS)
 
 bin_PROGRAMS 	=
 noinst_PROGRAMS =

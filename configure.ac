@@ -16,6 +16,7 @@ AC_SEARCH_LIBS([getaddrinfo_a], [anl], )
 PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
 PKG_CHECK_MODULES([activemq], [activemq-cpp >= 3.4.0])
 PKG_CHECK_MODULES([apr], [apr-1 >= 1.3.9])
+PKG_CHECK_MODULES([libxml], [libxml-2.0 >= 2.7.6])
 
 tryepicsdir=""
 AC_ARG_WITH(epics,
