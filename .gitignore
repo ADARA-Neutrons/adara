@@ -16,6 +16,8 @@ sms/test/storage-test
 
 sts/sts
 
+dasmon/server/dasmond
+
 # All of this crap is from autotools
 #
 .dirstamp
