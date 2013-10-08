@@ -1,6 +1,12 @@
 
-noinst_PROGRAMS += tools/adara-parser tools/adara-gen tools/adara-pvgen
-noinst_PROGRAMS += tools/adara-dump
+noinst_PROGRAMS += tools/adara-parser tools/adara-dump
+
+if BUILD_ADARA_GEN
+noinst_PROGRAMS += tools/adara-gen
+endif
+if BUILD_ADARA_PVGEN
+noinst_PROGRAMS += tools/adara-pvgen
+endif
 
 tools_adara_parser_SOURCES = tools/adara-parser.cc $(COMMON_PARSER)
 tools_adara_parser_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)

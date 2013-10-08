@@ -1,5 +1,7 @@
 
+if BUILD_STS
 bin_PROGRAMS += sts/sts
+endif
 
 sts_sts_SOURCES = sts/main.cpp sts/NxGen.cpp sts/StreamParser.cpp \
     sts/h5nx.cpp sts/ComBusTransMon.cpp combus/ComBus.cpp $(COMMON_PARSER)

@@ -1,6 +1,8 @@
 
+if BUILD_SMS
 bin_PROGRAMS += sms/smsd
 noinst_PROGRAMS += sms/test/storage-test
+endif
 
 sms_smsd_SOURCES = sms/smsd.cc sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/StorageFile.cc sms/DataSource.cc sms/LiveClient.cc \

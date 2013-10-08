@@ -1,5 +1,7 @@
 
+if BUILD_DASMON_SERVER
 noinst_PROGRAMS += dasmon/server/dasmond
+endif
 
 dasmon_server_dasmond_SOURCES = dasmon/server/main.cpp dasmon/server/StreamAnalyzer.cpp \
         dasmon/server/StreamMonitor.cpp dasmon/server/ComBusRouter.cpp \
