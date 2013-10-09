@@ -1,10 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <errno.h>
 #include <iostream>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
-#include "POSIXParser.h"
+#include "ADARAParser.h"
 
 #include <boost/program_options.hpp>
 
@@ -128,9 +129,13 @@ static const char *markerType(ADARA::MarkerType::Enum type)
 	return "UndefinedType";
 }
 
-class Parser : public ADARA::POSIXParser {
+class Parser : public ADARA::Parser {
 public:
-	Parser(bool hex, bool word) : m_hexDump(hex), m_wordDump(word) { }
+	Parser() : m_hexDump(false), m_wordDump(false) { }
+
+	void parse(int argc, char **argv);
+	void parse_file(FILE *);
+	void parse_file(const std::string &);
 
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
@@ -158,7 +163,7 @@ public:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
-	using ADARA::POSIXParser::rxPacket;
+	using ADARA::Parser::rxPacket;
 
 private:
 	bool m_hexDump;
@@ -617,30 +622,111 @@ bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 	return false;
 }
 
-int main(int argc, char **argv)
+void Parser::parse_file(FILE *f)
 {
-        po::options_description desc("Allowed options");
-        desc.add_options()
+	size_t len;
+
+	while (!feof(f)) {
+		len = bufferFillLength();
+		len = fread(bufferFillAddress(), 1, len, f);
+		if (!len) {
+			if (feof(f))
+				return;
+			throw std::string("read error");
+		}
+
+		bufferBytesAppended((unsigned int) len);
+		if (bufferParse(0) < 0)
+			throw std::string("parse error");
+	}
+}
+
+void Parser::parse_file(const std::string &name)
+{
+	FILE *f = fopen(name.c_str(), "rb");
+	if (!f) {
+		int e = errno;
+		std::string msg("unable to open: ");
+		msg += name;
+		msg += ": ";
+		msg += strerror(e);
+		throw msg;
+	}
+
+	try {
+		parse_file(f);
+		fclose(f);
+	} catch (std::string m) {
+		fclose(f);
+
+		std::string msg(name);
+		msg += ": ";
+		msg += m;
+		throw msg;
+	}
+}
+
+void Parser::parse(int argc, char **argv)
+{
+        po::options_description opts("Allowed options");
+        opts.add_options()
                 ("help,h", "Show usage information")
                 ("hexdump,x", "Dump the contents of each packet in hex (bytes)")
                 ("worddump,w", "Dump the contents of each packet in hex (words)");
 
+	po::options_description hidden("Hidden options");
+	hidden.add_options()
+		("file", po::value<std::vector<std::string> >(), "input files");
+
+	po::options_description cmdline_options;
+	cmdline_options.add(opts).add(hidden);
+
+	po::positional_options_description p;
+	p.add("file", -1);
+
         po::variables_map vm;
         try {
-                po::store(po::parse_command_line(argc, argv, desc), vm);
+		po::store(po::command_line_parser(argc, argv).
+			  options(cmdline_options).positional(p).run(), vm);
                 po::notify(vm);
         } catch (po::unknown_option e) {
                 std::cerr << argv[0] << ": " << e.what() << std::endl
-                        << std::endl << desc << std::endl;
+                        << std::endl << opts << std::endl;
                 exit(2);
         }
 
         if (vm.count("help")) {
-                std::cerr << desc << std::endl;
+                std::cerr << opts << std::endl;
                 exit(2);
         }
 
-	Parser parser(vm.count("hexdump"), vm.count("worddump"));
-	parser.read(0);
+	m_hexDump = !!vm.count("hexdump");
+	m_wordDump = !!vm.count("worddump");
+
+	if (!vm.count("file")) {
+		try {
+			parse_file(stdin);
+		} catch (std::string m) {
+			std::cerr << argv[0] << ": stdin: " << m << std::endl;
+			exit(1);
+		}
+	} else {
+		std::vector<std::string> files;
+		std::vector<std::string>::iterator it;
+		files = vm["file"].as<std::vector<std::string> >();
+		try {
+			for (it = files.begin(); it != files.end(); it++)
+				parse_file(*it);
+		} catch (std::string m) {
+			std::cerr << argv[0] << ": " << m << std::endl;
+			exit(1);
+		}
+	}
+}
+
+int main(int argc, char **argv)
+{
+	Parser p;
+	p.parse(argc, argv);
 	return 0;
 }
