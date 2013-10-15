@@ -131,7 +131,10 @@ static const char *markerType(ADARA::MarkerType::Enum type)
 
 class Parser : public ADARA::Parser {
 public:
-	Parser() : m_hexDump(false), m_wordDump(false) { }
+	Parser() :
+		m_hexDump(false), m_wordDump(false), m_showEvents(false),
+		m_showVars(true)
+	{ }
 
 	void parse(int argc, char **argv);
 	void parse_file(FILE *);
@@ -168,6 +171,8 @@ public:
 private:
 	bool m_hexDump;
 	bool m_wordDump;
+	bool m_showEvents;
+	bool m_showVars;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
@@ -240,7 +245,7 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 	       pkt.tofCorrected() ? "" : " (raw)",
 	       (uint64_t) pkt.pulseCharge() * 10, pkt.num_events());
 
-	if (1) {
+	if (m_showEvents) {
 		uint32_t len = pkt.payload_length();
 		uint32_t *p = (uint32_t *) pkt.payload();
 		uint32_t tof, i = 0;
@@ -317,7 +322,7 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 		printf("\n");
 	}
 
-	if (1) {
+	if (m_showEvents) {
 		uint32_t len = pkt.payload_length();
 		uint32_t *p = (uint32_t *) pkt.payload();
 		uint32_t nBanks, nEvents;
@@ -400,7 +405,7 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 		printf("\n");
 	}
 
-	if (1) {
+	if (m_showEvents) {
 		uint32_t len = pkt.payload_length();
 		uint32_t *p = (uint32_t *) pkt.payload();
 		uint32_t nEvents;
@@ -588,37 +593,46 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
-	printf("%u.%09u U32 VARIABLE\n"
-	       "    Device %u Variable %u\n"
-	       "    Status %s Severity %s\n"
-	       "    Value %u\n",
-	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
-	       severityString(pkt.severity()), pkt.value());
+	if (m_showVars) {
+		printf("%u.%09u U32 VARIABLE\n"
+		       "    Device %u Variable %u\n"
+		       "    Status %s Severity %s\n"
+		       "    Value %u\n",
+		       (uint32_t) (pkt.pulseId() >> 32),
+		       (uint32_t) pkt.pulseId(),
+		       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+		       severityString(pkt.severity()), pkt.value());
+	}
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
-	printf("%u.%09u DOUBLE VARIABLE\n"
-	       "    Device %u Variable %u\n"
-	       "    Status %s Severity %s\n"
-	       "    Value %f\n",
-	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
-	       severityString(pkt.severity()), pkt.value());
+	if (m_showVars) {
+		printf("%u.%09u DOUBLE VARIABLE\n"
+		       "    Device %u Variable %u\n"
+		       "    Status %s Severity %s\n"
+		       "    Value %f\n",
+		       (uint32_t) (pkt.pulseId() >> 32),
+		       (uint32_t) pkt.pulseId(),
+		       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+		       severityString(pkt.severity()), pkt.value());
+	}
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
-	printf("%u.%09u String VARIABLE\n"
-	       "    Device %u Variable %u\n"
-	       "    Status %s Severity %s\n"
-	       "    Value '%s'\n",
-	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-	       pkt.devId(), pkt.varId(), statusString(pkt.status()),
-	       severityString(pkt.severity()), pkt.value().c_str());
+	if (m_showVars) {
+		printf("%u.%09u String VARIABLE\n"
+		       "    Device %u Variable %u\n"
+		       "    Status %s Severity %s\n"
+		       "    Value '%s'\n",
+		       (uint32_t) (pkt.pulseId() >> 32),
+		       (uint32_t) pkt.pulseId(),
+		       pkt.devId(), pkt.varId(), statusString(pkt.status()),
+		       severityString(pkt.severity()), pkt.value().c_str());
+	}
 	return false;
 }
 
@@ -670,9 +684,11 @@ void Parser::parse(int argc, char **argv)
 {
         po::options_description opts("Allowed options");
         opts.add_options()
-                ("help,h", "Show usage information")
-                ("hexdump,x", "Dump the contents of each packet in hex (bytes)")
-                ("worddump,w", "Dump the contents of each packet in hex (words)");
+		("help,h", "Show usage information")
+		("hexdump,x", "Dump the contents of each packet in hex (bytes)")
+		("worddump,w", "Dump the contents of each packet in hex (words)")
+		("hidevars,H", "Hide variable update packets")
+		("events,e", "Show events");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -702,6 +718,8 @@ void Parser::parse(int argc, char **argv)
 
 	m_hexDump = !!vm.count("hexdump");
 	m_wordDump = !!vm.count("worddump");
+	m_showEvents = !!vm.count("events");
+	m_showVars = !vm.count("hidevars");
 
 	if (!vm.count("file")) {
 		try {
