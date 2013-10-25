@@ -1,0 +1,28 @@
+<beamline>
+    <devices>
+        <device active="true">
+            <name>Device 1</name>
+            <pv>
+                <name>a</name>
+                <alias>alpha</alias>
+                <log/>
+                <scan/>
+            </pv>
+        </device>
+        <device active="true">
+            <name>Device 2</name>
+            <pv>
+                <name>b</name>
+                <alias>beta</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>c</name>
+                <alias>chi</alias>
+                <log/>
+                <scan/>
+            </pv>
+        </device>
+    </devices>
+</beamline>

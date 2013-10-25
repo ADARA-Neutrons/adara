@@ -1,0 +1,15 @@
+record(ao,"a"){
+  field(DTYP,"Soft Channel")
+  field(VAL,1)
+  field(UDF,1)
+}
+record(ao,"b"){
+  field(DTYP,"Soft Channel")
+  field(VAL,2)
+  field(UDF,1)
+}
+record(ao,"c"){
+  field(DTYP,"Soft Channel")
+  field(VAL,3)
+  field(UDF,1)
+}
