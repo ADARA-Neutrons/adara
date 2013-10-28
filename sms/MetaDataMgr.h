@@ -33,8 +33,7 @@ public:
 	void addFastMetaDDP(const struct timespec &ts, uint32_t mapped_dev,
 			    const std::string &ddp);
 	void updateMappedVariable(uint32_t mapped_dev, uint32_t var,
-				  uint32_t tag, const uint8_t *data,
-				  uint32_t size);
+				  const uint8_t *data, uint32_t size);
 
 	/* Allocate a unique output device identifier for a given input
 	 * source's device.

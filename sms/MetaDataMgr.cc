@@ -266,15 +266,14 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in, uint32_t tag)
 }
 
 void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t var,
-				       uint32_t tag, const uint8_t *data,
-				       uint32_t size)
+				       const uint8_t *data, uint32_t size)
 {
 	/* We need to make a copy of the packet, but can only copy from
 	 * another Packet object, so create a wrapper object then copy it.
 	 */
 	ADARA::Packet pkt(data, sizeof(size));
 	PacketSharedPtr copy(new ADARA::Packet(pkt));
-	updateVariable(mapped_dev, var, copy, tag);
+	updateVariable(mapped_dev, var, copy, 0);
 }
 
 void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
