@@ -452,30 +452,15 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 		ddp += "  </process_variables>\n";
 		ddp += "</device>";
 
-		uint32_t size = (ddp.size() + 3) & ~3;
-		size += 2 * sizeof(uint32_t) + sizeof(ADARA::Header);
-
-		uint32_t pkt[size / sizeof(uint32_t)];
-
-		memset(pkt, 0, sizeof(pkt));
-		pkt[0] = size - sizeof(ADARA::Header);
-		pkt[1] = ADARA::PacketType::DEVICE_DESC_V0;
-		pkt[2] = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
-
 		/* We currently reserve device IDs 0x80000000 for SMS internal
 		 * use. We put the choppers at the low end.
 		 *
 		 * TODO better allocation policy for IDs.
 		 */
-		pkt[4] = 0x80000000 | cid;
-		pkt[5] = ddp.size();
-		memcpy(pkt + 6, ddp.data(), ddp.size());
-
-		/* The MetaDataMgr wants to copy the DDP packet, but needs
-		 * an ADARA packet. Construct an object around our array.
-		 */
-		ADARA::Packet ddp_pkt((uint8_t *) pkt, sizeof(pkt));
-		m_meta->addFastMetaDDP(ddp_pkt, pkt[4], 0);
+		uint32_t cid_dev = 0x80000000 | cid;
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		m_meta->addFastMetaDDP(now, cid_dev, ddp);
 
 		m_choppers.insert(cid);
 	}

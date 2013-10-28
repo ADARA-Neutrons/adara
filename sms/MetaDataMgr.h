@@ -12,6 +12,8 @@
 #include "ADARA.h"
 #include "ADARAPackets.h"
 
+struct timespec;
+
 class MetaDataMgr : public boost::noncopyable {
 public:
 	MetaDataMgr();
@@ -28,8 +30,8 @@ public:
 	 * the remapped device identifier from allocDev() -- they do not
 	 * handle the remapping for the user.
 	 */
-	void addFastMetaDDP(const ADARA::Packet &ddp, uint32_t mapped_dev,
-			    uint32_t tag);
+	void addFastMetaDDP(const struct timespec &ts, uint32_t mapped_dev,
+			    const std::string &ddp);
 	void updateMappedVariable(uint32_t mapped_dev, uint32_t var,
 				  uint32_t tag, const uint8_t *data,
 				  uint32_t size);

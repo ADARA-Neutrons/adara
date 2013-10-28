@@ -167,24 +167,42 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	m_devices[mapped_dev].m_tag = tag;
 }
 
-void MetaDataMgr::addFastMetaDDP(const ADARA::Packet &ddp, uint32_t mapped_dev,
-				 uint32_t tag)
+void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
+				 const std::string &ddp)
 {
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
-
 	if (it != m_devices.end()) {
 		ERROR("addFastMetaDDP() adding existing (mapped) device 0x"
 			<< std::hex << mapped_dev);
 		return;
 	}
 
+	uint32_t size = (ddp.size() + 3) & ~3;
+	size += 2 * sizeof(uint32_t) + sizeof(ADARA::Header);
+
+	/* Build the base DDP packet */
+	uint32_t pkt[size / sizeof(uint32_t)];
+	memset(pkt, 0, sizeof(pkt));
+	pkt[0] = size - sizeof(ADARA::Header);
+	pkt[1] = ADARA::PacketType::DEVICE_DESC_V0;
+	pkt[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	pkt[3] = ts.tv_nsec;
+	pkt[4] = mapped_dev;
+	pkt[5] = ddp.size();
+	memcpy(pkt + 6, ddp.data(), ddp.size());
+
+	/* Wrap our buffered packet in an ADARA packet object so
+	 * we can make a copy to store in our device map.
+	 */
+	ADARA::Packet wrapped_ddp((uint8_t *) pkt, size);
+
 	/* Add the descriptor to the stream before we squirrel it away; this
 	 * keeps us from writing it twice in close proximity if we start
 	 * a new file with it.
 	 */
-	StorageManager::addPacket(ddp.packet(), ddp.packet_length());
-	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(ddp));
-	m_devices[mapped_dev].m_tag = tag;
+	StorageManager::addPacket(pkt, size);
+	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(wrapped_ddp));
+	m_devices[mapped_dev].m_tag = 0;
 }
 
 void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
