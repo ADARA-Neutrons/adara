@@ -372,9 +372,12 @@ int main(int argc, char **argv)
 		LiveServer::init();
 		STSClientMgr::init();
 
-		SMSControl::addSources(conf);
-	} catch (std::exception e) {
+		SMSControl::late_config(conf);
+	} catch (std::runtime_error e) {
 		ERROR("failed to start: " << e.what());
+		exit(1);
+	} catch (...) {
+		ERROR("failed to start -- unknown exception");
 		exit(1);
 	}
 
@@ -385,7 +388,7 @@ int main(int argc, char **argv)
 		StorageManager::lateInit();
 		close_std_files();
 		remove_temp_logger();
-	} catch (std::exception e) {
+	} catch (std::runtime_error e) {
 		ERROR("failed to start: " << e.what());
 		release_parent(CHILD_INIT_FAILED);
 		exit(1);
