@@ -23,6 +23,7 @@ class DataSource;
 class PixelMap;
 class BeamlineInfo;
 class MetaDataMgr;
+class FastMeta;
 class Markers;
 
 class SMSControl : public caServer {
@@ -118,6 +119,7 @@ private:
 		SourceMap				m_sources;
 		MonitorMap				m_monitors;
 		ChopperMap				m_chopperEvents;
+		EventVector				m_fastMetaEvents;
 		uint32_t				m_numEvents;
 		uint32_t				m_numBanks;
 		uint32_t				m_numMonEvents;
@@ -125,7 +127,6 @@ private:
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
 		uint32_t				m_flags;
-		// TODO fast meta updates
 
 		/* We use bank 0 and 1 to store the error bank (-2) and
 		 * unknown mapping bank (-1) respectively, so account
@@ -155,6 +156,7 @@ private:
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
 	boost::shared_ptr<MetaDataMgr> m_meta;
+	boost::shared_ptr<FastMeta> m_fastmeta;
 	boost::shared_ptr<Markers> m_markers;
 	std::set<uint32_t> m_choppers;
 
@@ -188,6 +190,7 @@ private:
 	void buildBankedPacket(PulsePtr &pulse);
 	void buildMonitorPacket(PulsePtr &pulse);
 	void buildChopperPackets(PulsePtr &pulse);
+	void buildFastMetaPackets(PulsePtr &pulse);
 
 	friend class smsRecordingPV;
 };
