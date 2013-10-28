@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<chopper>
+<Device Name="ChopperSystem" AppID="4012">
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/LambdaRequest,LambdaRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/LambdaRequestRem,LambdaRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/EnergyRequest,EnergyRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/EnergyRequestRem,EnergyRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequest[0],SpeedRequest1</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequestRem[0],SpeedRequest1</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequest[1],SpeedRequest2</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequestRem[1],SpeedRequest2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequest[2],SpeedRequest3</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequestRem[2],SpeedRequest3</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequest[3],SpeedRequest4</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://chopper/SpeedRequestRem[3],SpeedRequest4</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Speed[0],Speed1</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Speed[1],Speed2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Speed[2],Speed3</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Speed[3],Speed4</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Phase[0],Phase1</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Phase[1],Phase2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Phase[2],Phase3</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/Phase[3],Phase4</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequest[0],PhaseRequest1</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequest[1],PhaseRequest2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequest[2],PhaseRequest3</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequest[3],PhaseRequest4</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequestRem[0],PhaseRequest1</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequestRem[1],PhaseRequest2</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequestRem[2],PhaseRequest3</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://chopper/PhaseRequestRem[3],PhaseRequest4</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://chopper/Status[0],ChopperStatus1;UNKNOWN,0;FAULT,1;STOPPED,2;ATSPEED,3;LOCKED,4;RAMPING,5</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://chopper/Status[1],ChopperStatus2;UNKNOWN,0;FAULT,1;STOPPED,2;ATSPEED,3;LOCKED,4;RAMPING,5</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://chopper/Status[2],ChopperStatus3;UNKNOWN,0;FAULT,1;STOPPED,2;ATSPEED,3;LOCKED,4;RAMPING,5</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://chopper/Status[3],ChopperStatus4;UNKNOWN,0;FAULT,1;STOPPED,2;ATSPEED,3;LOCKED,4;RAMPING,5</VarMap>
+</Device>
+</chopper>

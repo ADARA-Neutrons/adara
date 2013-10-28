@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<sampleenv>
+
+
+
+	<Device Name="Lakeshore" AppID="1020">
+	<Help>Non at this time</Help>
+	<SN>1</SN>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSreadings[3],SampleTemp</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSTempSetPoint,SampleTempRequest</VarMap>
+		<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSTempSetPointRem,SampleTempRequest</VarMap>
+
+		<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://sampleenv/LKSStatus,SampleTemp_Status;Undefined,0;At_Temp,1;Out_of_temp,2</VarMap>
+
+		<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://sampleenv/LKSTolerance,TolRequest</VarMap>
+		<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://sampleenv/LKSToleranceRem,TolRequest</VarMap>
+
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSRamp,LKSRampRate</VarMap>
+		<VarMap Access="write" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSRampRem,LKSRampRate</VarMap>
+
+
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/LKSCurrentSP,CurrentSP</VarMap>
+	
+		
+	</Device>
+
+
+
+
+
+<Device Name="lakeshore_336" AppID="1025">
+	<Help>Non at this time</Help>
+	<SN>1</SN>
+
+
+
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[0],SensorA</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[1],SensorB</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[2],SensorC</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[3],SensorD</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[4],SP1</VarMap>
+		<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://sampleenv/lakeshore_readings[5],SP2</VarMap>
+
+
+		<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://sampleenv/setpointLP1,SetpointLP1</VarMap>
+		<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://sampleenv/setpointLP1Rem,SetpointLP1</VarMap>
+
+		<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://sampleenv/setpointLP2,SetpointLP2</VarMap>
+		<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://sampleenv/setpointLP2Rem,SetpointLP2</VarMap>
+
+		
+		<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://sampleenv/toleranceLP1,TolLP1</VarMap>
+		<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://sampleenv/toleranceLP1Rem,TolLP1</VarMap>
+		
+		
+		<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://sampleenv/toleranceLP2,TolLP2</VarMap>
+		<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://sampleenv/toleranceLP2Rem,TolLP2</VarMap>
+
+		<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://sampleenv/lakeshore_status1,Loop1_Status;Undefined,0;At_Temp,1;Out_of_temp,2</VarMap>
+
+		<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://sampleenv/lakeshore_status2,Loop2_Status;Undefined,0;At_Temp,1;Out_of_temp,2</VarMap>
+
+	
+	
+		
+	</Device>
+
+
+
+</sampleenv>
