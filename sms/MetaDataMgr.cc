@@ -194,14 +194,20 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	/* Wrap our buffered packet in an ADARA packet object so
 	 * we can make a copy to store in our device map.
 	 */
-	ADARA::Packet wrapped_ddp((uint8_t *) pkt, size);
+	ADARA::Packet wrapped((uint8_t *) pkt, size);
 
 	/* Add the descriptor to the stream before we squirrel it away; this
 	 * keeps us from writing it twice in close proximity if we start
 	 * a new file with it.
+	 *
+	 * We may get called before the StorageManager is fully initialized;
+	 * if we are not currently streaming data, then just store it in
+	 * our tracking structures; we'll put it in the stream when it gets
+	 * started.
 	 */
-	StorageManager::addPacket(pkt, size);
-	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(wrapped_ddp));
+	if (StorageManager::streaming())
+		StorageManager::addPacket(pkt, size);
+	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(wrapped));
 	m_devices[mapped_dev].m_tag = 0;
 }
 
