@@ -29,6 +29,8 @@ namespace po = boost::program_options;
 static uint16_t listen_port = 31416;
 static bool verbose = false;
 static double update_interval = 1.0;
+static uint32_t dev_id = 1;
+static uint32_t var_id = 1;
 
 /* Sigh... EPICS timers only think there is 10ms resolution for the timers
  * on Linux (believing the reported clock rate of 100 Hz), and subtracts
@@ -120,7 +122,7 @@ public:
 		*field++ = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
 		*field++ = 0;
 
-		*field++ = 1;	/* DevId */
+		*field++ = dev_id;
 		*field++ = strlen(desc);
 
 		strcpy((char *) field, desc);
@@ -137,8 +139,8 @@ public:
 		*field++ = u.ts.tv_sec;
 		*field++ = u.ts.tv_nsec;
 
-		*field++ = 1;	/* DevId */
-		*field++ = 1;	/* VarId */
+		*field++ = dev_id;
+		*field++ = var_id;
 		*field++ = 0;	/* Status/Severity */
 		*field = u.value;
 
@@ -355,6 +357,8 @@ static void parse_options(int argc, char **argv)
 		("help,h", "Show usage information")
 		("hz,r", po::value<double>(), "Pulse generation rate")
 		("port,p", po::value<uint16_t>(), "Listening port")
+		("devid,d", po::value<uint32_t>(), "Device ID")
+		("varid,V", po::value<uint32_t>(), "Variable ID")
 		("verbose,v", po::bool_switch(), "Add verbose output");
 
 	po::variables_map vm;
@@ -390,6 +394,10 @@ static void parse_options(int argc, char **argv)
 
 	if (vm.count("port"))
 		listen_port = vm["port"].as<uint16_t>();
+	if (vm.count("devid"))
+		dev_id = vm["devid"].as<uint32_t>();
+	if (vm.count("varid"))
+		var_id = vm["varid"].as<uint32_t>();
 }
 
 static void block_signals(void)
