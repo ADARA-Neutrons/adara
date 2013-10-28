@@ -78,10 +78,21 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		StorageManager::notify();
 }
 
+uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
+{
+	return dev;
+}
+
+uint32_t MetaDataMgr::remapDevice(uint32_t dev, uint32_t tag)
+{
+	return dev;
+}
+
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 				   uint32_t tag)
 {
-	DeviceMap::iterator it = m_devices.find(in.devId());
+	uint32_t mapped_dev = remapDevice(in.devId(), tag);
+	DeviceMap::iterator it = m_devices.find(mapped_dev);
 
 	if (it != m_devices.end()) {
 		/* Device exists already, ignore it if it didn't change. */
@@ -109,23 +120,29 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		m_devices.erase(it);
 	}
 
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
+	ddp.reset(new ADARA::DeviceDescriptorPkt(in));
+	ddp->remapDevice(mapped_dev);
+	PacketSharedPtr pkt(ddp);
+
 	/* Add the descriptor to the stream before we squirrel it away; this
 	 * keeps us from writing it twice in close proximity if we start
 	 * a new file with it.
 	 */
-	StorageManager::addPacket(in.packet(), in.packet_length());
-	m_devices[in.devId()].m_descriptor.reset(new ADARA::Packet(in));
-	m_devices[in.devId()].m_tag = tag;
+	StorageManager::addPacket(pkt->packet(), pkt->packet_length());
+	m_devices[mapped_dev].m_descriptor = pkt;
+	m_devices[mapped_dev].m_tag = tag;
 }
 
-void MetaDataMgr::addFastMetaDDP(const ADARA::Packet &ddp, uint32_t devId,
+void MetaDataMgr::addFastMetaDDP(const ADARA::Packet &ddp, uint32_t mapped_dev,
 				 uint32_t tag)
 {
-	DeviceMap::iterator it = m_devices.find(devId);
+	DeviceMap::iterator it = m_devices.find(mapped_dev);
 
 	if (it != m_devices.end()) {
-		ERROR("addFastMetaDDP() adding existing device 0x"
-			<< std::hex << devId);
+		ERROR("addFastMetaDDP() adding existing (mapped) device 0x"
+			<< std::hex << mapped_dev);
 		return;
 	}
 
@@ -134,12 +151,84 @@ void MetaDataMgr::addFastMetaDDP(const ADARA::Packet &ddp, uint32_t devId,
 	 * a new file with it.
 	 */
 	StorageManager::addPacket(ddp.packet(), ddp.packet_length());
-	m_devices[devId].m_descriptor.reset(new ADARA::Packet(ddp));
-	m_devices[devId].m_tag = tag;
+	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(ddp));
+	m_devices[mapped_dev].m_tag = tag;
+}
+
+void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
+{
+	uint32_t mapped_dev = remapDevice(in.devId(), tag);
+
+	if (!mapped_dev) {
+		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
+			<< ":" << std::hex << in.varId()
+			<< ":" << std::hex << tag);
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::VariableU32Pkt> vup;
+	vup.reset(new ADARA::VariableU32Pkt(in));
+	vup->remapDevice(mapped_dev);
+	PacketSharedPtr pkt(vup);
+
+	updateVariable(mapped_dev, in.varId(), pkt, tag);
+}
+
+void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in, uint32_t tag)
+{
+	uint32_t mapped_dev = remapDevice(in.devId(), tag);
+
+	if (!mapped_dev) {
+		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
+			<< ":" << std::hex << in.varId()
+			<< ":" << std::hex << tag);
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::VariableDoublePkt> vup;
+	vup.reset(new ADARA::VariableDoublePkt(in));
+	vup->remapDevice(mapped_dev);
+	PacketSharedPtr pkt(vup);
+
+	updateVariable(mapped_dev, in.varId(), pkt, tag);
+}
+
+void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in, uint32_t tag)
+{
+	uint32_t mapped_dev = remapDevice(in.devId(), tag);
+
+	if (!mapped_dev) {
+		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
+			<< ":" << std::hex << in.varId()
+			<< ":" << std::hex << tag);
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::VariableStringPkt> vup;
+	vup.reset(new ADARA::VariableStringPkt(in));
+	vup->remapDevice(mapped_dev);
+	PacketSharedPtr pkt(vup);
+
+	updateVariable(mapped_dev, in.varId(), pkt, tag);
+}
+
+void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t var,
+				       uint32_t tag, const uint8_t *data,
+				       uint32_t size)
+{
+	/* We need to make a copy of the packet, but can only copy from
+	 * another Packet object, so create a wrapper object then copy it.
+	 */
+	ADARA::Packet pkt(data, sizeof(size));
+	PacketSharedPtr copy(new ADARA::Packet(pkt));
+	updateVariable(mapped_dev, var, copy, tag);
 }
 
 void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
-				 const ADARA::Packet &in, uint32_t tag)
+				 PacketSharedPtr &in, uint32_t tag)
 {
 	DeviceMap::iterator it = m_devices.find(dev);
 
@@ -176,8 +265,8 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 	if (vit != varmap.end())
 		varmap.erase(vit);
 
-	StorageManager::addPacket(in.packet(), in.packet_length());
-	varmap[var].reset(new ADARA::Packet(in));
+	StorageManager::addPacket(in->packet(), in->packet_length());
+	varmap[var] = in;
 }
 
 void MetaDataMgr::onPrologue(void)
