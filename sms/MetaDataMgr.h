@@ -5,6 +5,7 @@
 #include <boost/signal.hpp>
 #include <boost/smart_ptr.hpp>
 #include <map>
+#include <set>
 
 #include <stdint.h>
 
@@ -52,6 +53,9 @@ private:
 
 	DeviceMap m_devices;
 	boost::signals::connection m_connection;
+	std::map<uint64_t, uint32_t> m_devIdMap;
+	std::set<uint32_t> m_activeDevId;
+	uint32_t m_nextDevId;
 
 	void upstreamDisconnected(VariableMap &vars);
 

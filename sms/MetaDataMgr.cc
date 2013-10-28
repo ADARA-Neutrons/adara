@@ -7,7 +7,7 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
 
-MetaDataMgr::MetaDataMgr()
+MetaDataMgr::MetaDataMgr() : m_nextDevId(1)
 {
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&MetaDataMgr::onPrologue, this));
@@ -76,24 +76,56 @@ void MetaDataMgr::dropTag(uint32_t tag)
 
 	if (dropped)
 		StorageManager::notify();
+
+	/* Remove the mapped device ids for this tag */
+	std::map<uint64_t, uint32_t>::iterator it, end;
+	end = m_devIdMap.end();
+	for (it = m_devIdMap.begin(); it != end; ) {
+		if (it->first >> 32 == tag) {
+			m_activeDevId.erase(it->second);
+			m_devIdMap.erase(it++);
+		} else
+			it++;
+	}
 }
 
 uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
 {
-	return dev;
+	uint64_t key = ((uint64_t) tag << 32) | dev;
+	std::map<uint64_t, uint32_t>::iterator val;
+
+	val = m_devIdMap.find(key);
+	if (val != m_devIdMap.end())
+		return val->second;
+
+	while (m_activeDevId.count(m_nextDevId))
+		m_nextDevId++;
+
+	m_activeDevId.insert(m_nextDevId);
+	m_devIdMap[key] = m_nextDevId;
+	return m_nextDevId++;
 }
 
 uint32_t MetaDataMgr::remapDevice(uint32_t dev, uint32_t tag)
 {
-	return dev;
+	uint64_t key = ((uint64_t) tag << 32) | dev;
+	std::map<uint64_t, uint32_t>::iterator val;
+
+	val = m_devIdMap.find(key);
+	if (val == m_devIdMap.end())
+		return 0;
+	return val->second;
 }
 
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 				   uint32_t tag)
 {
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
-	DeviceMap::iterator it = m_devices.find(mapped_dev);
 
+	if (!mapped_dev)
+		mapped_dev = allocDev(in.devId(), tag);
+
+	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
 		/* Device exists already, ignore it if it didn't change. */
 		DeviceVariables &dev = it->second;
