@@ -62,7 +62,7 @@ public:
 
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
-	static void addSources(const boost::property_tree::ptree &conf);
+	static void late_config(const boost::property_tree::ptree &conf);
 
 private:
 	SMSControl();
@@ -173,6 +173,7 @@ private:
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
+	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
 		       const boost::property_tree::ptree &info);
 	bool setRecording(bool val);

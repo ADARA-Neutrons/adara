@@ -68,11 +68,19 @@ void SMSControl::init(void)
 	m_singleton = new SMSControl();
 }
 
+void SMSControl::late_config(const boost::property_tree::ptree &conf)
+{
+	SMSControl *sms = getInstance();
+	if (!sms)
+		throw std::logic_error("late_config on uninitialized obj");
+
+	sms->addSources(conf);
+}
+
 void SMSControl::addSources(const boost::property_tree::ptree &conf)
 {
 	std::string name, prefix("source ");
 	boost::property_tree::ptree::const_iterator it;
-	SMSControl *sms = getInstance();
 	size_t b, e, plen = prefix.length();
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
@@ -99,7 +107,7 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 			continue;
 		}
 
-		sms->addSource(name, it->second);
+		addSource(name, it->second);
 	}
 }
 
