@@ -23,7 +23,6 @@ class DataSource;
 class PixelMap;
 class BeamlineInfo;
 class MetaDataMgr;
-class MetaDataMgr;
 class Markers;
 
 class SMSControl : public caServer {
