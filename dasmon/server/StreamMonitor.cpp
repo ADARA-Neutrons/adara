@@ -638,27 +638,33 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
+    static short count[3] = {0,0,0};
+
     if ( m_diagnostics )
     {
+        if ( count[0] ) --count[0];
+        if ( count[1] ) --count[1];
+        if ( count[2] ) --count[2];
+
         if ( m_last_time )
         {
-            if ((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
-                ( m_last_cycle == 599 && a_pkt.cycle() != 0 ))
+            if (((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
+                ( m_last_cycle == 599 && a_pkt.cycle() != 0 )) && !count[0] )
             {
-                syslog( LOG_ERR, "Cycle error" );
-                //syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) last_cycle, (unsigned long) a_pkt.cycle() );
+                syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) m_last_cycle, (unsigned long) a_pkt.cycle() );
+                count[0] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
             }
 
             m_this_time = timespec_to_nsec(a_pkt.timestamp());
-            if ( m_last_time > m_this_time )
+            if ( m_last_time > m_this_time && !count[1] )
             {
-                syslog( LOG_ERR, "Pulse time went backwards" );
-                //syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( last_time - this_time ));
+                syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( m_last_time - m_this_time ));
+                count[1] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
             }
-            else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
+            else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 && !count[2] )
             {
-                syslog( LOG_ERR, "Pulse time interval is inaccurate" );
-                //syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( this_time - last_time ));
+                syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( m_this_time - m_last_time ));
+                count[2] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
             }
 
             m_last_time = m_this_time;
