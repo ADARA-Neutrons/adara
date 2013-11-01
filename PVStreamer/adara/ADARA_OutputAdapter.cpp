@@ -81,6 +81,7 @@ OutputAdapter::packetSendThread()
         }
         else
         {
+        cout << "[ADARA] Got: " << pvs_pkt->type << endl;
             if ( connected()) // If connected, translate and send packet
             {
                 if ( translate( *pvs_pkt, adara_pkt, payload ))
@@ -206,25 +207,8 @@ OutputAdapter::buildVVP( Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_stat
     a_adara_pkt.sec             = a_state.m_time.sec + EPICS_TIME_OFFSET;
     a_adara_pkt.nsec            = a_state.m_time.nsec;
 
-    switch ( a_state.m_status )
-    {
-    case PV_OK:
-        a_adara_pkt.vvp.status      = None;
-        a_adara_pkt.vvp.severity    = NoAlarm;
-        break;
-    case PV_DISCONNECTED:
-        a_adara_pkt.vvp.status      = Comm;
-        a_adara_pkt.vvp.severity    = Major;
-        break;
-    case PV_LOW_LIMIT:
-        a_adara_pkt.vvp.status      = Low;
-        a_adara_pkt.vvp.severity    = Minor;
-        break;
-    case PV_HIGH_LIMIT:
-        a_adara_pkt.vvp.status      = High;
-        a_adara_pkt.vvp.severity    = Minor;
-        break;
-    }
+    a_adara_pkt.vvp.status      = a_state.m_status;
+    a_adara_pkt.vvp.severity    = a_state.m_severity;
 
     switch ( a_pv->m_type )
     {
@@ -246,6 +230,10 @@ OutputAdapter::buildVVP( Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_stat
         a_adara_pkt.payload_len     = 20;
         a_adara_pkt.vvp.dval        = a_state.m_real_val;
         break;
+
+    case PV_STR:
+        // TODO Impl string values
+        break;
     }
 }
 
@@ -260,12 +248,12 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, Packet &a_adara_pkt, string &a
     switch ( a_pv_pkt.type )
     {
     case DeviceDefined:
-        defineDevice( *a_pv_pkt.device, a_pv_pkt.time );
+        defineDevice( *a_pv_pkt.device );
         buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
         return true;
 
     case DeviceRedefined:
-        redefineDevice( *a_pv_pkt.device, *a_pv_pkt.old_device, a_pv_pkt.time );
+        redefineDevice( *a_pv_pkt.device, *a_pv_pkt.old_device );
         buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
         return true;
 
@@ -298,6 +286,8 @@ OutputAdapter::getPVTypeXML( PVType a_type ) const
         return "integer";
     case PV_REAL:
         return "double";
+    case PV_STR:
+        return "string";
     }
 
     return "unknown";
@@ -305,7 +295,7 @@ OutputAdapter::getPVTypeXML( PVType a_type ) const
 
 
 void
-OutputAdapter::defineDevice( DeviceDescriptor &a_device, Timestamp &a_time )
+OutputAdapter::defineDevice( DeviceDescriptor &a_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -314,12 +304,12 @@ OutputAdapter::defineDevice( DeviceDescriptor &a_device, Timestamp &a_time )
 
     // Insert new PV state entries with disconnected status
     for ( vector<PVDescriptor*>::iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
-        m_pv_state[*ipv] = PVState( PV_DISCONNECTED, a_time );
+        m_pv_state[*ipv] = PVState();
 }
 
 
 void
-OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_old_device, Timestamp &a_time )
+OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_old_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -343,7 +333,7 @@ OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_o
         }
 
         if ( !found )
-            m_pv_state[*ipv] = PVState( PV_DISCONNECTED, a_time );
+            m_pv_state[*ipv] = PVState();
     }
 
     // Add "new" device to configured device list
@@ -538,6 +528,8 @@ OutputAdapter::sendSourceInfo( int a_socket )
 void
 OutputAdapter::sendPacket( ADARA::Packet &a_adara_pkt, std::string *a_payload, int a_socket )
 {
+    cout << "[" << hex << a_adara_pkt.format << dec << "] l=" << a_adara_pkt.payload_len << " ts=" << a_adara_pkt.sec << "." << a_adara_pkt.nsec << endl;
+
     bool res;
     uint32_t len = (int)a_adara_pkt.payload_len + 16;
 

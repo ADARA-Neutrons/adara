@@ -2,14 +2,29 @@ record(ao,"a"){
   field(DTYP,"Soft Channel")
   field(VAL,1)
   field(UDF,1)
+  field(EGU,"kg")
 }
 record(ao,"b"){
   field(DTYP,"Soft Channel")
   field(VAL,2)
+  field(EGU,"m/s")
   field(UDF,1)
 }
 record(ao,"c"){
   field(DTYP,"Soft Channel")
   field(VAL,3)
   field(UDF,1)
+  field(EGU,"amps")
+}
+record(ao,"d"){
+  field(DTYP,"Soft Channel")
+  field(VAL,4)
+  field(UDF,1)
+  field(EGU,"Ohm")
+}
+record(ao,"e"){
+  field(DTYP,"Soft Channel")
+  field(VAL,5)
+  field(UDF,1)
+  field(EGU,"Hz")
 }

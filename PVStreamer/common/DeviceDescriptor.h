@@ -65,6 +65,7 @@ public:
     ~DeviceDescriptor();
 
     EnumDescriptor     *defineEnumeration( const std::map<int32_t,std::string> &a_values );
+    EnumDescriptor     *defineEnumeration( const EnumDescriptor &a_enum );
     void                definePV( const std::string &a_name, const std::string &a_connection, PVType a_type, EnumDescriptor *a_enum, const std::string &a_units );
     PVDescriptor       *getPV( const std::string &a_pv_name ) const;
     bool                operator==( const DeviceDescriptor &a_desc ) const;

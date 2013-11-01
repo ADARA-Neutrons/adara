@@ -1,12 +1,7 @@
-/**
- * \file ADARA.h
- * \brief Header file for ADARA definitions.
- * \author Dale V. Stansberry
- * \date June 6, 2012
- */
-
 #ifndef ADARA_H
 #define ADARA_H
+
+#include <stdint.h>
 
 #define ADARA_PROTOCOL 2
 
@@ -57,27 +52,27 @@ enum Severity
 /// This struct is used to build and transmit ADARA protocol DDP and VVP packets.
 struct Packet
 {
-    unsigned long   payload_len;
-    unsigned long   format;
-    unsigned long   sec;
-    unsigned long   nsec;
-    unsigned long   dev_id; // Common to both DDP and VVP ADARA packets
+    uint32_t    payload_len;
+    uint32_t    format;
+    uint32_t    sec;
+    uint32_t    nsec;
+    uint32_t    dev_id; // Common to both DDP and VVP ADARA packets
     union
     {
         struct // Device Descriptor Packet (DDP)
         {
-            unsigned long       xml_len;
-            char                xml; // Placeholder for start of xml payload
+            uint32_t        xml_len;
+            char            xml; // Placeholder for start of xml payload
         } ddp;
         struct // Variable Value Packet (VVP)
         {
-            unsigned long       var_id;
-            unsigned short      severity;
-            unsigned short      status;
+            uint32_t        var_id;
+            uint16_t        severity;
+            uint16_t        status;
             union
             {
-                unsigned long   uval;   // unsigned long value
-                double          dval;   // double value
+                uint32_t    uval;   // unsigned long value
+                double      dval;   // double value
             };
         } vvp;
     };

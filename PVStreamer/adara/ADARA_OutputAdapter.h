@@ -32,8 +32,8 @@ private:
     void            buildVVP( ADARA::Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_state );
     bool            translate( StreamPacket &a_pv_pkt, ADARA::Packet &a_adara_pkt, std::string &a_payload );
     void            updatePV( PVDescriptor *a_pv, PVState a_state );
-    void            defineDevice( DeviceDescriptor &a_device, Timestamp &a_time );
-    void            redefineDevice( DeviceDescriptor &a_device,  DeviceDescriptor &a_old_device, Timestamp &a_time );
+    void            defineDevice( DeviceDescriptor &a_device );
+    void            redefineDevice( DeviceDescriptor &a_device,  DeviceDescriptor &a_old_device );
     void            undefineDevice( DeviceDescriptor &a_device );
     const char *    getPVTypeXML( PVType a_type ) const;
 

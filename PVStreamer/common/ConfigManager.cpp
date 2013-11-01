@@ -1,5 +1,6 @@
 #include <boost/lexical_cast.hpp>
 #include "ConfigManager.h"
+#include "StreamService.h"
 
 using namespace std;
 
@@ -11,6 +12,7 @@ namespace PVS {
 
 
 ConfigManager::ConfigManager()
+    : m_stream_api(0)
 {
 #ifdef USE_GC
     m_running = true;
@@ -26,6 +28,15 @@ ConfigManager::~ConfigManager()
     m_gc_thread->join();
     delete m_gc_thread;
 #endif
+}
+
+
+void
+ConfigManager::attach( IInputAdapterAPI *a_stream_api )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    m_stream_api = a_stream_api;
 }
 
 
@@ -114,6 +125,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 #ifdef USE_GC
             m_garbage.insert( idev->second );
 #endif
+            sendDeviceRedefined( record, idev->second );
+
             idev->second = record;
         }
     }
@@ -135,6 +148,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         // Store new record in devices vector
         record = DeviceRecordPtr(new_desc);
         m_devices[key] = record;
+
+        sendDeviceDefined( record );
     }
 
     return record;
@@ -185,6 +200,8 @@ ConfigManager::undefineDevice( const std::string &a_name, const std::string &a_s
 #ifdef USE_GC
         m_garbage.insert( idev->second );
 #endif
+        sendDeviceUndefined( idev->second );
+
         m_devices.erase( idev );
     }
 }
@@ -237,6 +254,54 @@ ConfigManager::getNextDeviceID() const
 
     return id;
 }
+
+
+void
+ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
+{
+    bool timeout;
+    StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
+    if ( pkt )
+    {
+        pkt->type = DeviceDefined;
+        pkt->device = a_dev_desc;
+
+        m_stream_api->putFilledPacket( pkt );
+    }
+}
+
+
+void
+ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
+{
+    bool timeout;
+    StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
+    if ( pkt )
+    {
+        pkt->type = DeviceUndefined;
+        pkt->device = a_dev_desc;
+
+        m_stream_api->putFilledPacket( pkt );
+    }
+}
+
+
+void
+ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr a_old_dev_desc )
+{
+    bool timeout;
+    StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
+    if ( pkt )
+    {
+        pkt->type = DeviceDefined;
+        pkt->device = a_dev_desc;
+        pkt->old_device = a_old_dev_desc;
+
+        m_stream_api->putFilledPacket( pkt );
+    }
+}
+
+
 
 #ifdef USE_GC
 

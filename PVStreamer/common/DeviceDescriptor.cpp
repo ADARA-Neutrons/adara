@@ -112,7 +112,7 @@ DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
 
 DeviceDescriptor::~DeviceDescriptor()
 {
-    cout << "Deleting " << this << endl;
+    cout << "Del DevDesc " << this << endl;
 
     for( vector<PVDescriptor*>::iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
          delete *p;
@@ -126,6 +126,26 @@ EnumDescriptor*
 DeviceDescriptor::defineEnumeration( const map<int32_t,std::string> &a_values )
 {
     EnumDescriptor *new_enum = new EnumDescriptor( a_values );
+    new_enum->m_id = m_enums.size() + 1;
+
+    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
+    {
+        if ( **e == *new_enum )
+        {
+            delete new_enum;
+            return *e;
+        }
+    }
+
+    m_enums.push_back( new_enum );
+    return new_enum;
+}
+
+
+EnumDescriptor*
+DeviceDescriptor::defineEnumeration( const EnumDescriptor &a_enum )
+{
+    EnumDescriptor *new_enum = new EnumDescriptor( a_enum );
     new_enum->m_id = m_enums.size() + 1;
 
     for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )

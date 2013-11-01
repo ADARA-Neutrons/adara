@@ -39,68 +39,25 @@ struct Timestamp
 
 struct PVState
 {
-    PVState() : m_status(PV_OK), m_uint_val(0) {}
-    PVState( PVStatus a_status, Timestamp a_time ) : m_status(a_status), m_time(a_time), m_uint_val(0) {}
+    PVState() : m_uint_val(0), m_status(0), m_severity(0) {}
 
-    PVStatus            m_status;
-    Timestamp           m_time;
     union
     {
         int32_t         m_int_val;    ///< Used for both int and enum type
         uint32_t        m_uint_val;
         double          m_real_val;
     };
+    std::string         m_str_val;
+    Timestamp           m_time;
+    int16_t             m_status;       ///< EPICS alarm code
+    int16_t             m_severity;     ///< EPICS severity code
 };
-
-
-/// Packet structure for the internal protocol-independent event stream
-#if 0
-struct PacketHeader
-{
-    StreamPktType       type;
-    Timestamp           time;
-};
-
-
-struct DeviceDefinedPacket
-{
-    StreamPktType       type;
-    Timestamp           time;
-    DeviceRecordPtr     device;
-};
-
-
-struct DeviceRedefinedPacket
-{
-    StreamPktType       type;
-    Timestamp           time;
-    DeviceRecordPtr     device;
-    DeviceRecordPtr     old_device;
-};
-
-struct DeviceUndefinedPacket
-{
-    StreamPktType       type;
-    Timestamp           time;
-    DeviceRecordPtr     device;
-};
-
-struct PVUpdatePacket
-{
-    StreamPktType       type;
-    Timestamp           time;
-    DeviceRecordPtr     device;
-    PVDescriptor       *pv;
-    PVState             state;
-};
-#endif
 
 
 // TODO This is a union of all stream packets - need to make it a proper hierarchy
 struct StreamPacket
 {
     StreamPktType       type;
-    Timestamp           time;
     DeviceRecordPtr     device;
     PVDescriptor       *pv;
     PVState             state;
@@ -141,7 +98,7 @@ public:
 class StreamService : private IInputAdapterAPI, private IOutputAdapterAPI
 {
 public:
-    StreamService( size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ );
+    StreamService( ConfigManager &a_cfg_mgr, size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ );
     ~StreamService();
 
     IInputAdapterAPI*       attach( IInputAdapter &a_adapter );
@@ -162,6 +119,7 @@ private:
 
 //    void            streamNotifyThread();
 
+    ConfigManager              &m_cfg_mgr;
     IOutputAdapter             *m_out_adapter;  ///< Active stream output adapter
     std::vector<IInputAdapter*> m_in_adapters;  ///< Active stream input adapters
     std::vector<StreamPacket*>  m_stream_pkts;  ///< Stream packets

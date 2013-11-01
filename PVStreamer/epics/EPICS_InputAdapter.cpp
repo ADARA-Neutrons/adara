@@ -167,6 +167,8 @@ InputAdapter::configFileMonitorThread()
 
                         if ( changed )
                         {
+                            cout << "Config file changed!" << endl;
+
                             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
                             if ( !m_active )

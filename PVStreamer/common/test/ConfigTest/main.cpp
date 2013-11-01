@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
 #endif
 
     ConfigManager           cfg_mgr;
-    StreamService           streamer(100);
+    StreamService           streamer( cfg_mgr, 100 );
     ADARA::OutputAdapter    out_adapt( streamer );
     EPICS::InputAdapter     in_adapter( streamer, cfg_mgr, "beamline.xml" );
 

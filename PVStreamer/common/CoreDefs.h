@@ -16,16 +16,35 @@ enum PVType
     PV_INT,
     PV_UINT,
     PV_REAL,
-    PV_ENUM
+    PV_ENUM,
+    PV_STR
 };
 
+#if 0
+class Value
+{
+public:
+    Value( ValueType a_type ) : m_type(a_type) {}
+
+private:
+    ValueType           m_type;
+    union
+    {
+        int32_t         m_int_val;    ///< Used for both int and enum type
+        uint32_t        m_uint_val;
+        double          m_real_val;
+    };
+    std::string         m_str_val;
+};
+#endif
 
 enum PVStatus
 {
     PV_OK = 0,
     PV_DISCONNECTED,
     PV_LOW_LIMIT,
-    PV_HIGH_LIMIT
+    PV_HIGH_LIMIT,
+    PV_ERR
 };
 
 

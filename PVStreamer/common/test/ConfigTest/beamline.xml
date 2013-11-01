@@ -8,9 +8,6 @@
                 <log/>
                 <scan/>
             </pv>
-        </device>
-        <device active="true">
-            <name>Device 2</name>
             <pv>
                 <name>b</name>
                 <alias>beta</alias>
@@ -18,11 +15,34 @@
                 <scan/>
             </pv>
             <pv>
+                <name>fubar</name>
+                <alias>fubar</alias>
+                <scan/>
+            </pv>
+        </device>
+        <device active="true">
+            <name>Device 2</name>
+            <pv>
                 <name>c</name>
                 <alias>chi</alias>
                 <log/>
                 <scan/>
             </pv>
+            <pv>
+                <name>d</name>
+                <alias>delta</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>e</name>
+                <alias>epsilon</alias>
+                <log/>
+                <scan/>
+            </pv>
+        </device>
+        <device active="false">
+            <name>Device 3</name>
         </device>
     </devices>
 </beamline>

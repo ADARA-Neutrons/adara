@@ -5,8 +5,8 @@ using namespace std;
 
 namespace PVS {
 
-StreamService::StreamService( size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ )
-    : m_out_adapter(0)
+StreamService::StreamService( ConfigManager &a_cfg_mgr, size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ )
+    : m_cfg_mgr(a_cfg_mgr), m_out_adapter(0)
 //    : m_max_notify_pkts(a_max_notify_pkts), m_stream_listeners_thread(0)
 {
     // Make sure buffer sizes are sane
@@ -26,6 +26,8 @@ StreamService::StreamService( size_t a_pkt_buffer_size /*, size_t a_max_notify_p
         m_stream_pkts.push_back(new StreamPacket());
         m_free_que.put( m_stream_pkts.back() );
     }
+
+    m_cfg_mgr.attach( this );
 
     // Start stream listener notify thread
     //m_stream_notify_thread = new boost::thread( boost::bind( &StreamService::streamNotifyThread, this ));

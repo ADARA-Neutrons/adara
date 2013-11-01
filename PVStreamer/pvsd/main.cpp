@@ -1,37 +1,42 @@
 #include <iostream>
+#include "ConfigManager.h"
+#include "StreamService.h"
+#include "EPICS_InputAdapter.h"
+#include "ADARA_OutputAdapter.h"
+#include "ComBus.h"
 #include <boost/program_options.hpp>
 #include <syslog.h>
-#include "ComBus.h"
-
-#include "PVS_Core.h"
-#include "PVS_EPICS_Reader.h"
-#include "PVS_ADARA_Writer.h"
+#include <stdint.h>
 
 using namespace std;
-//using namespace ADARA::PVSD;
+using namespace PVS;
+
+using namespace std;
 
 #define PVSD_VERSION "0.1.0"
 
 int main(int argc, char *argv[])
 {
-    unsigned short  port;
+    uint32_t        port;
+    uint32_t        heartbeat;
     string          broker_uri;
     string          broker_user;
     string          broker_pass;
     string          domain;
-    string          log_path;
+    string          epics_cfg;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
     options.add_options()
             ("help,h", "show help")
             ("version,v", "show version number")
-            ("port,p", po::value<unsigned short>( &port )->default_value( 31415 ), "set client port")
+            ("port,p", po::value<uint32_t>( &port )->default_value( 31416 ), "set client port")
+            ("hb", po::value<uint32_t>( &heartbeat )->default_value( 2000 ), "set ADARA heartbeat period (msec)")
             ("domain,d", po::value<string>( &domain )->default_value( "" ), "set communication domain prefix (EPICS/ComBus)")
-            ("log,l", po::value<string>( &log_path )->default_value( "" ), "set logging path")
             ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("epics", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
             ;
 
     po::variables_map opt_map;
@@ -54,27 +59,27 @@ int main(int argc, char *argv[])
     // Initialize SysLog
 
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pv streamer daemon (pvsd) started." );
+    syslog( LOG_INFO, "pvsd started." );
 
     if ( !opt_map.count( "domain" ))
-    {
         syslog( LOG_WARNING, "No communication domain specified - probably an error." );
-        cout << "No communication domain specified - probably an error."  << endl;
-    }
 
-    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
+    ::ADARA::ComBus::Connection *combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
 
     try
     {
         combus->waitForConnect( 10 );
 
-        PVS::CORE::CoreServices     core;
-        PVS::CORE::FileLogger       logger( core, log_path );
-        PVS::ADARA::ADARA_Reader    reader( core );
-        PVS::EPICS::EPICS_Writer    writer( core );
+        ConfigManager           cfg_mgr;
+        StreamService           streamer( cfg_mgr, 100 );
+        PVS::ADARA::OutputAdapter    out_adapt( streamer, port, heartbeat );
+        PVS::EPICS::InputAdapter     in_adapter( streamer, cfg_mgr, epics_cfg );
 
-        // CoreServices::run() will use calling thread and will not return
-        core.run();
+        // The main thread acts as the ComBus health / status output loop
+        while(1)
+        {
+            combus->status( ::ADARA::ComBus::STATUS_OK );
+        }
     }
     catch( exception &e )
     {
@@ -83,7 +88,7 @@ int main(int argc, char *argv[])
 
     delete combus;
 
-    syslog( LOG_INFO, "pv streamer daemon (pvsd) stopping." );
+    syslog( LOG_INFO, "pvvsd stopping." );
     closelog();
 
     return 0;
