@@ -1,12 +1,15 @@
 #include <iostream>
+#include <boost/program_options.hpp>
+#include <syslog.h>
+#include <stdint.h>
+#include <signal.h>
+
 #include "ConfigManager.h"
 #include "StreamService.h"
 #include "EPICS_InputAdapter.h"
 #include "ADARA_OutputAdapter.h"
 #include "ComBus.h"
-#include <boost/program_options.hpp>
-#include <syslog.h>
-#include <stdint.h>
+#include "TraceException.h"
 
 using namespace std;
 using namespace PVS;
@@ -15,8 +18,38 @@ using namespace std;
 
 #define PVSD_VERSION "0.1.0"
 
+bool g_active = true;
+
+void signalHandler( int a_signal )
+{
+    g_active = false;
+}
+
+
 int main(int argc, char *argv[])
 {
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = signalHandler;
+    sigemptyset( &new_action.sa_mask );
+    new_action.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGINT, &new_action, NULL);
+
+    sigaction (SIGHUP, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGHUP, &new_action, NULL);
+
+    sigaction (SIGTERM, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGTERM, &new_action, NULL);
+
+    sigaction (SIGQUIT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGQUIT, &new_action, NULL);
+
     uint32_t        port;
     uint32_t        heartbeat;
     string          broker_uri;
@@ -68,27 +101,46 @@ int main(int argc, char *argv[])
 
     try
     {
-        combus->waitForConnect( 10 );
+        //combus->waitForConnect( 10 );
 
-        ConfigManager           cfg_mgr;
-        StreamService           streamer( cfg_mgr, 100 );
-        PVS::ADARA::OutputAdapter    out_adapt( streamer, port, heartbeat );
-        PVS::EPICS::InputAdapter     in_adapter( streamer, cfg_mgr, epics_cfg );
+        //ConfigManager               cfg_mgr;
+        //StreamService               streamer( cfg_mgr, 100 );
+        //PVS::ADARA::OutputAdapter   out_adapter( streamer, port, heartbeat );
+        //PVS::EPICS::InputAdapter    in_adapter( streamer, cfg_mgr, epics_cfg );
+
+        StreamService   streamer( 100 );
+        streamer.attach( new PVS::ADARA::OutputAdapter( port, heartbeat ));
+        streamer.attach( new PVS::EPICS::InputAdapter( epics_cfg ));
 
         // The main thread acts as the ComBus health / status output loop
-        while(1)
+        uint32_t count = 0;
+
+        while( g_active )
         {
-            combus->status( ::ADARA::ComBus::STATUS_OK );
+            if (!(count % 2))
+                combus->status( ::ADARA::ComBus::STATUS_OK );
+
+            sleep(1);
         }
+
+        //streamer.stop();
+    }
+    catch( TraceException &e )
+    {
+        syslog( LOG_ERR, e.toString().c_str() );
     }
     catch( exception &e )
     {
         syslog( LOG_ERR, "Unhandled exception: %s", e.what());
     }
+    catch( ... )
+    {
+        syslog( LOG_ERR, "Unknown exception" );
+    }
 
     delete combus;
 
-    syslog( LOG_INFO, "pvvsd stopping." );
+    syslog( LOG_INFO, "pvsd stopping." );
     closelog();
 
     return 0;

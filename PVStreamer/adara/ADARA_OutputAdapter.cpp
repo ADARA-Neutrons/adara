@@ -3,6 +3,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <cstdio>
+#include <syslog.h>
+
 #include "ADARA_OutputAdapter.h"
 #include "ADARA.h"
 #include "TraceException.h"
@@ -10,11 +12,14 @@
 using namespace std;
 using namespace PVS::ADARA;
 
+/// Defines the difference between EPICS and Posix timestamp values
+#define EPICS_TIME_OFFSET -631152000
+
 namespace PVS {
 namespace ADARA {
 
-OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat )
-    : IOutputAdapter( a_stream_serv ), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
+OutputAdapter::OutputAdapter( unsigned short a_port, unsigned long a_heartbeat )
+    : IOutputAdapter(), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
 
@@ -33,8 +38,18 @@ OutputAdapter::~OutputAdapter()
     if ( m_listen_socket > -1 )
         close( m_listen_socket );
 
+    for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
+        close ( ic->socket );
+
     m_pkt_send_thread->join();
-    m_socket_listen_thread->join();
+    //m_socket_listen_thread->join();
+}
+
+
+void
+OutputAdapter::stop()
+{
+    m_active = false;
 }
 
 
@@ -51,13 +66,13 @@ void
 OutputAdapter::packetSendThread()
 {
     StreamPacket   *pvs_pkt;
-    Packet          adara_pkt;
-    Packet          heartbeat_pkt;
+    OutPacket       adara_pkt;
+    OutPacket       heartbeat_pkt;
     bool            timeout_flag = false;
     string          payload;
 
     heartbeat_pkt.payload_len = 0;
-    heartbeat_pkt.format = 0x00400900; //TODO This should come from ADARA header
+    heartbeat_pkt.format = ::ADARA::PacketType::HEARTBEAT_V0;
     heartbeat_pkt.nsec = 0;
 
     while(1)
@@ -76,12 +91,14 @@ OutputAdapter::packetSendThread()
             }
             else
             {
+                // A null packet w/o timeout means queues have been deactivated
                 break;
             }
         }
         else
         {
-        cout << "[ADARA] Got: " << pvs_pkt->type << endl;
+            process( *pvs_pkt );
+
             if ( connected()) // If connected, translate and send packet
             {
                 if ( translate( *pvs_pkt, adara_pkt, payload ))
@@ -108,11 +125,11 @@ OutputAdapter::packetSendThread()
  * \param a_time - EPICS timestamp of device description (activation).
  */
 void
-OutputAdapter::buildDDP( Packet &a_adara_pkt, string &a_payload, DeviceDescriptor &a_device )
+OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceDescriptor &a_device )
 {
     stringstream sstr;
 
-    a_adara_pkt.format  = 0x800000;
+    a_adara_pkt.format  = ::ADARA::PacketType::DEVICE_DESC_V0;
     a_adara_pkt.dev_id  = a_device.m_id;
 
     // Reset payload stringstream
@@ -200,8 +217,10 @@ OutputAdapter::buildDDP( Packet &a_adara_pkt, string &a_payload, DeviceDescripto
   * This method build a VVP packet for the PV specified by the parameters.
   */
 void
-OutputAdapter::buildVVP( Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_state )
+OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_state, string &a_payload )
 {
+    a_payload.clear();
+
     a_adara_pkt.dev_id          = a_pv->m_device->m_id;
     a_adara_pkt.vvp.var_id      = a_pv->m_id;
     a_adara_pkt.sec             = a_state.m_time.sec + EPICS_TIME_OFFSET;
@@ -214,25 +233,66 @@ OutputAdapter::buildVVP( Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_stat
     {
     case PV_ENUM:
     case PV_INT:
-        a_adara_pkt.format          = 0x800100;
+        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_U32_V0;     // TODO ADARA protocol doesn't support signed ints
         a_adara_pkt.payload_len     = 16;
         a_adara_pkt.vvp.uval        = a_state.m_int_val;
         break;
 
     case PV_UINT:
-        a_adara_pkt.format          = 0x800100;
+        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_U32_V0;
         a_adara_pkt.payload_len     = 16;
         a_adara_pkt.vvp.uval        = a_state.m_uint_val;
         break;
 
     case PV_REAL:
-        a_adara_pkt.format          = 0x800200;
+        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_DOUBLE_V0;
         a_adara_pkt.payload_len     = 20;
         a_adara_pkt.vvp.dval        = a_state.m_real_val;
         break;
 
     case PV_STR:
-        // TODO Impl string values
+        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_STRING_V0;
+        a_adara_pkt.payload_len     = 16 + a_state.m_str_val.size();
+        a_adara_pkt.vvp_str.str_len = a_state.m_str_val.size();
+
+        // Set payload
+        a_payload = a_state.m_str_val;
+
+        // Round payload length up to nearsest 4 bytes
+        int rem = a_adara_pkt.payload_len % 4;
+        if ( rem )
+        {
+            // Pad buffer with nulls
+            for ( int i = 0; i < (4-rem); ++i )
+                a_payload.push_back('\0');
+
+            // Adjust payload len field
+            a_adara_pkt.payload_len += (4 - rem);
+        }
+        break;
+    }
+}
+
+
+void
+OutputAdapter::process( StreamPacket &a_pv_pkt )
+{
+    switch ( a_pv_pkt.type )
+    {
+    case DeviceDefined:
+        defineDevice( *a_pv_pkt.device );
+        break;
+
+    case DeviceRedefined:
+        redefineDevice( *a_pv_pkt.device, *a_pv_pkt.old_device );
+        break;
+
+    case DeviceUndefined:
+        undefineDevice( *a_pv_pkt.device );
+        break;
+
+    case VariableUpdate:
+        updatePV( a_pv_pkt.pv, a_pv_pkt.state );
         break;
     }
 }
@@ -243,27 +303,23 @@ OutputAdapter::buildVVP( Packet &a_adara_pkt, PVDescriptor *a_pv, PVState a_stat
   * \param a_adara_pkt - ADARA packet to receive translation (output).
   */
 bool
-OutputAdapter::translate( StreamPacket &a_pv_pkt, Packet &a_adara_pkt, string &a_payload )
+OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, string &a_payload )
 {
     switch ( a_pv_pkt.type )
     {
     case DeviceDefined:
-        defineDevice( *a_pv_pkt.device );
         buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
         return true;
 
     case DeviceRedefined:
-        redefineDevice( *a_pv_pkt.device, *a_pv_pkt.old_device );
         buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
         return true;
 
-    case DeviceUndefined:
-        undefineDevice( *a_pv_pkt.device );
+    case DeviceUndefined: //TODO Need to send PV disconnection status
         return false;
 
     case VariableUpdate:
-        updatePV( a_pv_pkt.pv, a_pv_pkt.state );
-        buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state );
+        buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state, a_payload );
         return true;
     }
 
@@ -483,8 +539,8 @@ OutputAdapter::socketListenThread()
 void
 OutputAdapter::sendCurrentData( int a_socket )
 {
-    Packet  adara_pkt;
-    string  payload;
+    OutPacket   adara_pkt;
+    string      payload;
 
     // Use current time for DDP packets
     adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
@@ -502,8 +558,11 @@ OutputAdapter::sendCurrentData( int a_socket )
     // Send value updates for configured devices
     for ( map<PVDescriptor*,PVState>::iterator ipv = m_pv_state.begin(); ipv != m_pv_state.end(); ++ipv )
     {
-        buildVVP( adara_pkt, ipv->first, ipv->second );
-        sendPacket( adara_pkt, 0, a_socket );
+        buildVVP( adara_pkt, ipv->first, ipv->second, payload );
+        if ( payload.size() )
+            sendPacket( adara_pkt, &payload, a_socket );
+        else
+            sendPacket( adara_pkt, 0, a_socket );
     }
 }
 
@@ -514,10 +573,10 @@ OutputAdapter::sendCurrentData( int a_socket )
 void
 OutputAdapter::sendSourceInfo( int a_socket )
 {
-    Packet adara_pkt;
+    OutPacket adara_pkt;
 
     adara_pkt.payload_len = 0;
-    adara_pkt.format = 0x200;
+    adara_pkt.format = ::ADARA::PacketType::SOURCE_LIST_V0;
     adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
 
@@ -526,9 +585,9 @@ OutputAdapter::sendSourceInfo( int a_socket )
 
 
 void
-OutputAdapter::sendPacket( ADARA::Packet &a_adara_pkt, std::string *a_payload, int a_socket )
+OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload, int a_socket )
 {
-    cout << "[" << hex << a_adara_pkt.format << dec << "] l=" << a_adara_pkt.payload_len << " ts=" << a_adara_pkt.sec << "." << a_adara_pkt.nsec << endl;
+    //cout << "[" << hex << a_adara_pkt.format << dec << "] l=" << a_adara_pkt.payload_len << " ts=" << a_adara_pkt.sec << "." << a_adara_pkt.nsec << endl;
 
     bool res;
     uint32_t len = (int)a_adara_pkt.payload_len + 16;

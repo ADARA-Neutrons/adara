@@ -5,6 +5,7 @@
 #include <boost/system/error_code.hpp>
 #include <boost/algorithm/string.hpp>
 #include <cadef.h>
+#include <syslog.h>
 
 #include "TraceException.h"
 #include "ConfigManager.h"
@@ -17,8 +18,8 @@ namespace PVS {
 namespace EPICS {
 
 
-InputAdapter::InputAdapter( StreamService &a_stream_serv, ConfigManager &a_cfg_mgr, const std::string &a_config_file )
-  : IInputAdapter( a_stream_serv ), m_active(true), m_cfg_mgr(a_cfg_mgr), m_config_file(a_config_file), m_source("epics")
+InputAdapter::InputAdapter( const std::string &a_config_file )
+  : IInputAdapter(), m_active(true), m_config_file(a_config_file), m_source("epics")
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
@@ -52,7 +53,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
     }
     else
     {
-        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, m_cfg_mgr, a_device );
+        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, a_device );
     }
 }
 
@@ -167,7 +168,7 @@ InputAdapter::configFileMonitorThread()
 
                         if ( changed )
                         {
-                            cout << "Config file changed!" << endl;
+                            syslog( LOG_INFO, "EPICS beam config file has changed" );
 
                             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -183,7 +184,10 @@ InputAdapter::configFileMonitorThread()
                                 // Start device agents for all configured devices
                                 // It's OK if agents are already running
                                 for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                                {
+                                    syslog( LOG_DEBUG, "Starting device agent for: %s", (*idev)->m_name.c_str() );
                                     startDevice( *idev );
+                                }
 
                                 // Stop device agents that are no longer configured
                                 set<string> new_devices;
@@ -199,6 +203,10 @@ InputAdapter::configFileMonitorThread()
                                 // Save new device names and new buffer
                                 m_cur_devices = new_devices;
                                 m_config_buffer = buffer;
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR, "EPICS beam config file failed to parse" );
                             }
                         }
                     }
@@ -299,9 +307,12 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         res = false; // It's an error to omit the device name
                                     else if ( pvs.size())
                                     {
+                                        syslog( LOG_DEBUG, "Found device: %s", dev_name.c_str() );
                                         DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
                                         for ( vector<string>::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
                                         {
+                                            syslog( LOG_DEBUG, "With PV: %s", (*ipv).c_str() );
+
                                             // Don't know type or units yet - just use any value
                                             dev->definePV( *ipv, *ipv, PV_INT, 0, "" );
                                         }
@@ -323,8 +334,6 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
     // If parse failed, clean-up
     if ( !res )
     {
-        cout << "beamline.xml pares failed." << endl;
-
         for ( vector<DeviceDescriptor*>::iterator idev = a_devices.begin(); idev != a_devices.end(); ++idev )
             delete *idev;
 

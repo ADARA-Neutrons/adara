@@ -19,10 +19,6 @@ enum StreamPktType
     DeviceDefined,      // A NEW device has been defined
     DeviceRedefined,    // An existing device has been redefined
     DeviceUndefined,    // An existing device has been undefined
-    //DeviceActive,       // An existing device has become active
-    //DeviceInactive,     // An existing device has become inactive
-    //VariableActive,
-    //VariableInactive,
     VariableUpdate
 };
 
@@ -74,6 +70,7 @@ struct StreamPacket
 class IInputAdapterAPI
 {
 public:
+    virtual ConfigManager&  getCfgMgr() = 0;
     virtual StreamPacket   *getFreePacket() = 0;
     virtual StreamPacket   *getFreePacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual void            putFilledPacket( StreamPacket *a_pkt ) = 0;
@@ -89,6 +86,7 @@ public:
 class IOutputAdapterAPI
 {
 public:
+    virtual ConfigManager&  getCfgMgr() = 0;
     virtual StreamPacket   *getFilledPacket() = 0;
     virtual StreamPacket   *getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual void            putFreePacket( StreamPacket *a_pkt ) = 0;
@@ -98,11 +96,12 @@ public:
 class StreamService : private IInputAdapterAPI, private IOutputAdapterAPI
 {
 public:
-    StreamService( ConfigManager &a_cfg_mgr, size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ );
+    StreamService( size_t a_pkt_buffer_size );
     ~StreamService();
 
-    IInputAdapterAPI*       attach( IInputAdapter &a_adapter );
-    IOutputAdapterAPI*      attach( IOutputAdapter &a_adapter );
+    void            attach( IInputAdapter *a_adapter );
+    void            attach( IOutputAdapter *a_adapter );
+    ConfigManager&  getCfgMgr() { return m_cfg_mgr; }
 
 private:
     // ---------- IStreamProducer methods ----------
@@ -117,20 +116,12 @@ private:
     StreamPacket   *getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag );
     void            putFreePacket( StreamPacket *a_pkt );
 
-//    void            streamNotifyThread();
-
-    ConfigManager              &m_cfg_mgr;
+    ConfigManager               m_cfg_mgr;
     IOutputAdapter             *m_out_adapter;  ///< Active stream output adapter
     std::vector<IInputAdapter*> m_in_adapters;  ///< Active stream input adapters
     std::vector<StreamPacket*>  m_stream_pkts;  ///< Stream packets
     SyncDeque<StreamPacket*>    m_free_que;     ///< Free stream packet buffer
     SyncDeque<StreamPacket*>    m_fill_que;     ///< Filled stream packet buffer
-/*
-    SyncDeque<StreamPacket*>        m_notify_que;   ///< Stream listener notification packet buffer
-    uint32_t                        m_max_notify_pkts;
-    std::vector<IStreamListener*>   m_stream_listeners;         ///< Registered stream listener container
-    boost::thread                  *m_stream_notify_thread;  ///< Thread to send notifications to stream listeners
-*/
 };
 
 }

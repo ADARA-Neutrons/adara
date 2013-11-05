@@ -27,7 +27,7 @@ class DeviceAgent;
 class InputAdapter : public IInputAdapter
 {
 public:
-    InputAdapter( StreamService &a_stream_serv, ConfigManager &a_cfg_mgr, const std::string &a_config_file );
+    InputAdapter( const std::string &a_config_file );
     ~InputAdapter();
 
 private:
@@ -42,7 +42,6 @@ private:
     bool            xmlGetAttribute( xmlNode *a_node, const char *a_attrib, std::string &a_value ) const;
 
     bool                                m_active;
-    ConfigManager                      &m_cfg_mgr;
     std::string                         m_config_file;
     boost::thread                      *m_config_file_monitor_thread;
     std::vector<char>                   m_config_buffer;

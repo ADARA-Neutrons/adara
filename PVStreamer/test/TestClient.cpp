@@ -11,7 +11,8 @@
 //#include "float.h"
 #include <iostream>
 
-#include "../adara/ADARA.h"
+#include "../../common/ADARA.h"
+//#include "../../common/ADARAPackets.h"
 
 
 using namespace std;
@@ -94,9 +95,11 @@ int main( int argc, char* argv[])
         cout << " success." << endl;
 
 
-    PVS::ADARA::Packet hdr;
-    PVS::ADARA::Packet *pkt;
+    ADARA::Header   hdr;
+    //PVS::ADARA::Packet hdr;
+    //PVS::ADARA::Packet *pkt;
     char *buf = 0;
+    uint32_t *fields;
     int rc;
     unsigned long buf_len = 0;
     unsigned long rcount = 0;
@@ -109,8 +112,8 @@ int main( int argc, char* argv[])
         {
             ++pkt_count;
             // Get payload len from header
-            //if ( !test )
-            //cout << "Pkt # " << pkt_count << " [" << hex << hdr.format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.sec << "." << hdr.nsec << endl;
+            if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
+                cout << "[" << hex << hdr.pkt_format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
 
             if ( hdr.payload_len )
             {
@@ -119,14 +122,14 @@ int main( int argc, char* argv[])
                     if ( buf )
                         delete[] buf;
 
-                    buf = new char[16+hdr.payload_len + 1];
+                    buf = new char[hdr.payload_len + 1];
                     buf_len = hdr.payload_len;
                 }
 
                 rcount = 0;
                 while ( rcount < hdr.payload_len )
                 {
-                    rc = read( pvs_socket, buf+16+rcount, hdr.payload_len - rcount );
+                    rc = read( pvs_socket, buf + rcount, hdr.payload_len - rcount );
                     if ( rc == 0 )
                     {
                         cout << "  connection closed." << endl;
@@ -138,34 +141,46 @@ int main( int argc, char* argv[])
                     rcount += rc;
                 }
 
-                buf[16+hdr.payload_len] = 0;
+                buf[hdr.payload_len] = 0;
             }
 
             if ( rc <= 0 )
                 break;
 
-            pkt = (PVS::ADARA::Packet*)buf;
+            //pkt = (PVS::ADARA::Packet*)buf;
+            fields = (uint32_t*)buf;
 
-            if ( hdr.format == 0x800000 )
+            if ( hdr.pkt_format == ADARA::PacketType::DEVICE_DESC_V0 )
             {
                 cout << "DDP: ";
-                cout << " id: " << pkt->dev_id;
-                cout << ", xml len: " << pkt->ddp.xml_len << endl;
-                cout << "  xml: " << &pkt->ddp.xml << endl;
+                cout << " id: " << fields[0];
+                cout << ", xml len: " << fields[1] << endl;
+                cout << "  xml: " << &buf[8] << endl;
             }
-            else if ( hdr.format == 0x800100 )
+            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_U32_V0 )
             {
                 cout << "VVP: ";
-                cout << " id: " << pkt->dev_id << "." << pkt->vvp.var_id;
-                cout << ", value: " << pkt->vvp.uval;
-                cout << ", alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
+                cout << " id: " << fields[0] << "." << fields[1];
+                cout << ", value: " << fields[3];
+                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
-            else if ( hdr.format == 0x800200 )
+            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_DOUBLE_V0 )
             {
                 cout << "VVP: ";
-                cout << " id: " << pkt->dev_id << "." << pkt->vvp.var_id;
-                cout << ", value: " << pkt->vvp.dval;
-                cout << ", alarm: " << pkt->vvp.status << " [" << pkt->vvp.severity << "]" << endl;
+                cout << " id: " << fields[0] << "." << fields[1];
+                cout << ", value: " << *((double*)&fields[3]);
+                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+            }
+            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_STRING_V0 )
+            {
+                // Null terminate string val
+                buf[16 + fields[3]] = 0;
+
+                cout << "VVP: ";
+                cout << " id: " << fields[0] << "." << fields[1];
+                cout << ", len: " << fields[3];
+                cout << ", value: " << &buf[16];
+                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
             //else if ( hdr.format == 0x400900 )
                 //cout << "  heartbeat." << endl;

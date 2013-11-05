@@ -9,7 +9,7 @@ PVStreamer_pvsd_pvsd_SOURCES = PVStreamer/pvsd/main.cpp \
     combus/ComBus.cpp $(COMMON_PARSER)
 
 # TODO pick up the libxml2 include from autoconf/pkgconfig
-PVStreamer_pvsd_pvsd_CPPFLAGS = -IPVStreamer/common -Icombus \
+PVStreamer_pvsd_pvsd_CPPFLAGS = -IPVStreamer/common -Icombus -Icommon \
     -IPVStreamer/adara -IPVStreamer/epics \
     -I/usr/include/libxml2 \
     -I/usr/include/apr-1 -I/usr/include/activemq-cpp-3.4.0 \

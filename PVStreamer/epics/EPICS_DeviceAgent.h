@@ -7,6 +7,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include <cadef.h>
@@ -24,7 +25,7 @@ namespace EPICS {
 class DeviceAgent
 {
 public:
-    DeviceAgent( IInputAdapterAPI &a_stream_api, ConfigManager &a_cfg_mgr, DeviceDescriptor *a_device );
+    DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device );
     ~DeviceAgent();
 
     void    update( DeviceDescriptor *a_device );
@@ -72,14 +73,16 @@ private:
     static void epicsEventCallback( struct event_handler_args a_args );
 
     IInputAdapterAPI           &m_stream_api;
-    ConfigManager              &m_cfg_mgr;
     DeviceRecordPtr             m_dev_record;
     DeviceDescriptor           *m_dev_desc;
     bool                        m_defined;
     std::map<chid,ChanInfo>     m_chan_info;
     std::map<std::string,chid>  m_pv_index;
     boost::thread              *m_ctrl_thread;
-    boost::recursive_mutex      m_mutex;
+    //boost::reursive_mutex       m_mutex;
+    //boost::mutex                m_state_mutex;
+    boost::mutex                m_mutex;
+    boost::condition_variable   m_state_cond;
     bool                        m_active;
 };
 

@@ -5,20 +5,12 @@ using namespace std;
 
 namespace PVS {
 
-StreamService::StreamService( ConfigManager &a_cfg_mgr, size_t a_pkt_buffer_size /*, size_t a_max_notify_pkts*/ )
-    : m_cfg_mgr(a_cfg_mgr), m_out_adapter(0)
-//    : m_max_notify_pkts(a_max_notify_pkts), m_stream_listeners_thread(0)
+StreamService::StreamService( size_t a_pkt_buffer_size )
+    : m_cfg_mgr(), m_out_adapter(0)
 {
     // Make sure buffer sizes are sane
     if ( a_pkt_buffer_size < 2 )
         throw runtime_error( "Invalid buffer size parameter" );
-/*
-    if ( m_max_notify_pkts > a_pkt_buffer_size )
-        throw runtime_error( "Invalid notify buffer size parameter" );
-
-    if ( !m_max_notify_pkts )
-        m_max_notify_pkts = a_pkt_buffer_size >> 1;
-*/
 
     // Create stream packets and fill free queue;
     for ( size_t i = 0; i < a_pkt_buffer_size; ++i )
@@ -28,9 +20,6 @@ StreamService::StreamService( ConfigManager &a_cfg_mgr, size_t a_pkt_buffer_size
     }
 
     m_cfg_mgr.attach( this );
-
-    // Start stream listener notify thread
-    //m_stream_notify_thread = new boost::thread( boost::bind( &StreamService::streamNotifyThread, this ));
 }
 
 
@@ -39,7 +28,6 @@ StreamService::~StreamService()
     // Deactivate all queues - will force waiting threads to wake and exit
     m_free_que.deactivate();
     m_fill_que.deactivate();
-    //m_notify_que.deactivate();
 
     // Delete stream packets
     for ( vector<StreamPacket*>::iterator ip = m_stream_pkts.begin(); ip != m_stream_pkts.end(); ++ip )
@@ -47,24 +35,27 @@ StreamService::~StreamService()
 }
 
 
-IInputAdapterAPI*
-StreamService::attach( IInputAdapter &a_adapter )
+void
+StreamService::attach( IInputAdapter *a_adapter )
 {
-    if ( find( m_in_adapters.begin(), m_in_adapters.end(), &a_adapter ) == m_in_adapters.end())
-        m_in_adapters.push_back( &a_adapter );
-
-    return this;
+    if ( find( m_in_adapters.begin(), m_in_adapters.end(), a_adapter ) == m_in_adapters.end())
+    {
+        m_in_adapters.push_back( a_adapter );
+        a_adapter->m_srteam_api = this;
+        a_adapter->m_stream_serv = this;
+    }
 }
 
 
-IOutputAdapterAPI*
-StreamService::attach( IOutputAdapter &a_adapter )
+void
+StreamService::attach( IOutputAdapter *a_adapter )
 {
     if ( m_out_adapter )
         throw runtime_error( "Can not change output adapter once set." );
 
-    m_out_adapter = &a_adapter;
-    return this;
+    m_out_adapter = a_adapter;
+    m_out_adapter->m_srteam_api = this;
+    m_out_adapter->m_stream_serv = this;
 }
 
 

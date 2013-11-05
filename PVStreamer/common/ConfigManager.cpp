@@ -1,6 +1,7 @@
 #include <boost/lexical_cast.hpp>
 #include "ConfigManager.h"
 #include "StreamService.h"
+#include <syslog.h>
 
 using namespace std;
 
@@ -66,7 +67,7 @@ ConfigManager::getDeviceConfig( const string &a_device_name, const string &a_sou
 DeviceRecordPtr
 ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 {
-    cout << "defineDevice " << a_descriptor.m_name << "," << a_descriptor.m_source << "," << a_descriptor.m_protocol << endl;
+    syslog( LOG_DEBUG, "ConfigMgr::defineDevice: %s, %s, %lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     DeviceRecordPtr record;
@@ -80,13 +81,15 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         // Existing record found, compare to provided descriptor
         if ( a_descriptor == *idev->second )
         {
-            cout << "  device already defined." << endl;
+            syslog( LOG_DEBUG, "ConfigMgr: device already defined" );
+
             // Records are same, just return existing record
             record = idev->second;
         }
         else
         {
-            cout << "  device being re-defined." << endl;
+            syslog( LOG_DEBUG, "ConfigMgr: device being redefined" );
+
             // Record is different, must make new record but try to re-use identifiers
             const DeviceDescriptor *old_desc = idev->second.get();
             DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
@@ -132,7 +135,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     }
     else
     {
-        cout << "  device being defined." << endl;
+        syslog( LOG_DEBUG, "ConfigMgr: device being defined" );
 
         // No existing record, create a new one copied from the passed-in descriptor
         DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
@@ -187,7 +190,7 @@ ConfigManager::undefineDevice( const std::string &a_source, Protocol a_protocol 
 void
 ConfigManager::undefineDevice( const std::string &a_name, const std::string &a_source, Protocol a_protocol )
 {
-    cout << "undefineDevice " << a_name << "," << a_source << "," << a_protocol << endl;
+    syslog( LOG_DEBUG, "ConfigMgr::undefineDevice: %s, %s, %lu", a_name.c_str(), a_source.c_str(), (unsigned long)a_protocol );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -293,7 +296,7 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr 
     StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
     if ( pkt )
     {
-        pkt->type = DeviceDefined;
+        pkt->type = DeviceRedefined;
         pkt->device = a_dev_desc;
         pkt->old_device = a_old_dev_desc;
 
@@ -308,7 +311,7 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr 
 void
 ConfigManager::gcThread()
 {
-    cout << "GC thread started" << endl;
+    //cout << "GC thread started" << endl;
 
     set<DeviceRecordPtr>::iterator i;
     uint32_t    count = 0;
