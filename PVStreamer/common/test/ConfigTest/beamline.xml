@@ -1,48 +1,72 @@
 <beamline>
     <devices>
         <device active="true">
-            <name>Device 1</name>
+            <name>Device A</name>
             <pv>
-                <name>a</name>
-                <alias>alpha</alias>
+                <name>a1</name>
+                <alias>a1</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
-                <name>b</name>
-                <alias>beta</alias>
+                <name>a2</name>
+                <alias>a2</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
-                <name>fubar</name>
-                <alias>fubar</alias>
+                <name>a3</name>
+                <alias>a3</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>a4</name>
+                <alias>a4</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>fubar1</name>
+                <alias>fubar1</alias>
                 <scan/>
             </pv>
         </device>
         <device active="true">
-            <name>Device 2</name>
+            <name>Device B</name>
             <pv>
-                <name>c</name>
-                <alias>chi</alias>
+                <name>b1</name>
+                <alias>b1</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
-                <name>d</name>
-                <alias>delta</alias>
+                <name>b2</name>
+                <alias>b2</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
-                <name>e</name>
-                <alias>epsilon</alias>
+                <name>b3</name>
+                <alias>b3</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>b4</name>
+                <alias>b4</alias>
                 <log/>
                 <scan/>
             </pv>
         </device>
         <device active="false">
-            <name>Device 3</name>
+            <name>Device C</name>
+            <pv>
+                <name>fubar2</name>
+                <alias>fubar2</alias>
+                <log/>
+                <scan/>
+            </pv>
         </device>
     </devices>
 </beamline>

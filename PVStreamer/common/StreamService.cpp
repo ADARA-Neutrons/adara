@@ -29,6 +29,12 @@ StreamService::~StreamService()
     m_free_que.deactivate();
     m_fill_que.deactivate();
 
+    for (vector<IInputAdapter*>::iterator i = m_in_adapters.begin(); i != m_in_adapters.end(); ++i )
+        delete *i;
+
+    if ( m_out_adapter )
+        delete m_out_adapter;
+
     // Delete stream packets
     for ( vector<StreamPacket*>::iterator ip = m_stream_pkts.begin(); ip != m_stream_pkts.end(); ++ip )
         delete *ip;

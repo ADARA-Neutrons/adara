@@ -14,15 +14,6 @@ class IInputAdapterAPI;
 
 typedef boost::shared_ptr<DeviceDescriptor>    DeviceRecordPtr;
 
-#if 0
-class IConfigListener
-{
-public:
-    void            deviceDefined( DeviceRecordPtr a_device );
-    void            deviceRedefined( DeviceRecordPtr a_device );
-    void            deviceUndefined( DeviceRecordPtr a_device );
-};
-#endif
 
 class ConfigManager
 {
@@ -32,10 +23,7 @@ public:
 
     DeviceRecordPtr getDeviceConfig( const std::string &a_device_name, const std::string &a_source, Protocol a_protocol );
     DeviceRecordPtr defineDevice( DeviceDescriptor &a_descriptor );
-    //void            undefineDevice( const std::string &a_source, Protocol a_protocol );
-    void            undefineDevice( const std::string &a_device_name, const std::string &a_source, Protocol a_protocol );
-    //void            attachListener( IConfigListener &a_listener );
-    //void            detachListener( IConfigListener &a_listener );
+    void            undefineDevice( DeviceRecordPtr &a_record );
     void            attach( IInputAdapterAPI *a_stream_api );
 
 private:
@@ -48,14 +36,6 @@ private:
     IInputAdapterAPI*                       m_stream_api;
     std::map<std::string,DeviceRecordPtr>   m_devices;
     boost::mutex                            m_mutex;
-//    std::vector<IConfigListener *>          m_listeners;
-
-#ifdef USE_GC
-    bool                                    m_running;
-    void            gcThread();
-    std::set<DeviceRecordPtr>               m_garbage;
-    boost::thread                          *m_gc_thread;
-#endif
 };
 
 }

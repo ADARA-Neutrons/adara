@@ -60,7 +60,7 @@ private:
     void        connectPV( PVDescriptor *a_pv );
     void        disconnectPV( PVDescriptor *a_pv );
     void        controlThread();
-    void        sendLastValues();
+    void        sendCurrentValues();
     void        epicsConnectionHandler( struct connection_handler_args a_args );
     void        epicsEventHandler( struct event_handler_args a_args );
     PVType      epicsToPVType( uint32_t a_rec_type );
@@ -79,10 +79,9 @@ private:
     std::map<chid,ChanInfo>     m_chan_info;
     std::map<std::string,chid>  m_pv_index;
     boost::thread              *m_ctrl_thread;
-    //boost::reursive_mutex       m_mutex;
-    //boost::mutex                m_state_mutex;
     boost::mutex                m_mutex;
     boost::condition_variable   m_state_cond;
+    bool                        m_state_changed;
     bool                        m_active;
 };
 

@@ -4,7 +4,10 @@
 #include "StreamService.h"
 #include "EPICS_InputAdapter.h"
 #include "ADARA_OutputAdapter.h"
+#include "TraceException.h"
 #include <cadef.h>
+#include <signal.h>
+#include <syslog.h>
 
 using namespace std;
 using namespace PVS;
@@ -24,7 +27,7 @@ testRedundantConfig( ConfigManager &cfgmgr )
 
     bool res = (rec1 == rec2);
 
-    cfgmgr.undefineDevice( "dev1", "host-a", 1 );
+    cfgmgr.undefineDevice( rec1 );
 
     return res;
 }
@@ -57,7 +60,7 @@ testIDReuse( ConfigManager &cfgmgr )
     if ( rec2a->m_pvs[1]->m_id != rec2->m_pvs[2]->m_id )
         res = false;
 
-    cfgmgr.undefineDevice( "dev1", "host-a", 1 );
+    cfgmgr.undefineDevice( rec2 );
 
     return res;
 }
@@ -72,7 +75,7 @@ testDeviceUndefine( ConfigManager &cfgmgr )
 
     DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
 
-    cfgmgr.undefineDevice( "dev1", "host-a", 1 );
+    cfgmgr.undefineDevice( rec1 );
 
     DeviceRecordPtr rec1b = cfgmgr.getDeviceConfig( "dev1", "host-a", 1 );
 
@@ -114,7 +117,7 @@ testEnums( ConfigManager &cfgmgr )
     if ( rec1->m_pvs[3]->m_enum->m_values.size() != 4 )
         res = false;
 
-    cfgmgr.undefineDevice( "dev1", "host-a", 1 );
+    cfgmgr.undefineDevice( rec1 );
 
     return res;
 }
@@ -122,9 +125,44 @@ testEnums( ConfigManager &cfgmgr )
 
 #define PROCRES(x,test) if ( !x ) { cout << "Failed: " << test << endl; }
 
+
+bool g_active = true;
+
+void signalHandler( int a_signal )
+{
+    g_active = false;
+}
+
+
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+
+    struct sigaction new_action, old_action;
+
+    new_action.sa_handler = signalHandler;
+    sigemptyset( &new_action.sa_mask );
+    new_action.sa_flags = 0;
+
+    sigaction (SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGINT, &new_action, NULL);
+
+    sigaction (SIGHUP, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGHUP, &new_action, NULL);
+
+    sigaction (SIGTERM, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGTERM, &new_action, NULL);
+
+    sigaction (SIGQUIT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction (SIGQUIT, &new_action, NULL);
+
+    openlog( "pvsd", 0, LOG_DAEMON );
+    syslog( LOG_INFO, "pvsd-qt started." );
+
 #if 0
     cout << "ConfigManager Tests" << endl;
 
@@ -136,16 +174,34 @@ int main(int argc, char *argv[])
     PROCRES( testEnums( cfgmgr ), "Enum tests" );
 #endif
 
-    ConfigManager           cfg_mgr;
-    StreamService           streamer( cfg_mgr, 100 );
-    ADARA::OutputAdapter    out_adapt( streamer );
-    EPICS::InputAdapter     in_adapter( streamer, cfg_mgr, "beamline.xml" );
-
-    while(1)
+    try
     {
-        //sleep(1);
-        ca_pend_event(1.0);
+        uint32_t        port = 31416;
+        StreamService   streamer( 100 );
+        streamer.attach( new PVS::ADARA::OutputAdapter( port, 2 ));
+        streamer.attach( new PVS::EPICS::InputAdapter( "beamline.xml" ));
+
+        while( g_active )
+        {
+            sleep(1);
+        }
     }
+    catch( TraceException &e )
+    {
+        cout << e.toString() << endl;
+    }
+    catch( exception &e )
+    {
+        cout << "Unhandled exception: %s" << e.what() << endl;
+    }
+    catch( ... )
+    {
+        cout << "Unknown exception" << endl;
+    }
+
+    syslog( LOG_INFO, "pvsd-qt stopping." );
+    closelog();
+
 
     return 0;
 }

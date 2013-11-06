@@ -35,22 +35,24 @@ OutputAdapter::~OutputAdapter()
 
     m_active = false;
 
-    if ( m_listen_socket > -1 )
-        close( m_listen_socket );
-
     for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
+    {
+        cout << "Close client socket" << endl;
+        shutdown( ic->socket, SHUT_RDWR );
         close ( ic->socket );
+    }
+
+    if ( m_listen_socket > -1 )
+    {
+        cout << "Close list socket" << endl;
+        shutdown( m_listen_socket, SHUT_RDWR );
+        close( m_listen_socket );
+    }
 
     m_pkt_send_thread->join();
-    //m_socket_listen_thread->join();
+    m_socket_listen_thread->join();
 }
 
-
-void
-OutputAdapter::stop()
-{
-    m_active = false;
-}
 
 
 /** \brief Thread method for ADARA packet translation and transmission.
@@ -453,20 +455,24 @@ OutputAdapter::initSockets()
     // Resolve the local address and port to be used by the server
     rc = getaddrinfo( 0, port_str, &hints, &result );
     if ( rc )
-        EXCEPT( EC_SOCKET_ERROR, "getaddrinfo failed." );
+        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
 
     m_listen_socket = socket( result->ai_family, result->ai_socktype, result->ai_protocol );
     if ( m_listen_socket < 0 )
-        EXCEPT( EC_SOCKET_ERROR, "create socket failed." );
+        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
+
+    int yes = 1;
+    if ( setsockopt( m_listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
+        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
 
     rc = bind( m_listen_socket, result->ai_addr, (int)result->ai_addrlen );
     if ( rc < 0 )
-        EXCEPT( EC_SOCKET_ERROR, "bind socket failed." );
+        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
 
     if ( listen( m_listen_socket, 5 /*max connections*/ ) < 0 )
     {
         close( m_listen_socket );
-        EXCEPT( EC_SOCKET_ERROR, "listen socket failed." );
+        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
     }
 
     // Get Server IP address (not sure why the above does not set it correctly in result
@@ -509,6 +515,7 @@ OutputAdapter::socketListenThread()
     while(1)
     {
         info.socket = accept( m_listen_socket, &client_addr, &client_addr_len );
+cout << "accepted " << info.socket << endl;
         if ( info.socket < 0 )
         {
             if ( !m_active )

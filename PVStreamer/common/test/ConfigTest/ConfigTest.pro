@@ -15,7 +15,8 @@ CONFIG   -= app_bundle
 TEMPLATE = app
 
 INCLUDEPATH += ../.. /usr/include/libxml2 /opt/epics/base/include \
-    /opt/epics/base/include/os/Linux ../../../epics ../../../adara
+    /opt/epics/base/include/os/Linux ../../../epics ../../../adara \
+    ../../../../common
 
 SOURCES += main.cpp \
     ../../DeviceDescriptor.cpp \

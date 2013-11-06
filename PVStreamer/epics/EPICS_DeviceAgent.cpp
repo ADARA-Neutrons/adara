@@ -16,7 +16,7 @@ namespace EPICS {
 
 
 DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device )
-    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_active(true)
+    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true)
 {
     m_ctrl_thread = new boost::thread(boost::bind( &DeviceAgent::controlThread, this ));
 
@@ -26,17 +26,28 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_de
 
 DeviceAgent::~DeviceAgent()
 {
+    cout << "~DeviceAgent()" << endl;
+
     m_active = false;
     stop();
 
+    // Wake up ctrl thread and wait for it to exit
+    m_state_cond.notify_one();
     m_ctrl_thread->join();
+
+    // If a device is currently configured, undefine it
+    if ( m_dev_record.get())
+    {
+        cout << "undef dev" << endl;
+        m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+    }
 }
 
 
 void
 DeviceAgent::update( DeviceDescriptor *a_device )
 {
-    syslog( LOG_DEBUG, "DeviceAgent::update(%s)", a_device->m_name.c_str() );
+    //syslog( LOG_DEBUG, "DeviceAgent::update(%s)", a_device->m_name.c_str() );
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
@@ -109,6 +120,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
 
     // If no new PV channels were created, state machne will not progress on it's own
     // Wake state machine in this case (doesn't matter if its notified more than once)
+    m_state_changed = true;
     m_state_cond.notify_one();
 }
 
@@ -155,6 +167,8 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     m_chan_info[info.m_chid] = info;
     m_pv_index[a_pv->m_name] = info.m_chid;
 
+    cout << "ConnPV " << a_pv->m_name.c_str() << ":" << (long)info.m_chid << endl;
+
     syslog( LOG_DEBUG, "Connected PV: %s, chid: %li", a_pv->m_name.c_str(), (long)info.m_chid );
 }
 
@@ -171,10 +185,10 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
             if ( ich->second.m_subscribed )
                 ca_clear_subscription( ich->second.m_evid );
 
+            syslog( LOG_DEBUG, "Disconnected PV: %s, chid: %li", a_pv->m_name.c_str(), (long)ich->second.m_chid );
+
             ca_clear_channel( ich->second.m_chid );
             m_chan_info.erase( ich );
-
-            syslog( LOG_DEBUG, "Disconnected PV: %s", a_pv->m_name.c_str() );
         }
         m_pv_index.erase( ipv );
     }
@@ -189,18 +203,25 @@ DeviceAgent::controlThread()
     PVDescriptor *pv;
     size_t ready;
 
-    syslog( LOG_DEBUG, "DevAg: control thread started" );
+    //syslog( LOG_DEBUG, "DevAg: control thread started" );
 
     while( 1 )
     {
         boost::unique_lock<boost::mutex> lock(m_mutex);
 
-        m_state_cond.wait( lock );
+        if ( !m_state_changed )
+            m_state_cond.wait( lock );
 
         //syslog( LOG_DEBUG, "State machine running" );
 
         if ( !m_active )
             break;
+
+        // Might have been woken spuriously
+        if ( !m_state_changed )
+            continue;
+
+        m_state_changed = false;
 
         ready = 0;
         for ( ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
@@ -209,7 +230,11 @@ DeviceAgent::controlThread()
             {
             case INFO_NEEDED:
                 if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_pv->m_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
+                {
+                    cout << "INFO PEND " << (long)ich->second.m_chid << endl;
+
                     ich->second.m_chan_state = INFO_PENDING;
+                }
                 break;
             case READY:
                 ++ready;
@@ -219,13 +244,14 @@ DeviceAgent::controlThread()
             }
         }
 
-        if ( m_dev_desc && !m_defined && ready == m_dev_desc->m_pvs.size() )
+        if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
         {
+            cout << "Device ready to define!" << endl;
             //syslog( LOG_DEBUG, "Device Ready" );
 
             // All PVs for current device are initialized
             // Defined device
-            m_dev_record = m_cfg_mgr.defineDevice( *m_dev_desc );
+            m_dev_record = m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
 
             // Update all channel info objects with new device & pv references
             for ( idx = m_pv_index.begin(); idx != m_pv_index.end(); ++idx )
@@ -244,9 +270,9 @@ DeviceAgent::controlThread()
             delete m_dev_desc;
             m_dev_desc = 0;
 
-            sendLastValues();
+            sendCurrentValues();
         }
-#if 0
+#if 1
         else
         {
             cout << "CTRL: [" << (long)m_dev_desc << "][" << m_defined << "][" << ready << "]";
@@ -257,7 +283,7 @@ DeviceAgent::controlThread()
 #endif
     }
 
-    syslog( LOG_DEBUG, "DevAg: control thread exiting" );
+    //syslog( LOG_DEBUG, "DevAg: control thread exiting" );
 }
 
 
@@ -270,7 +296,8 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
     {
         if ( a_args.op == CA_OP_CONN_UP )
         {
-            syslog( LOG_DEBUG, "Connection UP: %li", (long)a_args.chid );
+            syslog( LOG_DEBUG, "Conn UP, chid: %li", (long)a_args.chid );
+            cout << "Con UP" << (long)a_args.chid << endl;
 
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -297,9 +324,13 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                             if ( ich->second.m_pv->m_type == PV_STR ) // There is NO ctrl record for EPICS string types
                                 ich->second.m_chan_state = READY;
                             else
+                            {
                                 ich->second.m_chan_state = INFO_NEEDED;
+                                cout << "INFO_NEEDED " << (long)a_args.chid << endl;
+                            }
 
                             // Wake state machine
+                            m_state_changed = true;
                             m_state_cond.notify_one();
                         }
                     }
@@ -308,7 +339,7 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
         }
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
-            syslog( LOG_DEBUG, "Connection DOWN: %li", (long)a_args.chid );
+            syslog( LOG_DEBUG, "Conn DOWN, chid: %li", (long)a_args.chid );
 
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -430,6 +461,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             }
             else if ( epicsIsCtrlRecordType( a_args.type ))
             {
+                cout << "Got CTRL" << endl;
                 boost::lock_guard<boost::mutex> lock(m_mutex);
 
                 map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
@@ -467,8 +499,11 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 
                     if ( ich->second.m_chan_state == INFO_PENDING )
                     {
+                        cout << "READY " << (long)a_args.chid << endl;
+
                         ich->second.m_chan_state = READY;
                         // Wake state machine
+                        m_state_changed = true;
                         m_state_cond.notify_one();
                     }
                 }
@@ -493,7 +528,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 
 
 void
-DeviceAgent::sendLastValues()
+DeviceAgent::sendCurrentValues()
 {
     for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
     {

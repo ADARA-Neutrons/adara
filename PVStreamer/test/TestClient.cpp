@@ -112,8 +112,8 @@ int main( int argc, char* argv[])
         {
             ++pkt_count;
             // Get payload len from header
-            if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
-                cout << "[" << hex << hdr.pkt_format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
+            //if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
+            //    cout << "[" << hex << hdr.pkt_format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
 
             if ( hdr.payload_len )
             {
@@ -155,7 +155,7 @@ int main( int argc, char* argv[])
                 cout << "DDP: ";
                 cout << " id: " << fields[0];
                 cout << ", xml len: " << fields[1] << endl;
-                cout << "  xml: " << &buf[8] << endl;
+                //cout << "  xml: " << &buf[8] << endl;
             }
             else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_U32_V0 )
             {

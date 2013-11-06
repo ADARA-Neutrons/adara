@@ -16,7 +16,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "0.1.0"
+#define PVSD_VERSION "1.0.0"
 
 bool g_active = true;
 
@@ -97,16 +97,11 @@ int main(int argc, char *argv[])
     if ( !opt_map.count( "domain" ))
         syslog( LOG_WARNING, "No communication domain specified - probably an error." );
 
-    ::ADARA::ComBus::Connection *combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
+    ::ADARA::ComBus::Connection *combus = 0;
 
     try
     {
-        //combus->waitForConnect( 10 );
-
-        //ConfigManager               cfg_mgr;
-        //StreamService               streamer( cfg_mgr, 100 );
-        //PVS::ADARA::OutputAdapter   out_adapter( streamer, port, heartbeat );
-        //PVS::EPICS::InputAdapter    in_adapter( streamer, cfg_mgr, epics_cfg );
+        combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
 
         StreamService   streamer( 100 );
         streamer.attach( new PVS::ADARA::OutputAdapter( port, heartbeat ));
@@ -117,13 +112,11 @@ int main(int argc, char *argv[])
 
         while( g_active )
         {
-            if (!(count % 2))
+            if (!(++count % 2))
                 combus->status( ::ADARA::ComBus::STATUS_OK );
 
             sleep(1);
         }
-
-        //streamer.stop();
     }
     catch( TraceException &e )
     {
@@ -138,7 +131,8 @@ int main(int argc, char *argv[])
         syslog( LOG_ERR, "Unknown exception" );
     }
 
-    delete combus;
+    if ( combus )
+        delete combus;
 
     syslog( LOG_INFO, "pvsd stopping." );
     closelog();

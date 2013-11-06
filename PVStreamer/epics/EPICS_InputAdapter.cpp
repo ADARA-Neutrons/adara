@@ -94,20 +94,23 @@ InputAdapter::gcThread()
     while( 1 )
     {
         sleep(1);
+
         boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-        for ( map<string,DeviceAgent*>::iterator idev = m_dev_agents.begin(); idev != m_dev_agents.end(); )
+        for ( list<DeviceAgent*>::iterator idev = m_garbage.begin(); idev != m_garbage.end(); )
         {
-            if ( idev->second->stopped())
+            if ( (*idev)->stopped())
             {
-                delete idev->second;
-                m_dev_agents.erase( ++idev );
+                delete *idev;
+                idev = m_garbage.erase( idev );
             }
             else
+            {
                 ++idev;
+            }
         }
 
-        if ( !m_active && !m_dev_agents.size())
+        if ( !m_active && !m_garbage.size() && !m_dev_agents.size() )
             break;
     }
 }
@@ -169,7 +172,7 @@ InputAdapter::configFileMonitorThread()
                         if ( changed )
                         {
                             syslog( LOG_INFO, "EPICS beam config file has changed" );
-
+cout << endl << "CFG CHANGE" << endl << endl;
                             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
                             if ( !m_active )
@@ -181,23 +184,31 @@ InputAdapter::configFileMonitorThread()
                             {
                                 // Parsed successfully
 
-                                // Start device agents for all configured devices
-                                // It's OK if agents are already running
+                                // Keep track of new device names
+                                set<string> new_devices;
                                 for ( idev = devices.begin(); idev != devices.end(); ++idev )
                                 {
-                                    syslog( LOG_DEBUG, "Starting device agent for: %s", (*idev)->m_name.c_str() );
+                                    cout << "Adding " << (*idev)->m_name << endl;
+                                    new_devices.insert( (*idev)->m_name );
+                                }
+
+                                // Start device agents for all configured devices
+                                // It's OK if agents are already running
+                                // NOTE: The DeviceDescriptor ptrs in devices vector will be deleted by the startDevice call
+                                for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                                {
+                                    //syslog( LOG_DEBUG, "Starting device agent for: %s", (*idev)->m_name.c_str() );
                                     startDevice( *idev );
                                 }
 
                                 // Stop device agents that are no longer configured
-                                set<string> new_devices;
-                                for ( idev = devices.begin(); idev != devices.end(); ++idev )
-                                    new_devices.insert( (*idev)->m_name );
-
                                 for ( icur = m_cur_devices.begin(); icur != m_cur_devices.end(); ++icur )
                                 {
                                     if ( new_devices.find( *icur ) == new_devices.end())
+                                    {
+                                        cout << "Stop " << *icur << endl;
                                         stopDevice( *icur );
+                                    }
                                 }
 
                                 // Save new device names and new buffer

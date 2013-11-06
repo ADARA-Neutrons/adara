@@ -14,22 +14,11 @@ namespace PVS {
 
 ConfigManager::ConfigManager()
     : m_stream_api(0)
-{
-#ifdef USE_GC
-    m_running = true;
-    m_gc_thread = new boost::thread(boost::bind( &ConfigManager::gcThread, this ));
-#endif
-}
+{}
 
 
 ConfigManager::~ConfigManager()
-{
-#ifdef USE_GC
-    m_running = false;
-    m_gc_thread->join();
-    delete m_gc_thread;
-#endif
-}
+{}
 
 
 void
@@ -67,12 +56,12 @@ ConfigManager::getDeviceConfig( const string &a_device_name, const string &a_sou
 DeviceRecordPtr
 ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 {
-    syslog( LOG_DEBUG, "ConfigMgr::defineDevice: %s, %s, %lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
+    //syslog( LOG_DEBUG, "ConfigMgr::defineDevice: %s, %s, %lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     DeviceRecordPtr record;
 
-    // Compare to the latest configuration records (those in trash don't matter)
+    // Compare to the latest configuration records
     string key = makeDeviceKey( a_descriptor.m_name, a_descriptor.m_source, a_descriptor.m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
@@ -81,14 +70,12 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         // Existing record found, compare to provided descriptor
         if ( a_descriptor == *idev->second )
         {
-            syslog( LOG_DEBUG, "ConfigMgr: device already defined" );
-
             // Records are same, just return existing record
             record = idev->second;
         }
         else
         {
-            syslog( LOG_DEBUG, "ConfigMgr: device being redefined" );
+            syslog( LOG_DEBUG, "Re-defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
             // Record is different, must make new record but try to re-use identifiers
             const DeviceDescriptor *old_desc = idev->second.get();
@@ -125,9 +112,6 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 
             // Move old record to trash, and save new record
             record = DeviceRecordPtr(new_desc);
-#ifdef USE_GC
-            m_garbage.insert( idev->second );
-#endif
             sendDeviceRedefined( record, idev->second );
 
             idev->second = record;
@@ -135,7 +119,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     }
     else
     {
-        syslog( LOG_DEBUG, "ConfigMgr: device being defined" );
+        syslog( LOG_DEBUG, "Defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
         // No existing record, create a new one copied from the passed-in descriptor
         DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
@@ -158,79 +142,28 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     return record;
 }
 
-#if 0
-/** \brief Undefine all devices of specified protocol on specified host
-  *
-  */
-void
-ConfigManager::undefineDevice( const std::string &a_source, Protocol a_protocol )
-{
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    for ( map<string,DeviceRecordPtr>::iterator idev = m_devices.begin(); idev != m_devices.end();  )
-    {
-        if ( idev->second->m_protocol == a_protocol && idev->second->m_source == a_source )
-        {
-#ifdef USE_GC
-            cout << "Moving " << idev->second.get() << " to garbage" << endl;
-            m_garbage.insert( idev->second );
-#endif
-            m_devices.erase( idev++ );
-        }
-        else
-            ++idev;
-    }
-}
-#endif
-
 
 /** \brief Undefine specified devices
   *
   */
 void
-ConfigManager::undefineDevice( const std::string &a_name, const std::string &a_source, Protocol a_protocol )
+ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
 {
-    syslog( LOG_DEBUG, "ConfigMgr::undefineDevice: %s, %s, %lu", a_name.c_str(), a_source.c_str(), (unsigned long)a_protocol );
+    syslog( LOG_DEBUG, "Un-defining device: %s:%s:%lu", a_record->m_name.c_str(), a_record->m_source.c_str(), (unsigned long)a_record->m_protocol );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     // Compare to the latest configuration records (those in trash don't matter)
-    string key = makeDeviceKey( a_name, a_source, a_protocol );
+    string key = makeDeviceKey( a_record->m_name, a_record->m_source, a_record->m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
     if ( idev != m_devices.end())
     {
-#ifdef USE_GC
-        m_garbage.insert( idev->second );
-#endif
         sendDeviceUndefined( idev->second );
 
         m_devices.erase( idev );
     }
 }
-
-#if 0
-void
-ConfigManager::attachListener( IConfigListener &a_listener )
-{
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    vector<IConfigListener *>::iterator l = find( m_listeners.begin(), m_listeners.end(), &a_listener );
-    if ( l == m_listeners.end())
-        m_listeners.push_back( &a_listener );
-}
-
-
-void
-ConfigManager::detachListener( IConfigListener &a_listener )
-{
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    vector<IConfigListener *>::iterator l = find( m_listeners.begin(), m_listeners.end(), &a_listener );
-    if ( l != m_listeners.end())
-        m_listeners.erase( l );
-}
-#endif
 
 
 //=============================================================================
@@ -303,45 +236,6 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr 
         m_stream_api->putFilledPacket( pkt );
     }
 }
-
-
-
-#ifdef USE_GC
-
-void
-ConfigManager::gcThread()
-{
-    //cout << "GC thread started" << endl;
-
-    set<DeviceRecordPtr>::iterator i;
-    uint32_t    count = 0;
-
-    while( m_running )
-    {
-        sleep(1);
-        count++;
-
-        if ( !(count % 2 ))
-        {
-            cout << "GC running" << endl;
-
-            boost::lock_guard<boost::mutex> lock(m_mutex);
-            for ( i = m_garbage.begin(); i != m_garbage.end(); )
-            {
-                if ( (*i).unique() )
-                {
-                    cout << "deleting device " << (*i).get() << "," << (*i)->m_id << "," << (*i)->m_name << endl;
-                    m_garbage.erase( i++ );
-                }
-                else
-                    ++i;
-            }
-        }
-    }
-    cout << "GC thread exiting" << endl;
-}
-
-#endif
 
 }
 
