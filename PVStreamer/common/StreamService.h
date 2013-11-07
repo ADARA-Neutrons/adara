@@ -102,7 +102,7 @@ public:
 class StreamService : private IInputAdapterAPI, private IOutputAdapterAPI
 {
 public:
-    StreamService( size_t a_pkt_buffer_size );
+    StreamService( size_t a_pkt_buffer_size, uint32_t a_offset = 0 );
     ~StreamService();
 
     void            attach( IInputAdapter *a_adapter );

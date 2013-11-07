@@ -76,8 +76,8 @@ private:
     DeviceRecordPtr             m_dev_record;
     DeviceDescriptor           *m_dev_desc;
     bool                        m_defined;
-    std::map<chid,ChanInfo>     m_chan_info;
-    std::map<std::string,chid>  m_pv_index;
+    std::map<chid,ChanInfo>     m_chan_info;        ///< PV channel ID to channel info map
+    std::map<std::string,chid>  m_pv_index;         ///< PV name (not connection) to channel id map
     boost::thread              *m_ctrl_thread;
     boost::mutex                m_mutex;
     boost::condition_variable   m_state_cond;

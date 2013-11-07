@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
     string          broker_pass;
     string          domain;
     string          epics_cfg;
+    uint32_t        offset;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("epics", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
+            ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
             ;
 
     po::variables_map opt_map;
@@ -103,7 +105,7 @@ int main(int argc, char *argv[])
     {
         combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
 
-        StreamService   streamer( 100 );
+        StreamService   streamer( 100, offset );
         streamer.attach( new PVS::ADARA::OutputAdapter( port, heartbeat ));
         streamer.attach( new PVS::EPICS::InputAdapter( epics_cfg ));
 

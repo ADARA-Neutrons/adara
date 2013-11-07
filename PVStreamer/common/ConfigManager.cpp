@@ -12,8 +12,8 @@ namespace PVS {
 //===== PUBLIC METHODS ========================================================
 
 
-ConfigManager::ConfigManager()
-    : m_stream_api(0)
+ConfigManager::ConfigManager( uint32_t a_offset )
+    : m_stream_api(0), m_offset(a_offset)
 {}
 
 
@@ -176,16 +176,28 @@ ConfigManager::makeDeviceKey( const string &a_device_name, const string &a_sourc
 }
 
 
+/** \brief Gets next available device identifier
+  * \return New identifier
+  *
+  * This method finds and returns the lowest-valued free device identifier,
+  * starting at 1 + offset. This new identifier is only reserved while m_mutex
+  * is locked (i.e. must configure new device before releasing mutex).
+  */
 Identifier
 ConfigManager::getNextDeviceID() const
 {
-    Identifier id = 1;
+    set<Identifier> ids;
     for (  map<std::string,DeviceRecordPtr>::const_iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
+        ids.insert(idev->second->m_id);
+
+    Identifier id = 1 + m_offset;
+
+    for (  set<Identifier>::const_iterator i = ids.begin(); i != ids.end(); ++i )
     {
-        if ( id < idev->second->m_id )
+        if ( id < *i )
             break;
         else
-            id = idev->second->m_id + 1;
+            id = (*i) + 1;
     }
 
     return id;

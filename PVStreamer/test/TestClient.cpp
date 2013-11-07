@@ -70,7 +70,7 @@ initConnection( const char *a_address, unsigned short a_port, int &a_socket )
 int main( int argc, char* argv[])
 {
     const char     *address = "localhost";
-    unsigned short  port = 31416;
+    unsigned short  port = 50011;
     unsigned long   pkt_count = 0;
 
     for ( int i = 1; i < argc; ++i )
@@ -112,7 +112,7 @@ int main( int argc, char* argv[])
         {
             ++pkt_count;
             // Get payload len from header
-            //if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
+            if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
                 cout << "[" << hex << hdr.pkt_format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
 
             if ( hdr.payload_len )

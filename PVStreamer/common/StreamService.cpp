@@ -5,8 +5,8 @@ using namespace std;
 
 namespace PVS {
 
-StreamService::StreamService( size_t a_pkt_buffer_size )
-    : m_cfg_mgr(), m_out_adapter(0)
+StreamService::StreamService( size_t a_pkt_buffer_size, uint32_t a_offset )
+    : m_cfg_mgr(a_offset), m_out_adapter(0)
 {
     // Make sure buffer sizes are sane
     if ( a_pkt_buffer_size < 2 )

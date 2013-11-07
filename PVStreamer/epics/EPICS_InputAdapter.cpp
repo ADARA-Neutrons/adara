@@ -264,6 +264,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
     */
 
     bool res = false;
+    stringstream sstr;
 
     xmlDocPtr doc = xmlReadMemory( a_buffer, a_buffer_size, 0, 0, 0 );
     if ( doc )
@@ -274,8 +275,10 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
             xmlNode *devices_node;
             xmlNode *tmp_node;
             string  value;
-            string dev_name;
-            vector<string> pvs;
+            string  dev_name;
+            string  pv_name;
+            string  pv_conn;
+            vector<pair<string,string> > pvs;
 
             // Skip to beamline section
             beam_node = xmlDocGetRootElement(doc);
@@ -307,28 +310,50 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         {
                                              if ( xmlFind( "log", cnode ))
                                              {
+                                                 pv_name.clear();
+                                                 pv_conn.clear();
+
                                                  tmp_node = xmlFind( "name", cnode );
-                                                 if ( tmp_node )
+                                                 if ( !tmp_node )
                                                  {
-                                                     xmlGetValue( tmp_node, value );
-                                                     pvs.push_back( value );
+                                                     syslog( LOG_ERR, "PV Name is missing/empty in config file" );
+                                                     throw -1;
                                                  }
+
+                                                 xmlGetValue( tmp_node, pv_conn ); // 'name' field is connection in xml
+
+                                                 tmp_node = xmlFind( "alias", cnode ); // 'alias' is name
+                                                 if ( tmp_node )
+                                                     xmlGetValue( tmp_node, pv_name );
+                                                 else
+                                                     pv_name = pv_conn;
+
+                                                 pvs.push_back( make_pair( pv_name, pv_conn ));
                                              }
                                         }
                                     }
 
                                     if ( dev_name.empty())
-                                        res = false; // It's an error to omit the device name
+                                    {
+                                        // It's an error to omit the device name
+                                        syslog( LOG_ERR, "Device name is missing/empty in config file" );
+                                        throw -1;
+                                    }
                                     else if ( pvs.size())
                                     {
-                                        syslog( LOG_DEBUG, "Found device: %s", dev_name.c_str() );
-                                        DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
-                                        for ( vector<string>::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
-                                        {
-                                            syslog( LOG_DEBUG, "With PV: %s", (*ipv).c_str() );
+                                        //sstr.clear();
+                                        //sstr << "Configuring device '" << dev_name << "' pvs: ";
+                                        //for ( vector<pair<string.string> >::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+                                        //    sstr << ipv->first << " (" << ipv->second << ") ";
+                                        //syslog( LOG_DEBUG, "%s", sstr.str().c_str() );
 
+                                        syslog( LOG_INFO, "Configuring device '%s'", dev_name.c_str() );
+
+                                        DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
+                                        for ( vector<pair<string,string> >::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+                                        {
                                             // Don't know type or units yet - just use any value
-                                            dev->definePV( *ipv, *ipv, PV_INT, 0, "" );
+                                            dev->definePV( ipv->first, ipv->second, PV_INT, 0, "" );
                                         }
                                         a_devices.push_back( dev );
                                     }

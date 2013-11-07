@@ -18,7 +18,7 @@ typedef boost::shared_ptr<DeviceDescriptor>    DeviceRecordPtr;
 class ConfigManager
 {
 public:
-    ConfigManager();
+    ConfigManager( uint32_t a_offset = 0 );
     ~ConfigManager();
 
     DeviceRecordPtr getDeviceConfig( const std::string &a_device_name, const std::string &a_source, Protocol a_protocol );
@@ -34,6 +34,7 @@ private:
     void            sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr a_old_dev_desc );
 
     IInputAdapterAPI*                       m_stream_api;
+    uint32_t                                m_offset;
     std::map<std::string,DeviceRecordPtr>   m_devices;
     boost::mutex                            m_mutex;
 };

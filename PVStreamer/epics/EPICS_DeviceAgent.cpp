@@ -166,9 +166,9 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     ChanInfo info;
     info.m_pv = a_pv;
 
-    if ( ca_create_channel( a_pv->m_name.c_str(), &epicsConnectionCallback, this, 0, &info.m_chid ) != ECA_NORMAL )
+    if ( ca_create_channel( a_pv->m_connection.c_str(), &epicsConnectionCallback, this, 0, &info.m_chid ) != ECA_NORMAL )
     {
-        syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_name.c_str() );
+        syslog( LOG_ERR, "Failed to create channel for PV: %s, connection: %s", a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
         EXCEPT( EC_EPICS_API, "Could not create PV channel" );
     }
     // Don't flush I/O here - update() method will call it
@@ -176,7 +176,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     m_chan_info[info.m_chid] = info;
     m_pv_index[a_pv->m_name] = info.m_chid;
 
-    cout << "ConnPV " << a_pv->m_name.c_str() << ":" << (long)info.m_chid << endl;
+    cout << "ConnPV " << a_pv->m_connection.c_str() << ":" << (long)info.m_chid << endl;
 
     syslog( LOG_DEBUG, "Connected PV: %s, chid: %li", a_pv->m_name.c_str(), (long)info.m_chid );
 }
