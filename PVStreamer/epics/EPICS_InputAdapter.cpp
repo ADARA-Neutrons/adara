@@ -53,7 +53,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
     }
     else
     {
-        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, a_device );
+        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
     }
 }
 
@@ -91,6 +91,9 @@ InputAdapter::stopAllDevices()
 void
 InputAdapter::gcThread()
 {
+    // Attach context just in case DevAgent destructor needs to make epics calls
+    ca_attach_context( m_epics_context );
+
     while( 1 )
     {
         sleep(1);

@@ -13,7 +13,7 @@ using namespace std;
 using namespace PVS::ADARA;
 
 /// Defines the difference between EPICS and Posix timestamp values
-#define EPICS_TIME_OFFSET -631152000
+#define EPICS_TIME_OFFSET 631152000
 
 namespace PVS {
 namespace ADARA {
@@ -87,7 +87,7 @@ OutputAdapter::packetSendThread()
                 // Send a heartbeat packet
                 if ( connected())
                 {
-                    heartbeat_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+                    heartbeat_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
                     sendPacket( heartbeat_pkt, 0 );
                 }
             }
@@ -132,6 +132,8 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceDescri
     stringstream sstr;
 
     a_adara_pkt.format  = ::ADARA::PacketType::DEVICE_DESC_V0;
+    a_adara_pkt.sec     = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
+    a_adara_pkt.nsec    = 0;
     a_adara_pkt.dev_id  = a_device.m_id;
 
     // Reset payload stringstream
@@ -225,7 +227,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
 
     a_adara_pkt.dev_id          = a_pv->m_device->m_id;
     a_adara_pkt.vvp.var_id      = a_pv->m_id;
-    a_adara_pkt.sec             = a_state.m_time.sec + EPICS_TIME_OFFSET;
+    a_adara_pkt.sec             = a_state.m_time.sec;
     a_adara_pkt.nsec            = a_state.m_time.nsec;
 
     a_adara_pkt.vvp.status      = a_state.m_status;
@@ -376,6 +378,7 @@ OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_o
     PVDescriptor *old_pv;
     bool found;
 
+    // Transfer last-known PVState to new state entries (keyed on new PVDescriptor instances)
     for ( vector<PVDescriptor*>::iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
     {
         found = false;
@@ -391,7 +394,7 @@ OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_o
         }
 
         if ( !found )
-            m_pv_state[*ipv] = PVState();
+            m_pv_state[*ipv] = PVState( ::ADARA::VariableStatus::UNDEFINED_ALARM, ::ADARA::VariableSeverity::INVALID );
     }
 
     // Add "new" device to configured device list
@@ -515,7 +518,6 @@ OutputAdapter::socketListenThread()
     while(1)
     {
         info.socket = accept( m_listen_socket, &client_addr, &client_addr_len );
-cout << "accepted " << info.socket << endl;
         if ( info.socket < 0 )
         {
             if ( !m_active )
@@ -550,7 +552,7 @@ OutputAdapter::sendCurrentData( int a_socket )
     string      payload;
 
     // Use current time for DDP packets
-    adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+    adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
 
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
@@ -584,7 +586,7 @@ OutputAdapter::sendSourceInfo( int a_socket )
 
     adara_pkt.payload_len = 0;
     adara_pkt.format = ::ADARA::PacketType::SOURCE_LIST_V0;
-    adara_pkt.sec = (unsigned long)time(0) + EPICS_TIME_OFFSET;
+    adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
 
     sendPacket( adara_pkt, 0, a_socket );

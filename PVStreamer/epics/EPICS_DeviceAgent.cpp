@@ -15,8 +15,8 @@ namespace PVS {
 namespace EPICS {
 
 
-DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device )
-    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true)
+DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context )
+    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true), m_epics_context(a_epics_context)
 {
     m_ctrl_thread = new boost::thread(boost::bind( &DeviceAgent::controlThread, this ));
 
@@ -26,21 +26,12 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_de
 
 DeviceAgent::~DeviceAgent()
 {
-    cout << "~DeviceAgent()" << endl;
-
     m_active = false;
     stop();
 
     // Wake up ctrl thread and wait for it to exit
     m_state_cond.notify_one();
     m_ctrl_thread->join();
-
-    // If a device is currently configured, undefine it
-    if ( m_dev_record.get())
-    {
-        cout << "undef dev" << endl;
-        m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
-    }
 }
 
 
@@ -130,12 +121,29 @@ DeviceAgent::stop()
 {
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
+    // If a device is currently configured, undefine it
+    if ( m_dev_record.get())
+    {
+        // Set state to disconnected
+        for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+        {
+            ich->second.m_pv_state.m_status = epicsAlarmComm;
+            ich->second.m_pv_state.m_severity = epicsSevInvalid;
+        }
+        // This will only send PV that have been sent before
+        // If being shutdown, nothing will be sent (queues are shutdown)
+        sendCurrentValues();
+        m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+    }
+
+    // Clear CA channels and unsubscribe
     for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
     {
         if ( ich->second.m_subscribed )
             ca_clear_subscription( ich->second.m_evid );
 
         ca_clear_channel( ich->second.m_chid );
+        ca_flush_io();
     }
 
     m_chan_info.clear();
@@ -163,6 +171,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_name.c_str() );
         EXCEPT( EC_EPICS_API, "Could not create PV channel" );
     }
+    // Don't flush I/O here - update() method will call it
 
     m_chan_info[info.m_chid] = info;
     m_pv_index[a_pv->m_name] = info.m_chid;
@@ -189,6 +198,8 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 
             ca_clear_channel( ich->second.m_chid );
             m_chan_info.erase( ich );
+
+            // Don't flush I/O here - update() method will call it
         }
         m_pv_index.erase( ipv );
     }
@@ -198,6 +209,8 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 void
 DeviceAgent::controlThread()
 {
+    ca_attach_context( m_epics_context );
+
     map<chid,ChanInfo>::iterator ich;
     map<std::string,chid>::iterator idx;
     PVDescriptor *pv;
@@ -235,6 +248,7 @@ DeviceAgent::controlThread()
 
                     ich->second.m_chan_state = INFO_PENDING;
                 }
+                ca_flush_io();
                 break;
             case READY:
                 ++ready;
@@ -246,14 +260,21 @@ DeviceAgent::controlThread()
 
         if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
         {
-            cout << "Device ready to define!" << endl;
+            bool device_changed = false;
+
             //syslog( LOG_DEBUG, "Device Ready" );
 
             // All PVs for current device are initialized
             // Defined device
-            m_dev_record = m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
 
-            // Update all channel info objects with new device & pv references
+            DeviceRecordPtr new_rec = m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
+            if ( new_rec != m_dev_record )
+                device_changed = true;
+
+            // Save new device record
+            m_dev_record = new_rec;
+
+            // Update channel info objects with new device & pv pointers (replaces m_dev_desc pointers)
             for ( idx = m_pv_index.begin(); idx != m_pv_index.end(); ++idx )
             {
                 pv = m_dev_record->getPV( idx->first );
@@ -266,11 +287,19 @@ DeviceAgent::controlThread()
                 }
             }
 
+            if ( device_changed )
+            {
+                cout << "Device " << m_dev_desc->m_name << " changed!" << endl;
+                sendCurrentValues();
+            }
+            else
+            {
+                cout << "Device " << m_dev_desc->m_name << " did NOT change." << endl;
+            }
+
             m_defined = true;
             delete m_dev_desc;
             m_dev_desc = 0;
-
-            sendCurrentValues();
         }
 #if 1
         else
@@ -333,6 +362,7 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                             m_state_changed = true;
                             m_state_cond.notify_one();
                         }
+                        ca_flush_io();
                     }
                 }
             }

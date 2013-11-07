@@ -35,7 +35,13 @@ struct Timestamp
 
 struct PVState
 {
-    PVState() : m_uint_val(0), m_status(0), m_severity(0) {}
+    PVState()
+        : m_uint_val(0), m_status(0), m_severity(0)
+    {}
+
+    PVState( int16_t a_status, int16_t a_severity )
+        : m_uint_val(0), m_status(a_status), m_severity(a_severity)
+    {}
 
     union
     {

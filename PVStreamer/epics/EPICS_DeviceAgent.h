@@ -25,7 +25,7 @@ namespace EPICS {
 class DeviceAgent
 {
 public:
-    DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device );
+    DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context );
     ~DeviceAgent();
 
     void    update( DeviceDescriptor *a_device );
@@ -83,6 +83,7 @@ private:
     boost::condition_variable   m_state_cond;
     bool                        m_state_changed;
     bool                        m_active;
+    struct ca_client_context   *m_epics_context;
 };
 
 }}
