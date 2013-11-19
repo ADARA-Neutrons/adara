@@ -115,7 +115,7 @@ private:
         ValueType           m_type;
         union
         {
-            int32_t         m_int_value;
+            int64_t         m_int_value;
             double          m_real_value;
         };
     };

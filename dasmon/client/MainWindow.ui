@@ -372,7 +372,11 @@
          </widget>
         </item>
         <item row="1" column="2">
-         <widget class="QLineEdit" name="scanNumLabel"/>
+         <widget class="QLineEdit" name="scanNumLabel">
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
         </item>
         <item row="5" column="3">
          <widget class="QLabel" name="label_17">
@@ -700,6 +704,9 @@
            <layout class="QHBoxLayout" name="horizontalLayout_4">
             <item>
              <widget class="QTableWidget" name="alertTable">
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
               <property name="columnCount">
                <number>4</number>
               </property>
@@ -724,6 +731,9 @@
            <layout class="QVBoxLayout" name="verticalLayout_4">
             <item>
              <widget class="QTableWidget" name="pvTable">
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
               <property name="columnCount">
                <number>4</number>
               </property>
@@ -748,6 +758,9 @@
            <layout class="QHBoxLayout" name="horizontalLayout_7">
             <item>
              <widget class="QTableWidget" name="procStatusTable">
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
               <property name="columnCount">
                <number>2</number>
               </property>
@@ -770,6 +783,9 @@
            <layout class="QHBoxLayout" name="horizontalLayout_8">
             <item>
              <widget class="QTableWidget" name="logTable">
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
               <property name="columnCount">
                <number>1</number>
               </property>
@@ -855,6 +871,9 @@
            </item>
            <item>
             <widget class="QTableWidget" name="transTable">
+             <property name="editTriggers">
+              <set>QAbstractItemView::NoEditTriggers</set>
+             </property>
              <property name="columnCount">
               <number>3</number>
              </property>

@@ -23,9 +23,11 @@ RuleEngine::Value::Value( bool a_value ) : m_type( VT_INT ), m_int_value( (int32
 RuleEngine::Value::Value( int8_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( int16_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( int32_t a_value ) : m_type( VT_INT ), m_int_value( a_value ) {}
+RuleEngine::Value::Value( int64_t a_value ) : m_type( VT_INT ), m_int_value( a_value ) {}
 RuleEngine::Value::Value( uint8_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( uint16_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( uint32_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
+RuleEngine::Value::Value( uint64_t a_value ) : m_type( VT_INT ), m_int_value( (int64_t)a_value ) {}
 RuleEngine::Value::Value( float a_value ) : m_type( VT_REAL ), m_real_value( (double)a_value ) {}
 RuleEngine::Value::Value( double a_value ) : m_type( VT_REAL ), m_real_value( a_value ) {}
 
@@ -603,6 +605,8 @@ template void RuleEngine::assert<int16_t>( const string &a_id, int16_t a_value )
 template void RuleEngine::assert<uint16_t>( const string &a_id, uint16_t a_value );
 template void RuleEngine::assert<int32_t>( const string &a_id, int32_t a_value );
 template void RuleEngine::assert<uint32_t>( const string &a_id, uint32_t a_value );
+template void RuleEngine::assert<int64_t>( const string &a_id, int64_t a_value );
+template void RuleEngine::assert<uint64_t>( const string &a_id, uint64_t a_value );
 template void RuleEngine::assert<float>( const string &a_id, float a_value );
 template void RuleEngine::assert<double>( const string &a_id, double a_value );
 template void RuleEngine::assert<RuleEngine::Value>( const string &a_id, RuleEngine::Value a_value ); // Used internally only
@@ -735,6 +739,8 @@ template void RuleEngine::assert<int16_t>( HFACT a_fact, int16_t a_value );
 template void RuleEngine::assert<uint16_t>( HFACT a_fact, uint16_t a_value );
 template void RuleEngine::assert<int32_t>( HFACT a_fact, int32_t a_value );
 template void RuleEngine::assert<uint32_t>( HFACT a_fact, uint32_t a_value );
+template void RuleEngine::assert<int64_t>( HFACT a_fact, int64_t a_value );
+template void RuleEngine::assert<uint64_t>( HFACT a_fact, uint64_t a_value );
 template void RuleEngine::assert<float>( HFACT a_fact, float a_value );
 template void RuleEngine::assert<double>( HFACT a_fact, double a_value );
 

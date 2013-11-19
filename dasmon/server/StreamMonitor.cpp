@@ -41,9 +41,10 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
 #endif
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
-      m_process_stream(true), m_bank_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0), m_paused(false),
-      m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
-      m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0)
+      m_process_stream(true), m_bank_count(0), m_mon_event_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0),
+      m_paused(false), m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
+      m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
+      m_bnk_pkt_count(0), m_mon_pkt_count(0)
 #ifndef NO_DB
      ,m_db_info(a_db_info)
 #endif
@@ -400,6 +401,7 @@ StreamMonitor::resetRunStats()
 
     m_first_pulse_time = 0;
     m_pcharge.total = 0.0;
+    m_mon_event_count = 0;
 }
 
 
@@ -430,9 +432,6 @@ StreamMonitor::metricsThread()
 {
     syslog( LOG_INFO, "Stream metrics thread started." );
 
-    uint32_t    last_count = 0;
-    bool        stalled = false;
-
     while( m_process_stream )
     {
         sleep(1);
@@ -442,30 +441,22 @@ StreamMonitor::metricsThread()
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
-            // Check for stalled stream
-            if ( last_count && ( m_run_metrics.m_total_counts == last_count ))
+            // Check low-count rate on banked events
+            if ( !m_bnk_pkt_count )
             {
-                if ( !stalled )
-                {
-                    syslog( LOG_WARNING, "Detected stalled ADARA stream." );
-                    resetStreamStats();
-                    stalled = true;
-                }
+                m_bank_count_info.reset();
+                m_pcharge.reset();
+                m_pfreq.reset();
             }
-            else
-            {
-                last_count = m_run_metrics.m_total_counts;
-                if ( stalled )
-                {
-                    stalled = false;
-                    syslog( LOG_NOTICE, "Stalled ADARA stream has resumed." );
-                }
-            }
+
+            // Check low-count rate on monitor events
+            if ( !m_mon_pkt_count )
+                m_mon_count_info.clear();
 
             m_beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;
             m_beam_metrics.m_pulse_charge = m_pcharge.average();
             m_beam_metrics.m_pulse_freq =  m_pfreq.average();
-            m_beam_metrics.m_stream_bps = m_stream_rate;
+            m_beam_metrics.m_stream_bps = m_stream_size; // Size = rate so long as polling is at 1 second
 
             m_beam_metrics.m_monitor_count_rate.clear();
             for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
@@ -479,6 +470,10 @@ StreamMonitor::metricsThread()
                 m_run_metrics.m_total_charge = m_pcharge.total;
                 m_notify.runMetrics( m_run_metrics );
             }
+
+            m_stream_size = 0;
+            m_bnk_pkt_count = 0;
+            m_mon_pkt_count = 0;
         }
     }
 
@@ -498,7 +493,9 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     if ( !m_process_stream )
         return false;
 
-    gatherStats( a_pkt );
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    m_stream_size += a_pkt.packet_length();
+    lock.unlock();
 
     switch (a_pkt.type())
     {
@@ -640,6 +637,8 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
     static short count[3] = {0,0,0};
 
+    ++m_bnk_pkt_count;
+
     if ( m_diagnostics )
     {
         if ( count[0] ) --count[0];
@@ -768,6 +767,8 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
+    ++m_mon_pkt_count;
+
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
 
@@ -783,7 +784,7 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
     {
         monitor_id = *rpos >> 22;
         event_count = *rpos++ & 0x003FFFFF;
-
+        m_mon_event_count += event_count;
         m_mon_count_info[monitor_id].addSample( event_count );
         m_mon_last_pulse[monitor_id] = a_pkt.pulseId();
 
@@ -1288,119 +1289,6 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 }
 
 
-/**
- * \brief Gathers general statistics from all ADARA packet types.
- */
-void
-StreamMonitor::gatherStats( const ADARA::Packet &a_pkt )
-{
-    static uint64_t last_time = timespec_to_nsec( a_pkt.timestamp() );
-    static uint32_t pulses = 0;
-
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    // Packet statistics are not currently used - commented out to reduce loading
-    /*
-    PktStats &stats = m_stats[a_pkt.type()];
-
-    ++stats.count;
-
-    if ( a_pkt.packet_length() < stats.min_pkt_size || !stats.min_pkt_size )
-        stats.min_pkt_size = a_pkt.packet_length();
-
-    if ( a_pkt.packet_length() > stats.max_pkt_size )
-        stats.max_pkt_size = a_pkt.packet_length();
-
-    stats.total_size += a_pkt.packet_length();
-    */
-
-    m_stream_size += a_pkt.packet_length();
-
-    if ( a_pkt.type() == ADARA::PacketType::BANKED_EVENT_V0 )
-        ++pulses;
-
-    if ( pulses == 30 )
-    {
-        uint64_t t = timespec_to_nsec( a_pkt.timestamp() );
-
-        // Timestamps are sometimes unreliable (jump backwards, large offsets)
-        // See if time diff is reasonable, if not wait till it is
-
-        if ( t > last_time )
-        {
-            double diff = ( t - last_time )*1.0e-9;
-            m_stream_rate = (uint64_t)( m_stream_size / diff );
-        }
-        else
-            m_stream_rate = 0;
-
-        m_stream_size = 0;
-        last_time = t;
-        pulses = 0;
-    }
-}
-
-
-#if 0
-void
-StreamMonitor::getStatistics( std::map<uint32_t,PktStats> &a_stats )
-{
-    boost::lock_guard<boost::mutex> lock(m_mutex);
-
-    a_stats = m_stats;
-}
-
-const char*
-StreamMonitor::getPktName(
-    uint32_t a_pkt_type   ///< [in] An ADARA packet type (defined in ADARA.h)
-) const
-{
-    // Mask out packet version number
-    switch ( a_pkt_type & 0xFFFFFF00 )
-    {
-    case ADARA::PacketType::RAW_EVENT_V0:
-        return "Raw Event";
-    case ADARA::PacketType::RTDL_V0:
-        return "RTDL";
-    case ADARA::PacketType::SOURCE_LIST_V0:
-        return "Src List";
-    case ADARA::PacketType::BANKED_EVENT_V0:
-        return "Bank Event";
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return "Beam Mon";
-    case ADARA::PacketType::PIXEL_MAPPING_V0:
-        return "Pix Map";
-    case ADARA::PacketType::RUN_STATUS_V0:
-        return "Run Stat";
-    case ADARA::PacketType::RUN_INFO_V0:
-        return "Run Info";
-    case ADARA::PacketType::TRANS_COMPLETE_V0:
-        return "Tran Comp";
-    case ADARA::PacketType::CLIENT_HELLO_V0:
-        return "Cli Hello";
-    case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        return "Annotation";
-    case ADARA::PacketType::SYNC_V0:
-        return "Sync";
-    case ADARA::PacketType::HEARTBEAT_V0:
-        return "Heart";
-    case ADARA::PacketType::GEOMETRY_V0:
-        return "Geom Info";
-    case ADARA::PacketType::BEAMLINE_INFO_V0:
-        return "Beam Info";
-    case ADARA::PacketType::DEVICE_DESC_V0:
-        return "DDP";
-    case ADARA::PacketType::VAR_VALUE_U32_V0:
-        return "VVP U32";
-    case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
-        return "VVP DBL";
-    case ADARA::PacketType::VAR_VALUE_STRING_V0:
-        return "VVP STR";
-    }
-
-    return "Unknown";
-}
-#endif
 
 /**
  * \brief Extracts and trims the value string from an XML node.

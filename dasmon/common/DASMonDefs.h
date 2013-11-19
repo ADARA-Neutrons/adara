@@ -131,7 +131,7 @@ public:
     }
 
     double          m_time;                 ///< Run time (seconds)
-    uint32_t        m_total_counts;         ///< Sum of counts over all banks, excluding monitors
+    uint64_t        m_total_counts;         ///< Sum of counts over all banks, excluding monitors
     double          m_total_charge;         ///< Accumulated charge
     uint32_t        m_pixel_error_count;
     uint32_t        m_dup_pulse_count;

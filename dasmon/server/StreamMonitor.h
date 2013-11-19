@@ -241,7 +241,6 @@ private:
 
     using ADARA::Parser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
-    void        gatherStats( const ADARA::Packet &a_pkt );
     void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp, VariableStatus::Enum a_status );
@@ -260,6 +259,7 @@ private:
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
     std::map<uint32_t,uint64_t>     m_mon_last_pulse;
+    uint64_t                        m_mon_event_count;
     bool                            m_recording;
     uint32_t                        m_run_num;
     uint32_t                        m_run_timestamp;
@@ -285,6 +285,8 @@ private:
     uint32_t                        m_last_cycle;
     uint64_t                        m_last_time;
     uint64_t                        m_this_time;
+    uint32_t                        m_bnk_pkt_count;
+    uint32_t                        m_mon_pkt_count;
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;
