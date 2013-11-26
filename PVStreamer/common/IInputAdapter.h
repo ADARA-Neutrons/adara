@@ -18,14 +18,12 @@ class IInputAdapterAPI;
 class IInputAdapter
 {
 public:
-    IInputAdapter();
+    IInputAdapter( StreamService &a_stream_serv );
     virtual ~IInputAdapter();
 
 protected:
-    StreamService      *m_stream_serv;  ///< StreamService instance that owns this adapter
+    StreamService      &m_stream_serv;  ///< StreamService instance that owns this adapter
     IInputAdapterAPI   *m_srteam_api;   ///< Stream services interface acquired from owning StreamService
-
-    friend class StreamService;
 };
 
 }

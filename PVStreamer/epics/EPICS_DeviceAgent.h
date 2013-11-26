@@ -22,6 +22,12 @@ class IInputAdapterAPI;
 
 namespace EPICS {
 
+
+/** \brief EPICS DeviceAgent class
+  *
+  * The EPICS::DeviceAgent class manages the EPICS channel access connections
+  * for a given device.
+  */
 class DeviceAgent
 {
 public:
@@ -72,7 +78,7 @@ private:
     static void epicsConnectionCallback( struct connection_handler_args a_args );
     static void epicsEventCallback( struct event_handler_args a_args );
 
-    IInputAdapterAPI           &m_stream_api;
+    IInputAdapterAPI           &m_stream_api;       ///< Streaming API provided by StreamService
     DeviceRecordPtr             m_dev_record;
     DeviceDescriptor           *m_dev_desc;
     bool                        m_defined;

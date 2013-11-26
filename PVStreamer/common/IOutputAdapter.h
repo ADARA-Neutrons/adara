@@ -17,14 +17,12 @@ class IOutputAdapterAPI;
 class IOutputAdapter
 {
 public:
-    IOutputAdapter();
+    IOutputAdapter( StreamService &a_stream_serv );
     virtual ~IOutputAdapter();
 
 protected:
-    StreamService      *m_stream_serv;  ///< StreamService instance that owns this reader
+    StreamService      &m_stream_serv;  ///< StreamService instance that owns this reader
     IOutputAdapterAPI  *m_srteam_api;   ///< Stream services interface acquired from owning StreamService
-
-    friend class StreamService;
 };
 
 }

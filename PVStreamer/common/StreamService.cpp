@@ -41,27 +41,26 @@ StreamService::~StreamService()
 }
 
 
-void
+IInputAdapterAPI*
 StreamService::attach( IInputAdapter *a_adapter )
 {
     if ( find( m_in_adapters.begin(), m_in_adapters.end(), a_adapter ) == m_in_adapters.end())
     {
         m_in_adapters.push_back( a_adapter );
-        a_adapter->m_srteam_api = this;
-        a_adapter->m_stream_serv = this;
     }
+    return this;
 }
 
 
-void
+IOutputAdapterAPI*
 StreamService::attach( IOutputAdapter *a_adapter )
 {
     if ( m_out_adapter )
         throw runtime_error( "Can not change output adapter once set." );
 
     m_out_adapter = a_adapter;
-    m_out_adapter->m_srteam_api = this;
-    m_out_adapter->m_stream_serv = this;
+
+    return this;
 }
 
 

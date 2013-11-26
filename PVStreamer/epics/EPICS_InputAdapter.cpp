@@ -18,18 +18,30 @@ namespace PVS {
 namespace EPICS {
 
 
-InputAdapter::InputAdapter( const std::string &a_config_file )
-  : IInputAdapter(), m_active(true), m_config_file(a_config_file), m_source("epics")
+//=============================================================================
+//----- Public Methods --------------------------------------------------------
+
+
+/** \brief EPICS::InputAdapter constructor
+  * \param a_stream_serv - Parent StreamService instance
+  * \param a_config_file - EPICS configuration file
+  */
+InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file )
+  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_source("epics")
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
+    // Save EPICS thread context so other thread can join
     m_epics_context = ca_current_context();
 
-    m_config_file_monitor_thread = new boost::thread( boost::bind( &InputAdapter::configFileMonitorThread, this ));
+    // Start monitor and GC threads
+    m_cfg_mon_thread = new boost::thread( boost::bind( &InputAdapter::configFileMonitorThread, this ));
     m_gc_thread = new boost::thread(boost::bind( &InputAdapter::gcThread, this ));
 }
 
 
+/** \brief EPICS::InputAdapter destructor
+  */
 InputAdapter::~InputAdapter()
 {
     m_active = false;
@@ -37,10 +49,19 @@ InputAdapter::~InputAdapter()
     stopAllDevices();
 
     m_gc_thread->join();
-    m_config_file_monitor_thread->join();
+    m_cfg_mon_thread->join();
 }
 
 
+//=============================================================================
+//----- Private Methods -------------------------------------------------------
+
+
+/** \brief Starts a DeviceAgent for the given descriptor
+  * \param a_device - [in] The DeviceDescriptor that will be handled by agent
+  *
+  * This method either starts or updates a DeviceAgent.
+  */
 void
 InputAdapter::startDevice( DeviceDescriptor *a_device )
 {
@@ -58,6 +79,11 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
 }
 
 
+/** \brief Stops the specified DeviceAgent instance
+  * \param a_dev_name - Name of agent to stop
+  *
+  * Stopped agent is placed in the garbage for eventual destruction.
+  */
 void
 InputAdapter::stopDevice( const std::string &a_dev_name )
 {
@@ -73,6 +99,10 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
 }
 
 
+/** \brief Stops all running DeviceAgent instances
+  *
+  * Stopped agents are placed in the garbage for eventual destruction.
+  */
 void
 InputAdapter::stopAllDevices()
 {
@@ -88,6 +118,13 @@ InputAdapter::stopAllDevices()
 }
 
 
+/** \brief Garbage collection thread (for DeviceAgent instances)
+  *
+  * This thread deletes old DeviceAgent instances after they report their
+  * connections have been closed. (This is probably not required b/c the EPICS
+  * ca_clear_channel() method is apparently smart enough to block until all
+  * active callbacks have returned.)
+  */
 void
 InputAdapter::gcThread()
 {
@@ -119,6 +156,16 @@ InputAdapter::gcThread()
 }
 
 
+/** \brief Configuration file monitoring thread
+  *
+  * This method slowly polls the update time on the provided EPICS configuration
+  * file, and when changed, reads and parses the xml content to extract a
+  * payload of DeviceDescriptors for configured devices (and PVs). These
+  * descriptors are used to start (or update) DeviceAgent instances, and any
+  * previously configured devices that are no longer needed are stopped.
+  * Starting/updating and stopping of DeviceAgents is handled by the
+  * startDevice() and stopDevice() methods, respectively.
+  */
 void
 InputAdapter::configFileMonitorThread()
 {
@@ -126,10 +173,10 @@ InputAdapter::configFileMonitorThread()
     vector<PVDescriptor*>::iterator ipv;
     set<string>::iterator icur;
     boost::filesystem::path cfg_path( m_config_file );
-    time_t  t_now, t_last = 0;
-    bool    changed;
-    unsigned short count = 0;
-    vector<char>  buffer;
+    time_t          t_now, t_last = 0;
+    bool            changed;
+    unsigned short  count = 0;
+    vector<char>    buffer;
 
     ca_attach_context( m_epics_context );
 
@@ -175,7 +222,7 @@ InputAdapter::configFileMonitorThread()
                         if ( changed )
                         {
                             syslog( LOG_INFO, "EPICS beam config file has changed" );
-cout << endl << "CFG CHANGE" << endl << endl;
+
                             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
                             if ( !m_active )
@@ -190,10 +237,7 @@ cout << endl << "CFG CHANGE" << endl << endl;
                                 // Keep track of new device names
                                 set<string> new_devices;
                                 for ( idev = devices.begin(); idev != devices.end(); ++idev )
-                                {
-                                    cout << "Adding " << (*idev)->m_name << endl;
                                     new_devices.insert( (*idev)->m_name );
-                                }
 
                                 // Start device agents for all configured devices
                                 // It's OK if agents are already running
@@ -208,10 +252,7 @@ cout << endl << "CFG CHANGE" << endl << endl;
                                 for ( icur = m_cur_devices.begin(); icur != m_cur_devices.end(); ++icur )
                                 {
                                     if ( new_devices.find( *icur ) == new_devices.end())
-                                    {
-                                        cout << "Stop " << *icur << endl;
                                         stopDevice( *icur );
-                                    }
                                 }
 
                                 // Save new device names and new buffer
@@ -236,11 +277,16 @@ cout << endl << "CFG CHANGE" << endl << endl;
 }
 
 
-/**
+/** \brief Parses configuration file for DeviceDescriptor payload
+  * \param a_buffer - [in] Buffer containing file contents
+  * \param a_buffer_size - [in] Size of file buffer
+  * \param a_devices - [out] Extracted DeviceDescriptor payload
+  * \return True if buffered parsed succeddfully; false otherwise
+  *
   * This method tries to parse the xml configuration data stored in the provided
-  * buffer and returns a vector of device descriptors in the a_devices output
+  * buffer and outputs a vector of device descriptors in the a_devices
   * paramter. The process variables associated with the output devices have
-  * arbitrary type and unit information as a CA connection is needed to
+  * unknown type and unit information as a CA connection is needed to
   * determine these values. Only devices and PVs that are configured for logging
   * will be returned.
   */
@@ -341,12 +387,6 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                     }
                                     else if ( pvs.size())
                                     {
-                                        //sstr.clear();
-                                        //sstr << "Configuring device '" << dev_name << "' pvs: ";
-                                        //for ( vector<pair<string.string> >::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
-                                        //    sstr << ipv->first << " (" << ipv->second << ") ";
-                                        //syslog( LOG_DEBUG, "%s", sstr.str().c_str() );
-
                                         syslog( LOG_INFO, "Configuring device '%s'", dev_name.c_str() );
 
                                         DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
@@ -383,6 +423,11 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
 }
 
 
+/** \brief Helper function to find a child node by name (tag)
+  * \param a_tag - [in] Tag to search for
+  * \param a_parent_node - [in] Parent node to search
+  * \return xmlNode pointer if found, null otherwise
+  */
 xmlNode*
 InputAdapter::xmlFind( const char *a_tag, xmlNode *a_parent_node ) const
 {
@@ -396,6 +441,12 @@ InputAdapter::xmlFind( const char *a_tag, xmlNode *a_parent_node ) const
 }
 
 
+/** \brief Helper function to read a node value
+  * \param a_node - [in] Node to get value of
+  * \param a_value - [out] Value read
+  *
+  * Retrieves trimmed value of a node.
+  */
 void
 InputAdapter::xmlGetValue( xmlNode *a_node, string &a_value ) const
 {
@@ -409,6 +460,14 @@ InputAdapter::xmlGetValue( xmlNode *a_node, string &a_value ) const
 }
 
 
+/** \brief Helper function to read a node attribute
+  * \param a_node - [in] Node that contains attribute
+  * \param a_attrib - [in] Name of attribute to read
+  * \param a_value - [out] Value of attribute read (if found)
+  * \return True if attribute found; false otherwise
+  *
+  * Retrieves trimmed value of an attribute.
+  */
 bool
 InputAdapter::xmlGetAttribute( xmlNode *a_node, const char *a_attrib, string &a_value ) const
 {
@@ -421,6 +480,8 @@ InputAdapter::xmlGetAttribute( xmlNode *a_node, const char *a_attrib, string &a_
                 a_value = (char*)attribute->children->content;
             else
                 a_value = "";
+
+            boost::algorithm::trim( a_value );
             return true;
         }
 

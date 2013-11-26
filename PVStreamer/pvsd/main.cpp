@@ -106,8 +106,8 @@ int main(int argc, char *argv[])
         combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
 
         StreamService   streamer( 100, offset );
-        streamer.attach( new PVS::ADARA::OutputAdapter( port, heartbeat ));
-        streamer.attach( new PVS::EPICS::InputAdapter( epics_cfg ));
+        new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
+        new PVS::EPICS::InputAdapter( streamer, epics_cfg );
 
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;

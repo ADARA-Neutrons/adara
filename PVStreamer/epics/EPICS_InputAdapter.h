@@ -24,10 +24,21 @@ namespace EPICS {
 
 class DeviceAgent;
 
+
+/** \brief EPICS stream input adapter
+  *
+  * The EPICS::InputAdapter class manages the activities related to the
+  * configuration and streaming of EPICS process variables into a
+  * StreamService instance. This class monitors the specified configuration
+  * file for updates and creates EPICS::DeviceAgent instances to handle
+  * configured devices and process variables. A garbage collection thread is
+  * used to allow de-configured DeviceAgent instances to clean-up any live
+  * connection prior to be deleted.
+  */
 class InputAdapter : public IInputAdapter
 {
 public:
-    InputAdapter( const std::string &a_config_file );
+    InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file );
     ~InputAdapter();
 
 private:
@@ -41,17 +52,17 @@ private:
     void            xmlGetValue( xmlNode *a_node, std::string &a_value ) const;
     bool            xmlGetAttribute( xmlNode *a_node, const char *a_attrib, std::string &a_value ) const;
 
-    bool                                m_active;
-    std::string                         m_config_file;
-    boost::thread                      *m_config_file_monitor_thread;
-    std::vector<char>                   m_config_buffer;
-    std::set<std::string>               m_cur_devices;
-    std::string                         m_source;
-    std::map<std::string,DeviceAgent*>  m_dev_agents;
-    std::list<DeviceAgent*>             m_garbage;
-    boost::thread                      *m_gc_thread;
-    boost::recursive_mutex              m_mutex;
-    struct ca_client_context           *m_epics_context;
+    bool                                m_active;           ///< Instance active flag (reset on destruction)
+    std::string                         m_config_file;      ///< Configuration file to read/monitor
+    boost::thread                      *m_cfg_mon_thread;   ///< Configuration file monitoring thread handle
+    std::vector<char>                   m_config_buffer;    ///< Configuration file buffer
+    std::string                         m_source;           ///< Source "host" (not really used for EPICS adapter)
+    std::set<std::string>               m_cur_devices;      ///< Currently configured devices (by name)
+    std::map<std::string,DeviceAgent*>  m_dev_agents;       ///< Active DeviceAgent instances (by name)
+    std::list<DeviceAgent*>             m_garbage;          ///< Decommissioned DeviceAgent instanced
+    boost::thread                      *m_gc_thread;        ///< Garbage collection thread handle
+    boost::recursive_mutex              m_mutex;            ///< Synch mutex
+    struct ca_client_context           *m_epics_context;    ///< Current EPICS thread context
 
 };
 

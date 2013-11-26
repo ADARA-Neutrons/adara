@@ -21,7 +21,7 @@ namespace ADARA {
 class OutputAdapter : public IOutputAdapter
 {
 public:
-    OutputAdapter( unsigned short a_port = 31416, unsigned long a_heartbeat = 2000 );
+    OutputAdapter( StreamService &a_stream_serv, unsigned short a_port = 31416, unsigned long a_heartbeat = 2000 );
     ~OutputAdapter();
 
 private:

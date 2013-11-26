@@ -18,8 +18,8 @@ using namespace PVS::ADARA;
 namespace PVS {
 namespace ADARA {
 
-OutputAdapter::OutputAdapter( unsigned short a_port, unsigned long a_heartbeat )
-    : IOutputAdapter(), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
+OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat )
+    : IOutputAdapter(a_stream_serv), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
 

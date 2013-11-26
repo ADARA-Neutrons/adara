@@ -105,9 +105,9 @@ public:
     StreamService( size_t a_pkt_buffer_size, uint32_t a_offset = 0 );
     ~StreamService();
 
-    void            attach( IInputAdapter *a_adapter );
-    void            attach( IOutputAdapter *a_adapter );
-    ConfigManager&  getCfgMgr() { return m_cfg_mgr; }
+    IInputAdapterAPI*   attach( IInputAdapter *a_adapter );
+    IOutputAdapterAPI*  attach( IOutputAdapter *a_adapter );
+    ConfigManager&      getCfgMgr() { return m_cfg_mgr; }
 
 private:
     // ---------- IStreamProducer methods ----------
