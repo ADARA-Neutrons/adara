@@ -176,14 +176,16 @@ StreamParser::pvValueUpdate
     // SMS file boundary crossings.
     if ( ts_nano > pvinfo->m_last_time )
     {
-        float t = 0; // Relative time of update in seconds from first pulse of run
+        double t = 0; // Relative time of update in seconds from first pulse of run
 
         // Note: if first pulse has not arrived, truncate all PV times to 0
         if ( m_pulse_info.start_time )
         {
             // Truncate negative time offsets to 0
             if ( ts_nano > m_pulse_info.start_time )
+            {
                 t = (ts_nano - m_pulse_info.start_time)/1000000000.0;
+            }
             else if ( pvinfo->m_value_buffer.size() )
             {
                 // Because the time value is 0, erase any values recvd before now

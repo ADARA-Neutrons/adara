@@ -125,7 +125,7 @@ private:
                 {
                     m_nxgen.makeGroup( m_log_path, "NXlog" );
                     m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
-                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, TIME_SEC_UNITS );
+                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
                 }
 
                 // TODO - This code may need to be optimized when fast metadata is supported
