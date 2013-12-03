@@ -103,30 +103,37 @@ NxGen::makeBankInfo
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
-    NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve );
-
-    if ( m_gen_nexus)
+    try
     {
-        // Instrument bank group
-        string instr_path = string("/entry/instrument/") + bi->m_name;
-        makeGroup( instr_path, "NXdetector" );
-        makeDataset( instr_path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
-        makeDataset( instr_path, "event_id", NeXus::UINT32 );
-        makeDataset( instr_path, "event_index", NeXus::UINT64 );
+        NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve );
 
-        // Event data group
-        string event_path = string("/entry/") + bi->m_eventname;
-        makeGroup( event_path, "NXevent_data" );
-        makeLink( instr_path + "/event_time_offset", event_path + "/event_time_offset" );
-        makeLink( instr_path + "/event_id", event_path + "/event_id" );
-        makeLink( instr_path + "/event_index", event_path + "/event_index" );
+        if ( m_gen_nexus)
+        {
+            // Instrument bank group
+            string instr_path = string("/entry/instrument/") + bi->m_name;
+            makeGroup( instr_path, "NXdetector" );
+            makeDataset( instr_path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
+            makeDataset( instr_path, "event_id", NeXus::UINT32 );
+            makeDataset( instr_path, "event_index", NeXus::UINT64 );
 
-        // Link pulse time to bank event times
-        makeLink( "/entry/DASlogs/frequency/time", instr_path + "/event_time_zero" );
-        makeLink( "/entry/DASlogs/frequency/time", event_path + "/event_time_zero" );
+            // Event data group
+            string event_path = string("/entry/") + bi->m_eventname;
+            makeGroup( event_path, "NXevent_data" );
+            makeLink( instr_path + "/event_time_offset", event_path + "/event_time_offset" );
+            makeLink( instr_path + "/event_id", event_path + "/event_id" );
+            makeLink( instr_path + "/event_index", event_path + "/event_index" );
+
+            // Link pulse time to bank event times
+            makeLink( "/entry/DASlogs/frequency/time", instr_path + "/event_time_zero" );
+            makeLink( "/entry/DASlogs/frequency/time", event_path + "/event_time_zero" );
+        }
+
+        return bi;
     }
-
-    return bi;
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "makeBankInfo (bank: " << a_id << ") failed." )
+    }
 }
 
 
@@ -144,21 +151,28 @@ NxGen::makeMonitorInfo
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
-    NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve );
-
-    if ( m_gen_nexus)
+    try
     {
-        // create instrument/bank# group
-        string path = "/entry/" + mi->m_name;
+        NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve );
 
-        makeGroup( path, "NXmonitor" );
-        makeDataset( path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
-        makeDataset( path, "event_index", NeXus::UINT64 );
+        if ( m_gen_nexus)
+        {
+            // create instrument/bank# group
+            string path = "/entry/" + mi->m_name;
 
-        makeLink( "/entry/DASlogs/frequency/time", path + "/event_time_zero" );
+            makeGroup( path, "NXmonitor" );
+            makeDataset( path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
+            makeDataset( path, "event_index", NeXus::UINT64 );
+
+            makeLink( "/entry/DASlogs/frequency/time", path + "/event_time_zero" );
+        }
+
+        return mi;
     }
-
-    return mi;
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "makeMonitorInfo (mon: " << a_id << ") failed." )
+    }
 }
 
 

@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define STS_VERSION "1.0.4"
+#define STS_VERSION "1.0.5"
 
 void
 moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
@@ -214,7 +214,8 @@ int main(int argc, char** argv)
             sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.toString( true, true );
 
-        monitor->failure( sms_code, sms_reason );
+        if ( monitor )
+            monitor->failure( sms_code, sms_reason );
     }
     catch( exception &e )
     {
@@ -222,7 +223,8 @@ int main(int argc, char** argv)
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        monitor->failure( sms_code, sms_reason );
+        if ( monitor )
+            monitor->failure( sms_code, sms_reason );
     }
     catch( ... )
     {
@@ -230,7 +232,8 @@ int main(int argc, char** argv)
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
 
-        monitor->failure( sms_code, sms_reason );
+        if ( monitor )
+            monitor->failure( sms_code, sms_reason );
     }
 
     if ( !interact )

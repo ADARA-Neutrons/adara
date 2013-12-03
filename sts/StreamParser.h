@@ -116,7 +116,8 @@ private:
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
-    std::map<PVKey,PVInfoBase*>             m_pvs;                      ///< Container of process variable information
+    std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
+    std::map<std::string,PVInfoBase*>       m_pvs_by_name;              ///< Index of process variable information (by name)
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
     unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received
@@ -160,8 +161,8 @@ StreamParser::pvValueUpdate
 {
     PVKey   key(a_device_id,a_pv_id);
 
-    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
-    if ( ipv == m_pvs.end() )
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find(key);
+    if ( ipv == m_pvs_by_key.end() )
         THROW_TRACE( ERR_PV_NOT_DEFINED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not defined." )
 
     PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );

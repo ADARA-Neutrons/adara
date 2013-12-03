@@ -118,6 +118,9 @@ private:
             struct STS::RunMetrics *a_run_metrics      ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
+            try
+            {
+
             if ( m_nxgen.m_gen_nexus )
             {
                 // Create log if no data has been written yet
@@ -152,6 +155,12 @@ private:
                         m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
                     }
                 }
+            }
+
+            }
+            catch( TraceException &e )
+            {
+                RETHROW_TRACE( e, "NxPVInfo::flushBuffers (pv: " << this->m_device_id << "." << this->m_pv_id << ") failed." )
             }
 
             this->m_value_buffer.clear();
