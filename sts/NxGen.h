@@ -118,6 +118,9 @@ private:
             struct STS::RunMetrics *a_run_metrics      ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
+            try
+            {
+
             if ( m_nxgen.m_gen_nexus )
             {
                 // Create log if no data has been written yet
@@ -125,7 +128,7 @@ private:
                 {
                     m_nxgen.makeGroup( m_log_path, "NXlog" );
                     m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
-                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT32, TIME_SEC_UNITS );
+                    m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
                 }
 
                 // TODO - This code may need to be optimized when fast metadata is supported
@@ -152,6 +155,12 @@ private:
                         m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
                     }
                 }
+            }
+
+            }
+            catch( TraceException &e )
+            {
+                RETHROW_TRACE( e, "NxPVInfo::flushBuffers (pv: " << this->m_device_id << "." << this->m_pv_id << ") failed." )
             }
 
             this->m_value_buffer.clear();

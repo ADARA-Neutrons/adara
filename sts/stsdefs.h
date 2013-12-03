@@ -203,7 +203,7 @@ public:
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
-    std::vector<float>  m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
+    std::vector<double> m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
 };
 
 /// Intermmediary PV template class that provides typed value buffer

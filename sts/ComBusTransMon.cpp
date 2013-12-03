@@ -17,7 +17,6 @@ ComBusTransMon::ComBusTransMon()
 {
     openlog( "sts", 0, LOG_DAEMON );
     syslog( LOG_INFO, "STS service started." );
-
 }
 
 
@@ -58,8 +57,6 @@ ComBusTransMon::start( STS::StreamParser &a_stream_parser, const std::string &a_
                        const std::string &a_broker_user, const std::string &a_broker_pass,
                        const std::string &a_domain )
 {
-    syslog( LOG_INFO, "STS monitor started." );
-
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
     if ( !m_comm_thread )
@@ -87,7 +84,7 @@ ComBusTransMon::start( STS::StreamParser &a_stream_parser, const std::string &a_
 void
 ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 {
-    syslog( LOG_INFO, "STS success." );
+    syslog( LOG_INFO, "STS success on file %s", a_nexus_file.c_str() );
 
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
@@ -112,7 +109,8 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 void
 ComBusTransMon::failure( STS::TranslationStatusCode a_code, const std::string a_reason )
 {
-    syslog( LOG_INFO, "STS failure." );
+    syslog( LOG_INFO, "STS failed for %s %s Run %lu (%s).", m_stream_parser->getBeamShortName().c_str(),
+     m_stream_parser->getProposalID().c_str(), m_stream_parser->getRunNumber(), a_reason.c_str() );
 
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
@@ -156,8 +154,6 @@ ComBusTransMon::commThread()
                 // Only notify workflow if file was moved to catalog path
                 if ( m_send_to_workflow )
                     m_combus->postWorkflow( *m_terminal_msg );
-
-                syslog( LOG_INFO, "Sent terminal msg" );
 
                 // Automatically stop comm thread when terminal message sent
                 break;

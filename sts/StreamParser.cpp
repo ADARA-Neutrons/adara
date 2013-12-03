@@ -73,7 +73,7 @@ StreamParser::~StreamParser()
     for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
         delete imi->second;
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
         if ( ipv->second )
             delete ipv->second;
 }
@@ -932,6 +932,7 @@ StreamParser::rxPacket
         short       found;
         string      tag;
         string      value;
+        map<string,PVInfoBase*>::iterator ipv;
 
         try
         {
@@ -978,11 +979,47 @@ StreamParser::rxPacket
 
                             if ( found == 7 )
                             {
+
+                                // Note: due to the current behavior of the SMS in dealing with pvstreamer
+                                // restarts durring a run, it is possible that duplicate DDPs will be re-injected
+                                // into the ADARA stream with different device and PV IDs. This will cause Nexus
+                                // file generation to fail due to attempting to initialize DAS log entries more
+                                // than once. To avoid this, PV entries are indexed both by ID and by NAME. It is
+                                // of course required that all PV names be unique on a beam line.
+
                                 PVKey   key(a_pkt.devId(),pv_id);
 
-                                if ( m_pvs.find(key) == m_pvs.end() )
+                                // Check if this PV alread exists BY NAME
+                                ipv = m_pvs_by_name.find(pv_name);
+                                if ( ipv != m_pvs_by_name.end() )
                                 {
-                                    m_pvs[key] = makePVInfo( pv_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                    // If PV already exists, do not redefine, just update key if needed
+                                    if ( ipv->second->m_device_id != a_pkt.devId() || ipv->second->m_pv_id != pv_id )
+                                    {
+                                        PVKey old_key(ipv->second->m_device_id,ipv->second->m_pv_id);
+
+                                        // Update pv info
+                                        ipv->second->m_device_id = a_pkt.devId();
+                                        ipv->second->m_pv_id = pv_id;
+
+                                        // Update key index
+                                        m_pvs_by_key[key] = ipv->second;
+                                        m_pvs_by_key.erase( old_key );
+                                    }
+                                }
+                                else // If no name entry, check by ID
+                                {
+                                    if ( m_pvs_by_key.find(key) == m_pvs_by_key.end() )
+                                    {
+                                        PVInfoBase *info = makePVInfo( pv_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        m_pvs_by_key[key] = info;
+                                        m_pvs_by_name[pv_name] = info;
+                                    }
+                                    else
+                                    {
+                                        // Name does not exist, but key does, this is an ERROR
+                                        THROW_TRACE( ERR_UNEXPECTED_INPUT, "DDP redefines an existing PV: " << a_pkt.devId() << "." << pv_id )
+                                    }
                                 }
                             }
                             else
@@ -1213,7 +1250,7 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in PV buffers
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
     {
         if ( ipv->second->m_time_buffer.size() > 0 )
             ipv->second->flushBuffers( &m_run_metrics );
