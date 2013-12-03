@@ -61,6 +61,7 @@ private:
     void    runInfo( const RunInfo &a_info );
     void    beamMetrics( const BeamMetrics &a_metrics );
     void    runMetrics( const RunMetrics &a_metrics );
+    void    streamMetrics( const StreamMetrics &a_metrics );
     void    pvDefined( const std::string &a_name );
     void    pvUndefined( const std::string &a_name );
     void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );

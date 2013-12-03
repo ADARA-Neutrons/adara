@@ -356,6 +356,14 @@ ComBusRouter::runMetrics( const RunMetrics &a_metrics )
 }
 
 
+void
+ComBusRouter::streamMetrics( const StreamMetrics &a_metrics )
+{
+    ComBus::DASMON::StreamMetricsMessage msg( a_metrics );
+    m_combus.broadcast( msg );
+}
+
+
 /** \param a_name - Name of process variable
   *
   * This method is a callback from the StreamMonitor to indicate that a process

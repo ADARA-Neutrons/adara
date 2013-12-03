@@ -989,6 +989,13 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 }
 
 
+void
+StreamAnalyzer::streamMetrics( const StreamMetrics &a_metrics )
+{
+    // TODO assert stream metrics facts
+}
+
+
 /** \brief Callback to indicate PV has been defined
   * \param a_pv_name - Name of defined PV
   *

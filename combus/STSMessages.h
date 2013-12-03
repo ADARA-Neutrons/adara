@@ -114,7 +114,7 @@ protected:
         m_beam_sname = a_prop_tree.get( "instrument", "" );
         m_proposal_id = a_prop_tree.get( "ipts", "" );
         m_run_num = a_prop_tree.get( "run_number", 0 );
-        m_reason = (::STS::TranslationStatusCode) a_prop_tree.get( "code", 0 );
+        m_code = (::STS::TranslationStatusCode) a_prop_tree.get( "code", 0 );
         m_reason = a_prop_tree.get( "reason", "" );
     }
 

@@ -654,6 +654,67 @@ protected:
 };
 
 
+/// Carries a payload of run metrics data
+class StreamMetricsMessage :
+        public TemplMessageBase<MSG_DASMON_STREAM_METRICS,StreamMetricsMessage>,
+        public ADARA::DASMON::StreamMetrics
+{
+public:
+    StreamMetricsMessage()
+    {}
+
+    StreamMetricsMessage( const ADARA::DASMON::StreamMetrics &a_metrics )
+      : ADARA::DASMON::StreamMetrics( a_metrics )
+    {}
+
+protected:
+    virtual void read( const boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::read( a_prop_tree );
+
+        m_invalid_pkt_type      = a_prop_tree.get( "pkt_type", 0UL );
+        m_invalid_pkt           = a_prop_tree.get( "inv_pkt", 0UL );
+        m_invalid_pkt_time      = a_prop_tree.get( "pkt_time", 0UL );
+        m_duplicate_packet      = a_prop_tree.get( "dup_pkt", 0UL );
+        m_pulse_freq_tol        = a_prop_tree.get( "pulse_freq", 0UL );
+        m_cycle_err             = a_prop_tree.get( "cycle", 0UL );
+        m_invalid_bank_id       = a_prop_tree.get( "inv_bank", 0UL );
+        m_bank_source_mismatch  = a_prop_tree.get( "bank_src", 0UL );
+        m_duplicate_source      = a_prop_tree.get( "dup_src", 0UL );
+        m_duplicate_bank        = a_prop_tree.get( "dup_bank", 0UL );
+        m_pixel_map_err         = a_prop_tree.get( "pix_map", 0UL );
+        m_pixel_bank_mismatch   = a_prop_tree.get( "pix_bank", 0UL );
+        m_pixel_invalid_tof     = a_prop_tree.get( "pix_tof", 0UL );
+        m_pixel_unknown_id      = a_prop_tree.get( "pix_id", 0UL );
+        m_pixel_errors          = a_prop_tree.get( "pix_err", 0UL );
+        m_bad_ddp_xml           = a_prop_tree.get( "ddp_xml", 0UL );
+        m_bad_runinfo_xml       = a_prop_tree.get( "runinfo_xml", 0UL );
+    }
+
+    virtual void write( boost::property_tree::ptree &a_prop_tree )
+    {
+        MessageBase::write( a_prop_tree );
+
+        a_prop_tree.put( "pkt_type", m_invalid_pkt_type );
+        a_prop_tree.put( "inv_pkt", m_invalid_pkt );
+        a_prop_tree.put( "pkt_time", m_invalid_pkt_time );
+        a_prop_tree.put( "dup_pkt", m_duplicate_packet );
+        a_prop_tree.put( "pulse_freq", m_pulse_freq_tol );
+        a_prop_tree.put( "cycle", m_cycle_err );
+        a_prop_tree.put( "inv_bank", m_invalid_bank_id );
+        a_prop_tree.put( "bank_src", m_bank_source_mismatch );
+        a_prop_tree.put( "dup_src", m_duplicate_source );
+        a_prop_tree.put( "dup_bank", m_duplicate_bank );
+        a_prop_tree.put( "pix_map", m_pixel_map_err );
+        a_prop_tree.put( "pix_bank", m_pixel_bank_mismatch );
+        a_prop_tree.put( "pix_tof", m_pixel_invalid_tof );
+        a_prop_tree.put( "pix_id", m_pixel_unknown_id );
+        a_prop_tree.put( "pix_err", m_pixel_errors );
+        a_prop_tree.put( "ddp_xml", m_bad_ddp_xml );
+        a_prop_tree.put( "runinfo_xml", m_bad_runinfo_xml );
+    }
+};
+
 }}}
 
 

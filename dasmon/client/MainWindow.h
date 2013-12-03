@@ -16,7 +16,7 @@
 #include "DASMonMessages.h"
 #include "STSMessages.h"
 
-#define DASMON_GUI_VERSION "1.1.9"
+#define DASMON_GUI_VERSION "1.2"
 
 
 namespace Ui {
@@ -137,6 +137,7 @@ private:
     void        updateRunInfo( const ADARA::DASMON::RunInfo &a_run_info );
     void        updateBeamMetrics( const ADARA::DASMON::BeamMetrics &a_metrics );
     void        updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics );
+    void        updateStreamMetrics( const ADARA::DASMON::StreamMetrics &a_metrics );
     void        setStaleText( QLineEdit *a_edit );
 
     void        setComBusActive( bool a_active );

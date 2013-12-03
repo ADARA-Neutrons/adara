@@ -893,6 +893,29 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 
 
 void
+MainWindow::updateStreamMetrics( const ADARA::DASMON::StreamMetrics &a_metrics )
+{
+    QMetaObject::invokeMethod( ui->invPktEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_invalid_pkt )));
+    QMetaObject::invokeMethod( ui->invPktTypeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_invalid_pkt_type )));
+    QMetaObject::invokeMethod( ui->invPktTimeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_invalid_pkt_time )));
+    QMetaObject::invokeMethod( ui->dupEventPktEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_duplicate_packet )));
+    QMetaObject::invokeMethod( ui->freqTolEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pulse_freq_tol )));
+    QMetaObject::invokeMethod( ui->cycleErrEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_cycle_err )));
+    QMetaObject::invokeMethod( ui->invBankEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_invalid_bank_id )));
+    QMetaObject::invokeMethod( ui->bankSrcMisEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_bank_source_mismatch )));
+    QMetaObject::invokeMethod( ui->dupSrcEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_duplicate_source )));
+    QMetaObject::invokeMethod( ui->dupBankEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_duplicate_bank )));
+    QMetaObject::invokeMethod( ui->repPixMapEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_map_err )));
+    QMetaObject::invokeMethod( ui->pixBankMisEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_bank_mismatch )));
+    QMetaObject::invokeMethod( ui->invTofEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_invalid_tof )));
+    QMetaObject::invokeMethod( ui->invPixEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_unknown_id )));
+    QMetaObject::invokeMethod( ui->repPixErrEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_errors )));
+    QMetaObject::invokeMethod( ui->invDDPXMLEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_bad_ddp_xml )));
+    QMetaObject::invokeMethod( ui->invRunXMLEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_bad_runinfo_xml )));
+}
+
+
+void
 MainWindow::clearBeamDisplay()
 {
     QMetaObject::invokeMethod( ui->beamIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
@@ -1198,6 +1221,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         {
             const ADARA::ComBus::DASMON::RunMetricsMessage &msg = (const ADARA::ComBus::DASMON::RunMetricsMessage&)a_msg;
             updateRunMetrics( msg );
+        }
+        break;
+    case ADARA::ComBus::MSG_DASMON_STREAM_METRICS:
+        {
+            const ADARA::ComBus::DASMON::StreamMetricsMessage &msg = (const ADARA::ComBus::DASMON::StreamMetricsMessage&)a_msg;
+            updateStreamMetrics( msg );
         }
         break;
 

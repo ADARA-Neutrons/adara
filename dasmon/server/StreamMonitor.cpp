@@ -27,6 +27,11 @@ namespace DASMON {
 #define ADARA_IN_BUF_SIZE 0x100000
 
 
+bool PixPairComp( const pair<uint32_t,uint16_t> a, const pair<uint32_t,uint16_t> b )
+{
+    return a.first < b.first;
+}
+
 /**
  * \brief StreamMonitor constructor.
  * \param a_sms_host - Hostname of SMS stream source
@@ -36,19 +41,21 @@ namespace DASMON {
  * performed until the start() method is called.
  */
 #ifndef NO_DB
-StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info )
+StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info, uint32_t a_maxtof )
 #else
 StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
 #endif
     : Parser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
-      m_process_stream(true), m_bank_count(0), m_mon_event_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0),
+      m_process_stream(true), m_mon_event_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0),
       m_paused(false), m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
       m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
-      m_bnk_pkt_count(0), m_mon_pkt_count(0)
+      m_bnk_pkt_count(0), m_mon_pkt_count(0), m_maxtof(a_maxtof), m_pixmap_processed(false)
 #ifndef NO_DB
      ,m_db_info(a_db_info)
 #endif
 {
+    m_maxtof *= 10; // Convert from usec to 100 nsec units
+
 #ifndef NO_DB
     if ( m_db_info )
         m_db_thread = new boost::thread( boost::bind( &StreamMonitor::dbThread, this ));
@@ -397,7 +404,7 @@ StreamMonitor::resetRunStats()
     m_info_rcv = 0;
     m_run_info.clear();
     m_run_metrics.clear();
-    m_stats.clear();
+    m_stream_metrics.clear();
 
     m_first_pulse_time = 0;
     m_pcharge.total = 0.0;
@@ -430,6 +437,8 @@ StreamMonitor::resetStreamStats()
 void
 StreamMonitor::metricsThread()
 {
+    unsigned short count = 0;
+
     syslog( LOG_INFO, "Stream metrics thread started." );
 
     while( m_process_stream )
@@ -474,6 +483,10 @@ StreamMonitor::metricsThread()
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
             m_mon_pkt_count = 0;
+
+            // Send stream metrics every 4 seconds
+            if ( !(++count & 0x3 ))
+                m_notify.streamMetrics( m_stream_metrics );
         }
     }
 
@@ -497,32 +510,44 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     m_stream_size += a_pkt.packet_length();
     lock.unlock();
 
-    switch (a_pkt.type())
+    try
     {
-    // These packets shall always be processed
-    case ADARA::PacketType::RUN_STATUS_V0:
-    case ADARA::PacketType::PIXEL_MAPPING_V0:
-    case ADARA::PacketType::RUN_INFO_V0:
-    case ADARA::PacketType::BEAMLINE_INFO_V0:
-    case ADARA::PacketType::DEVICE_DESC_V0:
-    case ADARA::PacketType::VAR_VALUE_U32_V0:
-    case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
-    case ADARA::PacketType::STREAM_ANNOTATION_V0:
-    case ADARA::PacketType::BANKED_EVENT_V0:
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return Parser::rxPacket(a_pkt);
+        switch (a_pkt.type())
+        {
+        // These packets shall always be processed
+        case ADARA::PacketType::RUN_STATUS_V0:
+        case ADARA::PacketType::PIXEL_MAPPING_V0:
+        case ADARA::PacketType::RUN_INFO_V0:
+        case ADARA::PacketType::BEAMLINE_INFO_V0:
+        case ADARA::PacketType::DEVICE_DESC_V0:
+        case ADARA::PacketType::VAR_VALUE_U32_V0:
+        case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
+        case ADARA::PacketType::STREAM_ANNOTATION_V0:
+        case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+        case ADARA::PacketType::BANKED_EVENT_V0:
+            return Parser::rxPacket(a_pkt);
 
-    // Packet types that are not processes by StreamParser
-    case ADARA::PacketType::GEOMETRY_V0:
-    case ADARA::PacketType::RAW_EVENT_V0:
-    case ADARA::PacketType::RTDL_V0:
-    case ADARA::PacketType::SOURCE_LIST_V0:
-    case ADARA::PacketType::TRANS_COMPLETE_V0:
-    case ADARA::PacketType::CLIENT_HELLO_V0:
-    case ADARA::PacketType::SYNC_V0:
-    case ADARA::PacketType::HEARTBEAT_V0:
-    case ADARA::PacketType::VAR_VALUE_STRING_V0:
-        break;
+        // Packet types that are not processes by StreamParser
+        case ADARA::PacketType::GEOMETRY_V0:
+        case ADARA::PacketType::RAW_EVENT_V0:
+        case ADARA::PacketType::RTDL_V0:
+        case ADARA::PacketType::SOURCE_LIST_V0:
+        case ADARA::PacketType::TRANS_COMPLETE_V0:
+        case ADARA::PacketType::CLIENT_HELLO_V0:
+        case ADARA::PacketType::SYNC_V0:
+        case ADARA::PacketType::HEARTBEAT_V0:
+        case ADARA::PacketType::VAR_VALUE_STRING_V0:
+            break;
+        default:
+            ++m_stream_metrics.m_invalid_pkt_type;
+            break;
+        }
+    }
+    catch(...)
+    {
+    cout << "rxPacket exception! pkt type: " << a_pkt.type() << endl;
+        ++m_stream_metrics.m_invalid_pkt;
+        throw;
     }
 
     //return Parser::rxPacket(a_pkt);
@@ -564,6 +589,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_run_num = a_pkt.runNumber();
         m_run_timestamp = a_pkt.timestamp().tv_sec;
 
+        m_pixmap_processed = false;
         resetRunStats();
 
         m_notify.runStatus( true, m_run_num, m_run_timestamp );
@@ -605,24 +631,76 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 {
-    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
-
-    uint16_t        bank_id;
-    uint16_t        pix_count;
-
-    m_bank_count = 0;
-
-    // Now build banks and populate bank container
-    while( rpos < epos )
+    if ( !m_pixmap_processed )
     {
-        rpos++;  // TODO This infomation is not currently processed.
-        bank_id = (uint16_t)(*rpos >> 16);
-        pix_count = (uint16_t)(*rpos & 0xFFFF);
-        rpos++;
+        const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+        const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+        const uint32_t *epos2;
 
-        rpos += pix_count;
-        m_bank_count++;
+        uint32_t        base_logical_id;
+        uint32_t        pid;
+        uint32_t        min_pid = 0;
+        uint32_t        max_pid = 0;
+        bool            first_pid = true;
+        uint16_t        bank_id;
+        uint16_t        pix_count;
+
+        m_bank_info.clear();
+        //m_pixel_to_bank.clear();
+
+        // Build banks and analyze pid range
+        while( rpos < epos )
+        {
+            base_logical_id = *rpos++;
+            bank_id = (uint16_t)(*rpos >> 16);
+            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            rpos++;
+
+            // Save bank ID
+            m_bank_info[bank_id] = BankInfo(bank_id);
+
+            epos2 = rpos + pix_count;
+            while ( rpos < epos2 )
+            {
+                pid = *rpos++;
+                if ( first_pid )
+                {
+                    min_pid = max_pid = pid;
+                    first_pid = false;
+                }
+                else
+                {
+                    if ( pid < min_pid )
+                        min_pid = pid;
+                    else if ( pid > max_pid )
+                        max_pid = pid;
+                }
+            }
+        }
+
+        m_pixmap.clear();
+        m_pixmap.resize( max_pid + 1, -1 );
+
+        //cout << "min pid: " << min_pid << endl;
+        //cout << "max pid: " << max_pid << endl;
+
+        // Build pid-to-bank index
+        rpos = (const uint32_t*)a_pkt.payload();
+        while( rpos < epos )
+        {
+            base_logical_id = *rpos++;
+            bank_id = (uint16_t)(*rpos >> 16);
+            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            rpos++;
+
+            epos2 = rpos + pix_count;
+            while ( rpos < epos2 )
+            {
+                // Store logical pixel IDs to bank ID
+                m_pixmap[*rpos++] = bank_id;
+            }
+        }
+        m_pixmap_processed = true;
     }
 
     return false;
@@ -635,46 +713,26 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
-    static short count[3] = {0,0,0};
-
     ++m_bnk_pkt_count;
 
-    if ( m_diagnostics )
+    m_this_time = timespec_to_nsec(a_pkt.timestamp());
+
+    if ( m_last_time )
     {
-        if ( count[0] ) --count[0];
-        if ( count[1] ) --count[1];
-        if ( count[2] ) --count[2];
+        if (((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
+            ( m_last_cycle == 599 && a_pkt.cycle() != 0 )) )
+            ++m_stream_metrics.m_cycle_err;
 
-        if ( m_last_time )
-        {
-            if (((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
-                ( m_last_cycle == 599 && a_pkt.cycle() != 0 )) && !count[0] )
-            {
-                syslog( LOG_ERR, "Cycle number error: %lu -> %lu", (unsigned long) m_last_cycle, (unsigned long) a_pkt.cycle() );
-                count[0] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
-            }
-
-            m_this_time = timespec_to_nsec(a_pkt.timestamp());
-            if ( m_last_time > m_this_time && !count[1] )
-            {
-                syslog( LOG_ERR, "Pulse time went backwards %lu nsec", (unsigned long)( m_last_time - m_this_time ));
-                count[1] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
-            }
-            else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 && !count[2] )
-            {
-                syslog( LOG_ERR, "Pulse time interval is inaccurate: %lu nsec", (unsigned long)( m_this_time - m_last_time ));
-                count[2] = 300; // Max log rate once per 300 pulse or 5 sec at 60Hz
-            }
-
-            m_last_time = m_this_time;
-        }
-        else
-        {
-            m_last_time = timespec_to_nsec(a_pkt.timestamp());
-        }
-
-        m_last_cycle = a_pkt.cycle();
+        if ( m_last_time > m_this_time )
+            ++m_stream_metrics.m_invalid_pkt_time;
+        else if ( m_last_time == m_this_time )
+            ++m_stream_metrics.m_duplicate_packet;
+        else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
+            ++m_stream_metrics.m_pulse_freq_tol;
     }
+
+    m_last_time = m_this_time;
+    m_last_cycle = a_pkt.cycle();
 
     // Parse banked event packet to calulate pulse info, event count, and event rate
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
@@ -684,11 +742,9 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 
     uint32_t flags = a_pkt.flags();
 
-#ifdef PIX_ERR_BY_PULSE
     // Check flags
     if ( flags & BankedEventPkt::ERROR_PIXELS )
          ++m_run_metrics.m_pixel_error_count;
-#endif
 
     if ( flags & BankedEventPkt::PULSE_VETO )
          ++m_run_metrics.m_pulse_veto_count;
@@ -702,39 +758,97 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     if ( flags & BankedEventPkt::DUPLICATE_PULSE )
          ++m_run_metrics.m_dup_pulse_count;
 
-    uint32_t bank_count;
-    uint32_t bank_id;
-    uint32_t event_count = 0;
-    uint32_t bank_event_count;
-    //const uint32_t *bank_endpos;
+    uint32_t        source_id;
+    uint32_t        bank_count;
+    int16_t         bank_id;
+    uint32_t        event_count = 0;
+    uint32_t        bank_event_count;
+    const uint32_t *bank_endpos;
+    uint32_t        tof, pid;
+    int16_t         pixbank;
+    map<int16_t,BankInfo>::iterator ibank;
+
+    m_sources.clear();
 
     // Process banks per-source
     while ( rpos < epos )
     {
-        rpos += 3; // Skip over source info
+        source_id = *rpos++;
+
+        if ( find( m_sources.begin(), m_sources.end(), source_id ) != m_sources.end())
+            ++m_stream_metrics.m_duplicate_source;
+        else
+            m_sources.push_back( source_id );
+
+        rpos += 2; // Skip over intrapulse time and TOF offset
         bank_count = *rpos++;
 
         // Process events per-bank
         while( bank_count-- )
         {
-            bank_id = *rpos++;
+            bank_id = (int16_t)*rpos++;
             bank_event_count = *rpos++;
-            if ( bank_id < m_bank_count )
+
+            if ( bank_id == -1 )
             {
+                m_stream_metrics.m_pixel_map_err += bank_event_count;
+                rpos += bank_event_count << 1;
+            }
+            else if ( bank_id == -2 )
+            {
+                m_stream_metrics.m_pixel_errors += bank_event_count;
+                rpos += bank_event_count << 1;
+            }
+            else if (( ibank = m_bank_info.find( bank_id )) != m_bank_info.end() )
+            {
+                if ( ibank->second.m_last_pulse_time == 0 )
+                {
+                    ibank->second.m_source_id = source_id;
+                    ibank->second.m_last_pulse_time = m_this_time;
+                }
+                else
+                {
+                    if ( ibank->second.m_source_id != source_id )
+                    {
+                        ++m_stream_metrics.m_bank_source_mismatch;
+                        //cout << "BSM: bank: " << bank_id << " reported in " << source_id << " should be in " << ibank->second.m_source_id << endl;
+                    }
+
+                    if ( ibank->second.m_last_pulse_time == m_this_time )
+                        ++m_stream_metrics.m_duplicate_bank;
+                }
+
                 event_count += bank_event_count;
+
+                bank_endpos = rpos + ( bank_event_count << 1 );
+                while ( rpos < bank_endpos )
+                {
+                    tof = *rpos++;
+                    pid = *rpos++;
+                    if ( tof > m_maxtof ) // in 100nsec units, compare to 2e8 usec
+                    {
+                        ++m_stream_metrics.m_pixel_invalid_tof;
+                        //cout << "TOF: " << tof << endl;
+                        //cout << "TOF: " << hex << tof << dec << endl;
+                    }
+
+                    if ( pid >= m_pixmap.size() )
+                        pixbank = -1;
+                    else
+                        pixbank = m_pixmap[pid];
+
+                    if ( pixbank < 0 )
+                        ++m_stream_metrics.m_pixel_unknown_id;
+                    else if ( pixbank != bank_id )
+                        ++m_stream_metrics.m_pixel_bank_mismatch;
+                }
             }
-#ifndef PIX_ERR_BY_PULSE
-            // Check individual events for error flags
-            bank_endpos = rpos + ( bank_event_count << 1 );
-            while ( rpos < bank_endpos )
+            else
             {
-                ++rpos; // Skip TOF value
-                if ( (*rpos++) & 0x80000000 ) // High bit of Pixel ID indicates error if set
-                    ++m_run_metrics.m_pixel_error_count;
+                // This code should never get called unless the SMS fails somehow
+                ++m_stream_metrics.m_invalid_bank_id;
+                rpos += bank_event_count << 1;
             }
-#else
-            rpos += bank_event_count << 1;
-#endif
         }
     }
 
@@ -888,9 +1002,14 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
         {
             // Primitive fault detection / reporting
             m_ok = false;
+            ++m_stream_metrics.m_bad_runinfo_xml;
         }
 
         xmlFreeDoc( doc );
+    }
+    else
+    {
+        ++m_stream_metrics.m_bad_runinfo_xml;
     }
 
     m_info_rcv |= 1;
@@ -1054,9 +1173,14 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         {
             // Primitive fault detection / reporting
             m_ok = false;
+            ++m_stream_metrics.m_bad_ddp_xml;
         }
 
         xmlFreeDoc( doc );
+    }
+    else
+    {
+        ++m_stream_metrics.m_bad_ddp_xml;
     }
 
 
@@ -1373,6 +1497,13 @@ StreamMonitor::Notifier::runMetrics( const RunMetrics &a_metrics )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->runMetrics( a_metrics );
+}
+
+void
+StreamMonitor::Notifier::streamMetrics( const StreamMetrics &a_metrics )
+{
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+        (*l)->streamMetrics( a_metrics );
 }
 
 void

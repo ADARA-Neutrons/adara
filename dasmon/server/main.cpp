@@ -9,7 +9,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.2.3"
+#define DASMON_VERSION "1.3"
 
 int main(int argc, char *argv[])
 {
@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
     unsigned short  log_level;
     string          config_dir;
     string          domain;
+    unsigned long   max_tof;
 
 #ifndef NO_DB
     DBConnectInfo   db_info;
@@ -42,6 +43,7 @@ int main(int argc, char *argv[])
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("nodiag", "Disable low-level stream diagnostics (test only)")
+            ("maxtof", po::value<unsigned long>( &max_tof )->default_value( 33333 ), "set maximum time of flight in usec")
 #ifndef NO_DB
             ("db_host", po::value<string>( &db_info.host )->default_value( "" ), "set database hostname")
             ("db_port", po::value<unsigned short>( &db_info.port )->default_value( 0 ), "set database port")
@@ -94,7 +96,7 @@ int main(int argc, char *argv[])
     {
         combus->waitForConnect( 10 );
 #ifndef NO_DB
-        StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info );
+        StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info, max_tof );
 #else
         StreamMonitor   monitor( sms_host, sms_port );
 #endif

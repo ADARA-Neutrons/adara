@@ -36,6 +36,7 @@ public:
     virtual void runInfo( const RunInfo &a_info ) = 0;
     virtual void beamMetrics( const BeamMetrics &a_metrics ) = 0;
     virtual void runMetrics( const RunMetrics &a_metrics ) = 0;
+    virtual void streamMetrics( const StreamMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvUndefined( const std::string &a_name ) = 0;
     virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
@@ -174,7 +175,7 @@ class StreamMonitor : public ADARA::Parser
 {
 public:
 #ifndef NO_DB
-    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415, DBConnectInfo *a_db_info = 0 );
+    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port, DBConnectInfo *a_db_info, uint32_t a_maxtof );
 #else
     StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415 );
 #endif
@@ -206,6 +207,7 @@ private:
         void runInfo( const RunInfo &a_info );
         void beamMetrics( const BeamMetrics &a_metrics );
         void runMetrics( const RunMetrics &a_metrics );
+        void streamMetrics( const StreamMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
         void pvUndefined( const std::string &a_name );
         void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
@@ -254,7 +256,7 @@ private:
     boost::thread                  *m_metrics_thread;
     bool                            m_process_stream;
     Notifier                        m_notify;
-    std::map<uint32_t,PktStats>     m_stats;
+    //std::map<uint32_t,PktStats>     m_stats;
     uint32_t                        m_bank_count;
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;
@@ -269,6 +271,7 @@ private:
     BeamMetrics                     m_beam_metrics;
     RunInfo                         m_run_info;
     RunMetrics                      m_run_metrics;
+    StreamMetrics                   m_stream_metrics;
     bool                            m_scanning;
     uint32_t                        m_scan_index;
     CountInfo<double>               m_pcharge;
@@ -287,6 +290,22 @@ private:
     uint64_t                        m_this_time;
     uint32_t                        m_bnk_pkt_count;
     uint32_t                        m_mon_pkt_count;
+    uint32_t                        m_maxtof;
+
+    struct BankInfo
+    {
+        BankInfo() : m_bank_id(0), m_source_id(0), m_last_pulse_time(0) {}
+        BankInfo( uint16_t a_bank_id ) : m_bank_id(a_bank_id), m_source_id(0), m_last_pulse_time(0) {}
+
+        uint16_t    m_bank_id;
+        uint32_t    m_source_id;
+        uint64_t    m_last_pulse_time;
+    };
+
+    std::map<int16_t,BankInfo>      m_bank_info;
+    std::vector<uint32_t>           m_sources;
+    std::vector<int16_t>            m_pixmap;
+    bool                            m_pixmap_processed;
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;
