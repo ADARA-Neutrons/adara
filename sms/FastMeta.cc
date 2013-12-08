@@ -251,11 +251,12 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 
 	/* Create a different timestamp for each variable update packet by
 	 * adding the TOF value to the pulse ID, handling overflow of the
-	 * nanoseconds field.
+	 * nanoseconds field. TOF is originally in units of 100ns.
 	 *
 	 * Note that we strip any cycle field from the TOF.
 	 */
 	tof &= ((1U << 21) - 1);
+	tof *= 100;
 	uint32_t ns = tof + (pulse_id & 0xffffffff);
 
 	pkt[2] = pulse_id >> 32;
