@@ -1,7 +1,7 @@
 #ifndef STREAMMONITOR_H
 #define STREAMMONITOR_H
 
-#include <ADARAParser.h>
+#include <POSIXParser.h>
 #include <map>
 #include <set>
 #include <vector>
@@ -171,7 +171,7 @@ struct DBConnectInfo
 };
 #endif
 
-class StreamMonitor : public ADARA::Parser
+class StreamMonitor : public ADARA::POSIXParser
 {
 public:
 #ifndef NO_DB
@@ -241,7 +241,7 @@ private:
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
-    using ADARA::Parser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
+    using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
     void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
     template<class T>

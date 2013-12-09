@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
@@ -13,7 +13,7 @@ struct addrinfo;
 
 class HWSource;
 
-class DataSource : public ADARA::Parser {
+class DataSource : public ADARA::POSIXParser {
 public:
 	DataSource(const std::string &name, const std::string &uri, uint32_t id,
 		   double connect_retry, double connect_timeout,
@@ -67,7 +67,7 @@ private:
 
 	friend class TimerAdapter<DataSource>;
 
-	using ADARA::Parser::rxPacket;
+	using ADARA::POSIXParser::rxPacket;
 };
 
 #endif /* __DATA_SOURCE_H */

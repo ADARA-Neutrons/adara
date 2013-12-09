@@ -10,7 +10,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 #include <libxml/tree.h>
-#include "ADARAParser.h"
+#include "POSIXParser.h"
 #include "Utils.h"
 #include "stsdefs.h"
 #include "TraceException.h"
@@ -27,7 +27,7 @@ namespace STS {
  * Parser class operates on posix file descriptors (for stream input and
  * also output of a filtered adara file).
  */
-class StreamParser : public ADARA::Parser, public IStreamAdapter
+class StreamParser : public ADARA::POSIXParser, public IStreamAdapter
 {
 public:
     StreamParser( int a_fd, const std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false,
@@ -90,7 +90,7 @@ private:
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
-    using ADARA::Parser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
+    using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
     void        processBankEvents( uint32_t a_bank_id, uint32_t a_event_count, const uint32_t *a_rpos );
