@@ -8,6 +8,7 @@
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
 #include "MetaDataMgr.h"
+#include "FastMeta.h"
 #include "Markers.h"
 #include "Logging.h"
 #include "utils.h"
@@ -68,11 +69,20 @@ void SMSControl::init(void)
 	m_singleton = new SMSControl();
 }
 
+void SMSControl::late_config(const boost::property_tree::ptree &conf)
+{
+	SMSControl *sms = getInstance();
+	if (!sms)
+		throw std::logic_error("late_config on uninitialized obj");
+
+	sms->addSources(conf);
+	sms->m_fastmeta->addDevices(conf);
+}
+
 void SMSControl::addSources(const boost::property_tree::ptree &conf)
 {
 	std::string name, prefix("source ");
 	boost::property_tree::ptree::const_iterator it;
-	SMSControl *sms = getInstance();
 	size_t b, e, plen = prefix.length();
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
@@ -99,15 +109,13 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 			continue;
 		}
 
-		sms->addSource(name, it->second);
+		addSource(name, it->second);
 	}
 }
 
 void SMSControl::addSource(const std::string &name,
 			   const boost::property_tree::ptree &info)
 {
-	/* TODO will eventually need to configure fast metadata conversion
-	 */
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
@@ -151,7 +159,8 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
-	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr)
+	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr),
+	m_fastmeta(new FastMeta(m_meta))
 {
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
@@ -444,30 +453,15 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 		ddp += "  </process_variables>\n";
 		ddp += "</device>";
 
-		uint32_t size = (ddp.size() + 3) & ~3;
-		size += 2 * sizeof(uint32_t) + sizeof(ADARA::Header);
-
-		uint32_t pkt[size / sizeof(uint32_t)];
-
-		memset(pkt, 0, sizeof(pkt));
-		pkt[0] = size - sizeof(ADARA::Header);
-		pkt[1] = ADARA::PacketType::DEVICE_DESC_V0;
-		pkt[2] = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
-
 		/* We currently reserve device IDs 0x80000000 for SMS internal
 		 * use. We put the choppers at the low end.
 		 *
 		 * TODO better allocation policy for IDs.
 		 */
-		pkt[4] = 0x80000000 | cid;
-		pkt[5] = ddp.size();
-		memcpy(pkt + 6, ddp.data(), ddp.size());
-
-		/* The MetaDataMgr wants to copy the DDP packet, but needs
-		 * an ADARA packet. Construct an object around our array.
-		 */
-		ADARA::Packet ddp_pkt((uint8_t *) pkt, sizeof(pkt));
-		m_meta->addFastMetaDDP(ddp_pkt, pkt[4], 0);
+		uint32_t cid_dev = 0x80000000 | cid;
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		m_meta->addFastMetaDDP(now, cid_dev, ddp);
 
 		m_choppers.insert(cid);
 	}
@@ -559,9 +553,18 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			bank += Pulse::REAL_BANK_OFFSET;
 			break;
 		case 5: case 6:
-			/* TODO handle fast metadata */
+			/* This is a fast-metadata update, see if we have a
+			 * mapping for it. If not, let it fall through to the
+			 * common error pixel handling.
+			 */
+			if (m_fastmeta->validVariable(phys)) {
+				pulse->m_fastMetaEvents.push_back(events[i]);
+				continue;
+			}
+			/* FALLTHROUGH */
 		case 1: case 2: case 3:
 			/* Unused sources, let them drop into error handling */
+			/* FALLTHROUGH */
 		default:
 			/* Error bit is set, identity map and put in the
 			 * error bank
@@ -652,7 +655,6 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 void SMSControl::recordPulse(PulsePtr &pulse)
 {
 	/* Send the RTDL packet, followed by the banked event packet */
-	/* TODO send fast metadata packets as well, perhaps before events */
 
 	// XXX avoid sending the RTDL for a pulse twice (if duplicated)
 
@@ -670,6 +672,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		buildMonitorPacket(pulse);
 		buildBankedPacket(pulse);
 		buildChopperPackets(pulse);
+		buildFastMetaPackets(pulse);
 	} catch (std::runtime_error e) {
 		ERROR("Failed to record pulse: " << e.what());
 
@@ -873,6 +876,15 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			StorageManager::addPacket(pkt, sizeof(pkt));
 		}
 	}
+}
+
+void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
+{
+	uint64_t pulse_id = pulse->m_id.first;
+	EventVector::iterator it, end = pulse->m_fastMetaEvents.end();
+
+	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
+		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,

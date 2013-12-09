@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instrumentmotors xmlns="http://neutrons.ornl.gov/SNS/ASG/GeometryMotors">
+  <component>
+    <xpath>/NXroot/NXinstrument/NXaperture[@name="aperture1"]</xpath>
+    <!-->Todo: need to add aperture1 in HYS geometry input file and/or IDF. <-->
+    <motorgroup>
+      <processprefix>motors</processprefix>
+      <motor>a1l</motor>
+      <motor>a1r</motor>
+      <motor>a1t</motor>
+      <motor>a1b</motor>
+      <motor>A1HWidth</motor>
+      <motor>A1VHeight</motor>
+      <motor>a1sd</motor>
+    </motorgroup>
+  </component>
+  <component>
+    <xpath>/NXroot/NXinstrument/NXaperture[@name="aperture2"]</xpath>
+    <!-->Todo: need to add aperture2 in HYS geometry input file and/or IDF. <-->
+    <motorgroup>
+      <processprefix>motors</processprefix>
+      <motor>a2l</motor>
+      <motor>a2r</motor>
+      <motor>a2t</motor>
+      <motor>a2b</motor>
+      <motor>A2HWidth</motor>
+      <motor>A2VHeight</motor>
+      <motor>a2sd</motor>
+    </motorgroup>
+  </component>
+  <component>
+    <xpath>/NXroot/NXinstrument/NXmonochromator[@name="monochromator"]</xpath>
+    <!-->Todo: need to add monochromator in HYS geometry input file and/or IDF. <-->
+    <motorgroup>
+      <processprefix>motors</processprefix>
+      <motor>mel</motor>
+      <motor>vMel</motor>
+      <motor>m1hu</motor>
+      <motor>mfhu</motor>
+      <motor>mthu</motor>
+      <motor>mghu</motor>
+      <motor>m1pg</motor>
+      <motor>mfpg</motor>
+      <motor>mtpg</motor>
+      <motor>mgpg</motor>
+    </motorgroup>
+  </component> 
+  <component>
+    <xpath>/NXroot/NXsample[@name="sample"]</xpath>
+    <motorgroup>
+      <processprefix>motors</processprefix>
+      <motor>msd</motor>
+      <motor>vMsd</motor>
+      <motor>s1</motor>
+      <motor>sgl</motor>
+      <motor>sgu</motor>
+      <motor>stl</motor>
+      <motor>stu</motor>
+      <motor>s2</motor>
+      <motor>vS2</motor>
+      <motor>m2</motor>
+      <motor>vM2</motor>
+    </motorgroup>
+  </component>
+  <component>
+    <xpath>/NXroot/NXinstrument/NXfermi_chopper[@name="FERMI"]</xpath>
+    <!-->Note the intended name is "energy" due to NXfermi_chopper definition. Also EnergyRequest is a chopper log (PV from chopper config file), not really a motor...<-->
+    <motorgroup>
+      <processprefix>motors</processprefix>
+      <motor>EnergyRequest</motor>
+    </motorgroup>
+  </component>
+</instrumentmotors>

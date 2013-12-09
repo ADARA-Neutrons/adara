@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<device xmlns="http://public.sns.gov/schema/device.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd">
+    <device_name>MotorsStopButton</device_name>
+    <device_description>From ArcsMotorsConfigFile. Note the pv is only writable.</device_description>
+    <app_id>1031</app_id>
+    <enumerations>
+        <enumeration>
+            <enum_name>enum_50</enum_name>
+            <enum_element>
+                <enum_element_name>UNDEFINED</enum_element_name>
+                <enum_element_value>0</enum_element_value>
+            </enum_element>
+            <enum_element>
+                <enum_element_name>NOTPUSHED</enum_element_name>
+                <enum_element_value>1</enum_element_value>
+            </enum_element>
+            <enum_element>
+                <enum_element_name>PUSHED</enum_element_name>
+                <enum_element_value>27384</enum_element_value>
+            </enum_element>
+        </enumeration>       
+    </enumerations>
+    <process_variables>
+        <process_variable>
+            <pv_name>MotorsStopButton</pv_name>
+            <pv_id>0</pv_id>
+            <pv_nids_write>dstp://motors/MotorsStopButton</pv_nids_write>
+            <pv_type>enum_50</pv_type>
+            <pv_hint>
+                <pv_nexus_type>NXpositioner</pv_nexus_type>              
+            </pv_hint> 
+        </process_variable>  
+    </process_variables>
+    <serial_number>200G</serial_number>
+</device>

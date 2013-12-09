@@ -66,8 +66,12 @@ public:
 		return m_prologue.connect(s);
 	}
 
-	static StorageContainer::SharedPtr &container (void) {
+	static StorageContainer::SharedPtr &container(void) {
 		return m_cur_container;
+	}
+
+	static bool streaming(void) {
+		return !!m_cur_container;
 	}
 
 	static uint32_t getNextRun(void);

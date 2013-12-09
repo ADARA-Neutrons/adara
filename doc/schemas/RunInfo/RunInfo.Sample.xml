@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<runinfo 
+ xmlns="http://public.sns.gov/schema/runinfo.xsd"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="http://public.sns.gov/schema/runinfo.xsd http://public.sns.gov/schema/runinfo.xsd">
+    <das_version>4.3</das_version>
+    <facility_name>SNS</facility_name>
+    <proposal_id>IPTS-12345</proposal_id>
+    <proposal_title>How to make a Better Cup of Coffee! :-D</proposal_title>
+    <run_number>24680</run_number>
+    <run_title>Run! Now! Save Yourself! :-o</run_title>
+    <run_revision>
+    <revision_number>3</revision_number>
+    <revision_log>3 Strikes, Yer Out... :-}</revision_log>
+    </run_revision>
+    <sample>
+    <name>Some Stuff I Found in the Back of My Frig...</name>
+    <id>SCUM-123</id>
+    <nature>liquid</nature>
+    <chemical_formula>H2-SO4</chemical_formula>
+    <environment>H2-SO4</environment>
+    </sample>
+    <users>
+    <user>
+    <id>y8y</id>
+    <name>Jeeeeeeeeeeeeeeeeeeeeeeeem</name>
+    </user>
+    <user>
+    <id>xuy</id>
+    <name>XingXing Marie Yao</name>
+    </user>
+    </users>
+    <reduction>
+    <detector_binning>
+        <binning_type>linear</binning_type>
+        <units>microsecond</units>
+        <start_bin>0.1234</start_bin>
+        <end_bin>9876.5432</end_bin>
+        <bin_width>1020.3040</bin_width>
+    </detector_binning>
+    <beam_monitor_binning>
+        <beam_monitor_name>White Beam</beam_monitor_name>
+        <beam_monitor_id>0</beam_monitor_id>
+        <beam_monitor_description>All Neutrons</beam_monitor_description>
+        <binning_type>log</binning_type>
+        <units>microsecond</units>
+        <start_bin>1.3579</start_bin>
+        <end_bin>8642.1234</end_bin>
+        <bin_width>246.810</bin_width>
+    </beam_monitor_binning>
+    </reduction>
+</runinfo>
