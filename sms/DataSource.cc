@@ -34,9 +34,15 @@ public:
 
 		SMSControl *ctrl = SMSControl::getInstance();
 		if (!eop) {
+#if 0
+			/* We currently get this on every other pulse for
+			 * 30 Hz operation; disable the message until
+			 * we get a better fix.
+			 */
 			/* TODO rate-limited logging of dropped packets */
 			ERROR("Lost packet from " << m_name << " src 0x"
 				<< std::hex << m_hwId);
+#endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
 		}
 
