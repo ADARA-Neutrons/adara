@@ -80,8 +80,6 @@ static void parseEntry(const std::string &name, const std::string &var,
 		       const std::string &val, uint32_t &varId, uint32_t &key,
 		       bool &persist)
 {
-	bool trigger = false;
-
 	/* Build the common error string */
 	std::string msg("fastmeta '");
 	msg += name;
@@ -108,7 +106,6 @@ static void parseEntry(const std::string &name, const std::string &var,
 	/* What type of fast metadata are we? */
 	if (boost::algorithm::iequals(*arg, "trigger")) {
 		key = 0x50000000;
-		trigger = true;
 	} else if (boost::algorithm::iequals(*arg, "adc")) {
 		key = 0x60000000;
 	} else {
@@ -138,26 +135,6 @@ static void parseEntry(const std::string &name, const std::string &var,
 	}
 
 	key |= dev << 16;
-
-	/* Processing varies here; if we are a trigger device, we need
-	 * to have rising or falling selected. Otherwise, we can proceed
-	 * to the optional 'persist' flag.
-	 */
-	if (trigger) {
-		if (++arg == tokens.end()) {
-			msg += " is missing edge specification";
-			throw std::runtime_error(msg);
-		}
-
-		if (boost::algorithm::iequals(*arg, "rising")) {
-			key |= 1;
-		} else if (boost::algorithm::iequals(*arg, "falling")) {
-			/* No change to key needed */
-		} else {
-			msg += " has invalid edge specification";
-			throw std::runtime_error(msg);
-		}
-	}
 
 	/* Now for the optional 'persist' flag; it is OK if it doesn't exist,
 	 * but if it does, it must be the last token.
@@ -266,23 +243,20 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	}
 	pkt[3] = ns;
 
-	/* If we're working on an ADC event, we need to mask off the value
-	 * before looking for the matching variable.
+	/* The device/type ID is the upper 15 bits of the fastmeta
+	 * pixel ID; just use that directly as a key. The lower 16 bits
+	 * indicate the ADC value, or the rising/falling edge, so it
+	 * will be the variable update value.
+	 *
+	 * TODO perhaps we can do something smart with the ADC values?
+	 * Allow user to specify a formula to convert it to a
+	 * meaningful unit?
+	 *
+	 * Then again, it could depend on temperature and other info
+	 * that we don't have available to us.
 	 */
-	uint32_t key = pixel;
-	uint32_t val = tof;
-	if ((key >> 28) == 6) {
-		/* TODO perhaps we can do something smart with the ADC values?
-		 * Allow user to specify a formula to convert it to a
-		 * meaningful unit?
-		 *
-		 * Then again, it could depend on temperature and other info
-		 * that we don't have available to us.
-		 */
-		val = pixel & 0xffff;
-		key &= ~0xffff;
-	}
-
+	uint32_t key = pixel & ~0xffff;
+	uint32_t val = pixel & 0xffff;
 	const Variable &var = m_vars[key];
 	pkt[4] = var.m_devId;
 	pkt[5] = var.m_varId;

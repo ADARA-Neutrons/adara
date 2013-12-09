@@ -17,12 +17,10 @@ public:
 	void addDevices(const boost::property_tree::ptree &conf);
 
 	bool validVariable(uint32_t pixel) {
-		/* If this is an ADC event, we need to mask off the actual
-		 * value before seeing if we have a matching variable.
+		/* Our variables are indexed by the type and device ID,
+		 * which are the upper 15 bits of the pixel.
 		 */
-		if ((pixel >> 28) == 6)
-			pixel &= ~0xffff;
-		return !!m_vars.count(pixel);
+		return !!m_vars.count(pixel & ~0xffff);
 	}
 
 	void sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof);
