@@ -1,3 +1,5 @@
+#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
+
 #include <boost/function.hpp>
 #include <string>
 

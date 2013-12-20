@@ -1,6 +1,8 @@
 #ifndef COMBUS_H
 #define COMBUS_H
 
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+
 #include <map>
 #include <vector>
 #include <boost/thread/thread.hpp>

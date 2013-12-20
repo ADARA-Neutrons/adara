@@ -1,3 +1,5 @@
+#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
+
 #include "FastMeta.h"
 #include "MetaDataMgr.h"
 #include "StorageManager.h"

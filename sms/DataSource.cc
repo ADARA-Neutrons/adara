@@ -1,3 +1,5 @@
+#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>

@@ -1,3 +1,5 @@
+#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
+
 #include <iostream>
 #include <stdexcept>
 #include <signal.h>
