@@ -3,7 +3,7 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <time.h>
 #include <stdint.h>
 #include <string>
@@ -15,7 +15,8 @@ class StorageContainer : boost::noncopyable {
 public:
 	typedef boost::shared_ptr<StorageContainer> SharedPtr;
 	typedef boost::weak_ptr<StorageContainer> WeakPtr;
-	typedef boost::signal<void (StorageFile::SharedPtr &)> onNewFile;
+	typedef boost::signals2::signal<void (StorageFile::SharedPtr &)>
+								onNewFile;
 
 	const struct timespec &startTime(void) const { return m_startTime; }
 	uint32_t runNumber (void) const { return m_runNumber; }
@@ -27,7 +28,7 @@ public:
 
 	bool active(void) const { return m_active; }
 
-	boost::signals::connection connect(const onNewFile::slot_type &slot) {
+	boost::signals2::connection connect(const onNewFile::slot_type &slot) {
 		return m_newFile.connect(slot);
 	}
 

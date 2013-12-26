@@ -20,7 +20,7 @@ public:
 	static void config(const boost::property_tree::ptree &conf);
 
 private:
-	typedef boost::signals::connection connection;
+	typedef boost::signals2::connection connection;
 	typedef std::pair<StorageFile::SharedPtr, off_t> FileEntry;
 	typedef std::list<FileEntry> FileList;
 

@@ -3,7 +3,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <utility>
 #include <vector>
 #include <string>
@@ -36,7 +36,7 @@ private:
 	boost::shared_array<uint8_t> m_packet;
 	uint32_t m_packetSize;
 	uint32_t m_numBanks;
-	boost::signals::connection m_connection;
+	boost::signals2::connection m_connection;
 
 	void onPrologue(void);
 };

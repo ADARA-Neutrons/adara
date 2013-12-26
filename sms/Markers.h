@@ -3,7 +3,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -29,7 +29,7 @@ private:
 	boost::shared_ptr<MarkerTriggerPV> m_annotatePV;
 	boost::shared_ptr<MarkerTriggerPV> m_runCommentPV;
 
-	boost::signals::connection m_connection;
+	boost::signals2::connection m_connection;
 
 	uint32_t m_scanIndex;
 

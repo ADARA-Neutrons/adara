@@ -29,7 +29,7 @@ private:
 	STSClientMgr();
 	~STSClientMgr();
 
-	typedef boost::signals::connection connection;
+	typedef boost::signals2::connection connection;
 	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_connect_timer;
