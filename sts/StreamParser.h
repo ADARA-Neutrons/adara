@@ -38,8 +38,6 @@ public:
     void    processStream();
     void    printStats( std::ostream &a_os ) const;
 
-    const struct timespec & getStartTime() const { return m_run_metrics.start_time; }
-    const struct timespec & getEndTime() const { return m_run_metrics.end_time; }
     std::string             getFacilityName() const { return m_run_info.facility_name; }
     std::string             getBeamShortName() const { return m_run_info.instr_shortname; }
     std::string             getProposalID() const { return m_run_info.proposal_id; }
