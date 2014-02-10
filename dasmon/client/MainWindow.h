@@ -1,6 +1,12 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "ComBus.h"
+#include "DASMonDefs.h"
+#include "SubClient.h"
+#include "DASMonMessages.h"
+#include "STSMessages.h"
+
 #include <map>
 #include <list>
 #include <deque>
@@ -10,11 +16,6 @@
 #include <QDateTime>
 #include <QMutex>
 #include <QLineEdit>
-#include "ComBus.h"
-#include "DASMonDefs.h"
-#include "SubClient.h"
-#include "DASMonMessages.h"
-#include "STSMessages.h"
 
 #define DASMON_GUI_VERSION "1.2"
 
