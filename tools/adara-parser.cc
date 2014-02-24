@@ -133,7 +133,7 @@ class Parser : public ADARA::Parser {
 public:
 	Parser() :
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
-		m_showVars(true)
+        m_showVars(true), m_showDDP(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -173,6 +173,7 @@ private:
 	bool m_wordDump;
 	bool m_showEvents;
 	bool m_showVars;
+    bool m_showDDP;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
@@ -588,6 +589,12 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 	       "    Device %u\n",
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.devId());
+
+    if ( m_showDDP )
+    {
+        printf( "%s\n", pkt.description().c_str() );
+    }
+
 	return false;
 }
 
@@ -688,7 +695,8 @@ void Parser::parse(int argc, char **argv)
 		("hexdump,x", "Dump the contents of each packet in hex (bytes)")
 		("worddump,w", "Dump the contents of each packet in hex (words)")
 		("hidevars,H", "Hide variable update packets")
-		("events,e", "Show events");
+    ("showddp,D", "Show payload of device descriptor packets")
+        ("events,e", "Show events");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -719,7 +727,8 @@ void Parser::parse(int argc, char **argv)
 	m_hexDump = !!vm.count("hexdump");
 	m_wordDump = !!vm.count("worddump");
 	m_showEvents = !!vm.count("events");
-	m_showVars = !vm.count("hidevars");
+    m_showVars = !vm.count("hidevars");
+    m_showDDP = vm.count("showddp");
 
 	if (!vm.count("file")) {
 		try {
