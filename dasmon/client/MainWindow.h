@@ -17,7 +17,7 @@
 #include <QMutex>
 #include <QLineEdit>
 
-#define DASMON_GUI_VERSION "1.2"
+#define DASMON_GUI_VERSION "1.2.1"
 
 
 namespace Ui {
@@ -31,7 +31,7 @@ class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, pub
     Q_OBJECT
 
 public:
-    MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, bool a_kiosk, bool a_master );
+    MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_master );
     ~MainWindow();
 
 signals:
@@ -126,6 +126,8 @@ private:
     void        comBusConnectionStatus( bool a_connected );
     void        comBusInputMessage( const ADARA::ComBus::MessageBase &a_cmd );
 
+    void        updateMainWindowTitle();
+
     void        updateAllStatusIndicators();
     void        updateComBusStatusIndicator();
     void        updateDASMonStatusIndicator();
@@ -156,14 +158,19 @@ private:
     bool        createRoute( SubClient &a_sub_client, ADARA::ComBus::MessageBase &a_msg, const std::string &a_dest_proc );
     void        removeRoute( SubClient &a_sub_client, std::string &a_correlation_id );
     void        clearCIDs_nolock( SubClient &a_sub_client );
+    void        initHighlightColors();
+    bool        event( QEvent *a_event );
 
     inline void testSetBkgnd( unsigned short &hlcnt, QTableWidgetItem* items[], int icnt )
     {
         if ( hlcnt )
         {
-          --hlcnt;
-          for ( int i = 0; i < icnt; ++i )
-            items[i]->setBackgroundColor( m_hl_color[hlcnt] );
+            --hlcnt;
+            for ( int i = 0; i < icnt; ++i )
+            {
+                items[i]->setTextColor( m_fg_color[hlcnt] );
+                items[i]->setBackgroundColor( m_bg_color[hlcnt] );
+            }
         }
     }
 
@@ -205,8 +212,9 @@ private:
     unsigned short                  m_event_scrollback;
     std::map<std::string,AlertInfo> m_alerts;
     std::list<AlertInfo>            m_events;
-    QColor                          m_default_bg_color;
-    std::vector<QColor>             m_hl_color;
+    //QColor                          m_default_bg_color;
+    std::vector<QColor>             m_fg_color;
+    std::vector<QColor>             m_bg_color;
     QDateTime                       m_start_time;
     QMutex                          m_mutex;
     QMutex                          m_log_mutex;
