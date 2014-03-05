@@ -30,3 +30,4 @@ include tools/Makefile.am
 include sms/Makefile.am
 include sts/Makefile.am
 include dasmon/server/Makefile.am
+include PVStreamer/pvsd/Makefile.am

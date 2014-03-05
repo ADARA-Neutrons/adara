@@ -1,0 +1,5 @@
+This directory contains common source code shared between the Windows
+PVStreamer application and the linux pvstreamer daemon (pvsd). This source
+code provides core functionality such as device and process variable
+configuration management, internal streaming support, and the ADARA protocol
+writer.

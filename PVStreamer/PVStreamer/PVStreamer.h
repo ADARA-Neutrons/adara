@@ -43,7 +43,7 @@ class PVWriter;
  * IPVConfigListener interfaces as well as the public interface of PVSTreamer class itself.
  * PVStreamer does not acquire configuration data; rather instances of associated
  * PVConfig objects gather configuration data and use PVStreamer to store and
- * disseminate this data. PVStreamer also does not monitor which devices and/or 
+ * disseminate this data. PVStreamer also does not monitor which devices and/or
  * process variables are actually active (as opposed to simply defined) - this is
  * defered to PVReader classes as it require protocol-specific implementation.
  *
@@ -118,10 +118,8 @@ private:
 
     // ---------- IPVConfigServices methods ----------
 
-    void                        defineApp( Protocol a_protocol, Identifier a_app_id, const std::string &a_source );
-    void                        undefineApp( Identifier a_app_id );
-    void                        defineDevice( Protocol a_protocol, Identifier a_dev_id, const std::string &a_name, const std::string &a_source, Identifier a_app_id = 0 );
-    void                        undefineDevice( Identifier a_dev_id );
+    void                        defineDevice( Protocol a_protocol, const std::string &a_name, const std::string &a_source );
+    void                        undefineDevice( Protocol a_protocol, const std::string &a_name );
     void                        undefineDeviceIfNoPVs( Identifier a_dev_id );
     void                        definePV( PVInfo & info );
     void                        undefinePV( Identifier a_dev_id, Identifier a_pv_id );
@@ -130,6 +128,8 @@ private:
     void                        configurationLoaded( Protocol a_protocol, const std::string &a_source );
     void                        configurationInvalid( Protocol a_protocol, const std::string &a_source );
     PVInfo*                     getWriteablePV( const std::string & a_name ) const;
+    Identifier                  getDeviceIdentifier( Protocol a_protocol, const std::string &a_device_name );
+    void                        releaseDeviceIdentifier( Protocol a_protocol, const std::string &a_device_name );
 
     // ---------- IPVReaderServices methods ----------
 
@@ -151,7 +151,7 @@ private:
     void                        notifyStreamListeners( PVStreamPacket *a_pkt );
 
     // ---------- Private Attributes ----------
- 
+
     size_t                                      m_pkt_buffer_size;          ///< Stream packet buffer size
     size_t                                      m_max_notify_pkts;          ///< Max stream packets to queue to notify service
     std::map<Protocol,PVConfig*>                m_config;                   ///< Active configuration objects
@@ -172,10 +172,9 @@ private:
     std::vector<IPVStreamerStatusListener*>     m_status_listeners;         ///< Registered status listener container
     std::map<PVKey,PVInfo*>                     m_pv_info;                  ///< All defined (configured) process variables
     std::map<Identifier,DeviceInfo*>            m_devices;                  ///< All defined (configured) devices
-    std::map<Identifier,AppInfo*>               m_apps;                     ///< All defined (configured) applications
     std::map<Identifier,Enum*>                  m_enums;                    ///< All defined (configured) enumerations
-
-    static Identifier m_next_enum_id;                                       ///< HACK to define IDs for enumerations
+    std::map<std::string,Identifier>            m_dev_id;                   ///< Device name to dynamically assigned identifier
+    std::map<Identifier,std::string>            m_id_dev;                   ///< Dynamically assigned identifier to device name
 };
 
 }}

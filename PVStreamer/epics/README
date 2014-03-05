@@ -1,0 +1,3 @@
+This directory contains source code spcific to EPICS input protocol handlers
+used by the pvstreamer core. This code is cross-platform, but requires EPICS
+version 3 libraries.
