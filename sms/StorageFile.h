@@ -3,7 +3,7 @@
 
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 #include "ADARA.h"
@@ -14,7 +14,7 @@ class StorageContainer;
 class StorageFile : boost::noncopyable {
 public:
 	typedef boost::shared_ptr<StorageFile> SharedPtr;
-	typedef boost::signal<void (const StorageFile &)> onUpdate;
+	typedef boost::signals2::signal<void (const StorageFile &)> onUpdate;
 
 	/* We cannot use StorageContainer::WeakPtr here due to a circular
 	 * dependency, so open-code a matching type to hold the weak pointer
@@ -35,7 +35,7 @@ public:
 	void persist(bool p = true) { m_persist = p; }
 	OwnerPtr owner(void) const { return m_owner; }
 
-	boost::signals::connection connect(const onUpdate::slot_type &slot) {
+	boost::signals2::connection connect(const onUpdate::slot_type &slot) {
 		return m_update.connect(slot);
 	}
 
