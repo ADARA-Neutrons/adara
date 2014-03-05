@@ -23,8 +23,10 @@ record(longout,"a3"){
     field(PINI,"YES")
 }
 
-record(stringout,"a4"){
-    field(VAL,"Hello")
+record(ao,"a4"){
+    field(VAL,4.5)
+    field(UDF,1)
+    field(EGU,"mm")
     field(PINI,"YES")
 }
 

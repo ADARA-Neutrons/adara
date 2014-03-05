@@ -11,8 +11,7 @@ PVStreamer_pvsd_pvsd_SOURCES = PVStreamer/pvsd/main.cpp \
 # TODO pick up the libxml2 include from autoconf/pkgconfig
 PVStreamer_pvsd_pvsd_CPPFLAGS = -IPVStreamer/common -Icombus -Icommon \
     -IPVStreamer/adara -IPVStreamer/epics \
-    -I/usr/include/libxml2 \
-    -I/usr/include/apr-1 -I/usr/include/activemq-cpp-3.4.0 \
+    $(libxml_CPPFLAGS) $(apr_CPPFLAGS) $(activemq_CPPFLAGS) \
      $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS)
 
 # TODO clean this up to compile with these warnings enabled
@@ -21,6 +20,6 @@ PVStreamer_pvsd_pvsd_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 # TODO pick up most of these from autoconf
 PVStreamer_pvsd_pvsd_LDFLAGS = $(EPICS_LDFLAGS)
 
-PVStreamer_pvsd_pvsd_LDADD = $(EPICS_LIBS) -lxml2 -lactivemq-cpp \
+PVStreamer_pvsd_pvsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(apr_LIBS) $(libxml_LIBS) \
     -lboost_filesystem -lboost_system -lboost_program_options -lboost_thread-mt
 
