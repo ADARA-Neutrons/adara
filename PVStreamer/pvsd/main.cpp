@@ -20,6 +20,7 @@ using namespace std;
 
 bool g_active = true;
 
+
 void signalHandler( int a_signal )
 {
     g_active = false;
@@ -28,6 +29,9 @@ void signalHandler( int a_signal )
 
 int main(int argc, char *argv[])
 {
+    // Setup signal handlers to catch all termination handlers so we can
+    // implement orderly shutdown.
+
     struct sigaction new_action, old_action;
 
     new_action.sa_handler = signalHandler;
@@ -58,6 +62,8 @@ int main(int argc, char *argv[])
     string          domain;
     string          epics_cfg;
     uint32_t        offset;
+    uint32_t        pid;
+    ::ADARA::ComBus::Connection *combus = 0;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
@@ -67,10 +73,11 @@ int main(int argc, char *argv[])
             ("port,p", po::value<uint32_t>( &port )->default_value( 31416 ), "set client port")
             ("hb", po::value<uint32_t>( &heartbeat )->default_value( 2000 ), "set ADARA heartbeat period (msec)")
             ("domain,d", po::value<string>( &domain )->default_value( "" ), "set communication domain prefix (EPICS/ComBus)")
+            ("pid", po::value<uint32_t>( &pid )->default_value( 0 ), "set combus process identifier")
             ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
-            ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
-            ("epics", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
+            ("broker_pw,w", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("config,c", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
             ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
             ;
 
@@ -92,18 +99,15 @@ int main(int argc, char *argv[])
     }
 
     // Initialize SysLog
-
     openlog( "pvsd", 0, LOG_DAEMON );
     syslog( LOG_INFO, "pvsd started." );
 
     if ( !opt_map.count( "domain" ))
         syslog( LOG_WARNING, "No communication domain specified - probably an error." );
 
-    ::ADARA::ComBus::Connection *combus = 0;
-
     try
     {
-        combus = new ::ADARA::ComBus::Connection( domain, "PVSD", 0, broker_uri, broker_user, broker_pass );
+        combus = new ::ADARA::ComBus::Connection( domain, "PVSD", pid, broker_uri, broker_user, broker_pass );
 
         StreamService   streamer( 100, offset );
         new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
@@ -114,7 +118,7 @@ int main(int argc, char *argv[])
 
         while( g_active )
         {
-            if (!(++count % 2))
+            if (!(++count % 5))
                 combus->status( ::ADARA::ComBus::STATUS_OK );
 
             sleep(1);

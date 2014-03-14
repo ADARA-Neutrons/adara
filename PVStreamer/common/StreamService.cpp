@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <stdexcept>
 #include "StreamService.h"
 
@@ -157,7 +158,6 @@ StreamService::getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag )
 void
 StreamService::putFreePacket( StreamPacket *a_pkt )
 {
-
     // If the notify buffer is backed-up, bypass it. This will cause stream
     // listeners to miss packets under heavy load, but it will maintain the
     // output stream integrity.
@@ -168,6 +168,7 @@ StreamService::putFreePacket( StreamPacket *a_pkt )
 
     // Ensure that shared ptr to Device is released before returning to free queue
     a_pkt->device.reset();
+    a_pkt->old_device.reset();
     a_pkt->pv = 0;
     m_free_que.put(a_pkt);
 }

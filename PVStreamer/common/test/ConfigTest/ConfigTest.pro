@@ -14,8 +14,8 @@ CONFIG   -= app_bundle
 
 TEMPLATE = app
 
-INCLUDEPATH += ../.. /usr/include/libxml2 /opt/epics/base/include \
-    /opt/epics/base/include/os/Linux ../../../epics ../../../adara \
+INCLUDEPATH += ../.. /usr/include/libxml2 /home/d3s/epics/include \
+    /home/d3s/epics/include/os/Linux ../../../epics ../../../adara \
     ../../../../common
 
 SOURCES += main.cpp \
@@ -43,7 +43,7 @@ HEADERS += \
     ../../../epics/EPICS_DeviceAgent.h
 
 LIBS += -lboost_thread-mt -lxml2 -lboost_filesystem  \
-    -L/opt/epics/base/lib/linux-x86_64 -lCom -lca
+    -L/home/d3s/epics/lib/linux-x86_64 -lCom -lca
 
 OTHER_FILES += \
     ../../../epics/test/ioc.db \

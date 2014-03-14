@@ -3,12 +3,12 @@
 
 #include <vector>
 #include <set>
+#include <map>
+#include <list>
 #include <string>
-#include <libxml/tree.h>
-
 #include <boost/thread.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/mutex.hpp>
+#include <libxml/tree.h>
 
 #include "CoreDefs.h"
 #include "IInputAdapter.h"

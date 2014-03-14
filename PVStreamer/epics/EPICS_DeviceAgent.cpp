@@ -8,22 +8,45 @@
 #include "DeviceDescriptor.h"
 #include "ConfigManager.h"
 #include "StreamService.h"
+#include "ComBus.h"
+#include "ComBusMessages.h"
 
 using namespace std;
 
 namespace PVS {
 namespace EPICS {
 
+//-------------------------------------------------------------------------------------------------
+// PUBLIC DeviceAgent Methods
+//-------------------------------------------------------------------------------------------------
 
+/**
+ * @brief DeviceAgent constructor
+ * @param a_stream_api - Input adapter API for internal stream I/O
+ * @param a_device - DeviceDescriptor for initial device to manage
+ * @param a_epics_context - EPICS context needed for background threads
+ *
+ * Calling this constructor will cause the new DeviceAgent to immediately begin activities
+ * for connecting to and streaming data for the specified device (from a private thread).
+ */
 DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context )
-    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true), m_epics_context(a_epics_context)
+    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true),
+      m_epics_context(a_epics_context), m_tid(0)
 {
-    m_ctrl_thread = new boost::thread(boost::bind( &DeviceAgent::controlThread, this ));
+    m_ctrl_thread = new boost::thread( boost::bind( &DeviceAgent::controlThread, this ));
 
     update(a_device);
 }
 
 
+/**
+ * @brief DeviceAgent destructor.
+ *
+ * This destructor will stop underlying I/O if not already stopped. Currently, there is
+ * no risk of blocking when destroying a running DeviceAgent; however this could change in
+ * the future (use stopped() to check asynchronously prior to deleting a DeviceAgent
+ * instance).
+ */
 DeviceAgent::~DeviceAgent()
 {
     m_active = false;
@@ -35,10 +58,19 @@ DeviceAgent::~DeviceAgent()
 }
 
 
+/**
+ * @brief Handles new or updated to device descriptors
+ * @param a_device - DeviceDescriptor for new/updated device
+ *
+ * This method is used to establish or update EPICS connections when a new device is defined or the
+ * current device is updated. If a current device is defined, the passed-in device descriptor is
+ * compared to the existing descriptor and connections are updated based on any detected differences.
+ * This method does NOT inject any packets into the internal data stream.
+ */
 void
 DeviceAgent::update( DeviceDescriptor *a_device )
 {
-    //syslog( LOG_DEBUG, "DeviceAgent::update(%s)", a_device->m_name.c_str() );
+    cout << "UPDATE DevDesc: " << hex << a_device << endl;
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
@@ -56,12 +88,11 @@ DeviceAgent::update( DeviceDescriptor *a_device )
 
     if ( old_desc )
     {
-        //syslog( LOG_DEBUG, "Redefining existing device" );
-
         // Disconnect any existing connections that are no longer needed
         for ( ipv = old_desc->m_pvs.begin(); ipv != old_desc->m_pvs.end(); ++ipv )
         {
-            if ( !a_device->getPV( (*ipv)->m_name ))
+            cout << "Check PV: " << (*ipv)->m_name << endl;
+            if ( !a_device->getPvByConnection( (*ipv)->m_connection ))
                 disconnectPV( *ipv );
         }
 
@@ -69,41 +100,56 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         // Make connections for new PVs in updated device
         for ( ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
         {
-            old_pv = old_desc->getPV( (*ipv)->m_name );
+            old_pv = old_desc->getPvByConnection( (*ipv)->m_connection );
             if ( !old_pv )
                 connectPV( *ipv );
             else
             {
-                // PV is shared between old and new device
-                // Transfer info to new pv
-                (*ipv)->m_type = old_pv->m_type;
-                (*ipv)->m_units = old_pv->m_units;
-                if ( old_pv->m_type == PV_ENUM )
-                    (*ipv)->m_enum = a_device->defineEnumeration( *old_pv->m_enum );
-
+                // PV channel is shared between old and new device, reuse connection
                 // Update PV pointer on channel info
-                idx = m_pv_index.find( old_pv->m_name );
+                idx = m_pv_index.find( old_pv->m_connection );
                 if ( idx != m_pv_index.end())
                 {
                     ich = m_chan_info.find( idx->second );
                     if ( ich != m_chan_info.end())
                     {
+                        cout << "REUSE chid: " << ich->first << " (PV: " << (*ipv)->m_connection << ", addr: " << hex << (*ipv) << ")" << endl;
+                        // Update PV to new (temporary) PV
                         ich->second.m_pv = *ipv;
+                        // Old device record is no longer valid - reset
+                        ich->second.m_device.reset();
+                        // Re-aqcuire metadata just in case it changed
+                        ich->second.m_chan_state = INFO_NEEDED;
                     }
                 }
             }
         }
 
-        // Clean-up & take ownership of descriptor (if used)
+        // Delete old temporary descriptor if set
         if ( m_dev_desc )
+        {
+            cout << "DELETE old temp DevDesc: " << hex << m_dev_desc << endl;
             delete m_dev_desc;
+        }
     }
     else
     {
-        //syslog( LOG_DEBUG, "Defining new device" );
-
         for ( ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
             connectPV( *ipv );
+    }
+
+    a_device->print(cout);
+    cout << "CHID map:" << endl;
+    for ( ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+    {
+        cout << "chid: " << ich->first << ", dev: " << ich->second.m_device.get() << ", pv: " << hex << ich->second.m_pv << ", ch st: " << ich->second.m_chan_state << endl;
+        cout << "      evid: " << ich->second.m_evid << ", conn: " << ich->second.m_connected << ", sub: " << ich->second.m_subscribed << endl;
+    }
+
+    cout << "Name/CHID map:" << endl;
+    for ( idx = m_pv_index.begin(); idx != m_pv_index.end(); ++idx )
+    {
+        cout << "PV: " << idx->first << ", chid: " << idx->second << endl;
     }
 
     m_dev_desc = a_device;
@@ -116,6 +162,53 @@ DeviceAgent::update( DeviceDescriptor *a_device )
 }
 
 
+/**
+ * @brief Handles metadata updates after device configuration
+ *
+ * This method is called by the state machine when metadata changes are detected after configuration
+ * for at least one connected PV. Because metadata (PV type, units, enum) are part of the device
+ * descriptor, the existing device must be redefined with the new metadata and a new device descriptor
+ * emitted. This method copies the current device descriptor, updates the changed metadata, and
+ * redefines the device through the configuration manager.
+ */
+void
+DeviceAgent::metadataUpdated()
+{
+    // No lock is required since this method is only called from state machine that holds the lock.
+
+    // Copy current device descriptor
+    DeviceDescriptor *new_dev = new DeviceDescriptor( *m_dev_record );
+    m_defined = false;
+    m_dev_desc = new_dev;
+
+    // Update channel info and channel state
+    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+    {
+        ich->second.m_device.reset();
+        ich->second.m_pv = m_dev_desc->getPvByConnection( ich->second.m_pv->m_connection );
+
+        if ( ich->second.m_chan_state == INFO_AVAILABLE )
+        {
+            ich->second.m_pv->setMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals );
+            ich->second.m_chan_state = READY;
+        }
+        else if ( ich->second.m_chan_state == READY )
+        {
+            // Re-request metadata from all other PV (they may have changed too)
+            ich->second.m_chan_state = INFO_NEEDED;
+        }
+    }
+}
+
+
+/**
+ * @brief Stops a DeviceAgent when associated device no longer needs to be streamed.
+ *
+ * This method causes the DeviceAgent to undefine any associated device and disconnect from
+ * all underlying input sources (in this case EPICS channels). This method can be called
+ * externally, and will also be called by the DeviceAgent destructor. Calling this method
+ * more than once is safe and will have no side effects.
+ */
 void
 DeviceAgent::stop()
 {
@@ -124,16 +217,8 @@ DeviceAgent::stop()
     // If a device is currently configured, undefine it
     if ( m_dev_record.get())
     {
-        // Set state to disconnected
-        for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
-        {
-            ich->second.m_pv_state.m_status = epicsAlarmComm;
-            ich->second.m_pv_state.m_severity = epicsSevInvalid;
-        }
-        // This will only send PV that have been sent before
-        // If being shutdown, nothing will be sent (queues are shutdown)
-        sendCurrentValues();
         m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+        m_dev_record.reset();
     }
 
     // Clear CA channels and unsubscribe
@@ -151,6 +236,16 @@ DeviceAgent::stop()
 }
 
 
+/**
+ * @brief This method determines if the DeviceAgent is in a stopped state
+ * @return True if device is stopped; false otherwise
+ *
+ * This method determines if the DeviceAgent is stopped - meaning underlying inputs are
+ * disconnected and there are no active or pending asynchronous I/O operations. This is
+ * useful to know when a DeviceAgent can be destroyed safely without vlocking in the
+ * destructor. Currently, this method is very simple as EPICS seems to ensure that no
+ * additional callbacks will be made after clearing channels and subscriptions.
+ */
 bool
 DeviceAgent::stopped()
 {
@@ -159,53 +254,80 @@ DeviceAgent::stopped()
 }
 
 
+//-------------------------------------------------------------------------------------------------
+// PRIVATE DeviceAgent Methods
+//-------------------------------------------------------------------------------------------------
+
+/**
+ * @brief Creates data connections to specified process variable
+ * @param a_pv - Process variable descriptor for connection
+ *
+ * This method makes EPICS calls to connect to the specified process variable. This call is
+ * asynchronous. Once the connections have been established, the epicsConnectionCallback method
+ * will be called and the DeviceAgent state machine will be stimulated.
+ */
 void
 DeviceAgent::connectPV( PVDescriptor *a_pv )
 {
-    // Create a CA channel
     ChanInfo info;
     info.m_pv = a_pv;
 
-    if ( ca_create_channel( a_pv->m_connection.c_str(), &epicsConnectionCallback, this, 0, &info.m_chid ) != ECA_NORMAL )
+    // Create a CA channel
+    if ( ca_create_channel( a_pv->m_connection.c_str(), &epicsConnectionCallback, this, 0, &info.m_chid ) == ECA_NORMAL )
     {
-        syslog( LOG_ERR, "Failed to create channel for PV: %s, connection: %s", a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-        EXCEPT( EC_EPICS_API, "Could not create PV channel" );
+        // Note: don't flush I/O here - update() method will call it
+
+        cout << "Connected to chid: " << info.m_chid << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
+
+        // Update channel info and PV name index structures
+        m_chan_info[info.m_chid] = info;
+        m_pv_index[a_pv->m_connection] = info.m_chid;
     }
-    // Don't flush I/O here - update() method will call it
-
-    m_chan_info[info.m_chid] = info;
-    m_pv_index[a_pv->m_name] = info.m_chid;
-
-    cout << "ConnPV " << a_pv->m_connection.c_str() << ":" << (long)info.m_chid << endl;
-
-    syslog( LOG_DEBUG, "Connected PV: %s, chid: %li", a_pv->m_name.c_str(), (long)info.m_chid );
+    else
+        syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_connection.c_str() );
 }
 
 
+/**
+ * @brief Disconnects the specified process variable
+ * @param a_pv - Process variable descriptor for diconnection
+ *
+ * This method makes EPICS calls to disconnect to the specified process variable. This call is
+ * synchronous (for now).
+ */
 void
 DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 {
-    map<std::string,chid>::iterator ipv = m_pv_index.find( a_pv->m_name );
+    map<std::string,chid>::iterator ipv = m_pv_index.find( a_pv->m_connection );
     if ( ipv != m_pv_index.end())
     {
         map<chid,ChanInfo>::iterator ich = m_chan_info.find(ipv->second);
         if ( ich != m_chan_info.end())
         {
+            cout << "Disconnected from chid: " << ich->first << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
+
             if ( ich->second.m_subscribed )
                 ca_clear_subscription( ich->second.m_evid );
-
-            syslog( LOG_DEBUG, "Disconnected PV: %s, chid: %li", a_pv->m_name.c_str(), (long)ich->second.m_chid );
+            else
+                cout << "   (NOT SUBSCRIBED)" << endl;
 
             ca_clear_channel( ich->second.m_chid );
+
+            // Update channel info index structures
             m_chan_info.erase( ich );
 
             // Don't flush I/O here - update() method will call it
         }
+
+        // Update name index structures
         m_pv_index.erase( ipv );
     }
 }
 
 
+/**
+ * @brief This method is the control thread for the DeviceAgent state machine
+ */
 void
 DeviceAgent::controlThread()
 {
@@ -215,119 +337,133 @@ DeviceAgent::controlThread()
     map<std::string,chid>::iterator idx;
     PVDescriptor *pv;
     size_t ready;
-
-    //syslog( LOG_DEBUG, "DevAg: control thread started" );
+    bool device_changed = false;
 
     while( 1 )
     {
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-
-        if ( !m_state_changed )
-            m_state_cond.wait( lock );
-
-        //syslog( LOG_DEBUG, "State machine running" );
-
-        if ( !m_active )
-            break;
-
-        // Might have been woken spuriously
-        if ( !m_state_changed )
-            continue;
-
-        m_state_changed = false;
-
-        ready = 0;
-        for ( ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+        try
         {
-            switch ( ich->second.m_chan_state )
+            boost::unique_lock<boost::mutex> lock(m_mutex);
+
+            if ( !m_state_changed )
+                m_state_cond.wait( lock );
+
+            if ( !m_active )
+                break;
+
+            // Might have been woken spuriously
+            if ( !m_state_changed )
+                continue;
+
+            m_state_changed = false;
+
+            ready = 0;
+            for ( ich = m_chan_info.begin(); ich != m_chan_info.end() && !m_state_changed; ++ich )
             {
-            case INFO_NEEDED:
-                if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_pv->m_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
+                switch ( ich->second.m_chan_state )
                 {
-                    cout << "INFO PEND " << (long)ich->second.m_chid << endl;
+                case INFO_NEEDED:
+                    cout << "GET CTRL, type: " << ich->second.m_ca_type << ", chid: " << ich->first << endl;
+                    if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_ca_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
+                        ich->second.m_chan_state = INFO_PENDING;
+                    else
+                    {
+                        cout << "FAILED - ca_get_callback (type = " << ich->second.m_ca_type << ")" << endl;
+                        syslog( LOG_ERR, "Failed to get channel info for PV: %s", ich->second.m_pv->m_connection.c_str() );
+                    }
+                    break;
+                case INFO_AVAILABLE:
+                    if ( m_defined )
+                    {
+                        if ( !ich->second.m_pv->equalMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals ))
+                        {
+                            cout << "METADATA UPDATE!!!" << endl;
+                            metadataUpdated();
+                            // Setup for another state machine pass
+                            ready = 0;
+                            m_state_changed = true;
+                            break;
+                        }
+                    }
 
-                    ich->second.m_chan_state = INFO_PENDING;
-                }
-                ca_flush_io();
-                break;
-            case READY:
-                ++ready;
-                break;
-            default:
-                break;
-            }
-        }
-
-        if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
-        {
-            bool device_changed = false;
-
-            //syslog( LOG_DEBUG, "Device Ready" );
-
-            // All PVs for current device are initialized
-            // Defined device
-
-            DeviceRecordPtr new_rec = m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
-            if ( new_rec != m_dev_record )
-                device_changed = true;
-
-            // Save new device record
-            m_dev_record = new_rec;
-
-            // Update channel info objects with new device & pv pointers (replaces m_dev_desc pointers)
-            for ( idx = m_pv_index.begin(); idx != m_pv_index.end(); ++idx )
-            {
-                pv = m_dev_record->getPV( idx->first );
-                ich = m_chan_info.find( idx->second );
-
-                if ( pv && ich != m_chan_info.end() )
-                {
-                    ich->second.m_device = m_dev_record;
-                    ich->second.m_pv = pv;
+                    cout << "SET METADATA: PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_ca_units << endl;
+                    ich->second.m_pv->setMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals );
+                    ich->second.m_chan_state = READY;
+                    cout << "   (after): PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_pv->m_units << endl;
+                    ++ready;
+                    break;
+                case READY:
+                    ++ready;
+                    break;
+                default:
+                    break;
                 }
             }
 
-            if ( device_changed )
-            {
-                cout << "Device " << m_dev_desc->m_name << " changed!" << endl;
-                sendCurrentValues();
-            }
-            else
-            {
-                cout << "Device " << m_dev_desc->m_name << " did NOT change." << endl;
-            }
+            // Flush any pending EPICS requests
+            ca_flush_io();
 
-            m_defined = true;
-            delete m_dev_desc;
-            m_dev_desc = 0;
+
+            if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
+            {
+                device_changed = false;
+
+                // Defined device with ConfigManager - this wil return the "real" DesviceDescriptor record
+                DeviceRecordPtr new_rec = m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
+
+                // If new record is the same as existing record, then nothing has changed
+                if ( new_rec != m_dev_record )
+                    device_changed = true;
+
+                // Save new device record
+                m_dev_record = new_rec;
+
+                // Update channel info objects with new device & pv pointers (replaces m_dev_desc pointers)
+                for ( idx = m_pv_index.begin(); idx != m_pv_index.end(); ++idx )
+                {
+                    // Careful! PV names can be changed in new_rec due to name conflicts!!!
+                    pv = m_dev_record->getPvByConnection( idx->first );
+                    ich = m_chan_info.find( idx->second );
+                    if ( pv && ich != m_chan_info.end() )
+                    {
+                        // Replace temporary device and PV records with new managed records
+                        ich->second.m_device = m_dev_record;
+                        ich->second.m_pv = pv;
+                    }
+                    else
+                    {
+                        // Something has gone terribly wrong if we land here (logic/programming error)
+                    }
+                }
+
+                // Send cached PV values only if the device actually changed
+                if ( device_changed )
+                    sendCurrentValues();
+
+                m_defined = true;
+                device_changed = false;
+
+                // Delete temporary device descriptor
+                cout << "Deleting temp dev ptr: " << hex << m_dev_desc << endl;
+                delete m_dev_desc;
+                m_dev_desc = 0;
+            }
         }
-#if 1
-        else
+        catch(...)
         {
-            cout << "CTRL: [" << (long)m_dev_desc << "][" << m_defined << "][" << ready << "]";
-            if ( m_dev_desc )
-                cout << "[" << m_dev_desc->m_pvs.size() << "]";
-            cout << endl;
+            syslog( LOG_ERR, "Exception thrown in DevAgent::controlThread!" );
         }
-#endif
     }
-
-    //syslog( LOG_DEBUG, "DevAg: control thread exiting" );
 }
 
 
 void
 DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
 {
-    cout << "ConHdlr op: " << a_args.op << ", chid: " << a_args.chid << endl;
-
     try
     {
         if ( a_args.op == CA_OP_CONN_UP )
         {
-            syslog( LOG_DEBUG, "Conn UP, chid: %li", (long)a_args.chid );
-            cout << "Con UP" << (long)a_args.chid << endl;
-
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
@@ -335,48 +471,52 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
             {
                 ich->second.m_connected = true;
 
-                if ( !ich->second.m_subscribed )
+                chtype type = ca_field_type( a_args.chid );
+                if ( VALID_DB_FIELD( type ))
                 {
-                    ich->second.m_chan_state = UNINITIALIZED;
+                    // Save native type
+                    ich->second.m_ca_type = type;
 
-                    chtype type = ca_field_type( a_args.chid );
-                    if ( VALID_DB_FIELD( type ))
+                    cout << "CONNECT! chid: " << ich->first << ", type: " << type << endl;
+
+                    //if ( !ich->second.m_subscribed )
                     {
-                        // Save native type and units of PV
-                        ich->second.m_pv->m_type = epicsToPVType( type );
-
                         if ( ca_create_subscription( epicsToTimeRecordType( type ), 0, ich->second.m_chid, DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
                                 &epicsEventCallback, this, &ich->second.m_evid ) == ECA_NORMAL )
-                        {
                             ich->second.m_subscribed = true;
+                        else
+                            syslog( LOG_ERR, "Failed to create subscription for PV: %s", ich->second.m_pv->m_connection.c_str() );
 
-                            if ( ich->second.m_pv->m_type == PV_STR ) // There is NO ctrl record for EPICS string types
-                                ich->second.m_chan_state = READY;
-                            else
-                            {
-                                ich->second.m_chan_state = INFO_NEEDED;
-                                cout << "INFO_NEEDED " << (long)a_args.chid << endl;
-                            }
-
-                            // Wake state machine
-                            m_state_changed = true;
-                            m_state_cond.notify_one();
-                        }
                         ca_flush_io();
                     }
+
+                    // Note: there is no way to know if the metadata on this channel has or hasn't changed, so assume it has changed
+                    if ( ich->second.m_pv->m_type == PV_STR ) // There is NO ctrl record for EPICS string types
+                        ich->second.m_chan_state = INFO_AVAILABLE;
+                    else
+                    {
+                        cout << "INFO_NEEDED for chid: " << ich->first << endl;
+                        ich->second.m_chan_state = INFO_NEEDED;
+                    }
+                    m_state_changed = true;
+                    m_state_cond.notify_one();
                 }
             }
         }
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
-            syslog( LOG_DEBUG, "Conn DOWN, chid: %li", (long)a_args.chid );
-
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
             if ( ich != m_chan_info.end())
             {
                 ich->second.m_connected = false;
+
+                if ( ich->second.m_subscribed )
+                {
+                    ca_clear_subscription( ich->second.m_evid );
+                    ich->second.m_subscribed = false;
+                }
 
                 // Set var state to disconnected
                 ich->second.m_pv_state.m_status = epicsAlarmComm;
@@ -426,8 +566,6 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
 void
 DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 {
-    cout << "EvHdlr ty: " << a_args.type << ", st: " << a_args.status << endl;
-
     try
     {
         if ( a_args.status == ECA_NORMAL && a_args.dbr != 0 )
@@ -439,37 +577,49 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
                 if ( ich != m_chan_info.end())
                 {
+                    cout << "VALUE! chid: " << ich->first << ", type: " << a_args.type << endl;
+
                     PVState &state = ich->second.m_pv_state;
                     switch ( a_args.type )
                     {
                         case DBR_TIME_STRING:
+                        cout << "STRING" << endl;
                             state.m_str_val = ((struct dbr_time_string *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_string, a_args.dbr )
                             break;
                         case DBR_TIME_SHORT:
+                        cout << "SHORT" << endl;
                             state.m_int_val = ((struct dbr_time_short *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_short, a_args.dbr )
                             break;
                         case DBR_TIME_FLOAT:
+                        cout << "FLOAT" << endl;
                             state.m_real_val = ((struct dbr_time_float *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_float, a_args.dbr )
                             break;
                         case DBR_TIME_ENUM:
+                        cout << "ENUM" << endl;
                             state.m_int_val = ((struct dbr_time_enum *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_enum, a_args.dbr )
                             break;
                         case DBR_TIME_CHAR:
+                        cout << "CHAR" << endl;
                             state.m_int_val = ((struct dbr_time_char *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_char, a_args.dbr )
                             break;
                         case DBR_TIME_LONG:
+                        cout << "LONG" << endl;
                             state.m_int_val = ((struct dbr_time_long *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_long, a_args.dbr )
                             break;
                         case DBR_TIME_DOUBLE:
+                        cout << "DOUBLE" << endl;
                             state.m_real_val = ((struct dbr_time_double *)a_args.dbr)->value;
                             SET_STATE( state, dbr_time_double, a_args.dbr )
                             break;
+                    default:
+                        cout << "UNKNOWN" << endl;
+                        break;
                     }
 
                     // Do not try to send value/alarm data unless device is fully defined
@@ -491,47 +641,57 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             }
             else if ( epicsIsCtrlRecordType( a_args.type ))
             {
-                cout << "Got CTRL" << endl;
                 boost::lock_guard<boost::mutex> lock(m_mutex);
 
                 map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
                 if ( ich != m_chan_info.end())
                 {
+                    cout << "CONTROL! chid: " << ich->first << ", type: " << a_args.type << endl;
+
                     // Note EPICS does not define ctrl structs (or units) for string types
                     // Enums are defined here also
                     switch ( a_args.type )
                     {
                         case DBR_CTRL_SHORT:
-                            ich->second.m_pv->m_units = ((struct dbr_ctrl_short *)a_args.dbr)->units;
+                        cout << "SHORT" << endl;
+                            ich->second.m_ca_units = ((struct dbr_ctrl_short *)a_args.dbr)->units;
                             break;
                         case DBR_CTRL_FLOAT:
-                            ich->second.m_pv->m_units = ((struct dbr_ctrl_float *)a_args.dbr)->units;
+                        cout << "FLOAT" << endl;
+                            ich->second.m_ca_units = ((struct dbr_ctrl_float *)a_args.dbr)->units;
                             break;
                         case DBR_CTRL_CHAR:
-                            ich->second.m_pv->m_units = ((struct dbr_ctrl_char *)a_args.dbr)->units;
+                        cout << "CHAR" << endl;
+                            ich->second.m_ca_units = ((struct dbr_ctrl_char *)a_args.dbr)->units;
                             break;
                         case DBR_CTRL_LONG:
-                            ich->second.m_pv->m_units = ((struct dbr_ctrl_long *)a_args.dbr)->units;
+                        cout << "LONG" << endl;
+                            ich->second.m_ca_units = ((struct dbr_ctrl_long *)a_args.dbr)->units;
                             break;
                         case DBR_CTRL_DOUBLE:
-                            ich->second.m_pv->m_units = ((struct dbr_ctrl_double *)a_args.dbr)->units;
+                        cout << "DOUBLE" << endl;
+                            ich->second.m_ca_units = ((struct dbr_ctrl_double *)a_args.dbr)->units;
                             break;
                         case DBR_CTRL_ENUM:
                             {
-                            map<int32_t,string> values;
+                        cout << "ENUM" << endl;
+                            ich->second.m_ca_enum_vals.clear();
                             for ( int i = 0; i < ((struct dbr_ctrl_enum *)a_args.dbr)->no_str; ++i )
-                                values[i] = ((struct dbr_ctrl_enum *)a_args.dbr)->strs[i];
+                                ich->second.m_ca_enum_vals[i] = ((struct dbr_ctrl_enum *)a_args.dbr)->strs[i];
 
-                            ich->second.m_pv->m_enum = ich->second.m_pv->m_device->defineEnumeration( values );
+                            //ich->second.m_pv->m_enum = ich->second.m_pv->m_device->defineEnumeration( values );
                             break;
                             }
+                        default:
+                            cout << "UNEXPECTED TYPE: " << a_args.type << endl;
+                            break;
                     }
 
                     if ( ich->second.m_chan_state == INFO_PENDING )
                     {
-                        cout << "READY " << (long)a_args.chid << endl;
+                        cout << "INFO_AVAILABLE for chid: " << ich->first << endl;
 
-                        ich->second.m_chan_state = READY;
+                        ich->second.m_chan_state = INFO_AVAILABLE;
                         // Wake state machine
                         m_state_changed = true;
                         m_state_cond.notify_one();
@@ -579,6 +739,7 @@ DeviceAgent::sendCurrentValues()
         }
     }
 }
+
 
 void
 DeviceAgent::epicsConnectionCallback( struct connection_handler_args a_args )

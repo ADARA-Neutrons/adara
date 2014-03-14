@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <iostream>
 #include <stdint.h>
 #include "CoreDefs.h"
@@ -17,6 +18,7 @@ class EnumDescriptor
 public:
     bool                operator==( const EnumDescriptor &a_enum ) const;
     bool                operator!=( const EnumDescriptor &a_enum ) const;
+    bool                operator==( const std::map<int32_t,std::string> &a_enum_vals ) const;
 
     std::ostream&       print( std::ostream &a_out ) const;
 
@@ -37,6 +39,8 @@ class PVDescriptor
 public:
     bool                operator==( const PVDescriptor &a_desc ) const;
     bool                operator!=( const PVDescriptor &a_desc ) const;
+    bool                equalMetadata( PVType a_type, const std::string &a_units, const std::map<int32_t,std::string> &a_enum_vals ) const;
+    void                setMetadata( PVType a_type, const std::string &a_units, const std::map<int32_t,std::string> &a_enum_vals );
 
     std::ostream&       print( std::ostream &a_out ) const;
 
@@ -67,7 +71,8 @@ public:
     EnumDescriptor     *defineEnumeration( const std::map<int32_t,std::string> &a_values );
     EnumDescriptor     *defineEnumeration( const EnumDescriptor &a_enum );
     void                definePV( const std::string &a_name, const std::string &a_connection, PVType a_type, EnumDescriptor *a_enum, const std::string &a_units );
-    PVDescriptor       *getPV( const std::string &a_pv_name ) const;
+    PVDescriptor       *getPvByName( const std::string &a_pv_name ) const;
+    PVDescriptor       *getPvByConnection( const std::string &a_pv_connection ) const;
     bool                operator==( const DeviceDescriptor &a_desc ) const;
     bool                operator!=( const DeviceDescriptor &a_desc ) const;
 

@@ -11,6 +11,8 @@
 #include "ConfigManager.h"
 #include "EPICS_InputAdapter.h"
 #include "EPICS_DeviceAgent.h"
+#include "ComBus.h"
+#include "ComBusMessages.h"
 
 using namespace std;
 
@@ -36,7 +38,7 @@ InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_c
 
     // Start monitor and GC threads
     m_cfg_mon_thread = new boost::thread( boost::bind( &InputAdapter::configFileMonitorThread, this ));
-    m_gc_thread = new boost::thread(boost::bind( &InputAdapter::gcThread, this ));
+    m_gc_thread = new boost::thread( boost::bind( &InputAdapter::gcThread, this ));
 }
 
 
@@ -184,7 +186,7 @@ InputAdapter::configFileMonitorThread()
     {
         try
         {
-            if ( !count % 5 ) // Only check every 5 seconds
+            if ( !count % 5 ) // Check every 5 seconds
             {
                 // If config file has been updated, read & process
                 // (last_write_time will throw if it can't access the file)
@@ -258,10 +260,16 @@ InputAdapter::configFileMonitorThread()
                                 // Save new device names and new buffer
                                 m_cur_devices = new_devices;
                                 m_config_buffer = buffer;
+
+                                ADARA::ComBus::SignalRetractMessage msg( "SID_EPICS_CFG_ERROR" );
+                                ADARA::ComBus::Connection::getInst().broadcast( msg );
                             }
                             else
                             {
-                                syslog( LOG_ERR, "EPICS beam config file failed to parse" );
+                                syslog( LOG_ERR, "EPICS beam config file (beamline.xml) failed to parse" );
+
+                                ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "EPICS beam config file (beamline.xml) failed to parse", ADARA::ERROR );
+                                ADARA::ComBus::Connection::getInst().broadcast( msg );
                             }
                         }
                     }
@@ -270,6 +278,10 @@ InputAdapter::configFileMonitorThread()
         }
         catch(...)
         {
+            syslog( LOG_ERR, "Exception thrown while parsing EPICS configuration file (beamline.xml)" );
+
+            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "Exception thrown while parsing EPICS configuration file (beamline.xml)", ADARA::ERROR );
+            ADARA::ComBus::Connection::getInst().broadcast( msg );
         }
 
         sleep(1);
@@ -299,8 +311,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
             <device active=true/false>          [only devices with active=true are used]
                 <name>Device Name</name>        [name of device]
                 <pv>
-                    <name>pv_name</name>        [name is the EPICS CA name without any prefix]
-                    <alias>pv_active</alias>    [not used]
+                    <name>pv_name</name>        [name is the EPICS CA connection string]
+                    <alias>pv_active</alias>    [used as name if defined; otherwise connection is name]
                     <log/>                      [only PVs with log tag are used]
                     <scan/>                     [not used]
                 </pv>
@@ -362,7 +374,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                  tmp_node = xmlFind( "name", cnode );
                                                  if ( !tmp_node )
                                                  {
-                                                     syslog( LOG_ERR, "PV Name is missing/empty in config file" );
+                                                     syslog( LOG_ERR, "PV Name is missing or empty" );
                                                      throw -1;
                                                  }
 
@@ -382,13 +394,11 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                     if ( dev_name.empty())
                                     {
                                         // It's an error to omit the device name
-                                        syslog( LOG_ERR, "Device name is missing/empty in config file" );
+                                        syslog( LOG_ERR, "Device name is missing or empty" );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
                                     {
-                                        syslog( LOG_INFO, "Configuring device '%s'", dev_name.c_str() );
-
                                         DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
                                         for ( vector<pair<string,string> >::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
                                         {
@@ -406,6 +416,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
         }
         catch(...)
         {
+            syslog( LOG_ERR, "Exception while parsing EPICS beamline XML" );
             res = false;
         }
     }

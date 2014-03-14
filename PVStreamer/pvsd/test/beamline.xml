@@ -26,11 +26,6 @@
                 <log/>
                 <scan/>
             </pv>
-            <pv>
-                <name>fubar1</name>
-                <alias>fubar1</alias>
-                <scan/>
-            </pv>
         </device>
         <device active="true">
             <name>Device B</name>

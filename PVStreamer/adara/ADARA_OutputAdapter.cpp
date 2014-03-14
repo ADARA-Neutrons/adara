@@ -1,9 +1,13 @@
+#include <unistd.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <cstdio>
 #include <syslog.h>
+#include <iomanip>
+#include <boost/lexical_cast.hpp>
+
 
 #include "ADARA_OutputAdapter.h"
 #include "ADARA.h"
@@ -18,16 +22,33 @@ using namespace PVS::ADARA;
 namespace PVS {
 namespace ADARA {
 
+/**
+ * @brief Constructor for ADARA OutputAdapter
+ * @param a_stream_serv - Owning StreamService instance
+ * @param a_port - TCP port to listen on
+ * @param a_heartbeat - ADARA heartbeat period in milliseconds
+ *
+ * This constructor produces an ADARA OutputAdapter owned by the specified StreamService instance. The
+ * StreamService will delete this OutputAdapter when it is destroyed. The ADARA OuputAdapter class
+ * starts two threads: one for handling in-coming TCP client connection requests, and another for
+ * processing, translating, and broadcasting packets from the internal data stream.
+ */
 OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat )
     : IOutputAdapter(a_stream_serv), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
 
     m_socket_listen_thread = new boost::thread( boost::bind( &OutputAdapter::socketListenThread, this ));
-    m_pkt_send_thread = new boost::thread( boost::bind( &OutputAdapter::packetSendThread, this ));
+    m_stream_proc_thread = new boost::thread( boost::bind( &OutputAdapter::streamProcessingThread, this ));
 }
 
 
+/**
+ * @brief Destructor for the ADARA OutputAdapter class.
+ *
+ * This destructor should only be called by the owning StreamService instance, and before doing so,
+ * stream queues must be deactivated.
+ */
 OutputAdapter::~OutputAdapter()
 {
     // The owning StreamService instance MUST deactivate() the queues before
@@ -37,19 +58,17 @@ OutputAdapter::~OutputAdapter()
 
     for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
     {
-        cout << "Close client socket" << endl;
         shutdown( ic->socket, SHUT_RDWR );
-        close ( ic->socket );
+        close( ic->socket );
     }
 
     if ( m_listen_socket > -1 )
     {
-        cout << "Close list socket" << endl;
         shutdown( m_listen_socket, SHUT_RDWR );
         close( m_listen_socket );
     }
 
-    m_pkt_send_thread->join();
+    m_stream_proc_thread->join();
     m_socket_listen_thread->join();
 }
 
@@ -65,7 +84,7 @@ OutputAdapter::~OutputAdapter()
   * connected, input packets are simply returned to the stream unused.
   */
 void
-OutputAdapter::packetSendThread()
+OutputAdapter::streamProcessingThread()
 {
     StreamPacket   *pvs_pkt;
     OutPacket       adara_pkt;
@@ -77,7 +96,7 @@ OutputAdapter::packetSendThread()
     heartbeat_pkt.format = ::ADARA::PacketType::HEARTBEAT_V0;
     heartbeat_pkt.nsec = 0;
 
-    while(1)
+    while ( 1 )
     {
         pvs_pkt = m_srteam_api->getFilledPacket( m_heartbeat, timeout_flag );
         if ( !pvs_pkt )
@@ -85,7 +104,7 @@ OutputAdapter::packetSendThread()
             if ( timeout_flag )
             {
                 // Send a heartbeat packet
-                if ( connected())
+                if ( connected() )
                 {
                     heartbeat_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
                     sendPacket( heartbeat_pkt, 0 );
@@ -93,15 +112,34 @@ OutputAdapter::packetSendThread()
             }
             else
             {
-                // A null packet w/o timeout means queues have been deactivated
+                // A null packet w/o timeout means queues have been deactivated and we should exit
                 break;
             }
         }
         else
         {
-            process( *pvs_pkt );
+            // Update internal state data (regardless of connection status)
+            switch ( pvs_pkt->type )
+            {
+            case DeviceDefined:
+                defineDevice( pvs_pkt->device );
+                break;
 
-            if ( connected()) // If connected, translate and send packet
+            case DeviceRedefined:
+                redefineDevice( pvs_pkt->device, pvs_pkt->old_device );
+                break;
+
+            case DeviceUndefined:
+                undefineDevice( pvs_pkt->device );
+                break;
+
+            case VariableUpdate:
+                updatePV( pvs_pkt->pv, pvs_pkt->state );
+                break;
+            }
+
+            // If connected, translate and send packet(s)
+            if ( connected())
             {
                 if ( translate( *pvs_pkt, adara_pkt, payload ))
                 {
@@ -114,10 +152,44 @@ OutputAdapter::packetSendThread()
                         sendPacket( adara_pkt, 0 );
                 }
             }
-            m_srteam_api->putFreePacket(pvs_pkt);
+
+            m_srteam_api->putFreePacket( pvs_pkt );
         }
     }
 }
+
+
+/** \brief Translates a stream packet into an ADARA packet.
+  * \param a_pv_pkt - stream packet to translate (input).
+  * \param a_adara_pkt - ADARA packet to receive translation (output).
+  */
+bool
+OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, string &a_payload )
+{
+    switch ( a_pv_pkt.type )
+    {
+    case DeviceDefined:
+        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device );
+        //cout << "DDP: " << a_payload << endl;
+        return true;
+
+    case DeviceRedefined:
+        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device );
+        //cout << "DDP: " << a_payload << endl;
+        return true;
+
+    case DeviceUndefined:
+        // Nothing to do since ADARA does not have a device undefined packet
+        return false;
+
+    case VariableUpdate:
+        buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state, a_payload );
+        return true;
+    }
+
+    return false;
+}
+
 
 
 /**
@@ -127,14 +199,14 @@ OutputAdapter::packetSendThread()
  * \param a_time - EPICS timestamp of device description (activation).
  */
 void
-OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceDescriptor &a_device )
+OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecordPtr a_device )
 {
     stringstream sstr;
 
     a_adara_pkt.format  = ::ADARA::PacketType::DEVICE_DESC_V0;
     a_adara_pkt.sec     = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
     a_adara_pkt.nsec    = 0;
-    a_adara_pkt.dev_id  = a_device.m_id;
+    a_adara_pkt.dev_id  = a_device->m_id;
 
     // Reset payload stringstream
 
@@ -147,15 +219,15 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceDescri
             << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl
             << "  xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd\">" << endl;
 
-    sstr << "  <device_name>" << a_device.m_name << "</device_name>" << endl;
+    sstr << "  <device_name>" << a_device->m_name << "</device_name>" << endl;
 
     // Generate enumeration definitions for enums used by this device only
 
-    if ( a_device.m_enums.size() )
+    if ( a_device->m_enums.size() )
     {
         sstr << "  <enumerations>" << endl;
         unsigned short id = 1;
-        for ( vector<EnumDescriptor*>::const_iterator e = a_device.m_enums.begin(); e != a_device.m_enums.end(); ++e, ++id )
+        for ( vector<EnumDescriptor*>::const_iterator e = a_device->m_enums.begin(); e != a_device->m_enums.end(); ++e, ++id )
         {
             sstr << "    <enumeration>" << endl;
             sstr << "      <enum_name>enum_" << setw(2) << setfill('0') << id << "</enum_name>" << endl;
@@ -175,7 +247,7 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceDescri
 
     sstr << "  <process_variables>" << endl;
 
-    for ( vector<PVDescriptor*>::const_iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::const_iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
     {
         sstr << "    <process_variable>" << endl;
         sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
@@ -278,57 +350,6 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
 }
 
 
-void
-OutputAdapter::process( StreamPacket &a_pv_pkt )
-{
-    switch ( a_pv_pkt.type )
-    {
-    case DeviceDefined:
-        defineDevice( *a_pv_pkt.device );
-        break;
-
-    case DeviceRedefined:
-        redefineDevice( *a_pv_pkt.device, *a_pv_pkt.old_device );
-        break;
-
-    case DeviceUndefined:
-        undefineDevice( *a_pv_pkt.device );
-        break;
-
-    case VariableUpdate:
-        updatePV( a_pv_pkt.pv, a_pv_pkt.state );
-        break;
-    }
-}
-
-
-/** \brief Translates a stream packet into an ADARA packet.
-  * \param a_pv_pkt - stream packet to translate (input).
-  * \param a_adara_pkt - ADARA packet to receive translation (output).
-  */
-bool
-OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, string &a_payload )
-{
-    switch ( a_pv_pkt.type )
-    {
-    case DeviceDefined:
-        buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
-        return true;
-
-    case DeviceRedefined:
-        buildDDP( a_adara_pkt, a_payload, *a_pv_pkt.device );
-        return true;
-
-    case DeviceUndefined: //TODO Need to send PV disconnection status
-        return false;
-
-    case VariableUpdate:
-        buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state, a_payload );
-        return true;
-    }
-
-    return false;
-}
 
 
 /** \brief Converts a PVType value into an ADARA DDP variable type (xml tag).
@@ -354,22 +375,37 @@ OutputAdapter::getPVTypeXML( PVType a_type ) const
 }
 
 
+/**
+ * @brief Updates internal state data for a newly defined device
+ * @param a_device - Newly defined device
+ */
 void
-OutputAdapter::defineDevice( DeviceDescriptor &a_device )
+OutputAdapter::defineDevice( DeviceRecordPtr a_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     // Add this device to configured device list
-    m_devices.insert( &a_device );
+    m_devices.insert( a_device );
 
     // Insert new PV state entries with disconnected status
-    for ( vector<PVDescriptor*>::iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
         m_pv_state[*ipv] = PVState();
 }
 
 
+/**
+ * @brief Processes device redefinition internalt stream packets
+ * @param a_device - Reference to new device definition
+ * @param a_old_device - Reference to old device definition
+ *
+ * This method updates internal state due to differences between the old and new definitions of the
+ * specified device. This method does NOT emit any ADARA packets, it only updates internal state. Any
+ * PVs that are in-common between the new and old definitions will have their last-known state transfered
+ * to the new PVDescriptor objects. Any PVs that have been dropped are moved to a "garbage" container
+ * where they will be further processed and eventually flushed.
+ */
 void
-OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_old_device )
+OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -379,10 +415,11 @@ OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_o
     bool found;
 
     // Transfer last-known PVState to new state entries (keyed on new PVDescriptor instances)
-    for ( vector<PVDescriptor*>::iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
+    vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
+    for ( ; ipv != a_device->m_pvs.end(); ++ipv )
     {
         found = false;
-        old_pv = a_old_device.getPV( (*ipv)->m_name );
+        old_pv = a_old_device->getPvByName( (*ipv)->m_name );
         if ( old_pv )
         {
             old_state = m_pv_state.find( old_pv );
@@ -393,34 +430,45 @@ OutputAdapter::redefineDevice( DeviceDescriptor &a_device, DeviceDescriptor &a_o
             }
         }
 
+        // If this is a brand new PV, set it's state to undefined/invalid (until we get the first value from it)
         if ( !found )
-            m_pv_state[*ipv] = PVState( ::ADARA::VariableStatus::UNDEFINED_ALARM, ::ADARA::VariableSeverity::INVALID );
+            m_pv_state[*ipv] = PVState( ::ADARA::VariableStatus::NOT_REPORTED, ::ADARA::VariableSeverity::INVALID );
     }
 
     // Add "new" device to configured device list
-    m_devices.insert( &a_device );
+    m_devices.insert( a_device );
 
     // Remove old PV state entries
     undefineDevice( a_old_device );
 }
 
 
+/**
+ * @brief Process device undefined internal stream packet
+ * @param a_device - Reference to device being undefined
+ * @param a_undefine_pvs - Flag indicating if member PVs should be placed in undef_pvs set
+ *
+ * This method updates internal state due to the removal of the specified device. This method does NOT
+ * emit any ADARA packets, it only updates internal state. If the a_undefine_pvs flag is set, all PVs
+ * of the device will be placed in a "garbage" container where they will be further processed and
+ * eventually flushed.
+ */
 void
-OutputAdapter::undefineDevice( DeviceDescriptor &a_device )
+OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     // Remove all pv state entries associated with device
     map<PVDescriptor*,PVState>::iterator ipv_state;
 
-    for ( vector<PVDescriptor*>::iterator ipv = a_device.m_pvs.begin(); ipv != a_device.m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
     {
         ipv_state = m_pv_state.find( *ipv );
         if ( ipv_state != m_pv_state.end())
             m_pv_state.erase( ipv_state );
     }
 
-    set<DeviceDescriptor*>::iterator idev = m_devices.find( &a_device );
+    set<DeviceRecordPtr>::iterator idev = m_devices.find( a_device );
     if ( idev != m_devices.end())
         m_devices.erase( idev );
 }
@@ -452,11 +500,11 @@ OutputAdapter::initSockets()
     hints.ai_protocol   = IPPROTO_TCP;
     hints.ai_flags      = AI_PASSIVE;
 
-    char port_str[20];
-    sprintf( port_str, "%u", m_port );
+
+    string port_str = boost::lexical_cast<string>( m_port );
 
     // Resolve the local address and port to be used by the server
-    rc = getaddrinfo( 0, port_str, &hints, &result );
+    rc = getaddrinfo( 0, port_str.c_str(), &hints, &result );
     if ( rc )
         EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
 
@@ -489,8 +537,6 @@ OutputAdapter::initSockets()
             m_addr = inet_ntoa( addr );
         }
     }
-
-    //LOG_INFO( "ADARA pv streaming service listening at " << m_addr << ":" << m_port );
 
     freeaddrinfo( result );
     result = 0;
@@ -558,9 +604,9 @@ OutputAdapter::sendCurrentData( int a_socket )
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     // Send DDPs for real devices
-    for ( set<DeviceDescriptor*>::iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
+    for ( set<DeviceRecordPtr>::iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
     {
-        buildDDP( adara_pkt, payload, **idev );
+        buildDDP( adara_pkt, payload, *idev );
         sendPacket( adara_pkt, &payload, a_socket );
     }
 
@@ -596,8 +642,6 @@ OutputAdapter::sendSourceInfo( int a_socket )
 void
 OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload, int a_socket )
 {
-    //cout << "[" << hex << a_adara_pkt.format << dec << "] l=" << a_adara_pkt.payload_len << " ts=" << a_adara_pkt.sec << "." << a_adara_pkt.nsec << endl;
-
     bool res;
     uint32_t len = (int)a_adara_pkt.payload_len + 16;
 

@@ -5,7 +5,7 @@
 #include "EPICS_InputAdapter.h"
 #include "ADARA_OutputAdapter.h"
 #include "TraceException.h"
-#include <cadef.h>
+//#include <cadef.h>
 #include <signal.h>
 #include <syslog.h>
 
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
     openlog( "pvsd", 0, LOG_DAEMON );
     syslog( LOG_INFO, "pvsd-qt started." );
 
-#if 0
+#if 1
     cout << "ConfigManager Tests" << endl;
 
     ConfigManager cfgmgr;
@@ -178,8 +178,8 @@ int main(int argc, char *argv[])
     {
         uint32_t        port = 31416;
         StreamService   streamer( 100 );
-        streamer.attach( new PVS::ADARA::OutputAdapter( port, 2 ));
-        streamer.attach( new PVS::EPICS::InputAdapter( "beamline.xml" ));
+        streamer.attach( new PVS::ADARA::OutputAdapter( streamer, port ));
+        streamer.attach( new PVS::EPICS::InputAdapter( streamer, "beamline.xml" ));
 
         while( g_active )
         {

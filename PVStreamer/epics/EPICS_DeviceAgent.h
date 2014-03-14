@@ -4,11 +4,11 @@
 #include <string>
 #include <map>
 #include <stdint.h>
-
+#include <signal.h>
+#include <time.h>
 #include <boost/thread.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 #include <cadef.h>
 
@@ -44,6 +44,7 @@ private:
         UNINITIALIZED = 0,
         INFO_NEEDED,
         INFO_PENDING,
+        INFO_AVAILABLE,
         READY
     };
 
@@ -52,17 +53,21 @@ private:
         ChanInfo() : m_pv(0), m_chid(0), m_evid(0), m_chan_state(UNINITIALIZED), m_connected(false), m_subscribed(false)
         {}
 
-        DeviceRecordPtr     m_device;
-        PVDescriptor       *m_pv;
-        chid                m_chid;
-        evid                m_evid;
-        ChanState           m_chan_state;
-        PVState             m_pv_state;
-        bool                m_connected;
-        bool                m_subscribed;
+        DeviceRecordPtr                 m_device;
+        PVDescriptor                   *m_pv;
+        chid                            m_chid;
+        evid                            m_evid;
+        ChanState                       m_chan_state;
+        PVState                         m_pv_state;
+        bool                            m_connected;
+        bool                            m_subscribed;
+        unsigned long                   m_ca_type;
+        std::string                     m_ca_units;
+        std::map<int32_t,std::string>   m_ca_enum_vals;
     };
 
 
+    void        metadataUpdated();
     void        connectPV( PVDescriptor *a_pv );
     void        disconnectPV( PVDescriptor *a_pv );
     void        controlThread();
@@ -83,13 +88,14 @@ private:
     DeviceDescriptor           *m_dev_desc;
     bool                        m_defined;
     std::map<chid,ChanInfo>     m_chan_info;        ///< PV channel ID to channel info map
-    std::map<std::string,chid>  m_pv_index;         ///< PV name (not connection) to channel id map
+    std::map<std::string,chid>  m_pv_index;         ///< PV connection to channel id map
     boost::thread              *m_ctrl_thread;
     boost::mutex                m_mutex;
     boost::condition_variable   m_state_cond;
     bool                        m_state_changed;
     bool                        m_active;
     struct ca_client_context   *m_epics_context;
+    timer_t                     m_tid;
 };
 
 }}

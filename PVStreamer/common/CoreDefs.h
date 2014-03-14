@@ -2,9 +2,6 @@
 #define COREDEFS_H
 
 #include <stdint.h>
-#include <map>
-#include <vector>
-#include <boost/shared_ptr.hpp>
 
 namespace PVS {
 
@@ -20,23 +17,6 @@ enum PVType
     PV_STR
 };
 
-#if 0
-class Value
-{
-public:
-    Value( ValueType a_type ) : m_type(a_type) {}
-
-private:
-    ValueType           m_type;
-    union
-    {
-        int32_t         m_int_val;    ///< Used for both int and enum type
-        uint32_t        m_uint_val;
-        double          m_real_val;
-    };
-    std::string         m_str_val;
-};
-#endif
 
 enum PVStatus
 {
