@@ -70,7 +70,7 @@ DeviceAgent::~DeviceAgent()
 void
 DeviceAgent::update( DeviceDescriptor *a_device )
 {
-    cout << "UPDATE DevDesc: " << hex << a_device << endl;
+    //cout << "UPDATE DevDesc: " << hex << a_device << endl;
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
@@ -91,7 +91,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         // Disconnect any existing connections that are no longer needed
         for ( ipv = old_desc->m_pvs.begin(); ipv != old_desc->m_pvs.end(); ++ipv )
         {
-            cout << "Check PV: " << (*ipv)->m_name << endl;
+            //cout << "Check PV: " << (*ipv)->m_name << endl;
             if ( !a_device->getPvByConnection( (*ipv)->m_connection ))
                 disconnectPV( *ipv );
         }
@@ -113,7 +113,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                     ich = m_chan_info.find( idx->second );
                     if ( ich != m_chan_info.end())
                     {
-                        cout << "REUSE chid: " << ich->first << " (PV: " << (*ipv)->m_connection << ", addr: " << hex << (*ipv) << ")" << endl;
+                        //cout << "REUSE chid: " << ich->first << " (PV: " << (*ipv)->m_connection << ", addr: " << hex << (*ipv) << ")" << endl;
                         // Update PV to new (temporary) PV
                         ich->second.m_pv = *ipv;
                         // Old device record is no longer valid - reset
@@ -128,7 +128,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         // Delete old temporary descriptor if set
         if ( m_dev_desc )
         {
-            cout << "DELETE old temp DevDesc: " << hex << m_dev_desc << endl;
+            //cout << "DELETE old temp DevDesc: " << hex << m_dev_desc << endl;
             delete m_dev_desc;
         }
     }
@@ -138,6 +138,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
             connectPV( *ipv );
     }
 
+    /*
     a_device->print(cout);
     cout << "CHID map:" << endl;
     for ( ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
@@ -151,6 +152,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     {
         cout << "PV: " << idx->first << ", chid: " << idx->second << endl;
     }
+    */
 
     m_dev_desc = a_device;
     ca_flush_io();
@@ -277,7 +279,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     {
         // Note: don't flush I/O here - update() method will call it
 
-        cout << "Connected to chid: " << info.m_chid << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
+        //cout << "Connected to chid: " << info.m_chid << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
 
         // Update channel info and PV name index structures
         m_chan_info[info.m_chid] = info;
@@ -304,12 +306,12 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
         map<chid,ChanInfo>::iterator ich = m_chan_info.find(ipv->second);
         if ( ich != m_chan_info.end())
         {
-            cout << "Disconnected from chid: " << ich->first << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
+            //cout << "Disconnected from chid: " << ich->first << " (for PV: " << a_pv->m_connection << ", addr: " << hex << a_pv << ")" << endl;
 
             if ( ich->second.m_subscribed )
                 ca_clear_subscription( ich->second.m_evid );
-            else
-                cout << "   (NOT SUBSCRIBED)" << endl;
+            //else
+            //    cout << "   (NOT SUBSCRIBED)" << endl;
 
             ca_clear_channel( ich->second.m_chid );
 
@@ -327,6 +329,12 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 
 /**
  * @brief This method is the control thread for the DeviceAgent state machine
+ *
+ * This method runs the state machine thread for a given DeviceAgent instance. The state machine
+ * governs the process of EPICS channel management and also finalizes device definition. There
+ * are two stimuli that can trigger device definition (or redefinition): a call to the update()
+ * method, or a detected change in process variable metadata (type, units, enum). The state
+ * machine is able to detect changes to metadata when a PV progresses to INFO_AVAILABLE state.
  */
 void
 DeviceAgent::controlThread()
@@ -345,9 +353,11 @@ DeviceAgent::controlThread()
         {
             boost::unique_lock<boost::mutex> lock(m_mutex);
 
+            // Only run when there is a state change
             if ( !m_state_changed )
                 m_state_cond.wait( lock );
 
+            // Exit loop if DeviceAgent instance is shutting down
             if ( !m_active )
                 break;
 
@@ -357,18 +367,19 @@ DeviceAgent::controlThread()
 
             m_state_changed = false;
 
+            // Check channel state of member process variables
             ready = 0;
             for ( ich = m_chan_info.begin(); ich != m_chan_info.end() && !m_state_changed; ++ich )
             {
                 switch ( ich->second.m_chan_state )
                 {
                 case INFO_NEEDED:
-                    cout << "GET CTRL, type: " << ich->second.m_ca_type << ", chid: " << ich->first << endl;
+                    //cout << "GET CTRL, type: " << ich->second.m_ca_type << ", chid: " << ich->first << endl;
                     if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_ca_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
                         ich->second.m_chan_state = INFO_PENDING;
                     else
                     {
-                        cout << "FAILED - ca_get_callback (type = " << ich->second.m_ca_type << ")" << endl;
+                        //cout << "FAILED - ca_get_callback (type = " << ich->second.m_ca_type << ")" << endl;
                         syslog( LOG_ERR, "Failed to get channel info for PV: %s", ich->second.m_pv->m_connection.c_str() );
                     }
                     break;
@@ -377,7 +388,7 @@ DeviceAgent::controlThread()
                     {
                         if ( !ich->second.m_pv->equalMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals ))
                         {
-                            cout << "METADATA UPDATE!!!" << endl;
+                            //cout << "METADATA UPDATE!!!" << endl;
                             metadataUpdated();
                             // Setup for another state machine pass
                             ready = 0;
@@ -386,10 +397,10 @@ DeviceAgent::controlThread()
                         }
                     }
 
-                    cout << "SET METADATA: PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_ca_units << endl;
+                    //cout << "SET METADATA: PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_ca_units << endl;
                     ich->second.m_pv->setMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals );
                     ich->second.m_chan_state = READY;
-                    cout << "   (after): PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_pv->m_units << endl;
+                    //cout << "   (after): PV " << ich->second.m_pv->m_connection << ", units: " << ich->second.m_pv->m_units << endl;
                     ++ready;
                     break;
                 case READY:
@@ -403,7 +414,7 @@ DeviceAgent::controlThread()
             // Flush any pending EPICS requests
             ca_flush_io();
 
-
+            // IF a temporary device descriptor is set (m_dev_desc) and all member PVs are READY, then define the device
             if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
             {
                 device_changed = false;
@@ -430,10 +441,6 @@ DeviceAgent::controlThread()
                         ich->second.m_device = m_dev_record;
                         ich->second.m_pv = pv;
                     }
-                    else
-                    {
-                        // Something has gone terribly wrong if we land here (logic/programming error)
-                    }
                 }
 
                 // Send cached PV values only if the device actually changed
@@ -444,7 +451,7 @@ DeviceAgent::controlThread()
                 device_changed = false;
 
                 // Delete temporary device descriptor
-                cout << "Deleting temp dev ptr: " << hex << m_dev_desc << endl;
+                //cout << "Deleting temp dev ptr: " << hex << m_dev_desc << endl;
                 delete m_dev_desc;
                 m_dev_desc = 0;
             }
@@ -457,11 +464,21 @@ DeviceAgent::controlThread()
 }
 
 
+/**
+ * @brief Handles EPICS connection status callbacks
+ * @param a_args - EPICS callback arguments
+ *
+ * This method handles EPICS channel connection Up/Down events. When a connection is establish,
+ * a subscription is created for time-value events, and the state machine is triggered to ask for
+ * channel metadata (INFO_NEEDED). When a connection is lost, the event subscription is dropped
+ * and a PV disconnect packet is emitted.
+ */
 void
 DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
 {
     try
     {
+        // Connection established?
         if ( a_args.op == CA_OP_CONN_UP )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -477,25 +494,22 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                     // Save native type
                     ich->second.m_ca_type = type;
 
-                    cout << "CONNECT! chid: " << ich->first << ", type: " << type << endl;
+                    //cout << "CONNECT! chid: " << ich->first << ", type: " << type << endl;
 
-                    //if ( !ich->second.m_subscribed )
-                    {
-                        if ( ca_create_subscription( epicsToTimeRecordType( type ), 0, ich->second.m_chid, DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
-                                &epicsEventCallback, this, &ich->second.m_evid ) == ECA_NORMAL )
-                            ich->second.m_subscribed = true;
-                        else
-                            syslog( LOG_ERR, "Failed to create subscription for PV: %s", ich->second.m_pv->m_connection.c_str() );
+                    if ( ca_create_subscription( epicsToTimeRecordType( type ), 0, ich->second.m_chid, DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
+                            &epicsEventCallback, this, &ich->second.m_evid ) == ECA_NORMAL )
+                        ich->second.m_subscribed = true;
+                    else
+                        syslog( LOG_ERR, "Failed to create subscription for PV: %s", ich->second.m_pv->m_connection.c_str() );
 
-                        ca_flush_io();
-                    }
+                    ca_flush_io();
 
                     // Note: there is no way to know if the metadata on this channel has or hasn't changed, so assume it has changed
                     if ( ich->second.m_pv->m_type == PV_STR ) // There is NO ctrl record for EPICS string types
                         ich->second.m_chan_state = INFO_AVAILABLE;
                     else
                     {
-                        cout << "INFO_NEEDED for chid: " << ich->first << endl;
+                        //cout << "INFO_NEEDED for chid: " << ich->first << endl;
                         ich->second.m_chan_state = INFO_NEEDED;
                     }
                     m_state_changed = true;
@@ -503,6 +517,7 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                 }
             }
         }
+        // Connection lost?
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -556,76 +571,86 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
     }
 }
 
-
+/// Macro for common state parsing below
 #define SET_STATE( state, type, src ) \
     state.m_time.sec = ((struct type *)src)->stamp.secPastEpoch; \
     state.m_time.nsec = ((struct type *)src)->stamp.nsec; \
     state.m_status = ((struct type *)src)->status; \
     state.m_severity = ((struct type *)src)->severity;
 
+/**
+ * @brief Handles EPICS channel events
+ * @param a_args - EPICS callback arguments
+ *
+ * This method handles EPICS data and metadata channel events.
+ */
 void
 DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 {
     try
     {
-        if ( a_args.status == ECA_NORMAL && a_args.dbr != 0 )
+        // Valid status / db record?
+        if ( a_args.status != ECA_NORMAL || a_args.dbr == 0 )
+            return;
+
+        // Data event?
+        if ( epicsIsTimeRecordType( a_args.type ))
         {
-            if ( epicsIsTimeRecordType( a_args.type ))
+            boost::lock_guard<boost::mutex> lock(m_mutex);
+
+            // Valid EPICS channel?
+            map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
+            if ( ich != m_chan_info.end())
             {
-                boost::lock_guard<boost::mutex> lock(m_mutex);
+                //cout << "VALUE! chid: " << ich->first << ", type: " << a_args.type << endl;
 
-                map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
-                if ( ich != m_chan_info.end())
+                // Extract PV state from type-specific data structure
+                PVState &state = ich->second.m_pv_state;
+                switch ( a_args.type )
                 {
-                    cout << "VALUE! chid: " << ich->first << ", type: " << a_args.type << endl;
+                case DBR_TIME_STRING:
+                    //cout << "STRING" << endl;
+                    state.m_str_val = ((struct dbr_time_string *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_string, a_args.dbr )
+                    break;
+                case DBR_TIME_SHORT:
+                    //cout << "SHORT" << endl;
+                    state.m_int_val = ((struct dbr_time_short *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_short, a_args.dbr )
+                    break;
+                case DBR_TIME_FLOAT:
+                    //cout << "FLOAT" << endl;
+                    state.m_real_val = ((struct dbr_time_float *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_float, a_args.dbr )
+                    break;
+                case DBR_TIME_ENUM:
+                    //cout << "ENUM" << endl;
+                    state.m_int_val = ((struct dbr_time_enum *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_enum, a_args.dbr )
+                    break;
+                case DBR_TIME_CHAR:
+                    //cout << "CHAR" << endl;
+                    state.m_int_val = ((struct dbr_time_char *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_char, a_args.dbr )
+                    break;
+                case DBR_TIME_LONG:
+                    //cout << "LONG" << endl;
+                    state.m_int_val = ((struct dbr_time_long *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_long, a_args.dbr )
+                    break;
+                case DBR_TIME_DOUBLE:
+                    //cout << "DOUBLE" << endl;
+                    state.m_real_val = ((struct dbr_time_double *)a_args.dbr)->value;
+                    SET_STATE( state, dbr_time_double, a_args.dbr )
+                    break;
+                default:
+                    //cout << "UNKNOWN" << endl;
+                    break;
+                }
 
-                    PVState &state = ich->second.m_pv_state;
-                    switch ( a_args.type )
-                    {
-                        case DBR_TIME_STRING:
-                        cout << "STRING" << endl;
-                            state.m_str_val = ((struct dbr_time_string *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_string, a_args.dbr )
-                            break;
-                        case DBR_TIME_SHORT:
-                        cout << "SHORT" << endl;
-                            state.m_int_val = ((struct dbr_time_short *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_short, a_args.dbr )
-                            break;
-                        case DBR_TIME_FLOAT:
-                        cout << "FLOAT" << endl;
-                            state.m_real_val = ((struct dbr_time_float *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_float, a_args.dbr )
-                            break;
-                        case DBR_TIME_ENUM:
-                        cout << "ENUM" << endl;
-                            state.m_int_val = ((struct dbr_time_enum *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_enum, a_args.dbr )
-                            break;
-                        case DBR_TIME_CHAR:
-                        cout << "CHAR" << endl;
-                            state.m_int_val = ((struct dbr_time_char *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_char, a_args.dbr )
-                            break;
-                        case DBR_TIME_LONG:
-                        cout << "LONG" << endl;
-                            state.m_int_val = ((struct dbr_time_long *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_long, a_args.dbr )
-                            break;
-                        case DBR_TIME_DOUBLE:
-                        cout << "DOUBLE" << endl;
-                            state.m_real_val = ((struct dbr_time_double *)a_args.dbr)->value;
-                            SET_STATE( state, dbr_time_double, a_args.dbr )
-                            break;
-                    default:
-                        cout << "UNKNOWN" << endl;
-                        break;
-                    }
-
-                    // Do not try to send value/alarm data unless device is fully defined
-                    if ( !m_defined )
-                        return;
-
+                // Send value/alarm data if device is fully defined
+                if ( m_defined )
+                {
                     bool timeout;
                     StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
                     if ( pkt )
@@ -639,63 +664,64 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                 }
             }
-            else if ( epicsIsCtrlRecordType( a_args.type ))
+        }
+        // Metadata event?
+        else if ( epicsIsCtrlRecordType( a_args.type ))
+        {
+            boost::lock_guard<boost::mutex> lock(m_mutex);
+
+            // Valid EPICS channel?
+            map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
+            if ( ich != m_chan_info.end())
             {
-                boost::lock_guard<boost::mutex> lock(m_mutex);
+                //cout << "CONTROL! chid: " << ich->first << ", type: " << a_args.type << endl;
 
-                map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
-                if ( ich != m_chan_info.end())
+                // Note EPICS does not define ctrl structs (or units) for string types
+                // Extract units and/or enumeration values
+                switch ( a_args.type )
                 {
-                    cout << "CONTROL! chid: " << ich->first << ", type: " << a_args.type << endl;
-
-                    // Note EPICS does not define ctrl structs (or units) for string types
-                    // Enums are defined here also
-                    switch ( a_args.type )
+                case DBR_CTRL_SHORT:
+                    //cout << "SHORT" << endl;
+                    ich->second.m_ca_units = ((struct dbr_ctrl_short *)a_args.dbr)->units;
+                    break;
+                case DBR_CTRL_FLOAT:
+                    //cout << "FLOAT" << endl;
+                    ich->second.m_ca_units = ((struct dbr_ctrl_float *)a_args.dbr)->units;
+                    break;
+                case DBR_CTRL_CHAR:
+                    //cout << "CHAR" << endl;
+                    ich->second.m_ca_units = ((struct dbr_ctrl_char *)a_args.dbr)->units;
+                    break;
+                case DBR_CTRL_LONG:
+                    //cout << "LONG" << endl;
+                    ich->second.m_ca_units = ((struct dbr_ctrl_long *)a_args.dbr)->units;
+                    break;
+                case DBR_CTRL_DOUBLE:
+                    //cout << "DOUBLE" << endl;
+                    ich->second.m_ca_units = ((struct dbr_ctrl_double *)a_args.dbr)->units;
+                    break;
+                case DBR_CTRL_ENUM:
                     {
-                        case DBR_CTRL_SHORT:
-                        cout << "SHORT" << endl;
-                            ich->second.m_ca_units = ((struct dbr_ctrl_short *)a_args.dbr)->units;
-                            break;
-                        case DBR_CTRL_FLOAT:
-                        cout << "FLOAT" << endl;
-                            ich->second.m_ca_units = ((struct dbr_ctrl_float *)a_args.dbr)->units;
-                            break;
-                        case DBR_CTRL_CHAR:
-                        cout << "CHAR" << endl;
-                            ich->second.m_ca_units = ((struct dbr_ctrl_char *)a_args.dbr)->units;
-                            break;
-                        case DBR_CTRL_LONG:
-                        cout << "LONG" << endl;
-                            ich->second.m_ca_units = ((struct dbr_ctrl_long *)a_args.dbr)->units;
-                            break;
-                        case DBR_CTRL_DOUBLE:
-                        cout << "DOUBLE" << endl;
-                            ich->second.m_ca_units = ((struct dbr_ctrl_double *)a_args.dbr)->units;
-                            break;
-                        case DBR_CTRL_ENUM:
-                            {
-                        cout << "ENUM" << endl;
-                            ich->second.m_ca_enum_vals.clear();
-                            for ( int i = 0; i < ((struct dbr_ctrl_enum *)a_args.dbr)->no_str; ++i )
-                                ich->second.m_ca_enum_vals[i] = ((struct dbr_ctrl_enum *)a_args.dbr)->strs[i];
-
-                            //ich->second.m_pv->m_enum = ich->second.m_pv->m_device->defineEnumeration( values );
-                            break;
-                            }
-                        default:
-                            cout << "UNEXPECTED TYPE: " << a_args.type << endl;
-                            break;
+                    //cout << "ENUM" << endl;
+                    ich->second.m_ca_enum_vals.clear();
+                    for ( int i = 0; i < ((struct dbr_ctrl_enum *)a_args.dbr)->no_str; ++i )
+                        ich->second.m_ca_enum_vals[i] = ((struct dbr_ctrl_enum *)a_args.dbr)->strs[i];
+                    break;
                     }
+                default:
+                    //cout << "UNEXPECTED TYPE: " << a_args.type << endl;
+                    break;
+                }
 
-                    if ( ich->second.m_chan_state == INFO_PENDING )
-                    {
-                        cout << "INFO_AVAILABLE for chid: " << ich->first << endl;
+                // Bump state to INFO_AVAILABLE if it was pending
+                if ( ich->second.m_chan_state == INFO_PENDING )
+                {
+                    //cout << "INFO_AVAILABLE for chid: " << ich->first << endl;
 
-                        ich->second.m_chan_state = INFO_AVAILABLE;
-                        // Wake state machine
-                        m_state_changed = true;
-                        m_state_cond.notify_one();
-                    }
+                    ich->second.m_chan_state = INFO_AVAILABLE;
+                    // Wake state machine
+                    m_state_changed = true;
+                    m_state_cond.notify_one();
                 }
             }
         }
@@ -717,6 +743,9 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 }
 
 
+/**
+ * @brief Send current PV values for all channels
+ */
 void
 DeviceAgent::sendCurrentValues()
 {
@@ -741,6 +770,10 @@ DeviceAgent::sendCurrentValues()
 }
 
 
+/**
+ * @brief Static connection callback for EPICS C-style API
+ * @param a_args - EPICS callback args
+ */
 void
 DeviceAgent::epicsConnectionCallback( struct connection_handler_args a_args )
 {
@@ -751,6 +784,10 @@ DeviceAgent::epicsConnectionCallback( struct connection_handler_args a_args )
 }
 
 
+/**
+ * @brief Static event callback for EPICS C-style API
+ * @param a_args - EPICS callback args
+ */
 void
 DeviceAgent::epicsEventCallback( struct event_handler_args a_args )
 {
@@ -761,7 +798,11 @@ DeviceAgent::epicsEventCallback( struct event_handler_args a_args )
 }
 
 
-
+/**
+ * @brief Checks if argument is a valid EPICS time record
+ * @param a_rec_type - Input value to check
+ * @return True if value is valid; false otherwise
+ */
 bool
 DeviceAgent::epicsIsTimeRecordType( uint32_t a_rec_type )
 {
@@ -772,6 +813,11 @@ DeviceAgent::epicsIsTimeRecordType( uint32_t a_rec_type )
 }
 
 
+/**
+ * @brief Checks if argument is a valid EPICS control record
+ * @param a_rec_type - Input value to check
+ * @return True if value is valid; false otherwise
+ */
 bool
 DeviceAgent::epicsIsCtrlRecordType( uint32_t a_rec_type )
 {
@@ -782,6 +828,11 @@ DeviceAgent::epicsIsCtrlRecordType( uint32_t a_rec_type )
 }
 
 
+/**
+ * @brief Converts EPICS record type to PVSD PV type
+ * @param a_rec_type - Input value to convert
+ * @return PVType if value is valid; throws otherwise
+ */
 PVType
 DeviceAgent::epicsToPVType( uint32_t a_rec_type )
 {
@@ -800,6 +851,11 @@ DeviceAgent::epicsToPVType( uint32_t a_rec_type )
 }
 
 
+/**
+ * @brief Converts EPICS DB record type to EPICS time record type
+ * @param a_rec_type - Input value to convert
+ * @return EPICS time type if value is valid; throws otherwise
+ */
 int32_t
 DeviceAgent::epicsToTimeRecordType( uint32_t a_rec_type )
 {
@@ -812,11 +868,17 @@ DeviceAgent::epicsToTimeRecordType( uint32_t a_rec_type )
     case DBR_CHAR:      return DBR_TIME_CHAR;
     case DBR_LONG:      return DBR_TIME_LONG;
     case DBR_DOUBLE:    return DBR_TIME_DOUBLE;
-    default:            return -1;
+    default:
+        EXCEPT_PARAM( EC_INVALID_PARAM, "Invalid EPICS DB record type: " << a_rec_type );
     }
 }
 
 
+/**
+ * @brief Converts EPICS DB record type to EPICS control record type
+ * @param a_rec_type - Input value to convert
+ * @return EPICS control type if value is valid; throws otherwise
+ */
 int32_t
 DeviceAgent::epicsToCtrlRecordType( uint32_t a_rec_type )
 {
@@ -829,7 +891,8 @@ DeviceAgent::epicsToCtrlRecordType( uint32_t a_rec_type )
     case DBR_CHAR:      return DBR_CTRL_CHAR;
     case DBR_LONG:      return DBR_CTRL_LONG;
     case DBR_DOUBLE:    return DBR_CTRL_DOUBLE;
-    default:            return -1;
+    default:
+        EXCEPT_PARAM( EC_INVALID_PARAM, "Invalid EPICS DB record type: " << a_rec_type );
     }
 }
 

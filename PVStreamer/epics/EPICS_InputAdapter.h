@@ -38,7 +38,7 @@ class DeviceAgent;
 class InputAdapter : public IInputAdapter
 {
 public:
-    InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file );
+    InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged = false );
     ~InputAdapter();
 
 private:
@@ -54,6 +54,7 @@ private:
 
     bool                                m_active;           ///< Instance active flag (reset on destruction)
     std::string                         m_config_file;      ///< Configuration file to read/monitor
+    bool                                m_track_logged;     ///< Track logged PVs only (default is all)
     boost::thread                      *m_cfg_mon_thread;   ///< Configuration file monitoring thread handle
     std::vector<char>                   m_config_buffer;    ///< Configuration file buffer
     std::string                         m_source;           ///< Source "host" (not really used for EPICS adapter)

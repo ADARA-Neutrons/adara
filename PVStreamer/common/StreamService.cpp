@@ -6,6 +6,17 @@ using namespace std;
 
 namespace PVS {
 
+
+/**
+ * @brief StreamService constructor
+ * @param a_pkt_buffer_size - Packet buffer size
+ * @param a_offset - Device ID offset value
+ *
+ * Constructs a new StreamService instance with specified buffer size and device ID offset. Buffer size
+ * must be at least 2, but useful values will be much larger (depending on throughput/latency). Device ID
+ * offset is optional (default is 0) and can be used to prevent ID collisions between multiple streamer
+ * instances running concurrently.
+ */
 StreamService::StreamService( size_t a_pkt_buffer_size, uint32_t a_offset )
     : m_cfg_mgr(a_offset), m_out_adapter(0)
 {
@@ -24,6 +35,12 @@ StreamService::StreamService( size_t a_pkt_buffer_size, uint32_t a_offset )
 }
 
 
+/**
+ * @brief StreamService destructor
+ *
+ * Destroys StreamService instance and all attached adapters. Adapters are signalled by the shutdown
+ * of buffer queues (blocked threads are woke).
+ */
 StreamService::~StreamService()
 {
     // Deactivate all queues - will force waiting threads to wake and exit
@@ -42,24 +59,34 @@ StreamService::~StreamService()
 }
 
 
+/**
+ * @brief Attaches an input protocol adapter.
+ * @param a_adapter - Instance of adapter to attach
+ * @return IInputAdapterAPI pointer for stream support
+ */
 IInputAdapterAPI*
-StreamService::attach( IInputAdapter *a_adapter )
+StreamService::attach( IInputAdapter &a_adapter )
 {
-    if ( find( m_in_adapters.begin(), m_in_adapters.end(), a_adapter ) == m_in_adapters.end())
+    if ( find( m_in_adapters.begin(), m_in_adapters.end(), &a_adapter ) == m_in_adapters.end())
     {
-        m_in_adapters.push_back( a_adapter );
+        m_in_adapters.push_back( &a_adapter );
     }
     return this;
 }
 
 
+/**
+ * @brief Attaches an output protocol adapter.
+ * @param a_adapter - Instance of adapter to attach
+ * @return IOutputAdapterAPI pointer for stream support
+ */
 IOutputAdapterAPI*
-StreamService::attach( IOutputAdapter *a_adapter )
+StreamService::attach( IOutputAdapter &a_adapter )
 {
     if ( m_out_adapter )
         throw runtime_error( "Can not change output adapter once set." );
 
-    m_out_adapter = a_adapter;
+    m_out_adapter = &a_adapter;
 
     return this;
 }

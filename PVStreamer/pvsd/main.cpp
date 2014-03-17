@@ -20,13 +20,19 @@ using namespace std;
 
 bool g_active = true;
 
-
+/// Used to catch shutdown/interrupt signals for clean shutdown
 void signalHandler( int a_signal )
 {
     g_active = false;
 }
 
 
+/**
+ * @brief Entry point for PVStreamer deaomon
+ * @param argc - CLI argument count
+ * @param argv - CLI arguments
+ * @return Always returns 0
+ */
 int main(int argc, char *argv[])
 {
     // Setup signal handlers to catch all termination handlers so we can
@@ -63,7 +69,10 @@ int main(int argc, char *argv[])
     string          epics_cfg;
     uint32_t        offset;
     uint32_t        pid;
+    bool            track_logged = false;
     ::ADARA::ComBus::Connection *combus = 0;
+
+    // Parse program options
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon server options" );
@@ -79,6 +88,7 @@ int main(int argc, char *argv[])
             ("broker_pw,w", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("config,c", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
             ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
+            ("track_log", "track logged PVs only (default is all)")
             ;
 
     po::variables_map opt_map;
@@ -98,6 +108,9 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if ( opt_map.count( "track_log" ))
+        track_logged = true;
+
     // Initialize SysLog
     openlog( "pvsd", 0, LOG_DAEMON );
     syslog( LOG_INFO, "pvsd started." );
@@ -107,11 +120,17 @@ int main(int argc, char *argv[])
 
     try
     {
+        // Create ComBus instance
         combus = new ::ADARA::ComBus::Connection( domain, "PVSD", pid, broker_uri, broker_user, broker_pass );
 
+        // Create and start protocol streamer
         StreamService   streamer( 100, offset );
+
+        // Attach ADARA ouptut adapter
         new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
-        new PVS::EPICS::InputAdapter( streamer, epics_cfg );
+
+        // Create and attach EPICS input adapter
+        new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged );
 
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;

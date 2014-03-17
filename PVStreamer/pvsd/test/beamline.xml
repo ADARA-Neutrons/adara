@@ -4,26 +4,26 @@
             <name>Device A</name>
             <pv>
                 <name>a1</name>
-                <alias>a1</alias>
+                <alias>A1</alias>
 		<log/>
                 <scan/>
             </pv>
             <pv>
                 <name>a2</name>
-                <alias>a2</alias>
+                <alias>A2</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
                 <name>a3</name>
-                <alias>a3</alias>
+                <alias>A3</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
                 <name>a4</name>
-                <alias>a4</alias>
-                <log/>
+                <alias>A4</alias>
+                <logx/>
                 <scan/>
             </pv>
         </device>
@@ -31,25 +31,25 @@
             <name>Device B</name>
             <pv>
                 <name>b1</name>
-                <alias>b1</alias>
+                <alias>B1</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
                 <name>b2</name>
-                <alias>b2</alias>
+                <alias>B2</alias>
                 <log/>
                 <scan/>
             </pv>
             <pv>
                 <name>b3</name>
-                <alias>b3</alias>
-                <log/>
+                <alias>B3</alias>
+                <logx/>
                 <scan/>
             </pv>
             <pv>
                 <name>b4</name>
-                <alias>b4</alias>
+                <alias>B4</alias>
                 <log/>
                 <scan/>
             </pv>

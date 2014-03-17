@@ -28,8 +28,8 @@ namespace EPICS {
   * \param a_stream_serv - Parent StreamService instance
   * \param a_config_file - EPICS configuration file
   */
-InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file )
-  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_source("epics")
+InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged )
+  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_track_logged(a_track_logged), m_source("epics")
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
@@ -366,28 +366,29 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         }
                                         else if ( xmlStrcmp( cnode->name, (const xmlChar*)"pv" ) == 0 )
                                         {
-                                             if ( xmlFind( "log", cnode ))
-                                             {
-                                                 pv_name.clear();
-                                                 pv_conn.clear();
+                                            // If track logged only, then make sure log tag is present
+                                            if ( !m_track_logged || xmlFind( "log", cnode ))
+                                            {
+                                                pv_name.clear();
+                                                pv_conn.clear();
 
-                                                 tmp_node = xmlFind( "name", cnode );
-                                                 if ( !tmp_node )
-                                                 {
-                                                     syslog( LOG_ERR, "PV Name is missing or empty" );
-                                                     throw -1;
-                                                 }
+                                                tmp_node = xmlFind( "name", cnode );
+                                                if ( !tmp_node )
+                                                {
+                                                    syslog( LOG_ERR, "PV Name is missing or empty" );
+                                                    throw -1;
+                                                }
 
-                                                 xmlGetValue( tmp_node, pv_conn ); // 'name' field is connection in xml
+                                                xmlGetValue( tmp_node, pv_conn ); // 'name' field is connection in xml
 
-                                                 tmp_node = xmlFind( "alias", cnode ); // 'alias' is name
-                                                 if ( tmp_node )
-                                                     xmlGetValue( tmp_node, pv_name );
-                                                 else
-                                                     pv_name = pv_conn;
+                                                tmp_node = xmlFind( "alias", cnode ); // 'alias' is name
+                                                if ( tmp_node )
+                                                    xmlGetValue( tmp_node, pv_name );
+                                                else
+                                                    pv_name = pv_conn;
 
-                                                 pvs.push_back( make_pair( pv_name, pv_conn ));
-                                             }
+                                                pvs.push_back( make_pair( pv_name, pv_conn ));
+                                            }
                                         }
                                     }
 

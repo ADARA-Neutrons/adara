@@ -32,7 +32,7 @@ struct Timestamp
     uint32_t    nsec;
 };
 
-
+/// Holds last-known value and alarm state/severity for a process variable
 struct PVState
 {
     PVState()
@@ -99,14 +99,26 @@ public:
 };
 
 
+/**
+ * @brief The StreamService class provide generalized internal streaming support
+ *
+ * The StreamService class provides a generalized streaming API to support both input- and output-
+ * protocol adapters. Input Adapters inject packets into the internal stream; whereas Output
+ * Adapters consume packets from the internal stream. Only one Output Adapter may be connected
+ * to a StreamService instance at a time. A packet buffer is used to avoid memory allocation,
+ * and SyncDeque instances are used to manage free- and filled-packet buffers. Ownership of connected
+ * adapters is transferred to the StreamService instance and are destroyed when the StreamService
+ * instance is destroyed. When destroyed, the StreamService instance shutsdown the SyncDeque objects
+ * which is the signal for adapters to clean-up in preparation for deletion.
+ */
 class StreamService : private IInputAdapterAPI, private IOutputAdapterAPI
 {
 public:
     StreamService( size_t a_pkt_buffer_size, uint32_t a_offset = 0 );
     ~StreamService();
 
-    IInputAdapterAPI*   attach( IInputAdapter *a_adapter );
-    IOutputAdapterAPI*  attach( IOutputAdapter *a_adapter );
+    IInputAdapterAPI*   attach( IInputAdapter &a_adapter );
+    IOutputAdapterAPI*  attach( IOutputAdapter &a_adapter );
     ConfigManager&      getCfgMgr() { return m_cfg_mgr; }
 
 private:

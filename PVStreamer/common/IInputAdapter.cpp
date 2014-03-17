@@ -9,7 +9,7 @@ namespace PVS {
 IInputAdapter::IInputAdapter( StreamService &a_stream_serv )
     : m_stream_serv(a_stream_serv), m_srteam_api(0)
 {
-    m_srteam_api = m_stream_serv.attach( this );
+    m_srteam_api = m_stream_serv.attach( *this );
 }
 
 
