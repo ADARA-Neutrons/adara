@@ -620,7 +620,7 @@ bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		printf("%u.%09u DOUBLE VARIABLE\n"
 		       "    Device %u Variable %u\n"
 		       "    Status %s Severity %s\n"
-		       "    Value %f\n",
+		       "    Value %lf\n",
 		       (uint32_t) (pkt.pulseId() >> 32),
 		       (uint32_t) pkt.pulseId(),
 		       pkt.devId(), pkt.varId(), statusString(pkt.status()),
