@@ -1,5 +1,3 @@
-#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
-
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 #include <string>

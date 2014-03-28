@@ -193,8 +193,6 @@ RuleConfigDialog::commTimeout()
 void
 RuleConfigDialog::updateRuleTables()
 {
-    static bool first_time = true;
-
     QTableWidgetItem *item;
     QString tip;
     map<string,string>::iterator ie;
@@ -209,14 +207,6 @@ RuleConfigDialog::updateRuleTables()
     for ( row = cur_count; row < ui->ruleTable->rowCount(); ++row )
     {
         item = new QTableWidgetItem( "" );
-
-        // This is rediculous, but there is not an easy way to determine the default text color of a table
-        // cell (style sheets are not supported in tables)
-        if ( first_time )
-        {
-            first_time = false;
-            m_def_color = item->textColor();
-        }
 
         ui->ruleTable->setItem( row, 0, item );
         ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
@@ -359,10 +349,11 @@ RuleConfigDialog::reject()
 void
 RuleConfigDialog::ruleCellChanged( int row, int col )
 {
+    (void)col;
     m_dirty = true;
 
-    QTableWidgetItem *item = ui->ruleTable->item( row, col );
-    item->setTextColor( Qt::darkBlue );
+    QTableWidgetItem *item = ui->ruleTable->item( row, 0 );
+    item->setText( "(*)" );
 
     updateGUIState();
 }
@@ -370,10 +361,11 @@ RuleConfigDialog::ruleCellChanged( int row, int col )
 void
 RuleConfigDialog::signalCellChanged( int row, int col )
 {
+    (void)col;
     m_dirty = true;
 
-    QTableWidgetItem *item = ui->signalTable->item( row, col );
-    item->setTextColor( Qt::darkBlue );
+    QTableWidgetItem *item = ui->signalTable->item( row, 0 );
+    item->setText( "(*)" );
 
     updateGUIState();
 }
@@ -611,23 +603,13 @@ void
 RuleConfigDialog::setupRuleTableRow( int a_row, bool a_error  )
 {
     QTableWidgetItem *item = ui->ruleTable->item( a_row, 0 );
-    QColor color = m_def_color;
 
     if ( a_error )
-    {
-        item->setText( "X" );
-        color = Qt::red;
-    }
+        item->setText( "(!)" );
     else
-    {
         item->setText( "" );
-    }
 
-    item->setTextColor( color );
     item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
-
-    ui->ruleTable->item( a_row, 1 )->setTextColor( color );
-    ui->ruleTable->item( a_row, 2 )->setTextColor( color );
 }
 
 
@@ -635,26 +617,13 @@ void
 RuleConfigDialog::setupSignalTableRow( int a_row, bool a_error )
 {
     QTableWidgetItem *item = ui->signalTable->item( a_row, 0 );
-    QColor color = m_def_color;
 
     if ( a_error )
-    {
-        item->setText( "X" );
-        color = Qt::red;
-    }
+        item->setText( "(!)" );
     else
-    {
         item->setText( "" );
-    }
 
-    item->setTextColor( color );
     item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
-
-    ui->signalTable->item( a_row, 1 )->setTextColor( color );
-    ui->signalTable->item( a_row, 2 )->setTextColor( color );
-    ui->signalTable->item( a_row, 3 )->setTextColor( color );
-    ui->signalTable->item( a_row, 4 )->setTextColor( color );
-    ui->signalTable->item( a_row, 5 )->setTextColor( color );
 }
 
 

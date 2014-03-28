@@ -1,5 +1,3 @@
-#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
-
 #include "EPICS.h"
 #include "ReadyAdapter.h"
 #include "SignalEvents.h"

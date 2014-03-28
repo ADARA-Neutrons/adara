@@ -84,7 +84,6 @@ private:
     std::string     m_last_cid;
     bool            m_dirty;
     bool            m_quit_on_set;
-    QColor          m_def_color;
     FactFilter      m_fact_filter;
     std::vector<RuleEngine::RuleInfo>       m_rules;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;

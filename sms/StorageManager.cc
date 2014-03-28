@@ -1,5 +1,3 @@
-#define BOOST_SIGNALS_NO_DEPRECATION_WARNING
-
 #include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>

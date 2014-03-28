@@ -35,7 +35,7 @@ using namespace std;
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
-                        const std::string &a_broker_pass, bool a_kiosk, bool a_master )
+                        const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_master )
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
@@ -47,9 +47,13 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
 {
     ui->setupUi(this);
 
+    QString m_app_name = "dasmon-gui";
+    if ( !a_config_label.empty() )
+        m_app_name += "-" + QString::fromStdString(a_config_label);
+
     QCoreApplication::setOrganizationDomain("ornl.gov");
     QCoreApplication::setOrganizationName("sns");
-    QCoreApplication::setApplicationName("dasmon-gui");
+    QCoreApplication::setApplicationName(m_app_name);
 
     QSettings settings;
 
@@ -78,6 +82,8 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
         m_domain += ".";
 
     m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+
+    updateMainWindowTitle();
 
     updateComBusStatusIndicator();
     updateDASMonStatusIndicator();
@@ -118,21 +124,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     ui->pvTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
     ui->pvTable->horizontalHeader()->show();
 
-    QPalette pal = this->palette();
-    m_default_bg_color = pal.color( QPalette::Base );
-
-    int br = m_default_bg_color.red();
-    int bg = m_default_bg_color.green();
-    int bb = m_default_bg_color.blue();
-    double dr = (255.0 - br)/PV_HIGHLIGH_DURATION;
-    double dg = (255.0 - bg)/PV_HIGHLIGH_DURATION;
-    double db = (200.0 - bb)/PV_HIGHLIGH_DURATION;
-
-    m_hl_color.resize(PV_HIGHLIGH_DURATION+1);
-    for ( int i = 0; i <= PV_HIGHLIGH_DURATION; ++i )
-    {
-        m_hl_color[i] = QColor( br + dr*i, bg + dg*i, bb + db*i );
-    }
+    initHighlightColors();
 
     m_combus->attach( *this );   // Listen to ComBus connection status
     m_combus->setInputListener( *this );
@@ -166,6 +158,69 @@ MainWindow::~MainWindow()
 }
 
 
+/**
+ * @brief Custom event handler for main window
+ * @param a_event - Event object
+ * @return Returns value from QMainWindow::event() method
+ *
+ * This method is used to hook into the event stream for the main window. This
+ * enables detection of system-wide changes (such as to the system palette)
+ * such that the application can adjust as needed.
+ */
+bool
+MainWindow::event( QEvent *a_event )
+{
+    // Re-init highlight colors on app palette change
+    if ( a_event->type() == QEvent::ApplicationPaletteChange )
+        initHighlightColors();
+
+    return QMainWindow::event( a_event );
+}
+
+/**
+ * @brief Initializes highlight-fade colors used in certain tables
+ *
+ * This method generates a set of foreground and background colors to create a
+ * gradual transition from the color-scheme-define highlight and normal colors.
+ * These colors are used to gradually fade highlights of new/changed items in
+ * certain tables. The algorithm attemps to produce a simple linear
+ * interpolation between the two color end-points; however, it also checks for
+ * reasonable contrast between the fg/bg colors and will auto-adjust the fg
+ * color if the contrast drops too low.
+ */
+void
+MainWindow::initHighlightColors()
+{
+    m_fg_color.resize(PV_HIGHLIGH_DURATION+1);
+    m_bg_color.resize(PV_HIGHLIGH_DURATION+1);
+
+    QPalette palette;
+    QColor fg_hl = palette.color( QPalette::HighlightedText );
+    QColor bg_hl = palette.color( QPalette::Highlight );
+    QColor fg_nm = palette.color( QPalette::Text );
+    QColor bg_nm = palette.color( QPalette::Base );
+
+    qreal hl[3], nm[3], d[3];
+
+    bg_hl.getRgbF( &hl[0], &hl[1], &hl[2] );
+    bg_nm.getRgbF( &nm[0], &nm[1], &nm[2] );
+
+    for ( int c = 0; c < 3; ++c )
+        d[c] = (hl[c] - nm[c])/PV_HIGHLIGH_DURATION;
+
+    int j = PV_HIGHLIGH_DURATION/2;
+
+    for ( int i = 0; i <= PV_HIGHLIGH_DURATION; ++i )
+    {
+        m_bg_color[i] = QColor::fromRgbF( nm[0] + d[0]*i, nm[1] + d[1]*i, nm[2] + d[2]*i );
+        if ( i < j )
+            m_fg_color[i] = fg_nm;
+        else
+            m_fg_color[i] = fg_hl;
+    }
+}
+
+
 void
 MainWindow::attach( SubClient &a_sub_client )
 {
@@ -186,7 +241,7 @@ MainWindow::setComBusActive( bool a_active )
     if ( a_active && !m_combus_state.activeTrue() )
     {
         m_combus_state.set( a_active, true );
-        updateComBusStatusIndicator();
+        updateAllStatusIndicators();
 
         writeLog( ADARA::INFO, "ComBus connection established." );
     }
@@ -224,7 +279,7 @@ MainWindow::setDASMonActive( bool a_active )
     if ( a_active && !m_dasmon_state.activeTrue() )
     {
         m_dasmon_state.set( a_active, true );
-        updateDASMonStatusIndicator();
+        updateAllStatusIndicators();
 
         for ( vector<SubClient*>::iterator c = m_sub_clients.begin(); c != m_sub_clients.end(); ++c )
             (*c)->dasmonStatus( a_active );
@@ -263,7 +318,7 @@ MainWindow::setSMSActive( bool a_active )
     if ( a_active && !m_sms_state.activeTrue() )
     {
         m_sms_state.set( a_active, true );
-        updateSMSConnStatusIndicator();
+        updateAllStatusIndicators();
 
         writeLog( ADARA::INFO, "SMS connection established." );
     }
@@ -581,6 +636,8 @@ MainWindow::configActiveMQ()
         m_combus->attach( *this, TOPIC_SIGNALS );
         m_combus->attach( *this, TOPIC_DASMON );
         m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
+
+        updateMainWindowTitle();
     }
 }
 
@@ -603,11 +660,41 @@ MainWindow::configRules()
     }
 }
 
+
 void
 MainWindow::about()
 {
     QMessageBox::about( this, "About DAS Monitor", QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg( DASMON_GUI_VERSION ));
 }
+
+
+// Update the main window title to reflect the latest domain selection
+void
+MainWindow::updateMainWindowTitle()
+{
+    // Get the current MainWindow Title string
+    QString windowTitle = this->property("windowTitle").toString();
+
+    // Trim off any existing domain string
+    int idx = windowTitle.lastIndexOf(" [");
+    if ( idx >= 0 )
+        windowTitle = windowTitle.left(idx - 1);
+
+    // Add back in any new domain string
+    if ( !m_domain.empty() )
+    {
+        // If domain includes trailing ".", remove it for title display
+        if ( m_domain[m_domain.length()-1] == '.' )
+            windowTitle += QString::fromStdString( " [" + m_domain.substr(0, m_domain.length()-1) + "]" );
+        else
+            windowTitle += QString::fromStdString( " [" + m_domain + "]" );
+    }
+
+    // Set the new MainWindow Title
+    setWindowTitle(QApplication::translate("MainWindow",
+        windowTitle.toLatin1().data(), 0, QApplication::UnicodeUTF8));
+}
+
 
 void
 MainWindow::updateAllStatusIndicators()
@@ -880,8 +967,8 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     uint hour = a_metrics.m_time / 3600;
     uint min = ((uint32_t)(a_metrics.m_time) % 3600) / 60;
     uint sec = (uint32_t)(a_metrics.m_time) % 60;
-    ui->durationLabel->setText( QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) );
 
+    QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) ));
     QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_counts )));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_charge )));
     QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
