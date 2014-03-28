@@ -8,7 +8,7 @@ using namespace std;
 
 namespace STS {
 
-/// This sets the size of the ADARA parser stream buffer in bytes (bigger is faster)
+/// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x1000000
 
 
