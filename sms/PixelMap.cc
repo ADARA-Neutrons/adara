@@ -231,7 +231,7 @@ PixelMap::PixelMap(const std::string &path) : m_numBanks(0)
 	 * in the valid entries.
 	 */
 	m_table.reserve(max_phys + 1);
-	for (i = 0; i < max_phys; ++i) {
+	for (i = 0; i <= max_phys; ++i) {
 		m_table.push_back(std::make_pair(i | 0x80000000,
 						 (uint16_t) ~0));
 	}
