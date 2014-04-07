@@ -67,21 +67,42 @@ STS::PVInfoBase*
 NxGen::makePVInfo
 (
     const string       &a_name,         ///< [in] Name of PV
+    const string       &a_device_name,  ///< [in] Name of device that owns the PV
     STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
     STS::Identifier     a_pv_id,        ///< [in] ID of the PV
     STS::PVType         a_type,         ///< [in] Type of PV
-    const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
+    const string       &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
+    set<string>::iterator i;
+    string internal_name = a_name;
+    uint32_t ver = 0;
+
+    // Check for name collisions: This code looks for name accross all PV names and if found
+    // increments a version number. Then it checks again to make sure the auto-generated internal
+    // name doesn't collide with an existing (top-level) name. This continues until a version
+    // is found that doesn't collide.
+    while ( 1 )
+    {
+        i = m_pv_name_history.find( internal_name );
+        if ( i != m_pv_name_history.end())
+            internal_name = a_name + "(" + boost::lexical_cast<string>( ++ver ) + ")";
+        else
+        {
+            m_pv_name_history.insert( internal_name );
+            break;
+        }
+    }
+
     switch ( a_type )
     {
-    case STS::PVT_INT:  // TODO ADARA only supports uint32_t currently
+    case STS::PVT_INT:  // ADARA only supports uint32_t currently
     case STS::PVT_ENUM:
     case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
-    case STS::PVT_FLOAT: // TODO ADARA only supports double currently
+        return new NxPVInfo<uint32_t>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+    case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
+        return new NxPVInfo<double>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "makePVInfo() failed - invalid PV type: " << a_type );
@@ -430,26 +451,33 @@ NxGen::pulseBuffersReady
     if (!m_gen_nexus)
         return;
 
-    writeSlab( "/entry/DASlogs/frequency/time", a_pulse_info.times, m_pulse_info_slab_size );
-    writeSlab( "/entry/DASlogs/frequency/value", a_pulse_info.freqs, m_pulse_info_slab_size );
-    writeSlab( "/entry/DASlogs/proton_charge/value", a_pulse_info.charges, m_pulse_info_slab_size );
-
-    m_pulse_info_slab_size += a_pulse_info.times.size();
-
-    // Must process pulse flags linearly
-    vector<double>::iterator t = a_pulse_info.times.begin();
-    for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin(); f != a_pulse_info.flags.end(); ++f, ++t )
+    try
     {
-        // Write pulse vetoes to DASlog
-        if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
-            m_pulse_vetoes.push_back( *t );
+        writeSlab( "/entry/DASlogs/frequency/time", a_pulse_info.times, m_pulse_info_slab_size );
+        writeSlab( "/entry/DASlogs/frequency/value", a_pulse_info.freqs, m_pulse_info_slab_size );
+        writeSlab( "/entry/DASlogs/proton_charge/value", a_pulse_info.charges, m_pulse_info_slab_size );
+
+        m_pulse_info_slab_size += a_pulse_info.times.size();
+
+        // Must process pulse flags linearly
+        vector<double>::iterator t = a_pulse_info.times.begin();
+        for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin(); f != a_pulse_info.flags.end(); ++f, ++t )
+        {
+            // Write pulse vetoes to DASlog
+            if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
+                m_pulse_vetoes.push_back( *t );
+        }
+
+        if ( m_pulse_vetoes.size() > m_chunk_size )
+        {
+            writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
+            m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
+            m_pulse_vetoes.clear();
+        }
     }
-
-    if ( m_pulse_vetoes.size() > m_chunk_size )
+    catch( TraceException &e )
     {
-        writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
-        m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
-        m_pulse_vetoes.clear();
+        RETHROW_TRACE( e, "pulseBuffersReady() failed." )
     }
 }
 
@@ -467,18 +495,25 @@ NxGen::bankBuffersReady
     if (!m_gen_nexus)
         return;
 
-    NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
-    if ( !bi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankBuffers()" )
+    try
+    {
+        NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+        if ( !bi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankBuffers()" )
 
-    writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
-    writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
+        writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
+        writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
 
-    bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+        bi->m_event_slab_size += a_bank.m_tof_buffer.size();
 
-    writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
+        writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
 
-    bi->m_index_slab_size += a_bank.m_index_buffer.size();
+        bi->m_index_slab_size += a_bank.m_index_buffer.size();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: " << a_bank.m_id )
+    }
 }
 
 
@@ -496,12 +531,19 @@ NxGen::bankPulseGap
     if (!m_gen_nexus)
         return;
 
-    NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
-    if ( !bi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankPulseGap()" )
+    try
+    {
+        NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+        if ( !bi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankPulseGap()" )
 
-    fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
-    bi->m_index_slab_size += a_count;
+        fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
+        bi->m_index_slab_size += a_count;
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "bankPulseGap() failed for bank id: " << a_bank.m_id << ", gap count: " << a_count )
+    }
 }
 
 
@@ -548,15 +590,22 @@ NxGen::monitorBuffersReady
     if (!m_gen_nexus)
         return;
 
-    NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
-    if ( !mi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorBuffersReady()" )
+    try
+    {
+        NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+        if ( !mi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorBuffersReady()" )
 
-    writeSlab( mi->m_tof_slab_path, a_monitor.m_tof_buffer, mi->m_event_slab_size );
-    mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
+        writeSlab( mi->m_tof_slab_path, a_monitor.m_tof_buffer, mi->m_event_slab_size );
+        mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
 
-    writeSlab( mi->m_index_slab_path, a_monitor.m_index_buffer, mi->m_index_slab_size );
-    mi->m_index_slab_size += a_monitor.m_index_buffer.size();
+        writeSlab( mi->m_index_slab_path, a_monitor.m_index_buffer, mi->m_index_slab_size );
+        mi->m_index_slab_size += a_monitor.m_index_buffer.size();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "monitorBuffersReady() failed for monitor id: " << a_monitor.m_id )
+    }
 }
 
 
@@ -571,15 +620,22 @@ NxGen::monitorPulseGap
     uint64_t            a_count     ///< [in] Number of missing pulses
 )
 {
-    if (!m_gen_nexus)
-        return;
+    try
+    {
+        if (!m_gen_nexus)
+            return;
 
-    NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
-    if ( !mi )
-        THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorPulseGap()" )
+        NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+        if ( !mi )
+            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorPulseGap()" )
 
-    fillSlab( mi->m_index_slab_path, mi->m_event_count, a_count, mi->m_index_slab_size );
-    mi->m_index_slab_size += a_count;
+        fillSlab( mi->m_index_slab_path, mi->m_event_count, a_count, mi->m_index_slab_size );
+        mi->m_index_slab_size += a_count;
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "monitorPulseGap() failed for monitor id: " << a_monitor.m_id << ", gap count: " << a_count )
+    }
 }
 
 
@@ -621,7 +677,14 @@ NxGen::runComment
     const std::string &a_comment    ///< [in] Overall run comments
 )
 {
-    writeString( "/entry/", "notes", a_comment );
+    try
+    {
+        writeString( "/entry/", "notes", a_comment );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "runComment() failed." )
+    }
 }
 
 
@@ -636,11 +699,18 @@ NxGen::markerPause
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
-    m_pause_time.push_back( a_time );
-    m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
+    try
+    {
+        m_pause_time.push_back( a_time );
+        m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
 
-    if ( a_comment.size())
-        markerComment( a_time, a_comment );
+        if ( a_comment.size())
+            markerComment( a_time, a_comment );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "markerPause() failed." )
+    }
 }
 
 
@@ -655,11 +725,18 @@ NxGen::markerResume
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
-    m_pause_time.push_back( a_time );
-    m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
+    try
+    {
+        m_pause_time.push_back( a_time );
+        m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
 
-    if ( a_comment.size())
-        markerComment( a_time, a_comment );
+        if ( a_comment.size())
+            markerComment( a_time, a_comment );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "markerResume() failed." )
+    }
 }
 
 
@@ -675,11 +752,18 @@ NxGen::markerScanStart
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
-    m_scan_time.push_back( a_time );
-    m_scan_value.push_back( a_scan_index );
+    try
+    {
+        m_scan_time.push_back( a_time );
+        m_scan_value.push_back( a_scan_index );
 
-    if ( a_comment.size())
-        markerComment( a_time, a_comment );
+        if ( a_comment.size())
+            markerComment( a_time, a_comment );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "markerScanStart() failed." )
+    }
 }
 
 
@@ -695,11 +779,18 @@ NxGen::markerScanStop
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
-    m_scan_time.push_back( a_time );
-    m_scan_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for all scan stops
+    try
+    {
+        m_scan_time.push_back( a_time );
+        m_scan_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for all scan stops
 
-    if ( a_comment.size())
-        markerComment( a_time, a_comment );
+        if ( a_comment.size())
+            markerComment( a_time, a_comment );
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "markerScanStop() failed." )
+    }
 }
 
 
@@ -714,16 +805,23 @@ NxGen::markerComment
     const std::string &a_comment        ///< [in] Comment to insert
 )
 {
-    if ( a_comment.size())
+    try
     {
-        m_comment_time.push_back( a_time );
+        if ( a_comment.size())
+        {
+            m_comment_time.push_back( a_time );
 
-        m_comment_offset.push_back( m_comment_last_offset );
-        m_comment_last_offset += a_comment.size();
-        m_comment_length.push_back( a_comment.size() );
+            m_comment_offset.push_back( m_comment_last_offset );
+            m_comment_last_offset += a_comment.size();
+            m_comment_length.push_back( a_comment.size() );
 
-        m_comment_data.reserve( m_comment_data.size() + a_comment.size() );
-        m_comment_data.insert( m_comment_data.end(), a_comment.begin(), a_comment.end()) ;
+            m_comment_data.reserve( m_comment_data.size() + a_comment.size() );
+            m_comment_data.insert( m_comment_data.end(), a_comment.begin(), a_comment.end()) ;
+        }
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "markerComment() failed." )
     }
 }
 
@@ -735,11 +833,18 @@ NxGen::markerComment
 void
 NxGen::flushPauseData()
 {
-    writeSlab( "/entry/DASlogs/pause/time", m_pause_time, 0 );
-    writeSlab( "/entry/DASlogs/pause/value", m_pause_value, 0 );
+    try
+    {
+        writeSlab( "/entry/DASlogs/pause/time", m_pause_time, 0 );
+        writeSlab( "/entry/DASlogs/pause/value", m_pause_value, 0 );
 
-    m_pause_time.clear();
-    m_pause_value.clear();
+        m_pause_time.clear();
+        m_pause_value.clear();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "flushPauseData() failed." )
+    }
 }
 
 
@@ -750,11 +855,18 @@ NxGen::flushPauseData()
 void
 NxGen::flushScanData()
 {
-    writeSlab( "/entry/DASlogs/scan_index/time", m_scan_time, 0 );
-    writeSlab( "/entry/DASlogs/scan_index/value", m_scan_value, 0 );
+    try
+    {
+        writeSlab( "/entry/DASlogs/scan_index/time", m_scan_time, 0 );
+        writeSlab( "/entry/DASlogs/scan_index/value", m_scan_value, 0 );
 
-    m_scan_time.clear();
-    m_scan_value.clear();
+        m_scan_time.clear();
+        m_scan_value.clear();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "flushScanData() failed." )
+    }
 }
 
 
@@ -765,17 +877,24 @@ NxGen::flushScanData()
 void
 NxGen::flushCommentData()
 {
-    writeSlab( "/entry/DASlogs/comments/time", m_comment_time, 0 );
-    writeSlab( "/entry/DASlogs/comments/offset", m_comment_offset, 0 );
-    writeSlab( "/entry/DASlogs/comments/length", m_comment_length, 0 );
+    try
+    {
+        writeSlab( "/entry/DASlogs/comments/time", m_comment_time, 0 );
+        writeSlab( "/entry/DASlogs/comments/offset", m_comment_offset, 0 );
+        writeSlab( "/entry/DASlogs/comments/length", m_comment_length, 0 );
 
-    if ( m_comment_data.size())
-        writeSlab( "/entry/DASlogs/comments/data", m_comment_data, 0 );
+        if ( m_comment_data.size())
+            writeSlab( "/entry/DASlogs/comments/data", m_comment_data, 0 );
 
-    m_comment_time.clear();
-    m_comment_offset.clear();
-    m_comment_length.clear();
-    m_comment_data.clear();
+        m_comment_time.clear();
+        m_comment_offset.clear();
+        m_comment_length.clear();
+        m_comment_data.clear();
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "flushCommentData() failed." )
+    }
 }
 
 

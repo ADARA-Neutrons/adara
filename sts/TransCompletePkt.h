@@ -5,33 +5,44 @@
 
 namespace STS {
 
+/**
+ * @brief The TransCompletePkt class wraps the translation status message sent back to the SMS.
+ *
+ * The status code and optional 'reason' message (for errors) is packaged into an ADARA
+ * message in an internal buffer.
+ */
 class TransCompletePkt
 {
 public:
+    /// Deafult constructor
     TransCompletePkt()
       : m_buf_ready(false), m_buffer(0), m_buffer_len(0), m_buffer_capacity(0), m_status(0)
     {}
 
+    /// Constructor taking status and reason parameters
     TransCompletePkt( uint16_t a_status, const std::string &a_reason )
       : m_buf_ready(false), m_buffer(0), m_buffer_len(0), m_buffer_capacity(0), m_status(a_status), m_reason(a_reason)
     {}
 
+    /// Destructor
     ~TransCompletePkt()
     {
         if ( m_buffer )
             delete[] m_buffer;
     }
 
+    /// Sets status code and reason message
     void
-    setStatusReason( uint16_t a_status, const std::string &a_reason )
+    set( uint16_t a_status, const std::string &a_reason )
     {
         m_status = a_status;
         m_reason = a_reason;
         m_buf_ready = false;
     }
 
+    /// Retrieves buffer containing ADARA message
     const char *
-    getBuffer()
+    getMessageBuffer()
     {
         if ( !m_buf_ready )
             buildSendBuffer();
@@ -39,8 +50,9 @@ public:
         return m_buffer;
     }
 
+    /// Retrieves length of ADARA message in buffer (not buffer capacity)
     uint32_t
-    getBufferLength()
+    getMessageLength()
     {
         if ( !m_buf_ready )
             buildSendBuffer();
@@ -49,6 +61,7 @@ public:
     }
 
 private:
+    /// Builds the message buffer and formats ADARA translation complete message
     void
     buildSendBuffer()
     {

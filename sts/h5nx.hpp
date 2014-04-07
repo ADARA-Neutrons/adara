@@ -12,6 +12,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <stdint.h>
 #include "napi.h"
 #include "hdf5.h"
 #include <nexus/NeXusFile.hpp>

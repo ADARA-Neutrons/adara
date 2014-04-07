@@ -175,6 +175,7 @@ public:
     PVInfoBase
     (
         const std::string  &a_name,         ///< [in] Name of PV
+        const std::string  &a_device_name,  ///< [in] Name of device that owns the PV
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
@@ -182,6 +183,7 @@ public:
     )
     :
         m_name(a_name),
+        m_device_name(a_device_name),
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
@@ -193,10 +195,30 @@ public:
     virtual ~PVInfoBase()
     {}
 
+    bool sameDefiniton( const std::string &a_name, const std::string &a_device_name, PVType a_type, const std::string &a_units )
+    {
+        // TODO - Add enumeration check when supported
+        if ( m_name == a_name && m_device_name == a_device_name && m_type == a_type && m_units == a_units )
+            return true;
+        else
+            return false;
+    }
+
+    /// Determine if PVs have equivalent definitions
+    bool sameDefiniton( const PVInfoBase &a_pv )
+    {
+        // TODO - Add enumeration check when supported
+        if ( m_name == a_pv.m_name && m_device_name == a_pv.m_device_name && m_type == a_pv.m_type && m_units == a_pv.m_units )
+            return true;
+        else
+            return false;
+    }
+
     /// Virtual method to allow subclasses to write buffered PV values and time axis
     virtual void flushBuffers( struct RunMetrics *a_run_metrics = 0 ) = 0;
 
     std::string         m_name;         ///< Name of PV
+    std::string         m_device_name;  ///< Name of device that owns the PV
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
@@ -215,12 +237,13 @@ public:
     PVInfo
     (
         const std::string  &a_name,         ///< [in] Name of PV
+        const std::string  &a_device_name,  ///< [in] Name of device that owns the PV
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
-    : PVInfoBase( a_name, a_device_id, a_pv_id, a_type, a_units )
+    : PVInfoBase( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units )
     {}
 
     /// PVInfo destructor
@@ -241,7 +264,7 @@ class IStreamAdapter
 public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
-    virtual PVInfoBase*     makePVInfo( const std::string & a_name, Identifier a_device_id, Identifier a_pv_id, PVType a_type, const std::string & a_units ) = 0;
+    virtual PVInfoBase*     makePVInfo( const std::string & a_name, const std::string & a_device_name, Identifier a_device_id, Identifier a_pv_id, PVType a_type, const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
     virtual void            processRunInfo( const RunInfo & a_run_info ) = 0;
