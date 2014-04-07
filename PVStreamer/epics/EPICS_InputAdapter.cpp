@@ -188,6 +188,8 @@ InputAdapter::configFileMonitorThread()
         {
             if ( !count % 5 ) // Check every 5 seconds
             {
+                count = 0;
+
                 // If config file has been updated, read & process
                 // (last_write_time will throw if it can't access the file)
                 t_now = boost::filesystem::last_write_time( cfg_path );
@@ -276,14 +278,23 @@ InputAdapter::configFileMonitorThread()
                 }
             }
         }
-        catch(...)
+        catch( std::exception &e )
         {
             syslog( LOG_ERR, "Exception thrown while parsing EPICS configuration file (beamline.xml)" );
+            syslog( LOG_ERR, e.what() );
 
             ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "Exception thrown while parsing EPICS configuration file (beamline.xml)", ADARA::ERROR );
             ADARA::ComBus::Connection::getInst().broadcast( msg );
         }
+        catch( ... )
+        {
+            syslog( LOG_ERR, "Unexpected exception thrown while parsing EPICS configuration file (beamline.xml)" );
 
+            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "Unexpected exception thrown while parsing EPICS configuration file (beamline.xml)", ADARA::ERROR );
+            ADARA::ComBus::Connection::getInst().broadcast( msg );
+        }
+
+        ++count;
         sleep(1);
     }
 }

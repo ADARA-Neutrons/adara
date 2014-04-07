@@ -1,4 +1,4 @@
-record(ao,"a1"){
+record(ao,"a3"){
     field(VAL,1)
     field(UDF,1)
     field(EGU,"kg")
@@ -17,7 +17,7 @@ record(mbbo,"a2"){
     field(PINI,"YES")
 }
 
-record(longout,"a3"){
+record(longout,"a1"){
     field(VAL,0)
     field(EGU,"cps")
     field(PINI,"YES")

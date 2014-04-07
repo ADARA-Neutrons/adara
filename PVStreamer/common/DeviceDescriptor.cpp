@@ -171,7 +171,7 @@ DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
         m_enums.push_back( new EnumDescriptor( **e ));
 
     for( vector<PVDescriptor*>::const_iterator p = a_source.m_pvs.begin(); p != a_source.m_pvs.end(); ++p )
-         m_pvs.push_back( new PVDescriptor( this, **p ));
+        m_pvs.push_back( new PVDescriptor( this, **p ));
 
 }
 
@@ -179,7 +179,7 @@ DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
 DeviceDescriptor::~DeviceDescriptor()
 {
     for( vector<PVDescriptor*>::iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
-         delete *p;
+        delete *p;
 
     for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
         delete *e;

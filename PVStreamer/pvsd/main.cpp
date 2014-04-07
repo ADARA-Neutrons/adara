@@ -19,11 +19,108 @@ using namespace std;
 #define PVSD_VERSION "1.0.0"
 
 bool g_active = true;
+bool g_child_signal = false;
+int g_child_code = 0;
+
 
 /// Used to catch shutdown/interrupt signals for clean shutdown
-void signalHandler( int a_signal )
+void
+signalHandlerExit( int a_signal )
 {
     g_active = false;
+}
+
+
+/// Handles child signal during daemonization
+void
+signalHandlerChild( int a_signal, siginfo_t *info, void *data )
+{
+    g_child_signal = true;
+    g_child_code = info->si_value.sival_int;
+}
+
+
+/// Sends signal to parent process during daemonization
+void
+signalParent( int ret_code )
+{
+    pid_t pid = getppid();
+    sigval_t data;
+
+    data.sival_int = ret_code;
+    if ( sigqueue( pid, SIGUSR1, data ) < 0 )
+    {
+        int e = errno;
+        syslog( LOG_ERR, "Unable to signal parent: %s", strerror(e));
+    }
+}
+
+
+/// Function to daemonize the PVStreamer process
+void
+daemonize()
+{
+    pid_t pid = fork();
+    if ( pid < 0 )
+    {
+        int e = errno;
+        syslog( LOG_ERR, "Unable to fork: %s", strerror(e));
+        exit(1);
+    }
+
+    if ( pid ) // Grandparent process, wait for parent status
+    {
+        while ( !g_child_signal )
+            sleep(1);
+
+        exit( g_child_code );
+    }
+
+    // We're the child process, become a daemon.
+    // Create a new session, then fork and have the parent exit,
+    // ensuring we are not the leader of the session -- we don't
+    // want a controlling terminal.
+    if ( setsid() < 0 )
+    {
+        int e = errno;
+        syslog( LOG_ERR, "Unable to setsid: %s", strerror(e));
+        exit(1);
+    }
+
+    pid = fork();
+    if ( pid < 0 )
+    {
+        int e = errno;
+        syslog( LOG_ERR, "Second fork failed: %s", strerror(e));
+        exit(1);
+    }
+    else if ( pid )
+    {
+        // Parent process, wait for child status
+        while ( !g_child_signal )
+            sleep(1);
+
+        // Signal grandparent
+        signalParent( g_child_code );
+        exit( g_child_code );
+    }
+
+    // Close stdin, stdout, sterr
+    close( STDIN_FILENO );
+    close( STDOUT_FILENO );
+    close( STDERR_FILENO );
+
+    // Chdir to "/"
+    if ( chdir("/") < 0 )
+    {
+        int e = errno;
+        syslog( LOG_ERR, "Chdir failed: %s", strerror(e));
+        exit(1);
+    }
+
+    // We're the second child now; we are in our own session, but
+    // are not the leader of it. Let initialization continue.
+    syslog( LOG_INFO, "pvsd daemonized" );
 }
 
 
@@ -35,30 +132,42 @@ void signalHandler( int a_signal )
  */
 int main(int argc, char *argv[])
 {
+    int ret_code = 0;
+
+    // Initialize SysLog
+    openlog( "pvsd", 0, LOG_DAEMON );
+    syslog( LOG_INFO, "pvsd starting" );
+
     // Setup signal handlers to catch all termination handlers so we can
     // implement orderly shutdown.
 
     struct sigaction new_action, old_action;
 
-    new_action.sa_handler = signalHandler;
+    new_action.sa_handler = signalHandlerExit;
     sigemptyset( &new_action.sa_mask );
     new_action.sa_flags = 0;
 
     sigaction (SIGINT, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGINT, &new_action, NULL);
+        sigaction( SIGINT, &new_action, NULL );
 
     sigaction (SIGHUP, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGHUP, &new_action, NULL);
+        sigaction( SIGHUP, &new_action, NULL );
 
     sigaction (SIGTERM, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGTERM, &new_action, NULL);
+        sigaction( SIGTERM, &new_action, NULL );
 
     sigaction (SIGQUIT, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN)
-        sigaction (SIGQUIT, &new_action, NULL);
+        sigaction( SIGQUIT, &new_action, NULL );
+
+    // Attach SIGUSR handler for daemon initialization
+    new_action.sa_handler = 0;
+    new_action.sa_sigaction = signalHandlerChild;
+    new_action.sa_flags = SA_SIGINFO;
+    sigaction( SIGUSR1, &new_action, NULL );
 
     uint32_t        port;
     uint32_t        heartbeat;
@@ -70,6 +179,7 @@ int main(int argc, char *argv[])
     uint32_t        offset;
     uint32_t        pid;
     bool            track_logged = false;
+    bool            daemon = false;
     ::ADARA::ComBus::Connection *combus = 0;
 
     // Parse program options
@@ -89,34 +199,38 @@ int main(int argc, char *argv[])
             ("config,c", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
             ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
             ("track_log", "track logged PVs only (default is all)")
+            ("daemon", "Run as background daemon")
             ;
 
     po::variables_map opt_map;
     po::store( po::parse_command_line(argc,argv,options), opt_map );
     po::notify( opt_map );
 
-    // Process help / version options and exit early
+    // Process options
 
-    if ( opt_map.count( "help" ))
+    if ( opt_map.count( "track_log" ))
+        track_logged = true;
+
+    if ( opt_map.count( "daemon" ))
+        daemon = true;
+
+    if ( opt_map.count( "help" ) && !daemon )
     {
         cout << options << endl;
         return 0;
     }
-    else if ( opt_map.count( "version" ))
+    else if ( opt_map.count( "version" ) && !daemon )
     {
         cout << PVSD_VERSION << endl;
         return 0;
     }
 
-    if ( opt_map.count( "track_log" ))
-        track_logged = true;
-
-    // Initialize SysLog
-    openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pvsd started." );
-
     if ( !opt_map.count( "domain" ))
         syslog( LOG_WARNING, "No communication domain specified - probably an error." );
+
+    // Parent process will exit in this call
+    if ( daemon )
+        daemonize();
 
     try
     {
@@ -132,6 +246,10 @@ int main(int argc, char *argv[])
         // Create and attach EPICS input adapter
         new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged );
 
+        // If we mad it here as a daemon, signal parent that all is well
+        if ( daemon )
+            signalParent(0);
+
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;
 
@@ -146,15 +264,22 @@ int main(int argc, char *argv[])
     catch( TraceException &e )
     {
         syslog( LOG_ERR, e.toString().c_str() );
+        ret_code = 1;
     }
     catch( exception &e )
     {
         syslog( LOG_ERR, "Unhandled exception: %s", e.what());
+        ret_code = 1;
     }
     catch( ... )
     {
         syslog( LOG_ERR, "Unknown exception" );
+        ret_code = 1;
     }
+
+    // If we failed due to an exception and we're a daemon, inform parent
+    if ( daemon && ret_code )
+        signalParent( ret_code );
 
     if ( combus )
         delete combus;
@@ -162,5 +287,5 @@ int main(int argc, char *argv[])
     syslog( LOG_INFO, "pvsd stopping." );
     closelog();
 
-    return 0;
+    return ret_code;
 }
