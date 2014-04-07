@@ -105,10 +105,17 @@ daemonize()
         exit( g_child_code );
     }
 
+    // We're the second child now; we are in our own session, but
+    // are not the leader of it. Let initialization continue.
+
     // Close stdin, stdout, sterr
     close( STDIN_FILENO );
     close( STDOUT_FILENO );
     close( STDERR_FILENO );
+
+    // Reopen log
+    openlog( "pvsd", 0, LOG_DAEMON );
+    syslog( LOG_INFO, "pvsd daemon starting" );
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
@@ -117,10 +124,6 @@ daemonize()
         syslog( LOG_ERR, "Chdir failed: %s", strerror(e));
         exit(1);
     }
-
-    // We're the second child now; we are in our own session, but
-    // are not the leader of it. Let initialization continue.
-    syslog( LOG_INFO, "pvsd daemonized" );
 }
 
 

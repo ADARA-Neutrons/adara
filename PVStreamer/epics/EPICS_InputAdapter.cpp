@@ -186,7 +186,7 @@ InputAdapter::configFileMonitorThread()
     {
         try
         {
-            if ( !count % 5 ) // Check every 5 seconds
+            if ( !(count % 5 )) // Check every 5 seconds
             {
                 count = 0;
 
@@ -294,8 +294,8 @@ InputAdapter::configFileMonitorThread()
             ADARA::ComBus::Connection::getInst().broadcast( msg );
         }
 
-        ++count;
         sleep(1);
+        ++count;
     }
 }
 

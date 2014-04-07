@@ -933,6 +933,7 @@ StreamParser::rxPacket
         short       found;
         string      tag;
         string      value;
+        PVInfoBase *info;
 
         try
         {
@@ -998,25 +999,31 @@ StreamParser::rxPacket
 
                                 // Note that PV name ~should~ be unique within the stream, but currently the SMS does
                                 // not perform any checks to prevent datasources from publishing duplicate PV names;
-                                // thus it will eventuall happen. The STS will try to handle name collisions without
+                                // thus it will eventually happen. The STS will try to handle name collisions without
                                 // aborting, but the above behavior that tries to gracefully handle pvsd restarts
                                 // enables a fatal error condition IF the PV being replaced is actually a duplicate
                                 // PV that is still live. On the next value update of the replaced PV, the STS will
                                 // detect that there is no KEY present for that variable. This is a ~very~ unlikely
-                                // scnario given that there is no use case for running multiple pvsd instances, and
+                                // scenario given that there is no use case for running multiple pvsd instances, and
                                 // even if there were, they would have to be publishing the exact same DDP content.
                                 // Therefore, this code will assume a PV with a new ID but identacle content is due to
                                 // a pvsd restart condition.
 
+                                // Also note that the following code favors the most recently received configuration
+                                // data when collisions do occur. If there is a name conflict, the most recently
+                                // received definition will overwrite the previous defintion, and if value updates
+                                // are recievd for the over-written definition, the STS will throw an error.
+
                                 PVKey       key(a_pkt.devId(),pv_id);
                                 map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find( key );
+                                map<string,PVKey>::iterator xref;
 
                                 if ( ipv == m_pvs_by_key.end() )
                                 {
                                     // This is a NEW key - see if there is an existing entry (by dev:name) that matches this PV EXACTLY
 
                                     bool create = true;
-                                    map<string,PVKey>::iterator xref = m_pv_name_xref.find( dev_name + ":" + pv_name );
+                                    xref = m_pv_name_xref.find( dev_name + ":" + pv_name );
 
                                     if ( xref != m_pv_name_xref.end() )
                                     {
@@ -1046,10 +1053,12 @@ StreamParser::rxPacket
                                                 // Existing entry differs, flush and delete old entry
                                                 ipv->second->flushBuffers(0);
                                                 delete ipv->second;
+
                                                 // Update maps
                                                 m_pvs_by_key.erase( ipv );
                                                 m_pv_name_xref.erase( xref );
-                                                // New entries will be created below
+
+                                                // New PVInfo entry will be created below
                                             }
                                         }
                                         else
@@ -1063,20 +1072,53 @@ StreamParser::rxPacket
                                     // If no existing matching PV was found, make a new one
                                     if ( create )
                                     {
-                                        m_pvs_by_key[key] = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
-                                        m_pv_name_xref[dev_name + ":" + pv_name] = key;
+                                        // If adapter doesn't support PV type, makePVInfo will return NULL
+                                        info = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        if ( info )
+                                        {
+                                            m_pvs_by_key[key] = info;
+                                            m_pv_name_xref[dev_name + ":" + pv_name] = key;
+                                        }
                                     }
                                 }
                                 else
                                 {
-                                    // PV Key is already in use
+                                    // PV Key is already in use - An existing key will be received here when the SMS re-
+                                    // broadcasts DDPs at file boundaries (in which case the definitions will match).
+                                    // They can also be received if pvsd is reconfigured (in which case the definition
+                                    // can be different). Pvsd tries to keep ID-to-Name mappings consistent accross re-
+                                    // configurations, but it may not always be able to.
+
                                     if ( !ipv->second->sameDefiniton( pv_name, dev_name, pv_type, pv_units ))
                                     {
+                                        // Did the name change?
+                                        if ( dev_name != ipv->second->m_device_name || pv_name != ipv->second->m_name )
+                                        {
+                                            // Delete existing name-key xref entry
+                                            xref = m_pv_name_xref.find( ipv->second->m_device_name + ":" + ipv->second->m_name );
+                                            if ( xref != m_pv_name_xref.end())
+                                                m_pv_name_xref.erase( xref );
+
+                                            // There is nothing the STS can do if there is a name conlfict here,
+                                            // the existing name-to-key entry will be overwritten below (if PV type
+                                            // is supported)
+                                        }
+
                                         // PV definition has changed, flush and replace existing PVInfo object
                                         ipv->second->flushBuffers(0);
                                         delete ipv->second;
 
-                                        m_pvs_by_key[key] = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        // If PV type not supported, makePVInfo will return NULL
+                                        info = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        if ( info )
+                                        {
+                                            m_pvs_by_key[key] = info;
+                                            m_pv_name_xref[dev_name + ":" + pv_name] = key;
+                                        }
+                                        else
+                                        {
+                                            m_pvs_by_key.erase( ipv );
+                                        }
                                     }
                                 }
                             }
@@ -1397,6 +1439,8 @@ StreamParser::toPVType
         return PVT_DOUBLE;
     else if ( boost::iequals( a_source, "float" ))
         return PVT_FLOAT;
+    else if ( boost::iequals( a_source, "string" ))
+        return PVT_STRING;
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 

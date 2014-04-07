@@ -103,6 +103,8 @@ NxGen::makePVInfo
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+    case STS::PVT_STRING:
+        return 0; // Not supported
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "makePVInfo() failed - invalid PV type: " << a_type );
@@ -920,6 +922,8 @@ NxGen::toNxType
         return NeXus::FLOAT32;
     case STS::PVT_DOUBLE:
         return NeXus::FLOAT64;
+    case STS::PVT_STRING: // Not supported
+        break;
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )

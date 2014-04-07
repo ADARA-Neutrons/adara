@@ -164,7 +164,8 @@ enum PVType
     PVT_UINT,
     PVT_FLOAT,
     PVT_DOUBLE,
-    PVT_ENUM
+    PVT_ENUM,
+    PVT_STRING
 };
 
 /// Base class for all process variable (PV) types
