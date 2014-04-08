@@ -46,7 +46,7 @@
 
 using namespace std;
 
-#define STS_VERSION "1.0.7"
+#define STS_VERSION "1.0.8"
 
 
 /**
@@ -136,9 +136,9 @@ int main( int argc, char** argv )
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
                 ("event-buf-size", po::value<unsigned short>( &evt_buf_size )->default_value( 20 ),"set event buffers to (in chunks)")
                 ("anc-buf-size", po::value<unsigned short>( &anc_buf_size )->default_value( 2 ),"set ancillary buffers (in chunks)")
-                ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "" ), "set AMQP broker URI/IP address")
-                ("broker_user,u", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
-                ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+                ("broker_uri", po::value<string>( &broker_uri )->default_value( "" ), "set AMQP broker URI/IP address")
+                ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
+                ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
                 ;
 
