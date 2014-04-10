@@ -2,6 +2,7 @@
 #include "TransCompletePkt.h"
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
+#include <syslog.h>
 
 
 using namespace std;
@@ -432,6 +433,47 @@ StreamParser::rxPacket
     }
 
     return false;
+}
+
+
+/*! \brief This method throws away the contents of an Oversized Packet received as part of the ADARA Stream.
+ *
+ * This method hopefully squawks to the log file when an Oversized Packet
+ * arrives from the SMS, rather than silently dropping it on the floor.
+ * It is unlikely that such packets will occur frequently, however in
+ * the ADARA Test Harness these can be generated when an Event Index
+ * is way off, and _All_ the events for a Data Source show up in 1 Pulse.
+ * And if such oversized packets do start cropping up, we really should
+ * look into it, since we simply throw these packets on the floor... :-b
+ */
+bool
+StreamParser::rxOversizePkt
+(
+    const ADARA::PacketHeader *hdr,  ///< [in] ADARA PacketHeader object for Oversized Packet (1st Invocation Only, then NULL for rest of packet)
+    const uint8_t *chunk,  ///< [in] Chunk of Oversized Message Data
+    unsigned int chunk_offset,  ///< [in] Offset of This Oversized Chunk
+    unsigned int chunk_len  ///< [in] Length of this Oversized Chunk (in bytes)
+)
+{
+    // Log Oversized Packet (with Header)
+    if (hdr != NULL)
+    {
+        syslog( LOG_WARNING,
+        "OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+            (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+            (uint32_t) hdr->timestamp().tv_nsec,
+            hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
+    }
+
+    // Log Oversized Packet (Next Chunk)
+    else
+    {
+        syslog( LOG_WARNING, "OversizePkt: next chunk offset=%u len=%u",
+            chunk_offset, chunk_len);
+    }
+
+    // Invoke the base handler, in case it ever does anything...
+    return Parser::rxOversizePkt(hdr, chunk, chunk_offset, chunk_len);
 }
 
 

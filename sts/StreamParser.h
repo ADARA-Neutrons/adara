@@ -88,6 +88,8 @@ private:
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
+    bool        rxOversizePkt( const ADARA::PacketHeader *hdr, const uint8_t *chunk, unsigned int chunk_offset, unsigned int chunk_len);
+
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
