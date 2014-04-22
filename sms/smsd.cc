@@ -47,6 +47,7 @@ static void parse_options(int argc, char **argv)
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help,h", "Show usage information")
+		("version", "Show software version(s) information")
 		("foreground,f", "Don't become a daemon")
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
@@ -65,6 +66,12 @@ static void parse_options(int argc, char **argv)
 
 	if (vm.count("help")) {
 		std::cerr << desc << std::endl;
+		exit(2);
+	}
+	if (vm.count("version")) {
+		std::cerr << "SMS Daemon Version " << SMSD_VERSION
+			<< " (ADARA Common Version " << ADARA::VERSION << ")"
+			<< std::endl;
 		exit(2);
 	}
 	if (vm.count("foreground"))
@@ -358,6 +365,9 @@ int main(int argc, char **argv)
 	 */
 	PropertyConfigurator::configure(log_conf);
 	verify_log4cxx_config();
+
+	INFO("SMS Daemon Started, Version " << SMSD_VERSION
+			<< " (ADARA Common Version " << ADARA::VERSION << ")");
 
 	load_config(argv[0], conf);
 
