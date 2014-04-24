@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<chopper Name="Chopper System" AppID="123">
+<Optionsmap Name="LambdaRequest" Option="hardwarealarm" Changable="False">0.0, 6.0</Optionsmap>
+<Optionsmap Name="EnergyRequest" Option="hardwarealarm" Changable="False">0.0, 2000.0</Optionsmap>
+
+<Optionsmap Name="Lambda" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Lambda1" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Lambda2" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Lambda3" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Lambda4" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+
+<Optionsmap Name="Energy" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Energy1" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Energy2" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Energy3" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="Energy4" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+
+
+
+<Optionsmap Name="LambdaError" Option="hardwarelimit" Changable="False">0, 6</Optionsmap>
+<Optionsmap Name="BandWidth" Option="hardwarealarm" Changable="False">0, 0.5</Optionsmap>
+<Optionsmap Name="PhaseRequest1" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseRequest2" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseRequest3" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseRequest4" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+
+<Optionsmap Name="PhaseAct1" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseAct2" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseAct3" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+<Optionsmap Name="PhaseAct4" Option="hardwarealarm" Changable="False">-180, 180</Optionsmap>
+
+
+<Optionsmap Name="SpeedRequest1" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedRequest2" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedRequest3" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedRequest4" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+
+
+<Optionsmap Name="SpeedAct1" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedAct2" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedAct3" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+<Optionsmap Name="SpeedAct4" Option="hardwarealarm" Changable="False">0, 60</Optionsmap>
+
+
+</chopper>

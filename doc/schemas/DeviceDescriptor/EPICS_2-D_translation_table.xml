@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<device xmlns="http://public.sns.gov/schema/device.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd">
+    <device_name>2-D Translation Table</device_name>
+    <ioc_name>Simulation</ioc_name>
+    <ioc_script>/home/epics/R3.14.12.2/applications/bl99/simulation/st.cmd</ioc_script>
+    <ioc_console_port>4812</ioc_console_port>
+    <process_variables>
+        <process_variable>
+            <pv_name>active</pv_name>
+            <pv_id>0</pv_id>
+            <pv_type>boolean</pv_type>
+            <pv_hint>
+                <pv_nexus_type>NXpositioner</pv_nexus_type>              
+            </pv_hint> 
+        </process_variable>
+        <process_variable>
+            <pv_name>xpos</pv_name>
+            <pv_id>1</pv_id>
+            <pv_epics_name>motor_x</pv_epics_name> <!-- Readable and writable, similar to pv "s1lRequest" in current das. -->
+            <pv_type>signed integer</pv_type>
+            <pv_hint>
+                <pv_nexus_type>NXpositioner</pv_nexus_type>              
+            </pv_hint> 
+        </process_variable>
+        <process_variable>
+            <pv_name>xpos_readback</pv_name>
+            <pv_id>2</pv_id>
+            <pv_epics_name>motor_x</pv_epics_name> <!-- Readable, similar to pv "s1l" in current das. -->
+            <pv_type>signed integer</pv_type>
+            <pv_hint>
+                <pv_nexus_type>NXpositioner</pv_nexus_type>              
+            </pv_hint> 
+        </process_variable>  
+    </process_variables>
+</device>

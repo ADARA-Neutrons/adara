@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# smsd		This shell script takes care of starting and stopping
+#		SMS for the ADARA system
+#
+# chkconfig: - 98 94
+# description: SMS is the ADARA Stream Management Service
+
+### BEGIN INIT INFO
+# Provides: smsd
+# Required-Start: $network $local_fs $remote_fs
+# Required-Stop: $network $local_fs $remote_fs
+# Should-Start: $syslog $named
+# Should-Stop: $syslog $named
+# Short-Description: start and stop smsd
+# Description: SMS is the ADARA Stream Management Service
+### END INIT INFO
+
+# Source function library.
+. /etc/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+prog=smsd
+lockfile=/var/lock/subsys/$prog
+
+export PATH=/usr/local/bin:$PATH
+
+start() {
+	[ "$EUID" != "0" ] && exit 4
+	[ "$NETWORKING" = "no" ] && exit 1
+	[ -x /usr/local/bin/smsd ] || exit 5
+
+        # Start daemons.
+        echo -n $"Starting $prog: "
+        daemon $prog $OPTIONS
+	RETVAL=$?
+        echo
+	[ $RETVAL -eq 0 ] && touch $lockfile
+	return $RETVAL
+}
+
+stop() {
+	[ "$EUID" != "0" ] && exit 4
+        echo -n $"Shutting down $prog: "
+	killproc $prog
+	RETVAL=$?
+        echo
+	[ $RETVAL -eq 0 ] && rm -f $lockfile
+	return $RETVAL
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+	status $prog
+	;;
+  restart|force-reload)
+	stop
+	start
+	;;
+  try-restart|condrestart)
+	if status $prog > /dev/null; then
+	    stop
+	    start
+	fi
+	;;
+  reload)
+	exit 3
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart|try-restart|force-reload}"
+	exit 2
+esac

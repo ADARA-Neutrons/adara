@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<runinfo 
+    xmlns="http://public.sns.gov/schema/runinfo.xsd"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://public.sns.gov/schema/runinfo.xsd http://public.sns.gov/schema/runinfo.xsd">
+    <das_version>4.3</das_version>
+    <facility_name>SNS</facility_name>
+    <proposal_id>IPTS-6627</proposal_id>
+    <proposal_title>Slow lattice dynamics in the relaxor ferroelectric PMN-30%PT</proposal_title>
+    <run_number>19654</run_number>
+    <run_title>_No10</run_title>
+    <users>
+        <user>
+            <id>GUANGYONG</id>
+            <role>V</role>
+        </user>
+        <user>
+            <id>CSTOCK</id>
+            <role>V</role>
+        </user>
+        <user>
+            <id>PMGEHRING</id>
+            <role>V</role>
+        </user>
+        <user>
+            <id>JWEN</id>
+            <role>V</role>
+        </user>
+        <user>
+            <id>ZHIJUNXU</id>
+            <role>V</role>
+        </user>
+        <user>
+            <id>MASAMATSUURA</id>
+            <role>PI</role>
+        </user>
+    </users>
+    <reduction>
+        <detector_binning>
+            <binning_type>linear</binning_type>
+            <units>microsecond</units>
+            <start_bin>0.0</start_bin>
+            <end_bin>200010.0</end_bin>
+            <bin_width>10.0</bin_width>
+        </detector_binning>
+        <beam_monitor_binning>
+            <beam_monitor_name>BEAMMON1</beam_monitor_name>
+            <beam_monitor_id>1</beam_monitor_id>
+            <beam_monitor_description>beam monitor</beam_monitor_description>
+            <binning_type>linear</binning_type>
+            <units>microsecond</units>
+            <start_bin>0.0</start_bin>
+            <end_bin>200001.0</end_bin>
+            <bin_width>1.0</bin_width>
+        </beam_monitor_binning>
+    </reduction>
+</runinfo>

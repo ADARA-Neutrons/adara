@@ -1,0 +1,3 @@
+These are some packages for RHEL6 to fulfill the build requirements for
+several programs in ADARA. Only packages that are not available in the
+RHEL or EPEL repositories should be here.

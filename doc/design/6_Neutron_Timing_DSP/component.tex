@@ -1,0 +1,173 @@
+\section{Hardware Design Change to Move Timing into the DSP}
+This document will capture preliminary design discussions and hopefully bring clarity to design specifications for hardware that is needed to operate an instrument at the SNS in the year 2013 with prototype hardware running in early 2012. 
+The first sections will focus on functionality.  The next section will discuss partitioning these functions with regard to how they might map to existing hardware that can be repurposed to handle the new functions.  Changes to software will also be addressed.   Issues that must be considered to fully specify a new replacement for the DSP board will be highlighted.
+
+\subsection{Current Starting Point Hardware}
+The discussion will start not at the lowest level next to the detector pre-amps, but at the other end of the detector electronics chain that can readily benefit from just repartitioning on which boards some of the functions take place.  
+
+The top level custom data buffering and processing board is the ``Data System Packetizer'' (DSP).   The DSP formats the data from the lower level distributed detector electronics boards and sends it over a custom fiber optic link to the top level board called the Optical Communications Card (OCC).  The OCC resides in a computer called the Preprocessor.  One more additional component is a software application called DCOMServer that run on this PC.  The Preprocessor/OCC system is responsible for taking the neutron event data from the detector hardware chain and combining it with information from the Accelerator RTDL and generating  2 standard DAS data files.  The Pulse ID file and the Event Data file.  More details can be found in respective documents.
+
+The actual time synchronization of the DAS system to the Accelerator systems takes place through a separate set of boards, computers and software applications.  Because the details of how this information would flow into the DAS system were not finalized, a separate flexible DAS Timing Card was designed to handle this interface to Accelerator Timing.    The actual master synchronization timing pulse is delivered to the DAS system Timing Card from another card, the ETC board,  that decodes the Accelerator Timing Link, called the Event Link.  The DAS Timing card synchronizes to a trigger from the ETC and also handles Chopper phasing and has the ability to measure the Chopper phase error with each beam pulse.  This ETC board resides in a PC and is controlled by an application that is also responsible for extracting other data from the Real Time Data Link, (RTDL).   Data about beam production and the beam itself needs to be recorded by the DAS system for use later in the data analysis step.
+
+With the current system, Accelerator Timing, and data specific to each pulse enters the DAS system through the ETC card.  This card generates the Timing or synchronization pulse to phase the detector system and Choppers to the production of neutrons.  The needed RTDL data is extracted from this data stream and sent from the ETC PC to the Preprocessor via UDP packets.  
+
+The functions of the ETC Card and DAS Timing Card will not only be merged, but moved into the current DSP board.  This is a significant change in both hardware and software, but it will produce a number of payoffs in both software simplicity and elimination of two custom hardware boards and associated PC’s.  The desire is to place more functions into hardware but this will involve significant changes in the software, because at least 3 applications (ETC, TimingHandler, Chopper Passthrough) will require modifications or combining into a master Timing\_Phasing application That will run on the \_\_?\_\_ (Preprocessor PC?)
+
+\subsection {Accelerator Timing}
+The first obvious repurposing of existing hardware is to add accelerator timing directly to the DAS central data concentration board, the DSP board.   The name DSP could stand for ``Data System Packetizer'' and not the traditional meaning of this abbreviation.  
+
+The following data is needed to configure the logic that will produce triggers from the Event Link
+
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | c | c}
+    Old & New & Type/Offset \\
+    \hline
+    Event(xx) & Event(xx) & uint32/0 \\
+    Width & Width (may still want this to be a parameter read from disk file?) [100ns][10ns][?] & uint32/1 \\
+    Delay & Delay [100ns][10ns][?] & uint32/2 \\
+    Delay & Delay [100ns][10ns][?] & uint32/3 \\
+    Delay & Delay [100ns][10ns][?] & uint32/4 \\
+    \end{tabular}
+    \begin{tabular} { c }
+    This should be able to handle (X) triggers X=4?\\
+    \end{tabular}
+  \end{center}
+  \caption {Event Link}
+  \label{table:Event_Link}
+\end{table}
+
+
+The following information about the proton pulse will be pulled off the RTDL, Real Time Data Link, each Beam Cycle.
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | c | c}
+    Old & New & Type/Offset \\
+    \hline
+    Timestamp Low & Timestamp Low & uint32/0 \\
+    Timestamp High & Timestamp High & uint32/1 \\
+    Pulse Type & Pulse Type & uint32/2 \\
+    Veto Status & Veto Status & uint32/3 \\
+    Proton Charge [$10pC$] & Proton Charge [$10pC$] & uint32/4 \\
+    Stored Turns & Stored Turns & uint32/5 \\
+    Ring Period & Ring Period & uint32/6 \\
+    Spare & Spare & uint32/7 \\
+     & \ldots & \\
+    Spare & Spare & uint32/15 \\
+    \end{tabular}
+  \end{center}
+  \caption {RTDL}
+  \label{table:RTDL}
+\end{table}
+
+This will translate into a BRAM of 512x32 with address  pointer of [8:4] and data[3:0]
+
+In normal operation, the write pointer and read pointer should track in lock step, but we will have a circular buffer 32 deep back in time if needed.
+
+\subsection {Timing}
+
+The functions of the DAS TimingCard will move to the current DSP, ``Data System Packetizer'', board.  The interface between the logic contained in the original card will be through a shared Block RAM in the FPGA.   Data flowing out of the Timing logic will be written into this RAM with a write pointer, WP.  Configuration data will be written to another Block RAM with a strobe into the Timing Logic to read this data to local registers.  The following registers are needed
+
+Choppers require the following information:
+\begin{itemize}
+\item
+Phase or Offset, They produce TDC return signal used to verify the phase of chopper system.
+\end {itemize}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | c | c | c | c | c | c}
+    Old & New & & Width & Type & Offset & \\
+    \hline
+    FRun\_Divisor & LocalTimeBase & ? & 32 & uint32 & 0 & \\
+    Delay\_Count & Tsync\_Delay\_Count & & 32 & uint32 & 1 & \\
+    Tsync\_Select & Tsync\_Select & & 1 & uint32 & 2 & \\
+    FrameN & DetBank1\_FrameNum & & 4 & uint32 & 3 & \\
+    & BMonitor1\_FrameNum & & & & & \\
+    & BMonitor2\_FrameNum & & & & & \\
+    & BMonitor3\_FrameNum & & & & & \\
+    & Chop1\_FrameNum & & & & & \\
+    & Chop2\_FrameNum & & & & & \\
+    & Chopx\_FrameNum & & & & & \\
+    DCOUNT1 & DelayOffset1 & & 24 & uint32 & 4 &\\
+    : & : & & 24 & uint32 & : & \\
+    DCOUNT8 & DelayOffset8 & & 24 & uint32 & 11 &\\
+    TDCWindow1 & TDCWindow1 & & 24 & uint32 & 12 &\\
+    : & : & & 24 & uint32 & : & \\
+    TDCWindow8 & TDCWindow8 & & 24 & uint32 & 19 &\\
+    TDCOffset1 & TDCOffset1 & & 24 & uint32 & 20 &\\
+    : & : & & 24 & uint32 & : & \\
+    TDCOffset8 & TDCOffset8 & & 24 & uint32 & 27 &\\
+    Chop1Mask & Chopper1RelativeFrame & & 16 & uint32 & 28 & \\
+    : & : & & 16 & uint32 & : &\\
+    Chop8Mask & Chopper8RelativeFrame & & 16 & uint32 & 35 & \\
+    PT0\_OverdueMask & & & & & &\\
+    LossOLockMask & & & & & & \\
+    B\_VetoMask & & & & & & \\
+    LossOLock\_Count & & & & & & \\
+    Clear\_ChopVErr & & & 8 & & &\\
+    & RESET & & & & & \\
+    \end{tabular}
+  \end{center}
+  \caption {Write/Read Registers}
+  \label{table:Write_Read_Registers}
+\end{table}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | c | c | c | c | c | c}
+    Old & New & & Width & Type & Offset & \\
+    \hline
+    Diff\_Count & ElapsedTimeCount & & 32 & uint32 & 0 & \\
+    & 16 deep buffer of TsyncPeriodCounts & & & & & \\
+    Chop1VErr\_cnt & Chop1VetoCount & & 24 & uint32 & 1 & \\
+    : & : & & 24 & uint32 & : & \\
+    Chop8VErr\_cnt & Chop8VetoCount & & 24 & uint32 & 8 & \\
+    B\_VetoErr\_cnt & AcceleratorVetoCount & & 24 & uint32 & 9 & \\
+    TDC1\_cnt & Chop1PhaseErrorCount & & 24 & uint32 & 10 & \\
+    : & : & & 24 & uint32 & : & \\
+    TDC8\_cnt & Chop8PhaseErrorCount & & 24 & uint32 & 18 & \\
+    PeriodTDC1\_cnt & TDC1\_PeriodCount & & 24 & uint32 & 19 & \\
+    & : & & 24 & uint32 & : & \\
+    & TDC8\_PeriodCount & & 24 & uint32 & 26 & \\
+    & DateCode & & 24 & uint32 & 27 & \\
+    & RevisionCode & & 24 & & 28 & \\
+    \end{tabular}
+  \end{center}
+  \caption {Read Only Registers}
+  \label{table:Read_Only_Registers}
+\end{table}
+
+
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | p{2.5cm} | c | p{3.5cm} | c | c | c | c | c}
+    Frame & PulseID XXXXs + & Label & TsyncPeriodCounts (Assume 10 MHz clk) & Chop1 P & Chop1 V & Chop2 P & Chop2 V & Detector \\
+    \hline
+    1 & 0 & A & 166,666 cnts & & & & & \\
+    2 & 16,666,667ns & B & 166,666 cnts & & & & & \\
+    3 & 33,333,333ns & C & 166,666 cnts & Bad & V(C) & Bad & V(B) & \\
+    4 & 49,999,999ns & D & 166,666 cnts & & & & & \\
+    5 & 66,666,966ns & E & 166,669 cnts & & & & & A \\
+    6 & 83,333,333ns & F & 166,663 cnts & & & & & B \\
+    7 & 100,000,000ns & G & 166,666 cnts & Bad & V(G) & & & C \\
+    8 &116,666,667ns & H & 166,666 cnts &  & & Bad & V(G) & D \\
+    9 & 133,333,333ns & I & 166,666 cnts & & & & & E \\
+    10 & 149,999,999ns & J & 166,666 cnts & & & & &F\\
+    11 & 166,666,566ns & K & 166,666 cnts & & & & &G\\
+    12 & 183,333,333ns & L & 166,666 cnts & & & & &H\\
+    13 & 200,000,000ns & M & 166,666 cnts & & & & &I\\
+    14 & 216,666,667ns & N & 166,666 cnts & & & & &J\\
+    15 & 233,333,333ns & O & 166,666 cnts & & & & &K\\
+    16 & 249,999,999ns & P & 166,666 cnts & & & & &L\\
+    \end{tabular}
+  \end{center}
+  \caption {Example: For selected energy, Chopper-1 Operating in Frame 1, Chopper-2 in Frame 2, Detectors in  Frame 5 }
+  \caption* { Notes: Neutrons (A) arriving at the Detector will be detected with PulseID (E).  We should drop the concept of marking the Veto in hardware and just record the phase for each chopper.  Data analysis will have to account for the correct alignment to blank data that should be excluded based on the various conditions of neutron production or energy contamination due to choppers operating out of tolerance. }
+  \label{table:Example}
+\end{table}
+
+\clearpage  % this needs to be here or else Latex places the last 3 tables down in the middle of the next section

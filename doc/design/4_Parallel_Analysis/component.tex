@@ -1,0 +1,28 @@
+\section{Parallel Reduction}
+
+
+\subsection{Overview}
+
+Once the NeXus raw data file has been written (and is accessible to be read) an automated (user defined) process will be launched using appropriate computational resources.  This processing job can either be a simple mantid 'serial' process, which may use thread parallelisation, or split up into separate parallel jobs.  
+
+We will need a set of strategies for intelligently splitting up larger jobs into smaller ones, this will also be of use in the future for running reduction procedures on machines of limited resources, for which case we can just run each of the jobs in serial when we don't have access to a parallel resource (but this use case is outside the scope of this project).
+
+Various parts of the Mantid Framework will need modification in order to efficiently make use of any parallel resource (such as a cluster).  
+
+We will also look at how a user will easily submit and monitor jobs using a backend parallel compute resource.
+
+\cfinput{1_automated.tex}
+
+\cfinput{2_processdefinition.tex}
+
+\cfinput{3_chunking.tex}
+
+\cfinput{4_mpi.tex}
+
+\cfinput{5_tasksubmission.tex}
+
+\subsection{Parallel IO}
+
+In order to make most efficient use of a parallel file system we may need to implement addition techniques and methodology for some IO tasks within Mantid.  Until we have access to a Parallel File System, it is impossible to determine what these changes are and if indeed they are necessary.  
+This will be revisited once we have done sufficient testing and parameterisation using a parallel file system.
+

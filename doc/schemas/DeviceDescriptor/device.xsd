@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://public.sns.gov/schema/device.xsd"
+  xmlns="http://public.sns.gov/schema/device.xsd"  
+  version="0.5"
+  elementFormDefault="qualified" attributeFormDefault="unqualified">
+  <xsd:element name="device">
+    <xsd:annotation>
+      <xsd:documentation>SNS device descriptor root element.</xsd:documentation>
+    </xsd:annotation>  
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="device_name" type="xsd:string"/>  
+        <xsd:element name="device_description" type="xsd:string" minOccurs="0" maxOccurs="1"/>  
+        <xsd:choice>
+          <xsd:sequence>
+            <xsd:annotation>
+              <xsd:documentation>DAS application details.</xsd:documentation>
+            </xsd:annotation>
+            <xsd:element name="app_id" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="app_version" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+          </xsd:sequence>
+          <xsd:sequence>
+            <xsd:annotation>
+              <xsd:documentation>EPICS IOC details.</xsd:documentation>
+            </xsd:annotation>
+            <xsd:element name="ioc_name" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="ioc_script" type="xsd:string" minOccurs="0" maxOccurs="1"/>   
+            <xsd:element name="ioc_console_port" type="xsd:string" minOccurs="0" maxOccurs="1"/>            
+          </xsd:sequence>
+        </xsd:choice>       
+        <xsd:element ref="enumerations" minOccurs="0" maxOccurs="1">
+          <xsd:annotation>
+            <xsd:documentation>Shared enumerations accross all devices (enum_00 and enum_01 in device descriptor of virtual device 0) or across one device.</xsd:documentation>
+          </xsd:annotation>            
+        </xsd:element>
+        <xsd:element ref="process_variables"/>  
+        <xsd:element name="serial_number" type="xsd:string" minOccurs="0" maxOccurs="1">
+          <xsd:annotation>
+            <xsd:documentation>Could also be used for globally unique device identifier, such as barcode.</xsd:documentation>
+          </xsd:annotation>         
+        </xsd:element>
+        <xsd:element ref="manufacturer" minOccurs="0" maxOccurs="1"/>   
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element>  
+  <xsd:element name="process_variables">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element ref="process_variable" minOccurs="0" maxOccurs="unbounded"/>        
+      </xsd:sequence>  
+    </xsd:complexType>  
+  </xsd:element>
+  <xsd:element name="process_variable">
+    <xsd:complexType>
+      <xsd:sequence>        
+        <xsd:element name="pv_name" type="xsd:string">
+          <xsd:annotation>
+            <xsd:documentation>
+              (Friendly) name of the process variable. 
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:element>
+        <xsd:element name="pv_id" type="xsd:unsignedInt">
+          <xsd:annotation>
+            <xsd:documentation>Locally unique for each device. 32 bit unsigned integer, 0 to 4,294,967,295.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:element>  
+        <xsd:choice minOccurs="0" maxOccurs="1">
+          <xsd:sequence>
+            <xsd:annotation>
+              <xsd:documentation>National Instrument data sockets details.</xsd:documentation>
+            </xsd:annotation>
+            <xsd:element name="pv_nids_read" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+            <xsd:element name="pv_nids_write" type="xsd:string" minOccurs="0" maxOccurs="1"/>   
+          </xsd:sequence>
+          <xsd:element name="pv_epics_name" type="xsd:string" minOccurs="0" maxOccurs="1">
+            <xsd:annotation>
+              <xsd:documentation>
+                Alias of an epics pv. Skip pv_epics_name if no alias.
+                
+                Please note a virtual pv, such as num_active_devices from device 0 won't have data sockets or pv_epics_name.
+              </xsd:documentation>
+            </xsd:annotation>     
+          </xsd:element>
+        </xsd:choice>
+        <xsd:element name="pv_description" type="xsd:string" minOccurs="0" maxOccurs="1"/>
+        <xsd:element name="pv_type">
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:annotation>
+                <xsd:documentation>
+                  unsigned integer: unsigned 32 bit value.
+                  signed integer: signed 32 bit value. TODO: need to add to design document. 
+                  boolean: a subset of the unsigned integer type with 0 as False and 1 as True. Actual variable updates come as u32 packet.
+                  double: IEEE 754 double floating point value. 
+                  string: UTF-8 encoded string.
+                  two-tuple: Time_of_flight and value pair for fast metadata. TODO: add two-tuple details in design document.
+                  enum_[0-9][0-9]: Use shared enumerations. TODO: need extra step to validate against shared enumerations beyond the regular expression.
+                </xsd:documentation>
+              </xsd:annotation>         
+              <xsd:pattern value="unsigned integer|signed integer|boolean|double|string|two-tuple|enum_[0-9][0-9]"/>                  
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:element>
+        <xsd:element name="pv_units" type="xsd:string" minOccurs="0" maxOccurs="1">
+          <xsd:annotation>
+            <xsd:documentation>TODO: generate and maintain a list of standardized units somewhere to validate against.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:element>     
+        <xsd:element name="pv_min_value" minOccurs="0" maxOccurs="1">
+          <xsd:annotation>
+            <xsd:documentation>Lower bound (inclusive?) for numeric values, the type should be consistent to the one specified by pv_type. TODO: validate type?</xsd:documentation>
+          </xsd:annotation> 
+        </xsd:element> 
+        <xsd:element name="pv_max_value" minOccurs="0" maxOccurs="1">
+          <xsd:annotation>
+            <xsd:documentation>Upper bound (inclusive?) for numeric values, the type should be consistent to the one specified by pv_type. TODO: validate type</xsd:documentation>
+          </xsd:annotation> 
+        </xsd:element> 
+        <xsd:element ref="pv_hint" minOccurs="0" maxOccurs="1"/>            
+      </xsd:sequence>           
+    </xsd:complexType>  
+  </xsd:element>  
+  <xsd:element name="pv_hint">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="pv_nexus_link" minOccurs="0" >
+          <xsd:annotation>
+            <xsd:documentation>
+              pv_nexus_link holds full XPath path expression (with *intended name* if different from pv_name) to indicate where inside NeXus files a link needs to be created with target as "/entry/DASlogs/pv_name".
+            </xsd:documentation>
+          </xsd:annotation> 
+        </xsd:element> 
+        <xsd:element name="pv_nexus_type" minOccurs="0" maxOccurs="1">
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:annotation>
+                <xsd:documentation>
+                  pv_nexus_type sets "NXpositioner" as the type for /entry/DASlogs/pv_name in NeXus files for all PVs come from DAS motor config files.
+                </xsd:documentation>
+              </xsd:annotation>         
+              <xsd:pattern value="NXpositioner"/>                  
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:element>
+      </xsd:sequence> 
+    </xsd:complexType>      
+  </xsd:element>  
+  <xsd:element name="enumerations">
+    <xsd:annotation>
+      <xsd:documentation>Locally defined enumerations. Each enumeration can be used as pv_type for multiple process variables of this device. Naming convention: enum_00 to enum_99.</xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element ref="enumeration" minOccurs="0" maxOccurs="unbounded"/>        
+      </xsd:sequence>  
+    </xsd:complexType>  
+  </xsd:element>
+  <xsd:element name="enumeration">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="enum_name">
+          <xsd:annotation>
+            <xsd:documentation>
+              enum_00 to enum_49: enumerations shared across all devices.
+              enum_50 to enum_99: enumerations shared across one device.
+            </xsd:documentation>
+          </xsd:annotation>
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string"> 
+              <xsd:pattern value="enum_[0-9][0-9]">     
+              </xsd:pattern>      
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:element>          
+        <xsd:element ref="enum_element" minOccurs="1" maxOccurs="unbounded"/>                                  
+      </xsd:sequence>
+    </xsd:complexType>
+  </xsd:element> 
+  <xsd:element name="enum_element">
+    <xsd:complexType>
+      <xsd:sequence>        
+        <xsd:element name="enum_element_name" type="xsd:string"/>              
+        <xsd:element name="enum_element_value" type="xsd:integer"/>                  
+      </xsd:sequence>           
+    </xsd:complexType>  
+  </xsd:element>  
+  <xsd:element name="manufacturer">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="manufacturer_name" minOccurs="0" maxOccurs="1" type="xsd:string"/>
+        <xsd:element name="manufacturer_phone" minOccurs="0" maxOccurs="1" type="xsd:string"/>
+        <xsd:element name="manufacturer_email" minOccurs="0" maxOccurs="1" type="xsd:string"/>          
+      </xsd:sequence>  
+    </xsd:complexType>  
+  </xsd:element>  
+</xsd:schema>

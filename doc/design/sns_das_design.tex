@@ -1,0 +1,261 @@
+\documentclass[11pt,letterpaper]{article}
+% 1-inch margins all around
+\usepackage[margin=1in,headsep=20pt,headheight=14pt]{geometry}
+% Modern LaTeX font encoding
+\usepackage[T1]{fontenc}
+% Special characters from the main text font
+\usepackage{textcomp}
+% Change fonts to Times/Helvetica/Courier
+\usepackage{mathptmx}
+\usepackage[scaled=.92]{helvet}
+\usepackage{courier}
+\usepackage{color}
+\usepackage[usenames,dvipsnames]{xcolor}
+% \includegraphics
+\usepackage{graphicx}
+% \includepdf
+\usepackage{pdfpages}
+% \url (see below)
+\usepackage{url}
+% Compressed titles in sans-serif
+\usepackage[sf,bf,compact]{titlesec}
+% Captions that stand out from the text
+\usepackage[small,bf]{caption}
+% Sorted citations
+\usepackage{cite}
+% Compressed enumerations (see below)
+\usepackage{enumitem}
+% No indentation (see below)
+\usepackage[parfill]{parskip}
+% Include bibliography in index
+\usepackage[nottoc,numbib]{tocbibind}
+% \topcaption
+%\usepackage{topcapt}
+% \newcolumntype
+\usepackage{dcolumn}
+% Page headers style (see below).
+\usepackage{fancyhdr}
+% Hyper references
+\usepackage[colorlinks,linkcolor=black]{hyperref}
+
+% Easy bytefield creation (local package)
+\usepackage[endianness=big]{packages/bytefield}
+% Allow includes/inputs in subfolders
+\usepackage{chapterfolder}
+
+% Allow conditionals
+\usepackage{ifthen}
+
+\hypersetup{bookmarksopen=true,
+            pdfauthor={Oak Ridge National Laboratory},
+            pdftitle={Accelerating Data Acquisition, Reduction, and Analysis (ADARA) at the Spallation Neutron Source},
+            pdfsubject={ADARA}}
+
+\usepackage{multind}
+
+\definecolor{lightgrey}{gray}{0.8}
+
+% Set to false to hide comments
+\newboolean{CommentsVisible}
+\setboolean{CommentsVisible}{true}
+\colorlet{commentbg}{SkyBlue}
+
+% Show implementation details?
+\newboolean{ImplementationDetailsVisible}
+\setboolean{ImplementationDetailsVisible}{true}
+
+%\callout{indexname}{bgcolor}{leader}{shortname}{text}
+\newcommand{\callout}[5]{%
+\par%
+\addvspace{\baselineskip}%
+\noindent%
+\index{#1}{#4}%
+\fcolorbox{black}{#2}{%
+\begin{minipage}{\textwidth}%
+{\large \bf #3: #4 }\\[2pt]%
+#5%
+\end{minipage}%
+}%
+\\[5pt]%
+}
+
+%\todo{title}{text}
+%\makeindex{todo}
+\newcommand{\todo}[2]{\callout{todo}{lightgrey}{TODO}{#1}{#2}}
+
+%\assumption{title}{text}
+%\makeindex{assumptions}
+\newcommand{\assumption}[2]{\callout{assumptions}{yellow}{Assumption}{#1}{#2}}
+
+%\decision{title}{text}
+%\makeindex{decisions}
+\newcommand{\decision}[2]{\callout{decisions}{yellow}{Decision Needed}{#1}{#2}}
+
+%\detail{title}{text}
+%\makeindex{detail}
+\newcommand{\detail}[2]{%
+\ifthenelse{\boolean{ImplementationDetailsVisible}}{%
+\callout{detail}{lightgrey}{Implementation Detail}{#1}{#2}}{}}
+
+% command to mark comments that are easily hidden
+%\comment{this is a comment}
+\ifthenelse{\boolean{CommentsVisible}}{%
+\newcommand{\comment}[1]{%
+\par%
+\addvspace{\baselineskip}%
+\noindent%
+\fcolorbox{black}{commentbg}{%
+\begin{minipage}{\textwidth}%
+{\large \bf Review Comment}\\[2pt]%
+#1%
+\end{minipage}%
+}%
+\\[5pt]%
+}}
+%comments are not visible
+{\newcommand{\comment}[1]{}}
+
+
+% LaTeX is simply confused.  \frenchspacing should be the default, everywhere.
+\frenchspacing
+
+% URLs in sans-serif
+\urlstyle{sf}
+
+% Sane defaults for floats.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.9}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.9}
+
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\setcounter{dbltopnumber}{2}
+
+% Bring figures closer to text
+\renewcommand{\textfloatsep}{\intextsep}
+
+\newcommand{\estack}{{\em Estack}}
+
+
+
+% Remove needless spacing between the header and the first line.
+\setlength{\topskip}{5pt}
+
+% Reduce spacing between paragraphs in parskip
+\setlength{\parskip}{5pt plus 1pt}
+
+% Reduce spacing in itemize
+\setitemize{topsep=0pt,partopsep=0pt,itemsep=1pt,parsep=0pt,leftmargin=*,labelindent=\labelsep}
+\setenumerate{topsep=0pt,partopsep=0pt,itemsep=1pt,parsep=0pt,leftmargin=*,labelindent=\labelsep}
+%\setdescription{topsep=0pt,partopsep=0pt,itemsep=1pt,parsep=0pt}
+\setdescription{topsep=0pt,partopsep=0pt,itemsep=1pt,parsep=0pt,leftmargin=10pt}
+
+% Compute terms that LaTeX hyphenates badly by default
+\hyphenation{off-loaded peta-scale exa-scale time-stamp}
+
+% Generate PDF 1.6
+\pdfoptionpdfminorversion=6
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\emph{ADARA}}
+\chead{\emph{System Architecture}}
+\rhead{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+
+\newcommand{\groupname}[1]{\section{#1}}
+
+\newcommand{\componentname}[1]{\subsection{#1}}
+
+\newcommand{\leadername}[1]{\textsf{\textbf{#1}}}
+
+\newcommand{\componentsection}[1]{\subsection*{#1}}
+
+\newcommand{\componentsubsection}[1]{\subsubsection*{#1}}
+
+\pdfoutline
+user {<</S /GoToR /F (ESC_0_Cover.pdf) /D [2 /Fit] >>} count 0 {Cover Document}
+
+
+
+
+\graphicspath{
+  {./0_Overview/}{./0_Overview/figures/}
+  {./1_Network_Protocol/}{./1_Network_Protocol/figures/}
+  {./2_SMS}{./2_SMS/figures/}
+  {./3_Live_Analysis}{./3_Live_Analysis/figures/}
+  {./4_Parallel_Analysis}{./4_Parallel_Analysis/figures/}
+  {./5_Neutron_Event_Timing}{5_Neutron_Event_Timing/figures}
+  {6_Neutron_Timing_DSP}{6_Neutron_Timing_DSP/figures}
+  {7_Slow_Controls}{7_Slow_Controls/figures}
+  {./8_Translation_Services/}{./8_Translation_Services/figures/}
+}
+
+\begin{document}
+
+\pagenumbering{roman}
+
+\begin{center}
+
+\vspace*{30pt}
+
+{\fontsize{40}{42}\usefont{T1}{phv}{b}{n}\selectfont
+\textsf{\textbf{ADARA}}}
+
+\vspace{30pt}
+
+
+%% For when we get a logo 
+%%\includegraphics[height=0.25\textheight]{../logo.jpg}
+
+\vspace{30pt}
+
+{\Huge \textsf{\textbf{System Architecture}}}
+
+\vfill
+
+\input revision.tex
+built on \today
+
+\end{center}
+
+\thispagestyle{empty}
+
+\newpage
+
+
+
+\renewcommand\contentsname{Table of Contents}
+
+\subpdfbookmark{\contentsname}{toc}
+
+\tableofcontents
+
+\newpage
+
+
+\pagenumbering{arabic}
+
+\input intro.tex
+\input 0_Overview/component.tex
+\newpage
+\input 1_Network_Protocol/component.tex
+\newpage
+\input 2_SMS/component.tex
+\newpage
+\input 3_Live_Analysis/component.tex
+\newpage
+\cfchapter {}{4_Parallel_Analysis}{component.tex}
+\newpage
+\input 5_Neutron_Event_Timing/component.tex
+\newpage
+\input 6_Neutron_Timing_DSP/component.tex
+\newpage
+\input 7_Slow_Controls/component.tex
+\newpage
+\input 8_Translation_Services/component.tex
+
+\end{document}

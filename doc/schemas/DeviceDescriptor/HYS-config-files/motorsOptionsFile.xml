@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<motors>
+<Optionsmap Name="mezeiIn" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="mezeiInRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="scol40" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="scol40Request" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="scol20" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="scol20Request" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="guideB" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="guideBRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="fineRad" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="fineRadRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="polSupArr" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="polSupArrRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="helmholtz" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="helmholtzRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="he3Filter" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="he3FilterRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="polSupFlip" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="polSupFlipRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="he3Flip" Option="hardwarealarm" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="he3FlipRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.000000</Optionsmap>
+<Optionsmap Name="vMel" Option="hardwarealarm" Changable="False">      1.000000,      2.000000</Optionsmap>
+<Optionsmap Name="m1hu" Option="hardwarealarm" Changable="False">    -23.000000,     22.000000</Optionsmap>
+<Optionsmap Name="m1huRequest" Option="hardwarelimits" Changable="False">    -23.000000,     22.000000</Optionsmap>
+<Optionsmap Name="mfhu" Option="hardwarealarm" Changable="False">      0.000000,      1.800000</Optionsmap>
+<Optionsmap Name="mfhuRequest" Option="hardwarelimits" Changable="False">      0.000000,      1.800000</Optionsmap>
+<Optionsmap Name="m2" Option="hardwarealarm" Changable="False">     14.000000,     90.000000</Optionsmap>
+<Optionsmap Name="m2Request" Option="hardwarelimits" Changable="False">     14.000000,     90.000000</Optionsmap>
+<Optionsmap Name="s2" Option="hardwarealarm" Changable="False">   -115.000000,    115.000000</Optionsmap>
+<Optionsmap Name="s2Request" Option="hardwarelimits" Changable="False">   -115.000000,    115.000000</Optionsmap>
+<Optionsmap Name="msd" Option="hardwarealarm" Changable="False">  -1000.000000,   1810.000000</Optionsmap>
+<Optionsmap Name="msdRequest" Option="hardwarelimits" Changable="False">  -1000.000000,   1810.000000</Optionsmap>
+<Optionsmap Name="vMsdFixed" Option="hardwarealarm" Changable="False">      1.000000,      2.000000</Optionsmap>
+<Optionsmap Name="vProtected" Option="hardwarealarm" Changable="False">      1.000000,      2.000000</Optionsmap>
+<Optionsmap Name="tertiary" Option="hardwarealarm" Changable="False">     -3.000000,     70.000000</Optionsmap>
+<Optionsmap Name="shutterPosition" Option="hardwarealarm" Changable="False">      1.000000,      2.000000</Optionsmap>
+<Optionsmap Name="tertiaryPosition" Option="hardwarealarm" Changable="False">      1.000000,      2.000000</Optionsmap>
+</motors>

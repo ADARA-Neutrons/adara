@@ -1,0 +1,44 @@
+
+Prerequisites
+
+EPICS (http://www.aps.anl.gov/epics/download/base/baseR3.14.12.2.tar.gz)
+
+Boost (1.47 tested)
+automake (1.11 tested)
+autoconf (2.68 tested)
+
+
+Building
+
+1. Build EPICS (just extract and type make)
+2. cd sms-repo
+3. ./bootstrap (only need to do once)
+4. ./configure --with-epics=/path/to/epics/
+5. make (-jX)
+6. Make /SNSlocal/sms writable by yourself (once)
+7. Make /SNSlocal/sms/data, writable by yourself (once)
+8. Copy the configuration in sms-repo to /SNSlocal/sms/conf (once)
+9. Run as ./smsd
+
+If you need to change the configuration (paths, ports, etc), edit smsd.cc and SMSControl.cc; a proper configuration system is on the the TODO list.
+
+You can use caput, caget, and camonitor from EPICS to control recording.
+
+PVs currently supported:
+BL14BS:SMS:Recording
+BL14BS:SMS:RunNumber
+BL14BS:SMS:RunInfo:Reset
+BL14BS:SMS:RunInfo:ProposalId
+BL14BS:SMS:RunInfo:ProposalTitle
+BL14BS:SMS:RunInfo:RunTitle
+BL14BS:SMS:RunInfo:UserInfo
+BL14BS:SMS:RunInfo:Sample:Id
+BL14BS:SMS:RunInfo:Sample:Name
+BL14BS:SMS:RunInfo:Sample:Nature
+BL14BS:SMS:RunInfo:Sample:Formula
+BL14BS:SMS:RunInfo:Sample:Environment
+
+
+I've used BL14BS here as that matches the configuration files in the repo;
+you can change the BL14BS in the PVs to be a string of your choosing by editing
+the values given to the SMSControl constructor in smsd.cc.

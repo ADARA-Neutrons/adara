@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<chopper Name="Chopper System" AppID="1010">
+<Unitsmap Name="LambdaRequest" Class="Linear" Neumonic="A"/>
+
+<Unitsmap Name="EnergyRequest" Class="Linear" Neumonic="A"/>
+
+<Unitsmap Name="Energy" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="Energy1" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="Energy2" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="Energy3" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="Energy4" Class="Linear" Neumonic="A"/>
+
+
+<Unitsmap Name="LambdaError" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="BandWidth" Class="Linear" Neumonic="A"/>
+<Unitsmap Name="PhaseRequest1" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseRequest2" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseRequest3" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseRequest4" Class="Phase" Neumonic="D"/>
+
+
+<Unitsmap Name="PhaseAct1" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseAct2" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseAct3" Class="Phase" Neumonic="D"/>
+<Unitsmap Name="PhaseAct4" Class="Phase" Neumonic="D"/>
+
+
+<Unitsmap Name="SpeedRequest1" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedRequest2" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedRequest3" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedRequest4" Class="Phase" Neumonic="H"/>
+
+
+<Unitsmap Name="SpeedAct1" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedAct2" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedAct3" Class="Phase" Neumonic="H"/>
+<Unitsmap Name="SpeedAct4" Class="Phase" Neumonic="H"/>
+
+
+</chopper>

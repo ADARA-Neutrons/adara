@@ -1,0 +1,161 @@
+
+JENKINS Setup Information
+=========================
+
+Jenkins Build Server Information (adara-tester.sns.gov)
+-------------------------------------------------------
+
+Service Ports in /etc/services:
+
+   (Regular STS test ports)
+   sts-test        41417/tcp               # sts-test service
+   sts-test        41417/udp               # sts-test service
+
+   (Jenkins STS test ports)
+   sts-jenkins     51417/tcp               # sts-jenkins service
+   sts-jenkins     51417/udp               # sts-jenkins service
+
+
+Service script in /etc/xinetd.d/sts-jenkins:
+
+   # This is the configuration for the tcp/stream STS Jenkins Testing
+   # service.
+
+   service sts-jenkins
+   {
+       id              = sts-jenkins-stream
+       wait            = no
+       socket_type     = stream
+       user            = snsdata 
+       group           = adara
+       server          = /usr/local/sbin/sts-jenkins
+       port            = 51417
+   }
+
+
+Server script in /usr/local/sbin/sts-jenkins:
+
+   #!/bin/bash
+
+   JENKINS_WORKSPACE="/SNSlocal/jenkins/workspace/ADARA_Software_Build"
+
+   logfile="/var/log/ADARA/xinetd-sts-jenkins.log"
+   ### Note! Don't put log file in $JENKINS_WORKSPACE, likely unwritable
+   ### (for whatever goofy reason) and the script crashes... :-b
+
+   touch $logfile
+   date >> $logfile
+   echo "Entry /usr/local/sbin/sts-jenkins." >> $logfile
+   echo "Command Line Args: $*" >> $logfile
+
+   ### Note! For Jenkins/Testing we set the STS Workspace to .../SNS/stsdata
+   ### whereas for Production it needs to be Hard-Coded to a Specific Beamline
+   ### (working directory needs to be set _Before_ BeamlineInfo available,
+   ### but it's Ok wherever it is, as long as Same Filesystem as Archive
+   ### for the final NeXus file "rename"... ;-D Whew!)
+
+   echo "Running: $JENKINS_WORKSPACE/INSTALL/bin/sts -s -m -w /TESTING/JENKINS/SNS/stsdata -b /TESTING/JENKINS/" >> $logfile
+   $JENKINS_WORKSPACE/INSTALL/bin/sts -s -m -w /TESTING/JENKINS/SNS/stsdata -b /TESTING/JENKINS/
+   ### NOTE! *Don't* Redirect STS's stdout to the log file...! :-b
+   ### The SMS needs to get that response...! :-D
+
+   echo "After $JENKINS_WORKSPACE/INSTALL/bin/sts, return status = $?" >> $logfile
+
+   echo "Exit /usr/local/sbin/sts-jenkins." >> $logfile
+   date >> $logfile
+
+
+Jenkins Directory Set-Up:
+
+   drwxr-xr-x. 5 root root 4096 Nov 14 17:23 /SNSlocal/
+
+   drwxrwsr-x 4 root adara_developers 4096 Nov 19 17:14 /SNSlocal/jenkins/
+
+   (everything else will be created by Jenkins, on *1st* Build...! ;-D)
+
+
+Jenkins Configuration (builds.sns.gov)
+--------------------------------------
+
+Jenkins Build Node Configuration:
+
+   Name: ADARA Tester
+
+   Description: ADARA Test Harness Build Node
+
+   # of executors: 1
+
+   Remote FS root: /SNSlocal/jenkins/
+
+   Labels: adara
+
+   Usage: "Leave this machine for tied jobs only"
+
+   Launch method: "Launch slave agents on Unix machines via SSH"
+
+      Host: adara-tester.sns.gov
+
+      Username: y8y
+
+      Password: XXXXXXXX  (probably need to set up an SSH key, ahem... :)
+
+      Port: 22
+
+   Availability: "Keep this slave on-line as much as possible"
+
+
+Jenkins Project Information:
+
+   Project: ADARA_Software_Build
+
+   (Display Name: ADARA Software (SMS and STS) Build)
+
+   Description:
+      Build the basic SMS and STS software for Jenkins testing
+      (by the ADARA Test Suite, supposedly... :-).
+      (This version of the test uses the new "configfile" API,
+      now merged back into master... :-D)
+
+   X Restrict where this project can be run
+
+   Label Expression: adara
+
+   Source Code Management
+      Git:
+          Repository URL: git+ssh://trac.sns.gov/var/repos/ADARA
+          Name: origin
+          Branch Specifier: origin/master
+
+   X Build periodically
+
+   Schedule: 0 9 * * *
+
+   X Delete workspace before build starts
+
+   Build
+      Execute shell:
+         Command:
+            cd "$WORKSPACE"
+            pwd
+            ls
+            ./bootstrap
+            ./configure --with-epics=/home/epics/R3.14.12.2/base/ --prefix="$WORKSPACE/INSTALL"
+            make
+            make install
+
+   Post-build Actions
+
+      Build other projects:
+         ADARA_Test_Suite,
+         ADARA_Test_Suite_Bluish,
+         ADARA_Test_Suite_Golden
+      X Trigger only if build succeeds
+
+      Editable Email Notification
+         Project Recipient List: y8y@ornl.gov
+         Content Type: "Default Content Type"
+         Default Subject: $DEFAULT_SUBJECT
+         Default Content: $DEFAULT_CONTENT
+         Attachments:
+            config.log
+

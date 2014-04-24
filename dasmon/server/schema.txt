@@ -1,0 +1,6 @@
+drop table if exists pvdata;
+create table pvdata ( instrument varchar(50), name varchar(50), value double precision, status integer, update_time integer );
+
+create or replace function pvUpdate( instrument varchar(50), name varchar(50), value double precision, status integer, update_time integer )
+returns void as 'insert into pvdata values( $1, $2, $3, $4, $5 )' LANGUAGE SQL;
+

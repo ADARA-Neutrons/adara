@@ -1,0 +1,264 @@
+<?xml version="1.0" ?>
+<motors>
+<Device Name="slit1" AppID="1031">
+<Help>info for Slit 1</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[0],a1l</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[0],a1lRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[0],a1lRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[0],a1lStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[1],a1r</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[1],a1rRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[1],a1rRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[1],a1rStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[2],a1t</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[2],a1tRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[2],a1tRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[2],a1tStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[3],a1b</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[3],a1bRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[3],a1bRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[3],a1bStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="slit2" AppID="1031">
+<Help>info for Slit 2</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[4],a2l</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[4],a2lRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[4],a2lRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[4],a2lStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[5],a2r</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[5],a2rRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[5],a2rRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[5],a2rStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[6],a2t</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[6],a2tRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[6],a2tRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[6],a2tStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[7],a2b</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[7],a2bRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[7],a2bRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[7],a2bStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="noActions" AppID="1031">
+<Help>info for analysis</Help>
+<SN>200G</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/VDblPosition[0],a1sd</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/VDblRequest[0],a1sdRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/VDblRequestRem[0],a1sdRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/VDblPosition[1],a2sd</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/VDblRequest[1],a2sdRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/VDblRequestRem[1],a2sdRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/VDblPosition[2],mon3sd</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/VDblRequest[2],mon3sdRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/VDblRequestRem[2],mon3sdRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[3],mezeiIn</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[3],mezeiInRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[3],mezeiInRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[4],scol40</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[4],scol40Request</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[4],scol40Request</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[5],scol20</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[5],scol20Request</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[5],scol20Request</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[6],guideB</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[6],guideBRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[6],guideBRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[7],fineRad</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[7],fineRadRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[7],fineRadRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[8],polSupArr</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[8],polSupArrRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[8],polSupArrRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[9],helmholtz</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[9],helmholtzRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[9],helmholtzRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[10],he3Filter</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[10],he3FilterRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[10],he3FilterRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[11],polSupFlip</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[11],polSupFlipRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[11],polSupFlipRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[12],he3Flip</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[12],he3FlipRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[12],he3FlipRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[0],vNoActionStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="virtualSlits" AppID="1031">
+<Help>info for analysis</Help>
+<SN>200G</SN>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[13],A1HCenter</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[13],A1HCenterRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[13],A1HCenterRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffset[0],A1HCenterOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequest[0],A1HCenterOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequestRem[0],A1HCenterOffsetRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[14],A1HWidth</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[14],A1HWidthRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[14],A1HWidthRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[1],A1HStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[15],A1VCenter</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[15],A1VCenterRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[15],A1VCenterRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffset[1],A1VCenterOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequest[1],A1VCenterOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequestRem[1],A1VCenterOffsetRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[16],A1VHeight</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[16],A1VHeightRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[16],A1VHeightRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[2],A1VStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[17],A2HCenter</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[17],A2HCenterRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[17],A2HCenterRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffset[2],A2HCenterOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequest[2],A2HCenterOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequestRem[2],A2HCenterOffsetRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[18],A2HWidth</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[18],A2HWidthRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[18],A2HWidthRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[3],A2HStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[19],A2VCenter</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[19],A2VCenterRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[19],A2VCenterRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffset[3],A2VCenterOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequest[3],A2VCenterOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/VOffsetRequestRem[3],A2VCenterOffsetRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[20],A2VHeight</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[20],A2VHeightRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[20],A2VHeightRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[4],A2VStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="mel" AppID="1031">
+<Help>info for elevator stage</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[8],mel</VarMap>
+<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://motors/VIntPosition[0],vMel;UNDEFINED,0;PG,1;HU,2</VarMap>
+</Device>
+<Device Name="HU" AppID="1031">
+<Help>info for HU stages</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[9],m1hu</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[8],m1huRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[8],m1huRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[0],m1huOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[0],m1huOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[0],m1huOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[8],m1huStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[10],mfhu</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[9],mfhuRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[9],mfhuRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[1],mfhuOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[1],mfhuOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[1],mfhuOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[9],mfhuStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[11],mthu</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[12],mghu</VarMap>
+</Device>
+<Device Name="PG" AppID="1031">
+<Help>info for PG stages</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[13],m1pg</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[10],m1pgRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[10],m1pgRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[2],m1pgOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[2],m1pgOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[2],m1pgOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[10],m1pgStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[14],mfpg</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[11],mfpgRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[11],mfpgRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[3],mfpgOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[3],mfpgOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[3],mfpgOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[11],mfpgStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[15],mtpg</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[12],mtpgRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[12],mtpgRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[12],mtpgStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[16],mgpg</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[13],mgpgRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[13],mgpgRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[13],mgpgStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="M2MSDS2" AppID="1031">
+<Help>info for M2MSDS2 stages</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[17],m2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[14],m2Request</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[14],m2Request</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[4],m2Offset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[4],m2OffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[4],m2OffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[14],m2Status;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[18],s2</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[15],s2Request</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[15],s2Request</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[5],s2Offset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[5],s2OffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[5],s2OffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[15],s2Status;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[19],msd</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[16],msdRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[16],msdRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[6],msdOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[6],msdOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[6],msdOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[16],msdStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://motors/VIntPosition[1],vMsdFixed;UNDEFINED,0;MSD_14,1;MSD_18,2</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[21],vS2</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[21],vS2Request</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[21],vS2Request</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[5],vS2Status;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/VDblPosition[22],vM2</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="True">dstp://motors/VDblRequest[22],vM2Request</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="True">dstp://motors/VDblRequestRem[22],vM2Request</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/VStatus[6],vM2Status;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://motors/VIntPosition[2],vProtected;UNDEFINED,0;UNPROTECTED,1;PROTECTED,2</VarMap>
+</Device>
+<Device Name="shutters" AppID="1031">
+<Help>info for shutter stages</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[20],shutter</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[21],tertiary</VarMap>
+<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://motors/VIntPosition[3],shutterPosition;UNDEFINED,0;open,1;close,2</VarMap>
+<VarMap Access="read" DataType="enumeration" Units="False" Options="False">dstp://motors/VIntPosition[4],tertiaryPosition;UNDEFINED,0;open,1;close,2</VarMap>
+</Device>
+<Device Name="sample" AppID="1031">
+<Help>info for sample stages</Help>
+<SN>200E</SN>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[22],s1</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[17],s1Request</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[17],s1Request</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[7],s1Offset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[7],s1OffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[7],s1OffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[17],s1Status;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[23],sgl</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[18],sglRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[18],sglRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[8],sglOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[8],sglOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[8],sglOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[18],sglStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[24],sgu</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[19],sguRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[19],sguRequest</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/Offset[9],sguOffset</VarMap>
+<VarMap Access="read" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequest[9],sguOffsetRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="False" Options="False">dstp://motors/OffsetRequestRem[9],sguOffsetRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[19],sguStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[25],stl</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[20],stlRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[20],stlRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[20],stlStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="False">dstp://motors/Position[26],stu</VarMap>
+<VarMap Access="read" DataType="double" Units="True" Options="True">dstp://motors/Request[21],stuRequest</VarMap>
+<VarMap Access="write" DataType="double" Units="True" Options="True">dstp://motors/RequestRem[21],stuRequest</VarMap>
+<VarMap Access="read" DataType="enumerations" Units="False" Options="False">dstp://motors/RStatus[21],stuStatus;UNKNOWN,0;ACTIONREQ,1;MOVING,2;ATPOSITION,3;OFFTARGET,4;POSLIM,5;NEGLIM,6;PROBSTOP,7;ABORTED,8;OVERRIDDEN,9;VETOED,10;COMERR,11;DRVERR,12;REQERR,13;MOVEERR,14</VarMap>
+</Device>
+<Device Name="misc" AppID="1031">
+<Help>other stuff</Help>
+<SN>200G</SN>
+<VarMap Access="write" DataType="enumeration" Units="False" Options="False">dstp://motors/MotorsStopButton,MotorsStopButton;UNDEFINED,0;NOTPUSHED,1;PUSHED,27384</VarMap>
+</Device>
+</motors>

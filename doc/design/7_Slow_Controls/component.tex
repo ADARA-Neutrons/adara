@@ -1,0 +1,614 @@
+
+\section{Instrument Data Acquisition and Control System}
+
+
+\subsection{Introduction}
+
+The SNS Instrument Data Acquisition and Controls System serves as
+the interface between the beam line instrument equipment and the
+experimentalist User and the data analysis systems. The System is
+responsible for acquiring data from neutron detectors (including
+linear position sensitive $^3$He tubes, crossed-fiber detectors,
+and Anger cameras) and  beam monitors, and experiment data including
+neutron chopper phase, environmental conditions of the sample,
+and other relevant parameters as required for the neutron sciences
+experimental program. The data acquired must be saved to a central
+repository using the NeXus~\footnote{``NeXus Scientific Data Format,''
+\texttt{http://www.nexusformat.org}} data format, cataloged and
+archived in a way suitable for use by data analysis programs.  The System
+must also provide control for the experiment setup. Points of control
+include chopper setting for energy selection, motors for positioning and
+orienting the sample or the detector assembly, and a variety of sample
+environment equipment including close cycle refrigerators, furnaces,
+load frames, magnetic or electric field generators, and other equipment
+as required by the experiment. A block diagram of the system in shown
+in Fig.~\ref{blockdiagram}. Additionally, the System must interface
+with information systems residing in relational databases to acquire
+information from the proposal tracking system (IPTS), sample information
+(ITEMS) and other systems.
+
+\begin{figure}[htb]
+	\centering
+%	\includegraphics*[width=4in]{concept.eps}
+	\caption{Simplified block diagram showing the key components to
+	the Instrument Data Acquisition and Control System and primary
+	data flow.} 
+	\label{blockdiagram}
+\end{figure}
+
+\subsubsection{Scope}
+The scope of this section includes:
+
+\begin{itemize}
+
+\item the computer interface to the detector electronics
+
+\item the interface between the accelerator timing system and the
+detector electronics
+
+\item the interface to the sample environment equipment and other controls
+points for the instrument, i.e. ``slow controls''
+
+\item the mechanism for automating experiment control, i.e. ``scans''
+
+\item the experiment graphical user interface 
+
+\item and the tools to generate the NeXus data files and to archive and
+catalog these data files.
+
+\end{itemize}
+
+The section of the upgrade plan includes software required for these
+systems, and the computer systems necessary to run these systems. Also
+included is the network architecture for the instruments and the data
+systems which is necessary to implement this plan.
+
+The electronics which interface to the detector assemblies are not
+within the scope of this upgrade plan. However, this plan should factor
+in the critical need for a future upgrade in this area, and provide an
+appropriate upgrade path.
+
+Data analysis software is covered eslewhere in this upgrade plan.
+However, this section should be informed by design of the current data
+analysis system and for concurrent upgrade plans in this area. The ability
+to display live data overlaps with the data acquisition and data analysis
+areas so is partially included here. The ability to support feedback from
+the data analysis and data reduction systems is not directly within the
+scope of this project, however this should be considered a long range goal
+with this current upgrade providing the infrastructure to enable this.
+The data acquisition and data analysis systems should be well integrated
+from the Users perspective.
+
+\subsubsection{Design Principles}
+
+The design for the upgrade to the System needs to consider that the SNS
+operational period is measured in decades. Technologies should be chosen
+such that there is a reasonable expectation of support for greater then
+five years, and preferably well beyond that.  Use of proprietary software
+or hardware which may have a limited support lifetime should avoided where
+possible. The design should support incremental improvements and upgrades
+over time to be able to adapt to emerging technologies where appropriate.
+However, the design should make use of proven technologies and techniques
+to ensure a highly reliable and maintainable System.
+
+Software and system designs which are in use at similar facilities
+should be used where appropriate.  Existing software from other
+facilities meeting our requirements should be used or built upon where
+appropriate.  Reimplementation of existing software should only be done
+with a compelling reason.  Collaboration with other neutron sources,
+synchrotron sources, or other experimental facilities is encouraged.
+An overview of data acquisition and instrument control systems at neutron
+and synchrotron sources is included in the appendix. Links are included
+for additional information.
+
+A ``toolkit'' based approach is desired. General use (generic) tools
+should be identified or developed to meet general needs across the
+instrument suite. Customizations specific to individual instrument should
+be configurations using general purpose tools or optional add-ons.
+Additionally, newly developed or expanded tools should be designed
+(where reasonable) such that they could be used outside of SNS. In the
+same manner that this upgrade will take advantage of software and tools
+developed at other facilities, developers here should be aware that
+tools being developed may provide value to other facilities.
+
+All software must be stored in a shared repository, with version
+control and clearly defined release tags for production versions.
+Automatic testing should be used where reasonable.
+
+Documentation must be provided to support the ongoing operation and
+support of the System.
+
+\subsection{Detector Interface}
+\subsubsection{Requirements}
+
+The computer interface to the detectors must be capable of supporting
+data rates of 10 million events per second (at least equivalent to existing
+design).
+\todo{Event Rate}{%
+10 Msps sufficient?}
+
+The interface must provide a network stream of data to one 
+\todo{One always sufficient?}
+
+listeners at this data rate. The stream must provide accelerator
+pulse information (charge) and neutron event information (pixel ID
+and time of flight).
+
+The interface must be able to provide the ability to configure detector
+electronics (e.g. high voltage levels, thresholds, discriminator levels,
+etc.). Preferably, this should use the same user interface tools as the
+experimental control system.
+
+The interface should provide status information regarding the detector
+assemblies and make this data available in a way that can be displayed
+on the experiment control user interface or other monitoring systems.
+Sufficient status information should be available so as to facilitate
+in situ detector troubleshooting.
+
+It is preferable that data processing occur in the hardware (FPGA) level
+to ensure consistent and predictable response with well defined processing
+rates. However, the system should be capable of handling the input of raw
+data with data processing within the computer system. This may be required
+for detector development and upgrades and can provide for prototyping
+solutions as has been used recently with the Anger camera detectors.
+
+\todo{Necessary?}{%
+The interface must be capable of supporting either event mode or
+histogramming mode, with the ability to switch between these modes on
+an experiment by experiment level}
+
+Additional information concerning the detector read-out boards (ROCS) and
+the interface to those electronics can be found in Interface Standards
+document prepared by Lloyd Clonts (most recent version December 13,
+2011 circulated as Draft).
+
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+
+\item Refine existing streaming network protocol such that in can support
+slow controls data in addition to neutron event data.
+
+\item Investigate commercial solutions for computer interface to detector
+electronics. Possibility includes an evaluation board which could replace
+the `DSP' module and a GigE network card to replace the `OCC' card.
+TBD: hardware design.
+\todo{}{%
+}
+
+\item TBD: software.
+
+\item TBD: PVs for integration with UI and scanning service
+
+\end{enumerate}
+
+\subsection{Timing Interface}
+\subsubsection{Requirements}
+
+The Timing subsystem receives data from the accelerator timing system
+over the dedicated Real Time Data Link (RTDL) and Event Link (EL). These
+data include the 60~Hz (nominal) synchronization clock, pulse ID (time
+stamp), proton charge per pulse and other accelerator information.
+
+
+\begin{itemize}
+\item Decode data link and provide a synchronized clock to the detector
+electronics for time stamping neutron events with time of flight.  \item
+Provide synchronized triggers in reference to proton beam on target to
+choppers and other synchronous systems \item Provide proton charge per
+pulse and other accelerator parameters to the detector computer interface
+for inclusion in the neutron event data stream.
+
+Additional information in document ``Neutron Event Timing'' prepared by
+Steve Hicks.
+
+\end{itemize}
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+
+\item Incorporate existing FPGA code from accelerator control system
+timing receiver card into `DSP' interface board of data acquisition
+system.
+
+\item In conjunction with detector interface upgrade (above), develop
+simplified, consistent hardware interface module
+
+\item TBD: Define software requirements.
+
+Detailed plan is being prepared by team of Steve Hicks, Lloyd Clonts,
+Jeff Patterson and others.
+
+\end{enumerate}
+
+\subsection{Slow Controls and Sample Environment Equipment Interface}
+\subsubsection{Requirements}
+
+Sample environment equipment consists of a large number of commercial
+and custom equipment. Much of the equipment provides a network interface
+for remote monitoring and control. Some of the equipment provides an
+interface of another bus, such as GPIB or serial communication.
+
+Motor controllers are primarily of type Parker 6K from Compumotor,
+although there are a few exceptions.
+
+Some sample environment equipment is dedicated to a particular beam line.
+Other equipment may be shared between a few or all beam lines.
+
+The System must be capable of supporting changing of sample environment
+equipment on a routine basis.
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+\item Setup a development system in the H-104 lab. Install EPICS
+base (latest production version) and needed support modules
+and extensions. Begin with simple hardware setup, such as a
+Parker 6K motor controller (EPICS device support exists) and a
+Lakeshore temperature controller (EPICS device support exists for
+many models).  Create demonstration softIOC using standard EPICS
+toolkit\footnote{``Experimental Physics and Industrial Control System
+toolkit,'' \texttt{http://www.aps.anl.gov/epics} }.
+
+\item Begin to develop framework for support of dynamic sample environment
+equipment setups.
+
+\item Identify existing sample environment equipment with existing EPICS
+support. Demonstrate integration on test stand.
+
+\item Identify existing equipment without existing EPICS support.
+In each case, identify appropriate path towards integration, for example,
+develop new device driver or use LabView to EPICS interface.
+
+\item Determine mechanism for Channel Access client to provide data from
+slow control system to data translation process and to non-EPICS live
+viewing tools (see ``Stream Management Service'' document prepared by
+David Dillow).
+
+\end{enumerate}
+
+\todo{}{%
+Can BNL NSLS-2's ``Channel Finder'' provide a useful mechanism for
+flagging which PVs are available at a given beam line? Scan service and
+UI could potentially use this to discover which parameters are available.
+Otherwise, XML text files?
+}
+
+\todo{}{%
+integration for non-standard equipment
+}
+
+Note: some specialized sample environment equipment does not provide a
+remote interface appropriate for integration into a standard controls
+system (for example, the rheometer for Liquid Reflectometer or the
+MTS load frame for VULCAN). Such devices will continue to present a
+difficulty regardless of the control system design. Going forward,
+it is important for such equipment, whether purchased by a particular
+instrument or meant for general use, is reviewed for its ability to be
+integrated into a standard control system.
+
+
+\subsection{Automated Experiment Control}
+\subsubsection{Requirements}
+
+A mechanism for automating experiment control is required. Such a
+mechanism is commonly called a ``scripting engine'' or a ``scanning
+service.''
+
+The scanning service must be able to accept batch jobs submitted through
+a network interface. It must be able to queue multiple jobs and run them
+sequentially, with the ability to add or remove jobs from the queue,
+and to modify jobs which have been submitted but not yet run. It must
+be able to pause or abort a job. It must provide a mechanism to monitor
+the status of the queue through the user interface application.
+
+It should be possible for multiple user interface applications to interact
+with the scanning service.
+
+There should be multiple ways to create a scan. Creating a scan must
+not require the use a general purpose programming language, although
+such functionality could be provided for optional use. A domain specific
+language or a library providing a sufficiently simplified interface
+is preferred.  An optional
+graphical user interface for creating scan is preferred. A mechanism
+such as a table or spreadsheet view for creating scans is required.
+
+To facilitate use by inexperienced external users, the system should
+have reasonable defaults (such as automatically save data at run end,
+and reasonable responses to normally anticipated fault conditions).
+
+\subsubsection{Implementation Plan}
+
+A prototype of a scan engine has been developed in Java using the
+eclipse framework and CSS. Unit tests for current functionality exists.
+The prototype network interface for submitting scans uses RMI.
+
+\begin{enumerate}
+
+\item Begin integration with the EPICS lab test stand to demonstrate
+functionality.
+
+\item Explore options for collaboration with other Laboratories, such
+as APS or NSLS-2.
+
+\item Gather user input for additional functional requirements.
+
+\item Identify potential replacements for RMI to allow non-Java
+applications to interface with the scanning server, such as for Mantid
+or Python applications to submit scan jobs.
+
+\item Integrate with data stream ``Aggregator'' (see ``Stream Management
+Service'' document prepared by David Dillow) to provide slow controls
+data to Translation Service. 
+
+\end{enumerate}
+
+\todo{}{%
+
+TBD: define reasonable system defaults and error responses
+
+TBD: overall experiment control (proposal number, run number, start/stop, etc.)
+
+TBD: PVs for communication with detector systems, choppers, etc
+
+TBD: PVs for communication of status information with Aggregator 
+and translation service
+
+TBD: integration with IPTS and other static data sources
+}
+
+\subsection{User Interface}
+\subsubsection{Requirements}
+
+A common, integrated user interface for experiment control is preferred.
+The use of multiple independent applications with their own GUI should
+be avoided.
+
+The user interface must be independent from experiment control. Closing
+a user interface application should not cause an experiment to end. It
+should be possible for an experiment to run with zero, one or multiple
+user interface programs running for the experiment.
+
+A "shell" interface is valued by some Users, but Users should not be
+required to use it.
+
+There should be an abstraction layer for experiment perspective
+(i.e. chopper phase setting in wavelength, motors for crystal movement
+in $(h,k,l)$ space, etc.) The user interface should support multiple ways
+of presenting this data to the user based on experiment needs. This
+abstraction does not necessarily need to be implemented in the user
+interface, but the implementation should be such that it is adaptable
+to user needs.
+
+\subsubsection{Remote Monitoring}
+
+It is desirable to provide a read-only remote monitoring capability for
+experiment status through a commonly available interface such as a web
+browser. Such a remote status overview could provide information as to
+the current conditions of the sample environment, current run number,
+status of scan queue, data rates and other generic information to inform
+the User as to the status of the experiment.
+
+\todo{}{%
+network infrastructure requirements and networking policy implications
+}
+
+\subsubsection{Fault Notification}
+
+The integrated user interface should provide a clear display in experiment
+hutch as to availability of equipment necessary to conduct experiment.
+
+It is also desirable to provide a summary display for all instruments
+available to IHC for off-hours monitoring.
+
+A mechanism for alarming or remote notification is desirable. A consistent
+mechanism should be used for providing fault notification throughout
+the system, i.e. detectors, choppers, sample environment equipment, etc.
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+
+\item As the EPICS slow controls prototype is developed,
+create displays using existing Control System Studio
+(CSS) toolkit~\footnote{``Control System Studio toolkit,''
+\texttt{http://cs-studio.sourceforge.net/docbook}}. Develop standard
+nomenclature, color rules, font rules, and directory structure.
+
+
+\item Demonstrate suitability of CSS WebOPI tool for providing remote
+monitoring capability.
+
+\item Investigate suitability of CSS BEAST tool for alarming and fault
+notification.
+
+\end{enumerate}
+\todo{}{%
+TBD: abstraction layer to meaningful ``physics'' units
+
+TBD: archiving of status information, i.e. non experiment data or
+engineering information
+
+TBD: alarm configuration for fault notification and integration of 
+various subsystem into EPICS to be able to provide this service.
+}
+
+Additional description of requirements and implementation plan details
+can be found in the document "SNS Data Acquisition and Control GUI
+Requirements Analysis" (Chen and Kasemir).
+
+\subsection{Interface to Neutron Data and Live Data Visualization}
+
+\subsubsection{Requirements}
+
+Rich live viewing of experiments will be provided in
+Mantid~\footnote{``Mantid,'' \texttt{http://www.mantidproject.org}}.
+This will leverage the existing capabilities within Mantid for visualizing
+data. It will provide the capability to perform data normalization,
+background subtraction and other manipulation to present data during the
+experiment in a meaningful way. Details of live viewing within Mantid
+are covered elsewhere in this document.
+
+However, the data acquisition system will also need to provide a basic
+live data visualization capability and interaction with the neutron data
+stream. This is required to facilitate sample alignment or orientation,
+and to provide a mechanism for automated scanning based on, for example,
+number of counts within a region of interest.
+
+The System must provided variables accessible to the user interface and
+to the scanning service to provide number of events (i.e. counts on the
+detector system). This variable should be resettable to zero. A variable
+representing count rate is desired.
+
+A live 2D plot representing a simplified view of the physical detector
+assembly is required.  Such a plot shows X and Y pixel position,
+integrated over time of flight with color representing intensity
+(i.e. number of counts).  A live 2D plot representing X and time of
+flight, integrated over Y is also required.  It is preferred that the
+color scale representing intensity be configurable.  A profile of the
+plot should be provided. The ability to select a sub-region for viewing
+the profile is desired.
+
+Variations on these plots and other basic plots plots may also be
+desired. For example, representing the X dimension as the~2$\theta$
+angle or providing a plot of S(Q,$\omega$) or D-space. However, Mantid
+should be used where reasonable rather then re-implementing existing
+features already available within Mantid.
+
+The ability to select a region of interest from the 2D plot is desired.
+The region can be a rectangular area. It is desirable to be able to
+acquire statistics from within this region of interest, such as the number
+of detector counts, for use as a parameter within the scanning service.
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+
+\item Basic viewing functionality should be available within the user
+interface used for experiment control.
+
+\item More advanced viewing and analysis should be implemented in Mantid.
+Development of ``live viewing'' capability should be done in parallel
+with other development. It may also be worth pursuing using partial
+NeXus files (i.e. mini-NeXus) as a data source for Mantid.
+
+\item A listening service will need to be developed to listen to the
+neutron data stream and histogram data to provide basic plotting. The
+histograms will be converted into EPICS arrays for network transport
+to the user interface program. CSS/BOY currently has the capability of
+plotting such waveforms and calculating a profile. The 2D array can
+be packaged as is typical within EPICS for 2D plots (such as image
+waveforms).
+
+\item Additional development is required to define and interact with
+a region of interest or to select a slice of the waveform for viewing
+of profile.
+
+\item Additional user input is required to refine requirements.
+
+\end{enumerate}
+\todo{}{%
+TBD: refine requirements for histogramming service and it's interaction
+with the data stream Aggregator service.
+
+TBD: dividing line between this live view and that implemented for Mantid.
+}
+\subsection{Nexus file generation}
+\subsubsection{Requirements}
+
+Data should be available in repository for analysis withing seconds to
+minutes from end of experiment. Ideally, partial data available will be
+available during the run. Data is archived with a catalog in a relational
+database for later retrieval.
+
+\subsubsection{Archiving and Catalog}
+
+The data should be archived with a database catalog to link various data
+related to the experiment and provide a means for analysis and download
+tools to locate and access the stored data.
+\todo{}{%
+TBD: ICAT3~\footnote{``ICAT Project,''
+\texttt{http://www.icatproject.org/}}. 
+
+TBD: Data download
+}
+
+\subsubsection{Implementation Plan}
+
+\begin{enumerate}
+
+\item Streaming translation service will listen to aggregated data
+stream providing all neutron event data, slow control data and other
+experimental parameters which need to be included in output files. See
+``Stream Management Service'' document prepared by David Dillow.
+
+\item Finalize network protocol for streaming data. 
+
+Detailed plan for streaming NeXus generation
+can be found in the document "Streaming Translation Service" by Kohl, et al.
+
+\end{enumerate}
+
+\todo{}{%
+TBD: ICAT3 integration
+
+TBD: translation monitoring
+
+TBD: data download options (topcat?)
+}
+
+\subsection{Network Architecture}
+
+\subsubsection{Requirements}
+
+\todo{}{%
+TBD
+}
+
+data flow, high throughput needs
+
+segmentation between beam lines. No beam lines should be able to impact
+other beam lines.
+
+segmentation between external facing resources and internal resources.
+
+Security: assume instrument controls are not secure so must be protected
+
+Remote access for SNS staff to monitor, troubleshoot and repair.
+
+Read-only remote status information for Users.
+
+Reliability: All necessary resources should be located within the data systems
+network. No unnecessary external dependencies.
+
+\subsubsection{Implementation Plan}
+
+\todo{}{%
+Installation of fibers connecting 8700 A103 to
+8600 J115 
+
+fibers from instruments to A103
+
+General network logical architecture and topology
+}
+
+\subsection{Information Systems}
+
+\subsubsection{IPTS}
+
+\subsubsection{ITEMS}
+
+\subsubsection{Experiment Scheduling System}
+
+\subsubsection{Implementation Plan}
+
+Dedicated Oracle RDB to be set up during maintenance period in January
+2012. This database will host the current SCPROD applications which
+includes ICAT. This Oracle instance will also be used to replicate IPTS
+and ITEMS from XPROD which is on the ORNL Admin Protection Zone.  This is
+intended to provide system resilency be removing external dependencies
+for the data acqisition and translation/cataloging systems.
+
+

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://public.sns.gov/schema/runinfo.xsd"
+  xmlns="http://public.sns.gov/schema/runinfo.xsd"
+  version="0.5"
+  elementFormDefault="qualified" attributeFormDefault="unqualified">
+  <xs:element name="runinfo">
+    <xs:annotation>
+      <xs:documentation>SNS runinfo root element.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="das_version" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Current DAS version: 4.3</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="facility_name" type="xs:string"/>
+        <xs:element name="proposal_id" type="xs:string"/>
+        <xs:element name="proposal_title" type="xs:string" minOccurs="0" maxOccurs="1">
+          <xs:annotation>
+            <xs:documentation>Watch out for special characters typed by users, similar for all other user contributed fields, such as collection_title, run_title, sample details, and user_name.</xs:documentation>
+          </xs:annotation>    
+        </xs:element>
+        <xs:element name="run_number" type="xs:string"/>
+        <xs:element name="run_title" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="run_revision" minOccurs="0" maxOccurs="1"/>    
+        <xs:element ref="sample" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="users">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element ref="user" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+          </xs:complexType>  
+        </xs:element>
+        <xs:element ref="reduction" minOccurs="0" maxOccurs="1"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="run_revision">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Capture change logs of raw data.</xs:documentation>
+      </xs:annotation>
+      <xs:all>
+        <xs:element name="revision_number" type="xs:string"/>
+        <xs:element name="revision_log" type="xs:string"/>
+      </xs:all>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sample">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Sample information</xs:documentation>
+      </xs:annotation>
+      <xs:all>
+        <xs:element name="name" type="xs:string"  minOccurs="0" maxOccurs="1"/>
+        <xs:element name="id" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="nature" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="chemical_formula" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="environment" type="xs:string" minOccurs="0" maxOccurs="1"/>
+      </xs:all>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="user">
+    <xs:complexType>
+      <xs:all>
+        <xs:element name="id" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="name" type="xs:string" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="role" type="xs:string" minOccurs="0" maxOccurs="1"/>
+      </xs:all>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="binning_type">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:annotation>
+          <xs:documentation>Currently we only have linear and log binning. Momentum transfer (Q) and d_spacing binning will need geometry information.</xs:documentation>
+        </xs:annotation>
+        <xs:pattern value="linear|log|momentum_transfer|d_spacing"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+  <xs:group name="binning_parameters">
+    <xs:sequence>
+      <xs:element ref="binning_type"/>
+      <xs:element name="units" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>For linear and log binning, the default units is microsecond.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="start_bin" type="xs:float"/>
+      <xs:element name="end_bin" type="xs:float"/>
+      <xs:element name="bin_width" type="xs:float"/>
+    </xs:sequence>  
+  </xs:group>
+  <xs:element name="reduction">
+    <xs:complexType>
+      <xs:annotation>
+        <xs:documentation>Capture parameters needed for automatic data reduction.</xs:documentation>
+      </xs:annotation>
+      <xs:sequence>
+        <xs:element name="detector_binning" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:group ref="binning_parameters"/>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="beam_monitor_binning" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="beam_monitor_name" type="xs:string" minOccurs="0"/>
+              <xs:element name="beam_monitor_id" type="xs:string" minOccurs="0"/>
+              <xs:element name="beam_monitor_description" type="xs:string" minOccurs="0"/>              
+              <xs:group ref="binning_parameters"/>      
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
