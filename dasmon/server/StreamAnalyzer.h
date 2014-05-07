@@ -100,6 +100,7 @@ private:
     void pvUndefined( const std::string &a_name );
     void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
     void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
     void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface

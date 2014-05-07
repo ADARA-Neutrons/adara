@@ -9,7 +9,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.3.1"
+#define DASMON_VERSION "1.3.2"
 
 
 bool g_child_signal = false;
@@ -201,14 +201,6 @@ int main(int argc, char *argv[])
         daemonize();
 
     ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( domain, "DASMON", 0, broker_uri, broker_user, broker_pass );
-
-#if 0
-    ADARA::ComBus::Log4cxxAppender *combus_appender = new ADARA::ComBus::Log4cxxAppender();
-    log4cxx::LoggerPtr logger = log4cxx::Logger::getRootLogger();
-    logger->addAppender( combus_appender );
-    logger->setLevel( log4cxx::Level::getTrace() );
-    LOG4CXX_INFO(logger,"DASMON starting");
-#endif
 
     try
     {

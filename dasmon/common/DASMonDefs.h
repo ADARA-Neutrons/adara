@@ -28,6 +28,7 @@ struct SignalInfo
     std::string     source;
     ADARA::Level    level;
     std::string     msg;
+    std::string     desc;
 };
 
 

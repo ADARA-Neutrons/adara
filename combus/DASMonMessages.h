@@ -52,6 +52,7 @@ protected:
             {
                 rule.fact = v.second.get( "fact", "" );
                 rule.expr = v.second.get( "expr", "" );
+                rule.desc = v.second.get( "desc", "" );
 
                 m_rules.push_back( rule );
             }
@@ -67,6 +68,7 @@ protected:
                 signal.source = v.second.get( "source", "" );
                 signal.level = (Level)v.second.get( "level", 0 );
                 signal.msg = v.second.get( "message", "" );
+                signal.desc = v.second.get( "desc", "" );
 
                 m_signals.push_back( signal );
             }
@@ -80,6 +82,7 @@ protected:
             boost::property_tree::ptree pt;
             pt.put( "fact", r->fact );
             pt.put( "expr", r->expr );
+            pt.put( "desc", r->desc );
             a_prop_tree.add_child( "rules.rule", pt );
         }
 
@@ -91,6 +94,7 @@ protected:
             pt.put( "source", s->source );
             pt.put( "level", (unsigned short)s->level );
             pt.put( "message", s->msg );
+            pt.put( "desc", s->desc );
             a_prop_tree.add_child( "signals.signal", pt );
         }
     }
@@ -261,14 +265,20 @@ public:
     struct PVData
     {
         PVData()
-            : value(0.0), status(0), timestamp(0)
+            : is_str(false), dbl_val(0.0), status(0), timestamp(0)
         {}
 
         PVData( double a_value, int a_status, uint32_t a_timestamp )
-            : value(a_value), status(a_status), timestamp(a_timestamp)
+            : is_str(false), dbl_val(a_value), status(a_status), timestamp(a_timestamp)
         {}
 
-        double          value;
+        PVData( const std::string &a_value, int a_status, uint32_t a_timestamp )
+            : is_str(true), dbl_val(0.0), str_val(a_value), status(a_status), timestamp(a_timestamp)
+        {}
+
+        bool            is_str;
+        double          dbl_val;
+        std::string     str_val;
         int             status;
         uint32_t        timestamp;
     };
@@ -285,8 +295,12 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("pvs"))
             {
+                data.is_str = v.second.get( "is_str", false );
                 data.status = v.second.get( "status", 0 );
-                data.value = v.second.get( "value", 0.0 );
+                if ( data.is_str )
+                    data.str_val = v.second.get( "str_val", "" );
+                else
+                    data.dbl_val = v.second.get( "dbl_val", 0.0 );
                 data.timestamp = v.second.get( "timestamp", 0UL );
                 m_pvs[v.first] = data;
             }
@@ -300,8 +314,12 @@ protected:
         for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
         {
             boost::property_tree::ptree pt;
+            pt.put( "is_str", ipv->second.is_str );
             pt.put( "status", ipv->second.status );
-            pt.put( "value", ipv->second.value );
+            if ( ipv->second.is_str )
+                pt.put( "str_val", ipv->second.str_val );
+            else
+                pt.put( "dbl_val", ipv->second.dbl_val );
             pt.put( "timestamp", ipv->second.timestamp );
 
             a_prop_tree.add_child( std::string("pvs.") + ipv->first, pt );
