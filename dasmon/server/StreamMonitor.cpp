@@ -446,11 +446,13 @@ StreamMonitor::metricsThread()
             for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
                 beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
 
-            // If recording, send update run metrics
+            // Update total charge
             if ( m_recording )
+            {
                 m_run_metrics.m_total_charge = m_pcharge.total;
+                run_metrics = m_run_metrics;
+            }
 
-            run_metrics = m_run_metrics;
             stream_metrics = m_stream_metrics;
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
@@ -459,7 +461,9 @@ StreamMonitor::metricsThread()
             // Release lock and notify listeners
             lock.unlock();
             m_notify.beamMetrics( beam_metrics );
-            m_notify.runMetrics( run_metrics );
+
+            if ( m_recording )
+                m_notify.runMetrics( run_metrics );
 
             // Send stream metrics every 4 seconds
             if ( !(++count & 0x3 ))
