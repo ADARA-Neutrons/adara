@@ -35,7 +35,7 @@ set CONFIG_REPO = "git+ssh://trac.sns.gov/var/repos/config"
 set CONFIG_LINE = \
 	"------------------------------------------------------------------"
 
-set LOG = "$TMP_DIR/SMS_Deploy_Log.$$.txt"
+set LOG = "$TMP_DIR/ADARA_SMS_Deploy_Log.$$.txt"
 
 touch $LOG
 
@@ -57,7 +57,7 @@ echo "\nDeploying User: $gcos ($userid).\n" | tee -a $LOG
 
 set adara_repo = `git config --get remote.origin.url`
 
-echo "Using ADARA Git Repository = $adara_repo\n" | tee -a $LOG
+echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 
 # Make sure we're in the "right" repo...? ;-)
 
@@ -73,7 +73,7 @@ endif
 
 # Release Tag Name
 
-echo "Enter Release Tag Name from Git Repository:\n"
+echo "\nEnter Release Tag Name from Git Repository:\n"
 
 git tag -l
 
@@ -92,11 +92,11 @@ if ( $tag_ck != 1 ) then
 	exit -2
 endif
 
-echo "\nADARA Release Tag = $release_tag\n" | tee -a $LOG
+echo "\nADARA Release Tag = $release_tag" | tee -a $LOG
 
 # Deployment Log Description Text [Required!]
 
-echo "Please Enter Deployment Log Description Text:\n"
+echo "\nPlease Enter Deployment Log Description Text:\n"
 
 echo "(Enter a Blank Line to Finish.)\n"
 
@@ -211,6 +211,9 @@ echo "\nADARA Software, Release $release_tag, Successfully Built." \
 
 date | tee -a $LOG
 
+echo "\n. . ."
+sleep 3
+
 #
 # Prepare the ADARA Archive Directories in /home/controls/prod
 #
@@ -227,7 +230,7 @@ echo "\nInstalling ADARA Binaries for Beamline $beamline_num." \
 
 set adara_archive = "$INSTALL_BASE/prod/ADARA"
 
-if ( ! test -d "$adara_archive" ) then
+if ( ! -d "$adara_archive" ) then
 
 	echo "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
 
@@ -317,7 +320,7 @@ ls -l "$tag_archive/sts" |& tee -a $LOG
 
 # DASMON Server
 
-echo "\nCopying DASMION Server Executable into Archive Release Tag:\n" \
+echo "\nCopying DASMON Server Executable into Archive Release Tag:\n" \
 	| tee -a $LOG
 
 cp dasmon/server/dasmond "$tag_archive" |& tee -a $LOG
@@ -354,6 +357,9 @@ rm -f "$tag_archive"/adara-*.cc >& /dev/null
 
 ls -l "$tag_archive"/adara-* |& tee -a $LOG
 
+echo "\n. . ."
+sleep 3
+
 #
 # Link New Archive Release Tag into Current Working Set for Beamline
 #
@@ -362,7 +368,7 @@ ls -l "$tag_archive"/adara-* |& tee -a $LOG
 
 set adara_current = "$INSTALL_BASE/$beamline_num/ADARA"
 
-if ( ! test -d "$adara_current" ) then
+if ( ! -d "$adara_current" ) then
 
 	echo "\nADARA Current Working Set Directory Not Found.\n" | tee -a $LOG
 
@@ -403,7 +409,7 @@ foreach exe ( "$tag_archive"/* )
 
 	set tag_link = "$adara_current/$prog"
 
-	if ( test -L "$tag_link" ) then
+	if ( -l "$tag_link" ) then
 
 		# First, save what this previous version originally linked to...!
 		set previous_version = \
@@ -417,7 +423,7 @@ foreach exe ( "$tag_archive"/* )
 		echo "   $tag_link" | tee -a $LOG
 		/bin/rm "$tag_link" |& tee -a $LOG
 
-	else if ( test -e "$tag_link" ) then
+	else if ( -e "$tag_link" ) then
 
 		echo "\nError: Previous $prog file is _Not_ a link!\n" \
 			| tee -a $LOG
@@ -457,6 +463,12 @@ end
 
 echo "\nPrevious Versions:\n" | tee -a $LOG
 echo "$previous_versions" | tee -a $LOG
+
+echo "\nNew Current Working Set ($beamline_num):\n" | tee -a $LOG
+ls -l "$adara_current"/ | tee -a $LOG
+
+echo "\n. . ."
+sleep 3
 
 #
 # Document the deployment using the "Config" Git repository
@@ -507,10 +519,10 @@ set deploy_history = "$TMP_DIR/config/$deploy_history_base"
 
 # Create the History file, if it doesn't exist...
 
-if ( ! test -e "$deploy_history" ) then
+if ( ! -e "$deploy_history" ) then
 
 	echo "\nCreating Deployment History File for Beamline $beamline_num." \
-		tee -a $LOG
+		| tee -a $LOG
 	echo "\n   $deploy_history" | tee -a $LOG
 
 	echo "\nADARA SMS Deployment History ($beamline_num)\n$CONFIG_LINE\n" \
@@ -553,9 +565,12 @@ if ( ! test -e "$deploy_history" ) then
 
 endif
 
+echo "\n. . ."
+sleep 3
+
 # Add Current Deployment to History File
 
-echo "Appending Current Deployment to History File:\n" | tee -a $LOG
+echo "\nAppending Current Deployment to History File:\n" | tee -a $LOG
 echo "   $deploy_history\n" | tee -a $LOG
 
 echo "$CONFIG_LINE\n" | tee -a $LOG
@@ -594,6 +609,12 @@ echo "\nPrevious Versions Installed:\n" >> "$deploy_history"
 echo "$previous_versions" | tee -a $LOG
 echo "$previous_versions" >> "$deploy_history"
 
+echo "\nCurrent Working Set Links:\n" | tee -a $LOG
+echo "\nCurrent Working Set Links:\n" >> "$deploy_history"
+
+ls -l "$adara_current"/* |& tee -a $LOG
+ls -l "$adara_current"/* >> "$deploy_history"
+
 echo "$CONFIG_LINE\n" | tee -a $LOG
 echo "$CONFIG_LINE\n" >> "$deploy_history"
 
@@ -601,7 +622,7 @@ echo "$CONFIG_LINE\n" >> "$deploy_history"
 
 echo "Committing Current Deployment History Additions to Git." | tee -a $LOG
 
-echo "git commit -m 'Deployment History for $release_tag' "$deploy_history_base" | tee -a $LOG
+echo "git commit -m 'Deployment History for $release_tag' $deploy_history_base" | tee -a $LOG
 git commit -m "Deployment History for $release_tag" "$deploy_history_base" \
 	|& tee -a $LOG
 
@@ -616,7 +637,7 @@ endif
 
 # Now Push All the Config Commits to Origin
 
-echo "Pushing Config Commits to Origin:" | tee -a $LOG
+echo "\nPushing Config Commits to Origin:" | tee -a $LOG
 
 echo "git push" | tee -a $LOG
 git push |& tee -a $LOG
@@ -636,7 +657,7 @@ endif
 
 # Remove Clone of ADARA Git repository
 
-echo "Cleaning Up Temporary ADARA Software Repository Clone..." \
+echo "\nCleaning Up Temporary ADARA Software Repository Clone..." \
 	| tee -a $LOG
 
 echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
@@ -644,7 +665,7 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 
 # Remove Clone of Config Git repository
 
-echo "Cleaning Up Temporary Config Repository Clone..." | tee -a $LOG
+echo "\nCleaning Up Temporary Config Repository Clone..." | tee -a $LOG
 
 echo "/bin/rm -rf $TMP_DIR/config" |& tee -a $LOG
 /bin/rm -rf "$TMP_DIR/config" |& tee -a $LOG
@@ -653,10 +674,10 @@ echo "/bin/rm -rf $TMP_DIR/config" |& tee -a $LOG
 # (Optionally restart the SMS Daemon Service...?)
 #
 
-echo "Current SMS Daemon Status:\n" | tee -a $LOG
+echo "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
 
 echo "sudo /sbin/service smsd status" | tee -a $LOG
-sudo /sbin/service smsd status | tee -a $LOG
+sudo /sbin/service smsd status |& tee -a $LOG
 
 echo -n "\nDo You want to Restart the SMS Daemon service now [yes/No]? "
 
@@ -664,10 +685,10 @@ set restart_ck = "$<"
 
 if ( "#$restart_ck#" == '#yes#' ) then
 
-	echo "Restarting SMS Daemon service now on `hostname`." | tee -a $LOG
+	echo "\nRestarting SMS Daemon service now on `hostname`." | tee -a $LOG
 
 	echo "sudo /sbin/service smsd restart" | tee -a $LOG
-	sudo /sbin/service smsd restart | tee -a $LOG
+	sudo /sbin/service smsd restart |& tee -a $LOG
 
 	set restart_ok = $status
 
@@ -682,8 +703,8 @@ endif
 
 # Copy Final Log File into ADARA Archive Release Tag Directory
 
-echo "Done with Deployment of ADARA/SMS Release Tag $release_tag.\n" \
-	tee -a $LOG
+echo "\nDone with Deployment of ADARA/SMS Release Tag $release_tag.\n" \
+	| tee -a $LOG
 
 echo "Copying Deployment Log to Archive:\n" | tee -a $LOG
 
