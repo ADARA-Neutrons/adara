@@ -24,6 +24,8 @@
 # Install Defaults
 #
 
+set DEPLOY_VERSION = "1.0.0"
+
 set TMP_DIR = "/tmp"
 
 set INSTALL_BASE = "/home/controls"
@@ -41,6 +43,8 @@ touch $LOG
 
 echo "\nADARA SMS Deployment Log" | tee -a $LOG
 date | tee -a $LOG
+
+echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
 
 # Determine user identity (for accountability and documentation :-)
 
@@ -464,7 +468,7 @@ end
 echo "\nPrevious Versions:\n" | tee -a $LOG
 echo "$previous_versions" | tee -a $LOG
 
-echo "\nNew Current Working Set ($beamline_num):\n" | tee -a $LOG
+echo "\nNew Current Working Set Links ($beamline_num):\n" | tee -a $LOG
 ls -l "$adara_current"/ | tee -a $LOG
 
 echo "\n. . ."
@@ -578,6 +582,9 @@ echo "$CONFIG_LINE\n" | tee -a $LOG
 date | tee -a $LOG
 date >> "$deploy_history"
 
+echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
+echo "Deploy Script Version: $DEPLOY_VERSION" >> "$deploy_history"
+
 echo "ADARA/SMS Deployment by User: $gcos ($userid)." | tee -a $LOG
 echo "ADARA/SMS Deployment by User: $gcos ($userid)." >> "$deploy_history"
 
@@ -600,8 +607,8 @@ echo "\nInstalled into ADARA Archive Release Tag directory:\n" \
 echo "   $tag_archive\n" | tee -a $LOG
 echo "   $tag_archive\n" >> "$deploy_history"
 
-ls -l "$tag_archive"/* |& tee -a $LOG
-ls -l "$tag_archive"/* >> "$deploy_history"
+ls -l "$tag_archive"/ |& tee -a $LOG
+ls -l "$tag_archive"/ >> "$deploy_history"
 
 echo "\nPrevious Versions Installed:\n" | tee -a $LOG
 echo "\nPrevious Versions Installed:\n" >> "$deploy_history"
@@ -612,8 +619,11 @@ echo "$previous_versions" >> "$deploy_history"
 echo "\nCurrent Working Set Links:\n" | tee -a $LOG
 echo "\nCurrent Working Set Links:\n" >> "$deploy_history"
 
-ls -l "$adara_current"/* |& tee -a $LOG
-ls -l "$adara_current"/* >> "$deploy_history"
+echo "   $adara_current" | tee -a $LOG
+echo "   $adara_current" >> "$deploy_history"
+
+ls -l "$adara_current"/ |& tee -a $LOG
+ls -l "$adara_current"/ >> "$deploy_history"
 
 echo "$CONFIG_LINE\n" | tee -a $LOG
 echo "$CONFIG_LINE\n" >> "$deploy_history"
