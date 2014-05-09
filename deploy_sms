@@ -24,7 +24,7 @@
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.0"
+set DEPLOY_VERSION = "1.1.1"
 
 set TMP_DIR = "/tmp"
 
@@ -456,6 +456,11 @@ set previous_versions = ""
 foreach exe ( "$tag_archive"/* )
 
 	set prog = `basename "$exe"`
+
+	# duh... skip over the Log File from any previous installs... :)
+	set log_ck = \
+		`echo "$prog" | grep "SMS_Deploy_Log" | wc | awk '{print $1}'`
+	if ( $log_ck == 1 ) continue
 
 	echo "\nLinking ${prog}:" | tee -a $LOG
 
