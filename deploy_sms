@@ -24,7 +24,7 @@
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.2"
+set DEPLOY_VERSION = "1.1.3"
 
 set TMP_DIR = "/tmp"
 
@@ -652,8 +652,8 @@ echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
 echo "ADARA Release Tag = $release_tag" | tee -a $LOG
 echo "ADARA Release Tag = $release_tag" >> "$deploy_history"
 
-echo "\nDeployment Log Description\n:" | tee -a $LOG
-echo "\nDeployment Log Description\n:" >> "$deploy_history"
+echo "\nDeployment Log Description:\n" | tee -a $LOG
+echo "\nDeployment Log Description:\n" >> "$deploy_history"
 
 echo "$log_desc" | tee -a $LOG
 echo "$log_desc" >> "$deploy_history"
@@ -690,9 +690,13 @@ echo "\n$CONFIG_LINE\n" >> "$deploy_history"
 
 echo "Committing Current Deployment History Additions to Git." | tee -a $LOG
 
-echo "git commit -m 'Deployment History for $release_tag' $deploy_history_base" | tee -a $LOG
-git commit -m "Deployment History for $release_tag" "$deploy_history_base" \
-	|& tee -a $LOG
+echo "\nCommit Log:\n" | tee -a $LOG
+
+echo "Deployment History for $release_tag\n\n$log_desc\n" | tee -a $LOG
+
+echo "git commit -F - $deploy_history_base" | tee -a $LOG
+echo "Deployment History for $release_tag\n\n$log_desc" \
+	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 set commit_ok = $status
 
