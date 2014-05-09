@@ -24,7 +24,7 @@
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.1"
+set DEPLOY_VERSION = "1.1.2"
 
 set TMP_DIR = "/tmp"
 
@@ -652,8 +652,8 @@ echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
 echo "ADARA Release Tag = $release_tag" | tee -a $LOG
 echo "ADARA Release Tag = $release_tag" >> "$deploy_history"
 
-echo "\nDeployment Log Description:" | tee -a $LOG
-echo "\nDeployment Log Description:" >> "$deploy_history"
+echo "\nDeployment Log Description\n:" | tee -a $LOG
+echo "\nDeployment Log Description\n:" >> "$deploy_history"
 
 echo "$log_desc" | tee -a $LOG
 echo "$log_desc" >> "$deploy_history"
