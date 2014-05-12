@@ -28,7 +28,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.1.0";
+const std::string SMSD_VERSION = "1.1.1";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
@@ -283,6 +283,7 @@ static void daemonize(const char *pname)
 		 * has finished initialization, successful or not.
 		 */
 		uint64_t ok;
+		// NOTE: This is Standard C Library read()... ;-o
 		if (read(initCompleteFd, &ok, sizeof(ok)) < 0) {
 			int e = errno;
 			ERROR("unable to receive child signal: "
