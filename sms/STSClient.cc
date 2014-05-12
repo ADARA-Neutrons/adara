@@ -76,6 +76,8 @@ bool STSClient::sendHeartbeat(void)
 
 void STSClient::writable(void)
 {
+	// DEBUG("writable() entry");
+
 	std::list<StorageFile::SharedPtr>::iterator it;
 	ssize_t len, rc;
 
@@ -165,6 +167,7 @@ idle:
 	 */
 	m_write.reset();
 	m_timer->start(m_heartbeat_interval);
+	// DEBUG("writable() idle exit");
 	return;
 
 more:
@@ -175,6 +178,7 @@ more:
 	if (!m_write.get())
 		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
 				boost::bind(&STSClient::writable, this)));
+	// DEBUG("writable() more exit");
 }
 
 void STSClient::fileAdded(StorageFile::SharedPtr &f)
@@ -190,7 +194,9 @@ void STSClient::fileAdded(StorageFile::SharedPtr &f)
 
 void STSClient::fileUpdated(const StorageFile &f)
 {
-        /* The current file just got updated; if we're not already waiting
+	// DEBUG("fileUpdated() entry");
+
+	/* The current file just got updated; if we're not already waiting
 	 * for buffer space in the socket, try to send the new data
 	 */
 	if (!m_write.get())
@@ -198,14 +204,19 @@ void STSClient::fileUpdated(const StorageFile &f)
 
 	if (!f.active())
 		m_fileConnection.disconnect();
+
+	// DEBUG("fileUpdated() exit");
 }
 
 void STSClient::readable(void)
 {
+	// DEBUG("readable() entry");
+
 	bool ok = false;
 
 	try {
-		ok = read(m_sts_fd, 0, MAX_PACKET_SIZE);
+		// NOTE: This is POSIXParser::read()... ;-o
+		ok = read(m_sts_fd, 4000, MAX_PACKET_SIZE);
 		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
 			/* We log the reason for closing the connection
 			 * elsewhere, except for the default case of an
@@ -228,6 +239,8 @@ void STSClient::readable(void)
 	 */
 	if (!ok)
 		delete this;
+
+	// DEBUG("readable() exit");
 }
 
 bool STSClient::rxPacket(const ADARA::Packet &pkt)
