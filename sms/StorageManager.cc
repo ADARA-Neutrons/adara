@@ -260,6 +260,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 		return 0;
 	}
 
+	// NOTE: This is Standard C Library read()... ;-o
 	len = read(fd, buffer, sizeof(buffer));
 	e = errno;
 	close(fd);
@@ -599,6 +600,8 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
+	// DEBUG("StorageManager::addPacket() entry");
+
 	struct header *hdr = (struct header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
 	off_t size, blocks, resumeLocation;
@@ -649,6 +652,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		goal -= m_max_blocks_allowed;
 		requestPurge(goal);
 	}
+
+	// DEBUG("StorageManager::addPacket() exit");
 }
 
 void StorageManager::addPrologue(IoVector &iovec)
@@ -811,6 +816,8 @@ void StorageManager::backgroundIo(void)
 
 void StorageManager::ioCompleted(void)
 {
+	DEBUG("ioCompleted entry");
+
 	uint64_t val = m_ioCompleteEvent->read();
 
 	if (val == IOCMD_INITIAL) {
@@ -842,6 +849,8 @@ void StorageManager::ioCompleted(void)
 	}
 
 	m_ioActive = false;
+
+	DEBUG("ioCompleted exit");
 }
 
 void StorageManager::requestPurge(uint64_t goal)
@@ -957,6 +966,7 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		if (m_dailyExhausted || m_dailyCache.empty())
 			populateDailyCache();
 	} catch (...) {
+		ERROR("StorageManager::purgeData() populating cache");
 		/* If we cannot populate the cache, then we cannot purge. */
 		return 0;
 	}
