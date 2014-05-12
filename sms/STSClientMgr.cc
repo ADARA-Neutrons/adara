@@ -255,6 +255,8 @@ error:
 
 void STSClientMgr::connectComplete(void)
 {
+	DEBUG("connectComplete() entry");
+
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
@@ -271,6 +273,7 @@ void STSClientMgr::connectComplete(void)
 			new STSClient(m_fd, run, *this);
 			m_connections++;
 		} catch (...) {
+			ERROR("connectComplete() - STSClient() failed?");
 			/* TODO narrow what we catch? */
 			requeueRun(run);
 			connectFailed();
@@ -288,12 +291,15 @@ void STSClientMgr::connectComplete(void)
 
 	if (e == EINTR || e == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
+		DEBUG("connectComplete() odd-but-harmless exit");
 		return;
 	}
 
 	/* TODO ratelimited logging of connection issue */
 	WARN("Connection to STS failed: " << strerror(e));
 	connectFailed();
+
+	DEBUG("connectComplete() failed exit");
 }
 
 void STSClientMgr::connectFailed(void)
