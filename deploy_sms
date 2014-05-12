@@ -24,7 +24,7 @@
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.3"
+set DEPLOY_VERSION = "1.1.4"
 
 set TMP_DIR = "/tmp"
 
@@ -53,7 +53,7 @@ set userid = `id -un`
 set gcos = `echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
 	print $gcos' | perl`
 
-echo "\nDeploying User: $gcos ($userid).\n" | tee -a $LOG
+echo "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
 # Determine the Beamline Number associated with this computer system
 
@@ -90,22 +90,54 @@ echo "\nEnter Release Tag Name from Git Repository:\n"
 
 git tag -l
 
+echo "\n(Or 'Already_Deployed_Locally')"
+
 echo -n "\nRelease Tag Name? "
 
 set release_tag = "$<"
 
 # Verify valid release tag...
 
-set tag_ck = `git tag -l | grep "$release_tag" | wc | awk '{print $1}'`
+set adara_archive = "$INSTALL_BASE/prod/ADARA"
 
-if ( $tag_ck != 1 ) then
-	echo "\nError: Not a Valid Release Tag!\n" | tee -a $LOG
-	echo "   $release_tag\n" | tee -a $LOG
-	echo "Bailing Out..." | tee -a $LOG
-	exit -2
+set already_deployed_locally = 0
+set already_deployed = ""
+
+if ( "#$release_tag#" == '#Already_Deployed_Locally#' ) then
+
+	echo "\nRelease Tags Already Deployed Locally:\n"
+
+	/bin/ls -d $adara_archive/*/* | sed s@$adara_archive/@@
+
+	echo -n "\nRelease Tag Name? "
+
+	set release_tag = "$<"
+
+	if ( ! -d "$adara_archive/$release_tag" ) then
+		echo "\nError: Release Tag Directory Not Found!\n" | tee -a $LOG
+		echo "   $adara_archive/$release_tag\n" | tee -a $LOG
+		echo "Not a Valid Release Tag!" | tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -202
+	endif
+
+	set already_deployed_locally = 1
+	set already_deployed = " (Already Deployed Locally)"
+
+else
+
+	set tag_ck = `git tag -l | grep "$release_tag" | wc | awk '{print $1}'`
+
+	if ( $tag_ck != 1 ) then
+		echo "\nError: Not a Valid Release Tag!\n" | tee -a $LOG
+		echo "   $release_tag\n" | tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -2
+	endif
+
 endif
 
-echo "\nADARA Release Tag = $release_tag" | tee -a $LOG
+echo "\nADARA Release Tag = $release_tag$already_deployed" | tee -a $LOG
 
 # Deployment Log Description Text [Required!]
 
@@ -149,8 +181,6 @@ echo "$log_desc" | tee -a $LOG
 
 # Make sure the parent ADARA Archive directory exists
 
-set adara_archive = "$INSTALL_BASE/prod/ADARA"
-
 if ( ! -d "$adara_archive" ) then
 
 	echo "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
@@ -174,9 +204,19 @@ if ( ! -d "$adara_archive" ) then
 
 endif
 
-echo "\nInstalling into ADARA Archive directory:\n" \
-	| tee -a $LOG
-echo "   $adara_archive\n" | tee -a $LOG
+if ( $already_deployed_locally == 1 ) then
+
+	echo "\nUsing Existing Installation in ADARA Archive directory:\n" \
+		| tee -a $LOG
+	echo "   $adara_archive/$release_tag" | tee -a $LOG
+
+else
+
+	echo "\nInstalling into ADARA Archive directory:\n" \
+		| tee -a $LOG
+	echo "   $adara_archive" | tee -a $LOG
+
+endif
 
 # Create the Release Tag directory structure in the Current Working Set
 
@@ -184,7 +224,7 @@ set tag_archive = "$adara_archive/$release_tag"
 
 if ( ! -d "$tag_archive" ) then
 
-	echo "Creating ADARA Archive Release Tag Directory:\n" \
+	echo "\nCreating ADARA Archive Release Tag Directory:\n" \
 		| tee -a $LOG
 	echo "   $tag_archive\n" | tee -a $LOG
 
@@ -207,7 +247,11 @@ endif
 
 set need_build = 1
 
-if ( -e "$tag_archive/smsd" && -x "$tag_archive/smsd" ) then
+if ( $already_deployed_locally == 1 ) then
+
+	set need_build = 0
+
+else if ( -e "$tag_archive/smsd" && -x "$tag_archive/smsd" ) then
 
 	echo "\nWarning! A Build Already Exists for Release Tag $release_tag!" \
 		| tee -a $LOG
@@ -523,7 +567,7 @@ end
 echo "\nPrevious Versions:\n" | tee -a $LOG
 echo "$previous_versions" | tee -a $LOG
 
-echo "\nNew Current Working Set Links ($beamline_num):\n" | tee -a $LOG
+echo "New Current Working Set Links ($beamline_num):\n" | tee -a $LOG
 ls -l "$adara_current"/ | tee -a $LOG
 
 echo "\n. . ."
@@ -649,8 +693,9 @@ echo "Beamline $beamline_num on Host $beamline_host" >> "$deploy_history"
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
 
-echo "ADARA Release Tag = $release_tag" | tee -a $LOG
-echo "ADARA Release Tag = $release_tag" >> "$deploy_history"
+echo "ADARA Release Tag = $release_tag$already_deployed" | tee -a $LOG
+echo "ADARA Release Tag = $release_tag$already_deployed" \
+	>> "$deploy_history"
 
 echo "\nDeployment Log Description:\n" | tee -a $LOG
 echo "\nDeployment Log Description:\n" >> "$deploy_history"
@@ -674,8 +719,8 @@ echo "\nPrevious Versions Installed:\n" >> "$deploy_history"
 echo "$previous_versions" | tee -a $LOG
 echo "$previous_versions" >> "$deploy_history"
 
-echo "\nCurrent Working Set Links:\n" | tee -a $LOG
-echo "\nCurrent Working Set Links:\n" >> "$deploy_history"
+echo "Current Working Set Links:\n" | tee -a $LOG
+echo "Current Working Set Links:\n" >> "$deploy_history"
 
 echo "   $adara_current\n" | tee -a $LOG
 echo "   $adara_current\n" >> "$deploy_history"
@@ -692,10 +737,11 @@ echo "Committing Current Deployment History Additions to Git." | tee -a $LOG
 
 echo "\nCommit Log:\n" | tee -a $LOG
 
-echo "Deployment History for $release_tag\n\n$log_desc\n" | tee -a $LOG
+echo "Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
+	| tee -a $LOG
 
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
-echo "Deployment History for $release_tag\n\n$log_desc" \
+echo "Deployment History for $release_tag$already_deployed\n\n$log_desc" \
 	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 set commit_ok = $status
@@ -777,6 +823,10 @@ endif
 
 echo "\nDone with Deployment of ADARA/SMS Release Tag $release_tag.\n" \
 	| tee -a $LOG
+
+if ( $already_deployed_locally == 1 ) then
+	echo "  $already_deployed\n" | tee -a $LOG
+endif
 
 echo "Copying Deployment Log to Archive:\n" | tee -a $LOG
 
