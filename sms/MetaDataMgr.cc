@@ -141,7 +141,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		if (dev_pkt->packet_length() == in.packet_length() &&
 				!memcmp(dev_pkt->payload(), in.payload(),
 					dev_pkt->payload_length())) {
-			DEBUG("Inbound descriptor was indentical");
+			DEBUG("Inbound descriptor was identical");
 			return;
 		}
 
