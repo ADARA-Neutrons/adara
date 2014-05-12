@@ -4,6 +4,10 @@
 
 #include <gddApps.h>
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
+
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
  * using -Werror, but we can quiet the compiler easily.
@@ -205,6 +209,9 @@ gddAppFuncTableStatus smsRunNumberPV::getValue(gdd &in)
 
 caStatus smsRunNumberPV::read(const casCtx &ctx, gdd &prototype)
 {
+	aitUint32 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsRunNumberPV::read() value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
@@ -266,17 +273,23 @@ gddAppFuncTableStatus smsRecordingPV::getEnums(gdd &in)
 
 caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
 {
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsRecordingPV::read() value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 {
+	DEBUG("smsRecordingPV::write()");
+
 	aitUint16 uninitialized_var(v);
 
 	if (!val.isScalar())
 		return S_casApp_noSupport;
 
 	val.get(v);
+	DEBUG("smsRecordingPV::write() value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -343,11 +356,14 @@ gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
 
 caStatus smsStringPV::read(const casCtx &ctx, gdd &prototype)
 {
+	DEBUG("smsStringPV::read() value=" << m_value.get());
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 {
+	DEBUG("smsStringPV::write()");
+
 	unsigned int start, nelem;
 
 	/* caput sends a null string as a scalar, so interpret that
@@ -390,6 +406,8 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	char *new_str = new char[MAX_LENGTH+1];
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
+
+	DEBUG("smsStringPV::write() value=" << new_str);
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 				      MAX_LENGTH);
@@ -487,11 +505,16 @@ gddAppFuncTableStatus smsBooleanPV::getEnums(gdd &in)
 
 caStatus smsBooleanPV::read(const casCtx &ctx, gdd &prototype)
 {
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsBooleanPV::read() value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsBooleanPV::write(const casCtx &ctx, const gdd &val)
 {
+	DEBUG("smsBooleanPV::write()");
+
 	aitUint16 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
 	struct timespec ts;
@@ -500,6 +523,7 @@ caStatus smsBooleanPV::write(const casCtx &ctx, const gdd &val)
 		return S_casApp_noSupport;
 
 	val.get(v);
+	DEBUG("smsBooleanPV::write() value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -587,11 +611,16 @@ gddAppFuncTableStatus smsUint32PV::getValue(gdd &in)
 
 caStatus smsUint32PV::read(const casCtx &ctx, gdd &prototype)
 {
+	aitUint32 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsUint32PV::read() value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsUint32PV::write(const casCtx &ctx, const gdd &val)
 {
+	DEBUG("smsUint32PV::write()");
+
 	aitUint32 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
 	struct timespec ts;
@@ -600,6 +629,7 @@ caStatus smsUint32PV::write(const casCtx &ctx, const gdd &val)
 		return S_casApp_noSupport;
 
 	val.get(v);
+	DEBUG("smsUint32PV::write() value=" << v);
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -690,17 +720,23 @@ gddAppFuncTableStatus smsTriggerPV::getEnums(gdd &in)
 
 caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
 {
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsTriggerPV::read() value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
 {
+	DEBUG("smsTriggerPV::write()");
+
 	aitUint16 uninitialized_var(v);
 
 	if (!val.isScalar())
 		return S_casApp_noSupport;
 
 	val.get(v);
+	DEBUG("smsTriggerPV::write() value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
