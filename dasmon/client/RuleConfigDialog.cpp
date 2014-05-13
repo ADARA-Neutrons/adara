@@ -19,15 +19,17 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     ui->setupUi(this);
 
     QStringList headers;
-    headers << "Stat" << "Rule ID" << "Rule Expression";
+    headers << "Stat" << "Rule ID" << "Rule Expression" << "Description";
     ui->ruleTable->setHorizontalHeaderLabels( headers );
     ui->ruleTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+    ui->ruleTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->ruleTable->horizontalHeader()->show();
 
     headers.clear();
-    headers << "Stat" << "Signal ID" << "Rule ID" << "Source" << "Level" << "Message";
+    headers << "Stat" << "Signal ID" << "Rule ID" << "Source" << "Level" << "Message" << "Description";
     ui->signalTable->setHorizontalHeaderLabels( headers );
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+    ui->signalTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->signalTable->horizontalHeader()->show();
 
     ui->factFilterCB->insertItem(0,"PVs at Limits");
@@ -158,7 +160,6 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg 
         const RuleDefinitions *defs = dynamic_cast<const RuleDefinitions *>( &a_msg );
         if ( defs )
         {
-
             // Make copy of data, then trigger UI refresh
             m_rules = defs->m_rules;
             m_signals = defs->m_signals;
@@ -211,6 +212,7 @@ RuleConfigDialog::updateRuleTables()
         ui->ruleTable->setItem( row, 0, item );
         ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
         ui->ruleTable->setItem( row, 2, new QTableWidgetItem(""));
+        ui->ruleTable->setItem( row, 3, new QTableWidgetItem(""));
     }
 
     row = 0;
@@ -221,10 +223,13 @@ RuleConfigDialog::updateRuleTables()
         else
             tip.clear();
 
+        ui->ruleTable->item( row, 0 )->setToolTip( tip );
         ui->ruleTable->item( row, 1 )->setText( r->fact.c_str() );
         ui->ruleTable->item( row, 1 )->setToolTip( tip );
         ui->ruleTable->item( row, 2 )->setText( r->expr.c_str() );
         ui->ruleTable->item( row, 2 )->setToolTip( tip );
+        ui->ruleTable->item( row, 3 )->setText( r->desc.c_str() );
+        ui->ruleTable->item( row, 3 )->setToolTip( tip );
 
         setupRuleTableRow( row, ie != m_errors.end());
     }
@@ -240,6 +245,7 @@ RuleConfigDialog::updateRuleTables()
         ui->signalTable->setItem( row, 3, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 4, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 5, new QTableWidgetItem(""));
+        ui->signalTable->setItem( row, 6, new QTableWidgetItem(""));
     }
 
     ui->signalTable->setRowCount( m_signals.size() );
@@ -251,6 +257,7 @@ RuleConfigDialog::updateRuleTables()
         else
             tip.clear();
 
+        ui->signalTable->item( row, 0 )->setToolTip( tip );
         ui->signalTable->item( row, 1 )->setText( s->name.c_str() );
         ui->signalTable->item( row, 1 )->setToolTip( tip );
         ui->signalTable->item( row, 2 )->setText( s->fact.c_str() );
@@ -261,6 +268,8 @@ RuleConfigDialog::updateRuleTables()
         ui->signalTable->item( row, 4 )->setToolTip( tip );
         ui->signalTable->item( row, 5 )->setText( s->msg.c_str() );
         ui->signalTable->item( row, 5 )->setToolTip( tip );
+        ui->signalTable->item( row, 6 )->setText( s->desc.c_str() );
+        ui->signalTable->item( row, 6 )->setToolTip( tip );
 
         setupSignalTableRow( row, ie != m_errors.end());
     }
@@ -441,8 +450,8 @@ RuleConfigDialog::setRules( bool a_set_default )
             for ( row = 0; row < count; ++row )
             {
                 rule.fact = ui->ruleTable->item( row, 1 )->text().toUpper().toStdString();
-                //rule.expr = ui->ruleTable->item( row, 2 )->text().toUpper().toStdString();
                 rule.expr = ui->ruleTable->item( row, 2 )->text().toStdString();
+                rule.desc = ui->ruleTable->item( row, 3 )->text().toStdString();
                 m_rules.push_back( rule );
             }
 
@@ -465,6 +474,7 @@ RuleConfigDialog::setRules( bool a_set_default )
                 }
 
                 sig.msg = ui->signalTable->item( row, 5 )->text().toStdString();
+                sig.desc = ui->signalTable->item( row, 6 )->text().toStdString();
 
                 m_signals.push_back( sig );
             }
@@ -539,6 +549,7 @@ RuleConfigDialog::addRule()
     ui->ruleTable->setItem( row, 0, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 2, new QTableWidgetItem(""));
+    ui->ruleTable->setItem( row, 3, new QTableWidgetItem(""));
     setupRuleTableRow( ui->ruleTable->rowCount() - 1, false );
 
     ui->ruleTable->scrollToBottom();
@@ -574,6 +585,7 @@ RuleConfigDialog::addSignal()
     ui->signalTable->setItem( row, 3, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 4, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 5, new QTableWidgetItem(""));
+    ui->signalTable->setItem( row, 6, new QTableWidgetItem(""));
     setupSignalTableRow( ui->signalTable->rowCount() - 1, false );
 
     ui->signalTable->scrollToBottom();
@@ -631,21 +643,12 @@ void
 RuleConfigDialog::showHelp()
 {
     string help_msg =
-            "Rule expression syntax:\n\n"
-            "    FACT_ID OP [VALUE] [OP FACT_ID OP [VALUE] ...]\n\n"
-            "where OP is one of:\n\n"
-            "    DEF (unary - fact is defined)\n"
-            "    UNDEF (unary - fact is undefined)\n"
-            "    <, <=, =, !=, >=, >  (numeric comparisons)\n"
-            "    |    (boolean OR)\n"
-            "    &    (boolean AND)\n"
-            "    !|   (boolean NOR)\n"
-            "    !&   (boolean NAND)\n"
-            "    ^    (boolean XOR)\n\n"
-            "For non-unary operators, a value must be specified. The value "
-            "can be a numberic constant, or it may be a FACT_ID. For compound "
-            "expressions, additional fact-value clauses must be preceeded by "
-            "a boolean operator.";
+            "Rule operators:\n\n"
+            "    <, <=, ==, !=, >=, >  comparisons\n"
+            "    =    assignment\n"
+            "    ||   boolean OR)\n"
+            "    &&   boolean AND)\n"
+            "    ^    (boolean XOR)\n";
 
     QMessageBox::information( this, "DAS Monitor Rule Configuration Help", help_msg.c_str(), QMessageBox::Ok );
 }

@@ -230,8 +230,6 @@ StreamMonitor::stopProcessing()
 void
 StreamMonitor::processThread()
 {
-    char buf;
-
     syslog( LOG_INFO, "Stream monitor process thread started." );
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
@@ -251,37 +249,11 @@ StreamMonitor::processThread()
                     else
                         sleep(5);
                 }
-                else
+                else if ( !read( m_fd_in, 0, ADARA_IN_BUF_SIZE ))
                 {
-                    // See if there is any data to read - if not wait a bit
-                    if ( recv( m_fd_in, &buf, 1, MSG_PEEK ) == -1 )
-                    {
-                        if ( errno == EWOULDBLOCK )
-                        {
-                            usleep(200000);
-                            continue;
-                        }
-                        else if ( errno != EINTR && errno != EAGAIN )
-                        {
-                            syslog( LOG_ERR, "recv() returned error code %i. Dropping connection.", errno );
-                            // Connection lost
-                            handleLostConnection();
-                            // May have lost connection - dont wait for reconnect attempt
-                            continue;
-                        }
-                    }
-
-                    if ( !read( m_fd_in, 0, ADARA_IN_BUF_SIZE ))
-                    {
-                        syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0. Dropping connection." );
-                        // Connection lost due to source closing socket
-                        handleLostConnection();
-                    }
-                    else
-                    {
-                        // Ran out of data in buffer, wait just a bit
-                        usleep(20000);
-                    }
+                    syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0. Dropping connection." );
+                    // Connection lost due to source closing socket
+                    handleLostConnection();
                 }
             }
         }
@@ -422,7 +394,7 @@ StreamMonitor::resetStreamStats()
     m_mon_count_info.clear();
     m_pcharge.reset();
     m_pfreq.reset();
-    m_beam_metrics.clear();
+    //m_beam_metrics.clear();
     m_stream_rate = 0;
 }
 
@@ -437,7 +409,10 @@ StreamMonitor::resetStreamStats()
 void
 StreamMonitor::metricsThread()
 {
-    unsigned short count = 0;
+    unsigned short  count = 0;
+    BeamMetrics     beam_metrics;
+    RunMetrics      run_metrics;
+    StreamMetrics   stream_metrics;
 
     syslog( LOG_INFO, "Stream metrics thread started." );
 
@@ -448,7 +423,7 @@ StreamMonitor::metricsThread()
         // If connected, send beam info and beam metrics
         if ( m_fd_in > -1 )
         {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
+            boost::unique_lock<boost::mutex> lock(m_mutex);
 
             // Check low-count rate on banked events
             if ( !m_bnk_pkt_count )
@@ -462,27 +437,33 @@ StreamMonitor::metricsThread()
             if ( !m_mon_pkt_count )
                 m_mon_count_info.clear();
 
-            m_beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;
-            m_beam_metrics.m_pulse_charge = m_pcharge.average();
-            m_beam_metrics.m_pulse_freq =  m_pfreq.average();
-            m_beam_metrics.m_stream_bps = m_stream_size; // Size = rate so long as polling is at 1 second
+            beam_metrics.m_count_rate = m_bank_count_info.average() * 60.0;
+            beam_metrics.m_pulse_charge = m_pcharge.average();
+            beam_metrics.m_pulse_freq =  m_pfreq.average();
+            beam_metrics.m_stream_bps = m_stream_size; // Size = rate so long as polling is at 1 second
 
-            m_beam_metrics.m_monitor_count_rate.clear();
+            beam_metrics.m_monitor_count_rate.clear();
             for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
-                m_beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
+                beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
 
-            m_notify.beamMetrics( m_beam_metrics );
-
-            // If recording, send run info and run metrics
+            // Update total charge
             if ( m_recording )
             {
                 m_run_metrics.m_total_charge = m_pcharge.total;
-                m_notify.runMetrics( m_run_metrics );
+                run_metrics = m_run_metrics;
             }
 
+            stream_metrics = m_stream_metrics;
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
             m_mon_pkt_count = 0;
+
+            // Release lock and notify listeners
+            lock.unlock();
+            m_notify.beamMetrics( beam_metrics );
+
+            if ( m_recording )
+                m_notify.runMetrics( run_metrics );
 
             // Send stream metrics every 4 seconds
             if ( !(++count & 0x3 ))
@@ -522,6 +503,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         case ADARA::PacketType::DEVICE_DESC_V0:
         case ADARA::PacketType::VAR_VALUE_U32_V0:
         case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
+        case ADARA::PacketType::VAR_VALUE_STRING_V0:
         case ADARA::PacketType::STREAM_ANNOTATION_V0:
         case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
         case ADARA::PacketType::BANKED_EVENT_V0:
@@ -536,7 +518,6 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         case ADARA::PacketType::CLIENT_HELLO_V0:
         case ADARA::PacketType::SYNC_V0:
         case ADARA::PacketType::HEARTBEAT_V0:
-        case ADARA::PacketType::VAR_VALUE_STRING_V0:
             break;
         default:
             ++m_stream_metrics.m_invalid_pkt_type;
@@ -550,7 +531,6 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         throw;
     }
 
-    //return POSIXParser::rxPacket(a_pkt);
     return false;
 }
 
@@ -646,7 +626,6 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         uint16_t        pix_count;
 
         m_bank_info.clear();
-        //m_pixel_to_bank.clear();
 
         // Build banks and analyze pid range
         while( rpos < epos )
@@ -680,9 +659,6 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 
         m_pixmap.clear();
         m_pixmap.resize( max_pid + 1, -1 );
-
-        //cout << "min pid: " << min_pid << endl;
-        //cout << "max pid: " << max_pid << endl;
 
         // Build pid-to-bank index
         rpos = (const uint32_t*)a_pkt.payload();
@@ -809,10 +785,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
                 else
                 {
                     if ( ibank->second.m_source_id != source_id )
-                    {
                         ++m_stream_metrics.m_bank_source_mismatch;
-                        //cout << "BSM: bank: " << bank_id << " reported in " << source_id << " should be in " << ibank->second.m_source_id << endl;
-                    }
 
                     if ( ibank->second.m_last_pulse_time == m_this_time )
                         ++m_stream_metrics.m_duplicate_bank;
@@ -826,11 +799,7 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
                     tof = *rpos++;
                     pid = *rpos++;
                     if ( tof > m_maxtof ) // in 100nsec units, compare to 2e8 usec
-                    {
                         ++m_stream_metrics.m_pixel_invalid_tof;
-                        //cout << "TOF: " << tof << endl;
-                        //cout << "TOF: " << hex << tof << dec << endl;
-                    }
 
                     if ( pid >= m_pixmap.size() )
                         pixbank = -1;
@@ -1067,6 +1036,8 @@ StreamMonitor::toPVType
         return PVT_DOUBLE;
     else if ( boost::iequals( a_source, "float" ))
         return PVT_FLOAT;
+    else if ( boost::iequals( a_source, "string" ))
+        return PVT_STRING;
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 
@@ -1160,6 +1131,9 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                 case PVT_DOUBLE:
                                     m_pvs[key] = new PVInfo<double>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
                                     break;
+                                case PVT_STRING:
+                                    m_pvs[key] = new PVInfo<string>( pv_name, a_pkt.devId(), pv_id, pv_type, "" );
+                                    break;
                                 }
 
                                 m_notify.pvDefined( pv_name );
@@ -1169,8 +1143,9 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                 }
             }
         }
-        catch( ... )
+        catch( std::exception &e )
         {
+            cout << "Bad DDP: " << e.what() << endl;
             // Primitive fault detection / reporting
             m_ok = false;
             ++m_stream_metrics.m_bad_ddp_xml;
@@ -1207,6 +1182,18 @@ bool
 StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
     pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA variable update packet (string)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::VariableStringPkt &a_pkt )
+{
+    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -1307,7 +1294,6 @@ StreamMonitor::dbThread()
     vector<PVInfoBase*> pvs;
     vector<PVInfoBase*>::iterator ipvv;
     char buf[500];
-    double value;
     bool send_all =  true;
     bool update;
 
@@ -1342,12 +1328,21 @@ StreamMonitor::dbThread()
                 // Send PV updates to database
                 for ( ipvv = pvs.begin(); ipvv != pvs.end(); ++ipvv )
                 {
-                    if ( (*ipvv)->m_type == PVT_FLOAT || (*ipvv)->m_type == PVT_DOUBLE )
-                        value = ((PVInfo<double>*)(*ipvv))->m_value;
-                    else
-                        value = ((PVInfo<uint32_t>*)(*ipvv))->m_value;
+                    switch ( (*ipvv)->m_type )
+                    {
+                    case PVT_FLOAT:
+                    case PVT_DOUBLE:
+                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<double>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
+                        break;
+                    case PVT_INT:
+                    case PVT_UINT:
+                    case PVT_ENUM:
+                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<uint32_t>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
+                        break;
+                    case PVT_STRING:
+                        continue; // Web monitor db does not support strings yet
+                    }
 
-                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
@@ -1529,6 +1524,13 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, V
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+}
+
+void
+StreamMonitor::Notifier::pvValue( const std::string &a_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );

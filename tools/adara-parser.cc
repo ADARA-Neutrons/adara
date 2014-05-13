@@ -133,7 +133,7 @@ class Parser : public ADARA::Parser {
 public:
 	Parser() :
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
-        m_showVars(true), m_showDDP(false)
+        m_showVars(true), m_showDDP(false), m_lowRate(false )
 	{ }
 
 	void parse(int argc, char **argv);
@@ -174,6 +174,7 @@ private:
 	bool m_showEvents;
 	bool m_showVars;
     bool m_showDDP;
+    bool m_lowRate;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
@@ -619,7 +620,7 @@ bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		printf("%u.%09u DOUBLE VARIABLE\n"
 		       "    Device %u Variable %u\n"
 		       "    Status %s Severity %s\n"
-		       "    Value %f\n",
+		       "    Value %lf\n",
 		       (uint32_t) (pkt.pulseId() >> 32),
 		       (uint32_t) pkt.pulseId(),
 		       pkt.devId(), pkt.varId(), statusString(pkt.status()),
@@ -648,9 +649,12 @@ void Parser::parse_file(FILE *f)
 	size_t len;
 
 	while (!feof(f)) {
-		len = bufferFillLength();
-		len = fread(bufferFillAddress(), 1, len, f);
-		if (!len) {
+        if ( m_lowRate )
+            len = fread(bufferFillAddress(), 1, 16, f);
+        else
+            len = fread(bufferFillAddress(), 1, bufferFillLength(), f);
+
+        if (!len) {
 			if (feof(f))
 				return;
 			throw std::string("read error");
@@ -695,7 +699,8 @@ void Parser::parse(int argc, char **argv)
 		("hexdump,x", "Dump the contents of each packet in hex (bytes)")
 		("worddump,w", "Dump the contents of each packet in hex (words)")
 		("hidevars,H", "Hide variable update packets")
-    ("showddp,D", "Show payload of device descriptor packets")
+        ("showddp,D", "Show payload of device descriptor packets")
+        ("low,l", "Set low data rate mode (uses very small buffer size)")
         ("events,e", "Show events");
 
 	po::options_description hidden("Hidden options");
@@ -729,6 +734,7 @@ void Parser::parse(int argc, char **argv)
 	m_showEvents = !!vm.count("events");
     m_showVars = !vm.count("hidevars");
     m_showDDP = vm.count("showddp");
+    m_lowRate = vm.count("low");
 
 	if (!vm.count("file")) {
 		try {

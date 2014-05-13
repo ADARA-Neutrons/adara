@@ -8,6 +8,10 @@
 #include <unistd.h>
 #include <errno.h>
 
+// #include "Logging.h"
+
+// static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
+
 ReadyAdapter *SignalEvents::m_read;
 int SignalEvents::m_fd = -1;
 sigset_t SignalEvents::m_sig_set;
@@ -98,10 +102,13 @@ int SignalEvents::allocateRTsig(cbFunc cb)
 
 void SignalEvents::signaled(void)
 {
+	// DEBUG("signaled entry");
+
 	struct signalfd_siginfo info;
 	int rc;
 
 	for (;;) {
+		// NOTE: This is Standard C Library read()... ;-o
 		rc = read(m_fd, &info, sizeof(info));
 		if (rc <= 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -117,4 +124,6 @@ void SignalEvents::signaled(void)
 
 		m_sig_map[info.ssi_signo](info);
 	}
+
+	// DEBUG("signaled exit");
 }

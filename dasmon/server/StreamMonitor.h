@@ -41,6 +41,7 @@ public:
     virtual void pvUndefined( const std::string &a_name ) = 0;
     virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
     virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -56,7 +57,8 @@ enum PVType
     PVT_UINT,
     PVT_FLOAT,
     PVT_DOUBLE,
-    PVT_ENUM
+    PVT_ENUM,
+    PVT_STRING
 };
 
 /// Base class for all process variable (PV) types
@@ -212,6 +214,7 @@ private:
         void pvUndefined( const std::string &a_name );
         void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
         void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
         void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
 
     private:
@@ -239,6 +242,7 @@ private:
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableStringPkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
@@ -256,7 +260,6 @@ private:
     boost::thread                  *m_metrics_thread;
     bool                            m_process_stream;
     Notifier                        m_notify;
-    //std::map<uint32_t,PktStats>     m_stats;
     uint32_t                        m_bank_count;
     CountInfo<uint64_t>             m_bank_count_info;
     std::map<uint32_t,CountInfo<uint64_t> >     m_mon_count_info;

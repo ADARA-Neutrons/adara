@@ -67,21 +67,44 @@ STS::PVInfoBase*
 NxGen::makePVInfo
 (
     const string       &a_name,         ///< [in] Name of PV
+    const string       &a_device_name,  ///< [in] Name of device that owns the PV
     STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
     STS::Identifier     a_pv_id,        ///< [in] ID of the PV
     STS::PVType         a_type,         ///< [in] Type of PV
-    const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
+    const string       &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
+    set<string>::iterator i;
+    string internal_name = a_name;
+    uint32_t ver = 0;
+
+    // Check for name collisions: This code looks for name accross all PV names and if found
+    // increments a version number. Then it checks again to make sure the auto-generated internal
+    // name doesn't collide with an existing (top-level) name. This continues until a version
+    // is found that doesn't collide.
+    while ( 1 )
+    {
+        i = m_pv_name_history.find( internal_name );
+        if ( i != m_pv_name_history.end())
+            internal_name = a_name + "(" + boost::lexical_cast<string>( ++ver ) + ")";
+        else
+        {
+            m_pv_name_history.insert( internal_name );
+            break;
+        }
+    }
+
     switch ( a_type )
     {
-    case STS::PVT_INT:  // TODO ADARA only supports uint32_t currently
+    case STS::PVT_INT:  // ADARA only supports uint32_t currently
     case STS::PVT_ENUM:
     case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
-    case STS::PVT_FLOAT: // TODO ADARA only supports double currently
+        return new NxPVInfo<uint32_t>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+    case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_name, a_device_id, a_pv_id, a_type, a_units, *this );
+        return new NxPVInfo<double>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+    case STS::PVT_STRING:
+        return 0; // Not supported
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "makePVInfo() failed - invalid PV type: " << a_type );
@@ -899,6 +922,8 @@ NxGen::toNxType
         return NeXus::FLOAT32;
     case STS::PVT_DOUBLE:
         return NeXus::FLOAT64;
+    case STS::PVT_STRING: // Not supported
+        break;
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )

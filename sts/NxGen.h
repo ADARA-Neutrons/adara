@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -95,6 +96,8 @@ private:
         NxPVInfo
         (
             const std::string  &a_name,         ///< [in] Name of PV
+            const std::string  &a_internal_name,///< [in] Internal (Nexus) name of PV
+            const std::string  &a_device_name,  ///< [in] Name of owning device
             STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
             STS::Identifier     a_pv_id,        ///< [in] ID of the PV
             STS::PVType         a_type,         ///< [in] Type of PV
@@ -102,11 +105,12 @@ private:
             NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus ouput
         )
         :
-            STS::PVInfo<T>( a_name, a_device_id, a_pv_id, a_type, a_units ),
+            STS::PVInfo<T>( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units ),
             m_nxgen(a_nxgen),
+            m_internal_name(a_internal_name),
             m_slab_size(0)
         {
-            m_log_path = std::string("/entry/DASlogs/") + a_name;
+            m_log_path = std::string("/entry/DASlogs/") + m_internal_name;
         }
 
         /// NxPVInfo destructor
@@ -125,6 +129,8 @@ private:
                     // Create log if no data has been written yet
                     if ( !m_slab_size )
                     {
+                        std::cout << "Making entry for PV: " << m_log_path << std::endl;
+
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
                         m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
                         m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
@@ -166,6 +172,7 @@ private:
         }
 
         NxGen&          m_nxgen;        ///< NxGen instance used for Nexus ouput
+        std::string     m_internal_name;///< Internal Nexus name of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
     };
@@ -191,7 +198,7 @@ protected:
 
     void                initialize();
     void                finalize( const STS::RunMetrics &a_run_metrics );
-    STS::PVInfoBase*    makePVInfo( const std::string & a_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
+    STS::PVInfoBase*    makePVInfo( const std::string & a_name, const std::string & a_device_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
     STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
     STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
     void                processRunInfo( const STS::RunInfo & a_run_info );
@@ -286,22 +293,17 @@ private:
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
-    uint64_t            m_pulse_vetoes_slab_size;   ///< Current size of pulse vetoe slab
-
-    // Pause/resume data
-    std::vector<double>         m_pause_time;
-    std::vector<uint16_t>       m_pause_value;
-
-    // Scan start/stop/index data
-    std::vector<double>         m_scan_time;
-    std::vector<uint32_t>       m_scan_value;
-
-    // Stream annotation data
-    std::vector<double>         m_comment_time;
-    std::vector<uint32_t>       m_comment_offset;
-    std::vector<uint32_t>       m_comment_length;
-    std::vector<char>           m_comment_data;
-    unsigned long               m_comment_last_offset;
+    uint64_t            m_pulse_vetoes_slab_size;       ///< Current size of pulse vetoe slab
+    std::vector<double>         m_pause_time;           /// Pause annotation timestamp buffer
+    std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
+    std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
+    std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
+    std::vector<double>         m_comment_time;         /// Comment annotation timestamp buffer
+    std::vector<uint32_t>       m_comment_offset;       /// Comment data slab offset buffer
+    std::vector<uint32_t>       m_comment_length;       /// Comment data length buffer
+    std::vector<char>           m_comment_data;         /// Comment data buffer
+    unsigned long               m_comment_last_offset;  /// Last slab offset written to Nexus
+    std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
 };
 
 #endif // NXGEN_H

@@ -73,10 +73,13 @@ LiveClient::LiveClient(int fd) :
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
+	INFO("client " << m_clientName << " ready to connect");
+
 	try {
 		m_timer = new TimerAdapter<LiveClient>(this);
 		m_timer->start(m_hello_timeout);
 	} catch (...) {
+		ERROR("Unknown Exception in LiveClient() Hello Timeout");
 		delete m_read;
 		throw;
 	}
@@ -108,6 +111,8 @@ bool LiveClient::timerExpired(void)
 
 void LiveClient::writable(void)
 {
+	// DEBUG("writable() entry");
+
 	FileList::iterator it;
 	ssize_t len, rc;
 
@@ -145,11 +150,15 @@ void LiveClient::writable(void)
 				goto more;
 
 			/* Only complain if it's not the client going away */
+			int e = errno;
 			if (errno != EPIPE && errno != ECONNRESET) {
-				int e = errno;
 				ERROR("client " << m_clientName
 				      << ": Fatal error during sendfile: "
 				      << strerror(e));
+			}
+			else {
+				INFO("client " << m_clientName << " connection broken: "
+					<< strerror(e));
 			}
 
 			/* Nothing further to do, just clean ourselves up. */
@@ -188,6 +197,7 @@ idle:
 		delete m_write;
 		m_write = NULL;
 	}
+	// DEBUG("writable() idle exit");
 	return;
 
 more:
@@ -197,6 +207,7 @@ more:
 	if (!m_write)
 		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
 				boost::bind(&LiveClient::writable, this));
+	// DEBUG("writable() more exit");
 }
 
 void LiveClient::containerChange(StorageContainer::SharedPtr &c, bool starting)
@@ -228,6 +239,8 @@ void LiveClient::fileAdded(StorageFile::SharedPtr &f)
 
 void LiveClient::fileUpdated(const StorageFile &f)
 {
+	// DEBUG("fileUpdated() entry");
+
 	/* The current file just got updated; if we're not already waiting
 	 * for buffer space in the socket, try to send the new data
 	 */
@@ -236,12 +249,17 @@ void LiveClient::fileUpdated(const StorageFile &f)
 
 	if (!f.active())
 		m_fileConnection.disconnect();
+
+	// DEBUG("fileUpdated() exit");
 }
 
 void LiveClient::readable(void)
 {
+	// DEBUG("readable() entry");
+
 	try {
-		if (!read(m_client_fd, 0, MAX_PKT_SIZE)) {
+		// NOTE: This is POSIXParser::read()... ;-o
+		if (!read(m_client_fd, 4000, MAX_PKT_SIZE)) {
 			/* EOF or our handlers indicated it was time to stop,
 			 * so kill ourselves off. We can't do this from the
 			 * handlers, as ADARA::Parser::read() will modify
@@ -254,6 +272,8 @@ void LiveClient::readable(void)
 		      << " exception reading stream: " << e.what());
 		delete this;
 	}
+
+	// DEBUG("readable() exit");
 }
 
 bool LiveClient::rxPacket(const ADARA::Packet &pkt)
@@ -289,6 +309,9 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 	m_timer->cancel();
 	m_hello_received = true;
+
+	INFO("LiveClient Hello Received, Requested Start Time "
+		<< pkt.requestedStartTime());
 
 	m_mgrConnection = StorageManager::onContainerChange(
 		boost::bind(&LiveClient::containerChange, this, _1, _2));

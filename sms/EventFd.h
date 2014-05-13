@@ -72,6 +72,7 @@ private:
 		uint64_t val;
 		ssize_t rc;
 
+		// NOTE: This is Standard C Library read()... ;-o
 		rc = ::read(m_fd, &val, sizeof(val));
 		if (rc != 8) {
 			if (errno != EAGAIN) {

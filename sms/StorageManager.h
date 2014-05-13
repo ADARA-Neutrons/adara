@@ -4,7 +4,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <boost/thread.hpp>
 #include <stdint.h>
 #include <sys/uio.h>
@@ -20,9 +20,9 @@ class EventFd;
 
 class StorageManager {
 public:
-	typedef boost::signal<void (StorageContainer::SharedPtr &, bool)>
-								ContainerSignal;
-	typedef boost::signal<void (void)> PrologueSignal;
+	typedef boost::signals2::signal<void (StorageContainer::SharedPtr &,
+					      bool)> ContainerSignal;
+	typedef boost::signals2::signal<void (void)> PrologueSignal;
 	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
 								FileOffSetFunc;
 
@@ -56,12 +56,12 @@ public:
 
 	static int base_fd() { return m_base_fd; }
 
-	static boost::signals::connection onContainerChange(
+	static boost::signals2::connection onContainerChange(
 					const ContainerSignal::slot_type &s) {
 		return m_contChange.connect(s);
 	}
 
-	static boost::signals::connection onPrologue(
+	static boost::signals2::connection onPrologue(
 					const PrologueSignal::slot_type &s) {
 		return m_prologue.connect(s);
 	}
@@ -84,7 +84,7 @@ public:
 	static void config(const boost::property_tree::ptree &conf);
 
 private:
-	typedef boost::signals::connection connection;
+	typedef boost::signals2::connection connection;
 
 	struct IndexEntry {
 		StorageFile::SharedPtr	m_stateFile;

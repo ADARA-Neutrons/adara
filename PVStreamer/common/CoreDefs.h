@@ -1,0 +1,44 @@
+#ifndef COREDEFS_H
+#define COREDEFS_H
+
+#include <stdint.h>
+
+namespace PVS {
+
+typedef uint32_t Identifier;
+typedef uint32_t Protocol;
+
+enum PVType
+{
+    PV_INT,
+    PV_UINT,
+    PV_REAL,
+    PV_ENUM,
+    PV_STR
+};
+
+
+enum PVStatus
+{
+    PV_OK = 0,
+    PV_DISCONNECTED,
+    PV_LOW_LIMIT,
+    PV_HIGH_LIMIT,
+    PV_ERR
+};
+
+
+enum
+{
+    EC_INVALID_OPERATION = 1,
+    EC_INVALID_PARAM,
+    EC_INVALID_CONFIG_DATA,
+    EC_SOCKET_ERROR,
+    EC_UNKOWN_ERROR,
+    EC_EPICS_API,
+    EC_WINDOWS_ERROR = 0x1000
+};
+
+}
+
+#endif // COREDEFS_H

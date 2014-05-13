@@ -9,6 +9,9 @@
 #include "EPICS.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
 std::string LiveServer::m_service;
 LiveServer *LiveServer::m_singleton;
@@ -80,15 +83,20 @@ LiveServer::LiveServer()
 		goto error_fd;
 	}
 
+	INFO("LiveServer() listening for connections...");
+
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
 					boost::bind(&LiveServer::newConnection,
 						    this));
 	} catch(...) {
+		ERROR("Unknown LiveServer() Exception in Ready Adapter");
 		close(m_fd);
 		freeaddrinfo(ai);
 		throw;
 	}
+
+	INFO("LiveServer() adapter ready for connections");
 
 	return;
 
@@ -102,6 +110,8 @@ error:
 
 void LiveServer::newConnection(void)
 {
+	DEBUG("newConnection() entry");
+
 	int rc;
 
 	rc = accept4(m_fd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);
@@ -110,16 +120,18 @@ void LiveServer::newConnection(void)
 
 		if (e == EINTR || e == EAGAIN || e == EWOULDBLOCK ||
 							e == ECONNABORTED) {
+			DEBUG("newConnection() not-really-an-error exit");
 			/* Not really an error */
 			return;
 		}
 
 		if (e == ENOBUFS || e == ENOMEM || e == EMFILE || e == ENFILE) {
 			/* TODO log no descriptors */
+			DEBUG("newConnection() no-descriptors exit");
 			return;
 		}
 
-		std::string msg("LiveServer::fdReady accept error: ");
+		std::string msg("LiveServer::newConnection() accept error: ");
 		msg += strerror(e);
 		throw std::runtime_error(msg);
 	}
@@ -127,8 +139,12 @@ void LiveServer::newConnection(void)
 	try {
 		new LiveClient(rc);
 	} catch (...) {
+		ERROR("Unknown LiveClient() Exception in newConnection()");
 		close(rc);
 	}
 
 	/* TODO may want to put on list to cleanup during shutdown */
+
+	DEBUG("newConnection() exit");
 }
+

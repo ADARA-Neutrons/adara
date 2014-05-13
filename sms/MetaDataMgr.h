@@ -2,7 +2,7 @@
 #define __METADATAMGR_H
 
 #include <boost/noncopyable.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <boost/smart_ptr.hpp>
 #include <map>
 #include <set>
@@ -53,7 +53,7 @@ private:
 	typedef std::map<uint32_t, DeviceVariables> DeviceMap;
 
 	DeviceMap m_devices;
-	boost::signals::connection m_connection;
+	boost::signals2::connection m_connection;
 	std::map<uint64_t, uint32_t> m_devIdMap;
 	std::set<uint32_t> m_activeDevId;
 	uint32_t m_nextDevId;

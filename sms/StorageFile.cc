@@ -211,6 +211,9 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 
 off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 {
+	// DEBUG("StorageFile::write() entry len=" << len
+		// << " nvecs=" << iovec.size());
+
 	struct iovec *vec = &iovec.front();
 	int nvecs = iovec.size();
 	int iovcnt;
@@ -269,11 +272,17 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 	if (do_notify)
 		notify();
 
+	// DEBUG("StorageFile::write() exit");
+
 	return m_size;
 }
 
 void StorageFile::notify(void)
 {
+	// DEBUG("StorageFile::notify entry m_size=" << m_size
+		// << " m_sizeLastUpdate=" << m_sizeLastUpdate
+		// << " m_max_file_size=" << m_max_file_size);
+
 	if (m_size >= m_max_file_size)
 		m_oversize = true;
 
@@ -281,6 +290,8 @@ void StorageFile::notify(void)
 		m_sizeLastUpdate = m_size;
 		m_update(*this);
 	}
+
+	// DEBUG("StorageFile::notify exit");
 }
 
 void StorageFile::terminate(ADARA::RunStatus::Enum status)
@@ -355,6 +366,7 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 		f->m_path = path;
 		free(path);
 	} catch (...) {
+		ERROR("stateFile() reallocation error");
 		free(path);
 		throw;
 	}

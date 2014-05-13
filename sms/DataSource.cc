@@ -65,7 +65,8 @@ public:
 		if (m_lastPulse == m_activePulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
 			ERROR("Duplicate pulse from " << m_name << " src 0x"
-				<< std::hex << m_hwId);
+				<< std::hex << m_hwId
+				<< " (" << m_activePulse << ")");
 			m_dupCount++;
 		} else
 			m_dupCount = 0;
@@ -218,6 +219,8 @@ void DataSource::connectionFailed(void)
 
 bool DataSource::timerExpired(void)
 {
+	// DEBUG("timerExpired() entry");
+
 	switch (m_state) {
 	case IDLE:
 		startConnect();
@@ -233,11 +236,15 @@ bool DataSource::timerExpired(void)
 		break;
 	}
 
+	// DEBUG("timerExpired() exit");
+
 	return false;
 }
 
 void DataSource::fdReady(void)
 {
+	// DEBUG("fdReady() entry m_state=" << m_state);
+
 	switch (m_state) {
 	case IDLE:
 		throw std::logic_error("Invalid state");
@@ -248,6 +255,8 @@ void DataSource::fdReady(void)
 		dataReady();
 		break;
 	}
+
+	// DEBUG("fdReady() exit");
 }
 
 void DataSource::startConnect(void)
@@ -350,7 +359,8 @@ void DataSource::dataReady(void)
 	m_timer->start(m_data_timeout);
 
 	try {
-		if (!read(m_fd, 0, m_max_read_chunk)) {
+		// NOTE: This is POSIXParser::read()... ;-o
+		if (!read(m_fd, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name);
 			connectionFailed();
 		}

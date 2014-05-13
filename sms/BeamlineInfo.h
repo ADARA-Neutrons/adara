@@ -2,7 +2,7 @@
 #define __BEAMLINE_INFO_H
 
 #include <boost/noncopyable.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
 #include <string>
 
 class BeamlineInfo : boost::noncopyable {
@@ -14,7 +14,7 @@ public:
 private:
 	uint8_t *m_packet;
 	uint32_t m_packetSize;
-	boost::signals::connection m_connection;
+	boost::signals2::connection m_connection;
 
 	void onPrologue(void);
 };

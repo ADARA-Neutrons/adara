@@ -23,7 +23,7 @@ public:
 	static void config(const boost::property_tree::ptree &conf);
 
 private:
-	typedef boost::signals::connection connection;
+	typedef boost::signals2::connection connection;
 
 	STSClientMgr &m_mgr;
 	int m_sts_fd;

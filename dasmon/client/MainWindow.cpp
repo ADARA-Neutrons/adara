@@ -528,7 +528,11 @@ MainWindow::onTableTimer()
         for ( ; ipv != m_pvs.end(); ++ipv, ++i )
         {
             ui->pvTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( ipv->first.c_str() )));
-            ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.value )));
+            if ( ipv->second.is_str )
+                ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.str_val.c_str() )));
+            else
+                ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.dbl_val )));
+            ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
             ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
             ui->pvTable->setItem( i, 3, new QTableWidgetItem( QDateTime::fromTime_t(ipv->second.timestamp).toString() ));
         }
@@ -1014,7 +1018,6 @@ MainWindow::clearBeamDisplay()
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    //QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
 

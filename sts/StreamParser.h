@@ -88,6 +88,8 @@ private:
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
+    bool        rxOversizePkt( const ADARA::PacketHeader *hdr, const uint8_t *chunk, unsigned int chunk_offset, unsigned int chunk_len);
+
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
@@ -115,7 +117,7 @@ private:
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
-    std::map<std::string,PVInfoBase*>       m_pvs_by_name;              ///< Index of process variable information (by name)
+    std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
     unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received

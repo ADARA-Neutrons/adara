@@ -105,8 +105,7 @@ StreamAnalyzer::loadConfig()
     SignalInfo                      signal;
     vector<SignalInfo>              loaded_signals;
 
-    boost::char_separator<char> sep1(":");
-    boost::char_separator<char> sep2(",");
+    boost::char_separator<char> sep1(";");
     boost::tokenizer<boost::char_separator<char> >::iterator tok;
 
     string cfg = m_cfg_dir + "dasmond.cfg";
@@ -146,12 +145,15 @@ StreamAnalyzer::loadConfig()
                         rule.fact = *tok++;
                         if ( tok == tokens.end())
                             throw -1;
-                        rule.expr = *tok;
+                        rule.expr = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+                        rule.desc = *tok++;
                         loaded_rules.push_back( rule );
                     }
                     else if ( mode == 2 )
                     {
-                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep2 );
+                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
                         tok = tokens.begin();
 
                         if ( tok == tokens.end())
@@ -168,7 +170,14 @@ StreamAnalyzer::loadConfig()
                         signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
                         if ( tok == tokens.end())
                             throw -1;
+
                         signal.msg = *tok++;
+                        if ( tok == tokens.end())
+                            throw -1;
+
+                        signal.desc = *tok++;
+                        while ( tok != tokens.end())
+                            signal.desc += ";" + *tok++;
 
                         loaded_signals.push_back( signal );
                     }
@@ -222,7 +231,7 @@ StreamAnalyzer::saveConfig()
 
     for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
     {
-        outf << rule->fact << ":" << rule->expr << endl;
+        outf << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
     }
 
     // SIGNAL_ID,FACT_ID,SOURCE,LEVEL,Message
@@ -231,8 +240,8 @@ StreamAnalyzer::saveConfig()
 
     for ( map<string,SignalInfo>::iterator sig = m_signals.begin(); sig != m_signals.end(); ++sig )
     {
-        outf << sig->second.name << "," << sig->second.fact << "," << sig->second.source << ",";
-        outf << sig->second.level << "," << sig->second.msg << endl;
+        outf << sig->second.name << ";" << sig->second.fact << ";" << sig->second.source << ";";
+        outf << sig->second.level << ";" << sig->second.msg << ";" << sig->second.desc << endl;
     }
 
     outf.close();
@@ -381,7 +390,7 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     {
         try
         {
-            engine->defineRule( r->fact, r->expr );
+            engine->defineRule( r->fact, r->expr, r->desc );
         }
         catch ( std::exception &e )
         {
@@ -1074,6 +1083,35 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name, double a_value, VariableS
         m_engine->retract( m_pv_prefix + pv_name );
     else
         m_engine->assert( m_pv_prefix + pv_name, a_value );
+
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a string PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. String values
+  * are converted to "booleans" - true if not empty, false otherwise
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_pv_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    (void)a_timestamp;
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_pv_name );
+
+    cout << "str val [" << a_value << "] empty? " << a_value.empty() << endl;
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+        m_engine->retract( m_pv_prefix + pv_name );
+    else
+        m_engine->assert( m_pv_prefix + pv_name, a_value.empty()?0.0:1.0 );
+
 
     processPvStatus( pv_name, a_status, false );
 }
