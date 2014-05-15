@@ -17,15 +17,16 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 
 	unsigned long len, to_read = max_read ?: ~0UL;
 	unsigned int max_parse = ~0U;
+	unsigned long to_parse = max_packets ?: max_parse;
 	unsigned long total_bytes = 0;
 	unsigned int total_packets = 0;
 	unsigned int read_count = 0;
 	unsigned int loop_count = 0;
 	ssize_t rc;
 
-	// DEBUG("read() to_read=" << to_read << " max_packets=" << max_packets);
+	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
-	while (to_read && total_packets < max_packets && read_count < 10) {
+	while (to_read && total_packets < to_parse && read_count < 10) {
 		loop_count++;
 		len = bufferFillLength();
 		if (len > to_read)
