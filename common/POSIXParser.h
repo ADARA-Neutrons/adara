@@ -20,7 +20,7 @@ public:
 	 * limits the number of packets parsed. read() will stop if either
 	 * limit is reached.
 	 */
-        bool read(int fd, unsigned int max_packets = 0,
+        bool read(int fd, unsigned int max_packets = 1,
 		  unsigned int max_read = 0);
 
 	using ADARA::Parser::rxPacket;
