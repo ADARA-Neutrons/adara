@@ -41,6 +41,8 @@ protected:
 
 	virtual gddAppFuncTableStatus getValue(gdd &value) = 0;
 	virtual gddAppFuncTableStatus getEnums(gdd &value);
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
 	gddAppFuncTableStatus unusedType(gdd &in);
 
 	void initReadTable(void);
