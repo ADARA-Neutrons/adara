@@ -17,6 +17,21 @@ public:
 
 	virtual ~Parser();
 
+	ssize_t last_bytes_read;
+	ssize_t last_last_bytes_read;
+	ssize_t last_pkts_parsed;
+	ssize_t last_last_pkts_parsed;
+	unsigned long last_total_bytes;
+	unsigned long last_last_total_bytes;
+	unsigned int last_total_packets;
+	unsigned int last_last_total_packets;
+	unsigned int last_read_count;
+	unsigned int last_last_read_count;
+	unsigned int last_loop_count;
+	unsigned int last_last_loop_count;
+	time_t last_elapsed;
+	time_t last_last_elapsed;
+
 protected:
 	/* The ADARA::Parser class maintains an internal buffer that
 	 * subclasses and direct users must fill with stream data for

@@ -1,6 +1,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
 
 #include "POSIXParser.h"
 
@@ -15,6 +16,9 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 {
 	// DEBUG("read() entry");
 
+	time_t start_time = time(0);
+	time_t end_time;
+
 	unsigned long len, to_read = max_read ?: ~0UL;
 	unsigned int max_parse = ~0U;
 	unsigned long to_parse = max_packets ?: max_parse;
@@ -28,13 +32,19 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 
 	while (to_read && total_packets < to_parse && read_count < 10) {
 		loop_count++;
+		last_last_loop_count = last_loop_count;
+		last_loop_count = loop_count;
 		len = bufferFillLength();
 		if (len > to_read)
 			len = to_read;
 		if (len) {
 			read_count++;
+			last_last_read_count = last_read_count;
+			last_read_count = read_count;
 			// NOTE: This is Standard C Library read()... ;-o
 			rc = ::read(fd, bufferFillAddress(), len);
+			last_last_bytes_read = last_bytes_read;
+			last_bytes_read = rc;
 			if (rc < 0) {
 				switch (errno) {
 				case EINTR:
@@ -43,6 +53,9 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 					 * but we're OK
 					 */
 					// DEBUG("read() no data but OK exit");
+					end_time = time(0);
+					last_last_elapsed = last_elapsed;
+					last_elapsed = end_time - start_time;
 					return true;
 				case EPIPE:
 				case ECONNRESET:
@@ -53,6 +66,9 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 					 * shouldn't be fatal.
 					 */
 					// DEBUG("read() host went away exit");
+					end_time = time(0);
+					last_last_elapsed = last_elapsed;
+					last_elapsed = end_time - start_time;
 					return false;
 				default:
 					/* TODO consider if we should throw an
@@ -67,6 +83,9 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 
 			if (rc == 0) {
 				// DEBUG("read() read returned 0 exit");
+				end_time = time(0);
+				last_last_elapsed = last_elapsed;
+				last_elapsed = end_time - start_time;
 				return false;
 			}
 
@@ -79,6 +98,8 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			to_read -= rc;
 
 			total_bytes += rc;
+			last_last_total_bytes = last_total_bytes;
+			last_total_bytes = total_bytes;
 			// DEBUG("read() Read " << rc << " Bytes"
 				// << " to_read=" << to_read
 				// << " total_bytes=" << total_bytes);
@@ -86,8 +107,13 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 
 		// Always parse as many packets as possible, don't leave any behind.
 		rc = bufferParse(max_parse);
+		last_last_pkts_parsed = last_pkts_parsed;
+		last_pkts_parsed = rc;
 		if (rc < 0) {
 			// DEBUG("read() bufferParse() error exit");
+			end_time = time(0);
+			last_last_elapsed = last_elapsed;
+			last_elapsed = end_time - start_time;
 			return false;
 		}
 
@@ -96,6 +122,8 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 		 * safe to cast away the warning here.
 		 */
 		total_packets += (unsigned int) rc;
+		last_last_total_packets = last_total_packets;
+		last_total_packets = total_packets;
 		// DEBUG("read() Parsed " << rc << " Packets"
 			// << " total_packets=" << total_packets);
 	}
@@ -105,6 +133,10 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 		// << " total_packets=" << total_packets
 		// << " read_count=" << read_count
 		// << " loop_count=" << loop_count);
+
+	end_time = time(0);
+	last_last_elapsed = last_elapsed;
+	last_elapsed = end_time - start_time;
 
 	return true;
 }
