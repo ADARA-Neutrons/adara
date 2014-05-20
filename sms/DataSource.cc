@@ -200,7 +200,21 @@ void DataSource::connectionFailed(void)
 		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
 		<< " sec=" << m_last_pkt_sec
 		<< " nsec=" << m_last_pkt_nsec
-		<< " len=" << m_last_pkt_len );
+		<< " len=" << m_last_pkt_len
+		<< " last_bytes_read=" << Parser::last_bytes_read
+		<< " last_pkts_parsed=" << Parser::last_pkts_parsed
+		<< " last_total_bytes=" << Parser::last_total_bytes
+		<< " last_total_packets=" << Parser::last_total_packets
+		<< " last_read_count=" << Parser::last_read_count
+		<< " last_loop_count=" << Parser::last_loop_count
+		<< " last_elapsed=" << Parser::last_elapsed
+		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
+		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
+		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
+		<< " last_last_total_packets=" << Parser::last_last_total_packets
+		<< " last_last_read_count=" << Parser::last_last_read_count
+		<< " last_last_loop_count=" << Parser::last_last_loop_count
+		<< " last_last_elapsed=" << Parser::last_last_elapsed);
 
 	if (m_fdreg) {
 		delete m_fdreg;
