@@ -574,6 +574,40 @@ echo "\n. . ."
 sleep 3
 
 #
+# Commit the Changes to the Current Working Set Beamline Git Repository
+#
+
+set adara_current_git = "$INSTALL_BASE/$beamline_num/.git"
+
+# Skip the Beamlines that Don't Really Check This Out Yet... ;-}
+if ( -d "$adara_current_git" ) then
+
+	echo "\nCommitting Current Working Set changes to $beamline_num repo." \
+		tee -a $LOG
+
+	cd "$adara_current"
+
+	pwd | tee -a $LOG
+
+	git diff . | tee -a $LOG
+
+	echo "Deployed ADARA $release_tag$already_deployed\n\n$log_desc\n" \
+		| tee -a $LOG
+	echo "git commit -F - ." | tee -a $LOG
+
+	echo "Deployed ADARA $release_tag$already_deployed\n\n$log_desc" \
+		| git commit -F - . |& tee -a $LOG
+
+	set commit_ok = $status
+
+	if ( $commit_ok != 0 ) then
+		echo "\nWarning: Current Working Set Commit Fail! ($commit_ok)\n" \
+			| tee -a $LOG
+	endif
+
+endif
+
+#
 # Document the deployment using the "Config" Git repository
 #
 
@@ -739,8 +773,8 @@ echo "\nCommit Log:\n" | tee -a $LOG
 
 echo "Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
 	| tee -a $LOG
-
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
+
 echo "Deployment History for $release_tag$already_deployed\n\n$log_desc" \
 	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
