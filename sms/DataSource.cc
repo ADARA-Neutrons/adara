@@ -174,6 +174,11 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 		throw;
 	}
 
+	m_last_pkt_type = -1;
+	m_last_pkt_len = -1;
+	m_last_pkt_sec = -1;
+	m_last_pkt_nsec = -1;
+
 	startConnect();
 }
 
@@ -190,6 +195,12 @@ DataSource::~DataSource()
 void DataSource::connectionFailed(void)
 {
 	m_timer->cancel();
+
+	INFO("connectionFailed() Last Packet:"
+		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
+		<< " sec=" << m_last_pkt_sec
+		<< " nsec=" << m_last_pkt_nsec
+		<< " len=" << m_last_pkt_len );
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -267,14 +278,20 @@ void DataSource::startConnect(void)
 	reset();
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
-	if (m_fd < 0)
+	if (m_fd < 0) {
+		ERROR("Error creating socket for " << m_name);
 		goto error;
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
-	if (flags < 0)
+	if (flags < 0) {
+		ERROR("Error getting socket flags for " << m_name);
 		goto error_fd;
-	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK))
+	}
+	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK)) {
+		ERROR("Error setting socket flags for " << m_name);
 		goto error_fd;
+	}
 
 	rc = connect(m_fd, m_addrinfo->ai_addr, m_addrinfo->ai_addrlen);
 	if (rc < 0)
@@ -293,6 +310,9 @@ void DataSource::startConnect(void)
 		INFO("Connection established to " << m_name);
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
+	default:
+		WARN("Unknown connection request error for " << m_name
+			<< ": " << strerror(rc) << " (Ignoring!)");
 	}
 
 	/* TODO handle any other error here */
@@ -306,6 +326,7 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
+		ERROR("Bad Alloc Error for " << m_name << " adapter: " << e.what());
 		goto error_fd;
 	}
 
@@ -373,8 +394,22 @@ void DataSource::dataReady(void)
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Save "Last Packet" Info for Debugging...
+	m_last_pkt_type = pkt.type();
+	m_last_pkt_len = pkt.payload_length();
+	m_last_pkt_sec = pkt.timestamp().tv_sec;
+	m_last_pkt_nsec = pkt.timestamp().tv_nsec;
+
+	// INFO("rxPacket() type=0x" << std::hex << m_last_pkt_type << std::dec
+		// << " sec=" << m_last_pkt_sec
+		// << " nsec=" << m_last_pkt_nsec
+		// << " len=" << m_last_pkt_len );
+
 	switch (pkt.type()) {
 	case ADARA::PacketType::HEARTBEAT_V0:
+		/* We don't care about these packets, just drop them */
+		INFO("Heartbeat Packet for " << m_name);
+		return false;
 	case ADARA::PacketType::SYNC_V0:
 		/* We don't care about these packets, just drop them */
 		return false;

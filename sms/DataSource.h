@@ -63,6 +63,12 @@ private:
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 
+	// Last Packet Debug
+	int m_last_pkt_type; // PacketType::Enum
+	uint32_t m_last_pkt_len;
+	time_t m_last_pkt_sec;
+	long m_last_pkt_nsec;
+
 	HWSource &getHWSource(uint32_t hwId);
 
 	friend class TimerAdapter<DataSource>;
