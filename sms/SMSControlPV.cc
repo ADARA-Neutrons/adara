@@ -81,16 +81,19 @@ void smsPV::initReadTable(void)
 	m_read_table.installReadFunc("enums", &smsPV::getEnums);
 
 	/* These are not currently used by any child classes */
-	m_read_table.installReadFunc("alarmHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmHighWarning", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmLowWarning", &smsPV::unusedType);
-	m_read_table.installReadFunc("controlHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("controlLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("graphicHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("graphicLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("precision", &smsPV::unusedType);
-	m_read_table.installReadFunc("units", &smsPV::unusedType);
+        /* However, we are applying defaults so that clients requesting
+         * DBR_CTRL types won't complain so much.
+         */
+	m_read_table.installReadFunc("alarmHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmHighWarning", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmLowWarning", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("controlLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("graphicHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("graphicLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("precision", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("units", &smsPV::defaultString);
 }
 
 const char *smsPV::getName(void) const
@@ -158,6 +161,18 @@ gddAppFuncTableStatus smsPV::getEnums(gdd &)
 gddAppFuncTableStatus smsPV::unusedType(gdd &)
 {
 	return S_gddAppFuncTable_badType;
+}
+
+gddAppFuncTableStatus smsPV::defaultNumber(gdd &in)
+{
+        in.put(0.0);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsPV::defaultString(gdd &in)
+{
+        in.put("");
+	return S_cas_success;
 }
 
 /* ----------------------------------------------------------------------- */
