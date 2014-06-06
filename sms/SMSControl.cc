@@ -171,8 +171,12 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 	m_markers = boost::shared_ptr<Markers>(new Markers(m_beamlineId, this));
 
+        m_pvSummary = boost::shared_ptr<smsErrorPV>(new
+					smsErrorPV(prefix + ":Summary"));
+
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
+	addPV(m_pvSummary);
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -243,18 +247,24 @@ bool SMSControl::setRecording(bool v)
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
 	 * false for that case.
-	 *
-	 * TODO don't allow recording to start unless we have all required
-	 * fields from RunInfo.
 	 */
-	if (v == m_recording)
-		return !v;
-
 	clock_gettime(CLOCK_REALTIME, &now);
+
+	if (v == m_recording) {
+        	m_pvSummary->update(v, &now);
+		return !v;
+ 	}
+
 	if (v) {
 		/* Starting a new recording */
+                if (!m_runInfo->valid()) {
+                    	ERROR("runInfo invalid, not starting");
+                        m_pvSummary->update(1, &now);
+			return false;
+		}
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
 			ERROR("Unable to increment run number, not starting");
+                        m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -277,11 +287,13 @@ bool SMSControl::setRecording(bool v)
 			ERROR("Unable to start recording: " << e.what());
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
+                        m_pvSummary->update(1, &now);
 			return false;
 		} catch (...) {
 			ERROR("Unable to start recording, unknown exception");
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
+                        m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -297,6 +309,7 @@ bool SMSControl::setRecording(bool v)
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
 			ERROR("Unable to stop recording: " << e.what());
+                        m_pvSummary->update(1, &now);
 			return false;
 		}
 		m_pvRunNumber->update(0, &now);
@@ -304,6 +317,7 @@ bool SMSControl::setRecording(bool v)
 	}
 
 	m_recording = v;
+        m_pvSummary->update(0, &now);
 	return true;
 }
 

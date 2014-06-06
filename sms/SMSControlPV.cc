@@ -60,6 +60,33 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 
 /* ----------------------------------------------------------------------- */
 
+static gddAppFuncTableStatus getErrorEnums(gdd &in)
+{
+        aitFixedString *str;
+        fixedStringDestructor *des;
+
+        str = new aitFixedString[2];
+        if (!str)
+                return S_casApp_noMemory;
+
+        des = new fixedStringDestructor;
+        if (!des) {
+                delete [] str;
+                return S_casApp_noMemory;
+        }
+        strncpy(str[0].fixed_string, "OK", sizeof(str[0].fixed_string));
+        strncpy(str[1].fixed_string, "Error", sizeof(str[1].fixed_string));
+
+        in.setDimension(1);
+        in.setBound(0, 0, 2);
+        in.putRef(str, des);
+
+        return S_cas_success;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
 smsPV::smsPV() : m_interested(false)
 {
 	initReadTable();
@@ -311,10 +338,10 @@ caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 	if (m_sms->setRecording(v))
 		return S_casApp_success;
 
-	/* TODO is there a better return code? Should we return success
-	 * even if we fail?
-	 */
-	return S_casApp_outOfBounds;
+	/* don't cause disruption at the CA level just because the run 
+         * couldn't start
+         */
+	return S_casApp_success;
 }
 
 void smsRecordingPV::update(bool recording, struct timespec *ts)
@@ -594,6 +621,51 @@ bool smsBooleanPV::value(void)
 
 void smsBooleanPV::changed(void)
 {
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsErrorPV::smsErrorPV(const std::string &name) :
+                       smsBooleanPV(name) { }
+
+gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
+{
+        return getErrorEnums(in);
+}
+
+void smsErrorPV::set() {
+
+        struct timespec ts;
+
+        clock_gettime(CLOCK_REALTIME, &ts);
+        update(1, &ts);
+}
+void smsErrorPV::reset() {
+
+        struct timespec ts;
+
+        clock_gettime(CLOCK_REALTIME, &ts);
+        update(0, &ts);
+}
+
+void smsErrorPV::update(bool val, struct timespec *ts)
+{
+	gdd *nval;
+
+        nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+        nval->put(val);
+        nval->setTimeStamp(ts);
+
+        if (val != 0) {
+           nval->setStat(epicsAlarmState);
+           nval->setSevr(epicsSevMajor);
+        }
+        /* This does the unref/ref for us, so each event posted will
+         * get its own copy of the value at that time.
+         */
+        m_value = nval;
+
+        notify();
 }
 
 /* ----------------------------------------------------------------------- */

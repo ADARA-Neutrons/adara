@@ -137,6 +137,18 @@ public:
 	virtual void changed(void);
 };
 
+class smsErrorPV : public smsBooleanPV {
+public:
+        smsErrorPV(const std::string &name);
+
+        void update(bool val, struct timespec *ts);
+        void set(void);
+        void reset(void);
+
+        gddAppFuncTableStatus getEnums(gdd &value);
+
+};
+
 class smsUint32PV : public smsPV {
 public:
 	smsUint32PV(const std::string &name);

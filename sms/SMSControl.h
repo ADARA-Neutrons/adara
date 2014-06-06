@@ -17,6 +17,7 @@
 
 class smsRunNumberPV;
 class smsRecordingPV;
+class smsErrorPV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -145,6 +146,7 @@ private:
 	uint32_t m_nextSrcId;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	std::vector<boost::shared_ptr<DataSource> > m_sources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
