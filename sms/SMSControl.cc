@@ -246,15 +246,14 @@ bool SMSControl::setRecording(bool v)
 	 * It is not an error for a caller to try to stop recording if
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
-	 * false for that case.
+	 * false for that case.  
 	 */
-	clock_gettime(CLOCK_REALTIME, &now);
 
 	if (v == m_recording) {
-        	m_pvSummary->update(v, &now);
 		return !v;
  	}
 
+	clock_gettime(CLOCK_REALTIME, &now);
 	if (v) {
 		/* Starting a new recording */
                 if (!m_runInfo->valid()) {

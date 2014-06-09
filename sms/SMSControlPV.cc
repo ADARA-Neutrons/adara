@@ -650,7 +650,12 @@ void smsErrorPV::reset() {
 
 void smsErrorPV::update(bool val, struct timespec *ts)
 {
+	aitUint16 uninitialized_var(v);
 	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
 
         nval = new gddScalar(gddAppType_value, aitEnumEnum16);
         nval->put(val);
