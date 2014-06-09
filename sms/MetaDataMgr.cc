@@ -120,7 +120,11 @@ uint32_t MetaDataMgr::remapDevice(uint32_t dev, uint32_t tag)
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 				   uint32_t tag)
 {
+	DEBUG("Update Descriptor devId=" << in.devId() << " tag=" << tag);
+
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
+
+	DEBUG("mapped_dev = " << mapped_dev);
 
 	if (!mapped_dev)
 		mapped_dev = allocDev(in.devId(), tag);
@@ -135,6 +139,8 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 			/* XXX ratelimited log that we got a descriptor from
 			 * an incorrect tag (ie, wrong source)
 			 */
+			DEBUG("Got descriptor from incorrect tag "
+				<< it->second.m_tag << " != " << tag);
 			return;
 		}
 
@@ -149,6 +155,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		 * (don't notify, we'll be pushing the new descriptor in a
 		 * moment).
 		 */
+		INFO("Updating existing descriptor");
 		m_devices.erase(it);
 	}
 
