@@ -62,26 +62,26 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 
 static gddAppFuncTableStatus getErrorEnums(gdd &in)
 {
-        aitFixedString *str;
-        fixedStringDestructor *des;
+	aitFixedString *str;
+	fixedStringDestructor *des;
 
-        str = new aitFixedString[2];
-        if (!str)
-                return S_casApp_noMemory;
+	str = new aitFixedString[2];
+	if (!str)
+		return S_casApp_noMemory;
 
-        des = new fixedStringDestructor;
-        if (!des) {
-                delete [] str;
-                return S_casApp_noMemory;
-        }
-        strncpy(str[0].fixed_string, "OK", sizeof(str[0].fixed_string));
-        strncpy(str[1].fixed_string, "Error", sizeof(str[1].fixed_string));
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+	strncpy(str[0].fixed_string, "OK", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "Error", sizeof(str[1].fixed_string));
 
-        in.setDimension(1);
-        in.setBound(0, 0, 2);
-        in.putRef(str, des);
+	in.setDimension(1);
+	in.setBound(0, 0, 2);
+	in.putRef(str, des);
 
-        return S_cas_success;
+	return S_cas_success;
 }
 
 
@@ -108,9 +108,9 @@ void smsPV::initReadTable(void)
 	m_read_table.installReadFunc("enums", &smsPV::getEnums);
 
 	/* These are not currently used by any child classes */
-        /* However, we are applying defaults so that clients requesting
-         * DBR_CTRL types won't complain so much.
-         */
+	/* However, we are applying defaults so that clients requesting
+	 * DBR_CTRL types won't complain so much.
+	 */
 	m_read_table.installReadFunc("alarmHigh", &smsPV::defaultNumber);
 	m_read_table.installReadFunc("alarmLow", &smsPV::defaultNumber);
 	m_read_table.installReadFunc("alarmHighWarning", &smsPV::defaultNumber);
@@ -192,13 +192,13 @@ gddAppFuncTableStatus smsPV::unusedType(gdd &)
 
 gddAppFuncTableStatus smsPV::defaultNumber(gdd &in)
 {
-        in.put(0.0);
+	in.put(0.0);
 	return S_cas_success;
 }
 
 gddAppFuncTableStatus smsPV::defaultString(gdd &in)
 {
-        in.put("");
+	in.put("");
 	return S_cas_success;
 }
 
@@ -339,8 +339,8 @@ caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 		return S_casApp_success;
 
 	/* don't cause disruption at the CA level just because the run 
-         * couldn't start
-         */
+	 * couldn't start
+	 */
 	return S_casApp_success;
 }
 
@@ -452,7 +452,7 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	DEBUG("smsStringPV::write() value=" << new_str);
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
-				      MAX_LENGTH);
+					MAX_LENGTH);
 	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 
 	struct timespec ts;
@@ -626,26 +626,27 @@ void smsBooleanPV::changed(void)
 /* ----------------------------------------------------------------------- */
 
 smsErrorPV::smsErrorPV(const std::string &name) :
-                       smsBooleanPV(name) { }
+						smsBooleanPV(name) { }
 
 gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
 {
-        return getErrorEnums(in);
+	return getErrorEnums(in);
 }
 
 void smsErrorPV::set() {
 
-        struct timespec ts;
+	struct timespec ts;
 
-        clock_gettime(CLOCK_REALTIME, &ts);
-        update(1, &ts);
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(1, &ts);
 }
+
 void smsErrorPV::reset() {
 
-        struct timespec ts;
+	struct timespec ts;
 
-        clock_gettime(CLOCK_REALTIME, &ts);
-        update(0, &ts);
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(0, &ts);
 }
 
 void smsErrorPV::update(bool val, struct timespec *ts)
@@ -657,20 +658,21 @@ void smsErrorPV::update(bool val, struct timespec *ts)
 	if (v == val)
 		return;
 
-        nval = new gddScalar(gddAppType_value, aitEnumEnum16);
-        nval->put(val);
-        nval->setTimeStamp(ts);
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
 
-        if (val != 0) {
-           nval->setStat(epicsAlarmState);
-           nval->setSevr(epicsSevMajor);
-        }
-        /* This does the unref/ref for us, so each event posted will
-         * get its own copy of the value at that time.
-         */
-        m_value = nval;
+	if (val != 0) {
+		nval->setStat(epicsAlarmState);
+		nval->setSevr(epicsSevMajor);
+	}
 
-        notify();
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
 }
 
 /* ----------------------------------------------------------------------- */
@@ -838,7 +840,7 @@ caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
 		if (m_interested) {
 			caServer *cas = getCAS();
 			casEventMask mask = cas->valueEventMask() |
-					    cas->logEventMask();
+						cas->logEventMask();
 			smartGDDPointer edge;
 			struct timespec ts;
 

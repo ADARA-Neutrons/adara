@@ -54,7 +54,7 @@ public:
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
-			      uint32_t sourceId);
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoublePkt &pkt,
 			 uint32_t sourceId);
@@ -76,7 +76,7 @@ private:
 
 	struct EventSource {
 		EventSource(uint32_t intraPulse, uint32_t tofField,
-			    uint32_t nBanks) :
+			uint32_t nBanks) :
 				m_intraPulseTime(intraPulse),
 				m_tofField(tofField),
 				m_activeBanks(0),
@@ -178,16 +178,16 @@ private:
 
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
-		       const boost::property_tree::ptree &info);
+				const boost::property_tree::ptree &info);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void recordPulse(PulsePtr &pulse);
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-			     uint32_t id, uint32_t tof);
+				uint32_t id, uint32_t tof);
 	void addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-			     uint32_t id, uint32_t tof);
+				uint32_t id, uint32_t tof);
 
 	void buildBankedPacket(PulsePtr &pulse);
 	void buildMonitorPacket(PulsePtr &pulse);

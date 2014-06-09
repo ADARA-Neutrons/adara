@@ -114,7 +114,7 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 }
 
 void SMSControl::addSource(const std::string &name,
-			   const boost::property_tree::ptree &info)
+			const boost::property_tree::ptree &info)
 {
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
@@ -171,8 +171,8 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 	m_markers = boost::shared_ptr<Markers>(new Markers(m_beamlineId, this));
 
-        m_pvSummary = boost::shared_ptr<smsErrorPV>(new
-					smsErrorPV(prefix + ":Summary"));
+	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
+						smsErrorPV(prefix + ":Summary"));
 
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
@@ -183,7 +183,7 @@ SMSControl::SMSControl() :
 		throw std::runtime_error("Unable to get next run number");
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId, m_beamlineShortName,
-					      m_beamlineLongName));
+					m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
@@ -201,7 +201,7 @@ void SMSControl::show(unsigned level) const
 }
 
 pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const caNetAddr &,
-			   const char *pv_name)
+			const char *pv_name)
 {
 	/* This is the new version, but just call to the deprecated one
 	 * since we don't currently deal with access control on a per-net
@@ -256,14 +256,14 @@ bool SMSControl::setRecording(bool v)
 	clock_gettime(CLOCK_REALTIME, &now);
 	if (v) {
 		/* Starting a new recording */
-                if (!m_runInfo->valid()) {
-                    	ERROR("runInfo invalid, not starting");
-                        m_pvSummary->update(1, &now);
+		if (!m_runInfo->valid()) {
+			ERROR("runInfo invalid, not starting");
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
 			ERROR("Unable to increment run number, not starting");
-                        m_pvSummary->update(1, &now);
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -286,13 +286,13 @@ bool SMSControl::setRecording(bool v)
 			ERROR("Unable to start recording: " << e.what());
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
-                        m_pvSummary->update(1, &now);
+			m_pvSummary->update(1, &now);
 			return false;
 		} catch (...) {
 			ERROR("Unable to start recording, unknown exception");
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
-                        m_pvSummary->update(1, &now);
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -308,7 +308,7 @@ bool SMSControl::setRecording(bool v)
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
 			ERROR("Unable to stop recording: " << e.what());
-                        m_pvSummary->update(1, &now);
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 		m_pvRunNumber->update(0, &now);
@@ -316,7 +316,7 @@ bool SMSControl::setRecording(bool v)
 	}
 
 	m_recording = v;
-        m_pvSummary->update(0, &now);
+	m_pvSummary->update(0, &now);
 	return true;
 }
 
@@ -501,7 +501,7 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 }
 
 void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
-			     uint32_t dup)
+			uint32_t dup)
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -524,7 +524,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 		 * the unneeded constructions and copies...
 		 */
 		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
-				    m_maxBanks);
+				m_maxBanks);
 		SourceMap::value_type val(hwId, new_src);
 		src = pulse->m_sources.insert(val).first;
 	}
@@ -638,7 +638,7 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 }
 
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
-			      uint32_t smsId)
+			uint32_t smsId)
 {
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulsePtr &pulse = current->second;
@@ -907,19 +907,19 @@ void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 }
 
 void SMSControl::updateValue(const ADARA::VariableU32Pkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }
 
 void SMSControl::updateValue(const ADARA::VariableDoublePkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }
 
 void SMSControl::updateValue(const ADARA::VariableStringPkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }

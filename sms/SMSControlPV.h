@@ -139,14 +139,13 @@ public:
 
 class smsErrorPV : public smsBooleanPV {
 public:
-        smsErrorPV(const std::string &name);
+	smsErrorPV(const std::string &name);
 
-        void update(bool val, struct timespec *ts);
-        void set(void);
-        void reset(void);
+	void update(bool val, struct timespec *ts);
+	void set(void);
+	void reset(void);
 
-        gddAppFuncTableStatus getEnums(gdd &value);
-
+	gddAppFuncTableStatus getEnums(gdd &value);
 };
 
 class smsUint32PV : public smsPV {
