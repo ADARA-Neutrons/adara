@@ -35,6 +35,9 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
       m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0), m_ok(true)
 {
+    if ( !m_cfg_dir.empty() && m_cfg_dir[m_cfg_dir.length()-1] != '/' )
+         m_cfg_dir += "/";
+
     m_engine = new RuleEngine();
     m_monitor.addListener( *this );
     m_engine->attach( *this );
@@ -144,11 +147,17 @@ StreamAnalyzer::loadConfig()
                             throw -1;
                         rule.fact = *tok++;
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -2;
                         rule.expr = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
-                        rule.desc = *tok++;
+                        if ( tok != tokens.end())
+                        {
+                            rule.desc = *tok++;
+                            while ( tok != tokens.end())
+                                rule.desc += ";" + *tok++;
+                        }
+                        else
+                            rule.desc.clear();
+
                         loaded_rules.push_back( rule );
                     }
                     else if ( mode == 2 )
@@ -157,27 +166,29 @@ StreamAnalyzer::loadConfig()
                         tok = tokens.begin();
 
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -10;
                         signal.name = *tok++;
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -11;
                         signal.fact = *tok++;
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -12;
                         signal.source = *tok++;
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -13;
                         signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
                         if ( tok == tokens.end())
-                            throw -1;
+                            throw -14;
 
                         signal.msg = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
-
-                        signal.desc = *tok++;
-                        while ( tok != tokens.end())
-                            signal.desc += ";" + *tok++;
+                        if ( tok != tokens.end())
+                        {
+                            signal.desc = *tok++;
+                            while ( tok != tokens.end())
+                                signal.desc += ";" + *tok++;
+                        }
+                        else
+                            signal.desc.clear();
 
                         loaded_signals.push_back( signal );
                     }

@@ -26,8 +26,8 @@ using namespace std;
 #define TIMEOUT_PROC_DEAD_CLEANUP   30
 #define TIMEOUT_STS_INACTIVE        30
 #define TIMEOUT_STS_UNRESPONSIVE    10
-#define MONITOR_ID_INACTIVE_TIMEOUT 86400 // 24 hours
-#define MONITOR_ID_DATA_TIMEOUT     5
+#define MONITOR_ID_INACTIVE_TIMEOUT 60
+#define MONITOR_ID_DATA_TIMEOUT     10
 #define TOPIC_STATUS                "STATUS.>"
 #define TOPIC_SIGNALS               "SIGNAL.>"
 #define TOPIC_DASMON                "APP.DASMON"

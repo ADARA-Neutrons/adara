@@ -58,10 +58,10 @@ functions for the dasmond service, as follows:
   * behavior will result. This constructor causes the new ComBusRouter to attach itself
   * to the provided stream instances and initializes the ComBus interface.
   */
-ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
+ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, uint16_t a_metrics_period )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
-      m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
-
+      m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false),
+      m_metrics_period(a_metrics_period), m_beam_metrics_count(0), m_run_metrics_count(0), m_stream_metrics_count(0)
 {
     m_monitor.addListener( *this );
     m_analyzer.attach( *this );
@@ -336,8 +336,13 @@ ComBusRouter::runInfo( const RunInfo &a_info )
 void
 ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 {
-    ComBus::DASMON::BeamMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_beam_metrics_count >= m_metrics_period )
+    {
+        m_beam_metrics_count = 0;
+
+        ComBus::DASMON::BeamMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 
@@ -351,16 +356,26 @@ ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 void
 ComBusRouter::runMetrics( const RunMetrics &a_metrics )
 {
-    ComBus::DASMON::RunMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_run_metrics_count >= m_metrics_period )
+    {
+        m_run_metrics_count = 0;
+
+        ComBus::DASMON::RunMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 
 void
 ComBusRouter::streamMetrics( const StreamMetrics &a_metrics )
 {
-    ComBus::DASMON::StreamMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_stream_metrics_count >= m_metrics_period )
+    {
+        m_stream_metrics_count = 0;
+
+        ComBus::DASMON::StreamMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 

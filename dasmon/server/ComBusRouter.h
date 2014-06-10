@@ -26,7 +26,7 @@ class ComBusRouter : public IStreamListener, public ADARA::ComBus::IConnectionLi
         public StreamAnalyzer::ISignalListener, public ADARA::ComBus::ITopicListener
 {
 public:
-    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
+    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, uint16_t a_metrics_period  );
     virtual ~ComBusRouter();
 
     void    run();
@@ -93,6 +93,10 @@ private:
     mutable boost::mutex            m_mutex;
     std::map<std::string,ProcInfo>  m_procs;
     mutable boost::mutex            m_proc_mutex;
+    uint16_t                        m_metrics_period;
+    uint16_t                        m_beam_metrics_count;
+    uint16_t                        m_run_metrics_count;
+    uint16_t                        m_stream_metrics_count;
 };
 
 }}

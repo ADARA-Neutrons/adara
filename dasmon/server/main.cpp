@@ -9,7 +9,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.3.2"
+#define DASMON_VERSION "1.3.3"
 
 
 bool g_child_signal = false;
@@ -135,6 +135,7 @@ int main(int argc, char *argv[])
     string          domain;
     unsigned long   max_tof;
     bool            daemon = false;
+    uint16_t        metrics_period = 4;
 
 #ifndef NO_DB
     DBConnectInfo   db_info;
@@ -153,6 +154,7 @@ int main(int argc, char *argv[])
             ("broker_uri", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
             ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
             ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
+            ("metrics_period", po::value<unsigned short>( &metrics_period )->default_value( 4 ), "Metrics AMQP broadcast period")
             ("nodiag", "Disable low-level stream diagnostics (test only)")
             ("maxtof", po::value<unsigned long>( &max_tof )->default_value( 33333 ), "set maximum time of flight in usec")
             ("daemon", "Run as background daemon")
@@ -214,7 +216,7 @@ int main(int argc, char *argv[])
             monitor.enableDiagnostics(false);
 
         StreamAnalyzer  analyzer( monitor, config_dir );
-        ComBusRouter    router( monitor, analyzer );
+        ComBusRouter    router( monitor, analyzer, metrics_period );
 
         // Connect to and process the stream
         monitor.start();
