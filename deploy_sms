@@ -462,17 +462,69 @@ endif
 # Link New Archive Release Tag into Current Working Set for Beamline
 #
 
+# Make sure the Git Config repository has been cloned for deployment
+
+set adara_config = "$INSTALL_BASE/config"
+
+if ( ! -d "$adara_config" ) then
+
+	# Clone a fresh copy of the Git Config repository (in /home/controls)
+
+	echo "\nCloning Git Config repository (in $INSTALL_BASE):" \
+		| tee -a $LOG
+
+	echo "git clone $CONFIG_REPO $adara_config" | tee -a $LOG
+	git clone "$CONFIG_REPO" "$adara_config" |& tee -a $LOG
+
+	set clone_ok = $status
+
+	if ( $clone_ok != 0 ) then
+		echo "\nError Cloning Git Config repository! ($clone_ok)\n" \
+			| tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -3
+	endif
+
+endif
+
+# Make sure the Proper Beamline Branch is checked out in Config
+
+echo "\nConfig Beamline Repository:\n" | tee -a $LOG
+
+cd "$adara_config"
+
+pwd | tee -a $LOG
+
+ls -l | tee -a $LOG
+
+# Check out the desired Beamline Branch
+
+echo "\nChecking out the Config Beamline Branch: $beamline_num\n" \
+	| tee -a $LOG
+
+echo "git checkout $beamline_num" | tee -a $LOG
+git checkout "$beamline_num" |& tee -a $LOG
+
+set tag_ok = $status
+
+if ( $tag_ok != 0 ) then
+	echo "\nError Checking Out Beamline Branch! ($tag_ok)\n" | tee -a $LOG
+	echo "Bailing Out..." | tee -a $LOG
+	exit -4
+endif
+
 # Make sure the parent ADARA current working set directory exists
 
-set adara_current = "$INSTALL_BASE/$beamline_num/ADARA"
+set adara_current = "$INSTALL_BASE/config/deploy"
+set adara_current_new = 0
 
 if ( ! -d "$adara_current" ) then
 
 	echo "\nADARA Current Working Set Directory Not Found.\n" | tee -a $LOG
 
-	echo "Creating Parent ADARA Current Working Set Directory:\n" \
+	echo "Creating Current Working Set Parent Deploy Directory:\n" \
 		| tee -a $LOG
-	echo "   $adara_current\n" | tee -a $LOG
+	echo "   $adara_current" | tee -a $LOG
 
 	mkdir "$adara_current" |& tee -a $LOG
 
@@ -485,8 +537,7 @@ if ( ! -d "$adara_current" ) then
 		exit -14
 	endif
 
-	ls -ld "$adara_current" |& tee -a $LOG
-
+	set adara_current_new = 1
 endif
 
 echo "\nLinking into ADARA Current Working Set directory:\n" \
@@ -574,20 +625,53 @@ echo "\n. . ."
 sleep 3
 
 #
-# Commit the Changes to the Current Working Set Beamline Git Repository
+# Commit the Current Working Set Changes to the Git Config Repository
 #
 
-set adara_current_git = "$INSTALL_BASE/$beamline_num/.git"
+echo "\nCommitting Current Working Set changes to $beamline_num branch." \
+	| tee -a $LOG
 
-# Skip the Beamlines that Don't Really Check This Out Yet... ;-}
-if ( -d "$adara_current_git" ) then
+pwd | tee -a $LOG
 
-	echo "\nCommitting Current Working Set changes to $beamline_num repo." \
-		tee -a $LOG
+ls -l | tee -a $LOG
 
-	cd "$adara_current"
+if ( $adara_current_new == 1 ) then
 
-	pwd | tee -a $LOG
+	echo "\nNew Deployment Directory to Commit:\n" | tee -a $LOG
+
+	ls -ld "$adara_current" |& tee -a $LOG
+	echo | tee -a $LOG
+
+	ls -l "$adara_current" |& tee -a $LOG
+	echo | tee -a $LOG
+
+	echo "git add deploy" | tee -a $LOG
+	git add deploy |& tee -a $LOG
+
+	set add_ok = $status
+
+	if ( $add_ok != 0 ) then
+		echo "\nError Adding New Deployment Directory to Git! ($add_ok)\n" \
+			| tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -20
+	endif
+
+	echo "git commit -m 'Initial Config Deploy Directory Creation' deploy" \
+		| tee -a $LOG
+	git commit -m 'Initial Config Deploy Directory Creation' deploy \
+		|& tee -a $LOG
+
+	set commit_ok = $status
+
+	if ( $commit_ok != 0 ) then
+		echo "\nError Committing Config Deploy Directory! ($commit_ok)\n" \
+			| tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -21
+	endif
+
+else
 
 	git diff . | tee -a $LOG
 
@@ -611,48 +695,20 @@ endif
 # Document the deployment using the "Config" Git repository
 #
 
-# Clone a fresh copy of the Config Git repo (in /tmp)
-
-echo "\nCloning a Fresh Copy of the Config Git repository (in /tmp):" \
+echo "\nDocument Deployment History File for Beamline $beamline_num." \
 	| tee -a $LOG
 
-echo "git clone $CONFIG_REPO $TMP_DIR/config" | tee -a $LOG
-git clone "$CONFIG_REPO" "$TMP_DIR/config" |& tee -a $LOG
-
-set clone_ok = $status
-
-if ( $clone_ok != 0 ) then
-	echo "\nError Cloning Config repository! ($clone_ok)\n" | tee -a $LOG
-	echo "Bailing Out..." | tee -a $LOG
-	exit -17
-endif
-
-cd "$TMP_DIR/config"
+cd "$adara_config"
 
 pwd | tee -a $LOG
 
 ls -l | tee -a $LOG
 
-# Check out the correct Beamline Branch
-
-echo "\nChecking out the Beamline Branch: $beamline_num" | tee -a $LOG
-
-echo "git checkout $beamline_num" | tee -a $LOG
-git checkout "$beamline_num" |& tee -a $LOG
-
-set tag_ok = $status
-
-if ( $tag_ok != 0 ) then
-	echo "\nError Checking Out Beamline Branch! ($tag_ok)\n" | tee -a $LOG
-	echo "Bailing Out..." | tee -a $LOG
-	exit -18
-endif
-
 # Update the Deployment History File with a Proper Log!
 
 set deploy_history_base = "sms/deployment.history.txt"
 
-set deploy_history = "$TMP_DIR/config/$deploy_history_base"
+set deploy_history = "$INSTALL_BASE/config/$deploy_history_base"
 
 # Create the History file, if it doesn't exist...
 
@@ -660,7 +716,7 @@ if ( ! -e "$deploy_history" ) then
 
 	echo "\nCreating Deployment History File for Beamline $beamline_num." \
 		| tee -a $LOG
-	echo "\n   $deploy_history" | tee -a $LOG
+	echo "\n   $deploy_history\n" | tee -a $LOG
 
 	echo "\nADARA SMS Deployment History ($beamline_num)\n$CONFIG_LINE\n" \
 		> "$deploy_history"
@@ -814,13 +870,6 @@ echo "\nCleaning Up Temporary ADARA Software Repository Clone..." \
 
 echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 /bin/rm -rf "$TMP_DIR/ADARA" |& tee -a $LOG
-
-# Remove Clone of Config Git repository
-
-echo "\nCleaning Up Temporary Config Repository Clone..." | tee -a $LOG
-
-echo "/bin/rm -rf $TMP_DIR/config" |& tee -a $LOG
-/bin/rm -rf "$TMP_DIR/config" |& tee -a $LOG
 
 #
 # (Optionally restart the SMS Daemon Service...?)
