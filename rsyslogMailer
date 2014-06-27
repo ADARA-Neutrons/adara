@@ -1,0 +1,60 @@
+#!/bin/bash
+
+#
+# rsyslogMailer: a script to read stdin and collect critical log lines into an
+# alert email. (typically this is used to read a named-pipe written to by syslog)
+#
+#   example usage: rsyslogMailer < /etc/rsyslog.pipes/criticalMessages
+#
+# Note: Derived from original script proposed by "john & cailin":
+#   http://www.johnandcailin.com/blog/john/
+#       how-setup-real-time-email-notification-critical-syslog-events
+# Thanks!
+#   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+#
+
+alertRecipient="y8y@ornl.gov"      # the mail recipient for alerts
+
+hostName=`hostname`                # the host are we logging from
+
+criticalMessages=""
+
+SEND_EMAIL()
+{
+   if [ "#${criticalMessages}#" != '##' ]; then
+
+      # echo -e "criticalMessages:\n${criticalMessages}"
+
+      # send the alert
+      echo -e "${criticalMessages}" \
+         | mailx -s "*** Critical ADARA Syslog Error(s) on $hostName ***" \
+            ${alertRecipient}
+   fi
+
+   exit 0
+}
+
+trap "SEND_EMAIL" SIGTERM
+
+# kill myself if I wait around for too long... :-b
+(
+   sleep 3
+   # echo "Checking Signal to $$..."
+   kill -0 $$ || exit 0
+   # echo "Killing $$."
+   kill -s SIGTERM $$
+) &
+# ) 2> /dev/null &
+
+# process each line of input and produce an alert email
+while read line
+do
+   # remove any repeated messages
+   # echo ${line} | grep "message repeated" > /dev/null 2>&1
+   # if test $? -eq 1
+   # then
+      criticalMessages="${criticalMessages}\n${line}"
+   # fi
+done
+# note: loop never exits... :)
+
