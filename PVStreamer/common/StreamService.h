@@ -119,6 +119,8 @@ public:
 
     IInputAdapterAPI*   attach( IInputAdapter &a_adapter );
     IOutputAdapterAPI*  attach( IOutputAdapter &a_adapter );
+    void                detach( IInputAdapter &a_adapter );
+    void                detach( IOutputAdapter &a_adapter );
     ConfigManager&      getCfgMgr() { return m_cfg_mgr; }
 
 private:
@@ -140,6 +142,7 @@ private:
     std::vector<StreamPacket*>  m_stream_pkts;  ///< Stream packets
     SyncDeque<StreamPacket*>    m_free_que;     ///< Free stream packet buffer
     SyncDeque<StreamPacket*>    m_fill_que;     ///< Filled stream packet buffer
+    bool                        m_in_dtor;
 };
 
 }

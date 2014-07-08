@@ -17,7 +17,9 @@ IOutputAdapter::IOutputAdapter( StreamService &a_stream_serv )
 /** \brief Destructor for IOutputAdapter class.
   */
 IOutputAdapter::~IOutputAdapter()
-{}
+{
+    m_stream_serv.detach( *this );
+}
 
 
 }

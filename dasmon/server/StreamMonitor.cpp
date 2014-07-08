@@ -379,7 +379,7 @@ StreamMonitor::resetRunStats()
     m_stream_metrics.clear();
 
     m_first_pulse_time = 0;
-    m_pcharge.total = 0.0;
+    m_pcharge.reset_total( 0.0 );
     m_mon_event_count = 0;
 }
 
@@ -449,7 +449,7 @@ StreamMonitor::metricsThread()
             // Update total charge
             if ( m_recording )
             {
-                m_run_metrics.m_total_charge = m_pcharge.total;
+                m_run_metrics.m_total_charge = m_pcharge.total();
                 run_metrics = m_run_metrics;
             }
 
@@ -526,7 +526,6 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     }
     catch(...)
     {
-    cout << "rxPacket exception! pkt type: " << a_pkt.type() << endl;
         ++m_stream_metrics.m_invalid_pkt;
         throw;
     }
@@ -874,13 +873,23 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
         rpos += 2 + event_count;
     }
 
-    // Add zero count to monitors that had no events
-    for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
+    uint64_t dt;
+
+    // Add zero sample to monitor that had no events, or remove them if no counts received for more than a second
+    for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); )
     {
-        if ( m_mon_last_pulse[im->first] != a_pkt.pulseId())
+        dt = a_pkt.pulseId() - m_mon_last_pulse[im->first];
+        if ( dt > 0 ) //&& dt <= 1000000000 )
         {
             im->second.addSample(0);
+            ++im;
         }
+        //else if ( dt > 1000000000 )
+        //{
+        //    m_mon_count_info.erase(im++);
+        //}
+        else
+            ++im;
     }
 
     return false;
@@ -1145,7 +1154,6 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         }
         catch( std::exception &e )
         {
-            cout << "Bad DDP: " << e.what() << endl;
             // Primitive fault detection / reporting
             m_ok = false;
             ++m_stream_metrics.m_bad_ddp_xml;

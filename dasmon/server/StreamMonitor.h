@@ -114,51 +114,111 @@ public:
     T                   m_value;
 };
 
-#define WIN_AVG_SIZE 20
-
 
 template<class T>
 class CountInfo
 {
 public:
-    CountInfo()
-        : total(0), idx(0)
+    CountInfo( uint16_t a_window_size = 60 )
+        : m_average(0.0), m_cached(false), m_total(0), m_idx(0), m_win_sz(a_window_size)
     {
-        for ( int i = 0; i < WIN_AVG_SIZE; ++i )
-            samples[i] = 0;
+        m_samples = new T[m_win_sz]();
+    }
+
+    CountInfo( const CountInfo &a_info )
+        : m_samples(0), m_win_sz(0)
+    {
+        *this = a_info;
+    }
+
+    ~CountInfo()
+    {
+        delete[] m_samples;
+    }
+
+    CountInfo& operator=( const CountInfo &a_info )
+    {
+        if ( m_samples )
+        {
+            if ( m_win_sz != a_info.m_win_sz )
+            {
+                delete[] m_samples;
+                m_samples = new T[a_info.m_win_sz];
+            }
+        }
+        else
+        {
+            m_samples = new T[a_info.m_win_sz];
+        }
+
+        m_average = a_info.m_average;
+        m_cached = a_info.m_cached;
+        m_total = a_info.m_total;
+        m_idx = a_info.m_idx;
+        m_win_sz = a_info.m_win_sz;
+
+        for ( uint16_t i = 0; i < m_win_sz; ++i )
+            m_samples[i] = a_info.m_samples[i];
+
+        return *this;
     }
 
     void addSample( T sample )
     {
-        total += sample;
-        samples[idx++] = sample;
+        m_total += sample;
+        m_samples[m_idx++] = sample;
+        m_cached = false;
 
-        if ( idx == WIN_AVG_SIZE )
-            idx = 0;
+        if ( m_idx == m_win_sz )
+            m_idx = 0;
     }
 
     void reset()
     {
-        total = 0;
-        idx = 0;
+        m_average = 0.0;
+        m_cached = false;
+        m_total = 0;
+        m_idx = 0;
 
-        for ( int i = 0; i < WIN_AVG_SIZE; ++i )
-            samples[i] = 0;
+        for ( uint16_t i = 0; i < m_win_sz; ++i )
+            m_samples[i] = 0;
+    }
+
+    inline void reset_total( T a_total )
+    {
+        m_total = a_total;
+    }
+
+    inline T total()
+    {
+        return m_total;
     }
 
     double average()
     {
-        double avg = 0.0;
+        // Note: does not use running average due to numerical instability over very long time spans.
+        // If average() is called multiple times for same sample set, cached value is used.
+        if ( !m_cached )
+        {
+            m_average = 0.0;
 
-        for ( int i = 0; i < WIN_AVG_SIZE; ++i )
-            avg += samples[i];
+            for ( uint16_t i = 0; i < m_win_sz; ++i )
+                m_average += m_samples[i];
 
-        return avg/WIN_AVG_SIZE;
+            m_average = m_average/m_win_sz;
+            m_cached = true;
+        }
+
+        return m_average;
     }
 
-    T           samples[WIN_AVG_SIZE];
-    T           total;
-    uint16_t    idx;
+private:
+    double      m_average;
+    bool        m_cached;
+    T          *m_samples;
+    T           m_total;
+    uint16_t    m_idx;
+    uint16_t    m_win_sz;
 };
 
 #ifndef NO_DB
@@ -266,7 +326,7 @@ private:
     std::map<uint32_t,uint64_t>     m_mon_last_pulse;
     uint64_t                        m_mon_event_count;
     bool                            m_recording;
-    uint32_t                        m_run_num;
+    uint32_t                          m_run_num;
     uint32_t                        m_run_timestamp;
     bool                            m_paused;
     short                           m_info_rcv;

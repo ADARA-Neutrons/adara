@@ -29,7 +29,8 @@ namespace EPICS {
   * \param a_config_file - EPICS configuration file
   */
 InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged )
-  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_track_logged(a_track_logged), m_source("epics")
+  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_track_logged(a_track_logged),
+    m_cfg_mon_thread(0), m_source("epics"), m_gc_thread(0)
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );

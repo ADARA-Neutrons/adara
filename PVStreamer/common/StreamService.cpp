@@ -18,7 +18,7 @@ namespace PVS {
  * instances running concurrently.
  */
 StreamService::StreamService( size_t a_pkt_buffer_size, uint32_t a_offset )
-    : m_cfg_mgr(a_offset), m_out_adapter(0)
+    : m_cfg_mgr(a_offset), m_out_adapter(0), m_in_dtor(false)
 {
     // Make sure buffer sizes are sane
     if ( a_pkt_buffer_size < 2 )
@@ -43,6 +43,9 @@ StreamService::StreamService( size_t a_pkt_buffer_size, uint32_t a_offset )
  */
 StreamService::~StreamService()
 {
+    // Set flag indicating destruction - this causes detach() methods to do nothing
+    m_in_dtor = true;
+
     // Deactivate all queues - will force waiting threads to wake and exit
     m_free_que.deactivate();
     m_fill_que.deactivate();
@@ -91,6 +94,28 @@ StreamService::attach( IOutputAdapter &a_adapter )
     return this;
 }
 
+void
+StreamService::detach( IInputAdapter &a_adapter )
+{
+    if ( !m_in_dtor )
+    {
+        vector<IInputAdapter*>::iterator i = find( m_in_adapters.begin(), m_in_adapters.end(), &a_adapter );
+        if ( i != m_in_adapters.end())
+        {
+            m_in_adapters.erase(i);
+        }
+    }
+}
+
+void
+StreamService::detach( IOutputAdapter &a_adapter )
+{
+    if ( !m_in_dtor )
+    {
+        if ( &a_adapter == m_out_adapter )
+            m_out_adapter = 0;
+    }
+}
 
 // ---------- IStreamProducer methods ---------------------------------------
 

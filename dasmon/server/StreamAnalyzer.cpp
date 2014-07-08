@@ -1116,8 +1116,6 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name, string &a_value, Variable
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
 
-    cout << "str val [" << a_value << "] empty? " << a_value.empty() << endl;
-
     if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
         m_engine->retract( m_pv_prefix + pv_name );
     else
