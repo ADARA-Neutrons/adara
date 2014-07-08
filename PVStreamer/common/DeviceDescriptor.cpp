@@ -118,20 +118,12 @@ PVDescriptor::equalMetadata( PVType a_type, const std::string &a_units, const st
 {
     bool res = false;
 
-    //if ( a_type != m_type )
-    //    cout << "TYPE DIFF! new: " << a_type << " != old: " << m_type << endl;
-
-    //if ( a_units != m_units )
-    //    cout << "UNITS DIFF! new: " << a_units << " != old: " << m_units << endl;
-
     if ( a_type == m_type && a_units == m_units )
     {
         if ( m_type == PV_ENUM )
         {
             if ( m_enum && *m_enum == a_enum_vals )
                 res = true;
-            //else
-            //    cout << "ENUM DIFF!" << endl;
         }
         else
             res = true;
@@ -192,15 +184,8 @@ DeviceDescriptor::defineEnumeration( const map<int32_t,std::string> &a_values )
     EnumDescriptor *new_enum = new EnumDescriptor( a_values );
     new_enum->m_id = m_enums.size() + 1;
 
-    //cout << "Def new enum " << new_enum->m_id << " from values." << endl;
-
     for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
     {
-        //if ( *e == 0 )
-        //{
-        //    cout << "NULL enum in DevDesc: " << m_id << ", " << m_name << endl;
-        //}
-
         if ( **e == *new_enum )
         {
             delete new_enum;
@@ -218,8 +203,6 @@ DeviceDescriptor::defineEnumeration( const EnumDescriptor &a_enum )
 {
     EnumDescriptor *new_enum = new EnumDescriptor( a_enum );
     new_enum->m_id = m_enums.size() + 1;
-
-    //cout << "Def new enum " << new_enum->m_id << " from EnumDesc." << endl;
 
     for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
     {

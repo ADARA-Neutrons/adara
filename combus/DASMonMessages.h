@@ -292,7 +292,8 @@ protected:
 
         PVData data;
         m_pvs.clear();
-        try {
+        try
+        {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("pvs"))
             {
                 data.is_str = v.second.get( "is_str", false );
@@ -302,7 +303,7 @@ protected:
                 else
                     data.dbl_val = v.second.get( "dbl_val", 0.0 );
                 data.timestamp = v.second.get( "timestamp", 0UL );
-                m_pvs[v.first] = data;
+                m_pvs[v.second.get( "name", "" )] = data;
             }
         } catch(...) {}
     }
@@ -311,9 +312,12 @@ protected:
     {
         MessageBase::write( a_prop_tree );
 
+        boost::property_tree::ptree ppt;
+
         for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
         {
             boost::property_tree::ptree pt;
+            pt.put( "name", ipv->first );
             pt.put( "is_str", ipv->second.is_str );
             pt.put( "status", ipv->second.status );
             if ( ipv->second.is_str )
@@ -322,8 +326,9 @@ protected:
                 pt.put( "dbl_val", ipv->second.dbl_val );
             pt.put( "timestamp", ipv->second.timestamp );
 
-            a_prop_tree.add_child( std::string("pvs.") + ipv->first, pt );
+            ppt.push_back( std::make_pair( "", pt ));
         }
+        a_prop_tree.add_child( "pvs", ppt );
     }
 };
 

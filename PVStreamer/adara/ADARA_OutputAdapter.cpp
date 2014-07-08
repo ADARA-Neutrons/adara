@@ -34,7 +34,8 @@ namespace ADARA {
  * processing, translating, and broadcasting packets from the internal data stream.
  */
 OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat )
-    : IOutputAdapter(a_stream_serv), m_active(true), m_port(a_port), m_heartbeat(a_heartbeat), m_listen_socket(-1)
+    : IOutputAdapter(a_stream_serv), m_active(true), m_socket_listen_thread(0), m_stream_proc_thread(0), m_port(a_port),
+      m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
 
@@ -170,12 +171,10 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, string
     {
     case DeviceDefined:
         buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device );
-        //cout << "DDP: " << a_payload << endl;
         return true;
 
     case DeviceRedefined:
         buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device );
-        //cout << "DDP: " << a_payload << endl;
         return true;
 
     case DeviceUndefined:
@@ -490,56 +489,67 @@ OutputAdapter::updatePV( PVDescriptor *a_pv, PVState a_state )
 void
 OutputAdapter::initSockets()
 {
-    int rc;
-    struct addrinfo *result = 0;
-    struct addrinfo hints;
-
-    memset( &hints, 0, sizeof( hints ));
-    hints.ai_family     = AF_INET;
-    hints.ai_socktype   = SOCK_STREAM;
-    hints.ai_protocol   = IPPROTO_TCP;
-    hints.ai_flags      = AI_PASSIVE;
-
-
-    string port_str = boost::lexical_cast<string>( m_port );
-
-    // Resolve the local address and port to be used by the server
-    rc = getaddrinfo( 0, port_str.c_str(), &hints, &result );
-    if ( rc )
-        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
-
-    m_listen_socket = socket( result->ai_family, result->ai_socktype, result->ai_protocol );
-    if ( m_listen_socket < 0 )
-        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
-
-    int yes = 1;
-    if ( setsockopt( m_listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
-        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
-
-    rc = bind( m_listen_socket, result->ai_addr, (int)result->ai_addrlen );
-    if ( rc < 0 )
-        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
-
-    if ( listen( m_listen_socket, 5 /*max connections*/ ) < 0 )
+    try
     {
-        close( m_listen_socket );
-        EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
-    }
+        int rc;
+        struct addrinfo *result = 0;
+        struct addrinfo hints;
 
-    // Get Server IP address (not sure why the above does not set it correctly in result
-    struct hostent *info = gethostbyname( "localhost" );
-    if ( info && info->h_addrtype == AF_INET )
-    {
-        struct in_addr addr;
-        if ( info->h_addr_list[0] )
+        memset( &hints, 0, sizeof( hints ));
+        hints.ai_family     = AF_INET;
+        hints.ai_socktype   = SOCK_STREAM;
+        hints.ai_protocol   = IPPROTO_TCP;
+        hints.ai_flags      = AI_PASSIVE;
+
+        string port_str = boost::lexical_cast<string>( m_port );
+
+        // Resolve the local address and port to be used by the server
+        rc = getaddrinfo( 0, port_str.c_str(), &hints, &result );
+        if ( rc )
+            EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
+
+        m_listen_socket = socket( result->ai_family, result->ai_socktype, result->ai_protocol );
+        if ( m_listen_socket < 0 )
+            EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
+
+        int yes = 1;
+        if ( setsockopt( m_listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) == -1)
+            EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
+
+        rc = bind( m_listen_socket, result->ai_addr, (int)result->ai_addrlen );
+        if ( rc < 0 )
+            EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
+
+        if ( listen( m_listen_socket, 5 /*max connections*/ ) < 0 )
         {
-            addr.s_addr = *(unsigned long*)info->h_addr_list[0];
-            m_addr = inet_ntoa( addr );
+            close( m_listen_socket );
+            EXCEPT( EC_SOCKET_ERROR, strerror( errno ));
         }
-    }
 
-    freeaddrinfo( result );
-    result = 0;
+        // Get Server IP address (not sure why the above does not set it correctly in result
+        struct hostent *info = gethostbyname( "localhost" );
+        if ( info && info->h_addrtype == AF_INET )
+        {
+            struct in_addr addr;
+            if ( info->h_addr_list[0] )
+            {
+                addr.s_addr = *(unsigned long*)info->h_addr_list[0];
+                m_addr = inet_ntoa( addr );
+            }
+        }
+
+        freeaddrinfo( result );
+        result = 0;
+    }
+    catch ( TraceException &e )
+    {
+        e.addContext( "Unable to configure ADARA tcp socket (port " + boost::lexical_cast<string>(m_port) + ")" );
+        throw e;
+    }
+    catch (...)
+    {
+        EXCEPT( EC_SOCKET_ERROR, "Unknown exception in initSockets()." );
+    }
 }
 
 

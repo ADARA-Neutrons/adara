@@ -16,7 +16,9 @@ IInputAdapter::IInputAdapter( StreamService &a_stream_serv )
 /** \brief Destructor for IInputAdapter class.
   */
 IInputAdapter::~IInputAdapter()
-{}
+{
+    m_stream_serv.detach( *this );
+}
 
 
 }
