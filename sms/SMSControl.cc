@@ -275,6 +275,10 @@ bool SMSControl::setRecording(bool v)
 		m_runInfo->lock();
 		m_runInfo->setRunNumber(m_currentRunNumber);
 
+		/* Reset the Overall Monitor bookkeeping...
+		 */
+		m_allMonitors.clear();
+
 		try {
 			/* Let our marker control code have a shot at
 			 * fixing up current state before we start recording
@@ -407,17 +411,29 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	uint32_t rising = (pixel & 1) << 31;
 	tof |= rising;
 
-	pixel >>= 16;
-	pixel &= 0xff;
+	uint32_t monId = pixel >> 16;
+	monId &= 0xff;
 
-	MonitorMap::iterator mon = pulse->m_monitors.find(pixel);
+	MonitorMap::iterator mon = pulse->m_monitors.find(monId);
 	if (mon == pulse->m_monitors.end()) {
+
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
 		BeamMonitor new_mon(pkt.sourceID(), pkt.tofField());
-		MonitorMap::value_type val(pixel, new_mon);
+		MonitorMap::value_type val(monId, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
+
+		/* Track the creation of overall collections of monitors...
+		 */
+		MonitorMap::iterator allMon = m_allMonitors.find(monId);
+		if (allMon == m_allMonitors.end()) {
+			INFO("New Monitor id=" << monId
+				<< " (pixelId=" << pixel
+				<< " sourceID=" << pkt.sourceID()
+				<< " tofField=" << pkt.tofField() << ")");
+			m_allMonitors.insert(val);
+		}
 	}
 
 	mon->second.m_eventTof.push_back(tof);
