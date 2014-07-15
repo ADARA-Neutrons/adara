@@ -85,7 +85,7 @@ public:
 		return (uint8_t) (m_fields[3] >> 22);
 	}
 	uint16_t veto(void) const { return (m_fields[3] >> 10) & 0xfff; }
-	uint16_t cycle(void) const { return m_fields[3] &0x3ff; }
+	uint16_t cycle(void) const { return m_fields[3] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[4]; }
 	bool tofCorrected(void) const { return !!(m_fields[5] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
@@ -119,7 +119,7 @@ public:
 		return (uint8_t) (m_fields[1] >> 22);
 	}
 	uint16_t veto(void) const { return (m_fields[1] >> 10) & 0xfff; }
-	uint16_t cycle(void) const { return m_fields[1] &0x3ff; }
+	uint16_t cycle(void) const { return m_fields[1] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
 	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
