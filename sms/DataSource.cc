@@ -98,7 +98,7 @@ public:
 	}
 
 	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
-		DEBUG("dumpPulseInvariants():"
+		ERROR("dumpPulseInvariants():"
 			<< std::hex << " pulseId=0x" << pkt.pulseId()
 				<< "(0x" << m_activePulse << ")" << std::dec
 			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
