@@ -136,6 +136,8 @@ private:
 		enum { REAL_BANK_OFFSET = 2 };
 	};
 
+	MonitorMap				m_allMonitors;
+
 	typedef boost::shared_ptr<Pulse> PulsePtr;
 	typedef std::map<PulseIdentifier, PulsePtr> PulseMap;
 
