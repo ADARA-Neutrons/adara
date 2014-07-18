@@ -380,9 +380,34 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
-	it = m_pulses.find(pid);
-	if (it != m_pulses.end())
-		return it;
+	// Manually search the map, so we can check for Sawtooth pulses... ;-b
+	// it = m_pulses.find(pid);
+	if (m_pulses.begin() != m_pulses.end()) {
+
+		uint64_t min_id = (uint64_t) -1;
+		uint64_t max_id = (uint64_t) 0;
+		for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+			if (it->first.first < min_id) min_id = it->first.first;
+			if (it->first.first > max_id) max_id = it->first.first;
+			if (it->first == pid)
+				break;
+		}
+
+		if (it != m_pulses.end())
+			return it;
+
+		// Log any Sawtooth pulses... :-o
+		if (id < min_id) {
+			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+		else if (id >= min_id && id < max_id) {
+			ERROR("getPulse(): Interleaved SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+	}
 
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
 
