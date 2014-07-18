@@ -330,6 +330,7 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	 * source id and needs to allocate a bit position for completing
 	 * pulses. We don't have to be terribly fast here.
 	 */
+	m_lastPulseId = 0;
 	size_t i, max = m_eventSources.size();
 	for (i = 0; i < max; i++) {
 		if (!m_eventSources[i]) {
@@ -371,6 +372,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		m_pulses.erase(m_pulses.begin(), ++last);
 	}
 
+	m_lastPulseId = -1;
+
 	/* Mark this id for re-use. */
 	m_eventSources.reset(smsId);
 }
@@ -407,6 +410,15 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " min=0x" << min_id << " max=0x" << max_id);
 		}
+		m_lastPulseId = max_id;
+	}
+	else {
+		if ( id < m_lastPulseId ) {
+			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " versus Last Pulse id=0x" << m_lastPulseId);
+		}
+		m_lastPulseId = id;
 	}
 
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
