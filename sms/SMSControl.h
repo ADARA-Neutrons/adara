@@ -153,6 +153,7 @@ private:
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
 	PulseMap m_pulses;
+	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
 	uint32_t m_bankReserve;
 	boost::shared_ptr<RunInfo> m_runInfo;
