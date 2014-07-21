@@ -75,6 +75,8 @@ private:
     time_t m_last_stats;  // the last time the stats were printed
 #define STATS_INTERVAL 5 // in seconds
     unsigned int m_packets_processed;
+    unsigned long m_total_packets_processed;
+    unsigned long m_total_bytes_processed;
   
     // returns elapsed time in nanoseconds!
     inline int64_t fastElapsed( const timespec &start) const
@@ -103,7 +105,7 @@ private:
     bool timesUp( const struct timespec &pktTime);
     
     // prints (to stderr) some basic stats about the packet processing...
-    void printStats( unsigned packetsPerSec);
+    void printStats( );
     
     // No copy constructor or assignment operator
     SimpleParser( const SimpleParser &p);
@@ -117,7 +119,9 @@ SimpleParser::SimpleParser( std::ostream &outstream, float tf)
       m_timeFactor( tf),
       m_firstPktReceived( false),
       m_last_stats( time(NULL)),
-      m_packets_processed(0)
+      m_packets_processed( 0),
+      m_total_packets_processed( 0),
+      m_total_bytes_processed( 0)
 {
 }
 
@@ -142,10 +146,12 @@ bool SimpleParser::rxPacket( const ADARA::Packet &pkt)
     
     // Keep track of some packet statistics
     m_packets_processed++;
+    m_total_packets_processed++;
+    m_total_bytes_processed += pkt.packet_length();
     
     if (time( NULL) > (m_last_stats + STATS_INTERVAL))
     {
-        printStats(m_packets_processed / STATS_INTERVAL);
+        printStats();
         m_packets_processed = 0;
         m_last_stats = time(NULL);
     }
@@ -187,9 +193,13 @@ bool SimpleParser::timesUp( const timespec &outTime)
 #endif
 
 // prints (to stderr) some basic stats about the packet processing...
-void SimpleParser::printStats( unsigned packetsPerSec)
+void SimpleParser::printStats()
 {
-    std::cerr << "Packets per second: " << packetsPerSec << std::endl;
+    unsigned packetsPerSec = m_packets_processed / (time(NULL) - m_last_stats);
+    std::cerr << "Packets per second: " << packetsPerSec
+              << " / Total packets: " << m_total_packets_processed
+              << " / Total MB: " << m_total_bytes_processed / (float)(1024*1024)
+              << std::endl;
 }
 
 // TODO: Need to add code to handle a command line option for the time factor
