@@ -66,7 +66,8 @@ public:
 			/* TODO rate-limited logging of duplicate pulses? */
 			ERROR("Duplicate pulse from " << m_name << " src 0x"
 				<< std::hex << m_hwId
-				<< " (" << m_activePulse << ")");
+				<< " (0x" << m_activePulse << ")");
+			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
 			m_dupCount = 0;
@@ -96,8 +97,31 @@ public:
 			 pkt.tofOffset() == m_tofOffset);
 	}
 
+	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
+		ERROR("dumpPulseInvariants():"
+			<< std::hex << " pulseId=0x" << pkt.pulseId()
+				<< "(0x" << m_activePulse << ")" << std::dec
+			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
+			<< " pulseCharge=" << pkt.pulseCharge()
+				<< "(" << m_charge << ")"
+			<< " veto=" << pkt.veto() << "(" << m_veto << ")"
+			<< " cycle=" << pkt.cycle() << "(" << m_cycle << ")"
+			<< " timingStatus=" << (uint32_t) pkt.timingStatus()
+				<< "(" << (uint32_t) m_timingStatus << ")"
+			<< " intraPulseTime=" << pkt.intraPulseTime()
+				<< "(" << m_intraPulse << ")"
+			<< " tofOffset=" << pkt.tofOffset()
+				<< "(" << m_tofOffset << ")");
+	}
+
 	bool checkSeq(const ADARA::RawDataPkt &pkt) {
 		bool ok = (pkt.pktSeq() == m_pktSeq);
+		if ( !ok ) {
+			ERROR("checkSeq() Packet Sequence Out-of-Order: "
+				<< pkt.pktSeq() << " != " << m_pktSeq
+				<< std::hex << " m_activePulse=0x" << m_activePulse
+				<< " hwId=0x" << m_hwId);
+		}
 		m_pktSeq++;
 		return !ok;
 	}

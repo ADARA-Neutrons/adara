@@ -275,6 +275,10 @@ bool SMSControl::setRecording(bool v)
 		m_runInfo->lock();
 		m_runInfo->setRunNumber(m_currentRunNumber);
 
+		/* Reset the Overall Monitor bookkeeping...
+		 */
+		m_allMonitors.clear();
+
 		try {
 			/* Let our marker control code have a shot at
 			 * fixing up current state before we start recording
@@ -326,6 +330,7 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	 * source id and needs to allocate a bit position for completing
 	 * pulses. We don't have to be terribly fast here.
 	 */
+	m_lastPulseId = 0;
 	size_t i, max = m_eventSources.size();
 	for (i = 0; i < max; i++) {
 		if (!m_eventSources[i]) {
@@ -367,6 +372,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		m_pulses.erase(m_pulses.begin(), ++last);
 	}
 
+	m_lastPulseId = -1;
+
 	/* Mark this id for re-use. */
 	m_eventSources.reset(smsId);
 }
@@ -376,9 +383,43 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
-	it = m_pulses.find(pid);
-	if (it != m_pulses.end())
-		return it;
+	// Manually search the map, so we can check for Sawtooth pulses... ;-b
+	// it = m_pulses.find(pid);
+	if (m_pulses.begin() != m_pulses.end()) {
+
+		uint64_t min_id = (uint64_t) -1;
+		uint64_t max_id = (uint64_t) 0;
+		for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+			if (it->first.first < min_id) min_id = it->first.first;
+			if (it->first.first > max_id) max_id = it->first.first;
+			if (it->first == pid)
+				break;
+		}
+
+		if (it != m_pulses.end())
+			return it;
+
+		// Log any Sawtooth pulses... :-o
+		if (id < min_id) {
+			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+		else if (id >= min_id && id < max_id) {
+			ERROR("getPulse(): Interleaved SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+		m_lastPulseId = max_id;
+	}
+	else {
+		if ( id < m_lastPulseId ) {
+			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " versus Last Pulse id=0x" << m_lastPulseId);
+		}
+		m_lastPulseId = id;
+	}
 
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
 
@@ -407,17 +448,29 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	uint32_t rising = (pixel & 1) << 31;
 	tof |= rising;
 
-	pixel >>= 16;
-	pixel &= 0xff;
+	uint32_t monId = pixel >> 16;
+	monId &= 0xff;
 
-	MonitorMap::iterator mon = pulse->m_monitors.find(pixel);
+	MonitorMap::iterator mon = pulse->m_monitors.find(monId);
 	if (mon == pulse->m_monitors.end()) {
+
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
 		BeamMonitor new_mon(pkt.sourceID(), pkt.tofField());
-		MonitorMap::value_type val(pixel, new_mon);
+		MonitorMap::value_type val(monId, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
+
+		/* Track the creation of overall collections of monitors...
+		 */
+		MonitorMap::iterator allMon = m_allMonitors.find(monId);
+		if (allMon == m_allMonitors.end()) {
+			INFO("New Monitor id=" << monId
+				<< " (pixelId=" << pixel
+				<< " sourceID=" << pkt.sourceID()
+				<< " tofField=" << pkt.tofField() << ")");
+			m_allMonitors.insert(val);
+		}
 	}
 
 	mon->second.m_eventTof.push_back(tof);
