@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# (Cron) Script to Monitor Local SMS Daemon Executable
+#
+# Track things like Memory/CPU Usage, as well as Note If/When SMSD Fails!
+# (and maybe even notify via email or text message on a crash...! :-)
+#
+
+host=`hostname`
+#echo "host=$host"
+
+host_short=`echo $host | awk -F '.' '{print $1}'`
+#echo "host_short=$host_short"
+
+LOGFILE="$HOME/smsd_mon.$host_short.log"
+
+SMSD_USER="snsdata"
+SMSD="smsd"
+
+#
+# Get SMS Daemon process status...
+#
+
+date=`date`
+#echo "date=$date"
+
+status=`ps augxww | grep $SMSD | grep $SMSD_USER`
+#echo "status=$status"
+
+if [ "#$status#" == '##' ]; then
+	echo \
+		"Error on ${host}: SMS Daemon $SMSD Not Running as User $SMSD_USER!"
+	exit -1
+fi
+
+# Extract statistics of interest
+
+log="$date $host $SMSD as ${SMSD_USER}:\n  "
+
+pid=`echo "$status" | awk '{print $2}'`
+#echo "pid=$pid"
+log="$log pid=$pid"
+
+cpuP=`echo "$status" | awk '{print $3}'`
+#echo "cpuP=$cpuP"
+log="$log cpu=${cpuP}%"
+
+memP=`echo "$status" | awk '{print $4}'`
+#echo "memP=$memP"
+log="$log mem=${memP}%"
+
+vsz=`echo "$status" | awk '{print $5}'`
+#echo "vsz=$vsz"
+log="$log vsz=${vsz}K"
+
+rss=`echo "$status" | awk '{print $6}'`
+#echo "rss=$rss"
+log="$log rss=${rss}K"
+
+start=`echo "$status" | awk '{print $9}'`
+#echo "start=$start"
+log="$log start=$start"
+
+cpuT=`echo "$status" | awk '{print $10}'`
+#echo "cpuT=$cpuT"
+log="$log time=$cpuT"
+
+#
+# Dump SMS Daemon Status Snapshot into Log file...
+#
+
+echo -e "$log" >> $LOGFILE
+
