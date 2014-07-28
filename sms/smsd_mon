@@ -12,7 +12,7 @@ host=`hostname`
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$HOME/smsd_mon.$host_short.log"
+LOGFILE="$HOME/smsd_mon/smsd_mon.$host_short.log"
 
 SMSD_USER="snsdata"
 SMSD="smsd"
