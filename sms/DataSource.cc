@@ -58,15 +58,14 @@ public:
 			 * the previous pulse here.
 			 */
 			endPulse(false);
-			m_lastPulse = m_activePulse;
 		}
 
 		m_activePulse = pkt.pulseId();
 		if (m_lastPulse == m_activePulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
-			ERROR("Duplicate pulse from " << m_name << " src 0x"
-				<< std::hex << m_hwId
-				<< " (0x" << m_activePulse << ")");
+			ERROR("Duplicate pulse from " << m_name
+				<< " src=0x" << std::hex << m_hwId << std::dec
+				<< " pulseId=" << m_activePulse);
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
@@ -197,6 +196,10 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 		freeaddrinfo(m_addrinfo);
 		throw;
 	}
+
+	m_lastRTDLPulseId = 0;
+	m_lastRTDLCycle = 0;
+	m_dupRTDL = 0;
 
 	m_last_pkt_type = -1;
 	m_last_pkt_len = -1;
@@ -531,9 +534,33 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 * them may not show up for some time. Just forward them to
 	 * SMSControl.
 	 */
-	// XXX do duplicate checking on a per-datasource basis?
+
+	// do duplicate checking on a per-datasource basis
+
+	if (pkt.pulseId() == m_lastRTDLPulseId) {
+		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+		m_dupRTDL++;
+	}
+	else m_dupRTDL = 0;
+	m_lastRTDLPulseId = pkt.pulseId();
+
+	// just for yuks, check the cycle sequence
+
+	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
+			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+	}
+	m_lastRTDLCycle = pkt.cycle();
+
 	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseRTDL(pkt);
+	ctrl->pulseRTDL(pkt, m_dupRTDL);
+
 	return false;
 }
 
