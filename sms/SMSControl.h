@@ -48,7 +48,7 @@ public:
 
 	void pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			 uint32_t dup);
-	void pulseRTDL(const ADARA::RTDLPkt &pkt);
+	void pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup);
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
@@ -174,6 +174,8 @@ private:
 	static std::string m_beamlineLongName;
 	static std::string m_geometryPath;
 	static std::string m_pixelMapPath;
+
+	static int m_noEoPPulseBufferSize;
 
 	static SMSControl *m_singleton;
 

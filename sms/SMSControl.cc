@@ -23,6 +23,9 @@ std::string SMSControl::m_beamlineShortName;
 std::string SMSControl::m_beamlineLongName;
 std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
+
+int SMSControl::m_noEoPPulseBufferSize;
+
 SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
@@ -55,6 +58,19 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_beamlineShortName =
 			conf.get<std::string>("sms.beamline_shortname", "");
 	m_beamlineLongName = conf.get<std::string>("sms.beamline_longname", "");
+
+	/* Addendum 7/2014: for some legacy dcomserver implementations,
+	 * the neutron events and meta-data events can interleave and/or
+	 * arrive "out of order", so we can optionally enforce a
+	 * fixed-number-of-pulse buffering, to ensure complete pulses.
+	 * Defaults to 0 (which means "no such buffering :-).
+	 */
+	m_noEoPPulseBufferSize =
+			conf.get<int>("sms.no_eop_pulse_buffer_size", 0);
+	if (m_noEoPPulseBufferSize) {
+		INFO("Setting No-EoP-Pulse-Buffer-Size to "
+			<< m_noEoPPulseBufferSize << ".");
+	}
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -326,6 +342,8 @@ bool SMSControl::setRecording(bool v)
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
 {
+	DEBUG("registerEventSource hwId=" << hwId);
+
 	/* We're called when a data source discovers a new hardware
 	 * source id and needs to allocate a bit position for completing
 	 * pulses. We don't have to be terribly fast here.
@@ -335,28 +353,36 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	for (i = 0; i < max; i++) {
 		if (!m_eventSources[i]) {
 			m_eventSources.set(i);
+			DEBUG("registerEventSource returning smsId=" << i);
 			return i;
 		}
 	}
 
+	DEBUG("registerEventSource Out of Event Source (smsIds)!");
 	throw std::runtime_error("No more event sources available");
 }
 
 void SMSControl::unregisterEventSource(uint32_t smsId)
 {
-	PulseMap::iterator it, last;;
+	DEBUG("unregisterEventSource smsId=" << smsId);
+
+	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
 	/* Walk the pending pulses and mark them incomplete if they are still
 	 * waiting for data form this source, as it's not going to come. Keep
-	 * track of the last pulse that is completed by this process.
+	 * track of the last pulse that is completed, whether by this process
+	 * or via markCompleted() but left in queue due to No-EoP Buffering.
 	 */
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+		// release now-partial pulses...
 		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
-			if (it->second->m_pending.none())
-				last = it;
+		}
+		// note the last now-completed (partial or not) pulse for handling
+		if (it->second->m_pending.none()) {
+			last = it;
 		}
 	}
 
@@ -365,11 +391,58 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		 * departed source; all pulses previous to that one must be
 		 * complete now as well, as the monotonically increasing
 		 * pulse ids indicate that they were duplicate pulses.
+		 *
+		 * Addendum 7/2014: for some legacy dcomserver implementations,
+		 * the neutron events and meta-data events can interleave and/or
+		 * arrive "out of order", so we can optionally enforce a
+		 * fixed-number-of-pulse buffering, to ensure complete pulses.
+		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
-		for (it = m_pulses.begin(); it != last; it++)
+
+		// determine how many sources are registered
+		// (including the one we are unregistering)
+		size_t i, max = m_eventSources.size();
+		int num_sources = 0;
+		for (i = 0; i < max; i++) {
+			if (m_eventSources[i])
+				num_sources++;
+		}
+
+		last_minus_buffer = last;
+		int recorded = 0;
+		int cnt = 1; // for last...
+
+		// skip past any buffering level, unless we're the last to unreg
+		// (any other remaining sources could still spew out-of-order...)
+		while (cnt++ < m_noEoPPulseBufferSize && num_sources > 1) {
+			// skip over pulse to satisfy buffering requirement
+			if (last_minus_buffer != m_pulses.begin()) {
+				last_minus_buffer--;
+			}
+			// no pulses to record yet, buffer not "full" enough...
+			else {
+				return;
+			}
+		}
+
+		// record complete/partial pulses past the buffering threshold
+		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
 			recordPulse(it->second);
-		recordPulse(last->second);
-		m_pulses.erase(m_pulses.begin(), ++last);
+			last_recorded = it;
+			recorded++;
+		}
+
+		// always record the last pulse from the last source to unregister
+		if (!m_noEoPPulseBufferSize || num_sources == 1) {
+			recordPulse(last->second);
+			last_recorded = last;
+			recorded++;
+		}
+
+		// erase any now-recorded pulses
+		if (recorded) {
+			m_pulses.erase(m_pulses.begin(), ++last_recorded);
+		}
 	}
 
 	m_lastPulseId = -1;
@@ -659,9 +732,9 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 	}
 }
 
-void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt)
+void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 {
-	PulsePtr &pulse = getPulse(pkt.pulseId(), 0)->second;
+	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
 	/* We don't log about an existing RTDL packet: we'll always have
 	 * one if there is more than one pre-processor on the beam line.
@@ -694,11 +767,15 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
 	PulseMap::iterator current = getPulse(pulseId, dup);
+	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
 	pulse->m_pending.reset(smsId);
-	if (pulse->m_pending.any())
+
+	// pulse still pending from other data sources...
+	if (pulse->m_pending.any()) {
 		return;
+	}
 
 	/* This pulse has now been marked complete by all active data sources.
 	 * As we expect to get monotonically increasing pulse ids, all
@@ -708,14 +785,51 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 *
 	 * We can now walk from the beginning of the pending pulses to
 	 * the current one, pushing the data to storage.
+	 *
+	 * Addendum 7/2014: for some legacy dcomserver implementations,
+	 * the neutron events and meta-data events can interleave and/or
+	 * arrive "out of order", so we can optionally enforce a
+	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
-	for (PulseMap::iterator it = m_pulses.begin(); it != current; it++) {
-		it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-		recordPulse(it->second);
+
+	current_minus_buffer = current;
+	int recorded = 0;
+	int cnt = 1; // for current...
+
+	while (cnt++ < m_noEoPPulseBufferSize) {
+		// skip over pulse to satisfy buffering requirement
+		if (current_minus_buffer != m_pulses.begin()) {
+			current_minus_buffer--;
+		}
+		// no pulses to record yet, buffer not "full" enough...
+		else {
+			return;
+		}
 	}
 
-	recordPulse(current->second);
-	m_pulses.erase(m_pulses.begin(), ++current);
+	// record complete/partial pulses past the buffering threshold
+	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
+		// previous pulse will never be made complete, mark as partial
+		if (it->second->m_pending.any()) {
+			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+		}
+		// recording previously complete (buffered) pulse
+		recordPulse(it->second);
+		last_recorded = it;
+		recorded++;
+	}
+
+	// record the current pulse for sure, if not buffering...
+	if (!m_noEoPPulseBufferSize) {
+		recordPulse(current->second);
+		last_recorded = current;
+		recorded++;
+	}
+
+	// erase any now-recorded pulses
+	if (recorded) {
+		m_pulses.erase(m_pulses.begin(), ++last_recorded);
+	}
 }
 
 void SMSControl::recordPulse(PulsePtr &pulse)
