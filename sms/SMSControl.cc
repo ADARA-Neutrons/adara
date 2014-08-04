@@ -846,8 +846,12 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						  pulse->m_rtdl->packet_length(),
 						  false);
-		} else
+		} else {
+			ERROR("recordPulse(): NO RTDL for Pulse"
+				<< " id=0x" << std::hex << pulse->m_id.first
+				<< " dup=0x" << pulse->m_id.second << std::dec);
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
+		}
 
 		buildMonitorPacket(pulse);
 		buildBankedPacket(pulse);
