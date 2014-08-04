@@ -46,7 +46,8 @@ StreamParser::StreamParser
     m_strict(a_strict),
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
-    m_skipped_pkt_count(0)
+    m_skipped_pkt_count(0),
+    m_pulse_flag(0)
 {
     if ( !a_adara_out_file.empty() )
     {
@@ -335,7 +336,6 @@ StreamParser::rxPacket
 {
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
-    //uint32_t        bank_logical_id;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
@@ -400,10 +400,26 @@ StreamParser::rxPacket
     const ADARA::BankedEventPkt &a_pkt      ///< [in] ADARA BankedEventPkt object to process
 )
 {
-    processPulseID( a_pkt.pulseId() );
+    // Ignore duplicate pulses
+    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+        return false;
 
-    if ( !( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE ))
-        processPulseInfo( a_pkt );
+    // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
+    // any other value indicates an error with SMS packet generation
+
+    if ( m_pulse_flag == 0 )
+    {
+        // First packet of new pulse - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag |= 1;
+    }
+    else if ( m_pulse_flag == 2 )
+        m_pulse_flag = 0;
+    else
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid banked event packet sequence received" )
+
+
+    processPulseInfo( a_pkt );
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
@@ -475,7 +491,6 @@ StreamParser::rxOversizePkt
     // Invoke the base handler, in case it ever does anything...
     return Parser::rxOversizePkt(hdr, chunk, chunk_offset, chunk_len);
 }
-
 
 /*! \brief This method processes the neutron pulse data associated with a Banked Event packet.
  *
@@ -654,7 +669,23 @@ StreamParser::rxPacket
     const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
 )
 {
-    processPulseID( a_pkt.pulseId() );
+    // Ignore duplicate pulses
+    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+        return false;
+
+    // Pulse flag should be 0 (no data processed yet) or 1 (event data processed)
+    // any other value indicates an error with SMS packet generation
+
+    if ( m_pulse_flag == 0 )
+    {
+        // First packet of new pulse - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag |= 2;
+    }
+    else if ( m_pulse_flag == 1 )
+        m_pulse_flag = 0;
+    else
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid beam monitor packet sequence received" )
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
@@ -671,7 +702,7 @@ StreamParser::rxPacket
         monitor_id = *rpos >> 22;
         event_count = *rpos++ & 0x003FFFFF;
 
-        // TODO What do we do with the pulse info from beam monitor packets?
+        // TODO What do we do with the source info from beam monitor packets?
         rpos += 2; // Skip over source info (source ID & tof offset)
 
         processMonitorEvents( monitor_id, event_count, rpos );
@@ -1306,6 +1337,7 @@ StreamParser::rxPacket
  * current pulse ID). If so, the pulse count is incremented and the new pulse ID retained. This method is needed to
  * decouple packet ordering dependencies between banked event packets and monitor packets.
  */
+/*
 void
 StreamParser::processPulseID
 (
@@ -1318,7 +1350,7 @@ StreamParser::processPulseID
         ++m_pulse_count;
     }
 }
-
+*/
 
 /*! \brief Processes state of received informational packets
  *

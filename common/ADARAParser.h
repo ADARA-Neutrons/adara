@@ -4,6 +4,7 @@
 #include <string>
 #include <stdint.h>
 #include <stdexcept>
+#include <unistd.h> // for ssize_t
 
 #include "ADARA.h"
 #include "ADARAPackets.h"

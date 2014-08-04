@@ -1,5 +1,4 @@
 #include <string.h>
-
 #include "ADARAParser.h"
 
 using namespace ADARA;

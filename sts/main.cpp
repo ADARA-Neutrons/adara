@@ -46,7 +46,7 @@
 
 using namespace std;
 
-#define STS_VERSION "1.0.8"
+#define STS_VERSION "1.1.0"
 
 
 /**

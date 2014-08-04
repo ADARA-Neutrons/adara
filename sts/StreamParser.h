@@ -99,7 +99,7 @@ private:
     void        handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
-    void        processPulseID( uint64_t a_pulse_id );
+    //void        processPulseID( uint64_t a_pulse_id );
     void        receivedInfo( InfoBit a_bit );
     void        finalizeStreamProcessing();
     PVType      toPVType( const char *a_source ) const;
@@ -128,6 +128,8 @@ private:
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics
     mutable std::map<uint32_t,PktStats>     m_stats;                    ///< Continer for per-packet-type statistics
     uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
+
+    uint16_t                                m_pulse_flag;
 };
 
 
