@@ -39,6 +39,10 @@ private:
 	double m_data_timeout;
 	unsigned int m_max_read_chunk;
 
+	uint64_t m_lastRTDLPulseId;
+	uint16_t m_lastRTDLCycle;
+	uint32_t m_dupRTDL;
+
 	void fdReady(void);
 
 	void startConnect(void);
