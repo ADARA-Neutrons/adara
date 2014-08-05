@@ -46,8 +46,6 @@
 
 using namespace std;
 
-#define STS_VERSION "1.1.0"
-
 
 /**
  * @brief moveFile - Attempts to move a file to the specified path

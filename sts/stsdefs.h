@@ -6,6 +6,7 @@
 
 namespace STS {
 
+#define STS_VERSION "1.1.0"
 
 // ============================================================================
 // Neutron Event Classes and Types
