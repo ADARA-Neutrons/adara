@@ -472,13 +472,59 @@ StreamParser::rxOversizePkt
 )
 {
     // Log Oversized Packet (with Header)
-    if (hdr != NULL)
+    if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
         "OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
+
+        // Handle pulse sequence flag for this Oversized Packet
+        // (so we don't get "out of sync" when we throw it away... :-)
+
+        if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+        {
+            // Pulse flag should be 0 (no data processed yet) or 2 (monitor
+            // data processed) any other value indicates an error with
+            // SMS packet generation
+
+            if ( m_pulse_flag == 0 )
+            {
+                // First packet of new pulse - count it and set flag
+                // indicating it was counted
+                ++m_pulse_count;
+                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+                {
+                    m_pulse_flag |= 1;
+                }
+                else if ( hdr->type() ==
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+                {
+                    m_pulse_flag |= 2;
+                }
+            }
+            else if ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                        && m_pulse_flag == 2 )
+                    || ( hdr->type() ==
+                            ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                        && m_pulse_flag == 1 ) )
+            {
+                m_pulse_flag = 0;
+            }
+            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+            {
+                THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                    "Invalid banked event packet sequence received" )
+            }
+            else if ( hdr->type() ==
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+            {
+                THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                    "Invalid beam monitor packet sequence received" )
+            }
+        }
     }
 
     // Log Oversized Packet (Next Chunk)
