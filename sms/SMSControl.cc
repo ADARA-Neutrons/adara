@@ -175,8 +175,8 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
-	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr),
-	m_fastmeta(new FastMeta(m_meta))
+	m_lastPulseId(0), m_lastRingPeriod(0), m_bankReserve(4096),
+	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
@@ -348,7 +348,6 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	 * source id and needs to allocate a bit position for completing
 	 * pulses. We don't have to be terribly fast here.
 	 */
-	m_lastPulseId = 0;
 	size_t i, max = m_eventSources.size();
 	for (i = 0; i < max; i++) {
 		if (!m_eventSources[i]) {
@@ -445,8 +444,6 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		}
 	}
 
-	m_lastPulseId = -1;
-
 	/* Mark this id for re-use. */
 	m_eventSources.reset(smsId);
 }
@@ -474,12 +471,12 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 
 		// Log any Sawtooth pulses... :-o
 		if (id < min_id) {
-			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " min=0x" << min_id << " max=0x" << max_id);
 		}
 		else if (id >= min_id && id < max_id) {
-			ERROR("getPulse(): Interleaved SAWTOOTH Pulse(0x"
+			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " min=0x" << min_id << " max=0x" << max_id);
 		}
@@ -487,7 +484,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	}
 	else {
 		if ( id < m_lastPulseId ) {
-			ERROR("getPulse(): SAWTOOTH Pulse(0x"
+			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " versus Last Pulse id=0x" << m_lastPulseId);
 		}
