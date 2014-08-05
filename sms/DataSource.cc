@@ -61,15 +61,26 @@ public:
 		}
 
 		m_activePulse = pkt.pulseId();
-		if (m_lastPulse == m_activePulse) {
+
+		// check for Duplicate Pulses in event packets...
+		if (m_activePulse == m_lastPulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
-			ERROR("Duplicate pulse from " << m_name
+			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
 				<< " src=0x" << std::hex << m_hwId << std::dec
 				<< " pulseId=" << m_activePulse);
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
 			m_dupCount = 0;
+
+		// also check for SAWTOOTH Pulse Times in event packets...
+		if (m_activePulse < m_lastPulse) {
+			ERROR("newPulse(RawDataPkt): Local SAWTOOTH RawData"
+				<< " m_lastPulse=" << m_lastPulse
+				<< " m_activePulse=" << m_activePulse
+				<< " cycle=" << pkt.cycle()
+				<< " veto=" << pkt.veto());
+		}
 
 		m_flavor = pkt.flavor();
 		m_intraPulse = pkt.intraPulseTime();
@@ -84,7 +95,7 @@ public:
 	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt) {
 		/* These fields should not change for any packet in
 		 * the current pulse. If they do, then this is a
-		 * duplicate pulse id (or a new pulse alltogether.)
+		 * duplicate pulse id (or a new pulse all together.)
 		 */
 		return !(pkt.pulseId() == m_activePulse &&
 			 pkt.flavor() == m_flavor &&
@@ -219,6 +230,25 @@ DataSource::~DataSource()
 		close(m_fd);
 }
 
+void DataSource::unregisterHWSources(bool isSourceDown)
+{
+	/* Complete any outstanding pulses, and inform the manager
+	 * of our change of status
+	 */
+	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it, end = m_hwSources.end();
+
+	for (it = m_hwSources.begin(); it != end; it++) {
+		it->second->endPulse(false);
+		ctrl->unregisterEventSource(it->second->smsId());
+	}
+
+	m_hwSources.clear();
+
+	if (isSourceDown)
+		ctrl->sourceDown(m_smsSourceId);
+}
+
 void DataSource::connectionFailed(void)
 {
 	m_timer->cancel();
@@ -257,16 +287,7 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	SMSControl *ctrl = SMSControl::getInstance();
-	HWSrcMap::iterator it, end = m_hwSources.end();
-
-	for (it = m_hwSources.begin(); it != end; it++) {
-		it->second->endPulse(false);
-		ctrl->unregisterEventSource(it->second->smsId());
-	}
-
-	m_hwSources.clear();
-	ctrl->sourceDown(m_smsSourceId);
+	unregisterHWSources(true);
 }
 
 bool DataSource::timerExpired(void)
@@ -449,7 +470,6 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	switch (pkt.type()) {
 	case ADARA::PacketType::HEARTBEAT_V0:
 		/* We don't care about these packets, just drop them */
-		INFO("Heartbeat Packet for " << m_name);
 		return false;
 	case ADARA::PacketType::SYNC_V0:
 		/* We don't care about these packets, just drop them */
@@ -525,6 +545,7 @@ bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 
 	if (pkt.endOfPulse())
 		hw_src.endPulse();
+
 	return false;
 }
 
@@ -536,7 +557,6 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 */
 
 	// do duplicate checking on a per-datasource basis
-
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
 			<< " pulseId=" << pkt.pulseId()
@@ -545,10 +565,20 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		m_dupRTDL++;
 	}
 	else m_dupRTDL = 0;
+
+	// also check for "Local" SAWTOOTH, from within given DataSource stream
+	if (pkt.pulseId() < m_lastRTDLPulseId) {
+		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
+			<< " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+	}
+
+	// done with this last pulseid...
 	m_lastRTDLPulseId = pkt.pulseId();
 
 	// just for yuks, check the cycle sequence
-
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
@@ -598,3 +628,4 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
+
