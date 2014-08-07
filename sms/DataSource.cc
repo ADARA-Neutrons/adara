@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <boost/bind.hpp>
 #include <stdexcept>
@@ -217,6 +218,8 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 	m_last_pkt_sec = -1;
 	m_last_pkt_nsec = -1;
 
+	m_readDelay = false;
+
 	startConnect();
 }
 
@@ -296,18 +299,47 @@ bool DataSource::timerExpired(void)
 	// DEBUG("timerExpired() entry");
 
 	switch (m_state) {
-	case IDLE:
-		startConnect();
-		break;
-	case CONNECTING:
-		/* TODO only send this once until we successfully connect */
-		WARN("Connection request timed out to " << m_name);
-		connectionFailed();
-		break;
-	case ACTIVE:
-		WARN("Timed out waiting for data from " << m_name);
-		connectionFailed();
-		break;
+
+		case IDLE:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Connect Retry Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_connect_retry);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				startConnect();
+			}
+			break;
+		}
+
+		case CONNECTING:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Connect Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_connect_timeout);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				WARN("Connection request timed out to " << m_name);
+				connectionFailed();
+			}
+			break;
+		}
+
+		case ACTIVE:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Data Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_data_timeout);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				WARN("Timed out waiting for data from " << m_name);
+				connectionFailed();
+			}
+			break;
+		}
 	}
 
 	// DEBUG("timerExpired() exit");
@@ -442,16 +474,44 @@ void DataSource::dataReady(void)
 	m_timer->cancel();
 	m_timer->start(m_data_timeout);
 
+	struct timespec readStart;
+	clock_gettime(CLOCK_REALTIME, &readStart);
+
+ 	// reset read delayed flag, starting a new read now...
+	SMSControl *ctrl = SMSControl::getInstance();
+	ctrl->resetSourcesReadDelay();
+
+	bool readOk = true;
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name);
 			connectionFailed();
+			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		connectionFailed();
+		readOk = false;
+	}
+
+	if ( readOk )
+	{
+		struct timespec readEnd;
+		clock_gettime(CLOCK_REALTIME, &readEnd);
+
+		double elapsed = (double) ( readEnd.tv_sec - readStart.tv_sec )
+			+ (double) ( ( readEnd.tv_nsec - readStart.tv_nsec ) / 1e9 );
+
+ 		// set read delayed flag...!
+		if ( elapsed > 2.0 )
+		{
+			WARN("dataReady(): Read Delay Threshold Exceeded"
+				<< " elapsed=" << elapsed << " (" << m_name << ")");
+			ctrl->setSourcesReadDelay();
+		}
 	}
 }
 

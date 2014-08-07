@@ -20,6 +20,8 @@ public:
 		   double data_timeout, unsigned int read_chunk);
 	~DataSource();
 
+	bool m_readDelay;
+
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;

@@ -53,6 +53,9 @@ public:
 	void markPartial(uint64_t pulseId, uint32_t dup);
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
 
+	void resetSourcesReadDelay(void);
+	void setSourcesReadDelay(void);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
