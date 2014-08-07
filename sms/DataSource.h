@@ -67,6 +67,7 @@ private:
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
+	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 
 	// Last Packet Debug
 	int m_last_pkt_type; // PacketType::Enum

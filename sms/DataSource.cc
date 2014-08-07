@@ -253,7 +253,8 @@ void DataSource::connectionFailed(void)
 {
 	m_timer->cancel();
 
-	INFO("connectionFailed() Last Packet:"
+	INFO("connectionFailed() " << m_name
+		<< " Last Packet:"
 		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
 		<< " sec=" << m_last_pkt_sec
 		<< " nsec=" << m_last_pkt_nsec
@@ -469,8 +470,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 	switch (pkt.type()) {
 	case ADARA::PacketType::HEARTBEAT_V0:
-		/* We don't care about these packets, just drop them */
-		return false;
+		/* We actually *do* care about these packets after all;
+		 * we need to Unregister Any DataSource that sends us one...!
+		 * (or else we'll buffer everything else and swell up & pop! ;-)
+		 */
+		return Parser::rxPacket(pkt);
 	case ADARA::PacketType::SYNC_V0:
 		/* We don't care about these packets, just drop them */
 		return false;
@@ -626,6 +630,23 @@ bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
+{
+	INFO("Heartbeat Packet for " << m_name);
+
+	// In case this DataSource was formerly registered and sending events,
+	// we need to *Unregister All Registered SourceIds* when we receive a
+	// Heartbeat packet, so we won't hold back any other DataSources and
+	// swell up to buffer-explode...! ;-O
+
+	/* Complete any outstanding pulses, and inform the manager of our
+	 * now-idle state (not down, just idle... :-)
+	 */
+	unregisterHWSources(false);
+
 	return false;
 }
 
