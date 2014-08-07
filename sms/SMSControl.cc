@@ -527,8 +527,6 @@ void SMSControl::sourceDown(uint32_t id)
 void SMSControl::resetSourcesReadDelay(void)
 {
 	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		DEBUG("resetSourcesReadDelay: Resetting DataSource Read Delay id="
-			<< (i+1) << " m_readDelay was " << m_sources[i]->m_readDelay);
 		m_sources[i]->m_readDelay = false;
 	}
 }
@@ -539,8 +537,6 @@ void SMSControl::setSourcesReadDelay(void)
 	// Note: each DataSource will clear it's own flag on next Timeout...
 	// (or the next read() will automatically reset every source's flag)
 	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		DEBUG("setSourcesReadDelay: Setting DataSource Read Delay id="
-			<< (i+1) << " m_readDelay was " << m_sources[i]->m_readDelay);
 		m_sources[i]->m_readDelay = true;
 	}
 }

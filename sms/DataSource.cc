@@ -508,7 +508,7 @@ void DataSource::dataReady(void)
  		// set read delayed flag...!
 		if ( elapsed > 2.0 )
 		{
-			WARN("dataReady(): Read Delay Threshold Exceeded"
+			ERROR("dataReady(): Read Delay Threshold Exceeded"
 				<< " elapsed=" << elapsed << " (" << m_name << ")");
 			ctrl->setSourcesReadDelay();
 		}
