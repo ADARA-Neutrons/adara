@@ -44,6 +44,7 @@ ADARA SMS/STS syslog error messages:
    # Critical ADARA SMS Messages - Email Notification
    :msg, contains, "ERROR SMS"     |/etc/rsyslog.pipes/criticalMessages
    :msg, contains, "STS failed"    |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "OversizePkt"   |/etc/rsyslog.pipes/criticalMessages
 
    . . .
 
