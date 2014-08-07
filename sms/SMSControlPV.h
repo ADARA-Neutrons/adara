@@ -41,6 +41,8 @@ protected:
 
 	virtual gddAppFuncTableStatus getValue(gdd &value) = 0;
 	virtual gddAppFuncTableStatus getEnums(gdd &value);
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
 	gddAppFuncTableStatus unusedType(gdd &in);
 
 	void initReadTable(void);
@@ -133,6 +135,17 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+};
+
+class smsErrorPV : public smsBooleanPV {
+public:
+	smsErrorPV(const std::string &name);
+
+	void update(bool val, struct timespec *ts);
+	void set(void);
+	void reset(void);
+
+	gddAppFuncTableStatus getEnums(gdd &value);
 };
 
 class smsUint32PV : public smsPV {

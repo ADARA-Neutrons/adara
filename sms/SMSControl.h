@@ -17,6 +17,7 @@
 
 class smsRunNumberPV;
 class smsRecordingPV;
+class smsErrorPV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -47,13 +48,16 @@ public:
 
 	void pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			 uint32_t dup);
-	void pulseRTDL(const ADARA::RTDLPkt &pkt);
+	void pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup);
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
 
+	void resetSourcesReadDelay(void);
+	void setSourcesReadDelay(void);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
-			      uint32_t sourceId);
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoublePkt &pkt,
 			 uint32_t sourceId);
@@ -75,7 +79,7 @@ private:
 
 	struct EventSource {
 		EventSource(uint32_t intraPulse, uint32_t tofField,
-			    uint32_t nBanks) :
+			uint32_t nBanks) :
 				m_intraPulseTime(intraPulse),
 				m_tofField(tofField),
 				m_activeBanks(0),
@@ -135,6 +139,8 @@ private:
 		enum { REAL_BANK_OFFSET = 2 };
 	};
 
+	MonitorMap				m_allMonitors;
+
 	typedef boost::shared_ptr<Pulse> PulsePtr;
 	typedef std::map<PulseIdentifier, PulsePtr> PulseMap;
 
@@ -145,10 +151,12 @@ private:
 	uint32_t m_nextSrcId;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	std::vector<boost::shared_ptr<DataSource> > m_sources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
 	PulseMap m_pulses;
+	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
 	uint32_t m_bankReserve;
 	boost::shared_ptr<RunInfo> m_runInfo;
@@ -170,22 +178,24 @@ private:
 	static std::string m_geometryPath;
 	static std::string m_pixelMapPath;
 
+	static int m_noEoPPulseBufferSize;
+
 	static SMSControl *m_singleton;
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);
 
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
-		       const boost::property_tree::ptree &info);
+				const boost::property_tree::ptree &info);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void recordPulse(PulsePtr &pulse);
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-			     uint32_t id, uint32_t tof);
+				uint32_t id, uint32_t tof);
 	void addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-			     uint32_t id, uint32_t tof);
+				uint32_t id, uint32_t tof);
 
 	void buildBankedPacket(PulsePtr &pulse);
 	void buildMonitorPacket(PulsePtr &pulse);

@@ -20,6 +20,8 @@ public:
 		   double data_timeout, unsigned int read_chunk);
 	~DataSource();
 
+	bool m_readDelay;
+
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;
@@ -39,12 +41,17 @@ private:
 	double m_data_timeout;
 	unsigned int m_max_read_chunk;
 
+	uint64_t m_lastRTDLPulseId;
+	uint16_t m_lastRTDLCycle;
+	uint32_t m_dupRTDL;
+
 	void fdReady(void);
 
 	void startConnect(void);
 	void connectComplete(void);
 	void dataReady(void);
 
+	void unregisterHWSources(bool isSourceDown);
 	void connectionFailed(void);
 
 	bool timerExpired(void);
@@ -62,6 +69,13 @@ private:
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
+	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
+
+	// Last Packet Debug
+	int m_last_pkt_type; // PacketType::Enum
+	uint32_t m_last_pkt_len;
+	time_t m_last_pkt_sec;
+	long m_last_pkt_nsec;
 
 	HWSource &getHWSource(uint32_t hwId);
 

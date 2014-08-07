@@ -23,6 +23,9 @@ std::string SMSControl::m_beamlineShortName;
 std::string SMSControl::m_beamlineLongName;
 std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
+
+int SMSControl::m_noEoPPulseBufferSize;
+
 SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
@@ -55,6 +58,19 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_beamlineShortName =
 			conf.get<std::string>("sms.beamline_shortname", "");
 	m_beamlineLongName = conf.get<std::string>("sms.beamline_longname", "");
+
+	/* Addendum 7/2014: for some legacy dcomserver implementations,
+	 * the neutron events and meta-data events can interleave and/or
+	 * arrive "out of order", so we can optionally enforce a
+	 * fixed-number-of-pulse buffering, to ensure complete pulses.
+	 * Defaults to 0 (which means "no such buffering :-).
+	 */
+	m_noEoPPulseBufferSize =
+			conf.get<int>("sms.no_eop_pulse_buffer_size", 0);
+	if (m_noEoPPulseBufferSize) {
+		INFO("Setting No-EoP-Pulse-Buffer-Size to "
+			<< m_noEoPPulseBufferSize << ".");
+	}
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -114,7 +130,7 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 }
 
 void SMSControl::addSource(const std::string &name,
-			   const boost::property_tree::ptree &info)
+			const boost::property_tree::ptree &info)
 {
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
@@ -159,8 +175,8 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
-	m_lastRingPeriod(0), m_bankReserve(4096), m_meta(new MetaDataMgr),
-	m_fastmeta(new FastMeta(m_meta))
+	m_lastPulseId(0), m_lastRingPeriod(0), m_bankReserve(4096),
+	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
@@ -171,15 +187,19 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 	m_markers = boost::shared_ptr<Markers>(new Markers(m_beamlineId, this));
 
+	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
+						smsErrorPV(prefix + ":Summary"));
+
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
+	addPV(m_pvSummary);
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId, m_beamlineShortName,
-					      m_beamlineLongName));
+					m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
@@ -197,7 +217,7 @@ void SMSControl::show(unsigned level) const
 }
 
 pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const caNetAddr &,
-			   const char *pv_name)
+			const char *pv_name)
 {
 	/* This is the new version, but just call to the deprecated one
 	 * since we don't currently deal with access control on a per-net
@@ -242,19 +262,24 @@ bool SMSControl::setRecording(bool v)
 	 * It is not an error for a caller to try to stop recording if
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
-	 * false for that case.
-	 *
-	 * TODO don't allow recording to start unless we have all required
-	 * fields from RunInfo.
+	 * false for that case.  
 	 */
-	if (v == m_recording)
+
+	if (v == m_recording) {
 		return !v;
+ 	}
 
 	clock_gettime(CLOCK_REALTIME, &now);
 	if (v) {
 		/* Starting a new recording */
+		if (!m_runInfo->valid()) {
+			ERROR("runInfo invalid, not starting");
+			m_pvSummary->update(1, &now);
+			return false;
+		}
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
 			ERROR("Unable to increment run number, not starting");
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -265,6 +290,10 @@ bool SMSControl::setRecording(bool v)
 		INFO("Starting run " << m_currentRunNumber);
 		m_runInfo->lock();
 		m_runInfo->setRunNumber(m_currentRunNumber);
+
+		/* Reset the Overall Monitor bookkeeping...
+		 */
+		m_allMonitors.clear();
 
 		try {
 			/* Let our marker control code have a shot at
@@ -277,11 +306,13 @@ bool SMSControl::setRecording(bool v)
 			ERROR("Unable to start recording: " << e.what());
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
+			m_pvSummary->update(1, &now);
 			return false;
 		} catch (...) {
 			ERROR("Unable to start recording, unknown exception");
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 
@@ -297,6 +328,7 @@ bool SMSControl::setRecording(bool v)
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
 			ERROR("Unable to stop recording: " << e.what());
+			m_pvSummary->update(1, &now);
 			return false;
 		}
 		m_pvRunNumber->update(0, &now);
@@ -304,11 +336,14 @@ bool SMSControl::setRecording(bool v)
 	}
 
 	m_recording = v;
+	m_pvSummary->update(0, &now);
 	return true;
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
 {
+	DEBUG("registerEventSource hwId=" << hwId);
+
 	/* We're called when a data source discovers a new hardware
 	 * source id and needs to allocate a bit position for completing
 	 * pulses. We don't have to be terribly fast here.
@@ -317,41 +352,107 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	for (i = 0; i < max; i++) {
 		if (!m_eventSources[i]) {
 			m_eventSources.set(i);
+			DEBUG("registerEventSource returning smsId=" << i);
 			return i;
 		}
 	}
 
+	DEBUG("registerEventSource Out of Event Source (smsIds)!");
 	throw std::runtime_error("No more event sources available");
 }
 
 void SMSControl::unregisterEventSource(uint32_t smsId)
 {
-	PulseMap::iterator it, last;;
+	DEBUG("unregisterEventSource: smsId=" << smsId);
+
+	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
 	/* Walk the pending pulses and mark them incomplete if they are still
 	 * waiting for data form this source, as it's not going to come. Keep
-	 * track of the last pulse that is completed by this process.
+	 * track of the last pulse that is completed, whether by this process
+	 * or via markCompleted() but left in queue due to No-EoP Buffering.
 	 */
+	int marked_partial = 0;
+	int now_complete = 0;
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+		// release now-partial pulses...
 		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
-			if (it->second->m_pending.none())
-				last = it;
+			marked_partial++;
+		}
+		// note the last now-completed (partial or not) pulse for handling
+		if (it->second->m_pending.none()) {
+			last = it;
+			now_complete++;
 		}
 	}
+	DEBUG("unregisterEventSource: marked_partial=" << marked_partial
+		<< " now_complete=" << now_complete);
 
 	if (last != m_pulses.end()) {
 		/* Ok, we had at least one pulse completed by the recently
 		 * departed source; all pulses previous to that one must be
 		 * complete now as well, as the monotonically increasing
 		 * pulse ids indicate that they were duplicate pulses.
+		 *
+		 * Addendum 7/2014: for some legacy dcomserver implementations,
+		 * the neutron events and meta-data events can interleave and/or
+		 * arrive "out of order", so we can optionally enforce a
+		 * fixed-number-of-pulse buffering, to ensure complete pulses.
+		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
-		for (it = m_pulses.begin(); it != last; it++)
+
+		// determine how many sources are registered
+		// (including the one we are unregistering)
+		size_t i, max = m_eventSources.size();
+		int num_sources = 0;
+		for (i = 0; i < max; i++) {
+			if (m_eventSources[i])
+				num_sources++;
+		}
+
+		last_minus_buffer = last;
+		int recorded = 0;
+		int cnt = 1; // for last...
+
+		// skip past any buffering level, unless we're the last to unreg
+		// (any other remaining sources could still spew out-of-order...)
+		while (cnt++ < m_noEoPPulseBufferSize && num_sources > 1) {
+			// skip over pulse to satisfy buffering requirement
+			if (last_minus_buffer != m_pulses.begin()) {
+				last_minus_buffer--;
+			}
+			// no pulses to record yet, buffer not "full" enough...
+			else {
+				return;
+			}
+		}
+
+		// record complete/partial pulses past the buffering threshold
+		DEBUG("unregisterEventSource: Recording Pulses "
+			<< m_pulses.begin()->first.first << " up to "
+			<< last_minus_buffer->first.first);
+		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
 			recordPulse(it->second);
-		recordPulse(last->second);
-		m_pulses.erase(m_pulses.begin(), ++last);
+			last_recorded = it;
+			recorded++;
+		}
+
+		// always record the last pulse from the last source to unregister
+		if (!m_noEoPPulseBufferSize || num_sources == 1) {
+			DEBUG("unregisterEventSource Recording Last Pulse "
+				<< last->first.first);
+			recordPulse(last->second);
+			last_recorded = last;
+			recorded++;
+		}
+
+		// erase any now-recorded pulses
+		if (recorded) {
+			m_pulses.erase(m_pulses.begin(), ++last_recorded);
+		}
 	}
 
 	/* Mark this id for re-use. */
@@ -363,9 +464,43 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
-	it = m_pulses.find(pid);
-	if (it != m_pulses.end())
-		return it;
+	// Manually search the map, so we can check for Sawtooth pulses... ;-b
+	// it = m_pulses.find(pid);
+	if (m_pulses.begin() != m_pulses.end()) {
+
+		uint64_t min_id = (uint64_t) -1;
+		uint64_t max_id = (uint64_t) 0;
+		for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+			if (it->first.first < min_id) min_id = it->first.first;
+			if (it->first.first > max_id) max_id = it->first.first;
+			if (it->first == pid)
+				break;
+		}
+
+		if (it != m_pulses.end())
+			return it;
+
+		// Log any Sawtooth pulses... :-o
+		if (id < min_id) {
+			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+		else if (id >= min_id && id < max_id) {
+			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " min=0x" << min_id << " max=0x" << max_id);
+		}
+		m_lastPulseId = max_id;
+	}
+	else {
+		if ( id < m_lastPulseId ) {
+			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
+				<< std::hex << id << ", 0x" << dup << ")"
+				<< " versus Last Pulse id=0x" << m_lastPulseId);
+		}
+		m_lastPulseId = id;
+	}
 
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
 
@@ -388,23 +523,53 @@ void SMSControl::sourceDown(uint32_t id)
 	m_meta->dropTag(id);
 }
 
+// Clear all the DataSource "Read Delay" flags...
+void SMSControl::resetSourcesReadDelay(void)
+{
+	for (uint32_t i = 0; i < m_sources.size(); i++) {
+		m_sources[i]->m_readDelay = false;
+	}
+}
+
+// Set all the DataSource "Read Delay" flags, a Read Delay has Occurred...!
+void SMSControl::setSourcesReadDelay(void)
+{
+	// Note: each DataSource will clear it's own flag on next Timeout...
+	// (or the next read() will automatically reset every source's flag)
+	for (uint32_t i = 0; i < m_sources.size(); i++) {
+		m_sources[i]->m_readDelay = true;
+	}
+}
+
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				 uint32_t pixel, uint32_t tof)
 {
 	uint32_t rising = (pixel & 1) << 31;
 	tof |= rising;
 
-	pixel >>= 16;
-	pixel &= 0xff;
+	uint32_t monId = pixel >> 16;
+	monId &= 0xff;
 
-	MonitorMap::iterator mon = pulse->m_monitors.find(pixel);
+	MonitorMap::iterator mon = pulse->m_monitors.find(monId);
 	if (mon == pulse->m_monitors.end()) {
+
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
 		BeamMonitor new_mon(pkt.sourceID(), pkt.tofField());
-		MonitorMap::value_type val(pixel, new_mon);
+		MonitorMap::value_type val(monId, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
+
+		/* Track the creation of overall collections of monitors...
+		 */
+		MonitorMap::iterator allMon = m_allMonitors.find(monId);
+		if (allMon == m_allMonitors.end()) {
+			INFO("New Monitor id=" << monId
+				<< " (pixelId=" << pixel
+				<< " sourceID=" << pkt.sourceID()
+				<< " tofField=" << pkt.tofField() << ")");
+			m_allMonitors.insert(val);
+		}
 	}
 
 	mon->second.m_eventTof.push_back(tof);
@@ -488,7 +653,7 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 }
 
 void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
-			     uint32_t dup)
+			uint32_t dup)
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -511,7 +676,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 		 * the unneeded constructions and copies...
 		 */
 		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
-				    m_maxBanks);
+				m_maxBanks);
 		SourceMap::value_type val(hwId, new_src);
 		src = pulse->m_sources.insert(val).first;
 	}
@@ -593,9 +758,9 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 	}
 }
 
-void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt)
+void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 {
-	PulsePtr &pulse = getPulse(pkt.pulseId(), 0)->second;
+	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
 	/* We don't log about an existing RTDL packet: we'll always have
 	 * one if there is more than one pre-processor on the beam line.
@@ -625,14 +790,18 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 }
 
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
-			      uint32_t smsId)
+			uint32_t smsId)
 {
 	PulseMap::iterator current = getPulse(pulseId, dup);
+	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
 	pulse->m_pending.reset(smsId);
-	if (pulse->m_pending.any())
+
+	// pulse still pending from other data sources...
+	if (pulse->m_pending.any()) {
 		return;
+	}
 
 	/* This pulse has now been marked complete by all active data sources.
 	 * As we expect to get monotonically increasing pulse ids, all
@@ -642,14 +811,51 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 *
 	 * We can now walk from the beginning of the pending pulses to
 	 * the current one, pushing the data to storage.
+	 *
+	 * Addendum 7/2014: for some legacy dcomserver implementations,
+	 * the neutron events and meta-data events can interleave and/or
+	 * arrive "out of order", so we can optionally enforce a
+	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
-	for (PulseMap::iterator it = m_pulses.begin(); it != current; it++) {
-		it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-		recordPulse(it->second);
+
+	current_minus_buffer = current;
+	int recorded = 0;
+	int cnt = 1; // for current...
+
+	while (cnt++ < m_noEoPPulseBufferSize) {
+		// skip over pulse to satisfy buffering requirement
+		if (current_minus_buffer != m_pulses.begin()) {
+			current_minus_buffer--;
+		}
+		// no pulses to record yet, buffer not "full" enough...
+		else {
+			return;
+		}
 	}
 
-	recordPulse(current->second);
-	m_pulses.erase(m_pulses.begin(), ++current);
+	// record complete/partial pulses past the buffering threshold
+	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
+		// previous pulse will never be made complete, mark as partial
+		if (it->second->m_pending.any()) {
+			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+		}
+		// recording previously complete (buffered) pulse
+		recordPulse(it->second);
+		last_recorded = it;
+		recorded++;
+	}
+
+	// record the current pulse for sure, if not buffering...
+	if (!m_noEoPPulseBufferSize) {
+		recordPulse(current->second);
+		last_recorded = current;
+		recorded++;
+	}
+
+	// erase any now-recorded pulses
+	if (recorded) {
+		m_pulses.erase(m_pulses.begin(), ++last_recorded);
+	}
 }
 
 void SMSControl::recordPulse(PulsePtr &pulse)
@@ -666,8 +872,12 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						  pulse->m_rtdl->packet_length(),
 						  false);
-		} else
+		} else {
+			ERROR("recordPulse(): NO RTDL for Pulse"
+				<< " id=0x" << std::hex << pulse->m_id.first
+				<< " dup=0x" << pulse->m_id.second << std::dec);
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
+		}
 
 		buildMonitorPacket(pulse);
 		buildBankedPacket(pulse);
@@ -894,19 +1104,20 @@ void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 }
 
 void SMSControl::updateValue(const ADARA::VariableU32Pkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }
 
 void SMSControl::updateValue(const ADARA::VariableDoublePkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }
 
 void SMSControl::updateValue(const ADARA::VariableStringPkt &pkt,
-			     uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
 }
+

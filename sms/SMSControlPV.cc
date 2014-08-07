@@ -60,6 +60,33 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 
 /* ----------------------------------------------------------------------- */
 
+static gddAppFuncTableStatus getErrorEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[2];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+	strncpy(str[0].fixed_string, "OK", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "Error", sizeof(str[1].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 2);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
+
+
+/* ----------------------------------------------------------------------- */
+
 smsPV::smsPV() : m_interested(false)
 {
 	initReadTable();
@@ -81,16 +108,19 @@ void smsPV::initReadTable(void)
 	m_read_table.installReadFunc("enums", &smsPV::getEnums);
 
 	/* These are not currently used by any child classes */
-	m_read_table.installReadFunc("alarmHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmHighWarning", &smsPV::unusedType);
-	m_read_table.installReadFunc("alarmLowWarning", &smsPV::unusedType);
-	m_read_table.installReadFunc("controlHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("controlLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("graphicHigh", &smsPV::unusedType);
-	m_read_table.installReadFunc("graphicLow", &smsPV::unusedType);
-	m_read_table.installReadFunc("precision", &smsPV::unusedType);
-	m_read_table.installReadFunc("units", &smsPV::unusedType);
+	/* However, we are applying defaults so that clients requesting
+	 * DBR_CTRL types won't complain so much.
+	 */
+	m_read_table.installReadFunc("alarmHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmHighWarning", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("alarmLowWarning", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("controlLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("graphicHigh", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("graphicLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("precision", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("units", &smsPV::defaultString);
 }
 
 const char *smsPV::getName(void) const
@@ -158,6 +188,18 @@ gddAppFuncTableStatus smsPV::getEnums(gdd &)
 gddAppFuncTableStatus smsPV::unusedType(gdd &)
 {
 	return S_gddAppFuncTable_badType;
+}
+
+gddAppFuncTableStatus smsPV::defaultNumber(gdd &in)
+{
+	in.put(0.0);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsPV::defaultString(gdd &in)
+{
+	in.put("");
+	return S_cas_success;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -296,10 +338,10 @@ caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 	if (m_sms->setRecording(v))
 		return S_casApp_success;
 
-	/* TODO is there a better return code? Should we return success
-	 * even if we fail?
+	/* don't cause disruption at the CA level just because the run 
+	 * couldn't start
 	 */
-	return S_casApp_outOfBounds;
+	return S_casApp_success;
 }
 
 void smsRecordingPV::update(bool recording, struct timespec *ts)
@@ -410,7 +452,7 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	DEBUG("smsStringPV::write() value=" << new_str);
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
-				      MAX_LENGTH);
+					MAX_LENGTH);
 	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 
 	struct timespec ts;
@@ -583,6 +625,58 @@ void smsBooleanPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
+smsErrorPV::smsErrorPV(const std::string &name) :
+						smsBooleanPV(name) { }
+
+gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
+{
+	return getErrorEnums(in);
+}
+
+void smsErrorPV::set() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(1, &ts);
+}
+
+void smsErrorPV::reset() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(0, &ts);
+}
+
+void smsErrorPV::update(bool val, struct timespec *ts)
+{
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	if (val != 0) {
+		nval->setStat(epicsAlarmState);
+		nval->setSevr(epicsSevMajor);
+	}
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+/* ----------------------------------------------------------------------- */
+
 smsUint32PV::smsUint32PV(const std::string &name) : smsPV(name)
 {
 	struct timespec ts;
@@ -746,7 +840,7 @@ caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
 		if (m_interested) {
 			caServer *cas = getCAS();
 			casEventMask mask = cas->valueEventMask() |
-					    cas->logEventMask();
+						cas->logEventMask();
 			smartGDDPointer edge;
 			struct timespec ts;
 

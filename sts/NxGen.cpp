@@ -6,7 +6,6 @@
 
 using namespace std;
 
-
 /*! \brief Constructor for NxGen class.
  *
  * This constructor builds an NxGen instance using the options specified. If the nexus filename is empty, then no
@@ -36,6 +35,7 @@ NxGen::NxGen
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
     m_pulse_vetoes_slab_size(0),
+    m_pulse_flags_slab_size(0),
     m_comment_last_offset(0)
 {
     if ( !a_nexus_out_file.empty() )
@@ -232,6 +232,11 @@ NxGen::initialize()
         makeGroup( "/entry/DASlogs/Veto_pulse", "NXcollection" );
         makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
 
+        // Create pulse flag log
+        makeGroup( "/entry/DASlogs/pulse_flags", "NXcollection" );
+        makeDataset( "/entry/DASlogs/pulse_flags", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( "/entry/DASlogs/pulse_flags", "value", NeXus::UINT32 );
+
         // Create pause event log
         makeGroup( "/entry/DASlogs/pause", "NXlog" );
         makeDataset( "/entry/DASlogs/pause/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
@@ -291,12 +296,22 @@ NxGen::finalize
         writeScalar( "/entry/DASlogs/proton_charge", "average_value", a_run_metrics.charge_stats.mean(), CHARGE_UNITS );
         writeScalar( "/entry/DASlogs/proton_charge", "average_value_error", a_run_metrics.charge_stats.stdDev(), CHARGE_UNITS );
 
-        // Flush any remaining pulse vetoes
+        // Flush any remaining pulse vetos
         if ( m_pulse_vetoes.size() )
         {
             writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
             m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
+        }
+
+        // Flush any remaining pulse flags
+        if ( m_pulse_flags_time.size() )
+        {
+            writeSlab( "/entry/DASlogs/pulse_flags/time", m_pulse_flags_time, m_pulse_flags_slab_size );
+            writeSlab( "/entry/DASlogs/pulse_flags/value", m_pulse_flags_value, m_pulse_flags_slab_size );
+            m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
+            m_pulse_flags_time.clear();
+            m_pulse_flags_value.clear();
         }
 
         // Flush stream marker data
@@ -339,6 +354,10 @@ NxGen::finalize
         writeStringAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "start", time );
         writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+
+        writeStringAttribute( "/entry/DASlogs/pulse_flags/time", "start", time );
+        writeScalarAttribute( "/entry/DASlogs/pulse_flags/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( "/entry/DASlogs/pulse_flags/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
 
         // End time
         time = timeToISO8601( a_run_metrics.end_time );
@@ -465,7 +484,14 @@ NxGen::pulseBuffersReady
         vector<double>::iterator t = a_pulse_info.times.begin();
         for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin(); f != a_pulse_info.flags.end(); ++f, ++t )
         {
-            // Write pulse vetoes to DASlog
+            // If any pulse flags are set (except veto), write them to pulse_flags DASLog
+            if ( *f & ~ADARA::BankedEventPkt::PULSE_VETO )
+            {
+                m_pulse_flags_time.push_back( *t );
+                m_pulse_flags_value.push_back( *f & ~ADARA::BankedEventPkt::PULSE_VETO );
+            }
+
+            // Write pulse vetoes to dedicated DASlog area
             if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
                 m_pulse_vetoes.push_back( *t );
         }
@@ -475,6 +501,15 @@ NxGen::pulseBuffersReady
             writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
             m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
+        }
+
+        if ( m_pulse_flags_value.size() > m_chunk_size )
+        {
+            writeSlab( "/entry/DASlogs/pulse_flags/time", m_pulse_flags_time, m_pulse_flags_slab_size );
+            writeSlab( "/entry/DASlogs/pulse_flags/value", m_pulse_flags_value, m_pulse_flags_slab_size );
+            m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
+            m_pulse_flags_time.clear();
+            m_pulse_flags_value.clear();
         }
     }
     catch( TraceException &e )

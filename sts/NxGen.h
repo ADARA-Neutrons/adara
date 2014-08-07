@@ -129,8 +129,6 @@ private:
                     // Create log if no data has been written yet
                     if ( !m_slab_size )
                     {
-                        std::cout << "Making entry for PV: " << m_log_path << std::endl;
-
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
                         m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
                         m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
@@ -293,7 +291,12 @@ private:
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
-    uint64_t            m_pulse_vetoes_slab_size;       ///< Current size of pulse vetoe slab
+    uint64_t            m_pulse_vetoes_slab_size;       ///< Current size of pulse veto slab
+
+    std::vector<double>         m_pulse_flags_time;     ///< Buffer of pulse flag times
+    std::vector<uint32_t>       m_pulse_flags_value;    ///< Buffer of pulse flag values
+    uint64_t                    m_pulse_flags_slab_size;///< Current size of pulse flags slab
+
     std::vector<double>         m_pause_time;           /// Pause annotation timestamp buffer
     std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
     std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer

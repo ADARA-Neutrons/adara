@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <boost/bind.hpp>
 #include <stdexcept>
@@ -58,18 +59,29 @@ public:
 			 * the previous pulse here.
 			 */
 			endPulse(false);
-			m_lastPulse = m_activePulse;
 		}
 
 		m_activePulse = pkt.pulseId();
-		if (m_lastPulse == m_activePulse) {
+
+		// check for Duplicate Pulses in event packets...
+		if (m_activePulse == m_lastPulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
-			ERROR("Duplicate pulse from " << m_name << " src 0x"
-				<< std::hex << m_hwId
-				<< " (" << m_activePulse << ")");
+			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
+				<< " src=0x" << std::hex << m_hwId << std::dec
+				<< " pulseId=" << m_activePulse);
+			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
 			m_dupCount = 0;
+
+		// also check for SAWTOOTH Pulse Times in event packets...
+		if (m_activePulse < m_lastPulse) {
+			ERROR("newPulse(RawDataPkt): Local SAWTOOTH RawData"
+				<< " m_lastPulse=" << m_lastPulse
+				<< " m_activePulse=" << m_activePulse
+				<< " cycle=" << pkt.cycle()
+				<< " veto=" << pkt.veto());
+		}
 
 		m_flavor = pkt.flavor();
 		m_intraPulse = pkt.intraPulseTime();
@@ -84,7 +96,7 @@ public:
 	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt) {
 		/* These fields should not change for any packet in
 		 * the current pulse. If they do, then this is a
-		 * duplicate pulse id (or a new pulse alltogether.)
+		 * duplicate pulse id (or a new pulse all together.)
 		 */
 		return !(pkt.pulseId() == m_activePulse &&
 			 pkt.flavor() == m_flavor &&
@@ -96,8 +108,31 @@ public:
 			 pkt.tofOffset() == m_tofOffset);
 	}
 
+	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
+		ERROR("dumpPulseInvariants():"
+			<< std::hex << " pulseId=0x" << pkt.pulseId()
+				<< "(0x" << m_activePulse << ")" << std::dec
+			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
+			<< " pulseCharge=" << pkt.pulseCharge()
+				<< "(" << m_charge << ")"
+			<< " veto=" << pkt.veto() << "(" << m_veto << ")"
+			<< " cycle=" << pkt.cycle() << "(" << m_cycle << ")"
+			<< " timingStatus=" << (uint32_t) pkt.timingStatus()
+				<< "(" << (uint32_t) m_timingStatus << ")"
+			<< " intraPulseTime=" << pkt.intraPulseTime()
+				<< "(" << m_intraPulse << ")"
+			<< " tofOffset=" << pkt.tofOffset()
+				<< "(" << m_tofOffset << ")");
+	}
+
 	bool checkSeq(const ADARA::RawDataPkt &pkt) {
 		bool ok = (pkt.pktSeq() == m_pktSeq);
+		if ( !ok ) {
+			ERROR("checkSeq() Packet Sequence Out-of-Order: "
+				<< pkt.pktSeq() << " != " << m_pktSeq
+				<< std::hex << " m_activePulse=0x" << m_activePulse
+				<< " hwId=0x" << m_hwId);
+		}
 		m_pktSeq++;
 		return !ok;
 	}
@@ -174,6 +209,17 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 		throw;
 	}
 
+	m_lastRTDLPulseId = 0;
+	m_lastRTDLCycle = 0;
+	m_dupRTDL = 0;
+
+	m_last_pkt_type = -1;
+	m_last_pkt_len = -1;
+	m_last_pkt_sec = -1;
+	m_last_pkt_nsec = -1;
+
+	m_readDelay = false;
+
 	startConnect();
 }
 
@@ -187,9 +233,49 @@ DataSource::~DataSource()
 		close(m_fd);
 }
 
+void DataSource::unregisterHWSources(bool isSourceDown)
+{
+	/* Complete any outstanding pulses, and inform the manager
+	 * of our change of status
+	 */
+	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it, end = m_hwSources.end();
+
+	for (it = m_hwSources.begin(); it != end; it++) {
+		it->second->endPulse(false);
+		ctrl->unregisterEventSource(it->second->smsId());
+	}
+
+	m_hwSources.clear();
+
+	if (isSourceDown)
+		ctrl->sourceDown(m_smsSourceId);
+}
+
 void DataSource::connectionFailed(void)
 {
 	m_timer->cancel();
+
+	INFO("connectionFailed() " << m_name
+		<< " Last Packet:"
+		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
+		<< " sec=" << m_last_pkt_sec
+		<< " nsec=" << m_last_pkt_nsec
+		<< " len=" << m_last_pkt_len
+		<< " last_bytes_read=" << Parser::last_bytes_read
+		<< " last_pkts_parsed=" << Parser::last_pkts_parsed
+		<< " last_total_bytes=" << Parser::last_total_bytes
+		<< " last_total_packets=" << Parser::last_total_packets
+		<< " last_read_count=" << Parser::last_read_count
+		<< " last_loop_count=" << Parser::last_loop_count
+		<< " last_elapsed=" << Parser::last_elapsed
+		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
+		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
+		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
+		<< " last_last_total_packets=" << Parser::last_last_total_packets
+		<< " last_last_read_count=" << Parser::last_last_read_count
+		<< " last_last_loop_count=" << Parser::last_last_loop_count
+		<< " last_last_elapsed=" << Parser::last_last_elapsed);
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -205,16 +291,7 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	SMSControl *ctrl = SMSControl::getInstance();
-	HWSrcMap::iterator it, end = m_hwSources.end();
-
-	for (it = m_hwSources.begin(); it != end; it++) {
-		it->second->endPulse(false);
-		ctrl->unregisterEventSource(it->second->smsId());
-	}
-
-	m_hwSources.clear();
-	ctrl->sourceDown(m_smsSourceId);
+	unregisterHWSources(true);
 }
 
 bool DataSource::timerExpired(void)
@@ -222,18 +299,47 @@ bool DataSource::timerExpired(void)
 	// DEBUG("timerExpired() entry");
 
 	switch (m_state) {
-	case IDLE:
-		startConnect();
-		break;
-	case CONNECTING:
-		/* TODO only send this once until we successfully connect */
-		WARN("Connection request timed out to " << m_name);
-		connectionFailed();
-		break;
-	case ACTIVE:
-		WARN("Timed out waiting for data from " << m_name);
-		connectionFailed();
-		break;
+
+		case IDLE:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Connect Retry Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_connect_retry);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				startConnect();
+			}
+			break;
+		}
+
+		case CONNECTING:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Connect Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_connect_timeout);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				WARN("Connection request timed out to " << m_name);
+				connectionFailed();
+			}
+			break;
+		}
+
+		case ACTIVE:
+		{
+			if ( m_readDelay ) {
+				WARN("Ignoring Data Timeout (Read Delayed)"
+					<< " for " << m_name << ", Resetting Timer.");
+				m_timer->start(m_data_timeout);
+				m_readDelay = false; // reset flag set by SMSControl...
+			} else {
+				WARN("Timed out waiting for data from " << m_name);
+				connectionFailed();
+			}
+			break;
+		}
 	}
 
 	// DEBUG("timerExpired() exit");
@@ -267,14 +373,20 @@ void DataSource::startConnect(void)
 	reset();
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
-	if (m_fd < 0)
+	if (m_fd < 0) {
+		ERROR("Error creating socket for " << m_name);
 		goto error;
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
-	if (flags < 0)
+	if (flags < 0) {
+		ERROR("Error getting socket flags for " << m_name);
 		goto error_fd;
-	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK))
+	}
+	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK)) {
+		ERROR("Error setting socket flags for " << m_name);
 		goto error_fd;
+	}
 
 	rc = connect(m_fd, m_addrinfo->ai_addr, m_addrinfo->ai_addrlen);
 	if (rc < 0)
@@ -293,6 +405,9 @@ void DataSource::startConnect(void)
 		INFO("Connection established to " << m_name);
 		m_state = ACTIVE;
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
+	default:
+		WARN("Unknown connection request error for " << m_name
+			<< ": " << strerror(rc) << " (Ignoring!)");
 	}
 
 	/* TODO handle any other error here */
@@ -306,6 +421,7 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
+		ERROR("Bad Alloc Error for " << m_name << " adapter: " << e.what());
 		goto error_fd;
 	}
 
@@ -358,23 +474,67 @@ void DataSource::dataReady(void)
 	m_timer->cancel();
 	m_timer->start(m_data_timeout);
 
+	struct timespec readStart;
+	clock_gettime(CLOCK_REALTIME, &readStart);
+
+ 	// reset read delayed flag, starting a new read now...
+	SMSControl *ctrl = SMSControl::getInstance();
+	ctrl->resetSourcesReadDelay();
+
+	bool readOk = true;
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name);
 			connectionFailed();
+			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		connectionFailed();
+		readOk = false;
+	}
+
+	if ( readOk )
+	{
+		struct timespec readEnd;
+		clock_gettime(CLOCK_REALTIME, &readEnd);
+
+		double elapsed = (double) ( readEnd.tv_sec - readStart.tv_sec )
+			+ (double) ( ( readEnd.tv_nsec - readStart.tv_nsec ) / 1e9 );
+
+ 		// set read delayed flag...!
+		if ( elapsed > 2.0 )
+		{
+			ERROR("dataReady(): Read Delay Threshold Exceeded"
+				<< " elapsed=" << elapsed << " (" << m_name << ")");
+			ctrl->setSourcesReadDelay();
+		}
 	}
 }
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Save "Last Packet" Info for Debugging...
+	m_last_pkt_type = pkt.type();
+	m_last_pkt_len = pkt.payload_length();
+	m_last_pkt_sec = pkt.timestamp().tv_sec;
+	m_last_pkt_nsec = pkt.timestamp().tv_nsec;
+
+	// INFO("rxPacket() type=0x" << std::hex << m_last_pkt_type << std::dec
+		// << " sec=" << m_last_pkt_sec
+		// << " nsec=" << m_last_pkt_nsec
+		// << " len=" << m_last_pkt_len );
+
 	switch (pkt.type()) {
 	case ADARA::PacketType::HEARTBEAT_V0:
+		/* We actually *do* care about these packets after all;
+		 * we need to Unregister Any DataSource that sends us one...!
+		 * (or else we'll buffer everything else and swell up & pop! ;-)
+		 */
+		return Parser::rxPacket(pkt);
 	case ADARA::PacketType::SYNC_V0:
 		/* We don't care about these packets, just drop them */
 		return false;
@@ -449,6 +609,7 @@ bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 
 	if (pkt.endOfPulse())
 		hw_src.endPulse();
+
 	return false;
 }
 
@@ -458,9 +619,42 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 * them may not show up for some time. Just forward them to
 	 * SMSControl.
 	 */
-	// XXX do duplicate checking on a per-datasource basis?
+
+	// do duplicate checking on a per-datasource basis
+	if (pkt.pulseId() == m_lastRTDLPulseId) {
+		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+		m_dupRTDL++;
+	}
+	else m_dupRTDL = 0;
+
+	// also check for "Local" SAWTOOTH, from within given DataSource stream
+	if (pkt.pulseId() < m_lastRTDLPulseId) {
+		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
+			<< " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+	}
+
+	// done with this last pulseid...
+	m_lastRTDLPulseId = pkt.pulseId();
+
+	// just for yuks, check the cycle sequence
+	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
+			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
+			<< " pulseId=" << pkt.pulseId()
+			<< " cycle=" << pkt.cycle()
+			<< " veto=" << pkt.veto());
+	}
+	m_lastRTDLCycle = pkt.cycle();
+
 	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseRTDL(pkt);
+	ctrl->pulseRTDL(pkt, m_dupRTDL);
+
 	return false;
 }
 
@@ -498,3 +692,21 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
+
+bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
+{
+	INFO("Heartbeat Packet for " << m_name);
+
+	// In case this DataSource was formerly registered and sending events,
+	// we need to *Unregister All Registered SourceIds* when we receive a
+	// Heartbeat packet, so we won't hold back any other DataSources and
+	// swell up to buffer-explode...! ;-O
+
+	/* Complete any outstanding pulses, and inform the manager of our
+	 * now-idle state (not down, just idle... :-)
+	 */
+	unregisterHWSources(false);
+
+	return false;
+}
+
