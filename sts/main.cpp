@@ -152,7 +152,8 @@ int main( int argc, char** argv )
         }
         else if ( opt_map.count( "version" ))
         {
-            cout << STS_VERSION << endl;
+            cout << STS_VERSION
+                 << " (ADARA Common " << ADARA::VERSION << ")" << endl;
             return STS::TS_TRANSIENT_ERROR;
         }
 
@@ -185,20 +186,21 @@ int main( int argc, char** argv )
         if ( interact && verbose )
         {
             cout << "sts information" << endl;
-            cout << "  version      : " << STS_VERSION << endl;
-            cout << "  nexus file   : " << nexus_outfile << endl;
-            cout << "  adara file   : " << adara_outfile << endl;
-            cout << "  strict       : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  work path    : " << work_path << endl;
-            cout << "  base path    : " << base_path << endl;
-            cout << "  move nexus   : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  chunk size   : " << chunk_size << " (bytes)" << endl;
-            cout << "  cache size   : " << cache_size << " (bytes)" << endl;
-            cout << "  evt buf size : " << evt_buf_size << " (chunks)" << endl;
-            cout << "  anc buf size : " << anc_buf_size << " (chunks)" << endl;
-            cout << "  comp lev     : " << compression_level <<  endl;
-            cout << "  keep temp    : " << ( keep_temp ? "yes" : "no" ) << endl;
-            cout << "  gather stats : " << ( gather_stats ? "yes" : "no" ) << endl;
+            cout << "  version       : " << STS_VERSION << endl;
+            cout << "  ADARA version : " << ADARA::VERSION << endl;
+            cout << "  nexus file    : " << nexus_outfile << endl;
+            cout << "  adara file    : " << adara_outfile << endl;
+            cout << "  strict        : " << ( move ? "yes" : "no" ) << endl;
+            cout << "  work path     : " << work_path << endl;
+            cout << "  base path     : " << base_path << endl;
+            cout << "  move nexus    : " << ( move ? "yes" : "no" ) << endl;
+            cout << "  chunk size    : " << chunk_size << " (bytes)" << endl;
+            cout << "  cache size    : " << cache_size << " (bytes)" << endl;
+            cout << "  evt buf size  : " << evt_buf_size << " (chunks)" << endl;
+            cout << "  anc buf size  : " << anc_buf_size << " (chunks)" << endl;
+            cout << "  comp lev      : " << compression_level <<  endl;
+            cout << "  keep temp     : " << ( keep_temp ? "yes" : "no" ) << endl;
+            cout << "  gather stats  : " << ( gather_stats ? "yes" : "no" ) << endl;
         }
 
         if ( opt_map.count( "file" ))

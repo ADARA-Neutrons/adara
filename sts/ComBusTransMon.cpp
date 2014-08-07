@@ -16,7 +16,8 @@ ComBusTransMon::ComBusTransMon()
     : m_stream_parser(0), m_combus(0), m_comm_thread(0), m_stop(false), m_send_to_workflow(false), m_terminal_msg(0)
 {
     openlog( "sts", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "STS %s service started.", STS_VERSION );
+    syslog( LOG_INFO, "STS %s (ADARA Common %s) service started.",
+		STS_VERSION, ADARA::VERSION.c_str() );
 }
 
 
