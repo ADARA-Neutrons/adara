@@ -363,7 +363,7 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 
 void SMSControl::unregisterEventSource(uint32_t smsId)
 {
-	DEBUG("unregisterEventSource smsId=" << smsId);
+	DEBUG("unregisterEventSource: smsId=" << smsId);
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
@@ -372,18 +372,24 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	 * track of the last pulse that is completed, whether by this process
 	 * or via markCompleted() but left in queue due to No-EoP Buffering.
 	 */
+	int marked_partial = 0;
+	int now_complete = 0;
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
 		// release now-partial pulses...
 		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
+			marked_partial++;
 		}
 		// note the last now-completed (partial or not) pulse for handling
 		if (it->second->m_pending.none()) {
 			last = it;
+			now_complete++;
 		}
 	}
+	DEBUG("unregisterEventSource: marked_partial=" << marked_partial
+		<< " now_complete=" << now_complete);
 
 	if (last != m_pulses.end()) {
 		/* Ok, we had at least one pulse completed by the recently
@@ -425,6 +431,9 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		}
 
 		// record complete/partial pulses past the buffering threshold
+		DEBUG("unregisterEventSource: Recording Pulses "
+			<< m_pulses.begin()->first.first << " up to "
+			<< last_minus_buffer->first.first);
 		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
 			recordPulse(it->second);
 			last_recorded = it;
@@ -433,6 +442,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 		// always record the last pulse from the last source to unregister
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
+			DEBUG("unregisterEventSource Recording Last Pulse "
+				<< last->first.first);
 			recordPulse(last->second);
 			last_recorded = last;
 			recorded++;
@@ -1091,3 +1102,4 @@ void SMSControl::updateValue(const ADARA::VariableStringPkt &pkt,
 {
 	m_meta->updateValue(pkt, sourceId);
 }
+
