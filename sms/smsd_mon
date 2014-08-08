@@ -78,38 +78,46 @@ echo -e "$log" >> $LOGFILE
 # Check on the SMS Daemon Log File size/usage...
 #
 
-log_bytes=`/bin/ls -l $SMSD_LOG | awk '{print $5}'`
-log_hbytes=`/bin/ls -lh $SMSD_LOG | awk '{print $5}'`
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}'`
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}'`
 
-touch $LOGLOGFILE
-echo "$date $host $SMSD_LOG = $log_hbytes" >> $LOGLOGFILE
+# Only check once or twice per day maybe...?
+if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
-smsd_top_log_dir=`echo $SMSD_LOG | awk -F '/' '{print "/"$2}'`
+	log_bytes=`/bin/ls -l $SMSD_LOG | awk '{print $5}'`
+	log_hbytes=`/bin/ls -lh $SMSD_LOG | awk '{print $5}'`
 
-log_used=`df $SMSD_LOG | grep $smsd_top_log_dir | awk '{print $(NF-3)}'`
-#echo "log_used=$log_used"
-log_avail=`df $SMSD_LOG | grep $smsd_top_log_dir | awk '{print $(NF-2)}'`
-#echo "log_avail=$log_avail"
+	touch $LOGLOGFILE
+	echo "$date $host $SMSD_LOG = $log_hbytes" >> $LOGLOGFILE
 
-pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))
-#echo "pct_log=$pct_log"
+	smsd_top_logdir=`echo $SMSD_LOG | awk -F '/' '{print "/"$2}'`
 
-pct_used=$(( $log_used * 100 / $log_avail ))
-#echo "pct_used=$pct_used"
+	log_used=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-3)}'`
+	#echo "log_used=$log_used"
+	log_avail=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-2)}'`
+	#echo "log_avail=$log_avail"
 
-echo "   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
-	>> $LOGLOGFILE
+	pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))
+	#echo "pct_log=$pct_log"
 
-# Seemed like a good idea at the time... ;-D
-# if [[ $pct_log -gt 80 ]]; then
-# 	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
-# 	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
-# 	exit -2
-# fi
+	pct_used=$(( $log_used * 100 / $log_avail ))
+	#echo "pct_used=$pct_used"
 
-if [[ $pct_used -gt 80 ]]; then
-	echo "Error on ${host}: $smsd_top_log_dir is $pct_used% Full!"
-	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
-	exit -3
+	echo \
+	"   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
+		>> $LOGLOGFILE
+
+	# Seemed like a good idea at the time... ;-D
+	# if [[ $pct_log -gt 80 ]]; then
+	# 	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
+	# 	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
+	# 	exit -2
+	# fi
+
+	if [[ $pct_used -gt 80 ]]; then
+		echo "Error on ${host}: $smsd_top_logdir is $pct_used% Full!"
+		echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
+		exit -3
+	fi
 fi
 
