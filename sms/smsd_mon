@@ -100,11 +100,12 @@ pct_used=$(( $log_used * 100 / $log_avail ))
 echo "   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
 	>> $LOGLOGFILE
 
-if [[ $pct_log -gt 80 ]]; then
-	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
-	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
-	exit -2
-fi
+# Seemed like a good idea at the time... ;-D
+# if [[ $pct_log -gt 80 ]]; then
+# 	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
+# 	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
+# 	exit -2
+# fi
 
 if [[ $pct_used -gt 80 ]]; then
 	echo "Error on ${host}: $smsd_top_log_dir is $pct_used% Full!"
