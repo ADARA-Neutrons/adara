@@ -78,8 +78,12 @@ echo -e "$log" >> $LOGFILE
 # Check on the SMS Daemon Log File size/usage...
 #
 
-hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}'`
-min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}'`
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
+	| sed 's/^0//g'`
+#echo "hour=$hour"
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
+	| sed 's/^0//g'`
+#echo "min=$min"
 
 # Only check once or twice per day maybe...?
 if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
