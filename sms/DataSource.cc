@@ -85,7 +85,6 @@ public:
 
 		m_flavor = pkt.flavor();
 		m_intraPulse = pkt.intraPulseTime();
-		m_tofOffset = pkt.tofOffset();
 		m_charge = pkt.pulseCharge();
 		m_cycle = pkt.cycle();
 		m_veto = pkt.veto();
@@ -104,8 +103,7 @@ public:
 			 pkt.veto() == m_veto &&
 			 pkt.cycle() == m_cycle &&
 			 pkt.timingStatus() == m_timingStatus &&
-			 pkt.intraPulseTime() == m_intraPulse &&
-			 pkt.tofOffset() == m_tofOffset);
+			 pkt.intraPulseTime() == m_intraPulse);
 	}
 
 	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
@@ -120,9 +118,7 @@ public:
 			<< " timingStatus=" << (uint32_t) pkt.timingStatus()
 				<< "(" << (uint32_t) m_timingStatus << ")"
 			<< " intraPulseTime=" << pkt.intraPulseTime()
-				<< "(" << m_intraPulse << ")"
-			<< " tofOffset=" << pkt.tofOffset()
-				<< "(" << m_tofOffset << ")");
+				<< "(" << m_intraPulse << ")");
 	}
 
 	bool checkSeq(const ADARA::RawDataPkt &pkt) {
@@ -153,7 +149,6 @@ private:
 	 */
 	ADARA::PulseFlavor::Enum m_flavor;
 	uint32_t	m_intraPulse;
-	uint32_t	m_tofOffset;
 	uint32_t	m_charge;
 	uint16_t	m_cycle;
 	uint16_t	m_veto;
