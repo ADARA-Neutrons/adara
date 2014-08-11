@@ -20,7 +20,7 @@ class HWSource {
 public:
 	HWSource(const std::string &name, uint32_t hwId, uint32_t smsId) :
 		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
-		m_lastPulse(0), m_dupCount(0)
+		m_lastPulse(0), m_dupCount(0), m_trueNew(true)
 	{ }
 
 	uint64_t pulse(void) const { return m_activePulse; }
@@ -45,6 +45,10 @@ public:
 				<< std::hex << m_hwId);
 #endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
+			m_trueNew = false;
+		}
+		else {
+			m_trueNew = true;
 		}
 
 		ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
@@ -68,7 +72,8 @@ public:
 			/* TODO rate-limited logging of duplicate pulses? */
 			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
 				<< " src=0x" << std::hex << m_hwId << std::dec
-				<< " pulseId=" << m_activePulse);
+				<< " pulseId=" << m_activePulse
+				<< " trueNew=" << m_trueNew);
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
@@ -153,6 +158,7 @@ private:
 	uint16_t	m_cycle;
 	uint16_t	m_veto;
 	uint8_t		m_timingStatus;
+	bool		m_trueNew;
 };
 
 
