@@ -123,12 +123,12 @@ public:
 
 	bool checkSeq(const ADARA::RawDataPkt &pkt) {
 		bool ok = (pkt.pktSeq() == m_pktSeq);
-		if ( !ok ) {
+		/* if ( !ok ) {
 			ERROR("checkSeq() Packet Sequence Out-of-Order: "
 				<< pkt.pktSeq() << " != " << m_pktSeq
 				<< std::hex << " m_activePulse=0x" << m_activePulse
 				<< " hwId=0x" << m_hwId);
-		}
+		} */
 		m_pktSeq++;
 		return !ok;
 	}
