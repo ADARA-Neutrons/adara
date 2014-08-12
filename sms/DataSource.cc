@@ -71,8 +71,8 @@ public:
 		if (m_activePulse == m_lastPulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
 			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
-				<< " src=0x" << std::hex << m_hwId << std::dec
-				<< " pulseId=" << m_activePulse
+				<< std::hex << " src=0x" << m_hwId
+				<< " pulseId=0x" << m_activePulse << std::dec
 				<< " trueNew=" << m_trueNew);
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
@@ -624,7 +624,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 		m_dupRTDL++;
@@ -634,8 +634,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
-			<< " m_lastRTDLPulseId=" << m_lastRTDLPulseId
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+			<< " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 	}
@@ -647,7 +647,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 	}
