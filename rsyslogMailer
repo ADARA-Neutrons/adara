@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #
 # rsyslogMailer: a script to read stdin and collect critical log lines into an
 # alert email. (typically this is used to read a named-pipe written to by syslog)
@@ -12,30 +11,26 @@
 # Thanks!
 #   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
 #
-
 alertRecipient="y8y@ornl.gov"      # the mail recipient for alerts
-
 hostName=`hostname`                # the host are we logging from
-
 criticalMessages=""
-
+notifyActive=1
+deactivateFile="/usr/local/bin/deactivateRsyslogMailer"
+if [ -f $deactivateFile ]; then
+	notifyActive=0
+fi
 SEND_EMAIL()
 {
-   if [ "#${criticalMessages}#" != '##' ]; then
-
+   if [[ "#${criticalMessages}#" != '##' && notifyActive -eq 1 ]]; then
       # echo -e "criticalMessages:\n${criticalMessages}"
-
       # send the alert
       echo -e "${criticalMessages}" \
          | mailx -s "*** Critical ADARA Syslog Error(s) on $hostName ***" \
             ${alertRecipient}
    fi
-
    exit 0
 }
-
 trap "SEND_EMAIL" SIGTERM
-
 # kill myself if I wait around for too long... :-b
 (
    sleep 3
@@ -45,7 +40,6 @@ trap "SEND_EMAIL" SIGTERM
    kill -s SIGTERM $$
 ) &
 # ) 2> /dev/null &
-
 # process each line of input and produce an alert email
 while read line
 do
@@ -57,4 +51,3 @@ do
    # fi
 done
 # note: loop never exits... :)
-

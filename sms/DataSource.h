@@ -17,7 +17,7 @@ class DataSource : public ADARA::POSIXParser {
 public:
 	DataSource(const std::string &name, const std::string &uri, uint32_t id,
 		   double connect_retry, double connect_timeout,
-		   double data_timeout, unsigned int read_chunk);
+		   double data_timeout, bool ignore_eop, unsigned int read_chunk);
 	~DataSource();
 
 	bool m_readDelay;
@@ -39,6 +39,7 @@ private:
 	double m_connect_retry;
 	double m_connect_timeout;
 	double m_data_timeout;
+	bool m_ignore_eop;
 	unsigned int m_max_read_chunk;
 
 	uint64_t m_lastRTDLPulseId;

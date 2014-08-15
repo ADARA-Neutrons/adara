@@ -20,7 +20,7 @@ class HWSource {
 public:
 	HWSource(const std::string &name, uint32_t hwId, uint32_t smsId) :
 		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
-		m_lastPulse(0), m_dupCount(0)
+		m_lastPulse(0), m_dupCount(0), m_trueNew(true)
 	{ }
 
 	uint64_t pulse(void) const { return m_activePulse; }
@@ -45,6 +45,10 @@ public:
 				<< std::hex << m_hwId);
 #endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
+			m_trueNew = false;
+		}
+		else {
+			m_trueNew = true;
 		}
 
 		ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
@@ -67,8 +71,9 @@ public:
 		if (m_activePulse == m_lastPulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
 			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
-				<< " src=0x" << std::hex << m_hwId << std::dec
-				<< " pulseId=" << m_activePulse);
+				<< std::hex << " src=0x" << m_hwId
+				<< " pulseId=0x" << m_activePulse << std::dec
+				<< " trueNew=" << m_trueNew);
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
@@ -153,17 +158,19 @@ private:
 	uint16_t	m_cycle;
 	uint16_t	m_veto;
 	uint8_t		m_timingStatus;
+	bool		m_trueNew;
 };
 
 
 DataSource::DataSource(const std::string &name, const std::string &uri,
 		       uint32_t id, double connect_retry,
 		       double connect_timeout, double data_timeout,
-		       unsigned int read_chunk) :
+		       bool ignore_eop, unsigned int read_chunk) :
 	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
-	m_data_timeout(data_timeout), m_max_read_chunk(read_chunk)
+	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
+	m_max_read_chunk(read_chunk)
 {
 	std::string node;
 	std::string service("31416");
@@ -602,7 +609,8 @@ bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 	if (hw_src.checkSeq(pkt))
 		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
 
-	if (pkt.endOfPulse())
+	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
+	if (!m_ignore_eop && pkt.endOfPulse())
 		hw_src.endPulse();
 
 	return false;
@@ -618,7 +626,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 		m_dupRTDL++;
@@ -628,8 +636,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
-			<< " m_lastRTDLPulseId=" << m_lastRTDLPulseId
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+			<< " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 	}
@@ -641,7 +649,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
-			<< " pulseId=" << pkt.pulseId()
+			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
 	}
