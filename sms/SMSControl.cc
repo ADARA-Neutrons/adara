@@ -161,6 +161,12 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 
+	// Should probably let someone know if we're flying by the
+	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
+	if (ignore_eop) {
+		DEBUG("Ignore-EOP Flag Set to True - Self Synchronizing Pulses!");
+	}
+
 	boost::shared_ptr<DataSource> src(new DataSource(name,
 							 uri->second.data(),
 							 m_nextSrcId,
