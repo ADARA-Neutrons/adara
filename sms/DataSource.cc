@@ -165,11 +165,12 @@ private:
 DataSource::DataSource(const std::string &name, const std::string &uri,
 		       uint32_t id, double connect_retry,
 		       double connect_timeout, double data_timeout,
-		       unsigned int read_chunk) :
+		       bool ignore_eop, unsigned int read_chunk) :
 	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
-	m_data_timeout(data_timeout), m_max_read_chunk(read_chunk)
+	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
+	m_max_read_chunk(read_chunk)
 {
 	std::string node;
 	std::string service("31416");
@@ -608,7 +609,8 @@ bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 	if (hw_src.checkSeq(pkt))
 		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
 
-	if (pkt.endOfPulse())
+	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
+	if (!m_ignore_eop && pkt.endOfPulse())
 		hw_src.endPulse();
 
 	return false;

@@ -135,6 +135,7 @@ void SMSControl::addSource(const std::string &name,
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
+	bool ignore_eop;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
@@ -158,6 +159,7 @@ void SMSControl::addSource(const std::string &name,
 	connect_retry = info.get<double>("connect_retry", 15.0);
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
+	ignore_eop = info.get<bool>("ignore_eop", false);
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
 							 uri->second.data(),
@@ -165,6 +167,7 @@ void SMSControl::addSource(const std::string &name,
 							 connect_retry,
 							 connect_timeout,
 							 data_timeout,
+							 ignore_eop,
 							 chunk_size));
 	m_sources.push_back(src);
 
