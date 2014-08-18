@@ -625,7 +625,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
-		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
+		ERROR("rxPacket(RTDLPkt): Duplicate RTDL from " << m_name
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
@@ -635,7 +635,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
-		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
+		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
 			<< std::hex << " m_lastRTDLPulseId=" << m_lastRTDLPulseId
 			<< " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
@@ -647,7 +647,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
-		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from " << m_name
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
