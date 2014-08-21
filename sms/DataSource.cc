@@ -293,6 +293,8 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
+	INFO("Unregistering All Hardware Sources for Disconnected Data Source "
+		<< m_name);
 	unregisterHWSources(true);
 }
 
@@ -708,6 +710,8 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
+	INFO("Unregistering All Hardware Sources for Now-Idle Data Source "
+		<< m_name);
 	unregisterHWSources(false);
 
 	return false;
