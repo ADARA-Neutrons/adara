@@ -636,7 +636,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
 		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
-			<< std::hex << " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+			<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 			<< " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
