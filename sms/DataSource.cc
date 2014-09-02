@@ -293,7 +293,7 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	INFO("Unregistering All Hardware Sources for Disconnected Data Source "
+	INFO("Unregister Any/All Hardware Sources for Disconnected Data Source "
 		<< m_name);
 	unregisterHWSources(true);
 }
