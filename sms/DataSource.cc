@@ -293,6 +293,8 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
+	INFO("Unregister Any/All Hardware Sources for Disconnected Data Source "
+		<< m_name);
 	unregisterHWSources(true);
 }
 
@@ -625,7 +627,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
-		ERROR("rxPacket(RTDLPkt): Duplicate RTDL"
+		ERROR("rxPacket(RTDLPkt): Duplicate RTDL from " << m_name
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
@@ -635,8 +637,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
-		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL"
-			<< std::hex << " m_lastRTDLPulseId=" << m_lastRTDLPulseId
+		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
+			<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 			<< " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
 			<< " veto=" << pkt.veto());
@@ -647,7 +649,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
-		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence"
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from " << m_name
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
@@ -708,6 +710,8 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
+	INFO("Unregistering All Hardware Sources for Now-Idle Data Source "
+		<< m_name);
 	unregisterHWSources(false);
 
 	return false;
