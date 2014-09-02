@@ -710,7 +710,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
-	INFO("Unregistering All Hardware Sources for Now-Idle Data Source "
+	INFO("Unregistering Any/All Hardware Sources for Now-Idle Data Source "
 		<< m_name);
 	unregisterHWSources(false);
 
