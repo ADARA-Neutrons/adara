@@ -286,6 +286,7 @@ bool SMSControl::setRecording(bool v)
 			m_pvSummary->update(1, &now);
 			return false;
 		}
+
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
 			ERROR("Unable to increment run number, not starting");
 			m_pvSummary->update(1, &now);
@@ -346,6 +347,7 @@ bool SMSControl::setRecording(bool v)
 
 	m_recording = v;
 	m_pvSummary->update(0, &now);
+
 	return true;
 }
 
@@ -440,9 +442,9 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		}
 
 		// record complete/partial pulses past the buffering threshold
-		DEBUG("unregisterEventSource: Recording Pulses "
-			<< m_pulses.begin()->first.first << " up to "
-			<< last_minus_buffer->first.first);
+		DEBUG("unregisterEventSource: Recording Pulses"
+			<< std::hex << " 0x" << m_pulses.begin()->first.first
+			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
 		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
 			recordPulse(it->second);
 			last_recorded = it;
@@ -451,8 +453,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 		// always record the last pulse from the last source to unregister
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
-			DEBUG("unregisterEventSource Recording Last Pulse "
-				<< last->first.first);
+			DEBUG("unregisterEventSource Recording Last Pulse 0x"
+				<< std::hex << last->first.first << std::dec);
 			recordPulse(last->second);
 			last_recorded = last;
 			recorded++;
