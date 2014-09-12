@@ -571,7 +571,7 @@ MainWindow::onTableTimer()
         for ( ; ts != m_trans_status.rend(); ++ts, ++row )
         {
             ui->transTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( ts->first )));
-            ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( ts->second.sts_pid.c_str() )));
+            ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1 (%2)").arg( ts->second.sts_pid.c_str() ).arg(ts->second.sts_host.c_str())));
 
             if ( ts->second.running )
             {
@@ -1328,6 +1328,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             status.running = true;
             status.run_num = msg.m_run_num;
             status.sts_pid = msg.getSourceID();
+            status.sts_host = msg.m_host;
             status.run_status = ADARA::ComBus::STATUS_OK;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1343,6 +1344,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             status.running = false;
             status.run_num = msg.m_run_num;
             status.sts_pid = msg.getSourceID();
+            status.sts_host = msg.m_host;
             status.trans_status = STS::TS_SUCCESS;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1358,6 +1360,7 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
             status.running = false;
             status.run_num = msg.m_run_num;
             status.sts_pid = msg.getSourceID();
+            status.sts_host = msg.m_host;
             status.trans_status = msg.m_code;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;

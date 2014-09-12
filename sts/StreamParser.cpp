@@ -475,7 +475,7 @@ StreamParser::rxOversizePkt
     if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
-        "OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+        "[%i] OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u", g_pid,
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
@@ -530,7 +530,7 @@ StreamParser::rxOversizePkt
     // Log Oversized Packet (Next Chunk)
     else
     {
-        syslog( LOG_WARNING, "OversizePkt: next chunk offset=%u len=%u",
+        syslog( LOG_WARNING, "[%i] OversizePkt: next chunk offset=%u len=%u", g_pid,
             chunk_offset, chunk_len);
     }
 
@@ -1411,6 +1411,10 @@ StreamParser::receivedInfo( InfoBit a_bit )
     {
         processRunInfo( m_run_info );
         m_info_rcvd |= INFO_SENT;
+
+        syslog( LOG_INFO, "[%i] beam: %s:%s, prop: %s, run: %lu", g_pid,
+            m_run_info.facility_name.c_str(), m_run_info.instr_shortname.c_str(),
+            m_run_info.proposal_id.c_str(), m_run_info.run_number );
     }
 }
 

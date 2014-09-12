@@ -33,6 +33,7 @@
 
 #include <cstdlib>
 #include <stdio.h>
+#include <syslog.h>
 #include <string.h>
 #include <fcntl.h>
 #include <boost/lexical_cast.hpp>
@@ -46,6 +47,8 @@
 
 using namespace std;
 
+// Global pid
+pid_t g_pid = 0;
 
 /**
  * @brief moveFile - Attempts to move a file to the specified path
@@ -99,6 +102,12 @@ int main( int argc, char** argv )
     string                      nexus_outfile;
     string                      adara_outfile;
     bool                        keep_temp = false;
+
+    // Setup global syslog info
+    g_pid = getpid();
+
+    openlog( "sts", 0, LOG_DAEMON );
+    syslog( LOG_INFO, "[%i] Started. STS ver: %s, common ver: %s", g_pid, STS_VERSION, ADARA::VERSION.c_str() );
 
     try
     {
@@ -234,6 +243,8 @@ int main( int argc, char** argv )
             // Begin ADARA stream processing - does not return until recording ends
             nxgen->processStream();
 
+            syslog( LOG_INFO, "[%i] Stream processing completed", g_pid );
+
             // If we make it here, translation succeeded
 
             if ( move )
@@ -250,9 +261,13 @@ int main( int argc, char** argv )
                 moveFile( adara_outfile, cat_path + "adara", cat_name + ".adara" );
                 moveFile( nexus_outfile, cat_path + "nexus", cat_name + ".nxs.h5" );
 
+                string cat_nexus_file = cat_path + "nexus/" + cat_name + ".nxs.h5";
+
+                syslog( LOG_INFO, "[%i] Successfully moved Nexus file to: %s", g_pid, cat_nexus_file.c_str() );
+
                 // Send finished messages to ComBus AND workflow manager
                 if ( monitor )
-                    monitor->success( true, cat_path + "nexus/" + cat_name + ".nxs.h5" );
+                    monitor->success( true, cat_nexus_file );
             }
             else
             {
@@ -260,6 +275,7 @@ int main( int argc, char** argv )
                 if ( monitor )
                     monitor->success( false, nexus_outfile );
             }
+
 
             // Disable temp file deletion if translation / move succeeded
             keep_temp = true;
@@ -278,32 +294,49 @@ int main( int argc, char** argv )
             sms_code = STS::TS_PERM_ERROR;
 
         sms_reason = e.toString( true, true );
+
+        syslog( LOG_INFO, "[%i] TraceException: %s", g_pid, sms_reason.c_str() );
     }
     catch( exception &e )
     {
         // Unexpected exception
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
+
+        syslog( LOG_INFO, "[%i] Exception: %s", g_pid, sms_reason.c_str() );
     }
     catch( ... )
     {
         // Really unexpected exception
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
+
+        syslog( LOG_INFO, "[%i] Unknown exception.", g_pid );
     }
+
+    if ( sms_code != STS::TS_SUCCESS )
+        syslog( LOG_INFO, "[%i] Translation failed. code: %u", g_pid, (unsigned int)sms_code );
+    else
+        syslog( LOG_INFO, "[%i] Translation succeeded", g_pid );
 
     if ( !interact )
     {
         if ( sms_code != STS::TS_SUCCESS && monitor )
+        {
             monitor->failure( sms_code, sms_reason );
+        }
 
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         ::write( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
+
+        syslog( LOG_INFO, "[%i] Notified SMS of translation status", g_pid );
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
         cout << sms_reason << endl;
     }
+
+    syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
 
     delete monitor;
     delete nxgen;
@@ -320,6 +353,8 @@ int main( int argc, char** argv )
         try { boost::filesystem::remove( boost::filesystem::path( adara_outfile )); }
         catch( ... ) {}
     }
+
+    syslog( LOG_INFO, "[%i] Process exiting", g_pid );
 
     return sms_code != STS::TS_SUCCESS;
 }

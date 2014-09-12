@@ -1,10 +1,12 @@
+#include <syslog.h>
+#include <unistd.h>
+#include <string.h>
 #include <boost/thread/thread_time.hpp>
 #include <boost/thread/locks.hpp>
 #include "ComBusTransMon.h"
 #include "StreamParser.h"
 #include "combus/ComBusMessages.h"
 #include "combus/STSMessages.h"
-#include <syslog.h>
 
 using namespace std;
 
@@ -15,9 +17,12 @@ using namespace std;
 ComBusTransMon::ComBusTransMon()
     : m_stream_parser(0), m_combus(0), m_comm_thread(0), m_stop(false), m_send_to_workflow(false), m_terminal_msg(0)
 {
-    openlog( "sts", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "STS %s (ADARA Common %s) service started.",
-		STS_VERSION, ADARA::VERSION.c_str() );
+    char buf[256];
+    buf[255] = 0;
+    if ( gethostname( buf, 255 ) == -1 )
+        strcpy( buf, "unknown" );
+
+    m_host = buf;
 }
 
 
@@ -85,8 +90,6 @@ ComBusTransMon::start( STS::StreamParser &a_stream_parser, const std::string &a_
 void
 ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 {
-    syslog( LOG_INFO, "STS success on file %s", a_nexus_file.c_str() );
-
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
     // Can only set one terminal message
@@ -95,9 +98,11 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 
     m_terminal_msg = new ADARA::ComBus::STS::TranslationFinishedMsg( m_stream_parser->getFacilityName(),
         m_stream_parser->getBeamShortName(), m_stream_parser->getProposalID(),
-        m_stream_parser->getRunNumber(), a_nexus_file );
+        m_stream_parser->getRunNumber(), a_nexus_file, m_host );
 
     m_send_to_workflow = a_moved;
+
+    syslog( LOG_INFO, "[%i] ComBus translation success message sent", g_pid );
 }
 
 
@@ -110,9 +115,6 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 void
 ComBusTransMon::failure( STS::TranslationStatusCode a_code, const std::string a_reason )
 {
-    syslog( LOG_INFO, "STS failed for %s %s Run %lu (%s).", m_stream_parser->getBeamShortName().c_str(),
-     m_stream_parser->getProposalID().c_str(), m_stream_parser->getRunNumber(), a_reason.c_str() );
-
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
     // Can only set one terminal message
@@ -120,7 +122,9 @@ ComBusTransMon::failure( STS::TranslationStatusCode a_code, const std::string a_
         return;
 
     m_terminal_msg = new ADARA::ComBus::STS::TranslationFailedMsg( m_stream_parser->getBeamShortName(),
-        m_stream_parser->getProposalID(), m_stream_parser->getRunNumber(), a_code, a_reason );
+        m_stream_parser->getProposalID(), m_stream_parser->getRunNumber(), a_code, a_reason, m_host );
+
+    syslog( LOG_INFO, "[%i] ComBus translation failed message sent", g_pid );
 }
 
 
@@ -139,6 +143,8 @@ void
 ComBusTransMon::commThread()
 {
     unsigned long hb = 0;
+
+    syslog( LOG_INFO, "[%i] ComBus thread started", g_pid );
 
     while ( 1 )
     {
@@ -177,13 +183,11 @@ ComBusTransMon::commThread()
                 if ( m_domain.empty())
                     m_domain = m_stream_parser->getFacilityName() + "." + m_stream_parser->getBeamShortName();
 
-                syslog( LOG_INFO, "Got stream info. domain = %s", m_domain.c_str() );
-
                 m_combus = new ADARA::ComBus::Connection( m_domain, "STS", getpid(), m_broker_uri, m_broker_user, m_broker_pass );
                 m_combus->waitForConnect( 5 );
 
                 // Send Translation Started message
-                ADARA::ComBus::STS::TranslationStartedMsg msg( m_stream_parser->getRunNumber() );
+                ADARA::ComBus::STS::TranslationStartedMsg msg( m_stream_parser->getRunNumber(), m_host );
 
                 m_combus->broadcast( msg );
             }
@@ -192,12 +196,12 @@ ComBusTransMon::commThread()
         // Has client ask comm thread to stop?
         if ( m_stop )
         {
-            syslog( LOG_INFO, "Aborting" );
-
             // If combus or term msg is still null, a valid stream was never received
             // Probably due to a more fundamental problem, so quit now
             if ( !m_combus || !m_terminal_msg )
                 break;
         }
     }
+
+    syslog( LOG_INFO, "[%i] ComBus thread exiting", g_pid );
 }
