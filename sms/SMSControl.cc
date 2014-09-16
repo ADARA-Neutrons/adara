@@ -13,6 +13,7 @@
 #include "Logging.h"
 #include "utils.h"
 
+#include <time.h>
 #include <math.h>
 #include <boost/lexical_cast.hpp>
 
@@ -24,7 +25,7 @@ std::string SMSControl::m_beamlineLongName;
 std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
 
-int SMSControl::m_noEoPPulseBufferSize;
+uint32_t SMSControl::m_noEoPPulseBufferSize;
 
 SMSControl *SMSControl::m_singleton = NULL;
 
@@ -66,7 +67,7 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	 * Defaults to 0 (which means "no such buffering :-).
 	 */
 	m_noEoPPulseBufferSize =
-			conf.get<int>("sms.no_eop_pulse_buffer_size", 0);
+			conf.get<uint32_t>("sms.no_eop_pulse_buffer_size", 0);
 	if (m_noEoPPulseBufferSize) {
 		INFO("Setting No-EoP-Pulse-Buffer-Size to "
 			<< m_noEoPPulseBufferSize << ".");
@@ -194,14 +195,26 @@ SMSControl::SMSControl() :
 						smsRecordingPV(prefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(prefix));
-	m_markers = boost::shared_ptr<Markers>(new Markers(m_beamlineId, this));
+
+	m_markers = boost::shared_ptr<Markers>(new
+						Markers(m_beamlineId, this));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
 
+	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Config:"
+							+ "NoEoPPulseBufferSize"));
+
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
+	addPV(m_pvNoEoPPulseBufferSize);
+
+	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -403,6 +416,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		<< " now_complete=" << now_complete);
 
 	if (last != m_pulses.end()) {
+
 		/* Ok, we had at least one pulse completed by the recently
 		 * departed source; all pulses previous to that one must be
 		 * complete now as well, as the monotonically increasing
@@ -424,9 +438,12 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				num_sources++;
 		}
 
+		// get latest No End-of-Pulse Buffer Size value from PV...
+		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
+
 		last_minus_buffer = last;
 		int recorded = 0;
-		int cnt = 1; // for last...
+		uint32_t cnt = 1; // for last...
 
 		// skip past any buffering level, unless we're the last to unreg
 		// (any other remaining sources could still spew out-of-order...)
@@ -829,9 +846,12 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
 
+	// get latest No End-of-Pulse Buffer Size value from PV...
+	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
+
 	current_minus_buffer = current;
 	int recorded = 0;
-	int cnt = 1; // for current...
+	uint32_t cnt = 1; // for current...
 
 	while (cnt++ < m_noEoPPulseBufferSize) {
 		// skip over pulse to satisfy buffering requirement
