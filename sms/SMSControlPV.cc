@@ -253,7 +253,8 @@ caStatus smsRunNumberPV::read(const casCtx &ctx, gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRunNumberPV::read() value=" << v);
+	DEBUG("smsRunNumberPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
@@ -317,21 +318,24 @@ caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRecordingPV::read() value=" << v);
+	DEBUG("smsRecordingPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
 {
-	DEBUG("smsRecordingPV::write()");
-
 	aitUint16 uninitialized_var(v);
 
-	if (!val.isScalar())
+	if (!val.isScalar()) {
+		ERROR("smsRecordingPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
 		return S_casApp_noSupport;
+	}
 
 	val.get(v);
-	DEBUG("smsRecordingPV::write() value=" << v);
+	DEBUG("smsRecordingPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -398,37 +402,49 @@ gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
 
 caStatus smsStringPV::read(const casCtx &ctx, gdd &prototype)
 {
-	DEBUG("smsStringPV::read() value=" << m_value.get());
+	DEBUG("smsStringPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << m_value.get());
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 {
-	DEBUG("smsStringPV::write()");
-
 	unsigned int start, nelem;
 
 	/* caput sends a null string as a scalar, so interpret that
 	 * as an unset request.
 	 */
 	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
+		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Null String, Unset Value.");
 		unset();
 		return S_cas_success;
 	}
 
-	if (!val.isAtomic())
+	if (!val.isAtomic()) {
+		ERROR("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not Atomic!");
 		return S_casApp_noSupport;
+	}
 
-	if (val.dimension() != 1)
+	if (val.dimension() != 1) {
+		ERROR("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Out of Bounds (Multi-Dimensional)!");
 		return S_casApp_outOfBounds;
+	}
 
 	val.getBound(0, start, nelem);
-	if (start || nelem > MAX_LENGTH)
+	if (start || nelem > MAX_LENGTH) {
+		ERROR("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Out of Bounds (" << nelem << " > MAX_LENGTH)!");
 		return S_casApp_outOfBounds;
+	}
 
 	/* Writing no elements will be considered an unset request.
 	 */
 	if (!nelem) {
+		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Writing No Elements, Unset Value.");
 		unset();
 		return S_cas_success;
 	}
@@ -438,6 +454,8 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 		 * send a notification to any watchers, and just return
 		 * success.
 		 */
+		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " Updates Not Allowed, Ignore Value.");
 		notify();
 		return S_casApp_success;
 	}
@@ -449,7 +467,8 @@ caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
 
-	DEBUG("smsStringPV::write() value=" << new_str);
+	DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << new_str);
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
@@ -549,23 +568,25 @@ caStatus smsBooleanPV::read(const casCtx &ctx, gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsBooleanPV::read() value=" << v);
+	DEBUG("smsBooleanPV::read() m_pv_name=" << m_pv_name << " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsBooleanPV::write(const casCtx &ctx, const gdd &val)
 {
-	DEBUG("smsBooleanPV::write()");
-
 	aitUint16 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
 	struct timespec ts;
 
-	if (!val.isScalar())
+	if (!val.isScalar()) {
+		ERROR("smsBooleanPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
 		return S_casApp_noSupport;
+	}
 
 	val.get(v);
-	DEBUG("smsBooleanPV::write() value=" << v);
+	DEBUG("smsBooleanPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -707,23 +728,24 @@ caStatus smsUint32PV::read(const casCtx &ctx, gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsUint32PV::read() value=" << v);
+	DEBUG("smsUint32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsUint32PV::write(const casCtx &ctx, const gdd &val)
 {
-	DEBUG("smsUint32PV::write()");
-
 	aitUint32 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
 	struct timespec ts;
 
-	if (!val.isScalar())
+	if (!val.isScalar()) {
+		DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
 		return S_casApp_noSupport;
+	}
 
 	val.get(v);
-	DEBUG("smsUint32PV::write() value=" << v);
+	DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name << " value=" << v);
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -816,21 +838,23 @@ caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsTriggerPV::read() value=" << v);
+	DEBUG("smsTriggerPV::read() m_pv_name=" << m_pv_name << " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
 caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
 {
-	DEBUG("smsTriggerPV::write()");
-
 	aitUint16 uninitialized_var(v);
 
-	if (!val.isScalar())
+	if (!val.isScalar()) {
+		DEBUG("smsTriggerPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
 		return S_casApp_noSupport;
+	}
 
 	val.get(v);
-	DEBUG("smsTriggerPV::write() value=" << v);
+	DEBUG("smsTriggerPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	if (v > 1)
 		return S_casApp_noSupport;
 
