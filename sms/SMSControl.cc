@@ -203,7 +203,7 @@ SMSControl::SMSControl() :
 						smsErrorPV(prefix + ":Summary"));
 
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Config:"
+						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
 	addPV(m_pvRecording);
