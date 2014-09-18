@@ -10,6 +10,7 @@
 #include "EPICS.h"
 #include "DataSource.h"
 #include "SMSControl.h"
+#include "SMSControlPV.h"
 
 #include "Logging.h"
 
@@ -163,9 +164,10 @@ private:
 
 
 DataSource::DataSource(const std::string &name, const std::string &uri,
-		       uint32_t id, double connect_retry,
-		       double connect_timeout, double data_timeout,
-		       bool ignore_eop, unsigned int read_chunk) :
+			uint32_t id, const std::string beamlineId,
+			double connect_retry, double connect_timeout,
+			double data_timeout, bool ignore_eop,
+			unsigned int read_chunk) :
 	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
@@ -204,6 +206,39 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 		throw std::runtime_error(msg);
 	}
 
+	// Create Run-Time Status and Configuration PVs Per Data Source...
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	std::string prefix(beamlineId);
+	prefix += ":SMS";
+	prefix += ":DataSource:";
+
+	std::stringstream ss;
+	ss << m_smsSourceId;
+	prefix += ss.str();
+
+	m_pvName = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":Name"));
+
+	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
+		smsConnectedPV(prefix + ":Connected"));
+
+	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":IgnoreEoP"));
+
+	ctrl->addPV(m_pvName);
+	ctrl->addPV(m_pvConnected);
+	ctrl->addPV(m_pvIgnoreEoP);
+
+	// Initialize Data Source PVs...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvName->update(m_name, &now);
+	m_pvConnected->disconnected();
+	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+
+	// Set Up Data Source Connection Timer...
 	try {
 		m_timer = new TimerAdapter<DataSource>(this);
 	} catch(...) {
@@ -325,6 +360,7 @@ bool DataSource::timerExpired(void)
 				m_timer->start(m_connect_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
+				// Leave m_pvConnected in its current state, latch failures
 				WARN("Connection request timed out to " << m_name);
 				connectionFailed();
 			}
@@ -340,6 +376,7 @@ bool DataSource::timerExpired(void)
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				WARN("Timed out waiting for data from " << m_name);
+				m_pvConnected->failed();
 				connectionFailed();
 			}
 			break;
@@ -408,6 +445,7 @@ void DataSource::startConnect(void)
 	case 0:
 		INFO("Connection established to " << m_name);
 		m_state = ACTIVE;
+		m_pvConnected->connected();
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 	default:
 		WARN("Unknown connection request error for " << m_name
@@ -437,6 +475,7 @@ error_fd:
 	m_fd = -1;
 
 error:
+	m_pvConnected->failed();
 	connectionFailed();
 }
 
@@ -454,6 +493,7 @@ void DataSource::connectComplete(void)
 		m_timer->cancel();
 		m_timer->start(m_data_timeout);
 		m_state = ACTIVE;
+		m_pvConnected->connected();
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
 		INFO("Connection established to " << m_name);
@@ -470,6 +510,7 @@ void DataSource::connectComplete(void)
 
 	/* TODO ratelimited logging of connection issue */
 	WARN("Connection request to " << m_name << " failed: " << strerror(e));
+	// Leave m_pvConnected in its current state, latch failures
 	connectionFailed();
 }
 
@@ -491,12 +532,14 @@ void DataSource::dataReady(void)
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name);
+			m_pvConnected->disconnected();
 			connectionFailed();
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
+		m_pvConnected->failed();
 		connectionFailed();
 		readOk = false;
 	}
@@ -612,6 +655,7 @@ bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
+	m_ignore_eop = m_pvIgnoreEoP->value();
 	if (!m_ignore_eop && pkt.endOfPulse())
 		hw_src.endPulse();
 
