@@ -84,6 +84,33 @@ static gddAppFuncTableStatus getErrorEnums(gdd &in)
 	return S_cas_success;
 }
 
+/* ----------------------------------------------------------------------- */
+
+static gddAppFuncTableStatus getConnectedEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[3];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+	strncpy(str[0].fixed_string, "Connected", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "Disconnected",
+		sizeof(str[1].fixed_string));
+	strncpy(str[2].fixed_string, "Failed", sizeof(str[2].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 3);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
 
 /* ----------------------------------------------------------------------- */
 
@@ -492,6 +519,30 @@ bool smsStringPV::allowUpdate(const gdd &)
 	return true;
 }
 
+void smsStringPV::update(const std::string str, struct timespec *ts)
+{
+	/* We ensure we have room for MAX_LENGTH characters, plus a
+	 * trailing nul to make live easier when converting to a std::string.
+	 */
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	memcpy(new_str, (void *)str.c_str(), str.length());
+
+	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
+					MAX_LENGTH);
+	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
+	nv->setTimeStamp(ts);
+	nv->setStat(epicsAlarmNone);
+	nv->setSevr(epicsSevNone);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nv;
+
+	notify();
+}
+
 void smsStringPV::unset(void)
 {
 	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
@@ -684,6 +735,73 @@ void smsErrorPV::update(bool val, struct timespec *ts)
 	nval->setTimeStamp(ts);
 
 	if (val != 0) {
+		nval->setStat(epicsAlarmState);
+		nval->setSevr(epicsSevMajor);
+	}
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsConnectedPV::smsConnectedPV(const std::string &name) :
+						smsUint32PV(name) { }
+
+gddAppFuncTableStatus smsConnectedPV::getEnums(gdd &in)
+{
+	return getConnectedEnums(in);
+}
+
+void smsConnectedPV::connected() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(0, &ts);
+
+	DEBUG("smsConnectedPV::connected() m_pv_name=" << m_pv_name << " (0)");
+}
+
+void smsConnectedPV::disconnected() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(1, &ts);
+
+	DEBUG("smsConnectedPV::disconnected() m_pv_name=" << m_pv_name
+		<< " (1)");
+}
+
+void smsConnectedPV::failed() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(2, &ts);
+
+	DEBUG("smsConnectedPV::failed() m_pv_name=" << m_pv_name << " (2)");
+}
+
+void smsConnectedPV::update(uint32_t val, struct timespec *ts)
+{
+	aitUint32 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumUint32);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	if (val == 2) {
 		nval->setStat(epicsAlarmState);
 		nval->setSevr(epicsSevMajor);
 	}
