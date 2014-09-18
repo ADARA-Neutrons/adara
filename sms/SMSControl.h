@@ -182,6 +182,8 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
 	static uint32_t m_noEoPPulseBufferSize;
 
+	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
+
 	static SMSControl *m_singleton;
 
 	pvExistReturn pvExistTest(const casCtx &, const char *pv_name);

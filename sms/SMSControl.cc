@@ -171,12 +171,18 @@ void SMSControl::addSource(const std::string &name,
 	boost::shared_ptr<DataSource> src(new DataSource(name,
 							 uri->second.data(),
 							 m_nextSrcId,
+							 m_beamlineId,
 							 connect_retry,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
 							 chunk_size));
 	m_sources.push_back(src);
+
+	// Update Number of Data Sources PV...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvNumDataSources->update(m_nextSrcId, &now); // count from 1!
 
 	/* We save source ID 0 for internal use. */
 	m_nextSrcId++;
@@ -206,10 +212,15 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
+	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "NumDataSources"));
+
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
+	addPV(m_pvNumDataSources);
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	struct timespec now;
