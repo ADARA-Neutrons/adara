@@ -322,8 +322,8 @@ void DataSource::connectionFailed(void)
 		close(m_fd);
 		m_fd = -1;
 	}
+
 	m_state = IDLE;
-	m_timer->start(m_connect_retry);
 
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
@@ -331,6 +331,11 @@ void DataSource::connectionFailed(void)
 	INFO("Unregister Any/All Hardware Sources for Disconnected Data Source "
 		<< m_name);
 	unregisterHWSources(true);
+
+	m_lastRTDLPulseId = 0;
+	m_lastRTDLCycle = 0;
+
+	m_timer->start(m_connect_retry);
 }
 
 bool DataSource::timerExpired(void)
@@ -757,6 +762,9 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	INFO("Unregistering Any/All Hardware Sources for Now-Idle Data Source "
 		<< m_name);
 	unregisterHWSources(false);
+
+	m_lastRTDLPulseId = 0;
+	m_lastRTDLCycle = 0;
 
 	return false;
 }
