@@ -1,0 +1,182 @@
+#!/bin/bash
+
+# default settings
+SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+PRE="BL14B"
+
+# Check for any of possible required command line options (else 'usage')
+if [ $# == 0 ]; then
+	echo "usage:  liveconf \\"
+	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
+	echo "            [--no_eop_pulse_buffer_size=<npulses>] \\"
+	echo "            [ status ]"
+	exit -1
+fi
+
+# Make Sure we found the EPICS utilities... ;-b
+epicsck=`which caget 2>&1`
+if [ $? != 0 ]; then
+	echo "Error: EPICS Utilities Not Found...! Check EPICS Path..."
+	exit -999
+fi
+
+# Check for settings customization...
+npulses=1
+for arg in $* ; do
+	# echo "arg=$arg"
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key"
+    # echo "value=$value"
+	if [ "#$key#" == '#--beamline#' ]; then
+		PRE="$value"
+		echo "Setting Beamline to: $PRE"
+	elif [ "#$key#" == '#--config#' ]; then
+		SMSD_CONFIG="$value"
+		echo "Using SMS Daemon Config File in: $SMSD_CONFIG"
+	elif [ "#$key#" == '#--no_eop_pulse_buffer_size#' ]; then
+		command="no_eop_pulse_buffer_size"
+		npulses="$value"
+		echo "Setting Command to: $command ($value)"
+	else
+		command="$key"
+		echo "Setting Command to: $command"
+	fi
+done
+
+# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
+# (Give the SMS plenty of time to reply, since it's Not multi-threaded...?)
+caget -w 9 ${PRE}:SMS:Recording > /dev/null 2>&1
+if [ $? != 0 ]; then
+	echo "Error: $PRE SMS EPICS PVs Not Initialized... Is 'smsd' running?"
+	exit -2
+fi
+
+# Dump All Known SMS EPICS PVs...
+if [ "$command" = "status" ]; then
+
+	caget ${PRE}:SMS:Recording
+
+	caget ${PRE}:SMS:RunNumber
+
+	caget ${PRE}:SMS:Control:NoEoPPulseBufferSize
+
+	ndsvar="${PRE}:SMS:Control:NumDataSources"
+	caget $ndsvar
+	if [ $? == 0 ]; then
+		echo
+		numDataSources=`caget $ndsvar | grep $ndsvar | awk '{print $2}'`
+		# Count from 1...!
+		for (( ds=1 ; ds <= numDataSources ; ds++ )); do
+			echo "Data Source id=${ds}:"
+			caget -S ${PRE}:SMS:DataSource:${ds}:Name
+			caget -a ${PRE}:SMS:DataSource:${ds}:Connected
+			caget ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
+			echo
+		done
+	fi
+
+	caget -S ${PRE}:SMS:RunInfo:ProposalId
+	caget -S ${PRE}:SMS:RunInfo:ProposalTitle
+	caget -S ${PRE}:SMS:RunInfo:RunTitle
+	caget -S ${PRE}:SMS:RunInfo:Sample:Id
+	caget -S ${PRE}:SMS:RunInfo:Sample:Name
+	caget -S ${PRE}:SMS:RunInfo:Sample:Nature
+	caget -S ${PRE}:SMS:RunInfo:Sample:Formula
+	caget -S ${PRE}:SMS:RunInfo:Sample:Environment
+
+	echo
+
+	caget ${PRE}:SMS:Paused
+
+	echo
+
+	caget ${PRE}:SMS:Marker:ScanIndex
+	caget ${PRE}:SMS:Marker:StartScan
+	caget ${PRE}:SMS:Marker:StopScan
+	caget -S ${PRE}:SMS:Marker:Comment
+	caget ${PRE}:SMS:Marker:Annotate
+	caget ${PRE}:SMS:Marker:RunComment
+
+	echo
+
+# Set No End-of-Pulse Internal Pulse Buffer Size...
+elif [ "$command" = "no_eop_pulse_buffer_size" ]; then
+
+	option="[No EoP Pulse Buffer Size]"
+
+	echo
+
+	echo "Current Live SMS Daemon Setting (PV) for ${option}:"
+	live_current=`caget ${PRE}:SMS:Control:NoEoPPulseBufferSize 2>&1`
+	live_size=`echo $live_current | awk '{print $2}'`
+	echo "   $live_current ($live_size)"
+
+	echo
+
+	echo "Current SMS Daemon Config File Setting for ${option}:"
+	echo "   ($SMSD_CONFIG)"
+	config_opt_count=`grep "no_eop_pulse_buffer_size" $SMSD_CONFIG \
+		| grep -v ';' | wc | awk '{print $1}'`
+	config_current=`grep "no_eop_pulse_buffer_size" $SMSD_CONFIG \
+		| grep -v ';'`
+	config_size=`echo $config_current | awk '{print $3}'`
+	echo "   $config_current ($config_size)"
+	if [[ "$config_opt_count" != 1 ]]; then
+		echo -e "\nWARNING: *Multiple* Active Options Set! Bailing... ;-Q\n"
+		exit -80
+	fi
+
+	echo
+
+	if [ "$npulses" = "$live_size" ]; then
+		echo "Live SMS Daemon _Already Has_ ${option} = ${npulses}! :-)"
+		echo -e "\nDone."
+	else
+
+		echo -n \
+			"Proceed with Setting Live ${option} to ${npulses} (yes/No)? "
+		read ckset
+
+		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
+			echo -e "\nExiting LiveConf at User's Request.\n"
+			exit -3
+		fi
+
+		echo "Setting Live SMS Daemon ${option} to ${npulses}:"
+		caput ${PRE}:SMS:Control:NoEoPPulseBufferSize $npulses
+		if [ $? != 0 ]; then
+			echo "Error Setting ${option}...! Bailing..."
+			exit -99
+		fi
+	fi
+
+	echo
+
+	if [ "$npulses" = "$config_size" ]; then
+		echo "SMS Daemon Config _Already Has_ ${option} = ${npulses}! :-)"
+		echo -e "\nDone."
+	else
+
+		echo -n \
+			"Proceed with Setting Config ${option} to ${npulses} (yes/No)? "
+		read ckset
+
+		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
+			echo -e "\nExiting LiveConf at User's Request.\n"
+			exit -3
+		fi
+
+		echo "Setting SMS Daemon Config File ${option} to ${npulses}:"
+
+		# Fill In Tricky Parts Here... ;-D
+
+	fi
+
+	echo
+
+# Done
+fi
+
