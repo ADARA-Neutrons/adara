@@ -233,7 +233,7 @@ void STSClient::readable(void)
 	}
 
 	/* Hit an EOF, or our handlers indicated it was time to stop, so
-	 * kill outselves off. We cannot do this from the handlers, as
+	 * kill ourselves off. We cannot do this from the handlers, as
 	 * ADARA::Parser::read() will modify member variables after
 	 * calling them.
 	 */
@@ -265,10 +265,8 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	 * this stream and close the connection.
 	 */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
-	if (hdr) {
-		WARN("Received unexpected oversize packet of length "
-			<< hdr->packet_length());
-	}
+	WARN("Received unexpected oversize packet of length "
+		<< ((hdr) ? hdr->packet_length() : 0));
 	return true;
 }
 

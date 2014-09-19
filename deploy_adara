@@ -1,8 +1,8 @@
 #!/bin/tcsh
 #
-# Deploy SMS
+# Deploy ADARA Programs
 #
-# Script to install and document the deployment of the ADARA SMS Daemon:
+# Script to install and document the deployment of an ADARA Service/Daemon:
 #   - determine user identity (for accountability and documentation :-)
 #   - prompt for (non-null) user inputs:
 #      -> Release Tag Name
@@ -11,14 +11,48 @@
 #   - check out the desired Release Tag
 #   - build the ADARA software suite, using EPICS in /home/controls/epics
 #   - copy the ADARA binaries into /home/controls/prod for archiving
-#   - switch/create the soft link for the SMS Daemon Service
-#   - (optionally restart the SMS Daemon Service...?)
+#   - switch/create the soft link for the ADARA Daemon/Service Binary
+#   - (optionally restart the SMS Daemon Service...)
 #   - document the deployment using the "Config" Git repository
-#      -> determine which Beamline Number we are on...
+#      -> determine which Beamline/STS Host we are on...
 #      -> clone a fresh copy of the Config Git repo (in /tmp)
-#      -> check out the correct Beamline Branch
-#      -> update the "sms/deployment.history.txt" file with a proper log
+#      -> check out the correct Beamline/STS Branch
+#      -> update the "deployment.history.txt" file with a proper log
 #
+
+#
+# What are we actually Deploying...? (Check Command Line Options... :-)
+#
+
+set usage = "   usage:  deploy_adara [ sms | sts | sts_test ]"
+
+if ( $# != 1 ) then
+	echo "\n$usage\n"
+	exit -1
+endif
+
+# Parse Command Line Options
+
+set IS_STS = 0
+
+if ( "$1" == "sms" ) then
+	set PROG = "SMS"
+	set prog = "smsd"
+else if ( "$1" == "sts" ) then
+	set PROG = "STS"
+	set prog = "sts"
+	set IS_STS = 1
+else if ( "$1" == "sts_test" ) then
+	set PROG = "STS_TEST"
+	set prog = "sts"
+	set IS_STS = 1
+else
+	echo "\n   Unknown Deployment Target: $1"
+	echo "\n$usage\n"
+	exit -2
+endif
+
+echo "\nDeploying ADARA $PROG Target.\n"
 
 #
 # Install Defaults
@@ -37,11 +71,11 @@ set CONFIG_REPO = "git+ssh://trac.sns.gov/var/repos/config"
 set CONFIG_LINE = \
 	"------------------------------------------------------------------"
 
-set LOG = "$TMP_DIR/ADARA_SMS_Deploy_Log.$$.txt"
+set LOG = "$TMP_DIR/ADARA_${PROG}_Deploy_Log.$$.txt"
 
 touch $LOG
 
-echo "\nADARA SMS Deployment Log" | tee -a $LOG
+echo "\nADARA ${PROG} Deployment Log" | tee -a $LOG
 date | tee -a $LOG
 
 echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
@@ -55,14 +89,21 @@ set gcos = `echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
 
 echo "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
-# Determine the Beamline Number associated with this computer system
+# Determine the Beamline/STS Branch associated with this computer system
 
-set beamline_host = `hostname -A | sed 's/ /\n/g' | grep '^bl'`
+if ( $IS_STS == 1 ) then
+	set install_host = `hostname`
+	set install_branch = \
+		`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
+	set HOST_TYPE = "STS"
+else
+	set install_host = `hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	set install_branch = `echo "$install_host" | sed 's/-.*//'`
+	set HOST_TYPE = "Beamline"
+endif
 
-set beamline_num = `echo "$beamline_host" | sed 's/-.*//'`
-
-echo "\nInstalling ADARA/SMS for Beamline $beamline_num ($beamline_host)." \
-	| tee -a $LOG
+echo -n "\nInstalling ADARA/${PROG} " | tee -a $LOG
+echo "for $HOST_TYPE $install_branch ($install_host)." | tee -a $LOG
 
 #
 # Prompt for (Non-Null!) User Inputs:
@@ -251,7 +292,7 @@ if ( $already_deployed_locally == 1 ) then
 
 	set need_build = 0
 
-else if ( -e "$tag_archive/smsd" && -x "$tag_archive/smsd" ) then
+else if ( -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ) then
 
 	echo "\nWarning! A Build Already Exists for Release Tag $release_tag!" \
 		| tee -a $LOG
@@ -459,7 +500,7 @@ if ( $need_build == 1 ) then
 endif
 
 #
-# Link New Archive Release Tag into Current Working Set for Beamline
+# Link New Archive Release Tag into Current Working Set for Beamline/STS
 #
 
 # Make sure the Git Config repository has been cloned for deployment
@@ -487,9 +528,9 @@ if ( ! -d "$adara_config" ) then
 
 endif
 
-# Make sure the Proper Beamline Branch is checked out in Config
+# Make sure the Proper Beamline/STS Branch is checked out in Config
 
-echo "\nConfig Beamline Repository:\n" | tee -a $LOG
+echo "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
 
 cd "$adara_config"
 
@@ -497,18 +538,18 @@ pwd | tee -a $LOG
 
 ls -l | tee -a $LOG
 
-# Check out the desired Beamline Branch
+# Check out the desired Beamline/STS Branch
 
-echo "\nChecking out the Config Beamline Branch: $beamline_num\n" \
+echo "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
 	| tee -a $LOG
 
-echo "git checkout $beamline_num" | tee -a $LOG
-git checkout "$beamline_num" |& tee -a $LOG
+echo "git checkout $install_branch" | tee -a $LOG
+git checkout "$install_branch" |& tee -a $LOG
 
 set tag_ok = $status
 
 if ( $tag_ok != 0 ) then
-	echo "\nError Checking Out Beamline Branch! ($tag_ok)\n" | tee -a $LOG
+	echo "\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -4
 endif
@@ -548,20 +589,27 @@ echo "   $adara_current" | tee -a $LOG
 
 set previous_versions = ""
 
-foreach exe ( "$tag_archive"/* )
+foreach exe_path ( "$tag_archive"/* )
 
-	set prog = `basename "$exe"`
+	set exe = `basename "$exe_path"`
 
 	# duh... skip over the Log File from any previous installs... :)
 	set log_ck = \
-		`echo "$prog" | grep "SMS_Deploy_Log" | wc | awk '{print $1}'`
+		`echo "$exe" | grep "${PROG}_Deploy_Log" | wc | awk '{print $1}'`
 	if ( $log_ck == 1 ) continue
 
-	echo "\nLinking ${prog}:" | tee -a $LOG
+	# Handle Special STS "Test" Version Deployment...
+	if ( $PROG == "STS_TEST" && $exe == $prog ) then
+		echo "\nModifying STS Executable $exe for Test Deployment." \
+			| tee -a $LOG
+		set exe = "${exe}_test"
+	endif
+
+	echo "\nLinking ${exe}:" | tee -a $LOG
 
 	# Remove any previous soft links in the Current Working Set
 
-	set tag_link = "$adara_current/$prog"
+	set tag_link = "$adara_current/$exe"
 
 	if ( -l "$tag_link" ) then
 
@@ -573,13 +621,13 @@ foreach exe ( "$tag_archive"/* )
 		echo "   $previous_version" | tee -a $LOG
 
 		# Now remove it... :)
-		echo "\nRemoving previous $prog soft link:\n" | tee -a $LOG
+		echo "\nRemoving previous $exe soft link:\n" | tee -a $LOG
 		echo "   $tag_link" | tee -a $LOG
 		/bin/rm "$tag_link" |& tee -a $LOG
 
 	else if ( -e "$tag_link" ) then
 
-		echo "\nError: Previous $prog file is _Not_ a link!\n" \
+		echo "\nError: Previous $exe file is _Not_ a link!\n" \
 			| tee -a $LOG
 
 		ls -l "$tag_link" | tee -a $LOG
@@ -590,24 +638,24 @@ foreach exe ( "$tag_archive"/* )
 
 	else
 
-		echo "\nNo previous $prog link installed." | tee -a $LOG
+		echo "\nNo previous $exe link installed." | tee -a $LOG
 
-		set previous_version = "(No previous $prog link installed.)"
+		set previous_version = "(No previous $exe link installed.)"
 
 	endif
 
-	set previous_versions = "$previous_versions${prog}: $previous_version\n"
+	set previous_versions = "$previous_versions${exe}: $previous_version\n"
 
 	# Create New Link
 
 	echo "\nLinking New Release Tag for Deployment:" | tee -a $LOG
-	echo "ln -s $exe $tag_link" |& tee -a $LOG
-	ln -s "$exe" "$tag_link" |& tee -a $LOG
+	echo "ln -s $exe_path $tag_link" |& tee -a $LOG
+	ln -s "$exe_path" "$tag_link" |& tee -a $LOG
 
 	set link_ok = $status
 
 	if ( $link_ok != 0 ) then
-		echo "\nError Linking $prog to Current Working Set! ($link_ok)\n" \
+		echo "\nError Linking $exe to Current Working Set! ($link_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -16
@@ -618,7 +666,7 @@ end
 echo "\nPrevious Versions:\n" | tee -a $LOG
 echo "$previous_versions" | tee -a $LOG
 
-echo "New Current Working Set Links ($beamline_num):\n" | tee -a $LOG
+echo "New Current Working Set Links ($install_branch):\n" | tee -a $LOG
 ls -l "$adara_current"/ | tee -a $LOG
 
 echo "\n. . ."
@@ -628,7 +676,7 @@ sleep 3
 # Commit the Current Working Set Changes to the Git Config Repository
 #
 
-echo "\nCommitting Current Working Set changes to $beamline_num branch." \
+echo "\nCommitting Current Working Set changes to $install_branch branch." \
 	| tee -a $LOG
 
 pwd | tee -a $LOG
@@ -695,7 +743,7 @@ endif
 # Document the deployment using the "Config" Git repository
 #
 
-echo "\nDocument Deployment History File for Beamline $beamline_num." \
+echo "\nDocument Deployment History File for $HOST_TYPE $install_branch." \
 	| tee -a $LOG
 
 cd "$adara_config"
@@ -706,7 +754,11 @@ ls -l | tee -a $LOG
 
 # Update the Deployment History File with a Proper Log!
 
-set deploy_history_base = "sms/deployment.history.txt"
+if ( $IS_STS == 1 ) then
+	set deploy_history_base = "sts.deployment.history.txt"
+else
+	set deploy_history_base = "sms/deployment.history.txt"
+endif
 
 set deploy_history = "$INSTALL_BASE/config/$deploy_history_base"
 
@@ -714,12 +766,14 @@ set deploy_history = "$INSTALL_BASE/config/$deploy_history_base"
 
 if ( ! -e "$deploy_history" ) then
 
-	echo "\nCreating Deployment History File for Beamline $beamline_num." \
-		| tee -a $LOG
+	echo -n "\nCreating Deployment History File " | tee -a $LOG
+	echo "for $HOST_TYPE $install_branch." | tee -a $LOG
 	echo "\n   $deploy_history\n" | tee -a $LOG
 
-	echo "\nADARA SMS Deployment History ($beamline_num)\n$CONFIG_LINE\n" \
+	echo "\nADARA ${PROG} Deployment History ($install_branch)" \
 		> "$deploy_history"
+
+	echo "$CONFIG_LINE\n" >> "$deploy_history"
 
 	set create_ok = $status
 
@@ -774,11 +828,12 @@ date >> "$deploy_history"
 echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
 echo "Deploy Script Version: $DEPLOY_VERSION" >> "$deploy_history"
 
-echo "ADARA/SMS Deployment by User: $gcos ($userid)." | tee -a $LOG
-echo "ADARA/SMS Deployment by User: $gcos ($userid)." >> "$deploy_history"
+echo "ADARA/${PROG} Deployment by User: $gcos ($userid)." | tee -a $LOG
+echo "ADARA/${PROG} Deployment by User: $gcos ($userid)." \
+	>> "$deploy_history"
 
-echo "Beamline $beamline_num on Host $beamline_host" | tee -a $LOG
-echo "Beamline $beamline_num on Host $beamline_host" >> "$deploy_history"
+echo "$HOST_TYPE $install_branch on Host $install_host" | tee -a $LOG
+echo "$HOST_TYPE $install_branch on Host $install_host" >> "$deploy_history"
 
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
@@ -875,36 +930,41 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 # (Optionally restart the SMS Daemon Service...?)
 #
 
-echo "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
+if ( $PROG == "SMS" ) then
 
-echo "sudo /sbin/service smsd status" | tee -a $LOG
-sudo /sbin/service smsd status |& tee -a $LOG
+	echo "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
 
-echo -n "\nDo You want to Restart the SMS Daemon service now [yes/No]? "
+	echo "sudo /sbin/service smsd status" | tee -a $LOG
+	sudo /sbin/service smsd status |& tee -a $LOG
 
-set restart_ck = "$<"
+	echo -n "\nDo You want to Restart the SMS Daemon service now [yes/No]? "
 
-if ( "#$restart_ck#" == '#yes#' ) then
+	set restart_ck = "$<"
 
-	echo "\nRestarting SMS Daemon service now on `hostname`." | tee -a $LOG
+	if ( "#$restart_ck#" == '#yes#' ) then
 
-	echo "sudo /sbin/service smsd restart" | tee -a $LOG
-	sudo /sbin/service smsd restart |& tee -a $LOG
-
-	set restart_ok = $status
-
-	if ( $restart_ok != 0 ) then
-		echo "\nError Restarting SMS Daemon Service! ($restart_ok)\n" \
+		echo "\nRestarting SMS Daemon service now on `hostname`." \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -24
+
+		echo "sudo /sbin/service smsd restart" | tee -a $LOG
+		sudo /sbin/service smsd restart |& tee -a $LOG
+
+		set restart_ok = $status
+
+		if ( $restart_ok != 0 ) then
+			echo "\nError Restarting SMS Daemon Service! ($restart_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -24
+		endif
+
 	endif
 
 endif
 
 # Copy Final Log File into ADARA Archive Release Tag Directory
 
-echo "\nDone with Deployment of ADARA/SMS Release Tag $release_tag.\n" \
+echo "\nDone with Deployment of ADARA/${PROG} Release Tag $release_tag.\n" \
 	| tee -a $LOG
 
 if ( $already_deployed_locally == 1 ) then

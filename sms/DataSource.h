@@ -1,6 +1,7 @@
 #ifndef __DATA_SOURCE_H
 #define __DATA_SOURCE_H
 
+#include <boost/smart_ptr.hpp>
 #include <map>
 
 #include "POSIXParser.h"
@@ -12,12 +13,16 @@ struct addrinfo;
 }
 
 class HWSource;
+class smsStringPV;
+class smsConnectedPV;
+class smsBooleanPV;
 
 class DataSource : public ADARA::POSIXParser {
 public:
-	DataSource(const std::string &name, const std::string &uri, uint32_t id,
-		   double connect_retry, double connect_timeout,
-		   double data_timeout, bool ignore_eop, unsigned int read_chunk);
+	DataSource(const std::string &name, const std::string &uri,
+		uint32_t id, const std::string beamlineId,
+		double connect_retry, double connect_timeout, double data_timeout,
+		bool ignore_eop, unsigned int read_chunk);
 	~DataSource();
 
 	bool m_readDelay;
@@ -41,6 +46,10 @@ private:
 	double m_data_timeout;
 	bool m_ignore_eop;
 	unsigned int m_max_read_chunk;
+
+	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsConnectedPV> m_pvConnected;
+	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 
 	uint64_t m_lastRTDLPulseId;
 	uint16_t m_lastRTDLCycle;

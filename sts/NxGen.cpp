@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <string.h>
+#include <syslog.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
@@ -211,6 +212,8 @@ NxGen::initialize()
 
     try
     {
+        syslog( LOG_INFO, "[%i] Creating Nexus file: %s", g_pid, m_nexus_filename.c_str() );
+
         m_h5nx.H5NXcreate_file( m_nexus_filename );
 
         // Create general Nexus entries

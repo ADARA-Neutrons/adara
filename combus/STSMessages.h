@@ -16,11 +16,12 @@ public:
         : m_run_num(0)
     {}
 
-    TranslationStartedMsg( unsigned long a_run_num )
-        : m_run_num(a_run_num)
+    TranslationStartedMsg( unsigned long a_run_num, const std::string &a_host )
+        : m_run_num(a_run_num), m_host(a_host)
     {}
 
-    unsigned long m_run_num;
+    unsigned long   m_run_num;
+    std::string     m_host;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -28,6 +29,7 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_run_num = a_prop_tree.get( "run_num", 0 );
+        m_host = a_prop_tree.get( "host", "" );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -35,6 +37,7 @@ protected:
         MessageBase::write( a_prop_tree );
 
         a_prop_tree.put( "run_num", m_run_num );
+        a_prop_tree.put( "host", m_host );
     }
 };
 
@@ -48,9 +51,9 @@ public:
 
     TranslationFinishedMsg( const std::string &a_facility, const std::string &a_beam_sname,
                             const std::string &a_proposal_id, unsigned long a_run_num,
-                            const std::string &a_nexus_file )
+                            const std::string &a_nexus_file, const std::string &a_host )
         : m_facility(a_facility), m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id),
-          m_run_num(a_run_num), m_nexus_file(a_nexus_file)
+        m_run_num(a_run_num), m_nexus_file(a_nexus_file), m_host(a_host)
     {}
 
     std::string         m_facility;
@@ -58,6 +61,7 @@ public:
     std::string         m_proposal_id;
     unsigned long       m_run_num;
     std::string         m_nexus_file;
+    std::string         m_host;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -72,6 +76,7 @@ protected:
         m_proposal_id = a_prop_tree.get( "ipts", "" );
         m_run_num = a_prop_tree.get( "run_number", 0 );
         m_nexus_file = a_prop_tree.get( "data_file", "" );
+        m_host = a_prop_tree.get( "host", "" );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -83,6 +88,7 @@ protected:
         a_prop_tree.put( "ipts", m_proposal_id );
         a_prop_tree.put( "run_number", m_run_num );
         a_prop_tree.put( "data_file", m_nexus_file );
+        a_prop_tree.put( "host", m_host );
     }
 };
 
@@ -95,9 +101,10 @@ public:
     {}
 
     TranslationFailedMsg( const std::string &a_beam_sname, const std::string &a_proposal_id,
-                                unsigned long a_run_num, ::STS::TranslationStatusCode a_code, const std::string &a_reason )
+                          unsigned long a_run_num, ::STS::TranslationStatusCode a_code,
+                          const std::string &a_reason, const std::string &a_host )
         : m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id), m_run_num(a_run_num), m_code(a_code),
-          m_reason(a_reason)
+          m_reason(a_reason), m_host(a_host)
     {}
 
     std::string                 m_beam_sname;
@@ -105,6 +112,7 @@ public:
     unsigned long               m_run_num;
     ::STS::TranslationStatusCode  m_code;
     std::string                 m_reason;
+    std::string                 m_host;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -116,6 +124,7 @@ protected:
         m_run_num = a_prop_tree.get( "run_number", 0 );
         m_code = (::STS::TranslationStatusCode) a_prop_tree.get( "code", 0 );
         m_reason = a_prop_tree.get( "reason", "" );
+        m_host = a_prop_tree.get( "host", "" );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -127,6 +136,7 @@ protected:
         a_prop_tree.put( "run_number", m_run_num );
         a_prop_tree.put( "code", (unsigned short)m_code );
         a_prop_tree.put( "reason", m_reason );
+        a_prop_tree.put( "host", m_host );
     }
 };
 

@@ -1,12 +1,16 @@
 #ifndef STSDEFS_H
 #define STSDEFS_H
 
+#include <unistd.h>
 #include <vector>
 #include "Utils.h"
 
+// Global syslog info
+#define STS_VERSION "1.2.0"
+extern pid_t g_pid;
+
 namespace STS {
 
-#define STS_VERSION "1.1.0"
 
 // ============================================================================
 // Neutron Event Classes and Types

@@ -12,6 +12,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
+#include <time.h>
+
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
@@ -304,6 +306,11 @@ uint32_t StorageManager::getNextRun(void)
 
 bool StorageManager::updateNextRun(uint32_t run)
 {
+	struct timespec start, after;
+	double elapsed;
+
+	clock_gettime(CLOCK_REALTIME, &start);
+
 	std::string text = boost::lexical_cast<std::string>(run);
 	int fd, rc, write_errno = 0, fsync_errno = 0, close_errno = 0;
 
@@ -368,6 +375,11 @@ bool StorageManager::updateNextRun(uint32_t run)
 		      << strerror(e));
 		return true;
 	}
+
+	clock_gettime(CLOCK_REALTIME, &after);
+	elapsed = (double) ( after.tv_sec - start.tv_sec )
+		+ (double) ( ( after.tv_nsec - start.tv_nsec ) / 1e9 );
+	DEBUG("updateNextRun() took Total elapsed=" << elapsed);
 
 	return false;
 }
@@ -600,7 +612,7 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 
 void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
-	// DEBUG("StorageManager::addPacket() entry");
+	// DEBUG("addPacket() entry");
 
 	struct header *hdr = (struct header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
@@ -650,10 +662,11 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
+		DEBUG("addPacket() requestPurge! goal=" << goal);
 		requestPurge(goal);
 	}
 
-	// DEBUG("StorageManager::addPacket() exit");
+	// DEBUG("addPacket() exit len=" << len);
 }
 
 void StorageManager::addPrologue(IoVector &iovec)

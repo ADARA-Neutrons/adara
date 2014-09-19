@@ -36,6 +36,7 @@ private:
     bool                        m_send_to_workflow;
     ADARA::ComBus::MessageBase *m_terminal_msg;
     boost::mutex                m_api_mutex;
+    std::string                 m_host;
 };
 
 

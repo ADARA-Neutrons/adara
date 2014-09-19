@@ -101,6 +101,8 @@ public:
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
 
+	void update(const std::string str, struct timespec *ts);
+
 	virtual unsigned int maxDimension(void) const;
 	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
@@ -166,6 +168,18 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+};
+
+class smsConnectedPV : public smsUint32PV {
+public:
+	smsConnectedPV(const std::string &name);
+
+	void update(uint32_t val, struct timespec *ts);
+	void connected(void);
+	void disconnected(void);
+	void failed(void);
+
+	gddAppFuncTableStatus getEnums(gdd &value);
 };
 
 class smsTriggerPV : public smsPV {

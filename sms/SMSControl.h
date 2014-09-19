@@ -18,6 +18,7 @@
 class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
+class smsUint32PV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -178,7 +179,10 @@ private:
 	static std::string m_geometryPath;
 	static std::string m_pixelMapPath;
 
-	static int m_noEoPPulseBufferSize;
+	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
+	static uint32_t m_noEoPPulseBufferSize;
+
+	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	static SMSControl *m_singleton;
 

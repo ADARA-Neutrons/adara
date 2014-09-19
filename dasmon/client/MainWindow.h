@@ -82,6 +82,7 @@ private:
     {
         unsigned long               run_num;
         std::string                 sts_pid;
+        std::string                 sts_host;
         bool                        running;
         ADARA::ComBus::StatusCode   run_status;
         STS::TranslationStatusCode  trans_status;
