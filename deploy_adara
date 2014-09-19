@@ -595,7 +595,7 @@ foreach exe_path ( "$tag_archive"/* )
 
 	# duh... skip over the Log File from any previous installs... :)
 	set log_ck = \
-		`echo "$exe" | grep "${PROG}_Deploy_Log" | wc | awk '{print $1}'`
+		`echo "$exe" | grep "_Deploy_Log" | wc | awk '{print $1}'`
 	if ( $log_ck == 1 ) continue
 
 	# Handle Special STS "Test" Version Deployment...
