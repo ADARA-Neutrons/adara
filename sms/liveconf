@@ -7,13 +7,20 @@ CONFIG_REPO="/home/controls/config"
 CONFIG_USER="snsdata"
 TMP_DIR="/tmp"
 
-# Check for any of possible required command line options (else 'usage')
-if [ $# == 0 ]; then
+USAGE()
+{
+	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--no_eop_pulse_buffer_size=<npulses>] \\"
-	echo "            [ status ]"
+	echo "            [ status ] [--help]"
+	echo
+}
+
+# Check for any of possible required command line options (else 'usage')
+if [ $# == 0 ]; then
+	USAGE
 	exit -1
 fi
 
@@ -49,6 +56,9 @@ for arg in $* ; do
 		opt_name="[No EoP Pulse Buffer Size]"
 		opt_value="$value"
 		echo "Setting Command to: $command $option ($value)"
+	elif [ "#$key#" == '#--help#' ]; then
+		USAGE
+		exit -1
 	else
 		command="$key"
 		echo "Setting Command to: $command"
