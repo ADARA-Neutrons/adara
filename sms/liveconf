@@ -454,7 +454,7 @@ elif [ "$command" = "set_option" ]; then
 
 		# Now Push All the Config Commits to Origin
 
-		echo "\nPushing Config Commits to Origin:"
+		echo -e "\nPushing Config Commits to Origin:"
 		echo "git push"
 		git push
 		push_ok=$?
