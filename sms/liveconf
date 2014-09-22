@@ -6,7 +6,6 @@ REPO_CONFIG="./sms/conf/smsd.conf"
 CONFIG_REPO="/home/controls/config"
 CONFIG_USER="snsdata"
 TMP_DIR="/tmp"
-PRE="BL14B"
 
 # Check for any of possible required command line options (else 'usage')
 if [ $# == 0 ]; then
@@ -26,7 +25,8 @@ if [ $? != 0 ]; then
 fi
 
 # Check for settings customization...
-opt_value=1
+opt_value="-1"
+PRE="[NotSet]"
 for arg in $* ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
@@ -35,7 +35,7 @@ for arg in $* ; do
     # echo "value=$value"
 	if [ "#$key#" == '#--beamline#' ]; then
 		PRE="$value"
-		echo "Setting Beamline to: $PRE"
+		echo "Setting EPICS PV Prefix to: $PRE"
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
 		echo "Using SMS Daemon Config File in: $SMSD_CONFIG"
@@ -54,6 +54,34 @@ for arg in $* ; do
 		echo "Setting Command to: $command"
 	fi
 done
+
+#
+# Determine the Beamline Host, and thereby
+# the EPICS PV Prefix and Git Config Repo Branch...
+#
+
+if [ ${PRE} = "[NotSet]" ]; then
+
+	config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	config_branch=`echo "$config_host" | sed 's/-.*//'`
+	if [[ "$config_host" == "" || "$config_branch" == "" ]]; then
+		echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
+		exit -90
+	fi
+
+	echo "Changing Configuration on Host ${config_host}."
+	echo "(Git Config Repository Branch ${config_branch}."
+
+	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
+	echo "Setting EPICS PV Prefix from Config Branch: ${PRE}."
+
+else
+	config_branch=`echo "${PRE}" | tr '[:upper:]' '[:lower:]'`
+	echo -n "Setting Git Config Repository Branch "
+	echo "from EPICS PV Prefix: ${config_branch}."
+fi
+
+echo
 
 # Dump All Known SMS EPICS PVs...
 if [ "$command" = "status" ]; then
@@ -119,9 +147,7 @@ elif [ "$command" = "set_option" ]; then
 	# Prompt for Live/Config Option Change Log Description Text [Required!]
 	#
 
-	echo -e \
-		"\nPlease Enter ${opt_name} Option Change Log Description Text:\n"
-
+	echo -e "Please Enter ${opt_name} Option Change Log Description Text:\n"
 	echo -e "(Enter a Blank Line to Finish.)\n"
 
 	LOG="$TMP_DIR/LiveConfig-$option-$$.txt"
@@ -350,15 +376,7 @@ elif [ "$command" = "set_option" ]; then
 			exit -5
 		fi
 
-		config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
-		config_branch=`echo "$install_host" | sed 's/-.*//'`
-		if [[ "$config_host" == "" || "$config_branch" == "" ]; then
-			echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
-			/bin/ls -l $LOG
-			/bin/cat $LOG
-			exit -6
-		fi
-
+		echo "Checking Out Beamline Git Config Branch: ${config_branch}."
 		git checkout $config_branch
 		if [ $? != 0 ]; then
 			echo -e \
