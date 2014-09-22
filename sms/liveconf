@@ -460,7 +460,7 @@ elif [ "$command" = "set_option" ]; then
 		push_ok=$?
 
 		if [ $push_ok != 0 ]; then
-			echo -e "\nError Pushing Config Update to Git! ($push_ok)\n"
+			echo -e "\nError Pushing Config Update to Origin! ($push_ok)\n"
 		fi
 
 	fi
