@@ -70,7 +70,7 @@ if [ ${PRE} = "[NotSet]" ]; then
 	fi
 
 	echo "Changing Configuration on Host ${config_host}."
-	echo "(Git Config Repository Branch ${config_branch}."
+	echo "(Git Config Repository Branch ${config_branch}.)"
 
 	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
 	echo "Setting EPICS PV Prefix from Config Branch: ${PRE}."
