@@ -312,7 +312,7 @@ elif [ "$command" = "set_option" ]; then
 		echo -e \
 			"\nSetting SMS Daemon Config File ${opt_name} to ${opt_value}:"
 
-		tmpconfig="$SMSD_CONFIG.liveconf.$$"
+		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
 		new_config=`echo "$config_current" \
 			| sed "s/$config_value/$opt_value/"`
