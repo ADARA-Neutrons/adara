@@ -2,12 +2,17 @@
 
 # default settings
 SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+REPO_CONFIG="./sms/conf/smsd.conf"
+CONFIG_REPO="/home/controls/config"
+CONFIG_USER="snsdata"
+TMP_DIR="/tmp"
 PRE="BL14B"
 
 # Check for any of possible required command line options (else 'usage')
 if [ $# == 0 ]; then
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
+	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--no_eop_pulse_buffer_size=<npulses>] \\"
 	echo "            [ status ]"
 	exit -1
@@ -21,7 +26,7 @@ if [ $? != 0 ]; then
 fi
 
 # Check for settings customization...
-npulses=1
+opt_value=1
 for arg in $* ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
@@ -34,26 +39,33 @@ for arg in $* ; do
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
 		echo "Using SMS Daemon Config File in: $SMSD_CONFIG"
+	elif [ "#$key#" == '#--repo#' ]; then
+		CONFIG_REPO="$value"
+		echo "Using Git Config Repository in: $CONFIG_REPO"
 	elif [ "#$key#" == '#--no_eop_pulse_buffer_size#' ]; then
-		command="no_eop_pulse_buffer_size"
-		npulses="$value"
-		echo "Setting Command to: $command ($value)"
+		command="set_option"
+		PV="SMS:Control:NoEoPPulseBufferSize"
+		option="no_eop_pulse_buffer_size"
+		opt_name="[No EoP Pulse Buffer Size]"
+		opt_value="$value"
+		echo "Setting Command to: $command $option ($value)"
 	else
 		command="$key"
 		echo "Setting Command to: $command"
 	fi
 done
 
-# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
-# (Give the SMS plenty of time to reply, since it's Not multi-threaded...?)
-caget -w 9 ${PRE}:SMS:Recording > /dev/null 2>&1
-if [ $? != 0 ]; then
-	echo "Error: $PRE SMS EPICS PVs Not Initialized... Is 'smsd' running?"
-	exit -2
-fi
-
 # Dump All Known SMS EPICS PVs...
 if [ "$command" = "status" ]; then
+
+	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
+	# (Give the SMS plenty of time to reply, since it's Not multi-threaded.)
+	caget -w 9 ${PRE}:SMS:Recording > /dev/null 2>&1
+	if [ $? != 0 ]; then
+		echo \
+		"Error: $PRE SMS EPICS PVs Not Initialized... Is 'smsd' running?"
+		exit -2
+	fi
 
 	caget ${PRE}:SMS:Recording
 
@@ -101,81 +113,301 @@ if [ "$command" = "status" ]; then
 	echo
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
-elif [ "$command" = "no_eop_pulse_buffer_size" ]; then
+elif [ "$command" = "set_option" ]; then
 
-	option="[No EoP Pulse Buffer Size]"
+	#
+	# Prompt for Live/Config Option Change Log Description Text [Required!]
+	#
+
+	echo -e \
+		"\nPlease Enter ${opt_name} Option Change Log Description Text:\n"
+
+	echo -e "(Enter a Blank Line to Finish.)\n"
+
+	LOG="$TMP_DIR/LiveConfig-$option-$$.txt"
+
+	log_desc=""
+	empty=1
+	done=0
+
+	while [ $done != 1 ]; do
+
+		echo -n " > "
+		read text_line
+
+		if [ "$text_line" = "" ]; then
+			if [ $empty != 1 ]; then
+				done=1
+			else
+				echo \
+				"(Option Change Log Must Be Non-Empty! Please Enter Log.)"
+			fi
+		else
+			if [ $empty != 1 ]; then
+				log_desc="$log_desc\n$text_line"
+			else
+				log_desc="$text_line"
+			fi
+			empty=0
+		fi
+
+	done
+
+	echo -e "\nOption Change Log Description Text:\n" | tee -a $LOG
+
+	echo -e "$log_desc\n" | tee -a $LOG
+
+	any_change=0
+
+	#
+	# Get Current Live SMS Daemon Option Setting
+	#
 
 	echo
 
-	echo "Current Live SMS Daemon Setting (PV) for ${option}:"
-	live_current=`caget ${PRE}:SMS:Control:NoEoPPulseBufferSize 2>&1`
-	live_size=`echo $live_current | awk '{print $2}'`
-	echo "   $live_current ($live_size)"
+	do_live=1
+
+	echo "Current Live SMS Daemon Setting (PV) for ${opt_name}:"
+	live_current=`caget ${PRE}:${PV} 2>&1`
+	if [ $? != 0 ]; then
+		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
+		echo -n "Proceed with Live Config of ${opt_name} (yes/No)? "
+		read ckcont
+		ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckcont" == "" || "$ckcont" == "n" \
+				|| "$ckcont" == "no" ]]; then
+			echo -e "\nExiting LiveConf at User's Request.\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+		# Continue, But Skip Live Option Setting...
+		do_live=0
+	else
+		live_value=`echo $live_current | awk '{print $2}'`
+		echo "   $live_current ($live_value)"
+	fi
+
+	#
+	# Get Current SMS Daemon Config File Setting
+	#
 
 	echo
 
-	echo "Current SMS Daemon Config File Setting for ${option}:"
+	echo "Current SMS Daemon Config File Setting for ${opt_name}:"
 	echo "   ($SMSD_CONFIG)"
-	config_opt_count=`grep "no_eop_pulse_buffer_size" $SMSD_CONFIG \
+	config_opt_count=`grep "$option" $SMSD_CONFIG \
 		| grep -v ';' | wc | awk '{print $1}'`
-	config_current=`grep "no_eop_pulse_buffer_size" $SMSD_CONFIG \
+	config_current=`grep "$option" $SMSD_CONFIG \
 		| grep -v ';'`
-	config_size=`echo $config_current | awk '{print $3}'`
-	echo "   $config_current ($config_size)"
+	config_value=`echo $config_current | awk '{print $3}'`
+	echo "   $config_current ($config_value)"
 	if [[ "$config_opt_count" != 1 ]]; then
-		echo -e "\nWARNING: *Multiple* Active Options Set! Bailing... ;-Q\n"
+		echo -e \
+			"\nWARNING: *Multiple* or *Missing* Active Options Setting(s)!"
+		echo -e "Bailing... ;-Q\n"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
 		exit -80
 	fi
 
+	#
+	# Update Live SMS Daemon Option Setting
+	#
+
 	echo
 
-	if [ "$npulses" = "$live_size" ]; then
-		echo "Live SMS Daemon _Already Has_ ${option} = ${npulses}! :-)"
+	if [ $do_live != 1 ]; then
+		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
+	elif [ "$opt_value" = "$live_value" ]; then
+		echo "Live SMS Daemon _Already Has_ ${opt_name} = ${opt_value}! :-)"
 		echo -e "\nDone."
 	else
 
 		echo -n \
-			"Proceed with Setting Live ${option} to ${npulses} (yes/No)? "
+		"Proceed to Set Live ${opt_name} Option to ${opt_value} (yes/No)? "
 		read ckset
-
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
 			echo -e "\nExiting LiveConf at User's Request.\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
 			exit -3
 		fi
 
-		echo "Setting Live SMS Daemon ${option} to ${npulses}:"
-		caput ${PRE}:SMS:Control:NoEoPPulseBufferSize $npulses
+		echo "Setting Live SMS Daemon ${opt_name} to ${opt_value}:"
+		caput ${PRE}:${PV} $opt_value
 		if [ $? != 0 ]; then
-			echo "Error Setting ${option}...! Bailing..."
+			echo "Error Setting ${opt_name}...! Bailing..."
+			/bin/ls -l $LOG
+			/bin/cat $LOG
 			exit -99
 		fi
+
+		any_change=$(( any_change + 1 ))
+
 	fi
+
+	#
+	# Update Current SMS Daemon Config File Setting
+	#
 
 	echo
 
-	if [ "$npulses" = "$config_size" ]; then
-		echo "SMS Daemon Config _Already Has_ ${option} = ${npulses}! :-)"
+	do_config=1
+
+	if [ "$opt_value" = "$config_value" ]; then
+		echo \
+		"SMS Daemon Config _Already Has_ ${opt_name} = ${opt_value}! :-)"
 		echo -e "\nDone."
 	else
 
-		echo -n \
-			"Proceed with Setting Config ${option} to ${npulses} (yes/No)? "
+		echo -n "Proceed to Set Config File Option "
+		echo -n "${opt_name} to ${opt_value} (yes/No)? "
 		read ckset
-
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
 			echo -e "\nExiting LiveConf at User's Request.\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
 			exit -3
 		fi
 
-		echo "Setting SMS Daemon Config File ${option} to ${npulses}:"
+		echo -e \
+			"\nSetting SMS Daemon Config File ${opt_name} to ${opt_value}:"
 
-		# Fill In Tricky Parts Here... ;-D
+		tmpconfig="$SMSD_CONFIG.liveconf.$$"
+
+		new_config=`echo "$config_current" \
+			| sed "s/$config_value/$opt_value/"`
+
+		sed "s/^$config_current/$new_config/" $SMSD_CONFIG > $tmpconfig
+
+		echo -e "\nModified Config File Differences:"
+		diff $SMSD_CONFIG $tmpconfig
+		echo
+
+		echo -n "Replace Current Config File (yes/No)? "
+		read ckrepl
+		ckrepl=`echo "$ckrepl" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckrepl" == "" || "$ckrepl" == "n" \
+				|| "$ckrepl" == "no" ]]; then
+			echo -e "\nSkipping Config File Update at User's Request!\n"
+			do_config=0
+		else
+
+			sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
+			if [ $? != 0 ]; then
+				echo -e "\nError Copying New Config File to Production:\n"
+				/bin/ls -l $tmpconfig
+				echo
+				/bin/ls -l $SMSD_CONFIG
+				echo
+				/bin/ls -l $LOG
+				/bin/cat $LOG
+				exit -5
+			fi
+
+			any_change=$(( any_change + 1 ))
+
+		fi
+
+		/bin/rm $tmpconfig
 
 	fi
 
+	#
+	# Commit Config File Change to Git Repository
+	#
+
 	echo
+
+	if [ $do_config != 1 ]; then
+		echo "Skipping Git Config Repository Update, At User's Request."
+	elif [ $any_change == 0 ]; then
+		echo "No Live/Config Options Changed; Nothing to Commit/Log."
+	else
+
+		echo "Committing Change to Git Config Repository in:"
+		echo -e "   $CONFIG_REPO\n"
+
+		cd $CONFIG_REPO
+		if [ $? != 0 ]; then
+			echo -e "\nError: Git Config Repository Path Invalid!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -4
+		fi
+
+		# Make sure we're in the "right" repo...? ;-)
+		config_repo=`git config --get remote.origin.url`
+		repo_ck=`echo "$config_repo" | grep 'config$' \
+			| wc | awk '{print $1}'`
+		if [ "$repo_ck" != 1 ]; then
+			echo -e "\nError: This is _Not_ the Git Config Repository!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -5
+		fi
+
+		# "Freshen Up" the Local Config Repo Copy... ;-)
+		git pull
+		git diff
+		git status
+
+		echo
+
+		echo -n "Proceed to Update Git Config Repository (yes/No)? "
+		read ckupdate
+		ckupdate=`echo "$ckupdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckupdate" == "" || "$ckupdate" == "n" \
+				|| "$ckupdate" == "no" ]]; then
+			echo -e \
+			"\nSkipping Git Config Repository Update at User's Request!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+
+		cp -i $SMSD_CONFIG $REPO_CONFIG
+
+		echo -e "\nGit Repo Config File Differences:"
+		git diff
+		echo
+
+		echo -n "Proceed with Git Config Commit (yes/No)? "
+		read ckcommit
+		ckcommit=`echo "$ckcommit" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckcommit" == "" || "$ckcommit" == "n" \
+				|| "$ckcommit" == "no" ]]; then
+			echo -e "\nSkipping Config File Commit at User's Request!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+
+		echo -e \
+		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n"
+		echo "git commit -F - ."
+
+		echo -e \
+		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n" \
+			| git commit -F - .
+		commit_ok = $?
+
+		if [ $commit_ok != 0 ]; then
+			echo -e "\nError Committing Config Update! ($commit_ok)\n"
+		fi
+
+	fi
+
+	#
+	# Cleanup Temporary Log File...
+	#
+
+	echo 
+
+	/bin/rm $LOG
 
 # Done
 fi
