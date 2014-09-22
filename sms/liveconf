@@ -350,6 +350,24 @@ elif [ "$command" = "set_option" ]; then
 			exit -5
 		fi
 
+		config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+		config_branch=`echo "$install_host" | sed 's/-.*//'`
+		if [[ "$config_host" == "" || "$config_branch" == "" ]; then
+			echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -6
+		fi
+
+		git checkout $config_branch
+		if [ $? != 0 ]; then
+			echo -e \
+				"\nError Checking Out Git Config Branch $config_branch!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -7
+		fi
+
 		# "Freshen Up" the Local Config Repo Copy... ;-)
 		git pull
 		git diff
