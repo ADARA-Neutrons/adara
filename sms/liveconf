@@ -367,6 +367,7 @@ elif [ "$command" = "set_option" ]; then
 		echo "Committing Change to Git Config Repository in:"
 		echo -e "   $CONFIG_REPO\n"
 
+		# Go to the Git Config Repo Directory... (if it exists ;-)
 		cd $CONFIG_REPO
 		if [ $? != 0 ]; then
 			echo -e "\nError: Git Config Repository Path Invalid!\n"
@@ -386,6 +387,7 @@ elif [ "$command" = "set_option" ]; then
 			exit -5
 		fi
 
+		# Check Out Beamline Git Config Branch...
 		echo "Checking Out Beamline Git Config Branch: ${config_branch}."
 		git checkout $config_branch
 		if [ $? != 0 ]; then
@@ -403,6 +405,7 @@ elif [ "$command" = "set_option" ]; then
 
 		echo
 
+		# Prompt for Actually Updating the Git Config Repo...
 		echo -n "Proceed to Update Git Config Repository (yes/No)? "
 		read ckupdate
 		ckupdate=`echo "$ckupdate" | tr '[:upper:]' '[:lower:]'`
@@ -415,12 +418,15 @@ elif [ "$command" = "set_option" ]; then
 			exit -3
 		fi
 
+		# Update the SMS Daemon Config File in the Git Config Repo...
 		cp -i $SMSD_CONFIG $REPO_CONFIG
 
+		# Show what changed...
 		echo -e "\nGit Repo Config File Differences:"
 		git diff
 		echo
 
+		# Prompt for Committing the Config File Change...
 		echo -n "Proceed with Git Config Commit (yes/No)? "
 		read ckcommit
 		ckcommit=`echo "$ckcommit" | tr '[:upper:]' '[:lower:]'`
@@ -432,6 +438,7 @@ elif [ "$command" = "set_option" ]; then
 			exit -3
 		fi
 
+		# Commit the Config File Change...
 		echo -e \
 		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n"
 		echo "git commit -F - ."
@@ -439,10 +446,21 @@ elif [ "$command" = "set_option" ]; then
 		echo -e \
 		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n" \
 			| git commit -F - .
-		commit_ok = $?
+		commit_ok=$?
 
 		if [ $commit_ok != 0 ]; then
 			echo -e "\nError Committing Config Update! ($commit_ok)\n"
+		fi
+
+		# Now Push All the Config Commits to Origin
+
+		echo "\nPushing Config Commits to Origin:"
+		echo "git push"
+		git push
+		push_ok=$?
+
+		if [ $push_ok != 0 ]; then
+			echo -e "\nError Pushing Config Update to Git! ($push_ok)\n"
 		fi
 
 	fi
