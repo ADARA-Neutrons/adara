@@ -78,6 +78,47 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
 
 
 /**
+ * @brief Sends data over socket/fd
+ * @param a_fd - file descriptor to write to
+ * @param a_buffer - data buffer to send
+ * @param a_len - length of data buffer
+ * @return false on succes, true on error
+ **/
+bool sendBytes( int a_fd, const char *a_buffer, size_t a_len )
+{
+    ssize_t ec = 0;
+    size_t bytes_sent = 0;
+
+    while ( bytes_sent < a_len )
+    {
+        if (( ec = ::write( a_fd, a_buffer + bytes_sent, a_len - bytes_sent )) < 0 )
+        {
+            // Save errno locally
+            int errn = errno;
+
+            switch ( errn )
+            {
+                case EINTR:
+                case EAGAIN:    // Shouldn't see this as socket should be blocking
+                    continue;   // Try again
+                default:
+                    syslog( LOG_INFO, "[%i] write() failed: %s", g_pid, strerror( errn ));
+                    break;
+            }
+
+            return true;
+        }
+        else
+        {
+            bytes_sent += (size_t)ec;
+        }
+    }
+
+    return false;
+}
+
+
+/**
  * @brief main - Entry point of STS process
  * @param argc - Number of CLI arguments
  * @param argv - Array of CLI command/parameter strings
@@ -327,9 +368,52 @@ int main( int argc, char** argv )
         }
 
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
-        ::write( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
+        uint32_t heartbeat_pkt[4] = {0,0x00400900,0,0};
 
-        syslog( LOG_INFO, "[%i] Notified SMS of translation status", g_pid );
+        // Send ACK/NACK packet to SMS - go to extra effort to ensure the message is sent and
+        // any errors are detected. The second write of 1 byte after the message is sent is
+        // required due to limitations of tcp in detecting dropped connections. If the connection
+        // has been lost, the first write may or may not detect an error, but the second write
+        // (of the heartbeat packet) will fail.
+        // Also, the connection must be shutdown properly with shutdown(), and we must wait for
+        // the SMS to drop the connection when read() returns 0. This prevents the connection from
+        // being reset before the data is actually sent.
+
+        // Ignore SIGPIPE signals so we can get error codes from write()
+        signal( SIGPIPE, SIG_IGN );
+
+        bool send_failed = false;
+        send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
+        send_failed |= sendBytes( outfd, (char*)heartbeat_pkt, sizeof(heartbeat_pkt) );
+
+        if ( !send_failed )
+            syslog( LOG_INFO, "[%i] Notified SMS of translation status", g_pid );
+
+        // Request shutdown of write socket - should initiate buffer flush
+        shutdown( outfd, SHUT_WR );
+
+        // Read-spin on infd until connection is closed by SMS
+        char buf[1];
+        ssize_t ec;
+        while ( 1 )
+        {
+            ec = ::read( infd, buf, 1 );
+            if ( ec > 0 )
+                continue;
+            else if ( ec == 0 )
+                break;
+            else
+            {
+                switch ( ec )
+                {
+                case EINTR:
+                case EAGAIN:
+                    continue;
+                default:
+                    break;
+                }
+            }
+        }
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
