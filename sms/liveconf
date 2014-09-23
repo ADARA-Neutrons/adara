@@ -14,7 +14,7 @@ USAGE()
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--no_eop_pulse_buffer_size=<npulses>] \\"
-	echo "            [ status ] [--help]"
+	echo "            [ status ] [--testonly] [--help]"
 	echo
 }
 
@@ -32,6 +32,7 @@ if [ $? != 0 ]; then
 fi
 
 # Check for settings customization...
+testonly=0
 opt_value="-1"
 PRE="[NotSet]"
 for arg in $* ; do
@@ -56,6 +57,9 @@ for arg in $* ; do
 		opt_name="[No EoP Pulse Buffer Size]"
 		opt_value="$value"
 		echo "Setting Command to: $command $option ($value)"
+	elif [ "#$key#" == '#--testonly#' ]; then
+		testonly=1
+		echo -e "\n*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
 	elif [ "#$key#" == '#--help#' ]; then
 		USAGE
 		exit -1
@@ -272,7 +276,11 @@ elif [ "$command" = "set_option" ]; then
 		fi
 
 		echo "Setting Live SMS Daemon ${opt_name} to ${opt_value}:"
-		caput ${PRE}:${PV} $opt_value
+		if [ $testonly == 1 ]; then
+			echo "[TESTONLY] caput ${PRE}:${PV} $opt_value"
+		else
+			caput ${PRE}:${PV} $opt_value
+		fi
 		if [ $? != 0 ]; then
 			echo "Error Setting ${opt_name}...! Bailing..."
 			/bin/ls -l $LOG
@@ -332,7 +340,12 @@ elif [ "$command" = "set_option" ]; then
 			do_config=0
 		else
 
-			sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
+			if [ $testonly == 1 ]; then
+				echo \
+				"[TESTONLY] sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG"
+			else
+				sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
+			fi
 			if [ $? != 0 ]; then
 				echo -e "\nError Copying New Config File to Production:\n"
 				/bin/ls -l $tmpconfig
@@ -419,7 +432,18 @@ elif [ "$command" = "set_option" ]; then
 		fi
 
 		# Update the SMS Daemon Config File in the Git Config Repo...
-		cp -i $SMSD_CONFIG $REPO_CONFIG
+		if [ $testonly == 1 ]; then
+			echo "[TESTONLY] cp -i $SMSD_CONFIG $REPO_CONFIG"
+		else
+			cp -i $SMSD_CONFIG $REPO_CONFIG
+		fi
+		if [ $? != 0 ]; then
+			echo -e \
+				"\nError Copying Latest Config File into Git Config Repo!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -8
+		fi
 
 		# Show what changed...
 		echo -e "\nGit Repo Config File Differences:"
@@ -439,13 +463,16 @@ elif [ "$command" = "set_option" ]; then
 		fi
 
 		# Commit the Config File Change...
+		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
 		echo -e \
 		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n"
 		echo "git commit -F - ."
 
-		echo -e \
+		if [ $testonly != 1 ]; then
+			echo -e \
 		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n" \
-			| git commit -F - .
+				| git commit -F - .
+		fi
 		commit_ok=$?
 
 		if [ $commit_ok != 0 ]; then
