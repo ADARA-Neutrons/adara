@@ -165,7 +165,7 @@ elif [ "$command" == "option" ]; then
 
 	opt_id=`echo "$opt_arg" | awk -F ':' '{print $1}'`
 	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
-	echo "opt_id=$opt_id"
+	# echo "opt_id=$opt_id"
 
 	opt_id_type=`echo "$opt_id" | awk -F '[0-9]' '{print $1}'`
 	if [ "$opt_id_type" == "source" ]; then
@@ -175,11 +175,11 @@ elif [ "$command" == "option" ]; then
 		opt_id_num="-1"
 		optId="SMS"
 	fi
-	echo "opt_id_type=$opt_id_type opt_id_num=$opt_id_num optId=$optId"
+	# echo "opt_id_type=$opt_id_type opt_id_num=$opt_id_num optId=$optId"
 
 	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
 	opt_value=`echo "$opt_rest" | awk -F '[<>]' '{print $2}'`
-	echo "option=$option opt_value=$opt_value"
+	# echo "option=$option opt_value=$opt_value"
 
 	#
 	# Set Option-Specific Parameters and Information...
@@ -195,7 +195,7 @@ elif [ "$command" == "option" ]; then
 		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
 		exit -1
 	fi
-	echo "PV=$PV opt_name=$opt_name"
+	# echo "PV=$PV opt_name=$opt_name"
 
 	echo -e "Setting Option ${optId}:${opt_name} to ${opt_value}.\n"
 
@@ -299,37 +299,37 @@ elif [ "$command" == "option" ]; then
 	for (( n=1 ; n <= config_size ; n++ )); do
 
 		line=`echo "$config_list" | sed -n "${n}p"`
-		echo "config line $n = [$line]"
+		# echo "config line $n = [$line]"
 
 		line_num=`echo "$line" | awk -F ':' '{print $1}'`
-		echo "line_num=$line_num"
+		# echo "line_num=$line_num"
 
 		line_rest=`echo "$line" | awk -F ':' '{print $2}'`
-		echo "line_rest=$line_rest"
+		# echo "line_rest=$line_rest"
 
 		line_id=`echo "$line_rest" | awk -F '[][]' '{print $2}'`
-		echo "line_id=$line_id"
+		# echo "line_id=$line_id"
 
 		# Option Line
 		if [ "$line_id" == "" ]; then
 
-			echo "Config Option Line..."
+			# echo "Config Option Line..."
 
 			if [[ "$id_type" == "$opt_id_type" \
 					&& "$id_num" == "$opt_id_num" ]]; then
 
-				echo "Match!"
+				# echo "Match!"
 
 				config_current_line="$line_rest"
-				echo "Matching Config File Line = ${config_current_line}."
+				# echo "Matching Config File Line = ${config_current_line}."
 
 				config_line="$line_num"
-				echo "Matching Config File Line Number = ${config_line}."
+				# echo "Matching Config File Line Number = ${config_line}."
 
 				config_value=`echo "$line_rest" | awk -F '=' '{print $2}'`
 				config_value=`echo "$config_value" | sed "s/ //g"`
-				echo -n "Config File Option "
-				echo "${optId}:${opt_name} = ${config_value}."
+				# echo -n "Config File Option "
+				# echo "${optId}:${opt_name} = ${config_value}."
 
 				id_name="$line_id_name"
 
@@ -345,11 +345,11 @@ elif [ "$command" == "option" ]; then
 				line_id_name=" (${source_name})"
 				source_cnt=$(( source_cnt + 1 ))
 				id_num="$source_cnt"
-				echo "Source #${source_cnt}: ${source_name} Section."
+				# echo "Source #${source_cnt}: ${source_name} Section."
 			elif [ "$id_type" == "sms" ]; then
 				line_id_name=""
 				id_num="-1"
-				echo "SMS Section."
+				# echo "SMS Section."
 			fi
 		fi
 
