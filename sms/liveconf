@@ -13,12 +13,12 @@ USAGE()
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [--option="id:name<value>"] \\
+	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [ status ] [--testonly] [--help]"
 	echo
-	echo "   e.g. --option="sms:no_eop_pulse_buffer_size<3>"
-	echo "      or
-	echo "        --option="source1:ignore_eop<false>"
+	echo "   e.g. --option=\"sms:no_eop_pulse_buffer_size<3>\""
+	echo "      or"
+	echo "        --option=\"source1:ignore_eop<false>\""
 	echo
 }
 
