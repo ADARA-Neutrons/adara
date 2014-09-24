@@ -13,8 +13,12 @@ USAGE()
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [--no_eop_pulse_buffer_size=<npulses>] \\"
+	echo "            [--option="id:name<value>"] \\
 	echo "            [ status ] [--testonly] [--help]"
+	echo
+	echo "   e.g. --option="sms:no_eop_pulse_buffer_size<3>"
+	echo "      or
+	echo "        --option="source1:ignore_eop<false>"
 	echo
 }
 
@@ -23,6 +27,8 @@ if [ $# == 0 ]; then
 	USAGE
 	exit -1
 fi
+
+echo
 
 # Make Sure we found the EPICS utilities... ;-b
 epicsck=`which caget 2>&1`
@@ -33,7 +39,6 @@ fi
 
 # Check for settings customization...
 testonly=0
-opt_value="-1"
 PRE="[NotSet]"
 for arg in $* ; do
 	# echo "arg=$arg"
@@ -43,29 +48,26 @@ for arg in $* ; do
     # echo "value=$value"
 	if [ "#$key#" == '#--beamline#' ]; then
 		PRE="$value"
-		echo "Setting EPICS PV Prefix to: $PRE"
+		echo -e "Setting EPICS PV Prefix to: $PRE\n"
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
-		echo "Using SMS Daemon Config File in: $SMSD_CONFIG"
+		echo -e "Using SMS Daemon Config File in:\n   $SMSD_CONFIG\n"
 	elif [ "#$key#" == '#--repo#' ]; then
 		CONFIG_REPO="$value"
-		echo "Using Git Config Repository in: $CONFIG_REPO"
-	elif [ "#$key#" == '#--no_eop_pulse_buffer_size#' ]; then
-		command="set_option"
-		PV="SMS:Control:NoEoPPulseBufferSize"
-		option="no_eop_pulse_buffer_size"
-		opt_name="[No EoP Pulse Buffer Size]"
-		opt_value="$value"
-		echo "Setting Command to: $command $option ($value)"
+		echo -e "Using Git Config Repository in:\n   $CONFIG_REPO\n"
+	elif [ "#$key#" == '#--option#' ]; then
+		command="option"
+		opt_arg="$value"
+		echo -e "Setting Command to: $command $opt_arg\n"
 	elif [ "#$key#" == '#--testonly#' ]; then
 		testonly=1
-		echo -e "\n*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
+		echo -e "*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
 	elif [ "#$key#" == '#--help#' ]; then
 		USAGE
 		exit -1
 	else
 		command="$key"
-		echo "Setting Command to: $command"
+		echo -e "Setting Command to: $command\n"
 	fi
 done
 
@@ -74,7 +76,7 @@ done
 # the EPICS PV Prefix and Git Config Repo Branch...
 #
 
-if [ ${PRE} = "[NotSet]" ]; then
+if [ ${PRE} == "[NotSet]" ]; then
 
 	config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
 	config_branch=`echo "$config_host" | sed 's/-.*//'`
@@ -98,7 +100,7 @@ fi
 echo
 
 # Dump All Known SMS EPICS PVs...
-if [ "$command" = "status" ]; then
+if [ "$command" == "status" ]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give the SMS plenty of time to reply, since it's Not multi-threaded.)
@@ -155,16 +157,56 @@ if [ "$command" = "status" ]; then
 	echo
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
-elif [ "$command" = "set_option" ]; then
+elif [ "$command" == "option" ]; then
+
+	#
+	# Parse Option Arg String into Pieces... ;-D
+	#
+
+	opt_id=`echo "$opt_arg" | awk -F ':' '{print $1}'`
+	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
+	echo "opt_id=$opt_id"
+
+	opt_id_type=`echo "$opt_id" | awk -F '[0-9]' '{print $1}'`
+	if [ "$opt_id_type" == "source" ]; then
+		opt_id_num=`echo "$opt_id" | sed "s/source//"`
+		optId="Source${opt_id_num}"
+	else
+		opt_id_num="-1"
+		optId="SMS"
+	fi
+	echo "opt_id_type=$opt_id_type opt_id_num=$opt_id_num optId=$optId"
+
+	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
+	opt_value=`echo "$opt_rest" | awk -F '[<>]' '{print $2}'`
+	echo "option=$option opt_value=$opt_value"
+
+	#
+	# Set Option-Specific Parameters and Information...
+	#
+	if [[ "$option" == "no_eop_pulse_buffer_size" ]]; then
+		PV="SMS:Control:NoEoPPulseBufferSize"
+		opt_name="[No EoP Pulse Buffer Size]"
+	elif [[ "$option" == "ignore_eop" \
+			&& "$opt_id_type" == "source" ]]; then
+		PV="SMS:DataSource:${opt_id_num}:IgnoreEoP"
+		opt_name="[Ignore End-of-Pulse]"
+	else
+		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
+		exit -1
+	fi
+	echo "PV=$PV opt_name=$opt_name"
+
+	echo -e "Setting Option ${optId}:${opt_name} to ${opt_value}.\n"
 
 	#
 	# Prompt for Live/Config Option Change Log Description Text [Required!]
 	#
 
-	echo -e "Please Enter ${opt_name} Option Change Log Description Text:\n"
+	echo -e "Please Enter ${optId}:${opt_name} Option Change Log Text:\n"
 	echo -e "(Enter a Blank Line to Finish.)\n"
 
-	LOG="$TMP_DIR/LiveConfig-$option-$$.txt"
+	LOG="$TMP_DIR/LiveConfig-${opt_id}-${option}-$$.txt"
 
 	log_desc=""
 	empty=1
@@ -175,7 +217,7 @@ elif [ "$command" = "set_option" ]; then
 		echo -n " > "
 		read text_line
 
-		if [ "$text_line" = "" ]; then
+		if [ "$text_line" == "" ]; then
 			if [ $empty != 1 ]; then
 				done=1
 			else
@@ -207,11 +249,12 @@ elif [ "$command" = "set_option" ]; then
 
 	do_live=1
 
-	echo "Current Live SMS Daemon Setting (PV) for ${opt_name}:"
+	echo "Current Live SMS Daemon Setting (PV) for ${optId}:${opt_name}:"
 	live_current=`caget ${PRE}:${PV} 2>&1`
 	if [ $? != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
-		echo -n "Proceed with Live Config of ${opt_name} (yes/No)? "
+		echo "Proceed with Live Config of:"
+		echo -n "   ${optId}:${opt_name} (yes/No)? "
 		read ckcont
 		ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckcont" == "" || "$ckcont" == "n" \
@@ -234,21 +277,101 @@ elif [ "$command" = "set_option" ]; then
 
 	echo
 
-	echo "Current SMS Daemon Config File Setting for ${opt_name}:"
+	do_config=1
+
+	echo "Current SMS Daemon Config File Setting for ${optId}:${opt_name}:"
 	echo "   ($SMSD_CONFIG)"
-	config_opt_count=`grep "$option" $SMSD_CONFIG \
-		| grep -v ';' | wc | awk '{print $1}'`
-	config_current=`grep "$option" $SMSD_CONFIG \
-		| grep -v ';'`
-	config_value=`echo $config_current | awk '{print $3}'`
-	echo "   $config_current ($config_value)"
-	if [[ "$config_opt_count" != 1 ]]; then
-		echo -e \
-			"\nWARNING: *Multiple* or *Missing* Active Options Setting(s)!"
-		echo -e "Bailing... ;-Q\n"
-		/bin/ls -l $LOG
-		/bin/cat $LOG
-		exit -80
+
+	config_list=`grep -n -e '^\[' -e "$option" $SMSD_CONFIG | grep -v ';'`
+	config_size=`echo "$config_list" | wc | awk '{print $1}'`
+
+	config_value=""
+	config_line=""
+
+	source_cnt=0
+
+	id_name=""
+	id_type=""
+	id_num=0
+
+	found=0
+
+	for (( n=1 ; n <= config_size ; n++ )); do
+
+		line=`echo "$config_list" | sed -n "${n}p"`
+		echo "config line $n = [$line]"
+
+		line_num=`echo "$line" | awk -F ':' '{print $1}'`
+		echo "line_num=$line_num"
+
+		line_rest=`echo "$line" | awk -F ':' '{print $2}'`
+		echo "line_rest=$line_rest"
+
+		line_id=`echo "$line_rest" | awk -F '[][]' '{print $2}'`
+		echo "line_id=$line_id"
+
+		# Option Line
+		if [ "$line_id" == "" ]; then
+
+			echo "Config Option Line..."
+
+			if [[ "$id_type" == "$opt_id_type" \
+					&& "$id_num" == "$opt_id_num" ]]; then
+
+				echo "Match!"
+
+				config_current_line="$line_rest"
+				echo "Matching Config File Line = ${config_current_line}."
+
+				config_line="$line_num"
+				echo "Matching Config File Line Number = ${config_line}."
+
+				config_value=`echo "$line_rest" | awk -F '=' '{print $2}'`
+				config_value=`echo "$config_value" | sed "s/ //g"`
+				echo -n "Config File Option "
+				echo "${optId}:${opt_name} = ${config_value}."
+
+				id_name="$line_id_name"
+
+				found=$(( found + 1 ))
+
+			fi
+
+		# SMS or Source Line
+		else
+			id_type=`echo "$line_id" | awk '{print $1}'`
+			if [ "$id_type" == "source" ]; then
+				source_name=`echo "$line_id" | sed "s/^source //"`
+				line_id_name=" (${source_name})"
+				source_cnt=$(( source_cnt + 1 ))
+				id_num="$source_cnt"
+				echo "Source #${source_cnt}: ${source_name} Section."
+			elif [ "$id_type" == "sms" ]; then
+				line_id_name=""
+				id_num="-1"
+				echo "SMS Section."
+			fi
+		fi
+
+	done
+
+	opt_str="${optId}:${opt_name}${id_name} to ${opt_value}"
+
+	if [[ $found == 0 ]]; then
+		echo -e "\nWARNING: Active Option Setting Not Found!"
+		echo "Cannot Automatically Update Configuration File... ;-Q"
+		echo "   ${opt_str}"
+		do_config=0
+	elif [[ $found > 1 ]]; then
+		echo -e "\nWARNING: *Multiple* Active Non-Source Option Settings!"
+		echo "Cannot Automatically Update Configuration File... ;-Q"
+		echo "   ${opt_str}"
+		do_config=0
+	fi
+
+	if [ "$do_config" == 1 ]; then
+		echo -e "\nCurrent Config File Option at Line ${config_line}:"
+		echo "   ${optId}:${opt_name}${id_name} = ${config_value}."
 	fi
 
 	#
@@ -259,13 +382,14 @@ elif [ "$command" = "set_option" ]; then
 
 	if [ $do_live != 1 ]; then
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
-	elif [ "$opt_value" = "$live_value" ]; then
-		echo "Live SMS Daemon _Already Has_ ${opt_name} = ${opt_value}! :-)"
+	elif [ "$opt_value" == "$live_value" ]; then
+		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
+		echo "   ${optId}:${opt_name}${id_name} = ${opt_value}"
 		echo -e "\nDone."
 	else
 
-		echo -n \
-		"Proceed to Set Live ${opt_name} Option to ${opt_value} (yes/No)? "
+		echo "Proceed to Set Live Option:"
+		echo -n "   ${opt_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
@@ -275,14 +399,24 @@ elif [ "$command" = "set_option" ]; then
 			exit -3
 		fi
 
-		echo "Setting Live SMS Daemon ${opt_name} to ${opt_value}:"
-		if [ $testonly == 1 ]; then
-			echo "[TESTONLY] caput ${PRE}:${PV} $opt_value"
+		if [ "$opt_value" == "true" ]; then
+			value=1
+		elif [ "$opt_value" == "false" ]; then
+			value=0
 		else
-			caput ${PRE}:${PV} $opt_value
+			value="$opt_value"
+		fi
+
+		echo "Setting Live SMS Daemon Option:"
+		echo "   ${opt_str} ($value)"
+		if [ $testonly == 1 ]; then
+			echo "[TESTONLY] caput ${PRE}:${PV} $value"
+		else
+			caput ${PRE}:${PV} $value
 		fi
 		if [ $? != 0 ]; then
-			echo "Error Setting ${opt_name}...! Bailing..."
+			echo "Error Setting ${optId}:${opt_name}${id_name}...!"
+			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -99
@@ -298,16 +432,16 @@ elif [ "$command" = "set_option" ]; then
 
 	echo
 
-	do_config=1
-
-	if [ "$opt_value" = "$config_value" ]; then
-		echo \
-		"SMS Daemon Config _Already Has_ ${opt_name} = ${opt_value}! :-)"
+	if [ $do_config != 1 ]; then
+		echo "Skipping Config File Option Set."
+	elif [ "$opt_value" == "$config_value" ]; then
+		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
+		echo "   ${optId}:${opt_name}${id_name} = ${opt_value}"
 		echo -e "\nDone."
 	else
 
-		echo -n "Proceed to Set Config File Option "
-		echo -n "${opt_name} to ${opt_value} (yes/No)? "
+		echo "Proceed to Set Config File Option:"
+		echo -n "   ${opt_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
@@ -317,18 +451,20 @@ elif [ "$command" = "set_option" ]; then
 			exit -3
 		fi
 
-		echo -e \
-			"\nSetting SMS Daemon Config File ${opt_name} to ${opt_value}:"
+		echo
+		echo "Setting SMS Daemon Config File Option:"
+		echo "   ${opt_str}"
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
-		new_config=`echo "$config_current" \
+		new_config_line=`echo "$config_current_line" \
 			| sed "s/$config_value/$opt_value/"`
 
-		sed "s/^$config_current/$new_config/" $SMSD_CONFIG > $tmpconfig
+		sed "${config_line}s/^$config_current_line/$new_config_line/" \
+			$SMSD_CONFIG > $tmpconfig
 
 		echo -e "\nModified Config File Differences:"
-		diff $SMSD_CONFIG $tmpconfig
+		diff -c $SMSD_CONFIG $tmpconfig
 		echo
 
 		echo -n "Replace Current Config File (yes/No)? "
@@ -372,7 +508,7 @@ elif [ "$command" = "set_option" ]; then
 	echo
 
 	if [ $do_config != 1 ]; then
-		echo "Skipping Git Config Repository Update, At User's Request."
+		echo "Skipping Git Config Repository Update."
 	elif [ $any_change == 0 ]; then
 		echo "No Live/Config Options Changed; Nothing to Commit/Log."
 	else
@@ -464,13 +600,12 @@ elif [ "$command" = "set_option" ]; then
 
 		# Commit the Config File Change...
 		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
-		echo -e \
-		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n"
+		echo -e "Set SMS Live/Config Option:\n   ${opt_str}\n\n$log_desc\n"
 		echo "git commit -F - ."
 
 		if [ $testonly != 1 ]; then
 			echo -e \
-		"Set SMS Live/Config Option $option to $opt_value\n\n$log_desc\n" \
+			"Set SMS Live/Config Option:\n   ${opt_str}\n\n$log_desc\n" \
 				| git commit -F - .
 		fi
 		commit_ok=$?
