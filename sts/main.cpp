@@ -382,6 +382,9 @@ int main( int argc, char** argv )
         // Ignore SIGPIPE signals so we can get error codes from write()
         signal( SIGPIPE, SIG_IGN );
 
+// wait a bit before responding, see if this screws things up...?
+sleep(999);
+
         bool send_failed = false;
         send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
         send_failed |= sendBytes( outfd, (char*)heartbeat_pkt, sizeof(heartbeat_pkt) );
