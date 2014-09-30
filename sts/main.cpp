@@ -383,7 +383,7 @@ int main( int argc, char** argv )
         signal( SIGPIPE, SIG_IGN );
 
 // wait a bit before responding, see if this screws things up...?
-sleep(999);
+sleep(333);
 
         bool send_failed = false;
         send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
@@ -400,6 +400,7 @@ sleep(999);
         ssize_t ec;
         while ( 1 )
         {
+            // NOTE: This is Standard C Library read()... ;-o
             ec = ::read( infd, buf, 1 );
             if ( ec > 0 )
                 continue;
