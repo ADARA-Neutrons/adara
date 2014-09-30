@@ -102,12 +102,24 @@ StreamParser::processStream()
 
         while( m_processing_state < DONE_PROCESSING )
         {
+            // NOTE: This is POSIXParser::read()... ;-o
             if ( !read( m_fd ))
             {
+              syslog( LOG_INFO,
+                  "[%i] %s: Connection Lost m_processing_state=0x%x",
+                  g_pid, "processStream()", m_processing_state );
+
               if ( m_processing_state != DONE_PROCESSING )
               {
+                  syslog( LOG_INFO, "[%i] %s: Not Done Processing!",
+                      g_pid, "processStream()" );
+
                   if ( m_processing_state == PROCESSING_EVENTS )
                   {
+                      syslog( LOG_INFO,
+                          "[%i] %s: Still Processing Events!",
+                          g_pid, "processStream()" );
+
                       // On fatal error, flush buffers to Nexus before terminating
                       markerComment( m_pulse_info.last_time, "Stream processing terminated abnormally." );
                       m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
