@@ -383,7 +383,7 @@ int main( int argc, char** argv )
         signal( SIGPIPE, SIG_IGN );
 
 // wait a bit before responding, see if this screws things up...?
-sleep(333);
+sleep(99);
 
         bool send_failed = false;
         send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
