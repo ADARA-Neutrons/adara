@@ -105,6 +105,11 @@ void STSClient::writable(void)
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
 
+		if (!m_cur_offset) {
+			DEBUG("writable(): sending new file=" << f->path()
+				<< " size=" << f->size());
+		}
+
 		rc = sendfile(m_sts_fd, m_file_fd, &m_cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -210,7 +215,7 @@ void STSClient::fileUpdated(const StorageFile &f)
 
 void STSClient::readable(void)
 {
-	// DEBUG("readable() entry");
+	DEBUG("readable() entry");
 
 	bool ok = false;
 
@@ -240,7 +245,7 @@ void STSClient::readable(void)
 	if (!ok)
 		delete this;
 
-	// DEBUG("readable() exit");
+	DEBUG("readable() exit");
 }
 
 bool STSClient::rxPacket(const ADARA::Packet &pkt)
