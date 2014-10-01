@@ -51,14 +51,15 @@ public:
         bool a_debug = true     ///< [in] If true, includes file and linenumber information
     ) const
     {
-        std::string err_string = std::string("Trace exception (code ") + boost::lexical_cast<std::string>( m_error_code) + ")\n";
+        std::string err_string = std::string("Trace exception (code ")
+            + boost::lexical_cast<std::string>( m_error_code ) + "); ";
 
         if ( a_trace )
         {
             for ( std::list<ExceptionContext>::const_iterator ic = m_context.begin(); ic != m_context.end(); ++ic )
             {
                 if ( ic != m_context.begin())
-                    err_string += "\n";
+                    err_string += "; ";
 
                 err_string += ic->context_msg;
                 if ( a_debug )
