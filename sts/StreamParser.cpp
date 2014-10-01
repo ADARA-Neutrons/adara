@@ -581,7 +581,10 @@ StreamParser::processPulseInfo
         // It is (or should be) considered a fatal error if pulse times are not monotonically increasing
         if ( pulse_time < m_pulse_info.start_time )
         {
-            //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Pulse time went backwards at pulse ID " << a_pkt.pulseId() );
+            syslog( LOG_INFO,
+                "[%i] Unexpected input: %s at pulse ID 0x%lx, %s.",
+                g_pid, "Pulse time went backwards", a_pkt.pulseId(),
+                "Clamping to zero" );
             pulse_time = 0;
         }
         else
