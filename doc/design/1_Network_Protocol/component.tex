@@ -171,6 +171,8 @@ system.
 		\ref{section:protocol_geometry} \\
 	0x400B.0 & Beamline Info &
 		\ref{section:protocol_beamline_info} \\
+	0x400C.0 & Data Done &
+		\ref{section:protocol_data_done} \\
 	0x8000.0 & Device Descriptor &
 		\ref{section:protocol_device_descriptor} \\
 	0x8001.0 & Variable Value (u32) &
@@ -1534,6 +1536,62 @@ name for the beamline. These strings are concatenated together without
 intervening NULLs. This field must be padded to a multiple of 4 bytes.
 \end{itemize}
 
+
+\newpage
+\subsubsection{Data Done Packet}
+\label{section:protocol_data_done}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{0} \\
+    \wordbox{1}{0x00400C00} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)}
+  \end{bytefield}
+  \caption{Packet Type 0x400C.0: Data Done Packet}
+  \label{fig:protocol_packet_data_done}
+\end{figure}
+
+In order for the Streaming Translation Service (STS) client to
+authoritatively and directly know whether all data for a given run
+has indeed been sent from the Stream Management Service (SMS)
+(rather than simply having the SMS ``shut down'' the sending side
+of the socket connection between the SMS and STS)
+the SMS can send a ``Data Done'' packet to explicitly inform the STS
+that no more data will be streamed for the given run.
+This does not in any way indicate the ``completeness'' or validity
+of the previously streamed run data and meta-data,
+but it does allow the socket connection to remain ``open''
+while the STS finishes its processing of the stream into a NeXus data file,
+before it sends the final Translation Complete reply
+(Section~\ref{section:protocol_translation_complete}).
+
+On certain overall extended system/network configurations,
+it has been experienced that any extended processing time
+(greater than 1 minute) by the STS,
+{\it after} the last data has been streamed from the SMS,
+can result in an apparent {\it total loss} of SMS-STS network connectivity.
+This is despite the claimed semantics of the {\tt shutdown()} system call,
+with the {\tt SHUT\_WR} write-only socket direction specified;
+something about the fact that the STS service runs through a firewall,
+perhaps, or some other as-yet-unknown factor
+causes the {\it entire} socket connection to become unusable
+(in both directions).
+The Translation Complete message is therefore sent
+but {\it never received} by the SMS,
+leaving the given run in a hopeless state of ``incomplete'' limbo,
+having been fully processed but not marked as such by the SMS.
+The SMS will continue to ``retry'' the said run repeatedly, forever.
+
+This problem does not occur with comparable system setups,
+e.g. with the SMS and STS together on a local workstation,
+so the issue is not likely related to XInetd service management.
+Indeed, the "keepalive" setting has been activated for the STS service
+configuration to no avail.
+
+
 \newpage
 \subsection{Meta Data Packets}
 \label{section:protocol_meta_data_packets}
@@ -1553,10 +1611,10 @@ that variable such as the variable ID, source EPICS process variable name, a
 ``friendly'' name for the NeXus file and analysis, type (string, integer,
 IEEE754 double, etc.), units of measurement, and valid range.
 
-Each Veriable Value Packet contains a Device ID to link the value back
+Each Variable Value Packet contains a Device ID to link the value back
 to a specific Device Descriptor, and a Variable ID to identify the variable
 being updated. It includes information on the status of the variable
-and a seveity of any alarm such that operation outside of design parameters
+and a severity of any alarm such that operation outside of design parameters
 and data drop outs due to malfunctioning devices may be identified and
 the scientist can make an informed decision regarding the suitability
 of event data for the affected periods of time.
