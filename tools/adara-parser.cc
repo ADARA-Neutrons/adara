@@ -661,8 +661,12 @@ void Parser::parse_file(FILE *f)
 		}
 
 		bufferBytesAppended((unsigned int) len);
-		if (bufferParse(0) < 0)
-			throw std::string("parse error");
+
+		std::string log_info;
+		if (bufferParse(log_info, 0) < 0) {
+			log_info.append("parse error");
+			throw log_info;
+		}
 	}
 }
 

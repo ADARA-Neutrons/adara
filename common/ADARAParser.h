@@ -82,7 +82,7 @@ protected:
 	 * Partial packet chunks will be counted as completed when the last
 	 * fragment is processed.
 	 */
-	int bufferParse(unsigned int max_packets = 0);
+	int bufferParse(std::string & log_info, unsigned int max_packets = 0);
 
 	/* Flush the internal buffers and get ready to restart parsing.
 	 */

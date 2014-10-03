@@ -103,11 +103,11 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		}
 
 		// Always parse as many packets as possible, don't leave any behind.
-		rc = bufferParse(max_parse);
+		rc = bufferParse(log_info, max_parse);
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {
-			log_info = "read() bufferParse() error exit";
+			log_info.append("; read() bufferParse() error exit");
 			end_time = time(0);
 			last_last_elapsed = last_elapsed;
 			last_elapsed = end_time - start_time;

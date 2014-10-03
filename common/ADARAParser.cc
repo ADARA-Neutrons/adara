@@ -1,3 +1,4 @@
+#include <sstream>
 #include <string.h>
 #include "ADARAParser.h"
 
@@ -39,7 +40,7 @@ void Parser::reset(void)
 	m_restart_offset = 0;
 }
 
-int Parser::bufferParse(unsigned int max_packets)
+int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 {
 	unsigned int valid_len = m_len - m_restart_offset;
 	uint8_t *p = m_buffer + m_restart_offset;
@@ -47,8 +48,10 @@ int Parser::bufferParse(unsigned int max_packets)
 	bool stopped = false;
 
 	/* Is there anything to do? */
-	if (!valid_len)
+	if (!valid_len) {
+		log_info = "bufferParse() nothing to do";
 		return 0;
+	}
 
 	/* If we don't care how many packets we process, then set the limit
 	 * above the range of possibility to avoid needing to check for zero
@@ -81,6 +84,7 @@ int Parser::bufferParse(unsigned int max_packets)
 
 	while (valid_len >= PacketHeader::header_length() &&
 					processed < max_packets && !stopped) {
+
 		PacketHeader hdr(p);
 
 		if (hdr.payload_length() % 4)
@@ -127,6 +131,14 @@ int Parser::bufferParse(unsigned int max_packets)
 			 */
 			m_restart_offset = 0;
 			m_len = valid_len;
+
+			// log what we did...
+			std::stringstream ss;
+			ss << processed;
+			log_info = "bufferParse(): resized, processed ";
+			log_info.append(ss.str());
+			log_info.append(" packets");
+
 			return processed;
 		}
 
@@ -140,6 +152,15 @@ int Parser::bufferParse(unsigned int max_packets)
 
 		stopped = rxPacket(pkt);
 		processed++;
+
+		// log failed packet parsing...!
+		if ( stopped ) {
+			std::stringstream ss;
+			log_info = "bufferParse(): rxPacket() returned error for type=";
+			ss << pkt.type();
+			log_info.append(ss.str());
+			log_info.append(", stopped");
+		}
 	}
 
 	/* We're done processing for this round. Update our position and/or
@@ -175,7 +196,28 @@ int Parser::bufferParse(unsigned int max_packets)
 	/* We need an 32 GB buffer before we can fit 2^31 packets, so
 	 * casting to int is safe here.
 	 */
-	return stopped ? - (int) processed : (int) processed;
+
+	std::stringstream ss;
+	int rc;
+	
+	if ( stopped ) {
+		rc = - (int) processed;
+		// add to "stopped" log info...
+		ss << processed;
+		log_info.append("; had parsed ");
+		log_info.append(ss.str());
+		log_info.append(" packets");
+	}
+	else {
+		rc = (int) processed;
+		// create log info...
+		ss << rc;
+		log_info = "bufferParse(): Done. Parsed ";
+		log_info.append(ss.str());
+		log_info.append(" packets");
+	}
+
+	return rc;
 }
 
 bool Parser::rxPacket(const Packet &pkt)
