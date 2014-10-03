@@ -345,9 +345,6 @@ int main( int argc, char** argv )
         // Ignore SIGPIPE signals so we can get error codes from write()
         signal( SIGPIPE, SIG_IGN );
 
-// wait a bit before responding, see if this screws things up...?
-sleep(99);
-
         bool send_status = false;
 
         std::string log_info;
