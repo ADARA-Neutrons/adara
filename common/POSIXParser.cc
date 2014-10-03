@@ -12,7 +12,8 @@
 using namespace ADARA;
 
 // NOTE: This is POSIXParser::read()... ;-o
-bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
+bool POSIXParser::read(int fd, std::string & log_info,
+		unsigned int max_packets, unsigned int max_read)
 {
 	// DEBUG("read() entry");
 
@@ -49,10 +50,8 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 				switch (errno) {
 				case EINTR:
 				case EAGAIN:
-					/* We didn't get any data,
-					 * but we're OK
-					 */
-					// DEBUG("read() no data but OK exit");
+					/* We didn't get any data, but we're OK */
+					log_info = "read() no data but OK exit";
 					end_time = time(0);
 					last_last_elapsed = last_elapsed;
 					last_elapsed = end_time - start_time;
@@ -62,10 +61,8 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 				case ETIMEDOUT:
 				case EHOSTUNREACH:
 				case ENETUNREACH:
-					/* The host went away, but that
-					 * shouldn't be fatal.
-					 */
-					// DEBUG("read() host went away exit");
+					/* The host went away, but that shouldn't be fatal. */
+					log_info = "read() host went away exit";
 					end_time = time(0);
 					last_last_elapsed = last_elapsed;
 					last_elapsed = end_time - start_time;
@@ -82,7 +79,7 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			}
 
 			if (rc == 0) {
-				// DEBUG("read() read returned 0 exit");
+				log_info = "read() read returned 0 exit";
 				end_time = time(0);
 				last_last_elapsed = last_elapsed;
 				last_elapsed = end_time - start_time;
@@ -110,7 +107,7 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {
-			// DEBUG("read() bufferParse() error exit");
+			log_info = "read() bufferParse() error exit";
 			end_time = time(0);
 			last_last_elapsed = last_elapsed;
 			last_elapsed = end_time - start_time;
@@ -128,8 +125,8 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			// << " total_packets=" << total_packets);
 	}
 
-	// DEBUG("read() true exit"
-		// << " total_bytes=" << total_bytes
+	log_info = "read() true exit";
+	// DEBUG("read() true exit" << " total_bytes=" << total_bytes
 		// << " total_packets=" << total_packets
 		// << " read_count=" << read_count
 		// << " loop_count=" << loop_count);

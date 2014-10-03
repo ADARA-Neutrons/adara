@@ -521,6 +521,8 @@ void DataSource::connectComplete(void)
 
 void DataSource::dataReady(void)
 {
+	std::string log_info;
+
 	m_timer->cancel();
 	m_timer->start(m_data_timeout);
 
@@ -535,8 +537,9 @@ void DataSource::dataReady(void)
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		if (!read(m_fd, 4000, m_max_read_chunk)) {
-			INFO("Connection closed with " << m_name);
+		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
+			INFO("Connection closed with " << m_name
+				<< "(" << log_info << ")");
 			m_pvConnected->disconnected();
 			connectionFailed();
 			readOk = false;

@@ -10,6 +10,7 @@
 #include "STSClientMgr.h"
 #include "ReadyAdapter.h"
 #include "Logging.h"
+#include "ADARAUtils.h"
 #include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
@@ -217,19 +218,21 @@ void STSClient::readable(void)
 {
 	DEBUG("readable() entry");
 
+	std::string log_info;
+
 	bool ok = false;
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		ok = read(m_sts_fd, 4000, MAX_PACKET_SIZE);
+		ok = read(m_sts_fd, log_info, 4000, MAX_PACKET_SIZE);
 		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
 			/* We log the reason for closing the connection
 			 * elsewhere, except for the default case of an
 			 * unexpected connection loss.
 			 * Take care of that case here.
 			 */
-			WARN("Lost connection to STS for run "
-			     << m_run->runNumber());
+			WARN("Lost connection to STS for run " << m_run->runNumber()
+				 << " (" << log_info << ")");
 		}
 	} catch (ADARA::invalid_packet e) {
 		WARN("Got invalid packet from STS: " << e.what());

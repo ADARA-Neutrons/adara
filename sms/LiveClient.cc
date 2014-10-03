@@ -257,14 +257,18 @@ void LiveClient::readable(void)
 {
 	// DEBUG("readable() entry");
 
+	std::string log_info;
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		if (!read(m_client_fd, 4000, MAX_PKT_SIZE)) {
+		if (!read(m_client_fd, log_info, 4000, MAX_PKT_SIZE)) {
 			/* EOF or our handlers indicated it was time to stop,
 			 * so kill ourselves off. We can't do this from the
 			 * handlers, as ADARA::Parser::read() will modify
 			 * member variables after calling the handlers.
 			 */
+			DEBUG("client " << m_clientName
+				<< " error reading stream (" << log_info << ")");
 			delete this;
 		}
 	} catch (std::runtime_error e) {

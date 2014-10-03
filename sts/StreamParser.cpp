@@ -92,8 +92,13 @@ StreamParser::processStream()
 {
     // If anything goes wrong with translation, an exception will be thrown to caller of this method
 
+	std::string log_info;
+
     if ( m_processing_state != PROCESSING_NOT_STARTED )
-        THROW_TRACE( ERR_INVALID_OPERATION, "StreamParser::processStream() can not be called more than once." )
+    {
+        THROW_TRACE( ERR_INVALID_OPERATION,
+        "StreamParser::processStream() can not be called more than once." )
+    }
 
     try
     {
@@ -103,32 +108,39 @@ StreamParser::processStream()
         while( m_processing_state < DONE_PROCESSING )
         {
             // NOTE: This is POSIXParser::read()... ;-o
-            if ( !read( m_fd ))
+            if ( !read( m_fd, log_info ))
             {
-              syslog( LOG_INFO,
-                  "[%i] %s: Connection Lost m_processing_state=0x%x",
-                  g_pid, "processStream()", m_processing_state );
+                syslog( LOG_INFO,
+                "[%i] %s: Connection Lost m_processing_state=0x%x (%s)",
+                    g_pid, "processStream()", m_processing_state,
+                    log_info.c_str() );
 
-              if ( m_processing_state != DONE_PROCESSING )
-              {
-                  syslog( LOG_INFO,
-                      "[%i] STS failed %s: %s, Not Done Processing!",
-                      g_pid, "processStream()", "Connection failed" );
+                if ( m_processing_state != DONE_PROCESSING )
+                {
+                    syslog( LOG_INFO,
+                        "[%i] STS failed %s: %s, Not Done Processing!",
+                        g_pid, "processStream()", "Connection failed" );
 
-                  if ( m_processing_state == PROCESSING_EVENTS )
-                  {
-                      syslog( LOG_INFO,
-                          "[%i] %s: %s, Still Processing Events!",
-                          g_pid, "processStream()", "Connection failed" );
+                    if ( m_processing_state == PROCESSING_EVENTS )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s: %s, Still Processing Events!",
+                            g_pid, "processStream()",
+                            "Connection failed" );
 
-                      // On fatal error, flush buffers to Nexus before terminating
-                      markerComment( m_pulse_info.last_time, "Stream processing terminated abnormally." );
-                      m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
-                      finalizeStreamProcessing();
-                  }
+                        // On fatal error, flush buffers to Nexus
+                        // before terminating
+                        markerComment( m_pulse_info.last_time,
+                            "Stream processing terminated abnormally." );
+                        m_run_metrics.end_time = nsec_to_timespec(
+                            m_pulse_info.start_time
+                                + m_pulse_info.last_time );
+                        finalizeStreamProcessing();
+                    }
 
-                  THROW_TRACE( ERR_GENERAL_ERROR, "ADARA parser stopped unexpectedly." );
-              }
+                    THROW_TRACE( ERR_GENERAL_ERROR,
+                        "ADARA parser stopped unexpectedly." );
+                }
             }
         }
     }
@@ -138,11 +150,13 @@ StreamParser::processStream()
     }
     catch ( exception &e )
     {
-        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() exception {" << e.what() << "}" )
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "processStream() exception {" << e.what() << "}" )
     }
     catch ( ... )
     {
-        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() unexpected exception." )
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "processStream() unexpected exception." )
     }
 }
 
