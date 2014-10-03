@@ -107,10 +107,6 @@ StreamParser::processStream()
 
         while ( m_processing_state < DONE_PROCESSING )
         {
-            syslog( LOG_INFO,
-                "[%i] Calling POSIXParser::read() state=0x%x",
-                g_pid, m_processing_state );
-
             // NOTE: This is POSIXParser::read()... ;-o
             if ( !read( m_fd, log_info ))
             {
