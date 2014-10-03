@@ -16,8 +16,6 @@
 using namespace std;
 using namespace PVS::ADARA;
 
-/// Defines the difference between EPICS and Posix timestamp values
-#define EPICS_TIME_OFFSET 631152000
 
 namespace PVS {
 namespace ADARA {
@@ -194,8 +192,6 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, string
 /**
  * \brief Builds an ADARA device descriptor packet
  * \param a_adara_pkt - ADARA packet to receive DDP data.
- * \param a_dev_id - ID of device to be described.
- * \param a_time - EPICS timestamp of device description (activation).
  */
 void
 OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecordPtr a_device )
@@ -303,6 +299,8 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
 
     a_adara_pkt.vvp.status      = a_state.m_status;
     a_adara_pkt.vvp.severity    = a_state.m_severity;
+
+    //cout << "VVP for PV " << a_pv->m_device->m_id << "." << a_pv->m_id << ", stat = " <<  a_state.m_status << ", sev: " <<  a_state.m_severity << endl;
 
     switch ( a_pv->m_type )
     {
