@@ -11,7 +11,7 @@
 #include <boost/algorithm/string.hpp>
 #include <libxml/tree.h>
 #include "POSIXParser.h"
-#include "Utils.h"
+#include "ADARAUtils.h"
 #include "stsdefs.h"
 #include "TraceException.h"
 
