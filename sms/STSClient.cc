@@ -160,10 +160,14 @@ void STSClient::writable(void)
 		 * STS, so we'll notice if we're trying to resend a
 		 * corrupted file without a proper ending RunStatus packet.
 		 */
+#if 0
 		if (shutdown(m_sts_fd, SHUT_WR)) {
 			int e = errno;
 			WARN("shutdown() failed: " << strerror(e));
 		}
+#else
+		sendDataDone();
+#endif
 	}
 
 idle:
@@ -185,6 +189,31 @@ more:
 		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
 				boost::bind(&STSClient::writable, this)));
 	// DEBUG("writable() more exit");
+}
+
+void STSClient::sendDataDone(void)
+{
+	uint32_t data_done_pkt[4] = { 0, 0x00400C00, 0, 0 };
+
+	std::string log_info;
+
+	DEBUG("Sending Data Done to STS for run " << m_run->runNumber());
+
+	bool send_status = Utils::sendBytes( m_sts_fd,
+		(char *) data_done_pkt, sizeof( data_done_pkt ), log_info );
+
+	// Dang, it didn't work... ;-b
+	if ( !send_status ) {
+
+		ERROR("sendDataDone() failed! (" << log_info << ")");
+
+		// Resort to the dreaded shutdown() system call,
+		// which doesn't appear to work through our network setup... ;-b
+		if (shutdown(m_sts_fd, SHUT_WR)) {
+			int e = errno;
+			ERROR("shutdown() failed: " << strerror(e));
+		}
+	}
 }
 
 void STSClient::fileAdded(StorageFile::SharedPtr &f)
