@@ -591,6 +591,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 */
 		return Parser::rxPacket(pkt);
 	case ADARA::PacketType::SYNC_V0:
+	case ADARA::PacketType::DATA_DONE_V0:
 		/* We don't care about these packets, just drop them */
 		return false;
 	case ADARA::PacketType::RAW_EVENT_V0:

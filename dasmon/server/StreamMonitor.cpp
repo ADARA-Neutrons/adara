@@ -521,6 +521,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         case ADARA::PacketType::CLIENT_HELLO_V0:
         case ADARA::PacketType::SYNC_V0:
         case ADARA::PacketType::HEARTBEAT_V0:
+        case ADARA::PacketType::DATA_DONE_V0:
             break;
         default:
             ++m_stream_metrics.m_invalid_pkt_type;

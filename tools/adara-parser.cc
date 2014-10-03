@@ -161,6 +161,7 @@ public:
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 	bool rxPacket(const ADARA::GeometryPkt &pkt);
 	bool rxPacket(const ADARA::BeamlineInfoPkt &pkt);
+	bool rxPacket(const ADARA::DataDonePkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
@@ -580,6 +581,13 @@ bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 	       (uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 	       pkt.id().c_str(), pkt.shortName().c_str(),
 	       pkt.longName().c_str());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::DataDonePkt &pkt)
+{
+	printf("%u.%09u DATA DONE\n", (uint32_t) (pkt.pulseId() >> 32),
+	       (uint32_t) pkt.pulseId());
 	return false;
 }
 

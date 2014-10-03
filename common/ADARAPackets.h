@@ -352,6 +352,16 @@ private:
 	friend class Parser;
 };
 
+class DataDonePkt : public Packet {
+public:
+	DataDonePkt(const DataDonePkt &pkt);
+
+private:
+	DataDonePkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
 class DeviceDescriptorPkt : public Packet {
 public:
 	DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt);

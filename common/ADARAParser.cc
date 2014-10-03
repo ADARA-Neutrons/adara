@@ -244,6 +244,7 @@ bool Parser::rxPacket(const Packet &pkt)
 		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
 		MAP_TYPE(PacketType::GEOMETRY_V0, GeometryPkt);
 		MAP_TYPE(PacketType::BEAMLINE_INFO_V0, BeamlineInfoPkt);
+		MAP_TYPE(PacketType::DATA_DONE_V0, DataDonePkt);
 		MAP_TYPE(PacketType::DEVICE_DESC_V0, DeviceDescriptorPkt);
 		MAP_TYPE(PacketType::VAR_VALUE_U32_V0, VariableU32Pkt);
 		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_V0, VariableDoublePkt);
@@ -289,6 +290,7 @@ EXPAND_HANDLER(SyncPkt)
 EXPAND_HANDLER(HeartbeatPkt)
 EXPAND_HANDLER(GeometryPkt)
 EXPAND_HANDLER(BeamlineInfoPkt)
+EXPAND_HANDLER(DataDonePkt)
 EXPAND_HANDLER(DeviceDescriptorPkt)
 EXPAND_HANDLER(VariableU32Pkt)
 EXPAND_HANDLER(VariableDoublePkt)

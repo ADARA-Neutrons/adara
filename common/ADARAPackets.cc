@@ -339,6 +339,19 @@ BeamlineInfoPkt::BeamlineInfoPkt(const BeamlineInfoPkt &pkt) :
 
 /* ------------------------------------------------------------------------ */
 
+DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len)
+{
+	if (m_payload_len)
+		throw invalid_packet("DataDone packet is incorrect size");
+}
+
+DataDonePkt::DataDonePkt(const DataDonePkt &pkt) :
+	Packet(pkt)
+{}
+
+/* ------------------------------------------------------------------------ */
+
 DeviceDescriptorPkt::DeviceDescriptorPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
