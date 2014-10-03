@@ -92,7 +92,7 @@ StreamParser::processStream()
 {
     // If anything goes wrong with translation, an exception will be thrown to caller of this method
 
-	std::string log_info;
+    std::string log_info;
 
     if ( m_processing_state != PROCESSING_NOT_STARTED )
     {
@@ -249,6 +249,7 @@ StreamParser::rxPacket
     {
     // These packets shall always be processed
     case ADARA::PacketType::RUN_STATUS_V0:
+    case ADARA::PacketType::DATA_DONE_V0:
         return Parser::rxPacket(a_pkt);
 
     // These packets shall be processed ONCE during header and event processing
@@ -331,7 +332,9 @@ StreamParser::rxPacket
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
 
-            return true; // Must return true to halt stream processing
+            // DON'T return "true" here to halt stream processing...!
+            // We've marked the processing state to "Done",
+            // so just let things complete "naturally", without "error".
         }
         else
             bad_state = true;
@@ -1052,6 +1055,63 @@ StreamParser::rxPacket
     return false;
 }
 
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Data Done packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method handles the Data Done ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method handles the ADARA Data Done packets.
+ * This is the "direct" way of the SMS telling us that
+ * there is "No More Data" to stream; much better than using
+ * shutdown() for the sending side of the SMS-STS socket,
+ * which seems to cause a _total_ socket disconnect here,
+ * due to some aspect of the networking setup (firewall?).
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::DataDonePkt &a_pkt     ///< [in] The ADARA Data Done Packet to process
+)
+{
+    // Basically, mark the run as "Done"...
+    // (tho check for the normal completion status & squawk... :-)
+    if ( m_processing_state == DONE_PROCESSING )
+    {
+        syslog( LOG_INFO, "[%i] Data Done Received.", g_pid );
+    }
+
+    else if ( m_processing_state != DONE_PROCESSING )
+    {
+        syslog( LOG_INFO,
+            "[%i] STS failed: Data Done Received, Not Done Processing!",
+            g_pid );
+
+        if ( m_processing_state == PROCESSING_EVENTS )
+        {
+            syslog( LOG_INFO,
+                "[%i] Data Done Received, Still Processing Events!",
+                g_pid );
+
+            // On fatal error, flush buffers to Nexus before terminating
+            markerComment( m_pulse_info.last_time,
+                "Stream processing terminated abnormally." );
+            m_run_metrics.end_time = nsec_to_timespec(
+                m_pulse_info.start_time + m_pulse_info.last_time );
+            finalizeStreamProcessing();
+        }
+
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "ADARA stream ended unexpectedly." );
+    }
+
+    return false;
+}
+
+
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Device Descriptor packet processing
 //---------------------------------------------------------------------------------------------------------------------
@@ -1553,11 +1613,13 @@ StreamParser::getPktName(
     case ADARA::PacketType::SYNC_V0:
         return "Sync";
     case ADARA::PacketType::HEARTBEAT_V0:
-        return "Heart";
+        return "Heartbeat";
     case ADARA::PacketType::GEOMETRY_V0:
         return "Geom Info";
     case ADARA::PacketType::BEAMLINE_INFO_V0:
         return "Beam Info";
+    case ADARA::PacketType::DATA_DONE_V0:
+        return "Data Done";
     case ADARA::PacketType::DEVICE_DESC_V0:
         return "DDP";
     case ADARA::PacketType::VAR_VALUE_U32_V0:
