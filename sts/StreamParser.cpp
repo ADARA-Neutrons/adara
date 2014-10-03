@@ -110,23 +110,18 @@ StreamParser::processStream()
             // NOTE: This is POSIXParser::read()... ;-o
             if ( !read( m_fd, log_info ))
             {
-                syslog( LOG_INFO,
-                "[%i] %s: Connection Lost m_processing_state=0x%x (%s)",
-                    g_pid, "processStream()", m_processing_state,
-                    log_info.c_str() );
-
                 if ( m_processing_state != DONE_PROCESSING )
                 {
                     syslog( LOG_INFO,
                         "[%i] STS failed %s: %s, Not Done Processing!",
-                        g_pid, "processStream()", "Connection failed" );
+                        g_pid, "processStream()", "Connection Failed" );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
                         syslog( LOG_INFO,
                             "[%i] %s: %s, Still Processing Events!",
                             g_pid, "processStream()",
-                            "Connection failed" );
+                            "Connection Failed" );
 
                         // On fatal error, flush buffers to Nexus
                         // before terminating
@@ -343,11 +338,13 @@ StreamParser::rxPacket
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
 
-            // DON'T return "true" here to halt stream processing...!
-            // We've marked the processing state to "Done",
-            // so just let things complete "naturally", without "error".
+            // Dagnabbit, return "true" here to halt stream processing...
+            // We've marked the processing state to "Done", but we still
+            // need to forcibly terminate the POSIX read() loop, which in
+            // our case _sometimes_ hangs on relentlessly... <sigh/>
             syslog( LOG_INFO,
                 "[%i] Run Status End-of-Run Received.", g_pid );
+            return true;
         }
         else
         {
