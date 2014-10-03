@@ -105,8 +105,12 @@ StreamParser::processStream()
         initialize();
         m_processing_state = WAITING_FOR_RUN_START;
 
-        while( m_processing_state < DONE_PROCESSING )
+        while ( m_processing_state < DONE_PROCESSING )
         {
+            syslog( LOG_INFO,
+                "[%i] Calling POSIXParser::read() state=0x%x",
+                g_pid, m_processing_state );
+
             // NOTE: This is POSIXParser::read()... ;-o
             if ( !read( m_fd, log_info ))
             {
@@ -318,16 +322,27 @@ StreamParser::rxPacket
     if ( a_pkt.status() == ADARA::RunStatus::NEW_RUN )
     {
         if ( m_processing_state == WAITING_FOR_RUN_START )
+        {
             m_processing_state = PROCESSING_RUN_HEADER;
+            syslog( LOG_INFO,
+                "[%i] Run Status Start-of-Run Received.", g_pid );
+        }
         else
+        {
+            syslog( LOG_WARNING,
+                "[%i] Run Status Error: Start-of-Run with state=0x%x.",
+                g_pid, m_processing_state );
             bad_state = true;
+        }
     }
     else if ( a_pkt.status() == ADARA::RunStatus::END_RUN )
     {
         if ( m_processing_state == PROCESSING_EVENTS )
         {
-            // Run "end time" is defined as time of last pulse (which is nanoseconds epoch offset)
-            m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
+            // Run "end time" is defined as time of last pulse
+            // (which is nanoseconds epoch offset)
+            m_run_metrics.end_time = nsec_to_timespec(
+                m_pulse_info.start_time + m_pulse_info.last_time );
 
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
@@ -335,13 +350,23 @@ StreamParser::rxPacket
             // DON'T return "true" here to halt stream processing...!
             // We've marked the processing state to "Done",
             // so just let things complete "naturally", without "error".
+            syslog( LOG_INFO,
+                "[%i] Run Status End-of-Run Received.", g_pid );
         }
         else
+        {
+            syslog( LOG_WARNING,
+                "[%i] Run Status Error: End-of-Run with state=0x%x.",
+                g_pid, m_processing_state );
             bad_state = true;
+        }
     }
 
     if ( bad_state )
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Recvd Run Status pkt in wrong state.")
+    {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "Recvd Run Status pkt in wrong state.")
+    }
 
     return false;
 }
