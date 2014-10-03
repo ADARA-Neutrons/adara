@@ -79,6 +79,8 @@ private:
     int32_t     epicsToCtrlRecordType( uint32_t a_rec_type );
     bool        epicsIsTimeRecordType( uint32_t a_rec_type );
     bool        epicsIsCtrlRecordType( uint32_t a_rec_type );
+    template<typename T>
+    void        updateState( const void *a_src, PVState &a_state );
 
     static void epicsConnectionCallback( struct connection_handler_args a_args );
     static void epicsEventCallback( struct event_handler_args a_args );
