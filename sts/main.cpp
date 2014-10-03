@@ -40,6 +40,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "TransCompletePkt.h"
 #include "TraceException.h"
 #include "NxGen.h"
@@ -74,49 +75,6 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
     {
         THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "Move of " << a_source << " to " << a_dest_path << "/" << a_dest_filename << " failed. {" << e.what() << "}" )
     }
-}
-
-
-/**
- * @brief Sends data over socket/fd
- * @param a_fd - file descriptor to write to
- * @param a_buffer - data buffer to send
- * @param a_len - length of data buffer
- * @return false on succes, true on error
- **/
-bool sendBytes( int a_fd, const char *a_buffer, size_t a_len )
-{
-    ssize_t ec = 0;
-    size_t bytes_sent = 0;
-
-    while ( bytes_sent < a_len )
-    {
-        if (( ec = ::write( a_fd, a_buffer + bytes_sent, a_len - bytes_sent )) < 0 )
-        {
-            // Save errno locally
-            int errn = errno;
-
-            switch ( errn )
-            {
-                case EINTR:
-                case EAGAIN:    // Shouldn't see this as socket should be blocking
-                    continue;   // Try again
-                default:
-                    syslog( LOG_INFO,
-                        "[%i] STS failed: sendBytes() write() failed: %s",
-                        g_pid, strerror( errn ));
-                    break;
-            }
-
-            return true;
-        }
-        else
-        {
-            bytes_sent += (size_t)ec;
-        }
-    }
-
-    return false;
 }
 
 
@@ -390,12 +348,35 @@ int main( int argc, char** argv )
 // wait a bit before responding, see if this screws things up...?
 sleep(99);
 
-        bool send_failed = false;
-        send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
-        send_failed |= sendBytes( outfd, (char*)heartbeat_pkt, sizeof(heartbeat_pkt) );
+        bool send_status = false;
 
-        if ( !send_failed )
-            syslog( LOG_INFO, "[%i] Notified SMS of translation status", g_pid );
+        std::string log_info;
+
+        send_status |= Utils::sendBytes( outfd,
+            ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength(),
+            log_info );
+
+        if ( !send_status )
+        {
+            syslog( LOG_INFO,
+                "[%i] STS failed: Translation Complete Message: %s",
+                g_pid, log_info.c_str() );
+        }
+
+        send_status |= Utils::sendBytes( outfd,
+            (char*)heartbeat_pkt, sizeof(heartbeat_pkt), log_info );
+
+        if ( send_status )
+        {
+            syslog( LOG_INFO,
+                "[%i] Notified SMS of translation status", g_pid );
+        }
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] STS failed: Translation Complete/Heartbeat Msg: %s",
+                g_pid, log_info.c_str() );
+        }
 
         // Request shutdown of write socket - should initiate buffer flush
         shutdown( outfd, SHUT_WR );
