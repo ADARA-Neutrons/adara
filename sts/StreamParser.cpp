@@ -111,14 +111,15 @@ StreamParser::processStream()
 
               if ( m_processing_state != DONE_PROCESSING )
               {
-                  syslog( LOG_INFO, "[%i] %s: Not Done Processing!",
-                      g_pid, "processStream()" );
+                  syslog( LOG_INFO,
+                      "[%i] STS failed %s: %s, Not Done Processing!",
+                      g_pid, "processStream()", "Connection failed" );
 
                   if ( m_processing_state == PROCESSING_EVENTS )
                   {
                       syslog( LOG_INFO,
-                          "[%i] %s: Still Processing Events!",
-                          g_pid, "processStream()" );
+                          "[%i] %s: %s, Still Processing Events!",
+                          g_pid, "processStream()", "Connection failed" );
 
                       // On fatal error, flush buffers to Nexus before terminating
                       markerComment( m_pulse_info.last_time, "Stream processing terminated abnormally." );
@@ -542,8 +543,9 @@ StreamParser::rxOversizePkt
     // Log Oversized Packet (Next Chunk)
     else
     {
-        syslog( LOG_WARNING, "[%i] OversizePkt: next chunk offset=%u len=%u", g_pid,
-            chunk_offset, chunk_len);
+        syslog( LOG_WARNING,
+            "[%i] OversizePkt: next chunk offset=%u len=%u",
+            g_pid, chunk_offset, chunk_len);
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -579,7 +581,10 @@ StreamParser::processPulseInfo
         // It is (or should be) considered a fatal error if pulse times are not monotonically increasing
         if ( pulse_time < m_pulse_info.start_time )
         {
-            //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Pulse time went backwards at pulse ID " << a_pkt.pulseId() );
+            syslog( LOG_INFO,
+                "[%i] Unexpected input: %s at pulse ID 0x%lx, %s.",
+                g_pid, "Pulse time went backwards", a_pkt.pulseId(),
+                "Clamping to zero" );
             pulse_time = 0;
         }
         else
@@ -952,7 +957,7 @@ StreamParser::rxPacket
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {
@@ -1272,7 +1277,7 @@ StreamParser::rxPacket
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {

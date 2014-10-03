@@ -102,7 +102,9 @@ bool sendBytes( int a_fd, const char *a_buffer, size_t a_len )
                 case EAGAIN:    // Shouldn't see this as socket should be blocking
                     continue;   // Try again
                 default:
-                    syslog( LOG_INFO, "[%i] write() failed: %s", g_pid, strerror( errn ));
+                    syslog( LOG_INFO,
+                        "[%i] STS failed: sendBytes() write() failed: %s",
+                        g_pid, strerror( errn ));
                     break;
             }
 
@@ -336,7 +338,8 @@ int main( int argc, char** argv )
 
         sms_reason = e.toString( true, true );
 
-        syslog( LOG_INFO, "[%i] TraceException: %s", g_pid, sms_reason.c_str() );
+        syslog( LOG_INFO,
+            "[%i] STS failed: %s", g_pid, sms_reason.c_str() );
     }
     catch( exception &e )
     {
@@ -344,7 +347,8 @@ int main( int argc, char** argv )
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        syslog( LOG_INFO, "[%i] Exception: %s", g_pid, sms_reason.c_str() );
+        syslog( LOG_INFO,
+            "[%i] STS failed: Exception: %s", g_pid, sms_reason.c_str() );
     }
     catch( ... )
     {
@@ -352,11 +356,12 @@ int main( int argc, char** argv )
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
 
-        syslog( LOG_INFO, "[%i] Unknown exception.", g_pid );
+        syslog( LOG_INFO, "[%i] STS failed: Unknown exception.", g_pid );
     }
 
     if ( sms_code != STS::TS_SUCCESS )
-        syslog( LOG_INFO, "[%i] Translation failed. code: %u", g_pid, (unsigned int)sms_code );
+        syslog( LOG_INFO, "[%i] STS failed: Translation failed. code: %u",
+            g_pid, (unsigned int)sms_code );
     else
         syslog( LOG_INFO, "[%i] Translation succeeded", g_pid );
 
@@ -383,7 +388,7 @@ int main( int argc, char** argv )
         signal( SIGPIPE, SIG_IGN );
 
 // wait a bit before responding, see if this screws things up...?
-sleep(333);
+sleep(99);
 
         bool send_failed = false;
         send_failed |= sendBytes( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
