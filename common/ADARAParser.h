@@ -30,8 +30,8 @@ public:
 	unsigned int last_last_read_count;
 	unsigned int last_loop_count;
 	unsigned int last_last_loop_count;
-	time_t last_elapsed;
-	time_t last_last_elapsed;
+	double last_elapsed;
+	double last_last_elapsed;
 
 protected:
 	/* The ADARA::Parser class maintains an internal buffer that

@@ -24,8 +24,8 @@ Parser::Parser(unsigned int initial_buffer_size, unsigned int max_pkt_size) :
 	last_last_read_count = -1;
 	last_loop_count = -1;
 	last_last_loop_count = -1;
-	last_elapsed = -1;
-	last_last_elapsed = -1;
+	last_elapsed = -1.0;
+	last_last_elapsed = -1.0;
 }
 
 Parser::~Parser()

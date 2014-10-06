@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "POSIXParser.h"
+#include "ADARAUtils.h"
 
 // Need to reconcile different Logging Libraries between SMS and STS...! ;-b
 // #include "Logging.h"
@@ -17,8 +18,10 @@ bool POSIXParser::read(int fd, std::string & log_info,
 {
 	// DEBUG("read() entry");
 
-	time_t start_time = time(0);
-	time_t end_time;
+	struct timespec start_time;
+	struct timespec end_time;
+
+	clock_gettime(CLOCK_REALTIME, &start_time);
 
 	unsigned long len, to_read = max_read ?: ~0UL;
 	unsigned int max_parse = ~0U;
@@ -52,9 +55,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 				case EAGAIN:
 					/* We didn't get any data, but we're OK */
 					log_info = "read() no data but OK exit";
-					end_time = time(0);
+					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
-					last_elapsed = end_time - start_time;
+					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return true;
 				case EPIPE:
 				case ECONNRESET:
@@ -63,9 +66,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 				case ENETUNREACH:
 					/* The host went away, but that shouldn't be fatal. */
 					log_info = "read() host went away exit";
-					end_time = time(0);
+					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
-					last_elapsed = end_time - start_time;
+					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return false;
 				default:
 					/* TODO consider if we should throw an
@@ -80,9 +83,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 
 			if (rc == 0) {
 				log_info = "read() read returned 0 exit";
-				end_time = time(0);
+				clock_gettime(CLOCK_REALTIME, &end_time);
 				last_last_elapsed = last_elapsed;
-				last_elapsed = end_time - start_time;
+				last_elapsed = calcDiffSeconds( end_time, start_time );
 				return false;
 			}
 
@@ -108,9 +111,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		last_pkts_parsed = rc;
 		if (rc < 0) {
 			log_info.append("; read() bufferParse() error exit");
-			end_time = time(0);
+			clock_gettime(CLOCK_REALTIME, &end_time);
 			last_last_elapsed = last_elapsed;
-			last_elapsed = end_time - start_time;
+			last_elapsed = calcDiffSeconds( end_time, start_time );
 			return false;
 		}
 
@@ -131,9 +134,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		// << " read_count=" << read_count
 		// << " loop_count=" << loop_count);
 
-	end_time = time(0);
+	clock_gettime(CLOCK_REALTIME, &end_time);
 	last_last_elapsed = last_elapsed;
-	last_elapsed = end_time - start_time;
+	last_elapsed = calcDiffSeconds( end_time, start_time );
 
 	return true;
 }
