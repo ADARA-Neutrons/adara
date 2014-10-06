@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -562,8 +563,7 @@ void DataSource::dataReady(void)
 		struct timespec readEnd;
 		clock_gettime(CLOCK_REALTIME, &readEnd);
 
-		double elapsed = (double) ( readEnd.tv_sec - readStart.tv_sec )
-			+ (double) ( ( readEnd.tv_nsec - readStart.tv_nsec ) / 1e9 );
+		double elapsed = calcDiffSeconds( readEnd, readStart );
 
  		// set read delayed flag...!
 		if ( elapsed > 2.0 )

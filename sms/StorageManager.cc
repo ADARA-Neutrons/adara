@@ -18,6 +18,7 @@
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "EventFd.h"
 #include "STSClientMgr.h"
 #include "Logging.h"
@@ -377,8 +378,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 	}
 
 	clock_gettime(CLOCK_REALTIME, &after);
-	elapsed = (double) ( after.tv_sec - start.tv_sec )
-		+ (double) ( ( after.tv_nsec - start.tv_nsec ) / 1e9 );
+	elapsed = calcDiffSeconds( after, start );
 	DEBUG("updateNextRun() took Total elapsed=" << elapsed);
 
 	return false;
