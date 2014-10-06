@@ -47,7 +47,7 @@ public:
         }
         else
         {
-            m_new_M = m_old_M + (a_value - m_old_M)/m_n;
+            m_new_M = m_old_M + (a_value - m_old_M) / ((double) m_n);
             m_S = m_S + (a_value - m_old_M)*(a_value - m_new_M);
             m_old_M = m_new_M;
 
@@ -63,7 +63,8 @@ public:
     /// Returns mean value of sequence
     inline double      mean() const { return m_new_M; }
     /// Returns variance of sequence
-    inline double      variance() const { return m_n>1?m_S/(m_n-1):0.0; }
+    inline double      variance() const
+		{ return ( ( m_n > 1 ) ? ( m_S / ((double) (m_n - 1) ) ) : 0.0 ); }
     /// Returns standard deviation of sequence
     inline double      stdDev() const { return m_n>1?sqrt(variance()):0.0; }
     /// Returns minimum value of sequence
@@ -109,12 +110,12 @@ class Utils {
 public:
 
 	/**
- 	 * @brief Sends data over socket/fd
- 	 * @param a_fd - file descriptor to write to
- 	 * @param a_buffer - data buffer to send
- 	 * @param a_len - length of data buffer
- 	 * @return true on success, false on error
- 	 **/
+	 * @brief Sends data over socket/fd
+	 * @param a_fd - file descriptor to write to
+	 * @param a_buffer - data buffer to send
+	 * @param a_len - length of data buffer
+	 * @return true on success, false on error
+	 **/
 	static bool sendBytes( int a_fd, const char *a_buffer, size_t a_len,
 		std::string & log_info )
 	{
@@ -184,17 +185,19 @@ inline struct timespec nsec_to_timespec
 }
 
 
-/*! \brief Calcultes T1 - T2
- *  \return Difference in microseconds
+/*! \brief Calculates Elapsed Time (Duration) = endTime - startTime
+ *  \return Difference in seconds (up to nanosecond precision)
  */
 inline double
 calcDiffSeconds
 (
-    const struct timespec &a_ts1,   ///< [in] Base time value
-    const struct timespec &a_ts2    ///< [in] Time value to subtract from base
+	const struct timespec &a_endTime,   ///< [in] Ending Time value
+	const struct timespec &a_startTime  ///< [in] Starting Time value
 )
 {
-    return ( a_ts1.tv_sec + ( a_ts1.tv_nsec * 1.0e-9 )) - ( a_ts2.tv_sec + ( a_ts2.tv_nsec * 1.0e-9 ));
+	return( (double) ( a_endTime.tv_sec - a_startTime.tv_sec )
+		+ ( (double) ( a_endTime.tv_nsec - a_startTime.tv_nsec )
+			/ (double) 1.0e9 ) );
 }
 
 
