@@ -195,9 +195,10 @@ calcDiffSeconds
 	const struct timespec &a_startTime  ///< [in] Starting Time value
 )
 {
-	return( (double) ( a_endTime.tv_sec - a_startTime.tv_sec )
-		+ ( (double) ( a_endTime.tv_nsec - a_startTime.tv_nsec )
-			/ (double) 1.0e9 ) );
+	return( ( ((double) a_endTime.tv_sec)
+			+ ( ((double) a_endTime.tv_nsec) * 1.0e-9 ) )
+		- ( ((double) a_startTime.tv_sec)
+			+ ( ((double) a_startTime.tv_nsec) * 1.0e-9 ) ) );
 }
 
 
