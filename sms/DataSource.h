@@ -61,7 +61,7 @@ private:
 	void connectComplete(void);
 	void dataReady(void);
 
-	void unregisterHWSources(bool isSourceDown);
+	void unregisterHWSources(bool isSourceDown, std::string why);
 	void connectionFailed(void);
 
 	bool timerExpired(void);

@@ -270,7 +270,7 @@ DataSource::~DataSource()
 		close(m_fd);
 }
 
-void DataSource::unregisterHWSources(bool isSourceDown)
+void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 {
 	/* Complete any outstanding pulses, and inform the manager
 	 * of our change of status
@@ -279,6 +279,8 @@ void DataSource::unregisterHWSources(bool isSourceDown)
 	HWSrcMap::iterator it, end = m_hwSources.end();
 
 	for (it = m_hwSources.begin(); it != end; it++) {
+		INFO("Unregistering Event Source " << it->second->smsId()
+			<< " for " << why << " Data Source " << m_name);
 		it->second->endPulse(false);
 		ctrl->unregisterEventSource(it->second->smsId());
 	}
@@ -328,9 +330,7 @@ void DataSource::connectionFailed(void)
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	INFO("Unregister Any/All Hardware Sources for Disconnected Data Source "
-		<< m_name);
-	unregisterHWSources(true);
+	unregisterHWSources(true, "Disconnected");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
@@ -763,9 +763,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
-	INFO("Unregistering Any/All Hardware Sources for Now-Idle Data Source "
-		<< m_name);
-	unregisterHWSources(false);
+	unregisterHWSources(false, "Now-Idle");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
