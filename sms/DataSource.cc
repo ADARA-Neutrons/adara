@@ -291,11 +291,9 @@ void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 		ctrl->sourceDown(m_smsSourceId);
 }
 
-void DataSource::connectionFailed(void)
+void DataSource::dumpLastReadStats(std::string who)
 {
-	m_timer->cancel();
-
-	INFO("connectionFailed() " << m_name
+	INFO(who << ": " << m_name
 		<< " Last Packet:"
 		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
 		<< " sec=" << m_last_pkt_sec
@@ -315,6 +313,13 @@ void DataSource::connectionFailed(void)
 		<< " last_last_read_count=" << Parser::last_last_read_count
 		<< " last_last_loop_count=" << Parser::last_last_loop_count
 		<< " last_last_elapsed=" << Parser::last_last_elapsed);
+}
+
+void DataSource::connectionFailed(void)
+{
+	m_timer->cancel();
+
+	dumpLastReadStats("connectionFailed()");
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -566,6 +571,7 @@ void DataSource::dataReady(void)
 			ERROR("dataReady(): Read Delay Threshold Exceeded"
 				<< " elapsed=" << elapsed << " (" << m_name << ")");
 			ctrl->setSourcesReadDelay();
+			dumpLastReadStats("dataReady() (Read Delay)");
 		}
 	}
 }

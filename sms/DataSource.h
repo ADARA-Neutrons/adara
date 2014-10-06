@@ -61,6 +61,8 @@ private:
 	void connectComplete(void);
 	void dataReady(void);
 
+	void dumpLastReadStats(std::string who);
+
 	void unregisterHWSources(bool isSourceDown, std::string why);
 	void connectionFailed(void);
 
