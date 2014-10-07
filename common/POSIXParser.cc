@@ -18,6 +18,10 @@ bool POSIXParser::read(int fd, std::string & log_info,
 {
 	// DEBUG("read() entry");
 
+	struct timespec start_parse_time;
+	struct timespec end_parse_time;
+	struct timespec start_read_time;
+	struct timespec end_read_time;
 	struct timespec start_time;
 	struct timespec end_time;
 
@@ -45,8 +49,13 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			read_count++;
 			last_last_read_count = last_read_count;
 			last_read_count = read_count;
+			clock_gettime(CLOCK_REALTIME, &start_read_time);
 			// NOTE: This is Standard C Library read()... ;-o
 			rc = ::read(fd, bufferFillAddress(), len);
+			clock_gettime(CLOCK_REALTIME, &end_read_time);
+			last_last_read_elapsed = last_read_elapsed;
+			last_read_elapsed =
+				calcDiffSeconds( end_read_time, start_read_time );
 			last_last_bytes_read = last_bytes_read;
 			last_bytes_read = rc;
 			if (rc < 0) {
@@ -106,7 +115,12 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		}
 
 		// Always parse as many packets as possible, don't leave any behind.
+		clock_gettime(CLOCK_REALTIME, &start_parse_time);
 		rc = bufferParse(log_info, max_parse);
+		clock_gettime(CLOCK_REALTIME, &end_parse_time);
+		last_last_parse_elapsed = last_parse_elapsed;
+		last_parse_elapsed =
+			calcDiffSeconds( end_parse_time, start_parse_time );
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {

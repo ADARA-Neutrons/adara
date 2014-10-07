@@ -307,12 +307,16 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " last_read_count=" << Parser::last_read_count
 		<< " last_loop_count=" << Parser::last_loop_count
 		<< " last_elapsed=" << Parser::last_elapsed
+		<< " last_read_elapsed=" << Parser::last_read_elapsed
+		<< " last_parse_elapsed=" << Parser::last_parse_elapsed
 		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
 		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
 		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
 		<< " last_last_read_count=" << Parser::last_last_read_count
 		<< " last_last_loop_count=" << Parser::last_last_loop_count
+		<< " last_last_read_elapsed=" << Parser::last_last_read_elapsed
+		<< " last_last_parse_elapsed=" << Parser::last_last_parse_elapsed
 		<< " last_last_elapsed=" << Parser::last_last_elapsed);
 }
 
