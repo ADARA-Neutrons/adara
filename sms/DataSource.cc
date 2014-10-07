@@ -317,9 +317,13 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
 		<< " last_last_read_count=" << Parser::last_last_read_count
 		<< " last_last_loop_count=" << Parser::last_last_loop_count
+		<< " last_last_elapsed=" << Parser::last_last_elapsed
 		<< " last_last_read_elapsed=" << Parser::last_last_read_elapsed
+		<< " last_last_read_elapsed_total="
+			<< Parser::last_last_read_elapsed_total
 		<< " last_last_parse_elapsed=" << Parser::last_last_parse_elapsed
-		<< " last_last_elapsed=" << Parser::last_last_elapsed);
+		<< " last_last_parse_elapsed_total="
+			<< Parser::last_last_parse_elapsed_total);
 }
 
 void DataSource::connectionFailed(void)
