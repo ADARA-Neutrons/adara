@@ -36,6 +36,12 @@ bool POSIXParser::read(int fd, std::string & log_info,
 	unsigned int loop_count = 0;
 	ssize_t rc;
 
+	last_last_parse_elapsed_total = last_parse_elapsed_total;
+	last_last_read_elapsed_total = last_read_elapsed_total;
+
+	last_parse_elapsed = 0;
+	last_read_elapsed = 0;
+
 	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
 	while (to_read && total_packets < to_parse && read_count < 10) {
@@ -56,6 +62,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			last_last_read_elapsed = last_read_elapsed;
 			last_read_elapsed =
 				calcDiffSeconds( end_read_time, start_read_time );
+			last_read_elapsed_total += last_read_elapsed;
 			last_last_bytes_read = last_bytes_read;
 			last_bytes_read = rc;
 			if (rc < 0) {
@@ -121,6 +128,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		last_last_parse_elapsed = last_parse_elapsed;
 		last_parse_elapsed =
 			calcDiffSeconds( end_parse_time, start_parse_time );
+		last_parse_elapsed_total += last_parse_elapsed;
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {

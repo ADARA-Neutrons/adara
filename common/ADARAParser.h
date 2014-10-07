@@ -30,6 +30,10 @@ public:
 	unsigned int last_last_read_count;
 	unsigned int last_loop_count;
 	unsigned int last_last_loop_count;
+	double last_parse_elapsed_total;
+	double last_last_parse_elapsed_total;
+	double last_read_elapsed_total;
+	double last_last_read_elapsed_total;
 	double last_parse_elapsed;
 	double last_last_parse_elapsed;
 	double last_read_elapsed;
