@@ -39,8 +39,8 @@ bool POSIXParser::read(int fd, std::string & log_info,
 	last_last_parse_elapsed_total = last_parse_elapsed_total;
 	last_last_read_elapsed_total = last_read_elapsed_total;
 
-	last_parse_elapsed = 0;
-	last_read_elapsed = 0;
+	last_parse_elapsed_total = 0;
+	last_read_elapsed_total = 0;
 
 	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
