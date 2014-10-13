@@ -16,15 +16,18 @@ public:
 	typedef boost::shared_ptr<StorageContainer> SharedPtr;
 	typedef boost::weak_ptr<StorageContainer> WeakPtr;
 	typedef boost::signals2::signal<void (StorageFile::SharedPtr &)>
-								onNewFile;
+				onNewFile;
 
 	const struct timespec &startTime(void) const { return m_startTime; }
-	uint32_t runNumber (void) const { return m_runNumber; }
-	uint32_t numFiles (void) const { return m_numFiles; }
+	uint32_t runNumber(void) const { return m_runNumber; }
+	uint32_t numFiles(void) const { return m_numFiles; }
 	const std::string &name(void) const { return m_name; }
 	bool isTranslated(void) const { return m_translated; }
 	bool isManual(void) const { return m_manual; }
 	uint64_t blocks(void) const;
+
+	uint32_t getRequeueCount(void) const { return m_requeueCount; }
+	uint32_t incrRequeueCount(void) { return( ++m_requeueCount ); }
 
 	bool active(void) const { return m_active; }
 
@@ -35,7 +38,7 @@ public:
 	static SharedPtr create(const struct timespec &start, uint32_t run);
 	static SharedPtr scan(const std::string &path);
 	static uint64_t purge(const std::string &path, uint64_t goal,
-			      bool rmdir);
+				bool rmdir);
 
 	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
@@ -60,6 +63,7 @@ private:
 	bool m_active;
 	bool m_translated;
 	bool m_manual;
+	uint32_t m_requeueCount;
 
 	std::list<StorageFile::SharedPtr> m_files;
 
@@ -72,8 +76,8 @@ private:
 	bool validate(void);
 
 	static bool validatePath(const std::string &in_path,
-				 std::string &out_path, struct timespec &ts,
-				 uint32_t &run);
+				std::string &out_path, struct timespec &ts,
+				uint32_t &run);
 
 	static const char *m_completed_marker;
 	static const char *m_manual_marker;
