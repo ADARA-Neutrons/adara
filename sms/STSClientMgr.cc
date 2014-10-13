@@ -21,6 +21,7 @@ double STSClientMgr::m_connect_timeout = 15.0;
 double STSClientMgr::m_reconnect_timeout = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
+uint32_t STSClientMgr::m_max_requeue_count = 5;
 
 STSClientMgr *STSClientMgr::m_singleton;
 
@@ -85,15 +86,13 @@ void STSClientMgr::queueRun(StorageContainer::SharedPtr &c)
 		m_currentRun = c->runNumber();
 }
 
-void STSClientMgr::requeueRun(StorageContainer::SharedPtr &c)
+void STSClientMgr::dequeueRun(StorageContainer::SharedPtr &c)
 {
 	RunMap::iterator it;
 
 	it = m_sendingRuns.find(c->runNumber());
 	if (it != m_sendingRuns.end())
 		m_sendingRuns.erase(it);
-
-	queueRun(c);
 }
 
 StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
@@ -275,7 +274,8 @@ void STSClientMgr::connectComplete(void)
 		} catch (...) {
 			ERROR("connectComplete() - STSClient() failed?");
 			/* TODO narrow what we catch? */
-			requeueRun(run);
+			dequeueRun(run); // clean up...
+			queueRun(run); // re-queue run...
 			connectFailed();
 			throw;
 		}
@@ -336,12 +336,10 @@ bool STSClientMgr::transientTimeout(void)
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 				  Disposition disp)
 {
-	/* TODO this shares code with requeueRun, find a beter place? */
-	RunMap::iterator it;
+	INFO("clientComplete(): disp=" << disp);
 
-	it = m_sendingRuns.find(c->runNumber());
-	if (it != m_sendingRuns.end())
-		m_sendingRuns.erase(it);
+	// clean up...
+	dequeueRun(c);
 
 	switch (disp) {
 	case SUCCESS:
@@ -351,11 +349,7 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
-	case TRANSIENT_FAIL:
 	case INVALID_PROTOCOL:
-		/* TODO need to limit the number of tries for this run before
-		 * we make it a permament failure case
-		 */
 		/* We shouldn't pound on the STS if we keep hitting problems,
 		 * back off and give it time to breathe.
 		 */
@@ -363,7 +357,38 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			m_backoff = true;
 			m_transient_timer->start(m_transient_timeout);
 		}
-		requeueRun(c);
+		queueRun(c); // re-queue run...
+		break;
+	case TRANSIENT_FAIL:
+		/* Limit the number of retries for this run before
+		 * we make it a permanent failure case. [leerw]
+		 */
+		ERROR("Transient Failure Run=" << c->runNumber()
+			<< " disp=" << disp
+			<< " requeueCount=" << c->getRequeueCount()
+			<< "/" << m_max_requeue_count);
+		// Maxed Out Re-Queue Retries, Mark for Manual!
+		if ( c->getRequeueCount() >= m_max_requeue_count ) {
+			ERROR("Maximum Re-Queue Count Reached!"
+				<< " Marking Run " << c->runNumber()
+				<< " for Manual Translation");
+			c->markManual();
+		}
+		// Re-Queue Run to Try Again...
+		else {
+			// Increment Re-Queue Count
+			c->incrRequeueCount();
+			ERROR("Requeueing Run " << c->runNumber()
+				<< ", Re-Queue #" << c->getRequeueCount());
+			/* We shouldn't pound on the STS if we keep hitting problems,
+			 * back off and give it time to breathe.
+			 */
+			if (!m_backoff) {
+				m_backoff = true;
+				m_transient_timer->start(m_transient_timeout);
+			}
+			queueRun(c); // re-queue run...
+		}
 		break;
 	case PERMAMENT_FAIL:
 		/* STSClient already logged the failure, we just need to
@@ -387,6 +412,8 @@ void STSClientMgr::config(const boost::property_tree::ptree &conf)
 			conf.get<double>("stsclient.transient_timeout", 60.0);
 	m_max_connections =
 			conf.get<unsigned int>("stsclient.max_connections", 3);
+	m_max_requeue_count =
+			conf.get<uint32_t>("stsclient.max_requeue_count", 5);
 
 	std::string uri = conf.get<std::string>("stsclient.uri", "localhost");
 	const char *default_service = "31417";

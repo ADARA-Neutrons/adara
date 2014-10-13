@@ -17,7 +17,7 @@ public:
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 
-        static STSClientMgr *getInstance(void) { return m_singleton; }
+	static STSClientMgr *getInstance(void) { return m_singleton; }
 	void queueRun(StorageContainer::SharedPtr &c);
 	void startConnect(void);
 
@@ -58,12 +58,14 @@ private:
 	static double m_reconnect_timeout;
 	static double m_transient_timeout;
 	static unsigned int m_max_connections;
+	static uint32_t m_max_requeue_count;
 
 	static STSClientMgr *m_singleton;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
 
-	void requeueRun(StorageContainer::SharedPtr &c);
+	void dequeueRun(StorageContainer::SharedPtr &c);
+
 	StorageContainer::SharedPtr &nextRun(void);
 
 	void lookupComplete(const struct signalfd_siginfo &info);
@@ -74,8 +76,7 @@ private:
 	bool reconnectTimeout(void);
 	bool transientTimeout(void);
 
-	void clientComplete(StorageContainer::SharedPtr &c,
-			    Disposition disp);
+	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
 
 	friend class STSClient;
 	friend class TimerAdapter<STSClientMgr>;
