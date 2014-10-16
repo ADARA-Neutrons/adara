@@ -64,7 +64,7 @@ private:
 	void dumpLastReadStats(std::string who);
 
 	void unregisterHWSources(bool isSourceDown, std::string why);
-	void connectionFailed(void);
+	void connectionFailed(bool dumpDiscarded);
 
 	bool timerExpired(void);
 

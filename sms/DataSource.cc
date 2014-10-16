@@ -326,11 +326,17 @@ void DataSource::dumpLastReadStats(std::string who)
 			<< Parser::last_last_parse_elapsed_total);
 }
 
-void DataSource::connectionFailed(void)
+void DataSource::connectionFailed(bool dumpDiscarded)
 {
 	m_timer->cancel();
 
 	dumpLastReadStats("connectionFailed()");
+
+	if (dumpDiscarded) {
+		std::string log_info;
+		Parser::getDiscardedPacketsLogString(log_info);
+		INFO(log_info);
+	}
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -383,7 +389,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
 				WARN("Connection request timed out to " << m_name);
-				connectionFailed();
+				connectionFailed(false);
 			}
 			break;
 		}
@@ -398,7 +404,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				WARN("Timed out waiting for data from " << m_name);
 				m_pvConnected->failed();
-				connectionFailed();
+				connectionFailed(true);
 			}
 			break;
 		}
@@ -497,7 +503,7 @@ error_fd:
 
 error:
 	m_pvConnected->failed();
-	connectionFailed();
+	connectionFailed(false);
 }
 
 void DataSource::connectComplete(void)
@@ -532,7 +538,7 @@ void DataSource::connectComplete(void)
 	/* TODO ratelimited logging of connection issue */
 	WARN("Connection request to " << m_name << " failed: " << strerror(e));
 	// Leave m_pvConnected in its current state, latch failures
-	connectionFailed();
+	connectionFailed(false);
 }
 
 void DataSource::dataReady(void)
@@ -557,14 +563,14 @@ void DataSource::dataReady(void)
 			INFO("Connection closed with " << m_name
 				<< "(" << log_info << ")");
 			m_pvConnected->disconnected();
-			connectionFailed();
+			connectionFailed(true);
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		m_pvConnected->failed();
-		connectionFailed();
+		connectionFailed(true);
 		readOk = false;
 	}
 
@@ -588,6 +594,14 @@ void DataSource::dataReady(void)
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
+	static uint64_t dump_count = 0;
+	if ( !( ++dump_count % 10000 ) ) {
+		std::string log_info;
+		Parser::getDiscardedPacketsLogString(log_info);
+		INFO("rxPacket(): " << log_info);
+	}
+
 	// Save "Last Packet" Info for Debugging...
 	m_last_pkt_type = pkt.type();
 	m_last_pkt_len = pkt.payload_length();
