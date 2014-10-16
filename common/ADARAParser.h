@@ -4,6 +4,7 @@
 #include <string>
 #include <stdint.h>
 #include <stdexcept>
+#include <map>
 #include <unistd.h> // for ssize_t
 
 #include "ADARA.h"
@@ -145,6 +146,16 @@ protected:
 	virtual bool rxPacket(const VariableDoublePkt &pkt);
 	virtual bool rxPacket(const VariableStringPkt &pkt);
 
+	/* Collect a log string with statistics on "discarded" packet types,
+	 * i.e. packets that for one reason or another were _Not_ parsed
+	 * or processed.
+	 *
+	 * Since we don't have a common logging approach in this software suite
+	 * (<sigh/>), we just fill up a happy logging string with info
+	 * and return it for the caller's logger du jour.
+	 */
+	void getDiscardedPacketsLogString(std::string & log_info);
+
 private:
 	uint8_t *	m_buffer;
 	unsigned int	m_size;
@@ -154,6 +165,8 @@ private:
 	unsigned int	m_restart_offset;
 	unsigned int	m_oversize_len;
 	unsigned int	m_oversize_offset;
+
+	std::map<PacketType::Enum, uint64_t>	m_discarded_packets;
 };
 
 } /* namespacce ADARA */

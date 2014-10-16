@@ -35,6 +35,8 @@ Parser::Parser(unsigned int initial_buffer_size, unsigned int max_pkt_size) :
 	last_last_read_elapsed = -1.0;
 	last_elapsed = -1.0;
 	last_last_elapsed = -1.0;
+
+	m_discarded_packets.clear();
 }
 
 Parser::~Parser()
@@ -47,6 +49,8 @@ void Parser::reset(void)
 	m_len = 0;
 	m_oversize_len = 0;
 	m_restart_offset = 0;
+
+	m_discarded_packets.clear();
 }
 
 int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
@@ -268,21 +272,24 @@ bool Parser::rxPacket(const Packet &pkt)
 #undef MAP_TYPE
 }
 
-bool Parser::rxUnknownPkt(const Packet &)
+bool Parser::rxUnknownPkt(const Packet &pkt)
 {
 	/* Default is to discard the data */
+	(m_discarded_packets[pkt.type()])++;
 	return false;
 }
 
-bool Parser::rxOversizePkt(const PacketHeader *, const uint8_t *,
+bool Parser::rxOversizePkt(const PacketHeader *hdr, const uint8_t *,
 			   unsigned int, unsigned int)
 {
 	/* Default is to discard the data */
+	(m_discarded_packets[hdr->type()])++;
 	return false;
 }
 
-#define EXPAND_HANDLER(type) \
-bool Parser::rxPacket(const type &) { return false; }
+#define EXPAND_HANDLER(_class) \
+bool Parser::rxPacket(const _class &pkt) \
+	{ (m_discarded_packets[pkt.type()])++; return false; }
 
 EXPAND_HANDLER(RawDataPkt)
 EXPAND_HANDLER(RTDLPkt)
@@ -304,3 +311,32 @@ EXPAND_HANDLER(DeviceDescriptorPkt)
 EXPAND_HANDLER(VariableU32Pkt)
 EXPAND_HANDLER(VariableDoublePkt)
 EXPAND_HANDLER(VariableStringPkt)
+
+void Parser::getDiscardedPacketsLogString(std::string & log_info)
+{
+	log_info = "Discarded ADARA Packet/Counts: ";
+
+	uint64_t total_discarded = 0;
+
+	// Append Each Discarded Packet Type Count...
+	for (std::map<PacketType::Enum, uint64_t>::iterator
+			it = m_discarded_packets.begin();
+			it != m_discarded_packets.end(); it++)
+	{
+		std::stringstream ss;
+		ss << std::hex << "0x" << it->first << std::dec
+			<< "=" << it->second << "; ";
+		log_info.append(ss.str());
+
+		total_discarded += it->second;
+	}
+
+	// Append Total Discarded Packet Count
+	std::stringstream ss;
+	ss << "Total=" << total_discarded;
+	log_info.append(ss.str());
+
+	// Reset Associative Map for Next Invocation...
+	m_discarded_packets.clear();
+}
+
