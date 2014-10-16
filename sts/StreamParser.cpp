@@ -1455,7 +1455,7 @@ StreamParser::rxPacket
     }
 
     // Switch on event type
-    switch ( a_pkt.type() )
+    switch ( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::GENERIC:
         markerComment( t, a_pkt.comment() );

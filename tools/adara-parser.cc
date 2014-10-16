@@ -539,7 +539,8 @@ bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 {
 	printf("%u.%09u STREAM ANNOTATION\n", (uint32_t) (pkt.pulseId() >> 32),
 		(uint32_t) pkt.pulseId());
-	printf("    Type %u (%s%s)\n", pkt.type(), markerType(pkt.type()),
+	printf("    Type %u (%s%s)\n",
+		pkt.marker_type(), markerType(pkt.marker_type()),
 		pkt.resetHint() ? ", Reset Hint" : "");
 	if (pkt.scanIndex())
 		printf("    Scan Index %u\n", pkt.scanIndex());

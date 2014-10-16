@@ -1391,7 +1391,7 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    switch( a_pkt.type() )
+    switch( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::SCAN_START:
         m_scanning = true;

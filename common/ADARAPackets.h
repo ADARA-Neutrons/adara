@@ -276,7 +276,7 @@ public:
 	AnnotationPkt(const AnnotationPkt &pkt);
 
 	bool resetHint(void) const { return !!(m_fields[0] & 0x80000000); }
-	MarkerType::Enum type(void) const {
+	MarkerType::Enum marker_type(void) const {
 		uint16_t type = (m_fields[0] >> 16) & 0x7fff;
 		return static_cast<MarkerType::Enum>(type);
 	}
