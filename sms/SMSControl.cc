@@ -691,8 +691,8 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	pulse->m_chopperEvents[cid].push_back(tof);
 }
 
-void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
-			uint32_t dup)
+void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
+		uint32_t hwId, uint32_t dup, bool is_mapped)
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -736,7 +736,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 		phys = events[i].pixel;
 
 		switch (phys >> 28) {
-		case 4:
+
+		case 4: // Monitor Event
 			/* Add this event to our monitors, and go on to the
 			 * next raw event -- it doesn't go in the banked
 			 * events section.
@@ -744,19 +745,35 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			addMonitorEvent(pkt, pulse, phys, events[i].tof);
 			pulse->m_numMonEvents++;
 			continue;
-		case 7:
+
+		case 7: // Chopper Event
 			/* Add this event to our choppers, and go on to the
 			 * next raw event -- it doesn't go into the banked
 			 * event section.
 			 */
 			addChopperEvent(pkt, pulse, phys, events[i].tof);
 			continue;
-		case 0:
-			if (m_pixelMap->mapEvent(phys, logical, bank))
-				pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-			bank += Pulse::REAL_BANK_OFFSET;
+
+		case 0: // Detector Event
+			// Already Mapped to Logical PixelId at Data Source...!
+			if (is_mapped) {
+				// PixelId Already Is Logical...!
+				logical = phys;
+				// Just Lookup Bank from Logical PixelId...
+				if (m_pixelMap->mapEventBank(logical, bank))
+					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
+				bank += Pulse::REAL_BANK_OFFSET;
+			}
+			// Not Yet Mapped, Map Physical PixelId to Logical PixelId
+			// and Identify Detector Bank...
+			else {
+				if (m_pixelMap->mapEvent(phys, logical, bank))
+					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
+				bank += Pulse::REAL_BANK_OFFSET;
+			}
 			break;
-		case 5: case 6:
+
+		case 5: case 6: // Fast-Metadata Variable Update
 			/* This is a fast-metadata update, see if we have a
 			 * mapping for it. If not, let it fall through to the
 			 * common error pixel handling.
@@ -766,10 +783,12 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 				continue;
 			}
 			/* FALLTHROUGH */
-		case 1: case 2: case 3:
+
+		case 1: case 2: case 3: // Unused as yet...
 			/* Unused sources, let them drop into error handling */
 			/* FALLTHROUGH */
-		default:
+
+		default: // Error Event
 			/* Error bit is set, identity map and put in the
 			 * error bank
 			 */
