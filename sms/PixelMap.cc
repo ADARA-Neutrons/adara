@@ -207,7 +207,9 @@ PixelMap::PixelMap(const std::string &path) : m_numBanks(0)
 	std::auto_ptr<TempMap> map;
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;
-	uint32_t i, max_phys = 0;
+	uint32_t max_logical = 0;
+	uint32_t max_phys = 0;
+	uint32_t i;
 
 	map = readMap(path);
 
@@ -215,6 +217,8 @@ PixelMap::PixelMap(const std::string &path) : m_numBanks(0)
 	for (it = map->begin(); it != end; ++it) {
 		if (it->first > max_phys)
 			max_phys = it->first;
+		if (it->second.first > max_logical)
+			max_logical = it->second.first;
 		if (it->second.second > m_numBanks)
 			m_numBanks = it->second.second;
 	}
@@ -236,8 +240,18 @@ PixelMap::PixelMap(const std::string &path) : m_numBanks(0)
 						 (uint16_t) ~0));
 	}
 
-	for (it = map->begin(); it != end; ++it)
+	/* While we're at it, _Also_ create a "Logical-to-Bank" lookup vector,
+	 * for the case where a Data Source has _Already_ mapped the PixelId...
+	 */
+	m_banks.reserve(max_logical + 1);
+	for (i = 0; i <= max_logical; ++i) {
+		m_banks.push_back((uint16_t) ~0);
+	}
+
+	for (it = map->begin(); it != end; ++it) {
 		m_table[it->first] = it->second;
+		m_banks[it->second.first] = it->second.second;
+	}
 
 	m_packet = genPacket(map.get(), m_packetSize);
 
