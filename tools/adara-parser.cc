@@ -140,14 +140,19 @@ public:
 	void parse_file(FILE *);
 	void parse_file(const std::string &);
 
+	bool rxPacket(const ADARA::Packet &pkt);
+
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
 				const uint8_t *chunk,
 				unsigned int chunk_offset,
 				unsigned int chunk_len);
 
-	bool rxPacket(const ADARA::Packet &pkt);
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
+	bool rxPacket(const ADARA::MappedDataPkt &pkt);
+
+	bool handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped);
+
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
@@ -231,25 +236,37 @@ bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 
 bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	printf("%u.%09u RAW EVENT DATA\n"
+	return( handleDataPkt(&pkt, false) );
+}
+
+bool Parser::rxPacket(const ADARA::MappedDataPkt &pkt)
+{
+	return( handleDataPkt(dynamic_cast<const ADARA::RawDataPkt *>(&pkt),
+		true) );
+}
+
+bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
+{
+	printf("%u.%09u %s EVENT DATA\n"
 		"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
 		"    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
 		"    charge %lupC, %u events\n",
-		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-		pkt.sourceID(), pkt.pktSeq(), pkt.dspSeq(),
-		pkt.endOfPulse() ? " EOP" : "",
-		pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
-		pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
-		pkt.timingStatus(), (int) pkt.flavor(),
-		pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
-		(uint64_t) pkt.tofOffset() * 100,
-		pkt.tofCorrected() ? "" : " (raw)",
-		(uint64_t) pkt.pulseCharge() * 10, pkt.num_events());
+		(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
+		is_mapped ? "MAPPED" : "RAW",
+		pkt->sourceID(), pkt->pktSeq(), pkt->dspSeq(),
+		pkt->endOfPulse() ? " EOP" : "",
+		pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
+		pkt->veto(), pkt->badVeto() ? " (BAD)" : "",
+		pkt->timingStatus(), (int) pkt->flavor(),
+		pulseFlavor(pkt->flavor()), (uint64_t) pkt->intraPulseTime() * 100,
+		(uint64_t) pkt->tofOffset() * 100,
+		pkt->tofCorrected() ? "" : " (raw)",
+		(uint64_t) pkt->pulseCharge() * 10, pkt->num_events());
 
 	if (m_showEvents) {
-		uint32_t len = pkt.payload_length();
-		uint32_t *p = (uint32_t *) pkt.payload();
+		uint32_t len = pkt->payload_length();
+		uint32_t *p = (uint32_t *) pkt->payload();
 		uint32_t tof, i = 0;
 		double s;
 
@@ -259,7 +276,8 @@ bool Parser::rxPacket(const ADARA::RawDataPkt &pkt)
 
 		while (len) {
 			if (len < 8) {
-				fprintf(stderr, "Raw event packet too short\n");
+				fprintf(stderr, "%s event packet too short\n",
+					is_mapped ? "Mapped" : "Raw");
 				return true;
 			}
 
