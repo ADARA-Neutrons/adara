@@ -102,6 +102,16 @@ private:
 	RawDataPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
+	friend class MappedDataPkt;
+};
+
+class MappedDataPkt : public RawDataPkt {
+public:
+	MappedDataPkt(const MappedDataPkt &pkt);
+private:
+	MappedDataPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
 };
 
 class RTDLPkt : public Packet {

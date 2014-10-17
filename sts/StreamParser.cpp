@@ -275,6 +275,7 @@ StreamParser::rxPacket
 
     // Packet types that are not processes by StreamParser
     case ADARA::PacketType::RAW_EVENT_V0:
+    case ADARA::PacketType::MAPPED_EVENT_V0:
     case ADARA::PacketType::RTDL_V0:
     case ADARA::PacketType::SOURCE_LIST_V0:
     case ADARA::PacketType::TRANS_COMPLETE_V0:
@@ -1608,6 +1609,8 @@ StreamParser::getPktName(
     {
     case ADARA::PacketType::RAW_EVENT_V0:
         return "Raw Event";
+    case ADARA::PacketType::MAPPED_EVENT_V0:
+        return "Mapped Event";
     case ADARA::PacketType::RTDL_V0:
         return "RTDL";
     case ADARA::PacketType::SOURCE_LIST_V0:

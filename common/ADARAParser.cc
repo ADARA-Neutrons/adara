@@ -243,6 +243,7 @@ bool Parser::rxPacket(const Packet &pkt)
 
 	switch (pkt.type()) {
 		MAP_TYPE(PacketType::RAW_EVENT_V0, RawDataPkt);
+		MAP_TYPE(PacketType::MAPPED_EVENT_V0, MappedDataPkt);
 		MAP_TYPE(PacketType::RTDL_V0, RTDLPkt);
 		MAP_TYPE(PacketType::SOURCE_LIST_V0, SourceListPkt);
 		MAP_TYPE(PacketType::BANKED_EVENT_V0, BankedEventPkt);
@@ -292,6 +293,7 @@ bool Parser::rxPacket(const _class &pkt) \
 	{ (m_discarded_packets[pkt.type()])++; return false; }
 
 EXPAND_HANDLER(RawDataPkt)
+EXPAND_HANDLER(MappedDataPkt)
 EXPAND_HANDLER(RTDLPkt)
 EXPAND_HANDLER(SourceListPkt)
 EXPAND_HANDLER(BankedEventPkt)

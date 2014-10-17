@@ -126,6 +126,7 @@ protected:
 	 * to continue.
 	 */
 	virtual bool rxPacket(const RawDataPkt &pkt);
+	virtual bool rxPacket(const MappedDataPkt &pkt);
 	virtual bool rxPacket(const RTDLPkt &pkt);
 	virtual bool rxPacket(const SourceListPkt &pkt);
 	virtual bool rxPacket(const BankedEventPkt &pkt);

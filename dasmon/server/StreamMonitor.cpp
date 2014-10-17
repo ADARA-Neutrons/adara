@@ -515,6 +515,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         // Packet types that are not processes by StreamParser
         case ADARA::PacketType::GEOMETRY_V0:
         case ADARA::PacketType::RAW_EVENT_V0:
+        case ADARA::PacketType::MAPPED_EVENT_V0:
         case ADARA::PacketType::RTDL_V0:
         case ADARA::PacketType::SOURCE_LIST_V0:
         case ADARA::PacketType::TRANS_COMPLETE_V0:

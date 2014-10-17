@@ -96,6 +96,19 @@ RawDataPkt::RawDataPkt(const RawDataPkt &pkt) :
 
 /* ------------------------------------------------------------------------ */
 
+MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
+	RawDataPkt(data, len)
+{
+	if (m_payload_len < (6 * sizeof(uint32_t)))
+		throw invalid_packet("MappedDataPacket is too short");
+}
+
+MappedDataPkt::MappedDataPkt(const MappedDataPkt &pkt) :
+	RawDataPkt(pkt)
+{}
+
+/* ------------------------------------------------------------------------ */
+
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
