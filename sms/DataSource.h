@@ -69,12 +69,17 @@ private:
 	bool timerExpired(void);
 
 	bool rxPacket(const ADARA::Packet &pkt);
+
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
 			   const uint8_t *chunk, unsigned int chunk_offset,
 			   unsigned int chunk_len);
 
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
+	bool rxPacket(const ADARA::MappedDataPkt &pkt);
+
+	bool handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped);
+
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::SourceListPkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);

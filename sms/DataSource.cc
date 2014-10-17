@@ -625,6 +625,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		/* We don't care about these packets, just drop them */
 		return false;
 	case ADARA::PacketType::RAW_EVENT_V0:
+	case ADARA::PacketType::MAPPED_EVENT_V0:
 	case ADARA::PacketType::RTDL_V0:
 	case ADARA::PacketType::SOURCE_LIST_V0:
 	case ADARA::PacketType::DEVICE_DESC_V0:
@@ -677,25 +678,42 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	HWSource &hw_src = getHWSource(pkt.sourceID());
+	DEBUG("rxPacket(): RawDataPkt type="
+		<< std::hex << pkt.type() << std::dec);
+
+	return( handleDataPkt(&pkt, false) );
+}
+
+bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
+{
+	DEBUG("rxPacket(): MappedDataPkt type="
+		<< std::hex << pkt.type() << std::dec);
+
+	return( handleDataPkt(dynamic_cast<const ADARA::RawDataPkt *>(&pkt),
+		true) );
+}
+
+bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
+{
+	HWSource &hw_src = getHWSource(pkt->sourceID());
 
 	/* Check that the fields are consistent with the pulse we are
 	 * currently processing. If not, then we've started a new pulse.
 	 * The HWSource class will take care of missing end-of-pulse
 	 * markers and duplicate pulse ids.
 	 */
-	if (hw_src.checkPulseInvariants(pkt))
-		hw_src.newPulse(pkt);
+	if (hw_src.checkPulseInvariants(*pkt))
+		hw_src.newPulse(*pkt);
 
 	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseEvents(pkt, hw_src.hwId(), hw_src.dupCount());
+	ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(), is_mapped);
 
-	if (hw_src.checkSeq(pkt))
-		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
+	if (hw_src.checkSeq(*pkt))
+		ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
 	m_ignore_eop = m_pvIgnoreEoP->value();
-	if (!m_ignore_eop && pkt.endOfPulse())
+	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
 	return false;
