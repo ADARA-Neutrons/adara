@@ -15,6 +15,7 @@ alertRecipient="y8y@ornl.gov"      # the mail recipient for alerts
 hostName=`hostname`                # the host are we logging from
 criticalMessages=""
 notifyActive=1
+namedPipeFile="/etc/rsyslog.pipes/criticalMessages"
 deactivateFile="/usr/local/bin/deactivateRsyslogMailer"
 if [ -f $deactivateFile ]; then
 	notifyActive=0
@@ -32,13 +33,15 @@ SEND_EMAIL()
 }
 trap "SEND_EMAIL" SIGTERM
 # kill myself if I wait around for too long... :-b
+KILL_ME_LATER()
 (
    sleep 3
    # echo "Checking Signal to $$..."
    kill -0 $$ || exit 0
    # echo "Killing $$."
    kill -s SIGTERM $$
-) &
+)
+KILL_ME_LATER &
 # ) 2> /dev/null &
 # process each line of input and produce an alert email
 while read line
@@ -49,5 +52,5 @@ do
    # then
       criticalMessages="${criticalMessages}\n${line}"
    # fi
-done
+done < $namedPipeFile
 # note: loop never exits... :)
