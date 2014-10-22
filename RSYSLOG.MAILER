@@ -31,7 +31,10 @@ that might be of interest to developers and maintainers of the system. :-)
 
    . . .
 
-   0-59/5 * * * * /usr/bin/rsyslogMailer < /etc/rsyslog.pipes/criticalMessages 2>&1
+   0-59/5 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+   (Note: the named pipe "/etc/rsyslog.pipes/criticalMessages" is
+   now hard-coded as $namedPipeFile in the actual "rsyslogMailer" script!)
 
 3. Configure the local RSyslog system to capture copies of key
 ADARA SMS/STS syslog error messages:
