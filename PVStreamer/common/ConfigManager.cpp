@@ -80,7 +80,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         {
             // The descriptor is not identical to existing record, analyze differences
 
-            syslog( LOG_DEBUG, "Re-defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
+            syslog( LOG_INFO, "Re-defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
             // Record is different, must make new record but try to re-use identifiers
             //const DeviceDescriptor *old_desc = idev->second.get();
@@ -138,7 +138,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     {
         // This is a NEW device
 
-        syslog( LOG_DEBUG, "Defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
+        syslog( LOG_INFO, "Defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
 
         // No existing record, create a new one copied from the passed-in descriptor
         DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
@@ -177,7 +177,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 void
 ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
 {
-    syslog( LOG_DEBUG, "Un-defining device: %s:%s:%lu", a_record->m_name.c_str(), a_record->m_source.c_str(), (unsigned long)a_record->m_protocol );
+    syslog( LOG_INFO, "Un-defining device: %s:%s:%lu", a_record->m_name.c_str(), a_record->m_source.c_str(), (unsigned long)a_record->m_protocol );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 

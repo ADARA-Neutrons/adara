@@ -115,8 +115,10 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         ich->second.m_pv = *ipv;
                         // Old device record is no longer valid - reset
                         ich->second.m_device.reset();
-                        // Re-aqcuire metadata just in case it changed
-                        ich->second.m_chan_state = INFO_NEEDED;
+
+                        // Re-aqcuire metadata just in case it changed (only if connected)
+                        if ( ich->second.m_chan_state != UNINITIALIZED )
+                            ich->second.m_chan_state = INFO_NEEDED;
                     }
                 }
             }
@@ -262,6 +264,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         // Update channel info and PV name index structures
         m_chan_info[info.m_chid] = info;
         m_pv_index[a_pv->m_connection] = info.m_chid;
+        //cout << "connected chid: " << info.m_chid << " for PV: " << a_pv->m_connection << endl;
     }
     else
         syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_connection.c_str() );
@@ -348,6 +351,8 @@ DeviceAgent::controlThread()
                 switch ( ich->second.m_chan_state )
                 {
                 case INFO_NEEDED:
+                    //cout <<  "IN, chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
+
                     if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_ca_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
                         ich->second.m_chan_state = INFO_PENDING;
                     else
@@ -356,6 +361,8 @@ DeviceAgent::controlThread()
                 case INFO_AVAILABLE:
                     if ( m_defined )
                     {
+                        //cout <<  "IA, chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
+
                         if ( !ich->second.m_pv->equalMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals ))
                         {
                             metadataUpdated();
@@ -365,6 +372,8 @@ DeviceAgent::controlThread()
                             break;
                         }
                     }
+
+                    //cout <<  "IN(2), chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
 
                     ich->second.m_pv->setMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals );
                     ich->second.m_chan_state = READY;
@@ -424,9 +433,19 @@ DeviceAgent::controlThread()
                 m_dev_desc = 0;
             }
         }
+        catch ( TraceException &e )
+        {
+            syslog( LOG_ERR, "TraceException thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "content: %s", e.toString( true ).c_str() );
+        }
+        catch ( exception &e )
+        {
+            syslog( LOG_ERR, "std::exception thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "content: %s", e.what() );
+        }
         catch(...)
         {
-            syslog( LOG_ERR, "Exception thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "Unkown exception thrown in DevAgent::controlThread!" );
         }
     }
 }
@@ -461,6 +480,7 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                 {
                     // Save native type
                     ich->second.m_ca_type = type;
+                    //cout <<  "chan: " << ich->first << " ca_type = " << type << " for PV: " << ich->second.m_pv->m_connection << endl;
 
                     if ( ca_create_subscription( epicsToTimeRecordType( type ), 0, ich->second.m_chid, DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
                             &epicsEventCallback, this, &ich->second.m_evid ) == ECA_NORMAL )
