@@ -599,7 +599,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
 	static uint64_t dump_count = 0;
-	if ( !( ++dump_count % 10000 ) ) {
+	if ( !( ++dump_count % 1000000 ) ) {
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
 		INFO("rxPacket(): " << log_info);
