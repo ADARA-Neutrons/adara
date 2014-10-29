@@ -157,6 +157,10 @@ protected:
 	 */
 	void getDiscardedPacketsLogString(std::string & log_info);
 
+	/* Reset the collected "discarded packet" statistics.
+	 */
+	void resetDiscardedPacketsStats(void);
+
 private:
 	uint8_t *	m_buffer;
 	unsigned int	m_size;

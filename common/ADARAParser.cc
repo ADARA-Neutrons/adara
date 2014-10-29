@@ -281,10 +281,12 @@ bool Parser::rxUnknownPkt(const Packet &pkt)
 }
 
 bool Parser::rxOversizePkt(const PacketHeader *hdr, const uint8_t *,
-			   unsigned int, unsigned int)
+				unsigned int, unsigned int)
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Default is to discard the data */
-	(m_discarded_packets[hdr->type()])++;
+	if (hdr != NULL)
+		(m_discarded_packets[hdr->type()])++;
 	return false;
 }
 
@@ -337,8 +339,11 @@ void Parser::getDiscardedPacketsLogString(std::string & log_info)
 	std::stringstream ss;
 	ss << "Total=" << total_discarded;
 	log_info.append(ss.str());
+}
 
-	// Reset Associative Map for Next Invocation...
+void Parser::resetDiscardedPacketsStats(void)
+{
+	// Reset Associative Map, Start Clean Stats...
 	m_discarded_packets.clear();
 }
 
