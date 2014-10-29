@@ -224,6 +224,7 @@ bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 				unsigned int chunk_offset,
 				unsigned int chunk_len)
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	if (hdr) {
 		printf("%u.%09u Oversize Packet\n",
 			(uint32_t) (hdr->pulseId() >> 32),

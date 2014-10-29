@@ -298,6 +298,7 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       unsigned int chunk_offset,
 			       unsigned int chunk_len)
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */

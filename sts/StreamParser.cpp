@@ -520,6 +520,8 @@ StreamParser::rxOversizePkt
     unsigned int chunk_len  ///< [in] Length of this Oversized Chunk (in bytes)
 )
 {
+    // NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
+
     // Log Oversized Packet (with Header)
     if ( hdr != NULL )
     {
