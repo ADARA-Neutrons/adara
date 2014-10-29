@@ -57,6 +57,8 @@ public:
 	void resetSourcesReadDelay(void);
 	void setSourcesReadDelay(void);
 
+	void resetPacketStats(void);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);

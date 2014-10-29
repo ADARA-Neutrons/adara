@@ -329,6 +329,10 @@ bool SMSControl::setRecording(bool v)
 		 */
 		m_allMonitors.clear();
 
+		/* Reset All DataSource Packet Statistics...
+		 */
+		resetPacketStats();
+
 		try {
 			/* Let our marker control code have a shot at
 			 * fixing up current state before we start recording
@@ -577,6 +581,15 @@ void SMSControl::setSourcesReadDelay(void)
 	// (or the next read() will automatically reset every source's flag)
 	for (uint32_t i = 0; i < m_sources.size(); i++) {
 		m_sources[i]->m_readDelay = true;
+	}
+}
+
+// Clear All Packet Statistics...
+// (use any DataSource, pick the "first"... :-)
+void SMSControl::resetPacketStats(void)
+{
+	if (m_sources.size() > 0) {
+		m_sources[0]->resetPacketStats();
 	}
 }
 

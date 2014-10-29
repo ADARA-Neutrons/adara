@@ -27,6 +27,8 @@ public:
 
 	bool m_readDelay;
 
+	void resetPacketStats(void);
+
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;

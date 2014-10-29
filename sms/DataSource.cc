@@ -333,9 +333,12 @@ void DataSource::connectionFailed(bool dumpDiscarded)
 	dumpLastReadStats("connectionFailed()");
 
 	if (dumpDiscarded) {
+		// Dump Discarded Packet Statistics...
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
 		INFO(log_info);
+		// Reset Discarded Packet Statistics...
+		Parser::resetDiscardedPacketsStats();
 	}
 
 	if (m_fdreg) {
@@ -656,8 +659,20 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *chunk, unsigned int chunk_offset,
 			       unsigned int chunk_len)
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	ERROR("Oversized packet from " << m_name);
 	return true;
+}
+
+void DataSource::resetPacketStats(void)
+{
+	// Dump Total Discarded Packet Statistics before Reset...
+	std::string log_info;
+	Parser::getDiscardedPacketsLogString(log_info);
+	INFO("resetPacketStats(): Totals Before Reset - " << log_info);
+
+	// Reset Discarded Packet Statistics...
+	Parser::resetDiscardedPacketsStats();
 }
 
 HWSource &DataSource::getHWSource(uint32_t hwId)
