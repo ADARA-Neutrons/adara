@@ -164,7 +164,8 @@ private:
 };
 
 
-DataSource::DataSource(const std::string &name, const std::string &uri,
+DataSource::DataSource(const std::string &name, bool enabled,
+			const std::string &uri,
 			uint32_t id, const std::string beamlineId,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
@@ -184,6 +185,8 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 	m_name += " (";
 	m_name += name;
 	m_name += ")";
+
+	m_enabled = enabled;
 
 	if (pos != std::string::npos) {
 		node = uri.substr(0, pos);
@@ -222,6 +225,9 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
 
+	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
+		smsEnabledPV(prefix + ":Enabled", this));
+
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
 
@@ -229,6 +235,7 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
 	ctrl->addPV(m_pvName);
+	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvIgnoreEoP);
 
@@ -258,7 +265,8 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 
 	m_readDelay = false;
 
-	startConnect();
+	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
+	m_pvEnabled->update(m_enabled, &now);
 }
 
 DataSource::~DataSource()
@@ -593,6 +601,18 @@ void DataSource::dataReady(void)
 			dumpLastReadStats("dataReady() (Read Delay)");
 		}
 	}
+}
+
+void DataSource::enabled(void)
+{
+	DEBUG("*** Data Source " << m_name << " Enabled!");
+
+	startConnect();
+}
+
+void DataSource::disabled(void)
+{
+	DEBUG("*** Data Source " << m_name << " Disabled!");
 }
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)

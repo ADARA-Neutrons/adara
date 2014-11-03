@@ -14,12 +14,14 @@ struct addrinfo;
 
 class HWSource;
 class smsStringPV;
+class smsEnabledPV;
 class smsConnectedPV;
 class smsBooleanPV;
 
 class DataSource : public ADARA::POSIXParser {
 public:
-	DataSource(const std::string &name, const std::string &uri,
+	DataSource(const std::string &name, bool enabled,
+		const std::string &uri,
 		uint32_t id, const std::string beamlineId,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, unsigned int read_chunk);
@@ -29,6 +31,9 @@ public:
 
 	void resetPacketStats(void);
 
+	void enabled(void);
+	void disabled(void);
+
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;
@@ -36,6 +41,7 @@ private:
 	enum State { IDLE, CONNECTING, ACTIVE };
 
 	std::string m_name;
+	bool m_enabled;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
@@ -50,6 +56,7 @@ private:
 	unsigned int m_max_read_chunk;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 
