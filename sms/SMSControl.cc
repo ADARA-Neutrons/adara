@@ -165,7 +165,8 @@ void SMSControl::addSource(const std::string &name,
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
 	if (ignore_eop) {
-		DEBUG("Ignore-EOP Flag Set to True - Self Synchronizing Pulses!");
+		DEBUG("Ignore-EOP Flag Set to True for " << name
+			<< " - Self Synchronizing Pulses!");
 	}
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
@@ -177,7 +178,7 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout,
 							 ignore_eop,
 							 chunk_size));
-	m_sources.push_back(src);
+	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
 	struct timespec now;
@@ -569,8 +570,8 @@ void SMSControl::sourceDown(uint32_t id)
 // Clear all the DataSource "Read Delay" flags...
 void SMSControl::resetSourcesReadDelay(void)
 {
-	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		m_sources[i]->m_readDelay = false;
+	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
+		m_dataSources[i]->m_readDelay = false;
 	}
 }
 
@@ -579,8 +580,8 @@ void SMSControl::setSourcesReadDelay(void)
 {
 	// Note: each DataSource will clear it's own flag on next Timeout...
 	// (or the next read() will automatically reset every source's flag)
-	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		m_sources[i]->m_readDelay = true;
+	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
+		m_dataSources[i]->m_readDelay = true;
 	}
 }
 
@@ -588,8 +589,8 @@ void SMSControl::setSourcesReadDelay(void)
 // (use any DataSource, pick the "first"... :-)
 void SMSControl::resetPacketStats(void)
 {
-	if (m_sources.size() > 0) {
-		m_sources[0]->resetPacketStats();
+	if (m_dataSources.size() > 0) {
+		m_dataSources[0]->resetPacketStats();
 	}
 }
 
@@ -722,15 +723,15 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	/* Find this source in the current pulse; if it doesn't exist
 	 * yet, we'll need to save the intrapulse time and TOF Offset fields.
 	 */
-	SourceMap::iterator src = pulse->m_sources.find(hwId);
-	if (src == pulse->m_sources.end()) {
+	SourceMap::iterator src = pulse->m_pulseSources.find(hwId);
+	if (src == pulse->m_pulseSources.end()) {
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
 		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
 				m_maxBanks);
 		SourceMap::value_type val(hwId, new_src);
-		src = pulse->m_sources.insert(val).first;
+		src = pulse->m_pulseSources.insert(val).first;
 	}
 
 	/* We'll save this time and time again, but we can't use the one
@@ -1040,7 +1041,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.clear();
 
 	uint32_t size = 1 + pulse->m_numBanks * 2;
-	size += pulse->m_sources.size() * 4;
+	size += pulse->m_pulseSources.size() * 4;
 	m_iovec.reserve(size);
 
 	/* IMPORTANT: m_hdrs must be correctly sized, as we use pointers
@@ -1048,7 +1049,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	 * StorageManager::addPacket(). No reallocation is allowed after
 	 * we've reserved the proper size.
 	 */
-	size = 8 + pulse->m_sources.size() * 4;
+	size = 8 + pulse->m_pulseSources.size() * 4;
 	size += pulse->m_numBanks * 2;
 	m_hdrs.reserve(size);
 
@@ -1072,8 +1073,8 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
 	m_iovec.push_back(iov);
 
-	SourceMap::iterator sIt, sEnd = pulse->m_sources.end();
-	for (sIt = pulse->m_sources.begin(); sIt != sEnd; sIt++) {
+	SourceMap::iterator sIt, sEnd = pulse->m_pulseSources.end();
+	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
 		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
 		iov.iov_len = 4 * sizeof(uint32_t);
 		m_iovec.push_back(iov);

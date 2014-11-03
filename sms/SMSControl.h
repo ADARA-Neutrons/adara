@@ -123,7 +123,7 @@ private:
 		PulseIdentifier				m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
-		SourceMap				m_sources;
+		SourceMap				m_pulseSources;
 		MonitorMap				m_monitors;
 		ChopperMap				m_chopperEvents;
 		EventVector				m_fastMetaEvents;
@@ -155,7 +155,7 @@ private:
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
-	std::vector<boost::shared_ptr<DataSource> > m_sources;
+	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
 	PulseMap m_pulses;
