@@ -8,6 +8,7 @@
 #include <smartGDDPointer.h>
 #include <casdef.h>
 
+class DataSource;
 class SMSControl;
 
 class smsPV : public casPV {
@@ -127,7 +128,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
+	virtual void update(bool val, struct timespec *ts);
+
 	bool valid(void);
 	bool value(void);
 
@@ -137,6 +139,18 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+};
+
+class smsEnabledPV : public smsBooleanPV {
+public:
+	smsEnabledPV(const std::string &name, DataSource *dataSource);
+
+	void update(bool val, struct timespec *ts);
+
+	gddAppFuncTableStatus getEnums(gdd &value);
+
+private:
+	DataSource *m_dataSource;
 };
 
 class smsErrorPV : public smsBooleanPV {

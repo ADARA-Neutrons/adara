@@ -1,4 +1,5 @@
 #include "EPICS.h"
+#include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
@@ -50,6 +51,32 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 
 	strncpy(str[0].fixed_string, "false", sizeof(str[0].fixed_string));
 	strncpy(str[1].fixed_string, "true", sizeof(str[1].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 2);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
+
+/* ----------------------------------------------------------------------- */
+
+static gddAppFuncTableStatus getEnabledEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[2];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+	strncpy(str[0].fixed_string, "Disabled", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "Enabled", sizeof(str[1].fixed_string));
 
 	in.setDimension(1);
 	in.setBound(0, 0, 2);
@@ -590,6 +617,7 @@ smsBooleanPV::smsBooleanPV(const std::string &name) : smsPV(name)
 
 	clock_gettime(CLOCK_REALTIME, &ts);
 
+	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
@@ -659,7 +687,7 @@ bool smsBooleanPV::allowUpdate(const gdd &)
 
 void smsBooleanPV::update(bool val, struct timespec *ts)
 {
-	aitUint32 uninitialized_var(v);
+	aitUint16 uninitialized_var(v);
 	gdd *nval;
 
 	m_value->get(v);
@@ -693,6 +721,45 @@ bool smsBooleanPV::value(void)
 
 void smsBooleanPV::changed(void)
 {
+}
+
+/* ----------------------------------------------------------------------- */
+
+smsEnabledPV::smsEnabledPV(const std::string &name,
+		DataSource *dataSource) :
+	smsBooleanPV(name), m_dataSource(dataSource) { }
+
+gddAppFuncTableStatus smsEnabledPV::getEnums(gdd &in)
+{
+	return getEnabledEnums(in);
+}
+
+void smsEnabledPV::update(bool val, struct timespec *ts)
+{
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	if (val != 0) {
+		m_dataSource->enabled();
+	}
+	else {
+		m_dataSource->disabled();
+	}
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
 }
 
 /* ----------------------------------------------------------------------- */
