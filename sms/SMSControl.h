@@ -192,7 +192,7 @@ private:
 
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
-				const boost::property_tree::ptree &info);
+				const boost::property_tree::ptree &info, bool enabled);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);

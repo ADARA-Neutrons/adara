@@ -121,17 +121,18 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 
 		name = it->first.substr(b + 1, e - b - 1);
 
-		if (it->second.count("disabled")) {
-			INFO("Ignoring disabled source '" << name << "'");
-			continue;
+		bool enabled = !(it->second.count("disabled"));
+
+		if (!enabled) {
+			INFO("Ignoring disabled source '" << name << "' (for now).");
 		}
 
-		addSource(name, it->second);
+		addSource(name, it->second, enabled);
 	}
 }
 
 void SMSControl::addSource(const std::string &name,
-			const boost::property_tree::ptree &info)
+			const boost::property_tree::ptree &info, bool enabled)
 {
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
@@ -170,6 +171,7 @@ void SMSControl::addSource(const std::string &name,
 	}
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
+							 enabled,
 							 uri->second.data(),
 							 m_nextSrcId,
 							 m_beamlineId,
