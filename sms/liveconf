@@ -115,6 +115,8 @@ if [ "$command" == "status" ]; then
 
 	caget ${PRE}:SMS:RunNumber
 
+	caget ${PRE}:SMS:Summary
+
 	caget ${PRE}:SMS:Control:NoEoPPulseBufferSize
 
 	ndsvar="${PRE}:SMS:Control:NumDataSources"
@@ -126,6 +128,7 @@ if [ "$command" == "status" ]; then
 		for (( ds=1 ; ds <= numDataSources ; ds++ )); do
 			echo "Data Source id=${ds}:"
 			caget -S ${PRE}:SMS:DataSource:${ds}:Name
+			caget ${PRE}:SMS:DataSource:${ds}:Enabled
 			caget -a ${PRE}:SMS:DataSource:${ds}:Connected
 			caget ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 			echo
