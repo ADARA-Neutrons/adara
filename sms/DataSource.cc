@@ -713,17 +713,11 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	DEBUG("rxPacket(): RawDataPkt type="
-		<< std::hex << pkt.type() << std::dec);
-
 	return( handleDataPkt(&pkt, false) );
 }
 
 bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
 {
-	DEBUG("rxPacket(): MappedDataPkt type="
-		<< std::hex << pkt.type() << std::dec);
-
 	return( handleDataPkt(dynamic_cast<const ADARA::RawDataPkt *>(&pkt),
 		true) );
 }
