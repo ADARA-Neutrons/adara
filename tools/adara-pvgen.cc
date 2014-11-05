@@ -18,6 +18,7 @@
 
 #include "ADARA.h"
 #include "ReadyAdapter.h"
+#include "ADARAUtils.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
@@ -326,7 +327,7 @@ public:
 		timer.start(*this, update_interval + timer_fudge);
 	}
 
-	expireStatus expire(const epicsTime &currentTime) {
+	expireStatus expire(const epicsTime &UNUSED(currentTime)) {
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 

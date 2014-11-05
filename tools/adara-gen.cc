@@ -19,6 +19,7 @@
 
 #include "ADARA.h"
 #include "ReadyAdapter.h"
+#include "ADARAUtils.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
@@ -451,7 +452,7 @@ public:
 		timer.start(*this, pulse_interval + timer_fudge);
 	}
 
-	expireStatus expire(const epicsTime &currentTime) {
+	expireStatus expire(const epicsTime &UNUSED(currentTime)) {
 		struct timespec now, diff;
 		uint32_t intrapulse;
 
