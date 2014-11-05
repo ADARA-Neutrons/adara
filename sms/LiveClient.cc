@@ -295,15 +295,20 @@ bool LiveClient::rxPacket(const ADARA::Packet &pkt)
 }
 
 bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
-					const uint8_t *chunk,
-					unsigned int chunk_offset,
-					unsigned int chunk_len)
+					const uint8_t *UNUSED(chunk),
+					unsigned int UNUSED(chunk_offset),
+					unsigned int UNUSED(chunk_len))
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
-	WARN("client " << m_clientName << " sent us an oversized packet");
+	if (hdr) {
+		WARN("client " << m_clientName << " sent us an oversized packet"
+			<< " of type " << hdr->type());
+	} else {
+		WARN("client " << m_clientName << " sent us an oversized packet");
+	}
 	return true;
 }
 

@@ -262,14 +262,16 @@ pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const caNetAddr &,
 	return pvExistTest(ctx, pv_name);
 }
 
-pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const char *pv_name)
+pvExistReturn SMSControl::pvExistTest(const casCtx &UNUSED(ctx),
+	const char *pv_name)
 {
 	if (m_pv_map.find(pv_name) != m_pv_map.end())
 		return pverExistsHere;
 	return pverDoesNotExistHere;
 }
 
-pvAttachReturn SMSControl::pvAttach(const casCtx &ctx, const char *pv_name)
+pvAttachReturn SMSControl::pvAttach(const casCtx &UNUSED(ctx),
+	const char *pv_name)
 {
 	std::map<std::string, boost::shared_ptr<casPV> >::iterator iter;
 
@@ -630,8 +632,8 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	mon->second.m_eventTof.push_back(tof);
 }
 
-void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-				 uint32_t pixel, uint32_t tof)
+void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
+				 PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;

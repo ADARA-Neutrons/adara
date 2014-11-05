@@ -294,17 +294,21 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 }
 
 bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
-			       const uint8_t *chunk,
-			       unsigned int chunk_offset,
-			       unsigned int chunk_len)
+			       const uint8_t *UNUSED(chunk),
+			       unsigned int UNUSED(chunk_offset),
+			       unsigned int UNUSED(chunk_len))
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
-	WARN("Received unexpected oversize packet of length "
-		<< ((hdr) ? hdr->packet_length() : 0));
+	if (hdr) {
+		WARN("Received unexpected oversize packet of type " << hdr->type()
+			<< " and length " << hdr->packet_length());
+	} else {
+		WARN("Received unexpected oversize packet");
+	}
 	return true;
 }
 

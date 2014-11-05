@@ -4,6 +4,8 @@
 #include <fdManager.h>
 #include <epicsTimer.h>
 
+#include "ADARAUtils.h"
+
 template<class T> class TimerAdapter : public epicsTimerNotify {
 public:
         explicit TimerAdapter(T *obj, bool (T::*f)(void) = &T::timerExpired) :
@@ -23,7 +25,7 @@ private:
 	bool (T::*m_f)(void);
 	double m_delay;
 
-	expireStatus expire(const epicsTime &currentTime) {
+	expireStatus expire(const epicsTime &UNUSED(currentTime)) {
 		if ((m_obj->*m_f)())
 			return expireStatus(restart, m_delay);
 		else

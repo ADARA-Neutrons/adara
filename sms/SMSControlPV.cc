@@ -2,6 +2,7 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
+#include "ADARAUtils.h"
 
 #include <gddApps.h>
 
@@ -182,7 +183,7 @@ const char *smsPV::getName(void) const
 	return m_pv_name.c_str();
 }
 
-void smsPV::show(unsigned level) const
+void smsPV::show(unsigned UNUSED(level)) const
 {
 	/* TODO perhaps we'll want this some day */
 }
@@ -204,12 +205,12 @@ aitEnum smsPV::bestExternalType(void) const
 	return casPV::bestExternalType();
 }
 
-caStatus smsPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsPV::read(const casCtx &UNUSED(ctx), gdd &UNUSED(prototype))
 {
 	return S_casApp_noSupport;
 }
 
-caStatus smsPV::write(const casCtx &ctx, const gdd &value)
+caStatus smsPV::write(const casCtx &UNUSED(ctx), const gdd &UNUSED(value))
 {
 	return S_casApp_noSupport;
 }
@@ -284,8 +285,8 @@ smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 }
 
 casChannel *smsRunNumberPV::createChannel(const casCtx &ctx,
-					  const char * const user,
-					  const char * const host)
+					  const char * const UNUSED(user),
+					  const char * const UNUSED(host))
 {
 	return new smsReadOnlyChannel(ctx);
 }
@@ -303,7 +304,7 @@ gddAppFuncTableStatus smsRunNumberPV::getValue(gdd &in)
 	return S_cas_success;
 }
 
-caStatus smsRunNumberPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
@@ -368,7 +369,7 @@ gddAppFuncTableStatus smsRecordingPV::getEnums(gdd &in)
 	return getBooleanEnums(in);
 }
 
-caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
@@ -377,7 +378,7 @@ caStatus smsRecordingPV::read(const casCtx &ctx, gdd &prototype)
 	return m_read_table.read(*this, prototype);
 }
 
-caStatus smsRecordingPV::write(const casCtx &ctx, const gdd &val)
+caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint16 uninitialized_var(v);
 
@@ -454,14 +455,14 @@ gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
 	return S_cas_success;
 }
 
-caStatus smsStringPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	DEBUG("smsStringPV::read() m_pv_name=" << m_pv_name
 		<< " value=" << m_value.get());
 	return m_read_table.read(*this, prototype);
 }
 
-caStatus smsStringPV::write(const casCtx &ctx, const gdd &val)
+caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	unsigned int start, nelem;
 
@@ -643,15 +644,16 @@ gddAppFuncTableStatus smsBooleanPV::getEnums(gdd &in)
 	return getBooleanEnums(in);
 }
 
-caStatus smsBooleanPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsBooleanPV::read() m_pv_name=" << m_pv_name << " value=" << v);
+	DEBUG("smsBooleanPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
-caStatus smsBooleanPV::write(const casCtx &ctx, const gdd &val)
+caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint16 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
@@ -909,7 +911,7 @@ gddAppFuncTableStatus smsUint32PV::getValue(gdd &in)
 	return S_cas_success;
 }
 
-caStatus smsUint32PV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
@@ -917,7 +919,7 @@ caStatus smsUint32PV::read(const casCtx &ctx, gdd &prototype)
 	return m_read_table.read(*this, prototype);
 }
 
-caStatus smsUint32PV::write(const casCtx &ctx, const gdd &val)
+caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint32 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
@@ -1019,7 +1021,7 @@ gddAppFuncTableStatus smsTriggerPV::getEnums(gdd &in)
 	return getBooleanEnums(in);
 }
 
-caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
+caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
@@ -1027,7 +1029,7 @@ caStatus smsTriggerPV::read(const casCtx &ctx, gdd &prototype)
 	return m_read_table.read(*this, prototype);
 }
 
-caStatus smsTriggerPV::write(const casCtx &ctx, const gdd &val)
+caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint16 uninitialized_var(v);
 
