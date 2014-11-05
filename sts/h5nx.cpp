@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include "ADARAUtils.h"
 
 #define H5NX_SANITY_CHECK
 
@@ -401,31 +402,31 @@ template <typename NumT>
 NeXus::NXnumtype to_nx_type(NumT number = NumT());
 
 template<>
-NeXus::NXnumtype to_nx_type( uint16_t number)
+NeXus::NXnumtype to_nx_type( uint16_t UNUSED(number))
 {
     return NeXus::UINT16;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( double number)
+NeXus::NXnumtype to_nx_type( double UNUSED(number))
 {
     return NeXus::FLOAT64;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( uint32_t  number)
+NeXus::NXnumtype to_nx_type( uint32_t  UNUSED(number))
 {
     return NeXus::UINT32;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( uint64_t  number)
+NeXus::NXnumtype to_nx_type( uint64_t  UNUSED(number))
 {
     return NeXus::UINT64;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( float  number)
+NeXus::NXnumtype to_nx_type( float  UNUSED(number))
 {
     return NeXus::FLOAT32;
 }

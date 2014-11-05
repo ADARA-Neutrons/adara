@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <syslog.h>
+#include "ADARAUtils.h"
 
 
 using namespace std;
@@ -1095,7 +1096,7 @@ StreamParser::rxPacket
 bool
 StreamParser::rxPacket
 (
-    const ADARA::DataDonePkt &a_pkt     ///< [in] The ADARA Data Done Packet to process
+    const ADARA::DataDonePkt &UNUSED(a_pkt)  ///< [in] The ADARA Data Done Packet to process
 )
 {
     // Basically, mark the run as "Done"...
