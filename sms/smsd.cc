@@ -298,7 +298,7 @@ static void daemonize(const char *pname)
 	}
 
 	/* We're the child process, become a daemon.
-	 * Create a new session, then fokr and have the parent exit,
+	 * Create a new session, then fork and have the parent exit,
 	 * ensuring we are not the leader of the session -- we don't
 	 * want a controlling terminal. StorageManager::init() already
 	 * took care of our working directory and umask settings.
@@ -324,7 +324,7 @@ static void daemonize(const char *pname)
 	/* We're the second child now; we are in our own session, but
 	 * are not the leader of it. Let initialization continue.
 	 */
-	DEBUG("daemonized");
+	DEBUG("daemonized (" << pname << ")");
 }
 
 static void close_std_files(void)
