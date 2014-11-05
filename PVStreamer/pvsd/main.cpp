@@ -10,6 +10,7 @@
 #include "ADARA_OutputAdapter.h"
 #include "ComBus.h"
 #include "TraceException.h"
+#include "ADARAUtils.h"
 
 using namespace std;
 using namespace PVS;
@@ -25,7 +26,7 @@ int g_child_code = 0;
 
 /// Used to catch shutdown/interrupt signals for clean shutdown
 void
-signalHandlerExit( int a_signal )
+signalHandlerExit( int UNUSED(a_signal) )
 {
     g_active = false;
 }
@@ -33,7 +34,8 @@ signalHandlerExit( int a_signal )
 
 /// Handles child signal during daemonization
 void
-signalHandlerChild( int a_signal, siginfo_t *info, void *data )
+signalHandlerChild( int UNUSED(a_signal), siginfo_t *info,
+        void *UNUSED(data) )
 {
     g_child_signal = true;
     g_child_code = info->si_value.sival_int;
