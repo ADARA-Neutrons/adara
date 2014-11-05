@@ -7,6 +7,7 @@
 #include "ADARA.h"
 #include "ComBus.h"
 #include "StreamAnalyzer.h"
+#include "ADARAUtils.h"
 
 #include <iostream>
 #include <fstream>
@@ -1010,7 +1011,7 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
 
 
 void
-StreamAnalyzer::streamMetrics( const StreamMetrics &a_metrics )
+StreamAnalyzer::streamMetrics( const StreamMetrics &UNUSED(a_metrics) )
 {
     // TODO assert stream metrics facts
 }
