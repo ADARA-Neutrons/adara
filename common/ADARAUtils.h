@@ -22,6 +22,16 @@
 
 #include "ADARA.h"
 
+// Macro to cut down on compiler warnings.
+// from Dr. Martin Ettl article:
+//     https://sites.google.com/site/opensourceconstriubtions/
+//     ettl-martin-1/articles/suppress-unused-parameter-compiler-warning
+#if 1  // there should be no more any compilers needing the "#else" version
+	#define UNUSED(x) /* x */
+#else  // stupid, broken compiler
+	#define UNUSED(x) x
+#endif
+
 /*! \class Statistics
  *
  * The Statistics class calculates running min, max, mean, variance, and standard deviation for a sequence of values.
