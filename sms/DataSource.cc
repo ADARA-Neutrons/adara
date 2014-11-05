@@ -671,16 +671,22 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-	ERROR("Unknown packet from " << m_name);
+	ERROR("Unknown packet type " << pkt.type() << " from " << m_name);
 	return true;
 }
 
 bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr, 
-			       const uint8_t *chunk, unsigned int chunk_offset,
-			       unsigned int chunk_len)
+			       const uint8_t *UNUSED(chunk),
+				   unsigned int UNUSED(chunk_offset),
+			       unsigned int UNUSED(chunk_len))
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
-	ERROR("Oversized packet from " << m_name);
+	if (hdr) {
+		ERROR("Oversized packet of type " << hdr->type()
+			<< " from " << m_name);
+	} else {
+		ERROR("Oversized packet from " << m_name);
+	}
 	return true;
 }
 
@@ -828,7 +834,7 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 	return false;
 }
 
-bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
+bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 {
 	INFO("Heartbeat Packet for " << m_name);
 
