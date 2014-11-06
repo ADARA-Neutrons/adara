@@ -381,15 +381,14 @@ int main( int argc, char** argv )
         // Read-spin on infd until connection is closed by SMS
         char buf[1];
         ssize_t ec;
+        long cnt = 0;
         while ( 1 )
         {
             // NOTE: This is Standard C Library read()... ;-o
             ec = ::read( infd, buf, 1 );
             if ( ec > 0 )
             {
-                syslog( LOG_INFO,
-                    "[%i] Warning: Extra Data Read from SMS socket ec=%ld!",
-                    g_pid, ec );
+                cnt += ec;
                 continue;
             }
             else if ( ec == 0 )
@@ -405,6 +404,14 @@ int main( int argc, char** argv )
                         break;
                 }
             }
+        }
+
+        // Log any extra data read from socket (probably DataDonePkt... :)
+        if ( cnt > 0 )
+        {
+            syslog( LOG_INFO,
+                "[%i] Warning: Extra Data Read from SMS socket cnt=%ld",
+                g_pid, cnt );
         }
     }
     else if ( sms_code != STS::TS_SUCCESS )
