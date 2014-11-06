@@ -386,18 +386,23 @@ int main( int argc, char** argv )
             // NOTE: This is Standard C Library read()... ;-o
             ec = ::read( infd, buf, 1 );
             if ( ec > 0 )
+            {
+                syslog( LOG_INFO,
+                    "[%i] Warning: Extra Data Read from SMS socket ec=%ld!",
+                    g_pid, ec );
                 continue;
+            }
             else if ( ec == 0 )
                 break;
             else
             {
                 switch ( ec )
                 {
-                case EINTR:
-                case EAGAIN:
-                    continue;
-                default:
-                    break;
+                    case EINTR:
+                    case EAGAIN:
+                        continue;
+                    default:
+                        break;
                 }
             }
         }
@@ -409,20 +414,37 @@ int main( int argc, char** argv )
 
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
 
-    delete monitor;
-    delete nxgen;
+    if ( monitor )
+        delete monitor;
+
+    if ( nxgen )
+        delete nxgen;
 
     // Clean-up temp output files if translation or move failed
     if ( !keep_temp && !nexus_outfile.empty() )
     {
-        try { boost::filesystem::remove( boost::filesystem::path( nexus_outfile )); }
-        catch( ... ) {}
+        try {
+            boost::filesystem::remove(
+                boost::filesystem::path( nexus_outfile ));
+        }
+        catch( ... )
+        {
+            syslog( LOG_INFO, "[%i] Error Cleaning Up NeXus File at %s.",
+                g_pid, nexus_outfile.c_str() );
+        }
     }
 
     if ( !keep_temp && !adara_outfile.empty() )
     {
-        try { boost::filesystem::remove( boost::filesystem::path( adara_outfile )); }
-        catch( ... ) {}
+        try {
+            boost::filesystem::remove(
+                boost::filesystem::path( adara_outfile ));
+        }
+        catch( ... )
+        {
+            syslog( LOG_INFO, "[%i] Error Cleaning Up ADARA File at %s.",
+                g_pid, adara_outfile.c_str() );
+        }
     }
 
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );

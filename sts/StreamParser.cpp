@@ -74,7 +74,8 @@ StreamParser::~StreamParser()
             delete *ibi;
 
     for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
-        delete imi->second;
+        if ( imi->second )
+            delete imi->second;
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
         if ( ipv->second )

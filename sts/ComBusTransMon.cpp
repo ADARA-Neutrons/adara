@@ -46,8 +46,13 @@ ComBusTransMon::~ComBusTransMon()
         delete m_comm_thread;
     }
 
-    delete m_combus;
-    delete m_terminal_msg;
+    if ( m_combus )
+        delete m_combus;
+
+    if ( m_terminal_msg )
+        delete m_terminal_msg;
+
+    syslog( LOG_INFO, "[%i] ComBusTransMon exiting", g_pid );
 }
 
 

@@ -73,7 +73,8 @@ private:
 
         if ( len + pad > m_buffer_capacity )
         {
-            delete[] m_buffer;
+            if ( m_buffer )
+                delete[] m_buffer;
 
             m_buffer_capacity = (len + pad)*2;
             m_buffer = new char[m_buffer_capacity];
