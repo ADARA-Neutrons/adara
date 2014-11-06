@@ -593,7 +593,7 @@ The intra-pulse time is the time between the previous $T_{SYNC}$ and the
 current $T_{SYNC}$.
 \item{\bf COR} indicates that the time of flight values in this packet are
 have been corrected for frame skew.
-\item{\bf TOF Offset} is the total offest that was (or should be, if {\bf COR}
+\item{\bf TOF Offset} is the total offset that was (or should be, if {\bf COR}
 is not set) added to these events to correct for frame skew.
 \item{\bf Event(s)} give the time of flight and location of the detected
 neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
@@ -910,7 +910,7 @@ do not always match up with the layout that the scientists wish to use for
 analysis. The Stream Management Service will transform the pixel IDs from
 physical in the Raw packets to logical in the Banked packets using a
 one-to-one mapping (communicated in the stream via ``Pixel Mapping Table''
-packets defined in Section~\ref{section:protocol_pixel_mapping_table}.
+packets defined in Section~\ref{section:protocol_pixel_mapping_table}).
 These logical pixels are then communicated in the ``Banked Event Data''
 packets. As part of this mapping process, the detector bank is determined,
 and the events are sorted into buckets accordingly. It is expected that
