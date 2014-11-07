@@ -171,7 +171,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
 	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
-	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
+	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk)
@@ -240,6 +240,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvIgnoreEoP);
 
 	// Initialize Data Source PVs...
+	// (All except "Enabled"!  Save that for later... :-)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvName->update(m_name, &now);
@@ -334,7 +335,7 @@ void DataSource::dumpLastReadStats(std::string who)
 			<< Parser::last_last_parse_elapsed_total);
 }
 
-void DataSource::connectionFailed(bool dumpDiscarded)
+void DataSource::connectionFailed(bool dumpDiscarded, State new_state)
 {
 	m_timer->cancel();
 
@@ -358,7 +359,7 @@ void DataSource::connectionFailed(bool dumpDiscarded)
 		m_fd = -1;
 	}
 
-	m_state = IDLE;
+	m_state = new_state;
 
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
@@ -368,7 +369,8 @@ void DataSource::connectionFailed(bool dumpDiscarded)
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
 
-	m_timer->start(m_connect_retry);
+	if (m_state != DISABLED)
+		m_timer->start(m_connect_retry);
 }
 
 bool DataSource::timerExpired(void)
@@ -376,6 +378,14 @@ bool DataSource::timerExpired(void)
 	// DEBUG("timerExpired() entry");
 
 	switch (m_state) {
+
+		case DISABLED:
+		{
+			WARN("Ignoring Timeout for Disabled Data Source " << m_name);
+			if ( m_readDelay )
+				m_readDelay = false; // reset flag set by SMSControl...
+			break;
+		}
 
 		case IDLE:
 		{
@@ -400,7 +410,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
 				WARN("Connection request timed out to " << m_name);
-				connectionFailed(false);
+				connectionFailed(false, IDLE);
 			}
 			break;
 		}
@@ -415,7 +425,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				WARN("Timed out waiting for data from " << m_name);
 				m_pvConnected->failed();
-				connectionFailed(true);
+				connectionFailed(true, IDLE);
 			}
 			break;
 		}
@@ -431,14 +441,17 @@ void DataSource::fdReady(void)
 	// DEBUG("fdReady() entry m_state=" << m_state);
 
 	switch (m_state) {
-	case IDLE:
-		throw std::logic_error("Invalid state");
-	case CONNECTING:
-		connectComplete();
-		break;
-	case ACTIVE:
-		dataReady();
-		break;
+		case DISABLED:
+			WARN("Ignoring Data Ready for Disabled Data Source " << m_name);
+			break;
+		case IDLE:
+			throw std::logic_error("Invalid state");
+		case CONNECTING:
+			connectComplete();
+			break;
+		case ACTIVE:
+			dataReady();
+			break;
 	}
 
 	// DEBUG("fdReady() exit");
@@ -472,22 +485,23 @@ void DataSource::startConnect(void)
 		rc = errno;
 
 	switch (rc) {
-	case ECONNREFUSED:
-		/* TODO ratelimited logging of refused connection */
-		WARN("Connection refused by " << m_name);
-		goto error_fd;
-	case EINTR:
-	case EINPROGRESS:
-		m_state = CONNECTING;
-		break;
-	case 0:
-		INFO("Connection established to " << m_name);
-		m_state = ACTIVE;
-		m_pvConnected->connected();
-		SMSControl::getInstance()->sourceUp(m_smsSourceId);
-	default:
-		WARN("Unknown connection request error for " << m_name
-			<< ": " << strerror(rc) << " (Ignoring!)");
+		case ECONNREFUSED:
+			/* TODO ratelimited logging of refused connection */
+			WARN("Connection refused by " << m_name);
+			goto error_fd;
+		case EINTR:
+		case EINPROGRESS:
+			m_state = CONNECTING;
+			break;
+		case 0:
+			INFO("Connection established to " << m_name);
+			m_state = ACTIVE;
+			m_pvConnected->connected();
+			SMSControl::getInstance()->sourceUp(m_smsSourceId);
+			break;
+		default:
+			WARN("Unknown connection request error for " << m_name
+				<< ": " << strerror(rc) << " (Ignoring!)");
 	}
 
 	/* TODO handle any other error here */
@@ -514,7 +528,7 @@ error_fd:
 
 error:
 	m_pvConnected->failed();
-	connectionFailed(false);
+	connectionFailed(false, IDLE);
 }
 
 void DataSource::connectComplete(void)
@@ -549,7 +563,7 @@ void DataSource::connectComplete(void)
 	/* TODO ratelimited logging of connection issue */
 	WARN("Connection request to " << m_name << " failed: " << strerror(e));
 	// Leave m_pvConnected in its current state, latch failures
-	connectionFailed(false);
+	connectionFailed(false, IDLE);
 }
 
 void DataSource::dataReady(void)
@@ -574,14 +588,14 @@ void DataSource::dataReady(void)
 			INFO("Connection closed with " << m_name
 				<< "(" << log_info << ")");
 			m_pvConnected->disconnected();
-			connectionFailed(true);
+			connectionFailed(true, IDLE);
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		m_pvConnected->failed();
-		connectionFailed(true);
+		connectionFailed(true, IDLE);
 		readOk = false;
 	}
 
@@ -607,12 +621,22 @@ void DataSource::enabled(void)
 {
 	DEBUG("*** Data Source " << m_name << " Enabled!");
 
+	// Change Internal State to Default "Idle", We're Enabled Now...
+	m_state = IDLE;
+
 	startConnect();
 }
 
 void DataSource::disabled(void)
 {
 	DEBUG("*** Data Source " << m_name << " Disabled!");
+
+	// Mark Connection State as "Disconnected"...
+	m_pvConnected->disconnected();
+
+	// Close Down Socket, Change Internal State to DISABLED...
+	// (so we won't do anything... ;-)
+	connectionFailed(true, DISABLED);
 }
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)

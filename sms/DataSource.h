@@ -38,7 +38,7 @@ private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;
 
-	enum State { IDLE, CONNECTING, ACTIVE };
+	enum State { DISABLED, IDLE, CONNECTING, ACTIVE };
 
 	std::string m_name;
 	bool m_enabled;
@@ -73,7 +73,7 @@ private:
 	void dumpLastReadStats(std::string who);
 
 	void unregisterHWSources(bool isSourceDown, std::string why);
-	void connectionFailed(bool dumpDiscarded);
+	void connectionFailed(bool dumpDiscarded, State new_state);
 
 	bool timerExpired(void);
 
