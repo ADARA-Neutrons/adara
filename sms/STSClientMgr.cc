@@ -336,8 +336,6 @@ bool STSClientMgr::transientTimeout(void)
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 				  Disposition disp)
 {
-	INFO("clientComplete(): disp=" << disp);
-
 	// clean up...
 	dequeueRun(c);
 
