@@ -20,6 +20,30 @@ SMSD="smsd"
 
 SMSD_LOG="/var/log/smsd.log"
 
+PROG="smsd_mon"
+
+#
+# Parse Command Line Options... ;-)
+#
+
+do_notify=1
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [ "#$key#" == '#--no_notify#' ]; then
+		do_notify=0
+	elif [ "#$key#" == '#--smsd_user#' ]; then
+		SMSD_USER="$value"
+	elif [ "#$key#" == '#--help#' ]; then
+		echo "usage:  smsd_mon [--no_notify] [--smsd_user=y8y]"
+		exit 0
+	fi
+
+done
+
 #
 # Get SMS Daemon process status...
 #
@@ -27,13 +51,19 @@ SMSD_LOG="/var/log/smsd.log"
 date=`date`
 #echo "date=$date"
 
-status=`ps augxww | grep $SMSD | grep $SMSD_USER`
+status=`ps augxww | grep $SMSD | grep -v -e $PROG -e grep | grep $SMSD_USER`
 #echo "status=$status"
 
 if [ "#$status#" == '##' ]; then
-	echo \
+
+	if [ $do_notify == 1 ]; then
+		echo \
 		"Error on ${host}: SMS Daemon $SMSD Not Running as User $SMSD_USER!"
-	exit -1
+		exit -1
+	else
+		# Just Exit Cleanly, Nothing to log here... ;-D
+		exit 0
+	fi
 fi
 
 # Extract statistics of interest
