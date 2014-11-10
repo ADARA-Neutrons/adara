@@ -22,6 +22,8 @@ SMSD_LOG="/var/log/smsd.log"
 
 PROG="smsd_mon"
 
+TIME="/usr/bin/time" # for Test Harness, duh... ;-b
+
 #
 # Parse Command Line Options... ;-)
 #
@@ -51,7 +53,7 @@ done
 date=`date`
 #echo "date=$date"
 
-status=`ps augxww | grep $SMSD | grep -v -e $PROG -e grep | grep $SMSD_USER`
+status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_USER`
 #echo "status=$status"
 
 if [ "#$status#" == '##' ]; then
