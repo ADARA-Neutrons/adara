@@ -128,9 +128,9 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	smsd_top_logdir=`echo $SMSD_LOG | awk -F '/' '{print "/"$2}'`
 
-	log_used=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-3)}'`
+	log_used=`df $SMSD_LOG | tail -1 | awk '{print $(NF-3)}'`
 	#echo "log_used=$log_used"
-	log_avail=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-2)}'`
+	log_avail=`df $SMSD_LOG | tail -1 | awk '{print $(NF-2)}'`
 	#echo "log_avail=$log_avail"
 
 	pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))
