@@ -231,12 +231,16 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
 
+	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetry"));
+
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
 	ctrl->addPV(m_pvName);
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
+	ctrl->addPV(m_pvConnectRetry);
 	ctrl->addPV(m_pvIgnoreEoP);
 
 	// Initialize Data Source PVs...
@@ -245,6 +249,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvName->update(m_name, &now);
 	m_pvConnected->disconnected();
+	m_pvConnectRetry->update(m_connect_retry, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 
 	// Set Up Data Source Connection Timer...
@@ -369,8 +374,11 @@ void DataSource::connectionFailed(bool dumpDiscarded, State new_state)
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
 
-	if (m_state != DISABLED)
+	if (m_state != DISABLED) {
+		// Update Connect Retry Time from PV...
+		m_connect_retry = m_pvConnectRetry->value();
 		m_timer->start(m_connect_retry);
+	}
 }
 
 bool DataSource::timerExpired(void)
@@ -392,6 +400,8 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Connect Retry Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Connect Retry Time from PV...
+				m_connect_retry = m_pvConnectRetry->value();
 				m_timer->start(m_connect_retry);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {

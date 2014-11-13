@@ -16,6 +16,7 @@ class HWSource;
 class smsStringPV;
 class smsEnabledPV;
 class smsConnectedPV;
+class smsFloat64PV;
 class smsBooleanPV;
 
 class DataSource : public ADARA::POSIXParser {
@@ -58,6 +59,7 @@ private:
 	boost::shared_ptr<smsStringPV> m_pvName;
 	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 
 	uint64_t m_lastRTDLPulseId;
