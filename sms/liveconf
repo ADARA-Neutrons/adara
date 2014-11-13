@@ -131,6 +131,7 @@ if [ "$command" == "status" ]; then
 			caget ${PRE}:SMS:DataSource:${ds}:Enabled
 			caget -a ${PRE}:SMS:DataSource:${ds}:Connected
 			caget ${PRE}:SMS:DataSource:${ds}:ConnectRetry
+			caget ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
 			caget ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 			echo
 		done
