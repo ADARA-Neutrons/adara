@@ -234,6 +234,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectRetry"));
 
+	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectTimeout"));
+
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
@@ -241,6 +244,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
 
 	// Initialize Data Source PVs...
@@ -250,6 +254,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvName->update(m_name, &now);
 	m_pvConnected->disconnected();
 	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 
 	// Set Up Data Source Connection Timer...
@@ -415,6 +420,8 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Connect Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Connect Timeout from PV...
+				m_connect_timeout = m_pvConnectTimeout->value();
 				m_timer->start(m_connect_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
@@ -529,6 +536,8 @@ void DataSource::startConnect(void)
 		goto error_fd;
 	}
 
+	// Update Connect Timeout from PV...
+	m_connect_timeout = m_pvConnectTimeout->value();
 	m_timer->start(m_connect_timeout);
 	return;
 
