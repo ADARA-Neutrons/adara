@@ -237,6 +237,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectTimeout"));
 
+	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":DataTimeout"));
+
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
@@ -245,6 +248,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvConnectRetry);
 	ctrl->addPV(m_pvConnectTimeout);
+	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
 
 	// Initialize Data Source PVs...
@@ -255,6 +259,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnected->disconnected();
 	m_pvConnectRetry->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
+	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 
 	// Set Up Data Source Connection Timer...
@@ -437,6 +442,8 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Data Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Data Timeout from PV...
+				m_data_timeout = m_pvDataTimeout->value();
 				m_timer->start(m_data_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
@@ -562,9 +569,15 @@ void DataSource::connectComplete(void)
 				boost::bind(&DataSource::fdReady, this));
 
 		m_timer->cancel();
+
+		// Update Data Timeout from PV...
+		m_data_timeout = m_pvDataTimeout->value();
 		m_timer->start(m_data_timeout);
+
 		m_state = ACTIVE;
+
 		m_pvConnected->connected();
+
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
 		INFO("Connection established to " << m_name);
@@ -590,6 +603,9 @@ void DataSource::dataReady(void)
 	std::string log_info;
 
 	m_timer->cancel();
+
+	// Update Data Timeout from PV...
+	m_data_timeout = m_pvDataTimeout->value();
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;

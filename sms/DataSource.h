@@ -61,6 +61,7 @@ private:
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
+	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 
 	uint64_t m_lastRTDLPulseId;
