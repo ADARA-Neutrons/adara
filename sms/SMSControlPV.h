@@ -212,4 +212,24 @@ public:
 	virtual void triggered(void) = 0;
 };
 
+class smsFloat64PV : public smsPV {
+public:
+	smsFloat64PV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(double val, struct timespec *ts);
+	bool valid(void);
+	double value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
+};
+
 #endif /* __SMS_CONTROL_PV_H */

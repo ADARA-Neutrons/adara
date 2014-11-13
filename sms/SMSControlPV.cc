@@ -932,7 +932,8 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name << " value=" << v);
+	DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -1025,7 +1026,8 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsTriggerPV::read() m_pv_name=" << m_pv_name << " value=" << v);
+	DEBUG("smsTriggerPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << v);
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1073,3 +1075,109 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	return S_casApp_success;
 }
+
+/* ----------------------------------------------------------------------- */
+
+smsFloat64PV::smsFloat64PV(const std::string &name) : smsPV(name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	m_value = new gddScalar(gddAppType_value, aitEnumFloat64);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0.0);
+
+	m_pv_name = name;
+}
+
+aitEnum smsFloat64PV::bestExternalType(void) const
+{
+	return aitEnumFloat64;
+}
+
+gddAppFuncTableStatus smsFloat64PV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
+{
+	aitFloat64 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsFloat64PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	aitFloat64 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+	struct timespec ts;
+
+	if (!val.isScalar()) {
+		DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
+		return S_casApp_noSupport;
+	}
+
+	val.get(v);
+	DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
+	m_value->get(cur);
+	if (v == cur)
+		return S_casApp_success;
+
+	val.getTimeStamp(&ts);
+	update(v, &ts);
+	changed();
+
+	return S_casApp_success;
+}
+
+bool smsFloat64PV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsFloat64PV::update(double val, struct timespec *ts)
+{
+	aitFloat64 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumFloat64);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+bool smsFloat64PV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+double smsFloat64PV::value(void)
+{
+	aitFloat64 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsFloat64PV::changed(void)
+{
+}
+
