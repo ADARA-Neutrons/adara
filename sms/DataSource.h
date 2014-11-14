@@ -22,8 +22,7 @@ class smsBooleanPV;
 class DataSource : public ADARA::POSIXParser {
 public:
 	DataSource(const std::string &name, bool enabled,
-		const std::string &uri,
-		uint32_t id, const std::string beamlineId,
+		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, unsigned int read_chunk);
 	~DataSource();

@@ -165,8 +165,7 @@ private:
 
 
 DataSource::DataSource(const std::string &name, bool enabled,
-			const std::string &uri,
-			uint32_t id, const std::string beamlineId,
+			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
@@ -214,7 +213,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	std::string prefix(beamlineId);
+	std::string prefix(ctrl->getBeamlineId());
 	prefix += ":SMS";
 	prefix += ":DataSource:";
 

@@ -174,7 +174,6 @@ void SMSControl::addSource(const std::string &name,
 							 enabled,
 							 uri->second.data(),
 							 m_nextSrcId,
-							 m_beamlineId,
 							 connect_retry,
 							 connect_timeout,
 							 data_timeout,
@@ -206,7 +205,7 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 
 	m_markers = boost::shared_ptr<Markers>(new
-						Markers(m_beamlineId, this));
+						Markers(this));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));

@@ -13,7 +13,7 @@ class MarkerTriggerPV;
 
 class Markers : boost::noncopyable {
 public:
-	Markers(const std::string &beamline, SMSControl *sms);
+	Markers(SMSControl *sms);
 	~Markers();
 
 	void newRun(void);
