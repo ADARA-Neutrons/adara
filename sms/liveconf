@@ -162,6 +162,10 @@ if [ "$command" == "status" ]; then
 
 	echo
 
+	caget ${PRE}:SMS:STSClient:ConnectTimeout
+
+	echo
+
 # Set No End-of-Pulse Internal Pulse Buffer Size...
 elif [ "$command" == "option" ]; then
 
