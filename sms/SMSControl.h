@@ -41,6 +41,8 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
+	std::string getBeamlineId(void) { return m_beamlineId; }
+
 	void sourceUp(uint32_t smsId);
 	void sourceDown(uint32_t smsId);
 
