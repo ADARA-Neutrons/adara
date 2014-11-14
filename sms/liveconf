@@ -119,6 +119,32 @@ if [ "$command" == "status" ]; then
 
 	caget ${PRE}:SMS:Control:NoEoPPulseBufferSize
 
+	echo
+
+	caget -S ${PRE}:SMS:RunInfo:ProposalId
+	caget -S ${PRE}:SMS:RunInfo:ProposalTitle
+	caget -S ${PRE}:SMS:RunInfo:RunTitle
+	caget -S ${PRE}:SMS:RunInfo:Sample:Id
+	caget -S ${PRE}:SMS:RunInfo:Sample:Name
+	caget -S ${PRE}:SMS:RunInfo:Sample:Nature
+	caget -S ${PRE}:SMS:RunInfo:Sample:Formula
+	caget -S ${PRE}:SMS:RunInfo:Sample:Environment
+
+	echo
+
+	caget ${PRE}:SMS:Marker:ScanIndex
+	caget ${PRE}:SMS:Marker:StartScan
+	caget ${PRE}:SMS:Marker:StopScan
+	caget -S ${PRE}:SMS:Marker:Comment
+	caget ${PRE}:SMS:Marker:Annotate
+	caget ${PRE}:SMS:Marker:RunComment
+
+	echo
+
+	caget ${PRE}:SMS:Paused
+
+	echo
+
 	ndsvar="${PRE}:SMS:Control:NumDataSources"
 	caget $ndsvar
 	if [ $? == 0 ]; then
@@ -137,30 +163,6 @@ if [ "$command" == "status" ]; then
 			echo
 		done
 	fi
-
-	caget -S ${PRE}:SMS:RunInfo:ProposalId
-	caget -S ${PRE}:SMS:RunInfo:ProposalTitle
-	caget -S ${PRE}:SMS:RunInfo:RunTitle
-	caget -S ${PRE}:SMS:RunInfo:Sample:Id
-	caget -S ${PRE}:SMS:RunInfo:Sample:Name
-	caget -S ${PRE}:SMS:RunInfo:Sample:Nature
-	caget -S ${PRE}:SMS:RunInfo:Sample:Formula
-	caget -S ${PRE}:SMS:RunInfo:Sample:Environment
-
-	echo
-
-	caget ${PRE}:SMS:Paused
-
-	echo
-
-	caget ${PRE}:SMS:Marker:ScanIndex
-	caget ${PRE}:SMS:Marker:StartScan
-	caget ${PRE}:SMS:Marker:StopScan
-	caget -S ${PRE}:SMS:Marker:Comment
-	caget ${PRE}:SMS:Marker:Annotate
-	caget ${PRE}:SMS:Marker:RunComment
-
-	echo
 
 	caget ${PRE}:SMS:STSClient:ConnectTimeout
 
