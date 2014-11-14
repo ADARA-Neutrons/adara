@@ -12,6 +12,8 @@
 
 class STSClient;
 
+class smsFloat64PV;
+
 class STSClientMgr {
 public:
 	static void config(const boost::property_tree::ptree &conf);
@@ -77,6 +79,8 @@ private:
 	bool transientTimeout(void);
 
 	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
+
+	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 
 	friend class STSClient;
 	friend class TimerAdapter<STSClientMgr>;

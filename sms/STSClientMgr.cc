@@ -3,10 +3,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <time.h>
 
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "STSClientMgr.h"
 #include "STSClient.h"
 #include "SignalEvents.h"
@@ -49,6 +52,28 @@ STSClientMgr::STSClientMgr() :
 	m_mgrConnection = StorageManager::onContainerChange(
 				boost::bind(&STSClientMgr::containerChange,
 					    this, _1, _2));
+
+	// Create Run-Time Configuration PVs for STS Client...
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	if (!ctrl) {
+		throw std::logic_error(
+			"uninitialized SMSControl obj for STSClientMgr!");
+	}
+
+	std::string prefix(ctrl->getBeamlineId());
+	prefix += ":SMS";
+	prefix += ":STSClient";
+
+	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectTimeout"));
+
+	ctrl->addPV(m_pvConnectTimeout);
+
+	// Initialize Data Source PVs...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvConnectTimeout->update(m_connect_timeout, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -243,6 +268,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		goto error;
 	}
 
+	// Update Connect Timeout from PV...
+	m_connect_timeout = m_pvConnectTimeout->value();
 	m_connect_timer->start(m_connect_timeout);
 	return;
 
