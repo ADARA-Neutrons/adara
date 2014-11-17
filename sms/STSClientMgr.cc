@@ -18,6 +18,25 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
 
+class MaxConnectionsPV : public smsUint32PV {
+public:
+	MaxConnectionsPV(const std::string &name, STSClientMgr *stsClientMgr) :
+		smsUint32PV(name), m_stsClientMgr(stsClientMgr) {}
+
+private:
+	STSClientMgr *m_stsClientMgr;
+
+	void changed(void)
+	{
+		// Give Peace a Chance...
+		// When we change the Max Number of STS Connections,
+		// see if we have anything new to do now... ;-D
+		DEBUG("MaxConnectionsPV: " << m_pv_name
+			<< " PV value changed, Start Any STS Client Connections...");
+		m_stsClientMgr->startConnect();
+	}
+};
+
 std::string STSClientMgr::m_node;
 std::string STSClientMgr::m_service;
 double STSClientMgr::m_connect_timeout = 15.0;
@@ -74,9 +93,13 @@ STSClientMgr::STSClientMgr() :
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":TransientTimeout"));
 
+	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
+		MaxConnectionsPV(prefix + ":MaxConnections", this));
+
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvReconnectTimeout);
 	ctrl->addPV(m_pvTransientTimeout);
+	ctrl->addPV(m_pvMaxConnections);
 
 	// Initialize Data Source PVs...
 	struct timespec now;
@@ -84,6 +107,7 @@ STSClientMgr::STSClientMgr() :
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvReconnectTimeout->update(m_reconnect_timeout, &now);
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
+	m_pvMaxConnections->update(m_max_connections, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -175,6 +199,9 @@ void STSClientMgr::startConnect(void)
 		state = "backoff, ";
 	if (m_connecting)
 		state = "connecting, ";
+
+	// Update Max Connections from PV...
+	m_max_connections = m_pvMaxConnections->value();
 
 	DEBUG("Checking for pending work (" << state
 		<< m_connections << " of " << m_max_connections << " active, "
@@ -392,7 +419,7 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		 */
 		if (!m_backoff) {
 			m_backoff = true;
-			// Update Connect Timeout from PV...
+			// Update Transient Timeout from PV...
 			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
@@ -424,7 +451,7 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			 */
 			if (!m_backoff) {
 				m_backoff = true;
-				// Update Connect Timeout from PV...
+				// Update Transient Timeout from PV...
 				m_transient_timeout = m_pvTransientTimeout->value();
 				m_transient_timer->start(m_transient_timeout);
 			}

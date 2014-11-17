@@ -13,6 +13,7 @@
 class STSClient;
 
 class smsFloat64PV;
+class smsUint32PV;
 
 class STSClientMgr {
 public:
@@ -83,6 +84,7 @@ private:
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvReconnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvTransientTimeout;
+	boost::shared_ptr<smsUint32PV> m_pvMaxConnections;
 
 	friend class STSClient;
 	friend class TimerAdapter<STSClientMgr>;
