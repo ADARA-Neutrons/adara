@@ -165,6 +165,7 @@ if [ "$command" == "status" ]; then
 	fi
 
 	caget ${PRE}:SMS:STSClient:ConnectTimeout
+	caget ${PRE}:SMS:STSClient:ReconnectTimeout
 
 	echo
 
