@@ -68,12 +68,17 @@ STSClientMgr::STSClientMgr() :
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectTimeout"));
 
+	m_pvReconnectTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ReconnectTimeout"));
+
 	ctrl->addPV(m_pvConnectTimeout);
+	ctrl->addPV(m_pvReconnectTimeout);
 
 	// Initialize Data Source PVs...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
+	m_pvReconnectTimeout->update(m_reconnect_timeout, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -336,6 +341,8 @@ void STSClientMgr::connectFailed(void)
 	m_fd = -1;
 	m_fdreg.reset();
 	m_connect_timer->cancel();
+	// Update Reconnect Timeout from PV...
+	m_reconnect_timeout = m_pvReconnectTimeout->value();
 	m_reconnect_timer->start(m_reconnect_timeout);
 }
 

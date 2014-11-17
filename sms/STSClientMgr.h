@@ -81,6 +81,7 @@ private:
 	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
 
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
+	boost::shared_ptr<smsFloat64PV> m_pvReconnectTimeout;
 
 	friend class STSClient;
 	friend class TimerAdapter<STSClientMgr>;
