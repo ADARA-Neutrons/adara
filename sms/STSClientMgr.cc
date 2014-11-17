@@ -71,14 +71,19 @@ STSClientMgr::STSClientMgr() :
 	m_pvReconnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ReconnectTimeout"));
 
+	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":TransientTimeout"));
+
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvReconnectTimeout);
+	ctrl->addPV(m_pvTransientTimeout);
 
 	// Initialize Data Source PVs...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvReconnectTimeout->update(m_reconnect_timeout, &now);
+	m_pvTransientTimeout->update(m_transient_timeout, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -387,6 +392,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		 */
 		if (!m_backoff) {
 			m_backoff = true;
+			// Update Connect Timeout from PV...
+			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
 		queueRun(c); // re-queue run...
@@ -417,6 +424,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			 */
 			if (!m_backoff) {
 				m_backoff = true;
+				// Update Connect Timeout from PV...
+				m_transient_timeout = m_pvTransientTimeout->value();
 				m_transient_timer->start(m_transient_timeout);
 			}
 			queueRun(c); // re-queue run...
