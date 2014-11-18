@@ -109,7 +109,7 @@ STSClientMgr::STSClientMgr() :
 	ctrl->addPV(m_pvMaxRequeueCount);
 	ctrl->addPV(m_pvServiceURI);
 
-	// Initialize Data Source PVs...
+	// Initialize STS Client PVs...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
