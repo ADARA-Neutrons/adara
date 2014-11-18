@@ -6,6 +6,7 @@ REPO_CONFIG="./sms/conf/smsd.conf"
 CONFIG_REPO="/home/controls/config"
 CONFIG_USER="snsdata"
 TMP_DIR="/tmp"
+WAIT="-w 9"
 
 USAGE()
 {
@@ -104,72 +105,72 @@ if [ "$command" == "status" ]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give the SMS plenty of time to reply, since it's Not multi-threaded.)
-	caget -w 9 ${PRE}:SMS:Recording > /dev/null 2>&1
+	caget $WAIT ${PRE}:SMS:Recording > /dev/null 2>&1
 	if [ $? != 0 ]; then
 		echo \
 		"Error: $PRE SMS EPICS PVs Not Initialized... Is 'smsd' running?"
 		exit -2
 	fi
 
-	caget ${PRE}:SMS:Recording
+	caget $WAIT ${PRE}:SMS:Recording
 
-	caget ${PRE}:SMS:RunNumber
+	caget $WAIT ${PRE}:SMS:RunNumber
 
-	caget ${PRE}:SMS:Summary
+	caget $WAIT ${PRE}:SMS:Summary
 
-	caget ${PRE}:SMS:Control:NoEoPPulseBufferSize
-
-	echo
-
-	caget -S ${PRE}:SMS:RunInfo:ProposalId
-	caget -S ${PRE}:SMS:RunInfo:ProposalTitle
-	caget -S ${PRE}:SMS:RunInfo:RunTitle
-	caget -S ${PRE}:SMS:RunInfo:Sample:Id
-	caget -S ${PRE}:SMS:RunInfo:Sample:Name
-	caget -S ${PRE}:SMS:RunInfo:Sample:Nature
-	caget -S ${PRE}:SMS:RunInfo:Sample:Formula
-	caget -S ${PRE}:SMS:RunInfo:Sample:Environment
+	caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
 
 	echo
 
-	caget ${PRE}:SMS:Marker:ScanIndex
-	caget ${PRE}:SMS:Marker:StartScan
-	caget ${PRE}:SMS:Marker:StopScan
-	caget -S ${PRE}:SMS:Marker:Comment
-	caget ${PRE}:SMS:Marker:Annotate
-	caget ${PRE}:SMS:Marker:RunComment
+	caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
+	caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalTitle
+	caget $WAIT -S ${PRE}:SMS:RunInfo:RunTitle
+	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
+	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
+	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
+	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
+	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Environment
 
 	echo
 
-	caget ${PRE}:SMS:Paused
+	caget $WAIT ${PRE}:SMS:Marker:ScanIndex
+	caget $WAIT ${PRE}:SMS:Marker:StartScan
+	caget $WAIT ${PRE}:SMS:Marker:StopScan
+	caget $WAIT -S ${PRE}:SMS:Marker:Comment
+	caget $WAIT ${PRE}:SMS:Marker:Annotate
+	caget $WAIT ${PRE}:SMS:Marker:RunComment
+
+	echo
+
+	caget $WAIT ${PRE}:SMS:Paused
 
 	echo
 
 	ndsvar="${PRE}:SMS:Control:NumDataSources"
-	caget $ndsvar
+	caget $WAIT $ndsvar
 	if [ $? == 0 ]; then
 		echo
-		numDataSources=`caget $ndsvar | grep $ndsvar | awk '{print $2}'`
+		numDataSources=`caget $WAIT $ndsvar |grep $ndsvar |awk '{print $2}'`
 		# Count from 1...!
 		for (( ds=1 ; ds <= numDataSources ; ds++ )); do
 			echo "Data Source id=${ds}:"
-			caget -S ${PRE}:SMS:DataSource:${ds}:Name
-			caget ${PRE}:SMS:DataSource:${ds}:Enabled
-			caget -a ${PRE}:SMS:DataSource:${ds}:Connected
-			caget ${PRE}:SMS:DataSource:${ds}:ConnectRetry
-			caget ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
-			caget ${PRE}:SMS:DataSource:${ds}:DataTimeout
-			caget ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
+			caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
+			caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
+			caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
+			caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
+			caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
+			caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
+			caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 			echo
 		done
 	fi
 
-	caget ${PRE}:SMS:STSClient:ConnectTimeout
-	caget ${PRE}:SMS:STSClient:ReconnectTimeout
-	caget ${PRE}:SMS:STSClient:TransientTimeout
-	caget ${PRE}:SMS:STSClient:MaxConnections
-	caget ${PRE}:SMS:STSClient:MaxRequeueCount
-	caget -S ${PRE}:SMS:STSClient:ServiceURI
+	caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
+	caget $WAIT ${PRE}:SMS:STSClient:ReconnectTimeout
+	caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
+	caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
+	caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
+	caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 	echo
 
@@ -267,7 +268,7 @@ elif [ "$command" == "option" ]; then
 	do_live=1
 
 	echo "Current Live SMS Daemon Setting (PV) for ${optId}:${opt_name}:"
-	live_current=`caget ${PRE}:${PV} 2>&1`
+	live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
 	if [ $? != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
 		echo "Proceed with Live Config of:"
