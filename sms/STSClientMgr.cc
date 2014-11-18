@@ -99,11 +99,15 @@ STSClientMgr::STSClientMgr() :
 	m_pvMaxRequeueCount = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":MaxRequeueCount"));
 
+	m_pvServiceURI = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":ServiceURI"));
+
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvReconnectTimeout);
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
 	ctrl->addPV(m_pvMaxRequeueCount);
+	ctrl->addPV(m_pvServiceURI);
 
 	// Initialize Data Source PVs...
 	struct timespec now;
@@ -113,6 +117,7 @@ STSClientMgr::STSClientMgr() :
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
+	m_pvServiceURI->update(m_node + ":" + m_service, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -216,10 +221,33 @@ void STSClientMgr::startConnect(void)
 					m_pendingRuns.empty())
 		return;
 
-        m_gai.ar_name = m_node.c_str();
-        m_gai.ar_service = m_service.c_str();
-        m_gai.ar_request = &m_gai_hints;
-        m_gai.ar_result = NULL;
+	// Update STS Service URI from PV...
+	std::string uri = m_pvServiceURI->value();
+	const char *default_service = "31417";
+	size_t pos = uri.find_first_of(':');
+	std::string node, service;
+	if (pos != std::string::npos) {
+		node = uri.substr(0, pos);
+		if (pos != uri.length())
+			service = uri.substr(pos + 1);
+		else
+			service = default_service;
+	} else {
+		node = uri;
+		service = default_service;
+	}
+	if ( node != m_node || service != m_service ) {
+		DEBUG("startConnect(): Updating STS Service URI from PV: "
+			<< m_node << ":" << m_service
+			<< " -> " << node << ":" << service);
+		m_node = node;
+		m_service = service;
+	}
+
+	m_gai.ar_name = m_node.c_str();
+	m_gai.ar_service = m_service.c_str();
+	m_gai.ar_request = &m_gai_hints;
+	m_gai.ar_result = NULL;
 
 	rc = getaddrinfo_a(GAI_NOWAIT, &gai, 1, &m_sigevent);
 	if (rc) {
