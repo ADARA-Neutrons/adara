@@ -736,6 +736,11 @@ gddAppFuncTableStatus smsEnabledPV::getEnums(gdd &in)
 	return getEnabledEnums(in);
 }
 
+aitEnum smsEnabledPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
+}
+
 void smsEnabledPV::update(bool val, struct timespec *ts)
 {
 	aitUint16 uninitialized_var(v);
@@ -772,6 +777,11 @@ smsErrorPV::smsErrorPV(const std::string &name) :
 gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
 {
 	return getErrorEnums(in);
+}
+
+aitEnum smsErrorPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
 }
 
 void smsErrorPV::set() {
@@ -818,12 +828,105 @@ void smsErrorPV::update(bool val, struct timespec *ts)
 
 /* ----------------------------------------------------------------------- */
 
-smsConnectedPV::smsConnectedPV(const std::string &name) :
-						smsUint32PV(name) { }
+smsConnectedPV::smsConnectedPV(const std::string &name) : smsPV(name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	/* Default all booleans (and derivatives) to false on startup */
+	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+
+	m_pv_name = name;
+}
+
+aitEnum smsConnectedPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
+}
+
+gddAppFuncTableStatus smsConnectedPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
 
 gddAppFuncTableStatus smsConnectedPV::getEnums(gdd &in)
 {
 	return getConnectedEnums(in);
+}
+
+caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
+{
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsConnectedPV::read() m_pv_name=" << m_pv_name
+		<< " value=" << v);
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	aitUint16 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+	struct timespec ts;
+
+	if (!val.isScalar()) {
+		ERROR("smsConnectedPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
+		return S_casApp_noSupport;
+	}
+
+	val.get(v);
+	DEBUG("smsConnectedPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
+	if (v > 1)
+		return S_casApp_noSupport;
+
+	m_value->get(cur);
+	if (v == cur)
+		return S_casApp_success;
+
+	val.getTimeStamp(&ts);
+	update(v, &ts);
+	changed();
+
+	return S_casApp_success;
+}
+
+bool smsConnectedPV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsConnectedPV::update(uint16_t val, struct timespec *ts)
+{
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	if (val == 2) {
+		nval->setStat(epicsAlarmState);
+		nval->setSevr(epicsSevMajor);
+	}
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
 }
 
 void smsConnectedPV::connected() {
@@ -857,30 +960,21 @@ void smsConnectedPV::failed() {
 	DEBUG("smsConnectedPV::failed() m_pv_name=" << m_pv_name << " (2)");
 }
 
-void smsConnectedPV::update(uint32_t val, struct timespec *ts)
+bool smsConnectedPV::valid(void)
 {
-	aitUint32 uninitialized_var(v);
-	gdd *nval;
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
 
-	m_value->get(v);
-	if (v == val)
-		return;
+bool smsConnectedPV::value(void)
+{
+	aitUint16 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
 
-	nval = new gddScalar(gddAppType_value, aitEnumUint32);
-	nval->put(val);
-	nval->setTimeStamp(ts);
-
-	if (val == 2) {
-		nval->setStat(epicsAlarmState);
-		nval->setSevr(epicsSevMajor);
-	}
-
-	/* This does the unref/ref for us, so each event posted will
-	 * get its own copy of the value at that time.
-	 */
-	m_value = nval;
-
-	notify();
+void smsConnectedPV::changed(void)
+{
 }
 
 /* ----------------------------------------------------------------------- */
