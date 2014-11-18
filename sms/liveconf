@@ -169,6 +169,7 @@ if [ "$command" == "status" ]; then
 	caget ${PRE}:SMS:STSClient:TransientTimeout
 	caget ${PRE}:SMS:STSClient:MaxConnections
 	caget ${PRE}:SMS:STSClient:MaxRequeueCount
+	caget -S ${PRE}:SMS:STSClient:ServiceURI
 
 	echo
 
