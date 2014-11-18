@@ -207,7 +207,7 @@ void StorageManager::lateInit(void)
 	 * invocation of SMS, and will already be accounted for; the
 	 * scan process must skip them.
 	 */
-        clock_gettime(CLOCK_REALTIME, &m_scanStart);
+	clock_gettime(CLOCK_REALTIME, &m_scanStart);
 
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
@@ -258,7 +258,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 		if (notify) {
 			e = errno;
 			ERROR("Unable to open run number storage: "
-			      << strerror(e));
+				<< strerror(e));
 		}
 		return 0;
 	}
@@ -271,7 +271,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 	if (len < 0) {
 		if (notify) {
 			ERROR("Unable to read run number storage: "
-			      << strerror(e));
+				<< strerror(e));
 		}
 		return 0;
 	}
@@ -292,7 +292,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 	if (*p || errno || run <= 0 || run >= (1L << 32)) {
 		if (notify) {
 			ERROR("Run storage has invalid data '"
-			      << buffer << "'");
+				<< buffer << "'");
 		}
 		return 0;
 	}
@@ -316,7 +316,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 	int fd, rc, write_errno = 0, fsync_errno = 0, close_errno = 0;
 
 	fd = openat(m_base_fd, m_run_tempname, O_CREAT|O_TRUNC|O_WRONLY,
-		    RUN_STORAGE_MODE);
+			RUN_STORAGE_MODE);
 	if (fd < 0) {
 		int e = errno;
 		ERROR("Unable to open run number temporary: " << strerror(e));
@@ -336,7 +336,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 
 	if (write_errno) {
 		ERROR("Unable to write run number temporary: "
-		      << strerror(write_errno));
+			<< strerror(write_errno));
 		return true;
 	}
 
@@ -347,13 +347,13 @@ bool StorageManager::updateNextRun(uint32_t run)
 
 	if (fsync_errno) {
 		ERROR("Unable to fsync run number temporary: "
-		      << strerror(fsync_errno));
+			<< strerror(fsync_errno));
 		return true;
 	}
 
 	if (close_errno) {
 		ERROR("Close error for run number temporary: "
-		      << strerror(close_errno));
+			<< strerror(close_errno));
 		return true;
 	}
 
@@ -373,7 +373,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 	if (fsync(m_base_fd)) {
 		int e = errno;
 		ERROR("fsync on base dir for run storage failed: "
-		      << strerror(e));
+			<< strerror(e));
 		return true;
 	}
 
@@ -402,13 +402,13 @@ bool StorageManager::cleanupRunFiles(void)
 	if (temprun <= nextrun) {
 		if (temprun) {
 			WARN("Stored run number tried to go backwards ("
-			     << nextrun << " vs " << temprun << ")");
+				<< nextrun << " vs " << temprun << ")");
 		}
 
 		if (unlinkat(m_base_fd, m_run_tempname, 0) && errno != ENOENT) {
 			int e = errno;
 			ERROR("Unable to clean up temp run storage: "
-			      << strerror(e));
+				<< strerror(e));
 			return true;
 		}
 
@@ -431,7 +431,7 @@ bool StorageManager::cleanupRunFiles(void)
 	if (fsync(m_base_fd)) {
 		int e = errno;
 		ERROR("fsync on base dir for run storage failed: "
-		      << strerror(e));
+			<< strerror(e));
 		return true;
 	}
 
@@ -646,7 +646,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 */
 	if (m_pulseTime >= m_nextIndexTime) {
 		StorageFile::SharedPtr state(StorageFile::stateFile(
-					     m_cur_container, m_stateDir));
+						m_cur_container, m_stateDir));
 		stateSnapshot(state);
 		indexState(state, m_cur_container->file(), resumeLocation);
 		state->put_fd();
@@ -773,7 +773,7 @@ void StorageManager::scanStorage(void)
 
 		if (!isValidDaily(file.string())) {
 			WARN("Daily directory '" << it->path()
-			      << "' has invalid format");
+				<< "' has invalid format");
 			continue;
 		}
 
@@ -781,7 +781,7 @@ void StorageManager::scanStorage(void)
 	}
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
-	      << m_pendingRuns.size() << " runs pending translation.");
+		<< m_pendingRuns.size() << " runs pending translation.");
 }
 
 void StorageManager::backgroundIo(void)
@@ -916,7 +916,7 @@ void StorageManager::populateDailyCache(void)
 }
 
 uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
-				    bool last)
+					bool last)
 {
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
@@ -951,8 +951,8 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 */
 		++cit;
 		purged += StorageContainer::purge(cpath.string(),
-						  goal - purged,
-						  last && cit == cend);
+							goal - purged,
+							last && cit == cend);
 	}
 
 	/* Try to remove the directory, but expect to fail. */
@@ -1005,7 +1005,7 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		 */
 		++it;
 		purged += purgeDaily(dir.string(), purgeRequested - purged,
-				     it == end);
+					it == end);
 	}
 
 	m_dailyExhausted = (purged < purgeRequested);
@@ -1058,14 +1058,14 @@ bool StorageManager::retireIndexDir(bool remove)
 		 * with the removal thread, leaving stale directories.
 		 */
 		if (!faccessat(m_base_fd, name.c_str(), 0,
-			      AT_SYMLINK_NOFOLLOW) || errno != ENOENT)
+				AT_SYMLINK_NOFOLLOW) || errno != ENOENT)
 			continue;
 
 		if (renameat(m_base_fd, m_stateDirPrefix.c_str(),
-			     m_base_fd, name.c_str()) < 0) {
+				m_base_fd, name.c_str()) < 0) {
 			int e = errno;
 			ERROR("Unable to rename index to " << name << ": "
-			      << strerror(e));
+				<< strerror(e));
 			return true;
 		}
 
@@ -1102,7 +1102,7 @@ bool StorageManager::cleanupIndexes(void)
 		fs::file_status status = it->status();
 		if (status.type() != fs::directory_file) {
 			WARN("Ignoring non-directory '" << it->path()
-			     << "' with index prefix");
+				<< "' with index prefix");
 			continue;
 		}
 
