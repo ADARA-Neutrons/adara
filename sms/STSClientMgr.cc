@@ -96,10 +96,14 @@ STSClientMgr::STSClientMgr() :
 	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
 		MaxConnectionsPV(prefix + ":MaxConnections", this));
 
+	m_pvMaxRequeueCount = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MaxRequeueCount"));
+
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvReconnectTimeout);
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
+	ctrl->addPV(m_pvMaxRequeueCount);
 
 	// Initialize Data Source PVs...
 	struct timespec now;
@@ -108,6 +112,7 @@ STSClientMgr::STSClientMgr() :
 	m_pvReconnectTimeout->update(m_reconnect_timeout, &now);
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
+	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -429,6 +434,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* Limit the number of retries for this run before
 		 * we make it a permanent failure case. [leerw]
 		 */
+		// Update Max Requeue Count from PV...
+		m_max_requeue_count = m_pvMaxRequeueCount->value();
 		ERROR("Transient Failure Run=" << c->runNumber()
 			<< " disp=" << disp
 			<< " requeueCount=" << c->getRequeueCount()
