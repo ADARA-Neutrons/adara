@@ -18,6 +18,10 @@
 
 class EventFd;
 
+class PoolsizePV;
+class PercentPV;
+class smsUint32PV;
+
 class StorageManager {
 public:
 	typedef boost::signals2::signal<void (StorageContainer::SharedPtr &,
@@ -83,6 +87,10 @@ public:
 
 	static void config(const boost::property_tree::ptree &conf);
 
+	static void set_max_blocks_allowed(uint64_t maxSize);
+
+	static void update_max_blocks_allowed_pv(void);
+
 private:
 	typedef boost::signals2::connection connection;
 
@@ -103,9 +111,16 @@ private:
 	static std::string m_baseDir;
 	static int m_base_fd;
 
+	static std::string m_poolsize;
+	static int m_percent;
+
 	static uint32_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
+
+	static boost::shared_ptr<PoolsizePV> m_pvPoolsize;
+	static boost::shared_ptr<PercentPV> m_pvPercent;
+	static boost::shared_ptr<smsUint32PV> m_pvMaxBlocksAllowed;
 
 	static struct timespec m_scanStart;
 	static uint64_t m_scannedBlocks;

@@ -17,6 +17,8 @@
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "ADARA.h"
 #include "ADARAUtils.h"
 #include "EventFd.h"
@@ -36,6 +38,88 @@ struct header {
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
+class PoolsizePV : public smsStringPV {
+public:
+	PoolsizePV(const std::string &name) : smsStringPV(name) {}
+private:
+	void changed(void)
+	{
+		DEBUG("PoolsizePV: " << m_pv_name
+			<< " PV value changed, Set Max Blocks Allowed...");
+
+		std::string poolsize = value();
+		uint64_t maxSize;
+
+		if (poolsize.length()) {
+			try {
+				maxSize = parse_size(poolsize);
+			} catch (std::runtime_error e) {
+				std::string msg("Unable to parse storage pool size: ");
+				msg += e.what();
+				DEBUG("PoolsizePV changed(): " << msg);
+				return;
+			}
+		} else {
+			DEBUG("PoolsizePV changed(): Ignoring Empty PV String Value");
+			return;
+		}
+
+		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize);
+
+		/* Set Max Blocks Allowed for StorageManager... */
+		StorageManager::set_max_blocks_allowed(maxSize);
+
+		/* Update Max Blocks Allowed EPICS PV... */
+		StorageManager::update_max_blocks_allowed_pv();
+	}
+};
+
+class PercentPV : public smsUint32PV {
+public:
+	PercentPV(const std::string &name,
+			std::string baseDir, uint32_t block_size) :
+		smsUint32PV(name), m_baseDir(baseDir), m_block_size(block_size) {}
+
+private:
+
+	std::string m_baseDir;
+	uint32_t m_block_size;
+
+	void changed(void)
+	{
+		DEBUG("PercentPV: " << m_pv_name
+			<< " PV value changed, Set Max Blocks Allowed...");
+
+		int percent = value();
+		uint64_t maxSize;
+
+		/* If the user doesn't specify a size, we'll use a percentage
+	 	 * of the total space, 80% by default.
+	 	 */
+		struct statfs fsstats;
+		if (statfs(m_baseDir.c_str(), &fsstats)) {
+			int err = errno;
+			std::string msg("Unable to statfs ");
+			msg += m_baseDir;
+			msg += ": ";
+			msg += strerror(err);
+			DEBUG("PercentPV changed(): " << msg);
+			return;
+		}
+
+		maxSize = fsstats.f_blocks * percent / 100;
+		maxSize *= m_block_size;
+
+		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
+
+		/* Set Max Blocks Allowed for StorageManager... */
+		StorageManager::set_max_blocks_allowed(maxSize);
+
+		/* Update Max Blocks Allowed EPICS PV... */
+		StorageManager::update_max_blocks_allowed_pv();
+	}
+};
+
 std::string StorageManager::m_baseDir;
 int StorageManager::m_base_fd = -1;
 
@@ -45,9 +129,16 @@ StorageFile::SharedPtr StorageManager::m_prologueFile;
 StorageManager::ContainerSignal StorageManager::m_contChange;
 StorageManager::PrologueSignal StorageManager::m_prologue;
 
+std::string StorageManager::m_poolsize;
+int StorageManager::m_percent;
+
 uint32_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
+
+boost::shared_ptr<PoolsizePV> StorageManager::m_pvPoolsize;
+boost::shared_ptr<PercentPV> StorageManager::m_pvPercent;
+boost::shared_ptr<smsUint32PV> StorageManager::m_pvMaxBlocksAllowed;
 
 struct timespec StorageManager::m_scanStart;
 uint64_t StorageManager::m_scannedBlocks;
@@ -90,6 +181,10 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		m_baseDir += "/data";
 	}
 
+	m_stateDir = m_baseDir;
+	m_stateDir += "/";
+	m_stateDir += m_stateDirPrefix;
+
 	struct stat stats;
 	if (stat(m_baseDir.c_str(), &stats)) {
 		int err = errno;
@@ -100,20 +195,20 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		throw std::runtime_error(msg);
 	}
 
-	m_stateDir = m_baseDir;
-	m_stateDir += "/";
-	m_stateDir += m_stateDirPrefix;
+	m_block_size = stats.st_blksize;
+	DEBUG("Filesystem Block Size = " << m_block_size);
 
 	uint64_t maxSize = 0;
-	std::string poolsize = conf.get<std::string>("storage.poolsize", "");
-	if (poolsize.length()) {
+	m_poolsize = conf.get<std::string>("storage.poolsize", "");
+	if (m_poolsize.length()) {
 		try {
-			maxSize = parse_size(poolsize);
+			maxSize = parse_size(m_poolsize);
 		} catch (std::runtime_error e) {
 			std::string msg("Unable to parse storage pool size: ");
 			msg += e.what();
 			throw std::runtime_error(msg);
 		}
+		DEBUG("Poolsize = " << m_poolsize << " -> MaxSize = " << maxSize);
 	} else {
 		/* If the user doesn't specify a size, we'll use a percentage
 		 * of the total space, 80% by default.
@@ -127,19 +222,64 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 			msg += strerror(err);
 			throw std::runtime_error(msg);
 		}
+		DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
 
-		int percent = conf.get<int>("storage.percent", 80);
-		maxSize = fsstats.f_blocks * 100 / percent;
-		maxSize *= 512;
+		m_percent = conf.get<int>("storage.percent", 80);
+		maxSize = fsstats.f_blocks * m_percent / 100;
+		maxSize *= m_block_size;
+
+		DEBUG("Percent = " << m_percent << " -> MaxSize = " << maxSize);
 	}
 
-	m_block_size = stats.st_blksize;
-	m_max_blocks_allowed = maxSize + m_block_size - 1;
-	m_max_blocks_allowed /= m_block_size;
+	set_max_blocks_allowed(maxSize);
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
 	StorageFile::config(conf);
+}
+
+void StorageManager::set_max_blocks_allowed(uint64_t maxSize)
+{
+	m_max_blocks_allowed = maxSize + m_block_size - 1;
+	m_max_blocks_allowed /= m_block_size;
+
+	DEBUG("Max Blocks Allowed set to " << m_max_blocks_allowed);
+
+	struct statfs fsstats;
+	if (statfs(m_baseDir.c_str(), &fsstats)) {
+		int err = errno;
+		std::string msg("Unable to statfs ");
+		msg += m_baseDir;
+		msg += ": ";
+		msg += strerror(err);
+		DEBUG("Warning: Could Not Stat Base Dir to Validate Max Blocks! "
+			<< msg);
+	}
+	else {
+		/* Limit Max Blocks to Total Size of Filesystem at Most... ;-D */
+		if ( (m_max_blocks_allowed * m_block_size)
+				> (fsstats.f_blocks * m_block_size) ) {
+			DEBUG("Max Blocks Too Big: requested size="
+				<< (m_max_blocks_allowed * m_block_size)
+				<< " > filesystem size="
+				<< (fsstats.f_blocks * m_block_size));
+			m_max_blocks_allowed = fsstats.f_blocks;
+			DEBUG("Max Blocks Allowed limited to "
+				<< m_max_blocks_allowed);
+		}
+		else {
+			DEBUG("Max Blocks Allowed verified less than filesystem size"
+				<< " (" << (m_max_blocks_allowed * m_block_size)
+				<< " <= " << (fsstats.f_blocks * m_block_size) << ")");
+		}
+	}
+}
+
+void StorageManager::update_max_blocks_allowed_pv(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &now);
 }
 
 void StorageManager::init(void)
@@ -202,12 +342,43 @@ void StorageManager::lateInit(void)
 	if (cleanupIndexes())
 		throw std::runtime_error("Unable to clean stale indexes");
 
+	/* Create Run-Time Configuration PVs for Storage Manager... */
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	if (!ctrl) {
+		throw std::logic_error(
+			"uninitialized SMSControl obj for StorageManager!");
+	}
+
+	std::string prefix(ctrl->getBeamlineId());
+	prefix += ":SMS";
+	prefix += ":StorageManager";
+
+	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new
+		PoolsizePV(prefix + ":Poolsize"));
+
+	m_pvPercent = boost::shared_ptr<PercentPV>(new
+		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
+
+	m_pvMaxBlocksAllowed = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MaxBlocksAllowed"));
+
+	ctrl->addPV(m_pvPoolsize);
+	ctrl->addPV(m_pvPercent);
+	ctrl->addPV(m_pvMaxBlocksAllowed);
+
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
 	 * invocation of SMS, and will already be accounted for; the
 	 * scan process must skip them.
 	 */
 	clock_gettime(CLOCK_REALTIME, &m_scanStart);
+
+	/* Initialize Storage Manager PVs... */
+	m_pvPoolsize->update(
+		m_poolsize.length() ? m_poolsize : "(unset)", &m_scanStart);
+	m_pvPercent->update(m_percent, &m_scanStart);
+	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &m_scanStart);
 
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
@@ -659,6 +830,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 */
 	blocks = size + m_block_size - 1;
 	blocks /= m_block_size;
+	/* Update Max Blocks Allowed from PV... */
+	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
