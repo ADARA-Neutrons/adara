@@ -20,7 +20,7 @@ class EventFd;
 
 class PoolsizePV;
 class PercentPV;
-class smsUint32PV;
+class MaxBlocksPV;
 
 class StorageManager {
 public:
@@ -120,7 +120,7 @@ private:
 
 	static boost::shared_ptr<PoolsizePV> m_pvPoolsize;
 	static boost::shared_ptr<PercentPV> m_pvPercent;
-	static boost::shared_ptr<smsUint32PV> m_pvMaxBlocksAllowed;
+	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowed;
 
 	static struct timespec m_scanStart;
 	static uint64_t m_scannedBlocks;

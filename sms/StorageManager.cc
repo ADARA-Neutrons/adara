@@ -40,8 +40,12 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 class PoolsizePV : public smsStringPV {
 public:
-	PoolsizePV(const std::string &name) : smsStringPV(name) {}
+	PoolsizePV(const std::string &name, uint32_t block_size) :
+		smsStringPV(name), m_block_size(block_size) {}
 private:
+
+	uint32_t m_block_size;
+
 	void changed(void)
 	{
 		DEBUG("PoolsizePV: " << m_pv_name
@@ -66,8 +70,12 @@ private:
 
 		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize);
 
+		/* Compute Max Blocks Allowed from Max Size... */
+		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
+		max_blocks_allowed /= m_block_size;
+
 		/* Set Max Blocks Allowed for StorageManager... */
-		StorageManager::set_max_blocks_allowed(maxSize);
+		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
 		/* Update Max Blocks Allowed EPICS PV... */
 		StorageManager::update_max_blocks_allowed_pv();
@@ -112,11 +120,35 @@ private:
 
 		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
 
+		/* Compute Max Blocks Allowed from Max Size... */
+		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
+		max_blocks_allowed /= m_block_size;
+
 		/* Set Max Blocks Allowed for StorageManager... */
-		StorageManager::set_max_blocks_allowed(maxSize);
+		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
 		/* Update Max Blocks Allowed EPICS PV... */
 		StorageManager::update_max_blocks_allowed_pv();
+	}
+};
+
+class MaxBlocksPV : public smsUint32PV {
+public:
+	MaxBlocksPV(const std::string &name) :
+		smsUint32PV(name) {}
+
+private:
+
+	void changed(void)
+	{
+		uint64_t max_blocks_allowed = value();
+
+		DEBUG("MaxBlocksPV: " << m_pv_name
+			<< " PV value changed, Set Max Blocks Allowed to "
+			<< max_blocks_allowed);
+
+		/* Set Max Blocks Allowed for StorageManager... */
+		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 	}
 };
 
@@ -138,7 +170,7 @@ uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
 
 boost::shared_ptr<PoolsizePV> StorageManager::m_pvPoolsize;
 boost::shared_ptr<PercentPV> StorageManager::m_pvPercent;
-boost::shared_ptr<smsUint32PV> StorageManager::m_pvMaxBlocksAllowed;
+boost::shared_ptr<MaxBlocksPV> StorageManager::m_pvMaxBlocksAllowed;
 
 struct timespec StorageManager::m_scanStart;
 uint64_t StorageManager::m_scannedBlocks;
@@ -231,17 +263,20 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		DEBUG("Percent = " << m_percent << " -> MaxSize = " << maxSize);
 	}
 
-	set_max_blocks_allowed(maxSize);
+	/* Compute Max Blocks Allowed from Max Size... */
+	uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
+	max_blocks_allowed /= m_block_size;
+
+	set_max_blocks_allowed(max_blocks_allowed);
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
 	StorageFile::config(conf);
 }
 
-void StorageManager::set_max_blocks_allowed(uint64_t maxSize)
+void StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 {
-	m_max_blocks_allowed = maxSize + m_block_size - 1;
-	m_max_blocks_allowed /= m_block_size;
+	m_max_blocks_allowed = max_blocks_allowed;
 
 	DEBUG("Max Blocks Allowed set to " << m_max_blocks_allowed);
 
@@ -355,13 +390,13 @@ void StorageManager::lateInit(void)
 	prefix += ":StorageManager";
 
 	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new
-		PoolsizePV(prefix + ":Poolsize"));
+		PoolsizePV(prefix + ":Poolsize", m_block_size));
 
 	m_pvPercent = boost::shared_ptr<PercentPV>(new
 		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
 
-	m_pvMaxBlocksAllowed = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":MaxBlocksAllowed"));
+	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
+		MaxBlocksPV(prefix + ":MaxBlocksAllowed"));
 
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
