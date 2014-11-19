@@ -165,6 +165,12 @@ if [ "$command" == "status" ]; then
 		done
 	fi
 
+	caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
+	caget $WAIT ${PRE}:SMS:StorageManager:Percent
+	caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+
+	echo
+
 	caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
 	caget $WAIT ${PRE}:SMS:STSClient:ReconnectTimeout
 	caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
