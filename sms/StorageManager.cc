@@ -148,7 +148,10 @@ private:
 			<< max_blocks_allowed);
 
 		/* Set Max Blocks Allowed for StorageManager... */
-		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
+		if ( StorageManager::set_max_blocks_allowed(max_blocks_allowed) ) {
+			/* Update Max Blocks Allowed PV if Requested Value Changed! */
+			StorageManager::update_max_blocks_allowed_pv();
+		}
 	}
 };
 
@@ -274,7 +277,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	StorageFile::config(conf);
 }
 
-void StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
+bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 {
 	m_max_blocks_allowed = max_blocks_allowed;
 
@@ -289,6 +292,7 @@ void StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 		msg += strerror(err);
 		DEBUG("Warning: Could Not Stat Base Dir to Validate Max Blocks! "
 			<< msg);
+		return( false ); // requested value unchanged...
 	}
 	else {
 		/* Limit Max Blocks to Total Size of Filesystem at Most... ;-D */
@@ -301,11 +305,13 @@ void StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 			m_max_blocks_allowed = fsstats.f_blocks;
 			DEBUG("Max Blocks Allowed limited to "
 				<< m_max_blocks_allowed);
+			return( true ); // requested value was Changed...!
 		}
 		else {
 			DEBUG("Max Blocks Allowed verified less than filesystem size"
 				<< " (" << (m_max_blocks_allowed * m_block_size)
 				<< " <= " << (fsstats.f_blocks * m_block_size) << ")");
+			return( false ); // requested value unchanged...
 		}
 	}
 }

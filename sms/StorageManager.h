@@ -87,7 +87,7 @@ public:
 
 	static void config(const boost::property_tree::ptree &conf);
 
-	static void set_max_blocks_allowed(uint64_t maxSize);
+	static bool set_max_blocks_allowed(uint64_t maxSize);
 
 	static void update_max_blocks_allowed_pv(void);
 
