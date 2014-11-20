@@ -15,7 +15,8 @@ USAGE()
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
-	echo "            [ status ] [--testonly] [--help]"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
+	echo "            [--testonly] [--help]"
 	echo
 	echo "   e.g. --option=\"sms:no_eop_pulse_buffer_size<3>\""
 	echo "      or"
@@ -101,7 +102,10 @@ fi
 echo
 
 # Dump All Known SMS EPICS PVs...
-if [ "$command" == "status" ]; then
+if [[ "$command" == "status" \
+		|| "$command" == "run_status" \
+		|| "$command" == "data_status" \
+		|| "$command" == "sys_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give the SMS plenty of time to reply, since it's Not multi-threaded.)
@@ -112,73 +116,86 @@ if [ "$command" == "status" ]; then
 		exit -2
 	fi
 
-	caget $WAIT ${PRE}:SMS:Recording
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" ]]; then
 
-	caget $WAIT ${PRE}:SMS:RunNumber
+		caget $WAIT ${PRE}:SMS:Recording
 
-	caget $WAIT ${PRE}:SMS:Summary
+		caget $WAIT ${PRE}:SMS:RunNumber
 
-	caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
+		caget $WAIT ${PRE}:SMS:Summary
 
-	echo
+		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
 
-	caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
-	caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalTitle
-	caget $WAIT -S ${PRE}:SMS:RunInfo:RunTitle
-	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
-	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
-	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
-	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
-	caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Environment
-
-	echo
-
-	caget $WAIT ${PRE}:SMS:Marker:ScanIndex
-	caget $WAIT ${PRE}:SMS:Marker:StartScan
-	caget $WAIT ${PRE}:SMS:Marker:StopScan
-	caget $WAIT -S ${PRE}:SMS:Marker:Comment
-	caget $WAIT ${PRE}:SMS:Marker:Annotate
-	caget $WAIT ${PRE}:SMS:Marker:RunComment
-
-	echo
-
-	caget $WAIT ${PRE}:SMS:Paused
-
-	echo
-
-	ndsvar="${PRE}:SMS:Control:NumDataSources"
-	caget $WAIT $ndsvar
-	if [ $? == 0 ]; then
 		echo
-		numDataSources=`caget $WAIT $ndsvar |grep $ndsvar |awk '{print $2}'`
-		# Count from 1...!
-		for (( ds=1 ; ds <= numDataSources ; ds++ )); do
-			echo "Data Source id=${ds}:"
-			caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
-			caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
-			caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
-			caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
-			caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
-			caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
-			caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
-			echo
-		done
+
+		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
+		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalTitle
+		caget $WAIT -S ${PRE}:SMS:RunInfo:RunTitle
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Environment
+
+		echo
+
+		caget $WAIT ${PRE}:SMS:Marker:ScanIndex
+		caget $WAIT ${PRE}:SMS:Marker:StartScan
+		caget $WAIT ${PRE}:SMS:Marker:StopScan
+		caget $WAIT -S ${PRE}:SMS:Marker:Comment
+		caget $WAIT ${PRE}:SMS:Marker:Annotate
+		caget $WAIT ${PRE}:SMS:Marker:RunComment
+
+		echo
+
+		caget $WAIT ${PRE}:SMS:Paused
+
+		echo
 	fi
 
-	caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
-	caget $WAIT ${PRE}:SMS:StorageManager:Percent
-	caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+	if [[ "$command" == "status" \
+			|| "$command" == "data_status" ]]; then
 
-	echo
+		ndsvar="${PRE}:SMS:Control:NumDataSources"
+		caget $WAIT $ndsvar
+		if [ $? == 0 ]; then
+			echo
+			numDataSources=`caget $WAIT $ndsvar | grep $ndsvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
+				echo "Data Source id=${ds}:"
+				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
+				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
+				echo
+			done
+		fi
+	fi
 
-	caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
-	caget $WAIT ${PRE}:SMS:STSClient:ReconnectTimeout
-	caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
-	caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
-	caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
-	caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
+	if [[ "$command" == "status" \
+			|| "$command" == "sys_status" ]]; then
 
-	echo
+		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
+		caget $WAIT ${PRE}:SMS:StorageManager:Percent
+		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+
+		echo
+
+		caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
+		caget $WAIT ${PRE}:SMS:STSClient:ReconnectTimeout
+		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
+		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
+		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
+		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
+
+		echo
+	fi
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
 elif [ "$command" == "option" ]; then
