@@ -125,8 +125,6 @@ if [[ "$command" == "status" \
 
 		caget $WAIT ${PRE}:SMS:Summary
 
-		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
-
 		echo
 
 		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
@@ -180,6 +178,10 @@ if [[ "$command" == "status" \
 
 	if [[ "$command" == "status" \
 			|| "$command" == "sys_status" ]]; then
+
+		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
+
+		echo
 
 		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
