@@ -8,6 +8,150 @@ CONFIG_USER="snsdata"
 TMP_DIR="/tmp"
 WAIT="-w 9"
 
+#
+# Option Configurations
+#
+
+# Option Types/Indexing...
+
+declare -A is_indexed
+declare -A idName
+
+is_indexed["sms"]=0
+idName["sms"]="SMS"
+
+is_indexed["runinfo"]=0
+idName["runinfo"]="RunInfo"
+
+is_indexed["marker"]=0
+idName["marker"]="Marker"
+
+is_indexed["source"]=1
+idName["source"]="Source"
+
+is_indexed["ctrl"]=0
+idName["ctrl"]="Control"
+
+is_indexed["storage"]=0
+idName["storage"]="Storage"
+
+is_indexed["sts"]=0
+idName["sts"]="STS"
+
+
+# Options...
+
+num_options=0
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="enabled"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
+option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
+option_label[$num_options]="[Enable/Disabled Data Source]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="connect_retry"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetry"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[Data Source Disconnect Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="connect_timeout"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[Data Source Connection Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="data_timeout"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[Data Source Data Delivery Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_eop"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreEoP"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_label[$num_options]="[Ignore End-of-Pulse]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="no_eop_pulse_buffer_size"
+option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
+option_value_type[$num_options]="UINT32_VALUE(pulses)"
+option_label[$num_options]="[No EoP Pulse Buffer Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="poolsize"
+option_pv[$num_options]="SMS:StorageManager:Poolsize"
+option_value_type[$num_options]="UINT32_VALUE+[G|M]"
+option_label[$num_options]="[Storage Poolsize (Max Blocks Allowed)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="percent"
+option_pv[$num_options]="SMS:StorageManager:Percent"
+option_value_type[$num_options]="UINT32_VALUE(percent)"
+option_label[$num_options]="[Percent of Storage (Max Blocks Allowed)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="max_blocks_allowed"
+option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowed"
+option_value_type[$num_options]="UINT32_VALUE(blocks)"
+option_label[$num_options]="[Max Blocks of Storage Allowed]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="connect_timeout"
+option_pv[$num_options]="SMS:STSClient:ConnectTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[STS Client Connection Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="reconnect_timeout"
+option_pv[$num_options]="SMS:STSClient:ReconnectTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[STS Client Re-Connection Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="transient_timeout"
+option_pv[$num_options]="SMS:STSClient:TransientTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[STS Client Transient Error Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="max_connections"
+option_pv[$num_options]="SMS:STSClient:MaxConnections"
+option_value_type[$num_options]="UINT32_VALUE(connections)"
+option_label[$num_options]="[Max Simultaneous STS Client Connections]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="max_requeue_count"
+option_pv[$num_options]="SMS:STSClient:MaxRequeueCount"
+option_value_type[$num_options]="UINT32_VALUE(requeues)"
+option_label[$num_options]="[Max STS Client Error Re-Queue Attempts]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
+option_name[$num_options]="service_uri"
+option_pv[$num_options]="SMS:STSClient:ServiceURI"
+option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
+option_label[$num_options]="[STS Client Service URI]"
+num_options=$(( num_options + 1 ))
+
+#
+# Dump Usage
+#
+
 USAGE()
 {
 	echo
@@ -18,9 +162,19 @@ USAGE()
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--testonly] [--help]"
 	echo
-	echo "   e.g. --option=\"sms:no_eop_pulse_buffer_size<3>\""
-	echo "      or"
-	echo "        --option=\"source1:ignore_eop<false>\""
+
+	echo "Available Options:"
+	echo
+
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+		echo -n "   --option=\"${option_id_type[$i]}"
+		if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
+			echo -n "<N>"
+		fi
+		echo ":${option_name[$i]}<${option_value_type[$i]}>\""
+		echo "      ${option_label[$i]}"
+	done
+
 	echo
 }
 
@@ -206,50 +360,57 @@ elif [ "$command" == "option" ]; then
 	# Parse Option Arg String into Pieces... ;-D
 	#
 
-	opt_id=`echo "$opt_arg" | awk -F ':' '{print $1}'`
-	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
-	# echo "opt_id=$opt_id"
+	opt_id_str=`echo "$opt_arg" | awk -F ':' '{print $1}'`
+	opt_id_type=`echo "$opt_id_str" | awk -F '[0-9]' '{print $1}'`
+	echo "opt_id_str=$opt_id_str opt_id_type=$opt_id_type"
 
-	opt_id_type=`echo "$opt_id" | awk -F '[0-9]' '{print $1}'`
-	if [ "$opt_id_type" == "source" ]; then
-		opt_id_num=`echo "$opt_id" | sed "s/source//"`
-		optId="Source${opt_id_num}"
+	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
+	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
+	opt_value=`echo "$opt_arg" | awk -F '[<>]' '{print $2}'`
+	echo "option=$option opt_value=$opt_value"
+
+	echo "is_indexed=${is_indexed[$opt_id_type]}"
+	if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+		opt_id_num=`echo "$opt_id_str" | sed "s/$opt_id_type//"`
+		optId="${idName[$opt_id_type]}${opt_id_num}"
 	else
 		opt_id_num="-1"
-		optId="SMS"
+		optId="${idName[$opt_id_type]}"
 	fi
-	# echo "opt_id_type=$opt_id_type opt_id_num=$opt_id_num optId=$optId"
+	echo "opt_id_num=$opt_id_num optId=$optId"
 
-	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
-	opt_value=`echo "$opt_rest" | awk -F '[<>]' '{print $2}'`
-	# echo "option=$option opt_value=$opt_value"
+	# Identify Option, Set Option-Specific Parameters and Information...
 
-	#
-	# Set Option-Specific Parameters and Information...
-	#
-	if [[ "$option" == "no_eop_pulse_buffer_size" ]]; then
-		PV="SMS:Control:NoEoPPulseBufferSize"
-		opt_name="[No EoP Pulse Buffer Size]"
-	elif [[ "$option" == "ignore_eop" \
-			&& "$opt_id_type" == "source" ]]; then
-		PV="SMS:DataSource:${opt_id_num}:IgnoreEoP"
-		opt_name="[Ignore End-of-Pulse]"
-	else
+	PV=""
+
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+		if [[ "$opt_id_type" == "${option_id_type[$i]}"
+				&& "$option" == "${option_name[$i]}" ]]; then
+			PV="${option_pv[$i]}"
+			opt_value_type="${option_value_type[$i]}"
+			opt_label="${option_label[$i]}"
+			break;
+		fi
+	done
+
+	if [ "#$PV#" == '##' ]; then
 		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
 		exit -1
 	fi
-	# echo "PV=$PV opt_name=$opt_name"
 
-	echo -e "Setting Option ${optId}:${opt_name} to ${opt_value}.\n"
+	echo "PV=$PV opt_label=$opt_label"
+
+	echo -e "Setting Option ${optId}:${opt_label} to ${opt_value}.\n"
 
 	#
 	# Prompt for Live/Config Option Change Log Description Text [Required!]
 	#
 
-	echo -e "Please Enter ${optId}:${opt_name} Option Change Log Text:\n"
+	echo "Please Enter Option Change Log Text for:"
+	echo -e "   ${optId}:${opt_label}\n"
 	echo -e "(Enter a Blank Line to Finish.)\n"
 
-	LOG="$TMP_DIR/LiveConfig-${opt_id}-${option}-$$.txt"
+	LOG="$TMP_DIR/LiveConfig-${opt_id_str}-${option}-$$.txt"
 
 	log_desc=""
 	empty=1
@@ -292,12 +453,13 @@ elif [ "$command" == "option" ]; then
 
 	do_live=1
 
-	echo "Current Live SMS Daemon Setting (PV) for ${optId}:${opt_name}:"
+	echo "Current Live SMS Daemon Setting (PV) for:"
+	echo -e "   ${optId}:${opt_label}\n"
 	live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
 	if [ $? != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
 		echo "Proceed with Live Config of:"
-		echo -n "   ${optId}:${opt_name} (yes/No)? "
+		echo -n "   ${optId}:${opt_label} (yes/No)? "
 		read ckcont
 		ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckcont" == "" || "$ckcont" == "n" \
@@ -322,8 +484,9 @@ elif [ "$command" == "option" ]; then
 
 	do_config=1
 
-	echo "Current SMS Daemon Config File Setting for ${optId}:${opt_name}:"
-	echo "   ($SMSD_CONFIG)"
+	echo "Current SMS Daemon Config File Setting for:"
+	echo "   ${optId}:${opt_label}"
+	echo "   (in $SMSD_CONFIG)"
 
 	config_list=`grep -n -e '^\[' -e "$option" $SMSD_CONFIG | grep -v ';'`
 	config_size=`echo "$config_list" | wc | awk '{print $1}'`
@@ -372,7 +535,7 @@ elif [ "$command" == "option" ]; then
 				config_value=`echo "$line_rest" | awk -F '=' '{print $2}'`
 				config_value=`echo "$config_value" | sed "s/ //g"`
 				# echo -n "Config File Option "
-				# echo "${optId}:${opt_name} = ${config_value}."
+				# echo "${optId}:${opt_label} = ${config_value}."
 
 				id_name="$line_id_name"
 
@@ -398,7 +561,7 @@ elif [ "$command" == "option" ]; then
 
 	done
 
-	opt_str="${optId}:${opt_name}${id_name} to ${opt_value}"
+	opt_str="${optId}:${opt_label}${id_name} to ${opt_value}"
 
 	if [[ $found == 0 ]]; then
 		echo -e "\nWARNING: Active Option Setting Not Found!"
@@ -414,7 +577,7 @@ elif [ "$command" == "option" ]; then
 
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line}:"
-		echo "   ${optId}:${opt_name}${id_name} = ${config_value}."
+		echo "   ${optId}:${opt_label}${id_name} = ${config_value}."
 	fi
 
 	#
@@ -427,7 +590,7 @@ elif [ "$command" == "option" ]; then
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_name}${id_name} = ${opt_value}"
+		echo "   ${optId}:${opt_label}${id_name} = ${opt_value}"
 		echo -e "\nDone."
 	else
 
@@ -442,23 +605,15 @@ elif [ "$command" == "option" ]; then
 			exit -3
 		fi
 
-		if [ "$opt_value" == "true" ]; then
-			value=1
-		elif [ "$opt_value" == "false" ]; then
-			value=0
-		else
-			value="$opt_value"
-		fi
-
 		echo "Setting Live SMS Daemon Option:"
-		echo "   ${opt_str} ($value)"
+		echo "   ${opt_str} ($opt_value)"
 		if [ $testonly == 1 ]; then
-			echo "[TESTONLY] caput ${PRE}:${PV} $value"
+			echo "[TESTONLY] caput ${PRE}:${PV} $opt_value"
 		else
-			caput ${PRE}:${PV} $value
+			caput "${PRE}:${PV}" "$opt_value"
 		fi
 		if [ $? != 0 ]; then
-			echo "Error Setting ${optId}:${opt_name}${id_name}...!"
+			echo "Error Setting ${optId}:${opt_label}${id_name}...!"
 			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -479,7 +634,7 @@ elif [ "$command" == "option" ]; then
 		echo "Skipping Config File Option Set."
 	elif [ "$opt_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_name}${id_name} = ${opt_value}"
+		echo "   ${optId}:${opt_label}${id_name} = ${opt_value}"
 		echo -e "\nDone."
 	else
 
