@@ -384,13 +384,25 @@ elif [ "$command" == "option" ]; then
 	PV=""
 
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+
 		if [[ "$opt_id_type" == "${option_id_type[$i]}"
 				&& "$option" == "${option_name[$i]}" ]]; then
-			PV="${option_pv[$i]}"
+
+			# Handle Indexed PV's, Substitute Option Id Number...
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				PV=`echo ${option_pv[$i]} \
+					| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
+			else
+				PV="${option_pv[$i]}"
+			fi
+
 			opt_value_type="${option_value_type[$i]}"
+
 			opt_label="${option_label[$i]}"
+
 			break;
 		fi
+
 	done
 
 	if [ "#$PV#" == '##' ]; then
