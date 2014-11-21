@@ -60,7 +60,7 @@ private:
 	static std::string m_node;
 	static std::string m_service;
 	static double m_connect_timeout;
-	static double m_reconnect_timeout;
+	static double m_connect_retry;
 	static double m_transient_timeout;
 	static unsigned int m_max_connections;
 	static uint32_t m_max_requeue_count;
@@ -84,7 +84,7 @@ private:
 	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
 
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
-	boost::shared_ptr<smsFloat64PV> m_pvReconnectTimeout;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
 	boost::shared_ptr<smsFloat64PV> m_pvTransientTimeout;
 	boost::shared_ptr<MaxConnectionsPV> m_pvMaxConnections;
 	boost::shared_ptr<smsUint32PV> m_pvMaxRequeueCount;

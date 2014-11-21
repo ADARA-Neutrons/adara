@@ -40,7 +40,7 @@ private:
 std::string STSClientMgr::m_node;
 std::string STSClientMgr::m_service;
 double STSClientMgr::m_connect_timeout = 15.0;
-double STSClientMgr::m_reconnect_timeout = 15.0;
+double STSClientMgr::m_connect_retry = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
 uint32_t STSClientMgr::m_max_requeue_count = 5;
@@ -87,8 +87,8 @@ STSClientMgr::STSClientMgr() :
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectTimeout"));
 
-	m_pvReconnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ReconnectTimeout"));
+	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetry"));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":TransientTimeout"));
@@ -103,7 +103,7 @@ STSClientMgr::STSClientMgr() :
 		smsStringPV(prefix + ":ServiceURI"));
 
 	ctrl->addPV(m_pvConnectTimeout);
-	ctrl->addPV(m_pvReconnectTimeout);
+	ctrl->addPV(m_pvConnectRetry);
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
 	ctrl->addPV(m_pvMaxRequeueCount);
@@ -113,7 +113,7 @@ STSClientMgr::STSClientMgr() :
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
-	m_pvReconnectTimeout->update(m_reconnect_timeout, &now);
+	m_pvConnectRetry->update(m_connect_retry, &now);
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
@@ -406,9 +406,9 @@ void STSClientMgr::connectFailed(void)
 	m_fd = -1;
 	m_fdreg.reset();
 	m_connect_timer->cancel();
-	// Update Reconnect Timeout from PV...
-	m_reconnect_timeout = m_pvReconnectTimeout->value();
-	m_reconnect_timer->start(m_reconnect_timeout);
+	// Update Connect Retry Timeout from PV...
+	m_connect_retry = m_pvConnectRetry->value();
+	m_reconnect_timer->start(m_connect_retry);
 }
 
 bool STSClientMgr::connectTimeout(void)
@@ -509,8 +509,9 @@ void STSClientMgr::config(const boost::property_tree::ptree &conf)
 {
 	m_connect_timeout =
 			conf.get<double>("stsclient.connect_timeout", 15.0);
-	m_reconnect_timeout =
-			conf.get<double>("stsclient.reconnect_timeout", 15.0);
+	m_connect_retry =
+			conf.get<double>("stsclient.connect_retry",
+				conf.get<double>("stsclient.reconnect_timeout", 15.0) );
 	m_transient_timeout =
 			conf.get<double>("stsclient.transient_timeout", 60.0);
 	m_max_connections =
