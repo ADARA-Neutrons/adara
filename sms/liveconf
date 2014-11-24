@@ -142,7 +142,7 @@ option_label[$num_options]="[Max STS Client Error Re-Queue Attempts]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
-option_name[$num_options]="service_uri"
+option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:STSClient:ServiceURI"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_label[$num_options]="[STS Client Service URI]"
@@ -160,7 +160,7 @@ USAGE()
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
-	echo "            [--testonly] [--help]"
+	echo "            [--skiplive] [--testonly] [--help]"
 	echo
 
 	echo "Available Options:"
@@ -194,6 +194,7 @@ if [ $? != 0 ]; then
 fi
 
 # Check for settings customization...
+skiplive=0
 testonly=0
 PRE="[NotSet]"
 for arg in $* ; do
@@ -215,6 +216,9 @@ for arg in $* ; do
 		command="option"
 		opt_arg="$value"
 		echo -e "Setting Command to: $command $opt_arg\n"
+	elif [ "#$key#" == '#--skiplive#' ]; then
+		skiplive=1
+		echo -e "*** Skipping Live Config - Update Config File Only!\n"
 	elif [ "#$key#" == '#--testonly#' ]; then
 		testonly=1
 		echo -e "*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
@@ -465,27 +469,33 @@ elif [ "$command" == "option" ]; then
 
 	do_live=1
 
-	echo "Current Live SMS Daemon Setting (PV) for:"
-	echo -e "   ${optId}:${opt_label}\n"
-	live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
-	if [ $? != 0 ]; then
-		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
-		echo "Proceed with Live Config of:"
-		echo -n "   ${optId}:${opt_label} (yes/No)? "
-		read ckcont
-		ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckcont" == "" || "$ckcont" == "n" \
-				|| "$ckcont" == "no" ]]; then
-			echo -e "\nExiting LiveConf at User's Request.\n"
-			/bin/ls -l $LOG
-			/bin/cat $LOG
-			exit -3
+	if [ $skiplive == 0 ]; then
+		echo "Current Live SMS Daemon Setting (PV) for:"
+		echo -e "   ${optId}:${opt_label}\n"
+		live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
+		if [ $? != 0 ]; then
+			echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
+			echo "Proceed with Live Config of:"
+			echo -n "   ${optId}:${opt_label} (yes/No)? "
+			read ckcont
+			ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckcont" == "" || "$ckcont" == "n" \
+					|| "$ckcont" == "no" ]]; then
+				echo -e "\nExiting LiveConf at User's Request.\n"
+				/bin/ls -l $LOG
+				/bin/cat $LOG
+				exit -3
+			fi
+			# Continue, But Skip Live Option Setting...
+			do_live=0
+		else
+			live_value=`echo $live_current | awk '{print $2}'`
+			echo "   $live_current ($live_value)"
 		fi
-		# Continue, But Skip Live Option Setting...
-		do_live=0
 	else
-		live_value=`echo $live_current | awk '{print $2}'`
-		echo "   $live_current ($live_value)"
+		echo "Skipping Live Configuration as Requested for:"
+		echo -e "   ${optId}:${opt_label}\n"
+		do_live=0
 	fi
 
 	#
@@ -500,11 +510,14 @@ elif [ "$command" == "option" ]; then
 	echo "   ${optId}:${opt_label}"
 	echo "   (in $SMSD_CONFIG)"
 
-	config_list=`grep -n -e '^\[' -e "$option" $SMSD_CONFIG | grep -v ';'`
+	config_list=`grep -n -e '^\[' -e "$option" $SMSD_CONFIG`
 	config_size=`echo "$config_list" | wc | awk '{print $1}'`
 
+	last_comment_line_num=""
+	last_comment_line=""
+
+	config_line_num=""
 	config_value=""
-	config_line=""
 
 	source_cnt=0
 
@@ -516,17 +529,21 @@ elif [ "$command" == "option" ]; then
 
 	for (( n=1 ; n <= config_size ; n++ )); do
 
-		line=`echo "$config_list" | sed -n "${n}p"`
-		# echo "config line $n = [$line]"
+		# Note: Just strip off _First_ ':' from Line Number -> '|'...
+		# (This preserves the ':' in URI values: "ip_addr:port".)
+		line=`echo "$config_list" | sed -n "${n}p" | sed "s/:/|/"`
+		echo "config line $n = [$line]"
 
-		line_num=`echo "$line" | awk -F ':' '{print $1}'`
+		line_num=`echo "$line" | awk -F '|' '{print $1}'`
 		# echo "line_num=$line_num"
 
-		line_rest=`echo "$line" | awk -F ':' '{print $2}'`
+		line_rest=`echo "$line" | awk -F '|' '{print $2}'`
 		# echo "line_rest=$line_rest"
 
 		line_id=`echo "$line_rest" | awk -F '[][]' '{print $2}'`
 		# echo "line_id=$line_id"
+
+		is_comment=`echo "$line_rest" | grep ';' | wc | awk '{print $1}'`
 
 		# Option Line
 		if [ "$line_id" == "" ]; then
@@ -536,13 +553,20 @@ elif [ "$command" == "option" ]; then
 			if [[ "$id_type" == "$opt_id_type" \
 					&& "$id_num" == "$opt_id_num" ]]; then
 
+				if [ "#$is_comment#" == '#1#' ]; then
+					echo "Comment: (line $line_num) [$line_rest]"
+					last_comment_line="$line_rest"
+					last_comment_line_num="$line_num"
+					continue;
+				fi
+
 				# echo "Match!"
 
 				config_current_line="$line_rest"
-				# echo "Matching Config File Line = ${config_current_line}."
+				# echo "Config File Line = ${config_current_line}."
 
-				config_line="$line_num"
-				# echo "Matching Config File Line Number = ${config_line}."
+				config_line_num="$line_num"
+				# echo "Config File Line Number = ${config_line_num}."
 
 				config_value=`echo "$line_rest" | awk -F '=' '{print $2}'`
 				config_value=`echo "$config_value" | sed "s/ //g"`
@@ -563,11 +587,25 @@ elif [ "$command" == "option" ]; then
 				line_id_name=" (${source_name})"
 				source_cnt=$(( source_cnt + 1 ))
 				id_num="$source_cnt"
-				# echo "Source #${source_cnt}: ${source_name} Section."
+				echo "Source #${source_cnt}: ${source_name} Section."
 			elif [ "$id_type" == "sms" ]; then
 				line_id_name=""
 				id_num="-1"
-				# echo "SMS Section."
+				echo "SMS Section."
+			elif [ "$id_type" == "storage" ]; then
+				line_id_name=""
+				id_num="-1"
+				echo "Storage Section."
+			elif [ "$id_type" == "livestream" ]; then
+				line_id_name=""
+				id_num="-1"
+				echo "Live Streaming Section."
+			elif [ "$id_type" == "stsclient" ]; then
+				# Abbreviate STS Client Id Type...
+				id_type="sts"
+				line_id_name=""
+				id_num="-1"
+				echo "STS Client Section."
 			fi
 		fi
 
@@ -575,11 +613,20 @@ elif [ "$command" == "option" ]; then
 
 	opt_str="${optId}:${opt_label}${id_name} to ${opt_value}"
 
+	config_use_comment=0
+
 	if [[ $found == 0 ]]; then
 		echo -e "\nWARNING: Active Option Setting Not Found!"
-		echo "Cannot Automatically Update Configuration File... ;-Q"
-		echo "   ${opt_str}"
-		do_config=0
+		if [[ "#$last_comment_line_num#" != '##' ]]; then
+			echo -n "   Using Last Comment: (line $last_comment_line_num) "
+			echo "[$last_comment_line]"
+			config_value="(commented out)"
+			config_use_comment=1
+		else
+			echo "Cannot Automatically Update Configuration File... ;-Q"
+			echo "   ${opt_str}"
+			do_config=0
+		fi
 	elif [[ $found > 1 ]]; then
 		echo -e "\nWARNING: *Multiple* Active Non-Source Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
@@ -588,7 +635,7 @@ elif [ "$command" == "option" ]; then
 	fi
 
 	if [ "$do_config" == 1 ]; then
-		echo -e "\nCurrent Config File Option at Line ${config_line}:"
+		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
 		echo "   ${optId}:${opt_label}${id_name} = ${config_value}."
 	fi
 
@@ -667,11 +714,25 @@ elif [ "$command" == "option" ]; then
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
-		new_config_line=`echo "$config_current_line" \
-			| sed "s/$config_value/$opt_value/"`
+		# Straight Substitution...
+		if [ $config_use_comment == 0 ]; then
 
-		sed "${config_line}s/^$config_current_line/$new_config_line/" \
-			$SMSD_CONFIG > $tmpconfig
+			new_config_line=`echo "$config_current_line" \
+				| sed "s/$config_value/$opt_value/"`
+
+			sed \
+			"${config_line_num}s/^$config_current_line/$new_config_line/" \
+				$SMSD_CONFIG > $tmpconfig
+
+		# Append New Config Option Reference After Last Comment...
+		else
+
+			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			sed \
+			${last_comment_line_num}a"|$option = $opt_value" $SMSD_CONFIG \
+				| tr '|' '\t' > $tmpconfig
+
+		fi
 
 		echo -e "\nModified Config File Differences:"
 		diff -c $SMSD_CONFIG $tmpconfig
