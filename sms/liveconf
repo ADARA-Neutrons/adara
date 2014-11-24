@@ -400,6 +400,12 @@ elif [ "$command" == "option" ]; then
 				PV="${option_pv[$i]}"
 			fi
 
+			# Map "Control" Options to "SMS" for rest of handling...
+			# (There's no separate "SMSControl" config section.)
+			if [ "$opt_id_type" == "ctrl" ]; then
+				opt_id_type="sms"
+			fi
+
 			opt_value_type="${option_value_type[$i]}"
 
 			opt_label="${option_label[$i]}"
