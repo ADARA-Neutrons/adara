@@ -245,10 +245,19 @@ if [ ${PRE} == "[NotSet]" ]; then
 		exit -90
 	fi
 
+	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
+
+	daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
+	if [ "#$daq_ck#" == '#1#' ]; then
+		config_branch="${config_branch}-daq"
+		PRE="${PRE}X"
+		echo -n "*** DAQ System - "
+		echo -e "Using Alternate Branch ${config_branch} ($PRE).\n"
+	fi
+
 	echo "Changing Configuration on Host ${config_host}."
 	echo "(Git Config Repository Branch ${config_branch}.)"
 
-	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
 	echo "Setting EPICS PV Prefix from Config Branch: ${PRE}."
 
 else
