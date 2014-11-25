@@ -157,9 +157,9 @@ USAGE()
 	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
-	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
 
@@ -518,7 +518,7 @@ elif [ "$command" == "option" ]; then
 
 	WS="^[[:space:]]*$"
 
-	config_list=`grep -n -e '^\[' -e "$option" -e "^[[:space:]]*$" $SMSD_CONFIG`
+	config_list=`grep -n -e '^\[' -e "$option" -e "$WS" $SMSD_CONFIG`
 	config_size=`echo "$config_list" | wc | awk '{print $1}'`
 
 	end_of_section_line_num=""
