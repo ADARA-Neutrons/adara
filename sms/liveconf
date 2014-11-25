@@ -778,7 +778,7 @@ elif [ "$command" == "option" ]; then
 			# Construct New Comment and Option Setting...
 			new_option="|; Option Auto-Added by LiveConf!\n"
 			new_option="$new_option|;    ${optId}:${opt_label}${id_name}\n"
-			new_option="$new_option|$option = $opt_value"
+			new_option="$new_option|$option = $opt_value\n"
 
 			# Goofy Incantation to get Sed to insert a Tab... ;-b
 			sed ${end_of_section_line_num}a"$new_option" \
