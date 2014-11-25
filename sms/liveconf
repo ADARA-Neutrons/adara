@@ -249,7 +249,7 @@ if [ ${PRE} == "[NotSet]" ]; then
 
 	daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
 	if [ "#$daq_ck#" == '#1#' ]; then
-		config_branch="${config_branch}-daq"
+		config_branch=`echo "$config_host" | sed 's/\..*//'`
 		PRE="${PRE}X"
 		echo -n "*** DAQ System - "
 		echo -e "Using Alternate Branch ${config_branch} ($PRE).\n"
