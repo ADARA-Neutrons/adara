@@ -544,7 +544,7 @@ elif [ "$command" == "option" ]; then
 		# Note: Just strip off _First_ ':' from Line Number -> '|'...
 		# (This preserves the ':' in URI values: "ip_addr:port".)
 		line=`echo "$config_list" | sed -n "${n}p" | sed "s/:/|/"`
-		echo "config line $n = [$line]"
+		# echo "config line $n = [$line]"
 
 		line_num=`echo "$line" | awk -F '|' '{print $1}'`
 		# echo "line_num=$line_num"
@@ -570,7 +570,7 @@ elif [ "$command" == "option" ]; then
 			# echo "Config Option Line..."
 
 			if [ "#$is_blank#" == '#1#' ]; then
-				echo "Blank Line at line $line_num [$line_rest]"
+				# echo "Blank Line at line $line_num [$line_rest]"
 				last_blank_line_num="$line_num"
 				continue;
 			fi
@@ -579,7 +579,7 @@ elif [ "$command" == "option" ]; then
 					&& "$id_num" == "$opt_id_num" ]]; then
 
 				if [ "#$is_comment#" == '#1#' ]; then
-					echo "Comment: (line $line_num) [$line_rest]"
+					# echo "Comment: (line $line_num) [$line_rest]"
 					last_comment_line="$line_rest"
 					last_comment_line_num="$line_num"
 					continue;
@@ -607,13 +607,14 @@ elif [ "$command" == "option" ]; then
 		# SMS or Source Line
 		else
 
-			echo "id_type=$id_type opt_id_type=$opt_id_type"
-			echo "id_num=$id_num opt_id_num=$opt_id_num"
+			# echo "id_type=$id_type opt_id_type=$opt_id_type"
+			# echo "id_num=$id_num opt_id_num=$opt_id_num"
 
 			# Mark End of Previous Section, If It's What We Want...
 			if [[ "$id_type" == "$opt_id_type" \
 					&& "$id_num" == "$opt_id_num" ]]; then
-				echo "Marking End of Requested Section at Line $line_num."
+				#echo -n "Marking End of Requested Section "
+				#echo "at Line $last_blank_line_num."
 				# Use "Last Blank Line" Number,
 				# as Section may be Preceded by Comment lines...
 				end_of_section_line_num="$last_blank_line_num"
@@ -626,25 +627,25 @@ elif [ "$command" == "option" ]; then
 				line_id_name=" (${source_name})"
 				source_cnt=$(( source_cnt + 1 ))
 				id_num="$source_cnt"
-				echo "Source #${source_cnt}: ${source_name} Section."
+				# echo "Source #${source_cnt}: ${source_name} Section."
 			elif [ "$id_type" == "sms" ]; then
 				line_id_name=""
 				id_num="-1"
-				echo "SMS Section."
+				# echo "SMS Section."
 			elif [ "$id_type" == "storage" ]; then
 				line_id_name=""
 				id_num="-1"
-				echo "Storage Section."
+				# echo "Storage Section."
 			elif [ "$id_type" == "livestream" ]; then
 				line_id_name=""
 				id_num="-1"
-				echo "Live Streaming Section."
+				# echo "Live Streaming Section."
 			elif [ "$id_type" == "stsclient" ]; then
 				# Abbreviate STS Client Id Type...
 				id_type="sts"
 				line_id_name=""
 				id_num="-1"
-				echo "STS Client Section."
+				# echo "STS Client Section."
 			fi
 		fi
 
