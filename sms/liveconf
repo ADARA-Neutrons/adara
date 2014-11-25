@@ -366,14 +366,14 @@ elif [ "$command" == "option" ]; then
 
 	opt_id_str=`echo "$opt_arg" | awk -F ':' '{print $1}'`
 	opt_id_type=`echo "$opt_id_str" | awk -F '[0-9]' '{print $1}'`
-	echo "opt_id_str=$opt_id_str opt_id_type=$opt_id_type"
+	# echo "opt_id_str=$opt_id_str opt_id_type=$opt_id_type"
 
 	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
 	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
 	opt_value=`echo "$opt_arg" | awk -F '[<>]' '{print $2}'`
-	echo "option=$option opt_value=$opt_value"
+	# echo "option=$option opt_value=$opt_value"
 
-	echo "is_indexed=${is_indexed[$opt_id_type]}"
+	# echo "is_indexed=${is_indexed[$opt_id_type]}"
 	if [ ${is_indexed[$opt_id_type]} == 1 ]; then
 		opt_id_num=`echo "$opt_id_str" | sed "s/$opt_id_type//"`
 		optId="${idName[$opt_id_type]}${opt_id_num}"
@@ -381,7 +381,7 @@ elif [ "$command" == "option" ]; then
 		opt_id_num="-1"
 		optId="${idName[$opt_id_type]}"
 	fi
-	echo "opt_id_num=$opt_id_num optId=$optId"
+	# echo "opt_id_num=$opt_id_num optId=$optId"
 
 	# Identify Option, Set Option-Specific Parameters and Information...
 
@@ -420,7 +420,7 @@ elif [ "$command" == "option" ]; then
 		exit -1
 	fi
 
-	echo "PV=$PV opt_label=$opt_label"
+	# echo "PV=$PV opt_label=$opt_label"
 
 	echo -e "Setting Option ${optId}:${opt_label} to ${opt_value}.\n"
 
@@ -516,11 +516,17 @@ elif [ "$command" == "option" ]; then
 	echo "   ${optId}:${opt_label}"
 	echo "   (in $SMSD_CONFIG)"
 
-	config_list=`grep -n -e '^\[' -e "$option" $SMSD_CONFIG`
+	WS="^[[:space:]]*$"
+
+	config_list=`grep -n -e '^\[' -e "$option" -e "^[[:space:]]*$" $SMSD_CONFIG`
 	config_size=`echo "$config_list" | wc | awk '{print $1}'`
+
+	end_of_section_line_num=""
 
 	last_comment_line_num=""
 	last_comment_line=""
+
+	last_blank_line_num=""
 
 	config_line_num=""
 	config_value=""
@@ -551,10 +557,23 @@ elif [ "$command" == "option" ]; then
 
 		is_comment=`echo "$line_rest" | grep ';' | wc | awk '{print $1}'`
 
+		nbytes=`echo "$line_rest" | awk '{print $1}' |wc| awk '{print $2}'`
+		if [ $nbytes == 0 ]; then
+			is_blank=1
+		else
+			is_blank=0
+		fi
+
 		# Option Line
 		if [ "$line_id" == "" ]; then
 
 			# echo "Config Option Line..."
+
+			if [ "#$is_blank#" == '#1#' ]; then
+				echo "Blank Line at line $line_num [$line_rest]"
+				last_blank_line_num="$line_num"
+				continue;
+			fi
 
 			if [[ "$id_type" == "$opt_id_type" \
 					&& "$id_num" == "$opt_id_num" ]]; then
@@ -587,6 +606,20 @@ elif [ "$command" == "option" ]; then
 
 		# SMS or Source Line
 		else
+
+			echo "id_type=$id_type opt_id_type=$opt_id_type"
+			echo "id_num=$id_num opt_id_num=$opt_id_num"
+
+			# Mark End of Previous Section, If It's What We Want...
+			if [[ "$id_type" == "$opt_id_type" \
+					&& "$id_num" == "$opt_id_num" ]]; then
+				echo "Marking End of Requested Section at Line $line_num."
+				# Use "Last Blank Line" Number,
+				# as Section may be Preceded by Comment lines...
+				end_of_section_line_num="$last_blank_line_num"
+			fi
+
+			# Set Up for New Section...
 			id_type=`echo "$line_id" | awk '{print $1}'`
 			if [ "$id_type" == "source" ]; then
 				source_name=`echo "$line_id" | sed "s/^source //"`
@@ -619,6 +652,7 @@ elif [ "$command" == "option" ]; then
 
 	opt_str="${optId}:${opt_label}${id_name} to ${opt_value}"
 
+	config_end_of_section=0
 	config_use_comment=0
 
 	if [[ $found == 0 ]]; then
@@ -628,6 +662,17 @@ elif [ "$command" == "option" ]; then
 			echo "[$last_comment_line]"
 			config_value="(commented out)"
 			config_use_comment=1
+		elif [[ "#$end_of_section_line_num#" != '##' ]]; then
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="(not found)"
+			config_end_of_section=1
+		elif [[ "$id_type" == "$opt_id_type" \
+				&& "$id_num" == "$opt_id_num" ]]; then
+			echo "   End of File at Last Section... ;-)"
+			end_of_section_line_num=`wc $SMSD_CONFIG | awk '{print $1}'`
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="(not found)"
+			config_end_of_section=1
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
 			echo "   ${opt_str}"
@@ -720,8 +765,27 @@ elif [ "$command" == "option" ]; then
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
+		# Append New Config Option Reference After Last Comment...
+		if [ $config_use_comment == 1 ]; then
+
+			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			sed ${last_comment_line_num}a"|$option = $opt_value" \
+				$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+
+		# Append New Config Option Reference at End of Section...
+		elif [ $config_end_of_section == 1 ]; then
+
+			# Construct New Comment and Option Setting...
+			new_option="|; Option Auto-Added by LiveConf!\n"
+			new_option="$new_option|;    ${optId}:${opt_label}${id_name}\n"
+			new_option="$new_option|$option = $opt_value"
+
+			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			sed ${end_of_section_line_num}a"$new_option" \
+				$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+
 		# Straight Substitution...
-		if [ $config_use_comment == 0 ]; then
+		else
 
 			new_config_line=`echo "$config_current_line" \
 				| sed "s/$config_value/$opt_value/"`
@@ -729,14 +793,6 @@ elif [ "$command" == "option" ]; then
 			sed \
 			"${config_line_num}s/^$config_current_line/$new_config_line/" \
 				$SMSD_CONFIG > $tmpconfig
-
-		# Append New Config Option Reference After Last Comment...
-		else
-
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed \
-			${last_comment_line_num}a"|$option = $opt_value" $SMSD_CONFIG \
-				| tr '|' '\t' > $tmpconfig
 
 		fi
 
