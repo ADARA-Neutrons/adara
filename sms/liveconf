@@ -638,8 +638,6 @@ elif [ "$command" == "option" ]; then
 				# echo -n "Config File Option "
 				# echo "${optId}:${opt_label} = ${config_value}."
 
-				id_name="$line_id_name"
-
 				found=$(( found + 1 ))
 
 			fi
@@ -664,26 +662,25 @@ elif [ "$command" == "option" ]; then
 			id_type=`echo "$line_id" | awk '{print $1}'`
 			if [ "$id_type" == "source" ]; then
 				source_name=`echo "$line_id" | sed "s/^source //"`
-				line_id_name=" (${source_name})"
 				source_cnt=$(( source_cnt + 1 ))
 				id_num="$source_cnt"
+				if [[ "$id_type" == "$opt_id_type" \
+						&& "$id_num" == "$opt_id_num" ]]; then
+					id_name=" (${source_name})"
+				fi
 				# echo "Source #${source_cnt}: ${source_name} Section."
 			elif [ "$id_type" == "sms" ]; then
-				line_id_name=""
 				id_num="-1"
 				# echo "SMS Section."
 			elif [ "$id_type" == "storage" ]; then
-				line_id_name=""
 				id_num="-1"
 				# echo "Storage Section."
 			elif [ "$id_type" == "livestream" ]; then
-				line_id_name=""
 				id_num="-1"
 				# echo "Live Streaming Section."
 			elif [ "$id_type" == "stsclient" ]; then
 				# Abbreviate STS Client Id Type...
 				id_type="sts"
-				line_id_name=""
 				id_num="-1"
 				# echo "STS Client Section."
 			fi
@@ -716,14 +713,16 @@ elif [ "$command" == "option" ]; then
 			config_end_of_section=1
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
-			echo "   ${opt_str} to ${opt_config_str}"
+			echo "   ${opt_str}"
+			echo "      to ${opt_config_str}"
 			do_config=0
 		fi
 	elif [[ $found > 1 ]]; then
 		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
 		echo "\"${option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
-		echo "   ${opt_str} to ${opt_config_str}"
+		echo "   ${opt_str}"
+		echo "      to ${opt_config_str}"
 		do_config=0
 	fi
 
@@ -1015,7 +1014,8 @@ elif [ "$command" == "option" ]; then
 		fi
 
 		commit_str="Set SMS Live/Config Option:\n"
-		commit_str="$commit_str   ${opt_str} to ${opt_config_str}\n"
+		commit_str="$commit_str   ${opt_str}\n"
+		commit_str="$commit_str      to ${opt_config_str}\n"
 		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
 		commit_str="$commit_str$log_desc\n"
 
