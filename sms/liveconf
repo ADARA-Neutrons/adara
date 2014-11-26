@@ -47,7 +47,7 @@ option_id_type[$num_options]="source"
 option_name[$num_options]="enabled"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
 option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
-option_label[$num_options]="[Enable/Disabled Data Source]"
+option_label[$num_options]="[Enable/Disable Data Source]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
@@ -275,7 +275,7 @@ if [[ "$command" == "status" \
 		|| "$command" == "sys_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
-	# (Give the SMS plenty of time to reply, since it's Not multi-threaded.)
+	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
 	caget $WAIT ${PRE}:SMS:Recording > /dev/null 2>&1
 	if [ $? != 0 ]; then
 		echo \
@@ -434,6 +434,37 @@ elif [ "$command" == "option" ]; then
 	echo -e "Setting Option ${optId}:${opt_label} to ${opt_value}.\n"
 
 	#
+	# Special Case:
+	#    - "enabled" PV really refers to "disabled" in the Config File...
+	#    (reverse bogus option value... ;-b)
+	#
+
+	opt_config_value="$opt_value"
+	opt_config_str="$opt_config_value"
+	if [ "$option" == "enabled" ]; then
+		option="disabled"
+		if [[ "#$opt_config_value#" == '#Enabled#'
+				|| "#$opt_config_value#" == "#TRUE#"
+				|| "#$opt_config_value#" == "#True#"
+				|| "#$opt_config_value#" == "#true#" ]]; then
+			echo -e "*** ENABLING Data Source $opt_id_num.\n"
+			opt_config_value="XXX_DELETE_XXX"
+			opt_config_str="[Enabled: DELETE $option Option]"
+		elif [[ "#$opt_config_value#" == '#Disabled#'
+				|| "#$opt_config_value#" == "#FALSE#"
+				|| "#$opt_config_value#" == "#False#"
+				|| "#$opt_config_value#" == "#false#" ]]; then
+			echo -e "*** DISABLING Data Source $opt_id_num.\n"
+			opt_config_value="true"
+			opt_config_str="[Disabled: $option = $opt_config_value]"
+		else
+			echo -e -n "\nError: Unknown Enabled/Disabled "
+			echo -e "Option Value [$option]...! Bailing...\n"
+			exit -1
+		fi
+	fi
+
+	#
 	# Prompt for Live/Config Option Change Log Description Text [Required!]
 	#
 
@@ -485,7 +516,7 @@ elif [ "$command" == "option" ]; then
 	do_live=1
 
 	if [ $skiplive == 0 ]; then
-		echo "Current Live SMS Daemon Setting (PV) for:"
+		echo "Getting Current Live SMS Daemon Setting (PV) for:"
 		echo -e "   ${optId}:${opt_label}\n"
 		live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
 		if [ $? != 0 ]; then
@@ -521,7 +552,7 @@ elif [ "$command" == "option" ]; then
 
 	do_config=1
 
-	echo "Current SMS Daemon Config File Setting for:"
+	echo "Getting Current SMS Daemon Config File Setting for:"
 	echo "   ${optId}:${opt_label}"
 	echo "   (in $SMSD_CONFIG)"
 
@@ -660,13 +691,13 @@ elif [ "$command" == "option" ]; then
 
 	done
 
-	opt_str="${optId}:${opt_label}${id_name} to ${opt_value}"
+	opt_str="${optId}:${opt_label}${id_name}"
 
 	config_end_of_section=0
 	config_use_comment=0
 
 	if [[ $found == 0 ]]; then
-		echo -e "\nWARNING: Active Option Setting Not Found!"
+		echo -e "\nWARNING: Active \"${option}\" Option Setting Not Found!"
 		if [[ "#$last_comment_line_num#" != '##' ]]; then
 			echo -n "   Using Last Comment: (line $last_comment_line_num) "
 			echo "[$last_comment_line]"
@@ -685,19 +716,21 @@ elif [ "$command" == "option" ]; then
 			config_end_of_section=1
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
-			echo "   ${opt_str}"
+			echo "   ${opt_str} to ${opt_config_str}"
 			do_config=0
 		fi
 	elif [[ $found > 1 ]]; then
-		echo -e "\nWARNING: *Multiple* Active Non-Source Option Settings!"
+		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
+		echo "\"${option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
-		echo "   ${opt_str}"
+		echo "   ${opt_str} to ${opt_config_str}"
 		do_config=0
 	fi
 
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
-		echo "   ${optId}:${opt_label}${id_name} = ${config_value}."
+		echo "   ${optId}:${opt_label}${id_name}"
+		echo "   ${option} = ${config_value}."
 	fi
 
 	#
@@ -710,15 +743,18 @@ elif [ "$command" == "option" ]; then
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${id_name} = ${opt_value}"
+		echo "   ${optId}:${opt_label}${id_name}"
+		echo "      = ${opt_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Live Option:"
-		echo -n "   ${opt_str} (yes/No)? "
+		echo "      ${opt_str}"
+		echo -n "   to ${opt_value} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
+		if [[ "$ckset" == "" \
+				|| "$ckset" == "n" || "$ckset" == "no" ]]; then
 			echo -e "\nExiting LiveConf at User's Request.\n"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -726,7 +762,8 @@ elif [ "$command" == "option" ]; then
 		fi
 
 		echo "Setting Live SMS Daemon Option:"
-		echo "   ${opt_str} ($opt_value)"
+		echo "      ${opt_str}"
+		echo "   to ${opt_value}."
 		if [ $testonly == 1 ]; then
 			echo "[TESTONLY] caput ${PRE}:${PV} $opt_value"
 		else
@@ -752,17 +789,20 @@ elif [ "$command" == "option" ]; then
 
 	if [ $do_config != 1 ]; then
 		echo "Skipping Config File Option Set."
-	elif [ "$opt_value" == "$config_value" ]; then
+	elif [ "$opt_config_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${id_name} = ${opt_value}"
+		echo "   ${optId}:${opt_label}${id_name}"
+		echo "      = ${opt_config_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Config File Option:"
-		echo -n "   ${opt_str} (yes/No)? "
+		echo "      ${opt_str}"
+		echo -n "   to ${opt_config_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckset" == "" || "$ckset" == "n" || "$ckset" == "no" ]]; then
+		if [[ "$ckset" == "" \
+				|| "$ckset" == "n" || "$ckset" == "no" ]]; then
 			echo -e "\nExiting LiveConf at User's Request.\n"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -771,76 +811,109 @@ elif [ "$command" == "option" ]; then
 
 		echo
 		echo "Setting SMS Daemon Config File Option:"
-		echo "   ${opt_str}"
+		echo "      ${opt_str}"
+		echo "   to ${opt_config_str}."
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
+
+		no_change=0
 
 		# Append New Config Option Reference After Last Comment...
 		if [ $config_use_comment == 1 ]; then
 
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${last_comment_line_num}a"|$option = $opt_value" \
-				$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+				echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
+				no_change=1
+			else
+				# Goofy Incantation to get Sed to insert a Tab... ;-b
+				sed \
+				${last_comment_line_num}a"|$option = $opt_config_value" \
+					$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+			fi
 
 		# Append New Config Option Reference at End of Section...
 		elif [ $config_end_of_section == 1 ]; then
 
-			# Construct New Comment and Option Setting...
-			new_option="|; Option Auto-Added by LiveConf!\n"
-			new_option="$new_option|;    ${optId}:${opt_label}${id_name}\n"
-			new_option="$new_option|$option = $opt_value\n"
+			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+				echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
+				no_change=1
+			else
+				# Construct New Comment and Option Setting...
+				new_opt="|; Option Auto-Added by LiveConf!\n"
+				new_opt="$new_opt|;    ${optId}:${opt_label}${id_name}\n"
+				new_opt="$new_opt|; $option = $opt_config_value\n"
+				new_opt="$new_opt|$option = $opt_config_value\n"
 
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${end_of_section_line_num}a"$new_option" \
-				$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+				# Goofy Incantation to get Sed to insert a Tab... ;-b
+				sed ${end_of_section_line_num}a"$new_opt" \
+					$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
+			fi
 
 		# Straight Substitution...
 		else
 
-			new_config_line=`echo "$config_current_line" \
-				| sed "s/$config_value/$opt_value/"`
+			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
 
-			sed \
-			"${config_line_num}s/^$config_current_line/$new_config_line/" \
-				$SMSD_CONFIG > $tmpconfig
+				echo -e "\n[DELETING $option Option]."
 
-		fi
+				sed "${config_line_num}d" $SMSD_CONFIG > $tmpconfig
 
-		echo -e "\nModified Config File Differences:"
-		diff -c $SMSD_CONFIG $tmpconfig
-		echo
-
-		echo -n "Replace Current Config File (yes/No)? "
-		read ckrepl
-		ckrepl=`echo "$ckrepl" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckrepl" == "" || "$ckrepl" == "n" \
-				|| "$ckrepl" == "no" ]]; then
-			echo -e "\nSkipping Config File Update at User's Request!\n"
-			do_config=0
-		else
-
-			if [ $testonly == 1 ]; then
-				echo \
-				"[TESTONLY] sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG"
 			else
-				sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
-			fi
-			if [ $? != 0 ]; then
-				echo -e "\nError Copying New Config File to Production:\n"
-				/bin/ls -l $tmpconfig
-				echo
-				/bin/ls -l $SMSD_CONFIG
-				echo
-				/bin/ls -l $LOG
-				/bin/cat $LOG
-				exit -5
-			fi
 
-			any_change=$(( any_change + 1 ))
+				new_config_line=`echo "$config_current_line" \
+					| sed "s/$config_value/$opt_config_value/"`
+
+				sed \
+			"${config_line_num}s/^$config_current_line/$new_config_line/" \
+					$SMSD_CONFIG > $tmpconfig
+
+			fi
 
 		fi
 
-		/bin/rm $tmpconfig
+		if [ $no_change == 0 ]; then
+
+			echo -e "\nModified Config File Differences:"
+			diff -c $SMSD_CONFIG $tmpconfig
+			echo
+
+			echo -n "Replace Current Config File (yes/No)? "
+			read ckrepl
+			ckrepl=`echo "$ckrepl" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckrepl" == "" || "$ckrepl" == "n" \
+					|| "$ckrepl" == "no" ]]; then
+				echo -e \
+					"\nSkipping Config File Update at User's Request!\n"
+				do_config=0
+			else
+
+				if [ $testonly == 1 ]; then
+					echo -n "[TESTONLY] "
+					echo "sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG"
+				else
+					sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
+				fi
+				if [ $? != 0 ]; then
+					echo -e \
+						"\nError Copying New Config File to Production:\n"
+					/bin/ls -l $tmpconfig
+					echo
+					/bin/ls -l $SMSD_CONFIG
+					echo
+					/bin/ls -l $LOG
+					/bin/cat $LOG
+					exit -5
+				fi
+
+				any_change=$(( any_change + 1 ))
+
+			fi
+
+			/bin/rm $tmpconfig
+
+		else
+			echo -e "\nNo Changes Required to Config File."
+		fi
 
 	fi
 
@@ -918,7 +991,7 @@ elif [ "$command" == "option" ]; then
 		fi
 		if [ $? != 0 ]; then
 			echo -e \
-				"\nError Copying Latest Config File into Git Config Repo!\n"
+			"\nError Copying Latest Config File into Git Config Repo!\n"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -8
@@ -941,15 +1014,18 @@ elif [ "$command" == "option" ]; then
 			exit -3
 		fi
 
+		commit_str="Set SMS Live/Config Option:\n"
+		commit_str="$commit_str   ${opt_str} to ${opt_config_str}\n"
+		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
+		commit_str="$commit_str$log_desc\n"
+
 		# Commit the Config File Change...
 		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
-		echo -e "Set SMS Live/Config Option:\n   ${opt_str}\n\n$log_desc\n"
+		echo -e "$commit_str"
 		echo "git commit -F - ."
 
 		if [ $testonly != 1 ]; then
-			echo -e \
-			"Set SMS Live/Config Option:\n   ${opt_str}\n\n$log_desc\n" \
-				| git commit -F - .
+			echo -e "$commit_str" | git commit -F - .
 		fi
 		commit_ok=$?
 
