@@ -89,6 +89,7 @@ option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
 option_pv_opt[$num_options]="-S"
+option_config_supercede[$num_options]="max_blocks_allowed"
 option_value_type[$num_options]="UINT32_VALUE+[G|M]"
 option_label[$num_options]="[Storage Poolsize (Max Blocks Allowed)]"
 num_options=$(( num_options + 1 ))
@@ -96,6 +97,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="storage"
 option_name[$num_options]="percent"
 option_pv[$num_options]="SMS:StorageManager:Percent"
+option_config_supercede[$num_options]="poolsize max_blocks_allowed"
 option_value_type[$num_options]="UINT32_VALUE(percent)"
 option_label[$num_options]="[Percent of Storage (Max Blocks Allowed)]"
 num_options=$(( num_options + 1 ))
@@ -547,22 +549,28 @@ elif [ "$command" == "option" ]; then
 		do_live=0
 	fi
 
-	#
-	# Get Current SMS Daemon Config File Setting
-	#
+#
+# Get Current SMS Daemon Config File Setting
+#
 
-	echo
-
-	do_config=1
+GET_CONFIG_SETTING()
+{
+	local _optId="$1"
+	local _opt_label="$2"
+	local _option="$3"
+	local _opt_config_str="$4"
 
 	echo "Getting Current SMS Daemon Config File Setting for:"
-	echo "   ${optId}:${opt_label}"
+	echo "   ${_optId}:${_opt_label}"
 	echo "   (in $SMSD_CONFIG)"
 
 	WS="^[[:space:]]*$"
 
-	config_list=`grep -n -e '^\[' -e "$option" -e "$WS" $SMSD_CONFIG`
-	config_size=`echo "$config_list" | wc | awk '{print $1}'`
+	local _config_list=""
+	local _config_size=""
+
+	_config_list=`grep -n -e '^\[' -e "${_option}" -e "$WS" $SMSD_CONFIG`
+	_config_size=`echo "${_config_list}" | wc | awk '{print $1}'`
 
 	end_of_section_line_num=""
 
@@ -574,86 +582,101 @@ elif [ "$command" == "option" ]; then
 	config_line_num=""
 	config_value=""
 
-	source_cnt=0
+	local _source_cnt=0
 
-	id_name=""
-	id_type=""
-	id_num=0
+	opt_name=""
 
-	found=0
+	local _id_type=""
+	local _id_num=0
 
-	for (( n=1 ; n <= config_size ; n++ )); do
+	local _found=0
+
+	local _n=0
+
+	for (( _n=1 ; _n <= _config_size ; _n++ )); do
+
+		local _line=""
+		local _line_num=""
+		local _line_rest=""
+		local _line_id=""
+
+		local _is_comment=""
+		local _is_blank=""
+		local _nbytes=""
 
 		# Note: Just strip off _First_ ':' from Line Number -> '|'...
 		# (This preserves the ':' in URI values: "ip_addr:port".)
-		line=`echo "$config_list" | sed -n "${n}p" | sed "s/:/|/"`
-		# echo "config line $n = [$line]"
+		_line=`echo "${_config_list}" | sed -n "${_n}p" | sed "s/:/|/"`
+		# echo "config line ${_n} = [${_line}]"
 
-		line_num=`echo "$line" | awk -F '|' '{print $1}'`
-		# echo "line_num=$line_num"
+		_line_num=`echo "${_line}" | awk -F '|' '{print $1}'`
+		# echo "line_num=${_line_num}"
 
-		line_rest=`echo "$line" | awk -F '|' '{print $2}'`
-		# echo "line_rest=$line_rest"
+		_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
+		# echo "line_rest=${_line_rest}"
 
-		line_id=`echo "$line_rest" | awk -F '[][]' '{print $2}'`
-		# echo "line_id=$line_id"
+		_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
+		# echo "line_id=${_line_id}"
 
-		is_comment=`echo "$line_rest" | grep ';' | wc | awk '{print $1}'`
+		_is_comment=`echo "${_line_rest}" | grep ';' | wc \
+			| awk '{print $1}'`
 
-		nbytes=`echo "$line_rest" | awk '{print $1}' |wc| awk '{print $2}'`
-		if [ $nbytes == 0 ]; then
-			is_blank=1
+		_nbytes=`echo "${_line_rest}" | awk '{print $1}' | wc \
+			| awk '{print $2}'`
+		if [ ${_nbytes} == 0 ]; then
+			_is_blank=1
 		else
-			is_blank=0
+			_is_blank=0
 		fi
 
 		# Option Line
-		if [ "$line_id" == "" ]; then
+		if [ "${_line_id}" == "" ]; then
 
 			# echo "Config Option Line..."
 
-			if [ "#$is_blank#" == '#1#' ]; then
-				# echo "Blank Line at line $line_num [$line_rest]"
-				last_blank_line_num="$line_num"
+			if [ "#${_is_blank}#" == '#1#' ]; then
+				# echo "Blank Line at line ${_line_num} [${_line_rest}]"
+				last_blank_line_num="${_line_num}"
 				continue;
 			fi
 
-			if [[ "$id_type" == "$opt_id_type" \
-					&& "$id_num" == "$opt_id_num" ]]; then
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
 
-				if [ "#$is_comment#" == '#1#' ]; then
-					# echo "Comment: (line $line_num) [$line_rest]"
-					last_comment_line="$line_rest"
-					last_comment_line_num="$line_num"
+				if [ "#${_is_comment}#" == '#1#' ]; then
+					# echo "Comment: (line ${_line_num}) [${_line_rest}]"
+					last_comment_line="${_line_rest}"
+					last_comment_line_num="${_line_num}"
 					continue;
 				fi
 
 				# echo "Match!"
 
-				config_current_line="$line_rest"
+				config_current_line="${_line_rest}"
 				# echo "Config File Line = ${config_current_line}."
 
-				config_line_num="$line_num"
+				config_line_num="${_line_num}"
 				# echo "Config File Line Number = ${config_line_num}."
 
-				config_value=`echo "$line_rest" | awk -F '=' '{print $2}'`
+				config_value=`echo "${_line_rest}" \
+					| awk -F '=' '{print $2}'`
 				config_value=`echo "$config_value" | sed "s/ //g"`
 				# echo -n "Config File Option "
-				# echo "${optId}:${opt_label} = ${config_value}."
+				# echo "${_optId}:${_opt_label} = ${config_value}."
 
-				found=$(( found + 1 ))
+				_found=$(( _found + 1 ))
 
 			fi
 
 		# SMS or Source Line
 		else
 
-			# echo "id_type=$id_type opt_id_type=$opt_id_type"
-			# echo "id_num=$id_num opt_id_num=$opt_id_num"
+			# echo "id_type=${_id_type} opt_id_type=$opt_id_type"
+			# echo "id_num=${_id_num} opt_id_num=$opt_id_num"
 
 			# Mark End of Previous Section, If It's What We Want...
-			if [[ "$id_type" == "$opt_id_type" \
-					&& "$id_num" == "$opt_id_num" ]]; then
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
 				#echo -n "Marking End of Requested Section "
 				#echo "at Line $last_blank_line_num."
 				# Use "Last Blank Line" Number,
@@ -662,42 +685,44 @@ elif [ "$command" == "option" ]; then
 			fi
 
 			# Set Up for New Section...
-			id_type=`echo "$line_id" | awk '{print $1}'`
-			if [ "$id_type" == "source" ]; then
-				source_name=`echo "$line_id" | sed "s/^source //"`
-				source_cnt=$(( source_cnt + 1 ))
-				id_num="$source_cnt"
-				if [[ "$id_type" == "$opt_id_type" \
-						&& "$id_num" == "$opt_id_num" ]]; then
-					id_name=" (${source_name})"
+			_id_type=`echo "${_line_id}" | awk '{print $1}'`
+			if [ "${_id_type}" == "source" ]; then
+				local _source_name=`echo "${_line_id}" \
+					| sed "s/^source //"`
+				_source_cnt=$(( _source_cnt + 1 ))
+				_id_num="$_source_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_name=" (${_source_name})"
 				fi
-				# echo "Source #${source_cnt}: ${source_name} Section."
-			elif [ "$id_type" == "sms" ]; then
-				id_num="-1"
+				# echo "Source #${_source_cnt}: ${_source_name} Section."
+			elif [ "${_id_type}" == "sms" ]; then
+				_id_num="-1"
 				# echo "SMS Section."
-			elif [ "$id_type" == "storage" ]; then
-				id_num="-1"
+			elif [ "${_id_type}" == "storage" ]; then
+				_id_num="-1"
 				# echo "Storage Section."
-			elif [ "$id_type" == "livestream" ]; then
-				id_num="-1"
+			elif [ "${_id_type}" == "livestream" ]; then
+				_id_num="-1"
 				# echo "Live Streaming Section."
-			elif [ "$id_type" == "stsclient" ]; then
+			elif [ "${_id_type}" == "stsclient" ]; then
 				# Abbreviate STS Client Id Type...
-				id_type="sts"
-				id_num="-1"
+				_id_type="sts"
+				_id_num="-1"
 				# echo "STS Client Section."
 			fi
 		fi
 
 	done
 
-	opt_str="${optId}:${opt_label}${id_name}"
+	opt_str="${_optId}:${_opt_label}${opt_name}"
 
 	config_end_of_section=0
 	config_use_comment=0
 
-	if [[ $found == 0 ]]; then
-		echo -e "\nWARNING: Active \"${option}\" Option Setting Not Found!"
+	if [[ ${_found} == 0 ]]; then
+		echo -e -n "\nWARNING: Active \"${_option}\" Option "
+		echo "Setting Not Found!"
 		if [[ "#$last_comment_line_num#" != '##' ]]; then
 			echo -n "   Using Last Comment: (line $last_comment_line_num) "
 			echo "[$last_comment_line]"
@@ -707,8 +732,8 @@ elif [ "$command" == "option" ]; then
 			echo "   End of Section at line $end_of_section_line_num."
 			config_value="(not found)"
 			config_end_of_section=1
-		elif [[ "$id_type" == "$opt_id_type" \
-				&& "$id_num" == "$opt_id_num" ]]; then
+		elif [[ "${_id_type}" == "$opt_id_type" \
+				&& "${_id_num}" == "$opt_id_num" ]]; then
 			echo "   End of File at Last Section... ;-)"
 			end_of_section_line_num=`wc $SMSD_CONFIG | awk '{print $1}'`
 			echo "   End of Section at line $end_of_section_line_num."
@@ -717,23 +742,34 @@ elif [ "$command" == "option" ]; then
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
 			echo "   ${opt_str}"
-			echo "      to ${opt_config_str}"
+			echo "      to ${_opt_config_str}"
 			do_config=0
 		fi
-	elif [[ $found > 1 ]]; then
+	elif [[ ${_found} > 1 ]]; then
 		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
-		echo "\"${option}\" Option Settings!"
+		echo "\"${_option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
 		echo "   ${opt_str}"
-		echo "      to ${opt_config_str}"
+		echo "      to ${_opt_config_str}"
 		do_config=0
 	fi
 
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
-		echo "   ${optId}:${opt_label}${id_name}"
-		echo "   ${option} = ${config_value}."
+		echo "   ${_optId}:${_opt_label}${opt_name}"
+		echo "   ${_option} = ${config_value}."
 	fi
+}
+
+	#
+	# Get Current SMS Daemon Config File Setting
+	#
+
+	echo
+
+	do_config=1
+
+	GET_CONFIG_SETTING "$optId" "$opt_label" "$option" "$opt_config_str"
 
 	#
 	# Update Live SMS Daemon Option Setting
@@ -745,7 +781,7 @@ elif [ "$command" == "option" ]; then
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${id_name}"
+		echo "   ${optId}:${opt_label}${opt_name}"
 		echo "      = ${opt_value}"
 		echo -e "\nDone."
 	else
@@ -772,7 +808,7 @@ elif [ "$command" == "option" ]; then
 			caput $opt_pv_opt ${PRE}:${PV} "$opt_value"
 		fi
 		if [ $? != 0 ]; then
-			echo "Error Setting ${optId}:${opt_label}${id_name}...!"
+			echo "Error Setting ${optId}:${opt_label}${opt_name}...!"
 			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -793,7 +829,7 @@ elif [ "$command" == "option" ]; then
 		echo "Skipping Config File Option Set."
 	elif [ "$opt_config_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${id_name}"
+		echo "   ${optId}:${opt_label}${opt_name}"
 		echo "      = ${opt_config_value}"
 		echo -e "\nDone."
 	else
@@ -842,7 +878,7 @@ elif [ "$command" == "option" ]; then
 			else
 				# Construct New Comment and Option Setting...
 				new_opt="|; Option Auto-Added by LiveConf!\n"
-				new_opt="$new_opt|;    ${optId}:${opt_label}${id_name}\n"
+				new_opt="$new_opt|;    ${optId}:${opt_label}${opt_name}\n"
 				new_opt="$new_opt|; $option = $opt_config_value\n"
 				new_opt="$new_opt|$option = $opt_config_value\n"
 
