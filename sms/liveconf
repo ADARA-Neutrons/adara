@@ -395,10 +395,23 @@ elif [ "$command" == "option" ]; then
 	fi
 	# echo "opt_id_num=$opt_id_num optId=$optId"
 
-	# Identify Option, Set Option-Specific Parameters and Information...
+#
+# Identify Option, Set Option-Specific Parameters and Information...
+#
+# Uses:
+#    $opt_id_type $option $opt_value
+#    $option_id_type[] $option_name[] $option_pv[]
+#    $opt_id_num $is_indexed[]
+#
+# Sets:
+#    $opt_id_type
+#    $opt_pv_opt $opt_config_supercede $opt_value_type $opt_label
+#    $opt_config_value $opt_config_str
+#    $option
+#
 
-	PV=""
-
+GET_OPTION_INFO()
+{
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
 
 		if [[ "$opt_id_type" == "${option_id_type[$i]}"
@@ -420,6 +433,8 @@ elif [ "$command" == "option" ]; then
 
 			opt_pv_opt="${option_pv_opt[$i]}"
 
+			opt_config_supercede="${option_config_supercede[$i]}"
+
 			opt_value_type="${option_value_type[$i]}"
 
 			opt_label="${option_label[$i]}"
@@ -428,15 +443,6 @@ elif [ "$command" == "option" ]; then
 		fi
 
 	done
-
-	if [ "#$PV#" == '##' ]; then
-		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
-		exit -1
-	fi
-
-	# echo "PV=$PV opt_label=$opt_label"
-
-	echo -e "Setting Option ${optId}:${opt_label} to ${opt_value}.\n"
 
 	#
 	# Special Case:
@@ -464,10 +470,30 @@ elif [ "$command" == "option" ]; then
 			opt_config_str="[Disabled: $option = $opt_config_value]"
 		else
 			echo -e -n "\nError: Unknown Enabled/Disabled "
-			echo -e "Option Value [$option]...! Bailing...\n"
+			echo -e "Option Value [${option}]...! Bailing...\n"
 			exit -1
 		fi
 	fi
+}
+
+	#
+	# Identify Option, Set Option-Specific Parameters and Information...
+	#
+
+	PV=""
+
+	GET_OPTION_INFO
+
+	# echo "PV=$PV opt_label=$opt_label"
+
+	if [ "#$PV#" == '##' ]; then
+		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
+		exit -1
+	fi
+
+	echo "Setting Option:"
+	echo "   ${optId}:${opt_label}"
+	echo -e "      to ${opt_value}.\n"
 
 	#
 	# Prompt for Live/Config Option Change Log Description Text [Required!]
@@ -551,6 +577,20 @@ elif [ "$command" == "option" ]; then
 
 #
 # Get Current SMS Daemon Config File Setting
+#
+# Uses:
+#    $SMSD_CONFIG
+#    $opt_id_type $opt_id_num
+#
+# Sets:
+#    $WS
+#    $end_of_section_line_num
+#    $last_comment_line_num $last_comment_line
+#    $last_blank_line_num
+#    $config_line_num $config_value
+#    $opt_id_name
+#    $opt_str
+#    $config_end_of_section $config_use_comment
 #
 
 GET_CONFIG_SETTING()
@@ -787,8 +827,8 @@ GET_CONFIG_SETTING()
 	else
 
 		echo "Proceed to Set Live Option:"
-		echo "      ${opt_str}"
-		echo -n "   to ${opt_value} (yes/No)? "
+		echo "   ${opt_str}"
+		echo -n "      to ${opt_value} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -800,8 +840,8 @@ GET_CONFIG_SETTING()
 		fi
 
 		echo "Setting Live SMS Daemon Option:"
-		echo "      ${opt_str}"
-		echo "   to ${opt_value}."
+		echo "   ${opt_str}"
+		echo "      to ${opt_value}."
 		if [ $testonly == 1 ]; then
 			echo "[TESTONLY] caput $opt_pv_opt ${PRE}:${PV} $opt_value"
 		else
@@ -822,17 +862,30 @@ GET_CONFIG_SETTING()
 #
 # Update Current SMS Daemon Config File Setting
 #
+# Uses:
+#    $option $opt_config_value
+#    $optId $opt_label $opt_id_name
+#    $config_use_comment $last_comment_line_num
+#    $config_end_of_section $end_of_section_line_num
+#    $config_current_line $config_line_num $config_value
+#
+# Sets:
+#    $changed
+#
 
 UPDATE_CONFIG_FILE()
 {
 	local _src_config="$1"
 	local _dst_config="$2"
 
+	local _no_change=0
+
 	# Append New Config Option Reference After Last Comment...
 	if [ $config_use_comment == 1 ]; then
 
 		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
 			echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
+			_no_change=1
 		else
 			# Goofy Incantation to get Sed to insert a Tab... ;-b
 			sed ${last_comment_line_num}a"|$option = $opt_config_value" \
@@ -845,6 +898,7 @@ UPDATE_CONFIG_FILE()
 
 		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
 			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
+			_no_change=1
 		else
 			# Construct New Comment and Option Setting...
 			local _new_opt=""
@@ -883,6 +937,18 @@ UPDATE_CONFIG_FILE()
 		fi
 
 	fi
+
+	# Force temporary output file creation, even if no changes...
+	if [[ ${_no_change} == 1 ]]; then
+		cp ${_src_config} ${_dst_config}
+		if [ $? != 0 ]; then
+			echo -e \
+			"\nError Copying Unchanged Config File into Temp Config!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -111
+		fi
+	fi
 }
 
 	#
@@ -901,8 +967,8 @@ UPDATE_CONFIG_FILE()
 	else
 
 		echo "Proceed to Set Config File Option:"
-		echo "      ${opt_str}"
-		echo -n "   to ${opt_config_str} (yes/No)? "
+		echo "   ${opt_str}"
+		echo -n "      to ${opt_config_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -915,14 +981,63 @@ UPDATE_CONFIG_FILE()
 
 		echo
 		echo "Setting SMS Daemon Config File Option:"
-		echo "      ${opt_str}"
-		echo "   to ${opt_config_str}."
+		echo "   ${opt_str}"
+		echo "      to ${opt_config_str}."
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
 		changed=0
 
 		UPDATE_CONFIG_FILE $SMSD_CONFIG $tmpconfig
+
+		# Construct Preliminary Config Repo Commit Log...
+		# (with _Original_ option name/value, before we muck with them...!)
+		commit_str="Set SMS Live/Config Option:\n"
+		commit_str="$commit_str   ${opt_str}\n"
+		commit_str="$commit_str      to ${opt_config_str}\n"
+		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
+
+		# Handle Any Higher Precedence Config File Options...!
+
+		for sup_opt in $opt_config_supercede ; do
+
+			echo
+			echo "*** Deactivating Higher Precedence Config File Option!"
+			echo -e "\n   $sup_opt\n"
+
+			# Get Superceding Option Settings
+
+			option="$sup_opt"
+			opt_value="XXX_DELETE_XXX"
+
+			GET_OPTION_INFO
+
+			# Get Superceding Option Details from Config File...
+
+			GET_CONFIG_SETTING \
+				"$optId" "$opt_label" "$option" "$opt_config_str"
+
+			# Deactivate Option in Config File...
+
+			newtmpconfig="$TMP_DIR/smsd.conf-liveconf.$option.$$"
+
+			UPDATE_CONFIG_FILE $tmpconfig $newtmpconfig
+
+			# Append Superceded Option Change to Config Repo Commit Log...
+			temp="Also Disabled Superceding Config File Option"
+			commit_str="${commit_str}${temp}:\n"
+			commit_str="$commit_str   ${opt_str}\n"
+			commit_str="$commit_str      set to ${opt_config_str}\n\n"
+
+			# Switch to New Temp Config...
+
+			/bin/rm $tmpconfig
+
+			tmpconfig="$newtmpconfig"
+
+		done
+
+		# Actually Replace Current Config with Any Modified Config File
 
 		newconfig="$tmpconfig"
 
@@ -955,6 +1070,8 @@ UPDATE_CONFIG_FILE()
 					echo
 					/bin/ls -l $SMSD_CONFIG
 					echo
+					echo -e "$commit_str"
+					echo
 					/bin/ls -l $LOG
 					/bin/cat $LOG
 					exit -5
@@ -964,11 +1081,12 @@ UPDATE_CONFIG_FILE()
 
 			fi
 
-			/bin/rm $tmpconfig
-
 		else
 			echo -e "\nNo Changes Required to Config File."
 		fi
+
+		# Temporary (Possibly-Modified) Config File Now _Always Created.
+		/bin/rm $tmpconfig
 
 	fi
 
@@ -991,6 +1109,7 @@ UPDATE_CONFIG_FILE()
 		cd $CONFIG_REPO
 		if [ $? != 0 ]; then
 			echo -e "\nError: Git Config Repository Path Invalid!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -4
@@ -1002,6 +1121,7 @@ UPDATE_CONFIG_FILE()
 			| wc | awk '{print $1}'`
 		if [ "$repo_ck" != 1 ]; then
 			echo -e "\nError: This is _Not_ the Git Config Repository!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -5
@@ -1013,6 +1133,7 @@ UPDATE_CONFIG_FILE()
 		if [ $? != 0 ]; then
 			echo -e \
 				"\nError Checking Out Git Config Branch $config_branch!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -7
@@ -1033,6 +1154,7 @@ UPDATE_CONFIG_FILE()
 				|| "$ckupdate" == "no" ]]; then
 			echo -e \
 			"\nSkipping Git Config Repository Update at User's Request!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -3
@@ -1047,6 +1169,7 @@ UPDATE_CONFIG_FILE()
 		if [ $? != 0 ]; then
 			echo -e \
 			"\nError Copying Latest Config File into Git Config Repo!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -8
@@ -1064,15 +1187,13 @@ UPDATE_CONFIG_FILE()
 		if [[ "$ckcommit" == "" || "$ckcommit" == "n" \
 				|| "$ckcommit" == "no" ]]; then
 			echo -e "\nSkipping Config File Commit at User's Request!\n"
+			echo -e "$commit_str"
 			/bin/ls -l $LOG
 			/bin/cat $LOG
 			exit -3
 		fi
 
-		commit_str="Set SMS Live/Config Option:\n"
-		commit_str="$commit_str   ${opt_str}\n"
-		commit_str="$commit_str      to ${opt_config_str}\n"
-		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
+		# Finally Append Required User Log Description...
 		commit_str="$commit_str$log_desc\n"
 
 		# Commit the Config File Change...
