@@ -27,6 +27,7 @@ public:
 	 */
 	int get_fd(void);
 	void put_fd(void);
+	std::string path(void) const { return m_path; }
 	bool active(void) const { return m_active; }
 	bool oversize(void) const { return m_oversize; }
 	off_t size(void) const { return m_size; }

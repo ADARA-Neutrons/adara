@@ -37,8 +37,8 @@ public:
         return ADARA::Parser::bufferBytesAppended( count);
     }
     
-    int bufferParse(unsigned int max_packets = 0) {
-        return ADARA::Parser::bufferParse( max_packets);
+    int bufferParse(std::string & log_info, unsigned int max_packets = 0) {
+        return ADARA::Parser::bufferParse( log_info, max_packets );
     }
 
 protected:
@@ -235,7 +235,10 @@ int main(int argc, char **argv)
         }
         
         p.bufferBytesAppended(std::cin.gcount());
-        p.bufferParse();
+
+		std::string log_info;
+        p.bufferParse(log_info);
+		std::cerr << "Buffer Parse returned: " << log_info << std::endl;
     }
     
     return 0;

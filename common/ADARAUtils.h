@@ -1,12 +1,12 @@
 /*
- * File:   Utils.h
+ * File:   ADARAUtils.h
  * Author: d3s
  *
  * Created on July 23, 2012, 3:42 PM
  */
 
-#ifndef UTILS_H
-#define	UTILS_H
+#ifndef ADARA_UTILS_H
+#define	ADARA_UTILS_H
 
 #include <math.h>
 #include <sys/types.h>
@@ -18,8 +18,19 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <errno.h>
 
 #include "ADARA.h"
+
+// Macro to cut down on compiler warnings.
+// from Dr. Martin Ettl article:
+//     https://sites.google.com/site/opensourceconstriubtions/
+//     ettl-martin-1/articles/suppress-unused-parameter-compiler-warning
+#if 1  // there should be no more any compilers needing the "#else" version
+	#define UNUSED(x) /* x */
+#else  // stupid, broken compiler
+	#define UNUSED(x) x
+#endif
 
 /*! \class Statistics
  *
@@ -46,7 +57,7 @@ public:
         }
         else
         {
-            m_new_M = m_old_M + (a_value - m_old_M)/m_n;
+            m_new_M = m_old_M + (a_value - m_old_M) / ((double) m_n);
             m_S = m_S + (a_value - m_old_M)*(a_value - m_new_M);
             m_old_M = m_new_M;
 
@@ -62,7 +73,8 @@ public:
     /// Returns mean value of sequence
     inline double      mean() const { return m_new_M; }
     /// Returns variance of sequence
-    inline double      variance() const { return m_n>1?m_S/(m_n-1):0.0; }
+    inline double      variance() const
+		{ return ( ( m_n > 1 ) ? ( m_S / ((double) (m_n - 1) ) ) : 0.0 ); }
     /// Returns standard deviation of sequence
     inline double      stdDev() const { return m_n>1?sqrt(variance()):0.0; }
     /// Returns minimum value of sequence
@@ -102,6 +114,58 @@ private:
 };
 
 
+/* ---------------------------------------------------------------------- */
+class Utils {
+
+public:
+
+	/**
+	 * @brief Sends data over socket/fd
+	 * @param a_fd - file descriptor to write to
+	 * @param a_buffer - data buffer to send
+	 * @param a_len - length of data buffer
+	 * @return true on success, false on error
+	 **/
+	static bool sendBytes( int a_fd, const char *a_buffer, size_t a_len,
+		std::string & log_info )
+	{
+		ssize_t ec = 0;
+		size_t bytes_sent = 0;
+
+		while ( bytes_sent < a_len )
+		{
+			if (( ec = ::write( a_fd,
+					a_buffer + bytes_sent, a_len - bytes_sent )) < 0 )
+			{
+				// Save errno locally
+				int errn = errno;
+
+				switch ( errn )
+				{
+					case EAGAIN:	// This shouldn't occur,
+									// as socket should be blocking...
+					case EINTR:
+						continue;	// Try again
+
+					default:
+						log_info = "sendBytes() write() failed: ";
+						log_info.append( strerror( errn ) );
+						break;
+				}
+
+				return false;
+			}
+			else
+			{
+				bytes_sent += (size_t)ec;
+			}
+		}
+
+		return true;
+	}
+};
+
+
 /*! \brief Converts a timespec struct to nanoseconds
  *  \return Time value in nanoseconds
  */
@@ -131,17 +195,20 @@ inline struct timespec nsec_to_timespec
 }
 
 
-/*! \brief Calcultes T1 - T2
- *  \return Difference in microseconds
+/*! \brief Calculates Elapsed Time (Duration) = endTime - startTime
+ *  \return Difference in seconds (up to nanosecond precision)
  */
 inline double
 calcDiffSeconds
 (
-    const struct timespec &a_ts1,   ///< [in] Base time value
-    const struct timespec &a_ts2    ///< [in] Time value to subtract from base
+	const struct timespec &a_endTime,   ///< [in] Ending Time value
+	const struct timespec &a_startTime  ///< [in] Starting Time value
 )
 {
-    return ( a_ts1.tv_sec + ( a_ts1.tv_nsec * 1.0e-9 )) - ( a_ts2.tv_sec + ( a_ts2.tv_nsec * 1.0e-9 ));
+	return( ( ((double) a_endTime.tv_sec)
+			+ ( ((double) a_endTime.tv_nsec) * 1.0e-9 ) )
+		- ( ((double) a_startTime.tv_sec)
+			+ ( ((double) a_startTime.tv_nsec) * 1.0e-9 ) ) );
 }
 
 
@@ -213,5 +280,5 @@ genTempName()
 }
 
 
-#endif	/* UTILS_H */
+#endif	/* ADARA_UTILS_H */
 

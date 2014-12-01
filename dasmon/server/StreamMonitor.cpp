@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <fcntl.h>
-#include "Utils.h"
+#include "ADARAUtils.h"
 #include <syslog.h>
 
 
@@ -230,6 +230,8 @@ StreamMonitor::stopProcessing()
 void
 StreamMonitor::processThread()
 {
+    std::string log_info;
+
     syslog( LOG_INFO, "Stream monitor process thread started." );
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
@@ -249,9 +251,10 @@ StreamMonitor::processThread()
                     else
                         sleep(5);
                 }
-                else if ( !read( m_fd_in, 0, ADARA_IN_BUF_SIZE ))
+                // NOTE: This is POSIXParser::read()... ;-o
+                else if ( !read( m_fd_in, log_info, 0, ADARA_IN_BUF_SIZE ))
                 {
-                    syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0. Dropping connection." );
+                    syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0 (%s). Dropping connection.", log_info.c_str() );
                     // Connection lost due to source closing socket
                     handleLostConnection();
                 }
@@ -512,12 +515,14 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         // Packet types that are not processes by StreamParser
         case ADARA::PacketType::GEOMETRY_V0:
         case ADARA::PacketType::RAW_EVENT_V0:
+        case ADARA::PacketType::MAPPED_EVENT_V0:
         case ADARA::PacketType::RTDL_V0:
         case ADARA::PacketType::SOURCE_LIST_V0:
         case ADARA::PacketType::TRANS_COMPLETE_V0:
         case ADARA::PacketType::CLIENT_HELLO_V0:
         case ADARA::PacketType::SYNC_V0:
         case ADARA::PacketType::HEARTBEAT_V0:
+        case ADARA::PacketType::DATA_DONE_V0:
             break;
         default:
             ++m_stream_metrics.m_invalid_pkt_type;
@@ -1387,7 +1392,7 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    switch( a_pkt.type() )
+    switch( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::SCAN_START:
         m_scanning = true;

@@ -102,6 +102,16 @@ private:
 	RawDataPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
+	friend class MappedDataPkt;
+};
+
+class MappedDataPkt : public RawDataPkt {
+public:
+	MappedDataPkt(const MappedDataPkt &pkt);
+private:
+	MappedDataPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
 };
 
 class RTDLPkt : public Packet {
@@ -276,7 +286,7 @@ public:
 	AnnotationPkt(const AnnotationPkt &pkt);
 
 	bool resetHint(void) const { return !!(m_fields[0] & 0x80000000); }
-	MarkerType::Enum type(void) const {
+	MarkerType::Enum marker_type(void) const {
 		uint16_t type = (m_fields[0] >> 16) & 0x7fff;
 		return static_cast<MarkerType::Enum>(type);
 	}
@@ -348,6 +358,16 @@ private:
 	std::string m_longName;
 
 	BeamlineInfoPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
+class DataDonePkt : public Packet {
+public:
+	DataDonePkt(const DataDonePkt &pkt);
+
+private:
+	DataDonePkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };

@@ -96,6 +96,19 @@ RawDataPkt::RawDataPkt(const RawDataPkt &pkt) :
 
 /* ------------------------------------------------------------------------ */
 
+MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
+	RawDataPkt(data, len)
+{
+	if (m_payload_len < (6 * sizeof(uint32_t)))
+		throw invalid_packet("MappedDataPacket is too short");
+}
+
+MappedDataPkt::MappedDataPkt(const MappedDataPkt &pkt) :
+	RawDataPkt(pkt)
+{}
+
+/* ------------------------------------------------------------------------ */
+
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
@@ -335,6 +348,19 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 BeamlineInfoPkt::BeamlineInfoPkt(const BeamlineInfoPkt &pkt) :
 	Packet(pkt), m_id(pkt.m_id), m_shortName(pkt.m_shortName),
 	m_longName(pkt.m_longName)
+{}
+
+/* ------------------------------------------------------------------------ */
+
+DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len)
+{
+	if (m_payload_len)
+		throw invalid_packet("DataDone packet is incorrect size");
+}
+
+DataDonePkt::DataDonePkt(const DataDonePkt &pkt) :
+	Packet(pkt)
 {}
 
 /* ------------------------------------------------------------------------ */

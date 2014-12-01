@@ -4,6 +4,7 @@
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
+#include "ADARAUtils.h"
 
 using namespace std;
 
@@ -815,7 +816,7 @@ void
 NxGen::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
-    unsigned long a_scan_index,         ///< [in] Scan index associated with scan
+    unsigned long UNUSED(a_scan_index), ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {

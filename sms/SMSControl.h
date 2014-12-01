@@ -41,14 +41,16 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
+	std::string getBeamlineId(void) { return m_beamlineId; }
+
 	void sourceUp(uint32_t smsId);
 	void sourceDown(uint32_t smsId);
 
 	uint32_t registerEventSource(uint32_t hwId);
 	void unregisterEventSource(uint32_t smsId);
 
-	void pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
-			 uint32_t dup);
+	void pulseEvents(const ADARA::RawDataPkt &pkt,
+			uint32_t hwId, uint32_t dup, bool is_mapped);
 	void pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup);
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
@@ -56,6 +58,8 @@ public:
 
 	void resetSourcesReadDelay(void);
 	void setSourcesReadDelay(void);
+
+	void resetPacketStats(void);
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
@@ -121,7 +125,7 @@ private:
 		PulseIdentifier				m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
-		SourceMap				m_sources;
+		SourceMap				m_pulseSources;
 		MonitorMap				m_monitors;
 		ChopperMap				m_chopperEvents;
 		EventVector				m_fastMetaEvents;
@@ -153,7 +157,7 @@ private:
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
-	std::vector<boost::shared_ptr<DataSource> > m_sources;
+	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
 	PulseMap m_pulses;
@@ -190,7 +194,7 @@ private:
 
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
-				const boost::property_tree::ptree &info);
+				const boost::property_tree::ptree &info, bool enabled);
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);

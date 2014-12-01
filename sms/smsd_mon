@@ -20,6 +20,32 @@ SMSD="smsd"
 
 SMSD_LOG="/var/log/smsd.log"
 
+PROG="smsd_mon"
+
+TIME="/usr/bin/time" # for Test Harness, duh... ;-b
+
+#
+# Parse Command Line Options... ;-)
+#
+
+do_notify=1
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [ "#$key#" == '#--no_notify#' ]; then
+		do_notify=0
+	elif [ "#$key#" == '#--smsd_user#' ]; then
+		SMSD_USER="$value"
+	elif [ "#$key#" == '#--help#' ]; then
+		echo "usage:  smsd_mon [--no_notify] [--smsd_user=y8y]"
+		exit 0
+	fi
+
+done
+
 #
 # Get SMS Daemon process status...
 #
@@ -27,13 +53,19 @@ SMSD_LOG="/var/log/smsd.log"
 date=`date`
 #echo "date=$date"
 
-status=`ps augxww | grep $SMSD | grep $SMSD_USER`
+status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_USER`
 #echo "status=$status"
 
 if [ "#$status#" == '##' ]; then
-	echo \
+
+	if [ $do_notify == 1 ]; then
+		echo \
 		"Error on ${host}: SMS Daemon $SMSD Not Running as User $SMSD_USER!"
-	exit -1
+		exit -1
+	else
+		# Just Exit Cleanly, Nothing to log here... ;-D
+		exit 0
+	fi
 fi
 
 # Extract statistics of interest
@@ -96,9 +128,9 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	smsd_top_logdir=`echo $SMSD_LOG | awk -F '/' '{print "/"$2}'`
 
-	log_used=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-3)}'`
+	log_used=`df $SMSD_LOG | tail -1 | awk '{print $(NF-3)}'`
 	#echo "log_used=$log_used"
-	log_avail=`df $SMSD_LOG | grep $smsd_top_logdir | awk '{print $(NF-2)}'`
+	log_avail=`df $SMSD_LOG | tail -1 | awk '{print $(NF-2)}'`
 	#echo "log_avail=$log_avail"
 
 	pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))

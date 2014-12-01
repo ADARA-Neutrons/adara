@@ -14,26 +14,34 @@ struct addrinfo;
 
 class HWSource;
 class smsStringPV;
+class smsEnabledPV;
 class smsConnectedPV;
+class smsFloat64PV;
 class smsBooleanPV;
 
 class DataSource : public ADARA::POSIXParser {
 public:
-	DataSource(const std::string &name, const std::string &uri,
-		uint32_t id, const std::string beamlineId,
+	DataSource(const std::string &name, bool enabled,
+		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, unsigned int read_chunk);
 	~DataSource();
 
 	bool m_readDelay;
 
+	void resetPacketStats(void);
+
+	void enabled(void);
+	void disabled(void);
+
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
 	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;
 
-	enum State { IDLE, CONNECTING, ACTIVE };
+	enum State { DISABLED, IDLE, CONNECTING, ACTIVE };
 
 	std::string m_name;
+	bool m_enabled;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
@@ -48,7 +56,11 @@ private:
 	unsigned int m_max_read_chunk;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
+	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 
 	uint64_t m_lastRTDLPulseId;
@@ -61,18 +73,25 @@ private:
 	void connectComplete(void);
 	void dataReady(void);
 
-	void unregisterHWSources(bool isSourceDown);
-	void connectionFailed(void);
+	void dumpLastReadStats(std::string who);
+
+	void unregisterHWSources(bool isSourceDown, std::string why);
+	void connectionFailed(bool dumpDiscarded, State new_state);
 
 	bool timerExpired(void);
 
 	bool rxPacket(const ADARA::Packet &pkt);
+
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
 			   const uint8_t *chunk, unsigned int chunk_offset,
 			   unsigned int chunk_len);
 
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
+	bool rxPacket(const ADARA::MappedDataPkt &pkt);
+
+	bool handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped);
+
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::SourceListPkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);

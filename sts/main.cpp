@@ -40,6 +40,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "TransCompletePkt.h"
 #include "TraceException.h"
 #include "NxGen.h"
@@ -295,7 +296,8 @@ int main( int argc, char** argv )
 
         sms_reason = e.toString( true, true );
 
-        syslog( LOG_INFO, "[%i] TraceException: %s", g_pid, sms_reason.c_str() );
+        syslog( LOG_INFO,
+            "[%i] STS failed: %s", g_pid, sms_reason.c_str() );
     }
     catch( exception &e )
     {
@@ -303,7 +305,8 @@ int main( int argc, char** argv )
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        syslog( LOG_INFO, "[%i] Exception: %s", g_pid, sms_reason.c_str() );
+        syslog( LOG_INFO,
+            "[%i] STS failed: Exception: %s", g_pid, sms_reason.c_str() );
     }
     catch( ... )
     {
@@ -311,11 +314,12 @@ int main( int argc, char** argv )
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
 
-        syslog( LOG_INFO, "[%i] Unknown exception.", g_pid );
+        syslog( LOG_INFO, "[%i] STS failed: Unknown exception.", g_pid );
     }
 
     if ( sms_code != STS::TS_SUCCESS )
-        syslog( LOG_INFO, "[%i] Translation failed. code: %u", g_pid, (unsigned int)sms_code );
+        syslog( LOG_INFO, "[%i] STS failed: Translation failed. code: %u",
+            g_pid, (unsigned int)sms_code );
     else
         syslog( LOG_INFO, "[%i] Translation succeeded", g_pid );
 
@@ -327,9 +331,88 @@ int main( int argc, char** argv )
         }
 
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
-        ::write( outfd, ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength());
+        uint32_t heartbeat_pkt[4] = {0,0x00400900,0,0};
 
-        syslog( LOG_INFO, "[%i] Notified SMS of translation status", g_pid );
+        // Send ACK/NACK packet to SMS - go to extra effort to ensure the message is sent and
+        // any errors are detected. The second write of 1 byte after the message is sent is
+        // required due to limitations of tcp in detecting dropped connections. If the connection
+        // has been lost, the first write may or may not detect an error, but the second write
+        // (of the heartbeat packet) will fail.
+        // Also, the connection must be shutdown properly with shutdown(), and we must wait for
+        // the SMS to drop the connection when read() returns 0. This prevents the connection from
+        // being reset before the data is actually sent.
+
+        // Ignore SIGPIPE signals so we can get error codes from write()
+        signal( SIGPIPE, SIG_IGN );
+
+        bool send_status = false;
+
+        std::string log_info;
+
+        send_status |= Utils::sendBytes( outfd,
+            ack_pkt.getMessageBuffer(), ack_pkt.getMessageLength(),
+            log_info );
+
+        if ( !send_status )
+        {
+            syslog( LOG_INFO,
+                "[%i] STS failed: Translation Complete Message: %s",
+                g_pid, log_info.c_str() );
+        }
+
+        send_status |= Utils::sendBytes( outfd,
+            (char*)heartbeat_pkt, sizeof(heartbeat_pkt), log_info );
+
+        if ( send_status )
+        {
+            syslog( LOG_INFO,
+                "[%i] Notified SMS of translation status", g_pid );
+        }
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] STS failed: Translation Complete/Heartbeat Msg: %s",
+                g_pid, log_info.c_str() );
+        }
+
+        // Request shutdown of write socket - should initiate buffer flush
+        shutdown( outfd, SHUT_WR );
+
+        // Read-spin on infd until connection is closed by SMS
+        char buf[1];
+        ssize_t ec;
+        long cnt = 0;
+        while ( 1 )
+        {
+            // NOTE: This is Standard C Library read()... ;-o
+            ec = ::read( infd, buf, 1 );
+            if ( ec > 0 )
+            {
+                cnt += ec;
+                continue;
+            }
+            else if ( ec == 0 )
+                break;
+            else
+            {
+                switch ( ec )
+                {
+                    case EINTR:
+                    case EAGAIN:
+                        continue;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        // Log any extra data read from socket (probably DataDonePkt... :)
+        if ( cnt > 0 )
+        {
+            syslog( LOG_INFO,
+                "[%i] Warning: Extra Data Read from SMS socket cnt=%ld",
+                g_pid, cnt );
+        }
     }
     else if ( sms_code != STS::TS_SUCCESS )
     {
@@ -338,20 +421,37 @@ int main( int argc, char** argv )
 
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
 
-    delete monitor;
-    delete nxgen;
+    if ( monitor )
+        delete monitor;
+
+    if ( nxgen )
+        delete nxgen;
 
     // Clean-up temp output files if translation or move failed
     if ( !keep_temp && !nexus_outfile.empty() )
     {
-        try { boost::filesystem::remove( boost::filesystem::path( nexus_outfile )); }
-        catch( ... ) {}
+        try {
+            boost::filesystem::remove(
+                boost::filesystem::path( nexus_outfile ));
+        }
+        catch( ... )
+        {
+            syslog( LOG_INFO, "[%i] Error Cleaning Up NeXus File at %s.",
+                g_pid, nexus_outfile.c_str() );
+        }
     }
 
     if ( !keep_temp && !adara_outfile.empty() )
     {
-        try { boost::filesystem::remove( boost::filesystem::path( adara_outfile )); }
-        catch( ... ) {}
+        try {
+            boost::filesystem::remove(
+                boost::filesystem::path( adara_outfile ));
+        }
+        catch( ... )
+        {
+            syslog( LOG_INFO, "[%i] Error Cleaning Up ADARA File at %s.",
+                g_pid, adara_outfile.c_str() );
+        }
     }
 
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );

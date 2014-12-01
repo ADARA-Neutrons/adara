@@ -5,6 +5,7 @@
 #include "StreamMonitor.h"
 #include <boost/program_options.hpp>
 #include <syslog.h>
+#include "ADARAUtils.h"
 
 using namespace std;
 using namespace ADARA::DASMON;
@@ -18,7 +19,8 @@ int g_child_code = 0;
 
 /// Handles child signal during daemonization
 void
-signalHandlerChild( int a_signal, siginfo_t *info, void *data )
+signalHandlerChild( int UNUSED(a_signal), siginfo_t *info,
+        void *UNUSED(data) )
 {
     g_child_signal = true;
     g_child_code = info->si_value.sival_int;

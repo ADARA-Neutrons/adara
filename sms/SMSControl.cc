@@ -121,17 +121,18 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 
 		name = it->first.substr(b + 1, e - b - 1);
 
-		if (it->second.count("disabled")) {
-			INFO("Ignoring disabled source '" << name << "'");
-			continue;
+		bool enabled = !(it->second.count("disabled"));
+
+		if (!enabled) {
+			INFO("Ignoring disabled source '" << name << "' (for now).");
 		}
 
-		addSource(name, it->second);
+		addSource(name, it->second, enabled);
 	}
 }
 
 void SMSControl::addSource(const std::string &name,
-			const boost::property_tree::ptree &info)
+			const boost::property_tree::ptree &info, bool enabled)
 {
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	double connect_retry, connect_timeout, data_timeout;
@@ -165,19 +166,20 @@ void SMSControl::addSource(const std::string &name,
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
 	if (ignore_eop) {
-		DEBUG("Ignore-EOP Flag Set to True - Self Synchronizing Pulses!");
+		DEBUG("Ignore-EOP Flag Set to True for " << name
+			<< " - Self Synchronizing Pulses!");
 	}
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
+							 enabled,
 							 uri->second.data(),
 							 m_nextSrcId,
-							 m_beamlineId,
 							 connect_retry,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
 							 chunk_size));
-	m_sources.push_back(src);
+	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
 	struct timespec now;
@@ -203,7 +205,7 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 
 	m_markers = boost::shared_ptr<Markers>(new
-						Markers(m_beamlineId, this));
+						Markers(this));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
@@ -259,14 +261,16 @@ pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const caNetAddr &,
 	return pvExistTest(ctx, pv_name);
 }
 
-pvExistReturn SMSControl::pvExistTest(const casCtx &ctx, const char *pv_name)
+pvExistReturn SMSControl::pvExistTest(const casCtx &UNUSED(ctx),
+	const char *pv_name)
 {
 	if (m_pv_map.find(pv_name) != m_pv_map.end())
 		return pverExistsHere;
 	return pverDoesNotExistHere;
 }
 
-pvAttachReturn SMSControl::pvAttach(const casCtx &ctx, const char *pv_name)
+pvAttachReturn SMSControl::pvAttach(const casCtx &UNUSED(ctx),
+	const char *pv_name)
 {
 	std::map<std::string, boost::shared_ptr<casPV> >::iterator iter;
 
@@ -328,6 +332,10 @@ bool SMSControl::setRecording(bool v)
 		/* Reset the Overall Monitor bookkeeping...
 		 */
 		m_allMonitors.clear();
+
+		/* Reset All DataSource Packet Statistics...
+		 */
+		resetPacketStats();
 
 		try {
 			/* Let our marker control code have a shot at
@@ -565,8 +573,8 @@ void SMSControl::sourceDown(uint32_t id)
 // Clear all the DataSource "Read Delay" flags...
 void SMSControl::resetSourcesReadDelay(void)
 {
-	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		m_sources[i]->m_readDelay = false;
+	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
+		m_dataSources[i]->m_readDelay = false;
 	}
 }
 
@@ -575,8 +583,17 @@ void SMSControl::setSourcesReadDelay(void)
 {
 	// Note: each DataSource will clear it's own flag on next Timeout...
 	// (or the next read() will automatically reset every source's flag)
-	for (uint32_t i = 0; i < m_sources.size(); i++) {
-		m_sources[i]->m_readDelay = true;
+	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
+		m_dataSources[i]->m_readDelay = true;
+	}
+}
+
+// Clear All Packet Statistics...
+// (use any DataSource, pick the "first"... :-)
+void SMSControl::resetPacketStats(void)
+{
+	if (m_dataSources.size() > 0) {
+		m_dataSources[0]->resetPacketStats();
 	}
 }
 
@@ -614,8 +631,8 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	mon->second.m_eventTof.push_back(tof);
 }
 
-void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-				 uint32_t pixel, uint32_t tof)
+void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
+				 PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;
@@ -691,8 +708,8 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 	pulse->m_chopperEvents[cid].push_back(tof);
 }
 
-void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
-			uint32_t dup)
+void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
+		uint32_t hwId, uint32_t dup, bool is_mapped)
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -709,15 +726,15 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 	/* Find this source in the current pulse; if it doesn't exist
 	 * yet, we'll need to save the intrapulse time and TOF Offset fields.
 	 */
-	SourceMap::iterator src = pulse->m_sources.find(hwId);
-	if (src == pulse->m_sources.end()) {
+	SourceMap::iterator src = pulse->m_pulseSources.find(hwId);
+	if (src == pulse->m_pulseSources.end()) {
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
 		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
 				m_maxBanks);
 		SourceMap::value_type val(hwId, new_src);
-		src = pulse->m_sources.insert(val).first;
+		src = pulse->m_pulseSources.insert(val).first;
 	}
 
 	/* We'll save this time and time again, but we can't use the one
@@ -736,7 +753,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 		phys = events[i].pixel;
 
 		switch (phys >> 28) {
-		case 4:
+
+		case 4: // Monitor Event
 			/* Add this event to our monitors, and go on to the
 			 * next raw event -- it doesn't go in the banked
 			 * events section.
@@ -744,19 +762,35 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 			addMonitorEvent(pkt, pulse, phys, events[i].tof);
 			pulse->m_numMonEvents++;
 			continue;
-		case 7:
+
+		case 7: // Chopper Event
 			/* Add this event to our choppers, and go on to the
 			 * next raw event -- it doesn't go into the banked
 			 * event section.
 			 */
 			addChopperEvent(pkt, pulse, phys, events[i].tof);
 			continue;
-		case 0:
-			if (m_pixelMap->mapEvent(phys, logical, bank))
-				pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-			bank += Pulse::REAL_BANK_OFFSET;
+
+		case 0: // Detector Event
+			// Already Mapped to Logical PixelId at Data Source...!
+			if (is_mapped) {
+				// PixelId Already Is Logical...!
+				logical = phys;
+				// Just Lookup Bank from Logical PixelId...
+				if (m_pixelMap->mapEventBank(logical, bank))
+					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
+				bank += Pulse::REAL_BANK_OFFSET;
+			}
+			// Not Yet Mapped, Map Physical PixelId to Logical PixelId
+			// and Identify Detector Bank...
+			else {
+				if (m_pixelMap->mapEvent(phys, logical, bank))
+					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
+				bank += Pulse::REAL_BANK_OFFSET;
+			}
 			break;
-		case 5: case 6:
+
+		case 5: case 6: // Fast-Metadata Variable Update
 			/* This is a fast-metadata update, see if we have a
 			 * mapping for it. If not, let it fall through to the
 			 * common error pixel handling.
@@ -766,10 +800,12 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt, uint32_t hwId,
 				continue;
 			}
 			/* FALLTHROUGH */
-		case 1: case 2: case 3:
+
+		case 1: case 2: case 3: // Unused as yet...
 			/* Unused sources, let them drop into error handling */
 			/* FALLTHROUGH */
-		default:
+
+		default: // Error Event
 			/* Error bit is set, identity map and put in the
 			 * error bank
 			 */
@@ -1008,7 +1044,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.clear();
 
 	uint32_t size = 1 + pulse->m_numBanks * 2;
-	size += pulse->m_sources.size() * 4;
+	size += pulse->m_pulseSources.size() * 4;
 	m_iovec.reserve(size);
 
 	/* IMPORTANT: m_hdrs must be correctly sized, as we use pointers
@@ -1016,7 +1052,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	 * StorageManager::addPacket(). No reallocation is allowed after
 	 * we've reserved the proper size.
 	 */
-	size = 8 + pulse->m_sources.size() * 4;
+	size = 8 + pulse->m_pulseSources.size() * 4;
 	size += pulse->m_numBanks * 2;
 	m_hdrs.reserve(size);
 
@@ -1040,8 +1076,8 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
 	m_iovec.push_back(iov);
 
-	SourceMap::iterator sIt, sEnd = pulse->m_sources.end();
-	for (sIt = pulse->m_sources.begin(); sIt != sEnd; sIt++) {
+	SourceMap::iterator sIt, sEnd = pulse->m_pulseSources.end();
+	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
 		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
 		iov.iov_len = 4 * sizeof(uint32_t);
 		m_iovec.push_back(iov);

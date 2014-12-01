@@ -176,7 +176,9 @@ bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
 int main(int, char **)
 {
 	Parser parser;
-	parser.read(0);
+	std::string log_info;
+
+	parser.read(0, log_info);
 
 	return 0;
 }

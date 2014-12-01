@@ -12,12 +12,17 @@
 
 class STSClient;
 
+class smsFloat64PV;
+class MaxConnectionsPV;
+class smsUint32PV;
+class smsStringPV;
+
 class STSClientMgr {
 public:
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 
-        static STSClientMgr *getInstance(void) { return m_singleton; }
+	static STSClientMgr *getInstance(void) { return m_singleton; }
 	void queueRun(StorageContainer::SharedPtr &c);
 	void startConnect(void);
 
@@ -55,15 +60,17 @@ private:
 	static std::string m_node;
 	static std::string m_service;
 	static double m_connect_timeout;
-	static double m_reconnect_timeout;
+	static double m_connect_retry;
 	static double m_transient_timeout;
 	static unsigned int m_max_connections;
+	static uint32_t m_max_requeue_count;
 
 	static STSClientMgr *m_singleton;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
 
-	void requeueRun(StorageContainer::SharedPtr &c);
+	void dequeueRun(StorageContainer::SharedPtr &c);
+
 	StorageContainer::SharedPtr &nextRun(void);
 
 	void lookupComplete(const struct signalfd_siginfo &info);
@@ -74,8 +81,14 @@ private:
 	bool reconnectTimeout(void);
 	bool transientTimeout(void);
 
-	void clientComplete(StorageContainer::SharedPtr &c,
-			    Disposition disp);
+	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
+
+	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
+	boost::shared_ptr<smsFloat64PV> m_pvTransientTimeout;
+	boost::shared_ptr<MaxConnectionsPV> m_pvMaxConnections;
+	boost::shared_ptr<smsUint32PV> m_pvMaxRequeueCount;
+	boost::shared_ptr<smsStringPV> m_pvServiceURI;
 
 	friend class STSClient;
 	friend class TimerAdapter<STSClientMgr>;

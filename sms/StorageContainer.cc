@@ -149,13 +149,13 @@ void StorageContainer::markManual(void)
 StorageContainer::StorageContainer(const struct timespec &start,
 				   uint32_t run) :
 	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true),
-	m_translated(false), m_manual(false)
+	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
 	m_runNumber(0), m_numFiles(0), m_name(name), m_active(false),
-	m_translated(false), m_manual(false)
+	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }
 

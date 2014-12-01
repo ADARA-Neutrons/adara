@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "POSIXParser.h"
+#include "ADARAUtils.h"
 
 // Need to reconcile different Logging Libraries between SMS and STS...! ;-b
 // #include "Logging.h"
@@ -12,12 +13,19 @@
 using namespace ADARA;
 
 // NOTE: This is POSIXParser::read()... ;-o
-bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
+bool POSIXParser::read(int fd, std::string & log_info,
+		unsigned int max_packets, unsigned int max_read)
 {
 	// DEBUG("read() entry");
 
-	time_t start_time = time(0);
-	time_t end_time;
+	struct timespec start_parse_time;
+	struct timespec end_parse_time;
+	struct timespec start_read_time;
+	struct timespec end_read_time;
+	struct timespec start_time;
+	struct timespec end_time;
+
+	clock_gettime(CLOCK_REALTIME, &start_time);
 
 	unsigned long len, to_read = max_read ?: ~0UL;
 	unsigned int max_parse = ~0U;
@@ -27,6 +35,12 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 	unsigned int read_count = 0;
 	unsigned int loop_count = 0;
 	ssize_t rc;
+
+	last_last_parse_elapsed_total = last_parse_elapsed_total;
+	last_last_read_elapsed_total = last_read_elapsed_total;
+
+	last_parse_elapsed_total = 0;
+	last_read_elapsed_total = 0;
 
 	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
@@ -41,34 +55,36 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			read_count++;
 			last_last_read_count = last_read_count;
 			last_read_count = read_count;
+			clock_gettime(CLOCK_REALTIME, &start_read_time);
 			// NOTE: This is Standard C Library read()... ;-o
 			rc = ::read(fd, bufferFillAddress(), len);
+			clock_gettime(CLOCK_REALTIME, &end_read_time);
+			last_last_read_elapsed = last_read_elapsed;
+			last_read_elapsed =
+				calcDiffSeconds( end_read_time, start_read_time );
+			last_read_elapsed_total += last_read_elapsed;
 			last_last_bytes_read = last_bytes_read;
 			last_bytes_read = rc;
 			if (rc < 0) {
 				switch (errno) {
 				case EINTR:
 				case EAGAIN:
-					/* We didn't get any data,
-					 * but we're OK
-					 */
-					// DEBUG("read() no data but OK exit");
-					end_time = time(0);
+					/* We didn't get any data, but we're OK */
+					log_info = "read() no data but OK exit";
+					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
-					last_elapsed = end_time - start_time;
+					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return true;
 				case EPIPE:
 				case ECONNRESET:
 				case ETIMEDOUT:
 				case EHOSTUNREACH:
 				case ENETUNREACH:
-					/* The host went away, but that
-					 * shouldn't be fatal.
-					 */
-					// DEBUG("read() host went away exit");
-					end_time = time(0);
+					/* The host went away, but that shouldn't be fatal. */
+					log_info = "read() host went away exit";
+					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
-					last_elapsed = end_time - start_time;
+					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return false;
 				default:
 					/* TODO consider if we should throw an
@@ -82,10 +98,10 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			}
 
 			if (rc == 0) {
-				// DEBUG("read() read returned 0 exit");
-				end_time = time(0);
+				log_info = "read() read returned 0 exit";
+				clock_gettime(CLOCK_REALTIME, &end_time);
 				last_last_elapsed = last_elapsed;
-				last_elapsed = end_time - start_time;
+				last_elapsed = calcDiffSeconds( end_time, start_time );
 				return false;
 			}
 
@@ -106,14 +122,20 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 		}
 
 		// Always parse as many packets as possible, don't leave any behind.
-		rc = bufferParse(max_parse);
+		clock_gettime(CLOCK_REALTIME, &start_parse_time);
+		rc = bufferParse(log_info, max_parse);
+		clock_gettime(CLOCK_REALTIME, &end_parse_time);
+		last_last_parse_elapsed = last_parse_elapsed;
+		last_parse_elapsed =
+			calcDiffSeconds( end_parse_time, start_parse_time );
+		last_parse_elapsed_total += last_parse_elapsed;
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {
-			// DEBUG("read() bufferParse() error exit");
-			end_time = time(0);
+			log_info.append("; read() bufferParse() error exit");
+			clock_gettime(CLOCK_REALTIME, &end_time);
 			last_last_elapsed = last_elapsed;
-			last_elapsed = end_time - start_time;
+			last_elapsed = calcDiffSeconds( end_time, start_time );
 			return false;
 		}
 
@@ -128,15 +150,15 @@ bool POSIXParser::read(int fd, unsigned int max_packets, unsigned int max_read)
 			// << " total_packets=" << total_packets);
 	}
 
-	// DEBUG("read() true exit"
-		// << " total_bytes=" << total_bytes
+	log_info = "read() true exit";
+	// DEBUG("read() true exit" << " total_bytes=" << total_bytes
 		// << " total_packets=" << total_packets
 		// << " read_count=" << read_count
 		// << " loop_count=" << loop_count);
 
-	end_time = time(0);
+	clock_gettime(CLOCK_REALTIME, &end_time);
 	last_last_elapsed = last_elapsed;
-	last_elapsed = end_time - start_time;
+	last_elapsed = calcDiffSeconds( end_time, start_time );
 
 	return true;
 }

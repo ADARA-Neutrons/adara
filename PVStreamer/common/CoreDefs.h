@@ -5,6 +5,9 @@
 
 namespace PVS {
 
+/// Defines the difference between EPICS and Posix timestamp values
+#define EPICS_TIME_OFFSET 631152000
+
 typedef uint32_t Identifier;
 typedef uint32_t Protocol;
 

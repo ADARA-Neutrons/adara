@@ -91,6 +91,8 @@ echo "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
 # Determine the Beamline/STS Branch associated with this computer system
 
+set CONFIG = "config"
+
 if ( $IS_STS == 1 ) then
 	set install_host = `hostname`
 	set install_branch = \
@@ -99,6 +101,13 @@ if ( $IS_STS == 1 ) then
 else
 	set install_host = `hostname -A | sed 's/ /\n/g' | grep '^bl'`
 	set install_branch = `echo "$install_host" | sed 's/-.*//'`
+	set install_suffix = \
+		`echo "$install_host" | sed 's/\..*//' | sed 's/bl.*-//'`
+	if ( "#$install_suffix#" != '##' \
+			&& "#$install_suffix#" != '#sms#' ) then
+		set install_branch = "${install_branch}-${install_suffix}"
+		set CONFIG = "${CONFIG}-${install_suffix}"
+	endif
 	set HOST_TYPE = "Beamline"
 endif
 
@@ -505,7 +514,7 @@ endif
 
 # Make sure the Git Config repository has been cloned for deployment
 
-set adara_config = "$INSTALL_BASE/config"
+set adara_config = "$INSTALL_BASE/$CONFIG"
 
 if ( ! -d "$adara_config" ) then
 
@@ -556,7 +565,7 @@ endif
 
 # Make sure the parent ADARA current working set directory exists
 
-set adara_current = "$INSTALL_BASE/config/deploy"
+set adara_current = "$INSTALL_BASE/$CONFIG/deploy"
 set adara_current_new = 0
 
 if ( ! -d "$adara_current" ) then
@@ -595,7 +604,7 @@ foreach exe_path ( "$tag_archive"/* )
 
 	# duh... skip over the Log File from any previous installs... :)
 	set log_ck = \
-		`echo "$exe" | grep "${PROG}_Deploy_Log" | wc | awk '{print $1}'`
+		`echo "$exe" | grep "_Deploy_Log" | wc | awk '{print $1}'`
 	if ( $log_ck == 1 ) continue
 
 	# Handle Special STS "Test" Version Deployment...
@@ -760,7 +769,7 @@ else
 	set deploy_history_base = "sms/deployment.history.txt"
 endif
 
-set deploy_history = "$INSTALL_BASE/config/$deploy_history_base"
+set deploy_history = "$INSTALL_BASE/$CONFIG/$deploy_history_base"
 
 # Create the History file, if it doesn't exist...
 

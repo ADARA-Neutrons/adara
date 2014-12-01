@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "StorageManager.h"
+#include "ADARAUtils.h"
 
 struct adara_header {
 	uint32_t payload_len;
@@ -12,7 +13,7 @@ struct adara_header {
 	uint32_t ts_nsec;
 };
 
-int main(int argc, char **argv)
+int main(int UNUSED(argc), char **UNUSED(argv))
 {
 	unsigned char pkt[8192] = { 0, };
 	struct adara_header *hdr = (struct adara_header *) pkt;

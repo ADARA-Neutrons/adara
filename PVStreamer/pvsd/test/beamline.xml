@@ -2,7 +2,7 @@
     <devices>
         <device active="true">
             <name>Device A</name>
-            <pv>
+            <!--pv>
                 <name>a1</name>
                 <alias>A1</alias>
 		<log/>
@@ -13,8 +13,12 @@
                 <alias>A2</alias>
                 <log/>
                 <scan/>
-            </pv>
-            <pv>
+            </pv-->
+            <pv><name>a1</name></pv>
+            <pv><name>a2</name></pv>
+            <pv><name>a3</name></pv>
+            <pv><name>a4</name></pv>
+            <!--pv>
                 <name>a3</name>
                 <alias>A3</alias>
                 <log/>
@@ -25,7 +29,7 @@
                 <alias>A4</alias>
                 <logx/>
                 <scan/>
-            </pv>
+            </pv-->
         </device>
         <device active="true">
             <name>Device B</name>

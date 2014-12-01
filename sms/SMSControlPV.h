@@ -8,6 +8,7 @@
 #include <smartGDDPointer.h>
 #include <casdef.h>
 
+class DataSource;
 class SMSControl;
 
 class smsPV : public casPV {
@@ -127,7 +128,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
+	virtual void update(bool val, struct timespec *ts);
+
 	bool valid(void);
 	bool value(void);
 
@@ -139,9 +141,25 @@ public:
 	virtual void changed(void);
 };
 
+class smsEnabledPV : public smsBooleanPV {
+public:
+	smsEnabledPV(const std::string &name, DataSource *dataSource);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(bool val, struct timespec *ts);
+
+	gddAppFuncTableStatus getEnums(gdd &value);
+
+private:
+	DataSource *m_dataSource;
+};
+
 class smsErrorPV : public smsBooleanPV {
 public:
 	smsErrorPV(const std::string &name);
+
+	virtual aitEnum bestExternalType(void) const;
 
 	void update(bool val, struct timespec *ts);
 	void set(void);
@@ -170,16 +188,30 @@ public:
 	virtual void changed(void);
 };
 
-class smsConnectedPV : public smsUint32PV {
+class smsConnectedPV : public smsPV {
 public:
 	smsConnectedPV(const std::string &name);
 
-	void update(uint32_t val, struct timespec *ts);
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(uint16_t val, struct timespec *ts);
+
 	void connected(void);
 	void disconnected(void);
 	void failed(void);
 
+	bool valid(void);
+	bool value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
 };
 
 class smsTriggerPV : public smsPV {
@@ -196,6 +228,26 @@ public:
 	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual void triggered(void) = 0;
+};
+
+class smsFloat64PV : public smsPV {
+public:
+	smsFloat64PV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(double val, struct timespec *ts);
+	bool valid(void);
+	double value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
 };
 
 #endif /* __SMS_CONTROL_PV_H */

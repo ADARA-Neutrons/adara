@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
 #include <syslog.h>
+#include "ADARAUtils.h"
 
 
 using namespace std;
@@ -73,7 +74,8 @@ StreamParser::~StreamParser()
             delete *ibi;
 
     for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
-        delete imi->second;
+        if ( imi->second )
+            delete imi->second;
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
         if ( ipv->second )
@@ -92,30 +94,50 @@ StreamParser::processStream()
 {
     // If anything goes wrong with translation, an exception will be thrown to caller of this method
 
+    std::string log_info;
+
     if ( m_processing_state != PROCESSING_NOT_STARTED )
-        THROW_TRACE( ERR_INVALID_OPERATION, "StreamParser::processStream() can not be called more than once." )
+    {
+        THROW_TRACE( ERR_INVALID_OPERATION,
+        "StreamParser::processStream() can not be called more than once." )
+    }
 
     try
     {
         initialize();
         m_processing_state = WAITING_FOR_RUN_START;
 
-        while( m_processing_state < DONE_PROCESSING )
+        while ( m_processing_state < DONE_PROCESSING )
         {
-            if ( !read( m_fd ))
+            // NOTE: This is POSIXParser::read()... ;-o
+            if ( !read( m_fd, log_info ))
             {
-              if ( m_processing_state != DONE_PROCESSING )
-              {
-                  if ( m_processing_state == PROCESSING_EVENTS )
-                  {
-                      // On fatal error, flush buffers to Nexus before terminating
-                      markerComment( m_pulse_info.last_time, "Stream processing terminated abnormally." );
-                      m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
-                      finalizeStreamProcessing();
-                  }
+                if ( m_processing_state != DONE_PROCESSING )
+                {
+                    syslog( LOG_INFO,
+                        "[%i] STS failed %s: %s, Not Done Processing!",
+                        g_pid, "processStream()", "Connection Failed" );
 
-                  THROW_TRACE( ERR_GENERAL_ERROR, "ADARA parser stopped unexpectedly." );
-              }
+                    if ( m_processing_state == PROCESSING_EVENTS )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s: %s, Still Processing Events!",
+                            g_pid, "processStream()",
+                            "Connection Failed" );
+
+                        // On fatal error, flush buffers to Nexus
+                        // before terminating
+                        markerComment( m_pulse_info.last_time,
+                            "Stream processing terminated abnormally." );
+                        m_run_metrics.end_time = nsec_to_timespec(
+                            m_pulse_info.start_time
+                                + m_pulse_info.last_time );
+                        finalizeStreamProcessing();
+                    }
+
+                    THROW_TRACE( ERR_GENERAL_ERROR,
+                        "ADARA parser stopped unexpectedly." );
+                }
             }
         }
     }
@@ -125,11 +147,13 @@ StreamParser::processStream()
     }
     catch ( exception &e )
     {
-        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() exception {" << e.what() << "}" )
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "processStream() exception {" << e.what() << "}" )
     }
     catch ( ... )
     {
-        THROW_TRACE( ERR_GENERAL_ERROR, "processStream() unexpected exception." )
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "processStream() unexpected exception." )
     }
 }
 
@@ -222,6 +246,7 @@ StreamParser::rxPacket
     {
     // These packets shall always be processed
     case ADARA::PacketType::RUN_STATUS_V0:
+    case ADARA::PacketType::DATA_DONE_V0:
         return Parser::rxPacket(a_pkt);
 
     // These packets shall be processed ONCE during header and event processing
@@ -252,6 +277,7 @@ StreamParser::rxPacket
 
     // Packet types that are not processes by StreamParser
     case ADARA::PacketType::RAW_EVENT_V0:
+    case ADARA::PacketType::MAPPED_EVENT_V0:
     case ADARA::PacketType::RTDL_V0:
     case ADARA::PacketType::SOURCE_LIST_V0:
     case ADARA::PacketType::TRANS_COMPLETE_V0:
@@ -290,28 +316,53 @@ StreamParser::rxPacket
     if ( a_pkt.status() == ADARA::RunStatus::NEW_RUN )
     {
         if ( m_processing_state == WAITING_FOR_RUN_START )
+        {
             m_processing_state = PROCESSING_RUN_HEADER;
+            syslog( LOG_INFO,
+                "[%i] Run Status Start-of-Run Received.", g_pid );
+        }
         else
+        {
+            syslog( LOG_WARNING,
+                "[%i] Run Status Error: Start-of-Run with state=0x%x.",
+                g_pid, m_processing_state );
             bad_state = true;
+        }
     }
     else if ( a_pkt.status() == ADARA::RunStatus::END_RUN )
     {
         if ( m_processing_state == PROCESSING_EVENTS )
         {
-            // Run "end time" is defined as time of last pulse (which is nanoseconds epoch offset)
-            m_run_metrics.end_time = nsec_to_timespec( m_pulse_info.start_time + m_pulse_info.last_time );
+            // Run "end time" is defined as time of last pulse
+            // (which is nanoseconds epoch offset)
+            m_run_metrics.end_time = nsec_to_timespec(
+                m_pulse_info.start_time + m_pulse_info.last_time );
 
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
 
-            return true; // Must return true to halt stream processing
+            // Dagnabbit, return "true" here to halt stream processing...
+            // We've marked the processing state to "Done", but we still
+            // need to forcibly terminate the POSIX read() loop, which in
+            // our case _sometimes_ hangs on relentlessly... <sigh/>
+            syslog( LOG_INFO,
+                "[%i] Run Status End-of-Run Received.", g_pid );
+            return true;
         }
         else
+        {
+            syslog( LOG_WARNING,
+                "[%i] Run Status Error: End-of-Run with state=0x%x.",
+                g_pid, m_processing_state );
             bad_state = true;
+        }
     }
 
     if ( bad_state )
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Recvd Run Status pkt in wrong state.")
+    {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "Recvd Run Status pkt in wrong state.")
+    }
 
     return false;
 }
@@ -471,6 +522,8 @@ StreamParser::rxOversizePkt
     unsigned int chunk_len  ///< [in] Length of this Oversized Chunk (in bytes)
 )
 {
+    // NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
+
     // Log Oversized Packet (with Header)
     if ( hdr != NULL )
     {
@@ -530,8 +583,9 @@ StreamParser::rxOversizePkt
     // Log Oversized Packet (Next Chunk)
     else
     {
-        syslog( LOG_WARNING, "[%i] OversizePkt: next chunk offset=%u len=%u", g_pid,
-            chunk_offset, chunk_len);
+        syslog( LOG_WARNING,
+            "[%i] OversizePkt: next chunk offset=%u len=%u",
+            g_pid, chunk_offset, chunk_len);
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -567,7 +621,10 @@ StreamParser::processPulseInfo
         // It is (or should be) considered a fatal error if pulse times are not monotonically increasing
         if ( pulse_time < m_pulse_info.start_time )
         {
-            //THROW_TRACE( ERR_UNEXPECTED_INPUT, "Pulse time went backwards at pulse ID " << a_pkt.pulseId() );
+            syslog( LOG_INFO,
+                "[%i] Unexpected input: %s at pulse ID 0x%lx, %s.",
+                g_pid, "Pulse time went backwards", a_pkt.pulseId(),
+                "Clamping to zero" );
             pulse_time = 0;
         }
         else
@@ -940,7 +997,7 @@ StreamParser::rxPacket
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {
@@ -1020,6 +1077,63 @@ StreamParser::rxPacket
 
     return false;
 }
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Data Done packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method handles the Data Done ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method handles the ADARA Data Done packets.
+ * This is the "direct" way of the SMS telling us that
+ * there is "No More Data" to stream; much better than using
+ * shutdown() for the sending side of the SMS-STS socket,
+ * which seems to cause a _total_ socket disconnect here,
+ * due to some aspect of the networking setup (firewall?).
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::DataDonePkt &UNUSED(a_pkt)  ///< [in] The ADARA Data Done Packet to process
+)
+{
+    // Basically, mark the run as "Done"...
+    // (tho check for the normal completion status & squawk... :-)
+    if ( m_processing_state == DONE_PROCESSING )
+    {
+        syslog( LOG_INFO, "[%i] Data Done Received.", g_pid );
+    }
+
+    else if ( m_processing_state != DONE_PROCESSING )
+    {
+        syslog( LOG_INFO,
+            "[%i] STS failed: Data Done Received, Not Done Processing!",
+            g_pid );
+
+        if ( m_processing_state == PROCESSING_EVENTS )
+        {
+            syslog( LOG_INFO,
+                "[%i] Data Done Received, Still Processing Events!",
+                g_pid );
+
+            // On fatal error, flush buffers to Nexus before terminating
+            markerComment( m_pulse_info.last_time,
+                "Stream processing terminated abnormally." );
+            m_run_metrics.end_time = nsec_to_timespec(
+                m_pulse_info.start_time + m_pulse_info.last_time );
+            finalizeStreamProcessing();
+        }
+
+        THROW_TRACE( ERR_GENERAL_ERROR,
+            "ADARA stream ended unexpectedly." );
+    }
+
+    return false;
+}
+
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Device Descriptor packet processing
@@ -1260,7 +1374,7 @@ StreamParser::rxPacket
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "\n" << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {
@@ -1346,7 +1460,7 @@ StreamParser::rxPacket
     }
 
     // Switch on event type
-    switch ( a_pkt.type() )
+    switch ( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::GENERIC:
         markerComment( t, a_pkt.comment() );
@@ -1499,6 +1613,8 @@ StreamParser::getPktName(
     {
     case ADARA::PacketType::RAW_EVENT_V0:
         return "Raw Event";
+    case ADARA::PacketType::MAPPED_EVENT_V0:
+        return "Mapped Event";
     case ADARA::PacketType::RTDL_V0:
         return "RTDL";
     case ADARA::PacketType::SOURCE_LIST_V0:
@@ -1522,11 +1638,13 @@ StreamParser::getPktName(
     case ADARA::PacketType::SYNC_V0:
         return "Sync";
     case ADARA::PacketType::HEARTBEAT_V0:
-        return "Heart";
+        return "Heartbeat";
     case ADARA::PacketType::GEOMETRY_V0:
         return "Geom Info";
     case ADARA::PacketType::BEAMLINE_INFO_V0:
         return "Beam Info";
+    case ADARA::PacketType::DATA_DONE_V0:
+        return "Data Done";
     case ADARA::PacketType::DEVICE_DESC_V0:
         return "DDP";
     case ADARA::PacketType::VAR_VALUE_U32_V0:

@@ -11,7 +11,7 @@
 #include <boost/algorithm/string.hpp>
 #include <libxml/tree.h>
 #include "POSIXParser.h"
-#include "Utils.h"
+#include "ADARAUtils.h"
 #include "stsdefs.h"
 #include "TraceException.h"
 
@@ -83,6 +83,7 @@ private:
     bool        rxPacket( const ADARA::RunInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::GeometryPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
+    bool        rxPacket( const ADARA::DataDonePkt &a_pkt );
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );

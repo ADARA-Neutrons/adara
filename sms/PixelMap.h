@@ -31,8 +31,20 @@ public:
 		return bank == 0xffff;
 	}
 
+	bool mapEventBank(uint32_t logical, uint16_t &bank) {
+		if (logical < m_banks.size()) {
+			bank = m_banks[logical];
+		} else {
+			bank = 0xffff;
+		}
+
+		/* Return true if this pixel wasn't mapped */
+		return bank == 0xffff;
+	}
+
 private:
 	Table m_table;
+	std::vector<uint16_t> m_banks;
 	boost::shared_array<uint8_t> m_packet;
 	uint32_t m_packetSize;
 	uint32_t m_numBanks;

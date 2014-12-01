@@ -34,9 +34,9 @@ private:
 	void triggered(void) { m_cb(); }
 };
 
-Markers::Markers(const std::string &beamline, SMSControl *sms)
+Markers::Markers(SMSControl *sms)
 {
-	std::string prefix(beamline);
+	std::string prefix(sms->getBeamlineId());
 	prefix += ":SMS:";
 
 	m_pausedPV.reset(new MarkerPausedPV(prefix + "Paused", this));

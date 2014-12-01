@@ -10,6 +10,7 @@
 #include "STSClientMgr.h"
 #include "ReadyAdapter.h"
 #include "Logging.h"
+#include "ADARAUtils.h"
 #include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
@@ -105,6 +106,11 @@ void STSClient::writable(void)
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
 
+		if (!m_cur_offset) {
+			DEBUG("writable(): sending new file=" << f->path()
+				<< " size=" << f->size());
+		}
+
 		rc = sendfile(m_sts_fd, m_file_fd, &m_cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -154,10 +160,14 @@ void STSClient::writable(void)
 		 * STS, so we'll notice if we're trying to resend a
 		 * corrupted file without a proper ending RunStatus packet.
 		 */
+#if 0
 		if (shutdown(m_sts_fd, SHUT_WR)) {
 			int e = errno;
 			WARN("shutdown() failed: " << strerror(e));
 		}
+#else
+		sendDataDone();
+#endif
 	}
 
 idle:
@@ -179,6 +189,31 @@ more:
 		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
 				boost::bind(&STSClient::writable, this)));
 	// DEBUG("writable() more exit");
+}
+
+void STSClient::sendDataDone(void)
+{
+	uint32_t data_done_pkt[4] = { 0, 0x00400C00, 0, 0 };
+
+	std::string log_info;
+
+	DEBUG("Sending Data Done to STS for run " << m_run->runNumber());
+
+	bool send_status = Utils::sendBytes( m_sts_fd,
+		(char *) data_done_pkt, sizeof( data_done_pkt ), log_info );
+
+	// Dang, it didn't work... ;-b
+	if ( !send_status ) {
+
+		ERROR("sendDataDone() failed! (" << log_info << ")");
+
+		// Resort to the dreaded shutdown() system call,
+		// which doesn't appear to work through our network setup... ;-b
+		if (shutdown(m_sts_fd, SHUT_WR)) {
+			int e = errno;
+			ERROR("shutdown() failed: " << strerror(e));
+		}
+	}
 }
 
 void STSClient::fileAdded(StorageFile::SharedPtr &f)
@@ -210,21 +245,23 @@ void STSClient::fileUpdated(const StorageFile &f)
 
 void STSClient::readable(void)
 {
-	// DEBUG("readable() entry");
+	DEBUG("readable() entry");
+
+	std::string log_info;
 
 	bool ok = false;
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		ok = read(m_sts_fd, 4000, MAX_PACKET_SIZE);
+		ok = read(m_sts_fd, log_info, 4000, MAX_PACKET_SIZE);
 		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
 			/* We log the reason for closing the connection
 			 * elsewhere, except for the default case of an
 			 * unexpected connection loss.
 			 * Take care of that case here.
 			 */
-			WARN("Lost connection to STS for run "
-			     << m_run->runNumber());
+			WARN("Lost connection to STS for run " << m_run->runNumber()
+				 << " (" << log_info << ")");
 		}
 	} catch (ADARA::invalid_packet e) {
 		WARN("Got invalid packet from STS: " << e.what());
@@ -240,7 +277,7 @@ void STSClient::readable(void)
 	if (!ok)
 		delete this;
 
-	// DEBUG("readable() exit");
+	DEBUG("readable() exit");
 }
 
 bool STSClient::rxPacket(const ADARA::Packet &pkt)
@@ -257,16 +294,21 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 }
 
 bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
-			       const uint8_t *chunk,
-			       unsigned int chunk_offset,
-			       unsigned int chunk_len)
+			       const uint8_t *UNUSED(chunk),
+			       unsigned int UNUSED(chunk_offset),
+			       unsigned int UNUSED(chunk_len))
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
-	WARN("Received unexpected oversize packet of length "
-		<< ((hdr) ? hdr->packet_length() : 0));
+	if (hdr) {
+		WARN("Received unexpected oversize packet of type " << hdr->type()
+			<< " and length " << hdr->packet_length());
+	} else {
+		WARN("Received unexpected oversize packet");
+	}
 	return true;
 }
 

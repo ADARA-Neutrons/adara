@@ -1,6 +1,7 @@
 #include <iostream>
 #include <syslog.h>
 #include <alarm.h>
+#include <time.h>
 
 #include "CoreDefs.h"
 #include "TraceException.h"
@@ -114,8 +115,10 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         ich->second.m_pv = *ipv;
                         // Old device record is no longer valid - reset
                         ich->second.m_device.reset();
-                        // Re-aqcuire metadata just in case it changed
-                        ich->second.m_chan_state = INFO_NEEDED;
+
+                        // Re-aqcuire metadata just in case it changed (only if connected)
+                        if ( ich->second.m_chan_state != UNINITIALIZED )
+                            ich->second.m_chan_state = INFO_NEEDED;
                     }
                 }
             }
@@ -261,6 +264,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         // Update channel info and PV name index structures
         m_chan_info[info.m_chid] = info;
         m_pv_index[a_pv->m_connection] = info.m_chid;
+        //cout << "connected chid: " << info.m_chid << " for PV: " << a_pv->m_connection << endl;
     }
     else
         syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_connection.c_str() );
@@ -347,6 +351,8 @@ DeviceAgent::controlThread()
                 switch ( ich->second.m_chan_state )
                 {
                 case INFO_NEEDED:
+                    //cout <<  "IN, chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
+
                     if ( ca_get_callback( epicsToCtrlRecordType( ich->second.m_ca_type ), ich->first, epicsEventCallback, this ) == ECA_NORMAL )
                         ich->second.m_chan_state = INFO_PENDING;
                     else
@@ -355,6 +361,8 @@ DeviceAgent::controlThread()
                 case INFO_AVAILABLE:
                     if ( m_defined )
                     {
+                        //cout <<  "IA, chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
+
                         if ( !ich->second.m_pv->equalMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals ))
                         {
                             metadataUpdated();
@@ -364,6 +372,8 @@ DeviceAgent::controlThread()
                             break;
                         }
                     }
+
+                    //cout <<  "IN(2), chan: " << ich->first << " ca_type = " << ich->second.m_ca_type << " for PV: " << ich->second.m_pv->m_connection << endl;
 
                     ich->second.m_pv->setMetadata( epicsToPVType( ich->second.m_ca_type ), ich->second.m_ca_units, ich->second.m_ca_enum_vals );
                     ich->second.m_chan_state = READY;
@@ -381,6 +391,8 @@ DeviceAgent::controlThread()
             ca_flush_io();
 
             // IF a temporary device descriptor is set (m_dev_desc) and all member PVs are READY, then define the device
+            // NOTE: Even if all PVs are READY, they may still be in an invalid state (i.e. connected but not processed)
+            // This is OK as it tells us that the channel is working, and the SMS should handle the PV state appropriately.
             if ( m_dev_desc && !m_defined && ready > 0 && ready == m_dev_desc->m_pvs.size() )
             {
                 device_changed = false;
@@ -421,9 +433,19 @@ DeviceAgent::controlThread()
                 m_dev_desc = 0;
             }
         }
+        catch ( TraceException &e )
+        {
+            syslog( LOG_ERR, "TraceException thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "content: %s", e.toString( true ).c_str() );
+        }
+        catch ( exception &e )
+        {
+            syslog( LOG_ERR, "std::exception thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "content: %s", e.what() );
+        }
         catch(...)
         {
-            syslog( LOG_ERR, "Exception thrown in DevAgent::controlThread!" );
+            syslog( LOG_ERR, "Unkown exception thrown in DevAgent::controlThread!" );
         }
     }
 }
@@ -458,6 +480,7 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
                 {
                     // Save native type
                     ich->second.m_ca_type = type;
+                    //cout <<  "chan: " << ich->first << " ca_type = " << type << " for PV: " << ich->second.m_pv->m_connection << endl;
 
                     if ( ca_create_subscription( epicsToTimeRecordType( type ), 0, ich->second.m_chid, DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
                             &epicsEventCallback, this, &ich->second.m_evid ) == ECA_NORMAL )
@@ -533,11 +556,42 @@ DeviceAgent::epicsConnectionHandler( struct connection_handler_args a_args )
 }
 
 /// Macro for common state parsing below
+/*
 #define SET_STATE( state, type, src ) \
     state.m_time.sec = ((struct type *)src)->stamp.secPastEpoch; \
     state.m_time.nsec = ((struct type *)src)->stamp.nsec; \
     state.m_status = ((struct type *)src)->status; \
     state.m_severity = ((struct type *)src)->severity;
+*/
+
+template<typename T>
+void
+DeviceAgent::updateState( const void *a_src, PVState &a_state )
+{
+    if ( ((T*)a_src)->stamp.secPastEpoch == 0 )
+    {
+        // Use a local timestamp if a valid timestamp has not yet been received
+        if ( a_state.m_time.sec == 0 )
+        {
+            a_state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
+            a_state.m_time.nsec = 0;
+        }
+    }
+    else
+    {
+        // Make sure timestamp does not go backwards
+        if ( ((T*)a_src)->stamp.secPastEpoch > a_state.m_time.sec ||
+             (((T*)a_src)->stamp.secPastEpoch == a_state.m_time.sec && ((T*)a_src)->stamp.nsec > a_state.m_time.nsec ))
+        {
+            a_state.m_time.sec = ((T*)a_src)->stamp.secPastEpoch;
+            a_state.m_time.nsec = ((T*)a_src)->stamp.nsec;
+        }
+    }
+
+    a_state.m_status = ((T*)a_src)->status;
+    a_state.m_severity = ((T*)a_src)->severity;
+}
+
 
 /**
  * @brief Handles EPICS channel events
@@ -565,35 +619,36 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             {
                 // Extract PV state from type-specific data structure
                 PVState &state = ich->second.m_pv_state;
+
                 switch ( a_args.type )
                 {
                 case DBR_TIME_STRING:
                     state.m_str_val = ((struct dbr_time_string *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_string, a_args.dbr )
+                    updateState<struct dbr_time_string>( a_args.dbr, state );
                     break;
                 case DBR_TIME_SHORT:
                     state.m_int_val = ((struct dbr_time_short *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_short, a_args.dbr )
+                    updateState<struct dbr_time_short>( a_args.dbr, state );
                     break;
                 case DBR_TIME_FLOAT:
                     state.m_real_val = ((struct dbr_time_float *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_float, a_args.dbr )
+                    updateState<struct dbr_time_float>( a_args.dbr, state );
                     break;
                 case DBR_TIME_ENUM:
                     state.m_int_val = ((struct dbr_time_enum *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_enum, a_args.dbr )
+                    updateState<struct dbr_time_enum>( a_args.dbr, state );
                     break;
                 case DBR_TIME_CHAR:
                     state.m_int_val = ((struct dbr_time_char *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_char, a_args.dbr )
+                    updateState<struct dbr_time_char>( a_args.dbr, state );
                     break;
                 case DBR_TIME_LONG:
                     state.m_int_val = ((struct dbr_time_long *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_long, a_args.dbr )
+                    updateState<struct dbr_time_long>( a_args.dbr, state );
                     break;
                 case DBR_TIME_DOUBLE:
                     state.m_real_val = ((struct dbr_time_double *)a_args.dbr)->value;
-                    SET_STATE( state, dbr_time_double, a_args.dbr )
+                    updateState<struct dbr_time_double>( a_args.dbr, state );
                     break;
                 default:
                     break;
@@ -691,20 +746,18 @@ DeviceAgent::sendCurrentValues()
 {
     for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
     {
-        // If data has been received, timestamp will be non-zero
-        if ( ich->second.m_pv_state.m_time.sec )
+        bool timeout;
+        StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
+        if ( pkt )
         {
-            bool timeout;
-            StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
-            if ( pkt )
-            {
-                pkt->type = VariableUpdate;
-                pkt->device = ich->second.m_device;
-                pkt->pv = ich->second.m_pv;
-                pkt->state = ich->second.m_pv_state;
+            pkt->type = VariableUpdate;
+            pkt->device = ich->second.m_device;
+            pkt->pv = ich->second.m_pv;
+            pkt->state = ich->second.m_pv_state;
 
-                m_stream_api.putFilledPacket( pkt );
-            }
+            //cout << "Sending PV " << ich->second.m_device->m_id << "." << ich->second.m_pv->m_id << " on chid " << ich->first << ", stat = " <<  pkt->state.m_status << ", sev: " <<  pkt->state.m_severity << endl;
+
+            m_stream_api.putFilledPacket( pkt );
         }
     }
 }

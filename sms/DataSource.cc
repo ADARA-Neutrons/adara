@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -163,13 +164,13 @@ private:
 };
 
 
-DataSource::DataSource(const std::string &name, const std::string &uri,
-			uint32_t id, const std::string beamlineId,
+DataSource::DataSource(const std::string &name, bool enabled,
+			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
 	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
-	m_state(IDLE), m_smsSourceId(id), m_fd(-1),
+	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk)
@@ -183,6 +184,8 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 	m_name += " (";
 	m_name += name;
 	m_name += ")";
+
+	m_enabled = enabled;
 
 	if (pos != std::string::npos) {
 		node = uri.substr(0, pos);
@@ -210,7 +213,7 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	std::string prefix(beamlineId);
+	std::string prefix(ctrl->getBeamlineId());
 	prefix += ":SMS";
 	prefix += ":DataSource:";
 
@@ -221,21 +224,41 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
 
+	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
+		smsEnabledPV(prefix + ":Enabled", this));
+
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
+
+	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetry"));
+
+	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectTimeout"));
+
+	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":DataTimeout"));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
 	ctrl->addPV(m_pvName);
+	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
+	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvConnectTimeout);
+	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
 
 	// Initialize Data Source PVs...
+	// (All except "Enabled"!  Save that for later... :-)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvName->update(m_name, &now);
 	m_pvConnected->disconnected();
+	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvConnectTimeout->update(m_connect_timeout, &now);
+	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 
 	// Set Up Data Source Connection Timer...
@@ -257,7 +280,8 @@ DataSource::DataSource(const std::string &name, const std::string &uri,
 
 	m_readDelay = false;
 
-	startConnect();
+	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
+	m_pvEnabled->update(m_enabled, &now);
 }
 
 DataSource::~DataSource()
@@ -270,7 +294,7 @@ DataSource::~DataSource()
 		close(m_fd);
 }
 
-void DataSource::unregisterHWSources(bool isSourceDown)
+void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 {
 	/* Complete any outstanding pulses, and inform the manager
 	 * of our change of status
@@ -279,6 +303,8 @@ void DataSource::unregisterHWSources(bool isSourceDown)
 	HWSrcMap::iterator it, end = m_hwSources.end();
 
 	for (it = m_hwSources.begin(); it != end; it++) {
+		INFO("Unregistering Event Source " << it->second->smsId()
+			<< " for " << why << " Data Source " << m_name);
 		it->second->endPulse(false);
 		ctrl->unregisterEventSource(it->second->smsId());
 	}
@@ -289,11 +315,9 @@ void DataSource::unregisterHWSources(bool isSourceDown)
 		ctrl->sourceDown(m_smsSourceId);
 }
 
-void DataSource::connectionFailed(void)
+void DataSource::dumpLastReadStats(std::string who)
 {
-	m_timer->cancel();
-
-	INFO("connectionFailed() " << m_name
+	INFO(who << ": " << m_name
 		<< " Last Packet:"
 		<< " type=0x" << std::hex << m_last_pkt_type << std::dec
 		<< " sec=" << m_last_pkt_sec
@@ -306,13 +330,39 @@ void DataSource::connectionFailed(void)
 		<< " last_read_count=" << Parser::last_read_count
 		<< " last_loop_count=" << Parser::last_loop_count
 		<< " last_elapsed=" << Parser::last_elapsed
+		<< " last_read_elapsed=" << Parser::last_read_elapsed
+		<< " last_read_elapsed_total=" << Parser::last_read_elapsed_total
+		<< " last_parse_elapsed=" << Parser::last_parse_elapsed
+		<< " last_parse_elapsed_total=" << Parser::last_parse_elapsed_total
 		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
 		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
 		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
 		<< " last_last_read_count=" << Parser::last_last_read_count
 		<< " last_last_loop_count=" << Parser::last_last_loop_count
-		<< " last_last_elapsed=" << Parser::last_last_elapsed);
+		<< " last_last_elapsed=" << Parser::last_last_elapsed
+		<< " last_last_read_elapsed=" << Parser::last_last_read_elapsed
+		<< " last_last_read_elapsed_total="
+			<< Parser::last_last_read_elapsed_total
+		<< " last_last_parse_elapsed=" << Parser::last_last_parse_elapsed
+		<< " last_last_parse_elapsed_total="
+			<< Parser::last_last_parse_elapsed_total);
+}
+
+void DataSource::connectionFailed(bool dumpDiscarded, State new_state)
+{
+	m_timer->cancel();
+
+	dumpLastReadStats("connectionFailed()");
+
+	if (dumpDiscarded) {
+		// Dump Discarded Packet Statistics...
+		std::string log_info;
+		Parser::getDiscardedPacketsLogString(log_info);
+		INFO(log_info);
+		// Reset Discarded Packet Statistics...
+		Parser::resetDiscardedPacketsStats();
+	}
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -323,19 +373,21 @@ void DataSource::connectionFailed(void)
 		m_fd = -1;
 	}
 
-	m_state = IDLE;
+	m_state = new_state;
 
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	INFO("Unregister Any/All Hardware Sources for Disconnected Data Source "
-		<< m_name);
-	unregisterHWSources(true);
+	unregisterHWSources(true, "Disconnected");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
 
-	m_timer->start(m_connect_retry);
+	if (m_state != DISABLED) {
+		// Update Connect Retry Time from PV...
+		m_connect_retry = m_pvConnectRetry->value();
+		m_timer->start(m_connect_retry);
+	}
 }
 
 bool DataSource::timerExpired(void)
@@ -344,11 +396,21 @@ bool DataSource::timerExpired(void)
 
 	switch (m_state) {
 
+		case DISABLED:
+		{
+			WARN("Ignoring Timeout for Disabled Data Source " << m_name);
+			if ( m_readDelay )
+				m_readDelay = false; // reset flag set by SMSControl...
+			break;
+		}
+
 		case IDLE:
 		{
 			if ( m_readDelay ) {
 				WARN("Ignoring Connect Retry Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Connect Retry Time from PV...
+				m_connect_retry = m_pvConnectRetry->value();
 				m_timer->start(m_connect_retry);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
@@ -362,12 +424,14 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Connect Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Connect Timeout from PV...
+				m_connect_timeout = m_pvConnectTimeout->value();
 				m_timer->start(m_connect_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
 				WARN("Connection request timed out to " << m_name);
-				connectionFailed();
+				connectionFailed(false, IDLE);
 			}
 			break;
 		}
@@ -377,12 +441,14 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Data Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
+				// Update Data Timeout from PV...
+				m_data_timeout = m_pvDataTimeout->value();
 				m_timer->start(m_data_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				WARN("Timed out waiting for data from " << m_name);
 				m_pvConnected->failed();
-				connectionFailed();
+				connectionFailed(true, IDLE);
 			}
 			break;
 		}
@@ -398,14 +464,17 @@ void DataSource::fdReady(void)
 	// DEBUG("fdReady() entry m_state=" << m_state);
 
 	switch (m_state) {
-	case IDLE:
-		throw std::logic_error("Invalid state");
-	case CONNECTING:
-		connectComplete();
-		break;
-	case ACTIVE:
-		dataReady();
-		break;
+		case DISABLED:
+			WARN("Ignoring Data Ready for Disabled Data Source " << m_name);
+			break;
+		case IDLE:
+			throw std::logic_error("Invalid state");
+		case CONNECTING:
+			connectComplete();
+			break;
+		case ACTIVE:
+			dataReady();
+			break;
 	}
 
 	// DEBUG("fdReady() exit");
@@ -439,22 +508,23 @@ void DataSource::startConnect(void)
 		rc = errno;
 
 	switch (rc) {
-	case ECONNREFUSED:
-		/* TODO ratelimited logging of refused connection */
-		WARN("Connection refused by " << m_name);
-		goto error_fd;
-	case EINTR:
-	case EINPROGRESS:
-		m_state = CONNECTING;
-		break;
-	case 0:
-		INFO("Connection established to " << m_name);
-		m_state = ACTIVE;
-		m_pvConnected->connected();
-		SMSControl::getInstance()->sourceUp(m_smsSourceId);
-	default:
-		WARN("Unknown connection request error for " << m_name
-			<< ": " << strerror(rc) << " (Ignoring!)");
+		case ECONNREFUSED:
+			/* TODO ratelimited logging of refused connection */
+			WARN("Connection refused by " << m_name);
+			goto error_fd;
+		case EINTR:
+		case EINPROGRESS:
+			m_state = CONNECTING;
+			break;
+		case 0:
+			INFO("Connection established to " << m_name);
+			m_state = ACTIVE;
+			m_pvConnected->connected();
+			SMSControl::getInstance()->sourceUp(m_smsSourceId);
+			break;
+		default:
+			WARN("Unknown connection request error for " << m_name
+				<< ": " << strerror(rc) << " (Ignoring!)");
 	}
 
 	/* TODO handle any other error here */
@@ -472,6 +542,8 @@ void DataSource::startConnect(void)
 		goto error_fd;
 	}
 
+	// Update Connect Timeout from PV...
+	m_connect_timeout = m_pvConnectTimeout->value();
 	m_timer->start(m_connect_timeout);
 	return;
 
@@ -481,7 +553,7 @@ error_fd:
 
 error:
 	m_pvConnected->failed();
-	connectionFailed();
+	connectionFailed(false, IDLE);
 }
 
 void DataSource::connectComplete(void)
@@ -496,9 +568,15 @@ void DataSource::connectComplete(void)
 				boost::bind(&DataSource::fdReady, this));
 
 		m_timer->cancel();
+
+		// Update Data Timeout from PV...
+		m_data_timeout = m_pvDataTimeout->value();
 		m_timer->start(m_data_timeout);
+
 		m_state = ACTIVE;
+
 		m_pvConnected->connected();
+
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
 		INFO("Connection established to " << m_name);
@@ -516,12 +594,17 @@ void DataSource::connectComplete(void)
 	/* TODO ratelimited logging of connection issue */
 	WARN("Connection request to " << m_name << " failed: " << strerror(e));
 	// Leave m_pvConnected in its current state, latch failures
-	connectionFailed();
+	connectionFailed(false, IDLE);
 }
 
 void DataSource::dataReady(void)
 {
+	std::string log_info;
+
 	m_timer->cancel();
+
+	// Update Data Timeout from PV...
+	m_data_timeout = m_pvDataTimeout->value();
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;
@@ -535,17 +618,18 @@ void DataSource::dataReady(void)
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		if (!read(m_fd, 4000, m_max_read_chunk)) {
-			INFO("Connection closed with " << m_name);
+		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
+			INFO("Connection closed with " << m_name
+				<< "(" << log_info << ")");
 			m_pvConnected->disconnected();
-			connectionFailed();
+			connectionFailed(true, IDLE);
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO ratelimited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		m_pvConnected->failed();
-		connectionFailed();
+		connectionFailed(true, IDLE);
 		readOk = false;
 	}
 
@@ -554,8 +638,7 @@ void DataSource::dataReady(void)
 		struct timespec readEnd;
 		clock_gettime(CLOCK_REALTIME, &readEnd);
 
-		double elapsed = (double) ( readEnd.tv_sec - readStart.tv_sec )
-			+ (double) ( ( readEnd.tv_nsec - readStart.tv_nsec ) / 1e9 );
+		double elapsed = calcDiffSeconds( readEnd, readStart );
 
  		// set read delayed flag...!
 		if ( elapsed > 2.0 )
@@ -563,12 +646,43 @@ void DataSource::dataReady(void)
 			ERROR("dataReady(): Read Delay Threshold Exceeded"
 				<< " elapsed=" << elapsed << " (" << m_name << ")");
 			ctrl->setSourcesReadDelay();
+			dumpLastReadStats("dataReady() (Read Delay)");
 		}
 	}
 }
 
+void DataSource::enabled(void)
+{
+	DEBUG("*** Data Source " << m_name << " Enabled!");
+
+	// Change Internal State to Default "Idle", We're Enabled Now...
+	m_state = IDLE;
+
+	startConnect();
+}
+
+void DataSource::disabled(void)
+{
+	DEBUG("*** Data Source " << m_name << " Disabled!");
+
+	// Mark Connection State as "Disconnected"...
+	m_pvConnected->disconnected();
+
+	// Close Down Socket, Change Internal State to DISABLED...
+	// (so we won't do anything... ;-)
+	connectionFailed(true, DISABLED);
+}
+
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
+	static uint64_t dump_count = 0;
+	if ( !( ++dump_count % 1000000 ) ) {
+		std::string log_info;
+		Parser::getDiscardedPacketsLogString(log_info);
+		INFO("rxPacket(): " << log_info);
+	}
+
 	// Save "Last Packet" Info for Debugging...
 	m_last_pkt_type = pkt.type();
 	m_last_pkt_len = pkt.payload_length();
@@ -588,9 +702,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 */
 		return Parser::rxPacket(pkt);
 	case ADARA::PacketType::SYNC_V0:
+	case ADARA::PacketType::DATA_DONE_V0:
 		/* We don't care about these packets, just drop them */
 		return false;
 	case ADARA::PacketType::RAW_EVENT_V0:
+	case ADARA::PacketType::MAPPED_EVENT_V0:
 	case ADARA::PacketType::RTDL_V0:
 	case ADARA::PacketType::SOURCE_LIST_V0:
 	case ADARA::PacketType::DEVICE_DESC_V0:
@@ -613,16 +729,34 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-	ERROR("Unknown packet from " << m_name);
+	ERROR("Unknown packet type " << pkt.type() << " from " << m_name);
 	return true;
 }
 
 bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr, 
-			       const uint8_t *chunk, unsigned int chunk_offset,
-			       unsigned int chunk_len)
+			       const uint8_t *UNUSED(chunk),
+				   unsigned int UNUSED(chunk_offset),
+			       unsigned int UNUSED(chunk_len))
 {
-	ERROR("Oversized packet from " << m_name);
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
+	if (hdr) {
+		ERROR("Oversized packet of type " << hdr->type()
+			<< " from " << m_name);
+	} else {
+		ERROR("Oversized packet from " << m_name);
+	}
 	return true;
+}
+
+void DataSource::resetPacketStats(void)
+{
+	// Dump Total Discarded Packet Statistics before Reset...
+	std::string log_info;
+	Parser::getDiscardedPacketsLogString(log_info);
+	INFO("resetPacketStats(): Totals Before Reset - " << log_info);
+
+	// Reset Discarded Packet Statistics...
+	Parser::resetDiscardedPacketsStats();
 }
 
 HWSource &DataSource::getHWSource(uint32_t hwId)
@@ -643,25 +777,36 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
-	HWSource &hw_src = getHWSource(pkt.sourceID());
+	return( handleDataPkt(&pkt, false) );
+}
+
+bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
+{
+	return( handleDataPkt(dynamic_cast<const ADARA::RawDataPkt *>(&pkt),
+		true) );
+}
+
+bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
+{
+	HWSource &hw_src = getHWSource(pkt->sourceID());
 
 	/* Check that the fields are consistent with the pulse we are
 	 * currently processing. If not, then we've started a new pulse.
 	 * The HWSource class will take care of missing end-of-pulse
 	 * markers and duplicate pulse ids.
 	 */
-	if (hw_src.checkPulseInvariants(pkt))
-		hw_src.newPulse(pkt);
+	if (hw_src.checkPulseInvariants(*pkt))
+		hw_src.newPulse(*pkt);
 
 	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseEvents(pkt, hw_src.hwId(), hw_src.dupCount());
+	ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(), is_mapped);
 
-	if (hw_src.checkSeq(pkt))
-		ctrl->markPartial(pkt.pulseId(), hw_src.dupCount());
+	if (hw_src.checkSeq(*pkt))
+		ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
 	m_ignore_eop = m_pvIgnoreEoP->value();
-	if (!m_ignore_eop && pkt.endOfPulse())
+	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
 	return false;
@@ -747,7 +892,7 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 	return false;
 }
 
-bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
+bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 {
 	INFO("Heartbeat Packet for " << m_name);
 
@@ -759,9 +904,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
-	INFO("Unregistering Any/All Hardware Sources for Now-Idle Data Source "
-		<< m_name);
-	unregisterHWSources(false);
+	unregisterHWSources(false, "Now-Idle");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;

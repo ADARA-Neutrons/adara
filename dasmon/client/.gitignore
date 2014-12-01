@@ -1,0 +1,7 @@
+dasmon
+moc_AMQConfigDialog.cpp
+moc_MainWindow.cpp
+moc_RuleConfigDialog.cpp
+ui_AMQConfigDialog.h
+ui_MainWindow.h
+ui_RuleConfigDialog.h

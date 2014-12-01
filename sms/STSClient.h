@@ -5,6 +5,7 @@
 #include <boost/smart_ptr.hpp>
 #include <memory>
 
+#include "ADARAPackets.h"
 #include "POSIXParser.h"
 #include "STSClientMgr.h"
 #include "StorageManager.h"
@@ -42,6 +43,8 @@ private:
 	void readable(void);
 	void writable(void);
 	bool sendHeartbeat(void);
+
+	void sendDataDone(void);
 
 	void fileAdded(StorageFile::SharedPtr &f);
 	void fileUpdated(const StorageFile &f);

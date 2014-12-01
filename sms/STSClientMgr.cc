@@ -3,10 +3,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <time.h>
 
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "STSClientMgr.h"
 #include "STSClient.h"
 #include "SignalEvents.h"
@@ -15,12 +18,32 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
 
+class MaxConnectionsPV : public smsUint32PV {
+public:
+	MaxConnectionsPV(const std::string &name, STSClientMgr *stsClientMgr) :
+		smsUint32PV(name), m_stsClientMgr(stsClientMgr) {}
+
+private:
+	STSClientMgr *m_stsClientMgr;
+
+	void changed(void)
+	{
+		// Give Peace a Chance...
+		// When we change the Max Number of STS Connections,
+		// see if we have anything new to do now... ;-D
+		DEBUG("MaxConnectionsPV: " << m_pv_name
+			<< " PV value changed, Start Any STS Client Connections...");
+		m_stsClientMgr->startConnect();
+	}
+};
+
 std::string STSClientMgr::m_node;
 std::string STSClientMgr::m_service;
 double STSClientMgr::m_connect_timeout = 15.0;
-double STSClientMgr::m_reconnect_timeout = 15.0;
+double STSClientMgr::m_connect_retry = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
+uint32_t STSClientMgr::m_max_requeue_count = 5;
 
 STSClientMgr *STSClientMgr::m_singleton;
 
@@ -48,6 +71,53 @@ STSClientMgr::STSClientMgr() :
 	m_mgrConnection = StorageManager::onContainerChange(
 				boost::bind(&STSClientMgr::containerChange,
 					    this, _1, _2));
+
+	// Create Run-Time Configuration PVs for STS Client...
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	if (!ctrl) {
+		throw std::logic_error(
+			"uninitialized SMSControl obj for STSClientMgr!");
+	}
+
+	std::string prefix(ctrl->getBeamlineId());
+	prefix += ":SMS";
+	prefix += ":STSClient";
+
+	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectTimeout"));
+
+	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetry"));
+
+	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":TransientTimeout"));
+
+	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
+		MaxConnectionsPV(prefix + ":MaxConnections", this));
+
+	m_pvMaxRequeueCount = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MaxRequeueCount"));
+
+	m_pvServiceURI = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":ServiceURI"));
+
+	ctrl->addPV(m_pvConnectTimeout);
+	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvTransientTimeout);
+	ctrl->addPV(m_pvMaxConnections);
+	ctrl->addPV(m_pvMaxRequeueCount);
+	ctrl->addPV(m_pvServiceURI);
+
+	// Initialize STS Client PVs...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvConnectTimeout->update(m_connect_timeout, &now);
+	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvTransientTimeout->update(m_transient_timeout, &now);
+	m_pvMaxConnections->update(m_max_connections, &now);
+	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
+	m_pvServiceURI->update(m_node + ":" + m_service, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }
@@ -85,15 +155,13 @@ void STSClientMgr::queueRun(StorageContainer::SharedPtr &c)
 		m_currentRun = c->runNumber();
 }
 
-void STSClientMgr::requeueRun(StorageContainer::SharedPtr &c)
+void STSClientMgr::dequeueRun(StorageContainer::SharedPtr &c)
 {
 	RunMap::iterator it;
 
 	it = m_sendingRuns.find(c->runNumber());
 	if (it != m_sendingRuns.end())
 		m_sendingRuns.erase(it);
-
-	queueRun(c);
 }
 
 StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
@@ -142,6 +210,9 @@ void STSClientMgr::startConnect(void)
 	if (m_connecting)
 		state = "connecting, ";
 
+	// Update Max Connections from PV...
+	m_max_connections = m_pvMaxConnections->value();
+
 	DEBUG("Checking for pending work (" << state
 		<< m_connections << " of " << m_max_connections << " active, "
 		<< m_pendingRuns.size() << " pending runs)");
@@ -150,10 +221,33 @@ void STSClientMgr::startConnect(void)
 					m_pendingRuns.empty())
 		return;
 
-        m_gai.ar_name = m_node.c_str();
-        m_gai.ar_service = m_service.c_str();
-        m_gai.ar_request = &m_gai_hints;
-        m_gai.ar_result = NULL;
+	// Update STS Service URI from PV...
+	std::string uri = m_pvServiceURI->value();
+	const char *default_service = "31417";
+	size_t pos = uri.find_first_of(':');
+	std::string node, service;
+	if (pos != std::string::npos) {
+		node = uri.substr(0, pos);
+		if (pos != uri.length())
+			service = uri.substr(pos + 1);
+		else
+			service = default_service;
+	} else {
+		node = uri;
+		service = default_service;
+	}
+	if ( node != m_node || service != m_service ) {
+		DEBUG("startConnect(): Updating STS Service URI from PV: "
+			<< m_node << ":" << m_service
+			<< " -> " << node << ":" << service);
+		m_node = node;
+		m_service = service;
+	}
+
+	m_gai.ar_name = m_node.c_str();
+	m_gai.ar_service = m_service.c_str();
+	m_gai.ar_request = &m_gai_hints;
+	m_gai.ar_result = NULL;
 
 	rc = getaddrinfo_a(GAI_NOWAIT, &gai, 1, &m_sigevent);
 	if (rc) {
@@ -244,6 +338,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		goto error;
 	}
 
+	// Update Connect Timeout from PV...
+	m_connect_timeout = m_pvConnectTimeout->value();
 	m_connect_timer->start(m_connect_timeout);
 	return;
 
@@ -275,7 +371,8 @@ void STSClientMgr::connectComplete(void)
 		} catch (...) {
 			ERROR("connectComplete() - STSClient() failed?");
 			/* TODO narrow what we catch? */
-			requeueRun(run);
+			dequeueRun(run); // clean up...
+			queueRun(run); // re-queue run...
 			connectFailed();
 			throw;
 		}
@@ -309,7 +406,9 @@ void STSClientMgr::connectFailed(void)
 	m_fd = -1;
 	m_fdreg.reset();
 	m_connect_timer->cancel();
-	m_reconnect_timer->start(m_reconnect_timeout);
+	// Update Connect Retry Timeout from PV...
+	m_connect_retry = m_pvConnectRetry->value();
+	m_reconnect_timer->start(m_connect_retry);
 }
 
 bool STSClientMgr::connectTimeout(void)
@@ -336,12 +435,8 @@ bool STSClientMgr::transientTimeout(void)
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 				  Disposition disp)
 {
-	/* TODO this shares code with requeueRun, find a beter place? */
-	RunMap::iterator it;
-
-	it = m_sendingRuns.find(c->runNumber());
-	if (it != m_sendingRuns.end())
-		m_sendingRuns.erase(it);
+	// clean up...
+	dequeueRun(c);
 
 	switch (disp) {
 	case SUCCESS:
@@ -351,19 +446,52 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
-	case TRANSIENT_FAIL:
 	case INVALID_PROTOCOL:
-		/* TODO need to limit the number of tries for this run before
-		 * we make it a permament failure case
-		 */
 		/* We shouldn't pound on the STS if we keep hitting problems,
 		 * back off and give it time to breathe.
 		 */
 		if (!m_backoff) {
 			m_backoff = true;
+			// Update Transient Timeout from PV...
+			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
-		requeueRun(c);
+		queueRun(c); // re-queue run...
+		break;
+	case TRANSIENT_FAIL:
+		/* Limit the number of retries for this run before
+		 * we make it a permanent failure case. [leerw]
+		 */
+		// Update Max Requeue Count from PV...
+		m_max_requeue_count = m_pvMaxRequeueCount->value();
+		ERROR("Transient Failure Run=" << c->runNumber()
+			<< " disp=" << disp
+			<< " requeueCount=" << c->getRequeueCount()
+			<< "/" << m_max_requeue_count);
+		// Maxed Out Re-Queue Retries, Mark for Manual!
+		if ( c->getRequeueCount() >= m_max_requeue_count ) {
+			ERROR("Maximum Re-Queue Count Reached!"
+				<< " Marking Run " << c->runNumber()
+				<< " for Manual Translation");
+			c->markManual();
+		}
+		// Re-Queue Run to Try Again...
+		else {
+			// Increment Re-Queue Count
+			c->incrRequeueCount();
+			ERROR("Requeueing Run " << c->runNumber()
+				<< ", Re-Queue #" << c->getRequeueCount());
+			/* We shouldn't pound on the STS if we keep hitting problems,
+			 * back off and give it time to breathe.
+			 */
+			if (!m_backoff) {
+				m_backoff = true;
+				// Update Transient Timeout from PV...
+				m_transient_timeout = m_pvTransientTimeout->value();
+				m_transient_timer->start(m_transient_timeout);
+			}
+			queueRun(c); // re-queue run...
+		}
 		break;
 	case PERMAMENT_FAIL:
 		/* STSClient already logged the failure, we just need to
@@ -381,12 +509,15 @@ void STSClientMgr::config(const boost::property_tree::ptree &conf)
 {
 	m_connect_timeout =
 			conf.get<double>("stsclient.connect_timeout", 15.0);
-	m_reconnect_timeout =
-			conf.get<double>("stsclient.reconnect_timeout", 15.0);
+	m_connect_retry =
+			conf.get<double>("stsclient.connect_retry",
+				conf.get<double>("stsclient.reconnect_timeout", 15.0) );
 	m_transient_timeout =
 			conf.get<double>("stsclient.transient_timeout", 60.0);
 	m_max_connections =
 			conf.get<unsigned int>("stsclient.max_connections", 3);
+	m_max_requeue_count =
+			conf.get<uint32_t>("stsclient.max_requeue_count", 5);
 
 	std::string uri = conf.get<std::string>("stsclient.uri", "localhost");
 	const char *default_service = "31417";

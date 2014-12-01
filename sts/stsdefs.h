@@ -3,10 +3,10 @@
 
 #include <unistd.h>
 #include <vector>
-#include "Utils.h"
+#include "ADARAUtils.h"
 
 // Global syslog info
-#define STS_VERSION "1.2.0"
+#define STS_VERSION "1.2.1"
 extern pid_t g_pid;
 
 namespace STS {

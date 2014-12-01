@@ -21,6 +21,9 @@ sms_smsd_LDADD = $(EPICS_LIBS) $(liblog4cxx_LIBS) -lboost_signals \
 sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/StorageFile.cc sms/STSClientMgr.cc sms/STSClient.cc \
+		sms/SMSControl.cc sms/SMSControlPV.cc sms/RunInfo.cc \
+		sms/Geometry.cc sms/Markers.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
+		sms/BeamlineInfo.cc sms/DataSource.cc sms/PixelMap.cc \
 		sms/SignalEvents.cc sms/utils.cc $(POSIX_PARSER)
 sms_test_storage_test_CPPFLAGS = -Isms $(COMMON_CPPFLAGS) \
 		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
