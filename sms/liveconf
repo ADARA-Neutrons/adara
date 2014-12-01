@@ -584,7 +584,7 @@ GET_CONFIG_SETTING()
 
 	local _source_cnt=0
 
-	opt_name=""
+	opt_id_name=""
 
 	local _id_type=""
 	local _id_num=0
@@ -693,7 +693,7 @@ GET_CONFIG_SETTING()
 				_id_num="$_source_cnt"
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_name=" (${_source_name})"
+					opt_id_name=" (${_source_name})"
 				fi
 				# echo "Source #${_source_cnt}: ${_source_name} Section."
 			elif [ "${_id_type}" == "sms" ]; then
@@ -715,7 +715,7 @@ GET_CONFIG_SETTING()
 
 	done
 
-	opt_str="${_optId}:${_opt_label}${opt_name}"
+	opt_str="${_optId}:${_opt_label}${opt_id_name}"
 
 	config_end_of_section=0
 	config_use_comment=0
@@ -756,7 +756,7 @@ GET_CONFIG_SETTING()
 
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
-		echo "   ${_optId}:${_opt_label}${opt_name}"
+		echo "   ${_optId}:${_opt_label}${opt_id_name}"
 		echo "   ${_option} = ${config_value}."
 	fi
 }
@@ -781,7 +781,7 @@ GET_CONFIG_SETTING()
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${opt_name}"
+		echo "   ${optId}:${opt_label}${opt_id_name}"
 		echo "      = ${opt_value}"
 		echo -e "\nDone."
 	else
@@ -808,7 +808,7 @@ GET_CONFIG_SETTING()
 			caput $opt_pv_opt ${PRE}:${PV} "$opt_value"
 		fi
 		if [ $? != 0 ]; then
-			echo "Error Setting ${optId}:${opt_label}${opt_name}...!"
+			echo "Error Setting ${optId}:${opt_label}${opt_id_name}...!"
 			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -818,6 +818,70 @@ GET_CONFIG_SETTING()
 		any_change=$(( any_change + 1 ))
 
 	fi
+
+#
+# Update Current SMS Daemon Config File Setting
+#
+
+UPDATE_CONFIG_FILE()
+{
+	local _src_config="$1"
+	local _dst_config="$2"
+
+	# Append New Config Option Reference After Last Comment...
+	if [ $config_use_comment == 1 ]; then
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+			echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
+		else
+			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			sed ${last_comment_line_num}a"|$option = $opt_config_value" \
+				${_src_config} | tr '|' '\t' > ${_dst_config}
+			changed=$(( changed + 1 ))
+		fi
+
+	# Append New Config Option Reference at End of Section...
+	elif [ $config_end_of_section == 1 ]; then
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
+		else
+			# Construct New Comment and Option Setting...
+			new_opt="|; Option Auto-Added by LiveConf!\n"
+			new_opt="$new_opt|;    ${optId}:${opt_label}${opt_id_name}\n"
+			new_opt="$new_opt|; $option = $opt_config_value\n"
+			new_opt="$new_opt|$option = $opt_config_value\n"
+
+			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			sed ${end_of_section_line_num}a"$new_opt" \
+				${_src_config} | tr '|' '\t' > ${_dst_config}
+			changed=$(( changed + 1 ))
+		fi
+
+	# Straight Substitution...
+	else
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+
+			echo -e "\n[DELETING $option Option]."
+
+			sed "${config_line_num}d" ${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+
+		else
+
+			new_config_line=`echo "$config_current_line" \
+				| sed "s/$config_value/$opt_config_value/"`
+
+			sed \
+			"${config_line_num}s/^$config_current_line/$new_config_line/" \
+				${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+
+		fi
+
+	fi
+}
 
 	#
 	# Update Current SMS Daemon Config File Setting
@@ -829,7 +893,7 @@ GET_CONFIG_SETTING()
 		echo "Skipping Config File Option Set."
 	elif [ "$opt_config_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${opt_name}"
+		echo "   ${optId}:${opt_label}${opt_id_name}"
 		echo "      = ${opt_config_value}"
 		echo -e "\nDone."
 	else
@@ -854,65 +918,16 @@ GET_CONFIG_SETTING()
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
-		no_change=0
+		changed=0
 
-		# Append New Config Option Reference After Last Comment...
-		if [ $config_use_comment == 1 ]; then
+		UPDATE_CONFIG_FILE $SMSD_CONFIG $tmpconfig
 
-			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
-				echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
-				no_change=1
-			else
-				# Goofy Incantation to get Sed to insert a Tab... ;-b
-				sed \
-				${last_comment_line_num}a"|$option = $opt_config_value" \
-					$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
-			fi
+		newconfig="$tmpconfig"
 
-		# Append New Config Option Reference at End of Section...
-		elif [ $config_end_of_section == 1 ]; then
-
-			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
-				echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
-				no_change=1
-			else
-				# Construct New Comment and Option Setting...
-				new_opt="|; Option Auto-Added by LiveConf!\n"
-				new_opt="$new_opt|;    ${optId}:${opt_label}${opt_name}\n"
-				new_opt="$new_opt|; $option = $opt_config_value\n"
-				new_opt="$new_opt|$option = $opt_config_value\n"
-
-				# Goofy Incantation to get Sed to insert a Tab... ;-b
-				sed ${end_of_section_line_num}a"$new_opt" \
-					$SMSD_CONFIG | tr '|' '\t' > $tmpconfig
-			fi
-
-		# Straight Substitution...
-		else
-
-			if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
-
-				echo -e "\n[DELETING $option Option]."
-
-				sed "${config_line_num}d" $SMSD_CONFIG > $tmpconfig
-
-			else
-
-				new_config_line=`echo "$config_current_line" \
-					| sed "s/$config_value/$opt_config_value/"`
-
-				sed \
-			"${config_line_num}s/^$config_current_line/$new_config_line/" \
-					$SMSD_CONFIG > $tmpconfig
-
-			fi
-
-		fi
-
-		if [ $no_change == 0 ]; then
+		if [ $changed > 0 ]; then
 
 			echo -e "\nModified Config File Differences:"
-			diff -c $SMSD_CONFIG $tmpconfig
+			diff -c $SMSD_CONFIG $newconfig
 			echo
 
 			echo -n "Replace Current Config File (yes/No)? "
@@ -927,14 +942,14 @@ GET_CONFIG_SETTING()
 
 				if [ $testonly == 1 ]; then
 					echo -n "[TESTONLY] "
-					echo "sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG"
+					echo "sudo -u $CONFIG_USER cp $newconfig $SMSD_CONFIG"
 				else
-					sudo -u $CONFIG_USER cp $tmpconfig $SMSD_CONFIG
+					sudo -u $CONFIG_USER cp $newconfig $SMSD_CONFIG
 				fi
 				if [ $? != 0 ]; then
 					echo -e \
 						"\nError Copying New Config File to Production:\n"
-					/bin/ls -l $tmpconfig
+					/bin/ls -l $newconfig
 					echo
 					/bin/ls -l $SMSD_CONFIG
 					echo
