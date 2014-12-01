@@ -12,6 +12,7 @@ tools/adara-parser
 tools/adara-dump
 
 sms/smsd
+sms/testfs
 sms/test/storage-test
 
 sts/sts
