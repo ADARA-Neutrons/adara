@@ -88,6 +88,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
+option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="UINT32_VALUE+[G|M]"
 option_label[$num_options]="[Storage Poolsize (Max Blocks Allowed)]"
 num_options=$(( num_options + 1 ))
@@ -415,6 +416,8 @@ elif [ "$command" == "option" ]; then
 				opt_id_type="sms"
 			fi
 
+			opt_pv_opt="${option_pv_opt[$i]}"
+
 			opt_value_type="${option_value_type[$i]}"
 
 			opt_label="${option_label[$i]}"
@@ -518,7 +521,7 @@ elif [ "$command" == "option" ]; then
 	if [ $skiplive == 0 ]; then
 		echo "Getting Current Live SMS Daemon Setting (PV) for:"
 		echo -e "   ${optId}:${opt_label}\n"
-		live_current=`caget $WAIT ${PRE}:${PV} 2>&1`
+		live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
 		if [ $? != 0 ]; then
 			echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
 			echo "Proceed with Live Config of:"
@@ -764,9 +767,9 @@ elif [ "$command" == "option" ]; then
 		echo "      ${opt_str}"
 		echo "   to ${opt_value}."
 		if [ $testonly == 1 ]; then
-			echo "[TESTONLY] caput ${PRE}:${PV} $opt_value"
+			echo "[TESTONLY] caput $opt_pv_opt ${PRE}:${PV} $opt_value"
 		else
-			caput "${PRE}:${PV}" "$opt_value"
+			caput $opt_pv_opt ${PRE}:${PV} "$opt_value"
 		fi
 		if [ $? != 0 ]; then
 			echo "Error Setting ${optId}:${opt_label}${id_name}...!"
