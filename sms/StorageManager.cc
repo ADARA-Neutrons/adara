@@ -233,42 +233,58 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	m_block_size = stats.st_blksize;
 	DEBUG("Filesystem Block Size = " << m_block_size);
 
-	uint64_t maxSize = 0;
-	m_poolsize = conf.get<std::string>("storage.poolsize", "");
-	if (m_poolsize.length()) {
-		try {
-			maxSize = parse_size(m_poolsize);
-		} catch (std::runtime_error e) {
-			std::string msg("Unable to parse storage pool size: ");
-			msg += e.what();
-			throw std::runtime_error(msg);
-		}
-		DEBUG("Poolsize = " << m_poolsize << " -> MaxSize = " << maxSize);
-	} else {
-		/* If the user doesn't specify a size, we'll use a percentage
-		 * of the total space, 80% by default.
-		 */
-		struct statfs fsstats;
-		if (statfs(m_baseDir.c_str(), &fsstats)) {
-			int err = errno;
-			std::string msg("Unable to statfs ");
-			msg += m_baseDir;
-			msg += ": ";
-			msg += strerror(err);
-			throw std::runtime_error(msg);
-		}
-		DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
-
-		m_percent = conf.get<int>("storage.percent", 80);
-		maxSize = fsstats.f_blocks * m_percent / 100;
-		maxSize *= m_block_size;
-
-		DEBUG("Percent = " << m_percent << " -> MaxSize = " << maxSize);
+	// Max Blocks Allowed - Option Priorities:
+	//    1. if "max_blocks_allowed" is explicitly set go with that, else
+	//    2. if "poolsize" is set, then go with that, else
+	//    3. if "percent" is set, then go with that (or its default :-)
+	uint64_t max_blocks_allowed =
+		conf.get<uint64_t>("storage.max_blocks_allowed", 0);
+	if ( max_blocks_allowed != 0 ) {
+		DEBUG("Explicit Max Blocks Allowed requested in config at: "
+			<< max_blocks_allowed);
 	}
+	else { // i.e. "not set"...
+		uint64_t maxSize = 0;
+		DEBUG("Explicit Max Blocks Allowed not in config: Try Poolsize.");
+		m_poolsize = conf.get<std::string>("storage.poolsize", "");
+		if (m_poolsize.length()) {
+			try {
+				maxSize = parse_size(m_poolsize);
+			} catch (std::runtime_error e) {
+				std::string msg("Unable to parse storage pool size: ");
+				msg += e.what();
+				throw std::runtime_error(msg);
+			}
+			DEBUG("Poolsize = " << m_poolsize
+				<< " -> MaxSize = " << maxSize);
+		} else {
+			DEBUG("Poolsize not in config: Use Percent (or default 80%).");
+			/* If the user doesn't specify a size, we'll use a percentage
+			 * of the total space, 80% by default.
+			 */
+			struct statfs fsstats;
+			if (statfs(m_baseDir.c_str(), &fsstats)) {
+				int err = errno;
+				std::string msg("Unable to statfs ");
+				msg += m_baseDir;
+				msg += ": ";
+				msg += strerror(err);
+				throw std::runtime_error(msg);
+			}
+			DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
 
-	/* Compute Max Blocks Allowed from Max Size... */
-	uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
-	max_blocks_allowed /= m_block_size;
+			m_percent = conf.get<int>("storage.percent", 80);
+			maxSize = fsstats.f_blocks * m_percent / 100;
+			maxSize *= m_block_size;
+
+			DEBUG("Percent = " << m_percent
+				<< " -> MaxSize = " << maxSize);
+		}
+
+		/* Compute Max Blocks Allowed from Max Size... */
+		max_blocks_allowed = maxSize + m_block_size - 1;
+		max_blocks_allowed /= m_block_size;
+	}
 
 	set_max_blocks_allowed(max_blocks_allowed);
 
