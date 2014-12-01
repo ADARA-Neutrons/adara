@@ -847,13 +847,15 @@ UPDATE_CONFIG_FILE()
 			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
 		else
 			# Construct New Comment and Option Setting...
-			new_opt="|; Option Auto-Added by LiveConf!\n"
-			new_opt="$new_opt|;    ${optId}:${opt_label}${opt_id_name}\n"
-			new_opt="$new_opt|; $option = $opt_config_value\n"
-			new_opt="$new_opt|$option = $opt_config_value\n"
+			local _new_opt=""
+			_new_opt="|; Option Auto-Added by LiveConf!\n"
+			_new_opt="${_new_opt}|; ${optId}:${opt_label}${opt_id_name}\n"
+			_new_opt="${_new_opt}|;\n"
+			_new_opt="${_new_opt}|; $option = $opt_config_value\n"
+			_new_opt="${_new_opt}|$option = $opt_config_value\n"
 
 			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${end_of_section_line_num}a"$new_opt" \
+			sed ${end_of_section_line_num}a"${_new_opt}" \
 				${_src_config} | tr '|' '\t' > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
@@ -870,11 +872,11 @@ UPDATE_CONFIG_FILE()
 
 		else
 
-			new_config_line=`echo "$config_current_line" \
+			local _new_config_line=`echo "$config_current_line" \
 				| sed "s/$config_value/$opt_config_value/"`
 
 			sed \
-			"${config_line_num}s/^$config_current_line/$new_config_line/" \
+		"${config_line_num}s/^$config_current_line/${_new_config_line}/" \
 				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 
@@ -924,7 +926,7 @@ UPDATE_CONFIG_FILE()
 
 		newconfig="$tmpconfig"
 
-		if [ $changed > 0 ]; then
+		if [[ $changed > 0 ]]; then
 
 			echo -e "\nModified Config File Differences:"
 			diff -c $SMSD_CONFIG $newconfig
