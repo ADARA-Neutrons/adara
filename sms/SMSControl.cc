@@ -601,6 +601,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				 uint32_t pixel, uint32_t tof)
 {
 	uint32_t rising = (pixel & 1) << 31;
+	tof &= ((1U << 21) - 1);
 	tof |= rising;
 
 	uint32_t monId = pixel >> 16;
