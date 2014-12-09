@@ -64,7 +64,7 @@ set TMP_DIR = "/tmp"
 
 set INSTALL_BASE = "/home/controls"
 
-set EPICS_BASE = "$INSTALL_BASE/epics/R3.14.12.2/base"
+set EPICS_BASE = "$INSTALL_BASE/epics/base/master"
 
 set CONFIG_REPO = "git+ssh://trac.sns.gov/var/repos/config"
 
