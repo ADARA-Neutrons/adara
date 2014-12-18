@@ -529,11 +529,13 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 
 		// Log any Sawtooth pulses... :-o
 		if (id < min_id) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " min=0x" << min_id << " max=0x" << max_id);
 		}
 		else if (id >= min_id && id < max_id) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " min=0x" << min_id << " max=0x" << max_id);
@@ -542,6 +544,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 	}
 	else {
 		if ( id < m_lastPulseId ) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
 				<< " versus Last Pulse id=0x" << m_lastPulseId);
@@ -952,6 +955,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 						  pulse->m_rtdl->packet_length(),
 						  false);
 		} else {
+			/* TODO rate-limited logging of no RTDL for pulse? */
 			ERROR("recordPulse(): NO RTDL for Pulse"
 				<< " id=0x" << std::hex << pulse->m_id.first
 				<< " dup=0x" << pulse->m_id.second << std::dec);

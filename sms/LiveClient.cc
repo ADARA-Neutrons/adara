@@ -272,6 +272,7 @@ void LiveClient::readable(void)
 			delete this;
 		}
 	} catch (std::runtime_error e) {
+		/* TODO rate-limited logging of LiveClient read exception? */
 		ERROR("client " << m_clientName
 		      << " exception reading stream: " << e.what());
 		delete this;
