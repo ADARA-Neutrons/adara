@@ -1019,7 +1019,7 @@ echo "   $LOG\n" | tee -a $LOG
 
 echo "   $tag_archive\n" | tee -a $LOG
 
-cp $LOG $tag_archive
+cp -p $LOG $tag_archive
 
 #
 # Done.
