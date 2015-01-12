@@ -159,7 +159,7 @@ USAGE()
 {
 	echo
 	echo "usage:  liveconf \\"
-	echo "            [--beamline=BL14B] [--alt] [--config=./smsd.conf] \\"
+	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
@@ -170,7 +170,6 @@ USAGE()
 	echo
 
 	echo "   --beamline=BL14B      = explicitly set Beamline PV Prefix"
-	echo "   --alt                 = append alternate 'X' to PV Prefix"
 	echo "   --config=./smsd.conf  = specify custom SMSD Config file"
 	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
 	echo "   --skiplive            = *don't* set live config option"
@@ -220,7 +219,6 @@ fi
 skiplive=0
 testonly=0
 PRE="[NotSet]"
-altpv=0
 for arg in $* ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
@@ -230,9 +228,6 @@ for arg in $* ; do
 	if [ "#$key#" == '#--beamline#' ]; then
 		PRE="$value"
 		echo -e "Setting EPICS PV Prefix to: $PRE\n"
-	elif [ "#$key#" == '#--alt#' ]; then
-		altpv=1
-		echo -e "Setting EPICS PV Prefix to *Alternate*...!\n"
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
 		echo -e "Using SMS Daemon Config File in:\n   $SMSD_CONFIG\n"
@@ -273,13 +268,37 @@ fi
 echo -e "Changing Configuration on Host ${config_host} [$config_blnum].\n"
 
 if [ ${PRE} == "[NotSet]" ]; then
-	PRE=`echo "$config_blnum" | tr '[:lower:]' '[:upper:]'`
-	echo -e "Setting EPICS PV Prefix from Beamline Hostname [${PRE}].\n"
-fi
 
-if [[ $altpv == 1 ]]; then
-	PRE="${PRE}X"
-	echo -e "*** Appending Alternate EPICS PV Prefix -> [${PRE}].\n"
+	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+	if [[ "#$bid_ck#" != '#1#' ]]; then
+		echo -e "\nError: Invalid Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo
+		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
+		exit -91
+	fi
+
+	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| awk '{print $1$2$3}'`
+
+	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+		echo -e "\nError Parsing Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo -e "\n   $bid_clean\n"
+		exit -92
+	fi
+
+	PRE="$bid_value"
+	echo "Setting EPICS PV Prefix from SMSD Config File:"
+	echo "   $SMSD_CONFIG"
+	echo "      -> $bid_key = $bid_value"
+	echo "         => [${PRE}]."
+	echo
+
 fi
 
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
