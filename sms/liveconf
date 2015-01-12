@@ -303,11 +303,14 @@ fi
 
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
 if [ "#$daq_ck#" == '#1#' ]; then
-	config_branch=`echo "$config_host" | sed 's/\..*//'`
 	echo -e "[DAQ Beamline Host.]\n"
+	CONFIG_REPO="${CONFIG_REPO}-daq1"
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
 else
 	config_branch="$config_blnum"
 fi
+
+echo -e "Git Config Repository: [${CONFIG_REPO}].\n"
 
 echo -e "Git Config Repository Branch: [${config_branch}].\n"
 
