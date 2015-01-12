@@ -159,11 +159,31 @@ USAGE()
 {
 	echo
 	echo "usage:  liveconf \\"
-	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
-	echo "            [status] [run_status] [data_status] [sys_status] \\"
+	echo "            [--beamline=BL14B] [--alt] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   --beamline=BL14B      = explicitly set Beamline PV Prefix"
+	echo "   --alt                 = append alternate 'X' to PV Prefix"
+	echo "   --config=./smsd.conf  = specify custom SMSD Config file"
+	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
+	echo "   --skiplive            = *don't* set live config option"
+	echo "   --testonly            = *don't* actually change anything!"
+	echo "   --help                = display this help/usage information"
+	echo
+
+	echo "Available Commands:"
+	echo
+	echo "   status                = display overall SMS beamline status"
+	echo "   run_status            = display SMS run status"
+	echo "   data_status           = display SMS data source status"
+	echo "   sys_status            = display SMS internal system status"
 	echo
 
 	echo "Available Options:"
@@ -200,6 +220,7 @@ fi
 skiplive=0
 testonly=0
 PRE="[NotSet]"
+altpv=0
 for arg in $* ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
@@ -209,6 +230,9 @@ for arg in $* ; do
 	if [ "#$key#" == '#--beamline#' ]; then
 		PRE="$value"
 		echo -e "Setting EPICS PV Prefix to: $PRE\n"
+	elif [ "#$key#" == '#--alt#' ]; then
+		altpv=1
+		echo -e "Setting EPICS PV Prefix to *Alternate*...!\n"
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
 		echo -e "Using SMS Daemon Config File in:\n   $SMSD_CONFIG\n"
@@ -239,37 +263,34 @@ done
 # the EPICS PV Prefix and Git Config Repo Branch...
 #
 
-if [ ${PRE} == "[NotSet]" ]; then
-
-	config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
-	config_branch=`echo "$config_host" | sed 's/-.*//'`
-	if [[ "$config_host" == "" || "$config_branch" == "" ]]; then
-		echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
-		exit -90
-	fi
-
-	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
-
-	daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
-	if [ "#$daq_ck#" == '#1#' ]; then
-		config_branch=`echo "$config_host" | sed 's/\..*//'`
-		PRE="${PRE}X"
-		echo -n "*** DAQ System - "
-		echo -e "Using Alternate Branch ${config_branch} ($PRE).\n"
-	fi
-
-	echo "Changing Configuration on Host ${config_host}."
-	echo "(Git Config Repository Branch ${config_branch}.)"
-
-	echo "Setting EPICS PV Prefix from Config Branch: ${PRE}."
-
-else
-	config_branch=`echo "${PRE}" | tr '[:upper:]' '[:lower:]'`
-	echo -n "Setting Git Config Repository Branch "
-	echo "from EPICS PV Prefix: ${config_branch}."
+config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+config_blnum=`echo "$config_host" | sed 's/-.*//'`
+if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
+	echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
+	exit -90
 fi
 
-echo
+echo -e "Changing Configuration on Host ${config_host} [$config_blnum].\n"
+
+if [ ${PRE} == "[NotSet]" ]; then
+	PRE=`echo "$config_blnum" | tr '[:lower:]' '[:upper:]'`
+	echo -e "Setting EPICS PV Prefix from Beamline Hostname [${PRE}].\n"
+fi
+
+if [[ $altpv == 1 ]]; then
+	PRE="${PRE}X"
+	echo -e "*** Appending Alternate EPICS PV Prefix -> [${PRE}].\n"
+fi
+
+daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
+if [ "#$daq_ck#" == '#1#' ]; then
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
+	echo -e "[DAQ Beamline Host.]\n"
+else
+	config_branch="$config_blnum"
+fi
+
+echo -e "Git Config Repository Branch: [${config_branch}].\n"
 
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \
