@@ -871,6 +871,9 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
+	static uint32_t queue_log_count = 0;
+	uint64_t queue_length = 0;
+
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
@@ -917,6 +920,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 	// record complete/partial pulses past the buffering threshold
 	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
+		queue_length++;
 		// previous pulse will never be made complete, mark as partial
 		if (it->second->m_pending.any()) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
@@ -925,6 +929,16 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		recordPulse(it->second);
 		last_recorded = it;
 		recorded++;
+	}
+
+	// Periodically log the size of the internal pulse buffer...
+	if ( !(++queue_log_count % 5000) ) {
+		// count the rest of the list we _didn't_ just process...
+		while ( it != m_pulses.end() ) {
+			queue_length++;
+			it++;
+		}
+		DEBUG("Internal Pulse Buffer Length = " << queue_length);
 	}
 
 	// record the current pulse for sure, if not buffering...
