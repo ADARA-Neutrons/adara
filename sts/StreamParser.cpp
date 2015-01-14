@@ -622,8 +622,9 @@ StreamParser::processPulseInfo
         if ( pulse_time < m_pulse_info.start_time )
         {
             syslog( LOG_INFO,
-                "[%i] Unexpected input: %s at pulse ID 0x%lx, %s.",
-                g_pid, "Pulse time went backwards", a_pkt.pulseId(),
+                "[%i] Unexpected input: %s at pulse #%ld ID=0x%lx, %s.",
+                g_pid, "Pulse time went backwards",
+				m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
             pulse_time = 0;
         }
