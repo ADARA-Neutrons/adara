@@ -181,7 +181,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	if (it != m_devices.end()) {
 		/* TODO rate-limited logging of adding existing device? */
 		ERROR("addFastMetaDDP() adding existing (mapped) device 0x"
-			<< std::hex << mapped_dev);
+			<< std::hex << mapped_dev << std::dec);
 		return;
 	}
 
@@ -226,8 +226,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 	if (!mapped_dev) {
 		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -247,8 +246,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in, uint32_t tag)
 	if (!mapped_dev) {
 		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -268,8 +266,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in, uint32_t tag)
 	if (!mapped_dev) {
 		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -303,8 +300,7 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		 * the corresponding device descriptor.
 		 */
 		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< std::hex << var << ":"
-					<< std::hex << tag
+					<< var << ":" << tag << std::dec
 					<< " without a descriptor");
 		return;
 	}
@@ -314,10 +310,9 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		 * an incorrect tag (ie, wrong source)
 		 */
 		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< std::hex << var << ":"
-					<< std::hex << tag
+					<< var << ":" << tag << std::dec
 					<< " but expected tag "
-					<< std::hex << it->second.m_tag);
+					<< std::hex << it->second.m_tag << std::dec);
 		return;
 	}
 

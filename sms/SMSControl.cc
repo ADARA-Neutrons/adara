@@ -532,13 +532,13 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id);
+				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
 		}
 		else if (id >= min_id && id < max_id) {
 			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id);
+				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
 		}
 		m_lastPulseId = max_id;
 	}
@@ -547,7 +547,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " versus Last Pulse id=0x" << m_lastPulseId);
+				<< " versus Last Pulse id=0x" << m_lastPulseId
+				<< std::dec);
 		}
 		m_lastPulseId = id;
 	}

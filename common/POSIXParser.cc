@@ -70,7 +70,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 				case EINTR:
 				case EAGAIN:
 					/* We didn't get any data, but we're OK */
-					log_info = "read() no data but OK exit";
+					log_info.append("read() no data but OK exit; ");
 					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
 					last_elapsed = calcDiffSeconds( end_time, start_time );
@@ -81,7 +81,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 				case EHOSTUNREACH:
 				case ENETUNREACH:
 					/* The host went away, but that shouldn't be fatal. */
-					log_info = "read() host went away exit";
+					log_info.append("read() host went away exit; ");
 					clock_gettime(CLOCK_REALTIME, &end_time);
 					last_last_elapsed = last_elapsed;
 					last_elapsed = calcDiffSeconds( end_time, start_time );
@@ -98,7 +98,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			}
 
 			if (rc == 0) {
-				log_info = "read() read returned 0 exit";
+				log_info.append("read() read returned 0 exit; ");
 				clock_gettime(CLOCK_REALTIME, &end_time);
 				last_last_elapsed = last_elapsed;
 				last_elapsed = calcDiffSeconds( end_time, start_time );
@@ -132,7 +132,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		last_last_pkts_parsed = last_pkts_parsed;
 		last_pkts_parsed = rc;
 		if (rc < 0) {
-			log_info.append("; read() bufferParse() error exit");
+			log_info.append("read() bufferParse() error exit; ");
 			clock_gettime(CLOCK_REALTIME, &end_time);
 			last_last_elapsed = last_elapsed;
 			last_elapsed = calcDiffSeconds( end_time, start_time );
@@ -150,7 +150,7 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			// << " total_packets=" << total_packets);
 	}
 
-	log_info = "read() true exit";
+	log_info.append("read() true exit; ");
 	// DEBUG("read() true exit" << " total_bytes=" << total_bytes
 		// << " total_packets=" << total_packets
 		// << " read_count=" << read_count

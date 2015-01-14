@@ -268,7 +268,7 @@ void LiveClient::readable(void)
 			 * member variables after calling the handlers.
 			 */
 			DEBUG("client " << m_clientName
-				<< " error reading stream (" << log_info << ")");
+				<< " error reading stream log_info=(" << log_info << ")");
 			delete this;
 		}
 	} catch (std::runtime_error e) {
@@ -291,7 +291,7 @@ bool LiveClient::rxPacket(const ADARA::Packet &pkt)
 
 	WARN("client " << m_clientName
 	     << " sent us an unexpected packet type 0x"
-	     << std::hex << pkt.type());
+	     << std::hex << pkt.type() << std::dec);
 	return true;
 }
 

@@ -44,7 +44,7 @@ public:
 			 */
 			/* TODO rate-limited logging of dropped packets */
 			ERROR("Lost packet from " << m_name << " src 0x"
-				<< std::hex << m_hwId);
+				<< std::hex << m_hwId << std::dec);
 #endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
 			m_trueNew = false;
@@ -85,8 +85,8 @@ public:
 		if (m_activePulse < m_lastPulse) {
 			/* TODO rate-limited logging of local sawtooth pulses? */
 			ERROR("newPulse(RawDataPkt): Local SAWTOOTH RawData"
-				<< " m_lastPulse=" << m_lastPulse
-				<< " m_activePulse=" << m_activePulse
+				<< std::hex << " m_lastPulse=" << m_lastPulse
+				<< " m_activePulse=" << m_activePulse << std::dec
 				<< " cycle=" << pkt.cycle()
 				<< " veto=" << pkt.veto());
 		}
@@ -136,7 +136,7 @@ public:
 			ERROR("checkSeq() Packet Sequence Out-of-Order: "
 				<< pkt.pktSeq() << " != " << m_pktSeq
 				<< std::hex << " m_activePulse=0x" << m_activePulse
-				<< " hwId=0x" << m_hwId);
+				<< " hwId=0x" << m_hwId << std::dec);
 		} */
 		m_pktSeq++;
 		return !ok;
@@ -622,7 +622,7 @@ void DataSource::dataReady(void)
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name
-				<< "(" << log_info << ")");
+				<< " log_info=(" << log_info << ")");
 			m_pvConnected->disconnected();
 			connectionFailed(true, IDLE);
 			readOk = false;
@@ -647,7 +647,8 @@ void DataSource::dataReady(void)
 		{
 			/* TODO rate-limited logging of read delay threshold? */
 			ERROR("dataReady(): Read Delay Threshold Exceeded"
-				<< " elapsed=" << elapsed << " (" << m_name << ")");
+				<< " elapsed=" << elapsed << " (" << m_name << ")"
+				<< " log_info=(" << log_info << ")");
 			ctrl->setSourcesReadDelay();
 			dumpLastReadStats("dataReady() (Read Delay)");
 		}
