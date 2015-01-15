@@ -106,6 +106,10 @@ private:
 	time_t m_last_pkt_sec;
 	long m_last_pkt_nsec;
 
+	// Last Packet Counts
+	uint32_t m_rtdl_pkt_counts;
+	uint32_t m_data_pkt_counts;
+
 	HWSource &getHWSource(uint32_t hwId);
 
 	friend class TimerAdapter<DataSource>;

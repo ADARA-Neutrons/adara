@@ -280,6 +280,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_last_pkt_sec = -1;
 	m_last_pkt_nsec = -1;
 
+	m_rtdl_pkt_counts = -1;
+	m_data_pkt_counts = -1;
+
 	m_readDelay = false;
 
 	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
@@ -618,6 +621,9 @@ void DataSource::dataReady(void)
 
 	bool readOk = true;
 
+	m_rtdl_pkt_counts = 0;
+	m_data_pkt_counts = 0;
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
@@ -648,7 +654,9 @@ void DataSource::dataReady(void)
 			/* TODO rate-limited logging of read delay threshold? */
 			ERROR("dataReady(): Read Delay Threshold Exceeded"
 				<< " elapsed=" << elapsed << " (" << m_name << ")"
-				<< " log_info=(" << log_info << ")");
+				<< " log_info=(" << log_info << ")"
+				<< " m_rtdl_pkt_counts=" << m_rtdl_pkt_counts
+				<< " m_data_pkt_counts=" << m_data_pkt_counts);
 			ctrl->setSourcesReadDelay();
 			dumpLastReadStats("dataReady() (Read Delay)");
 		}
@@ -816,6 +824,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
+	m_data_pkt_counts++;
+
 	return false;
 }
 
@@ -863,6 +873,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	SMSControl *ctrl = SMSControl::getInstance();
 	ctrl->pulseRTDL(pkt, m_dupRTDL);
+
+	m_rtdl_pkt_counts++;
 
 	return false;
 }
