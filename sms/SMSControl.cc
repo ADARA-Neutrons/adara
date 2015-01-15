@@ -590,6 +590,17 @@ void SMSControl::setSourcesReadDelay(void)
 	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
 		m_dataSources[i]->m_readDelay = true;
 	}
+
+	// Dump Internal Pulse Buffer Size/Info...
+	DEBUG("Internal Pulse Buffer " << std::hex
+		<< " begin()=" << " 0x" << m_pulses.begin()->first.first
+		<< " end()=" << " 0x" << m_pulses.end()->first.first << std::dec);
+	PulseMap::iterator it;
+	uint64_t queue_length = 0;
+	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+		queue_length++;
+	}
+	DEBUG("Internal Pulse Buffer Length = " << queue_length);
 }
 
 // Clear All Packet Statistics...
