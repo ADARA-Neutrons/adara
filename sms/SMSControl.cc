@@ -473,6 +473,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			}
 			// no pulses to record yet, buffer not "full" enough...
 			else {
+				/* D-Oh... Before returning, mark this id for re-use... */
+				m_eventSources.reset(smsId);
 				return;
 			}
 		}
@@ -592,14 +594,16 @@ void SMSControl::setSourcesReadDelay(void)
 	}
 
 	// Dump Internal Pulse Buffer Size/Info...
-	DEBUG("Internal Pulse Buffer " << std::hex
-		<< " begin()=" << " 0x" << m_pulses.begin()->first.first
-		<< " end()=" << " 0x" << m_pulses.end()->first.first << std::dec);
-	PulseMap::iterator it;
+	PulseMap::iterator it, next_to_last;
 	uint64_t queue_length = 0;
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
 		queue_length++;
+		next_to_last = it;
 	}
+	DEBUG("Internal Pulse Buffer " << std::hex
+		<< " begin()=" << " 0x" << m_pulses.begin()->first.first
+		<< " next_to_last=" << " 0x" << next_to_last->first.first
+		<< std::dec);
 	DEBUG("Internal Pulse Buffer Length = " << queue_length);
 }
 
