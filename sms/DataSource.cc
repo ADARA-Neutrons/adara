@@ -305,9 +305,9 @@ void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 	 * of our change of status
 	 */
 	SMSControl *ctrl = SMSControl::getInstance();
-	HWSrcMap::iterator it, end = m_hwSources.end();
+	HWSrcMap::iterator it;
 
-	for (it = m_hwSources.begin(); it != end; it++) {
+	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
 		INFO("Unregistering Event Source " << it->second->smsId()
 			<< " for " << why << " Data Source " << m_name);
 		it->second->endPulse(false);
