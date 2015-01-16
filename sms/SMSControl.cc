@@ -498,6 +498,19 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
+		// Log the size of the remaining internal pulse buffer...
+		// (count the rest of the list we _didn't_ just process...)
+		uint64_t queue_length = 0;
+		while ( it != m_pulses.end() ) {
+			queue_length++;
+			it++;
+		}
+		// account for last pulse, if recorded...
+		if (!m_noEoPPulseBufferSize || num_sources == 1) {
+			queue_length--;
+		}
+		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length);
+
 		// erase any now-recorded pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
@@ -888,7 +901,6 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
 	static uint32_t queue_log_count = 0;
-	uint64_t queue_length = 0;
 
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulseMap::iterator it, current_minus_buffer, last_recorded;
@@ -936,7 +948,6 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 	// record complete/partial pulses past the buffering threshold
 	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
-		queue_length++;
 		// previous pulse will never be made complete, mark as partial
 		if (it->second->m_pending.any()) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
@@ -947,21 +958,26 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		recorded++;
 	}
 
-	// Periodically log the size of the internal pulse buffer...
-	if ( !(++queue_log_count % 5000) ) {
-		// count the rest of the list we _didn't_ just process...
-		while ( it != m_pulses.end() ) {
-			queue_length++;
-			it++;
-		}
-		DEBUG("Internal Pulse Buffer Length = " << queue_length);
-	}
-
 	// record the current pulse for sure, if not buffering...
 	if (!m_noEoPPulseBufferSize) {
 		recordPulse(current->second);
 		last_recorded = current;
 		recorded++;
+	}
+
+	// Periodically log the size of the internal pulse buffer...
+	if ( !(++queue_log_count % 5000) ) {
+		// count the rest of the list we _didn't_ just process...
+		uint64_t queue_length = 0;
+		while ( it != m_pulses.end() ) {
+			queue_length++;
+			it++;
+		}
+		// account for last pulse, if recorded...
+		if (!m_noEoPPulseBufferSize) {
+			queue_length--;
+		}
+		DEBUG("Internal Pulse Buffer Length = " << queue_length);
 	}
 
 	// erase any now-recorded pulses
