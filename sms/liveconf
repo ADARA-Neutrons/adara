@@ -147,6 +147,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="sts"
 option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:STSClient:ServiceURI"
+option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_label[$num_options]="[STS Client Service URI]"
 num_options=$(( num_options + 1 ))
