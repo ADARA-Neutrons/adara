@@ -62,7 +62,7 @@ int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 
 	/* Is there anything to do? */
 	if (!valid_len) {
-		log_info = "bufferParse() nothing to do";
+		log_info.append("bufferParse() nothing to do; ");
 		return 0;
 	}
 
@@ -148,9 +148,9 @@ int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 			// log what we did...
 			std::stringstream ss;
 			ss << processed;
-			log_info = "bufferParse(): resized, processed ";
+			log_info.append("bufferParse(): resized, processed ");
 			log_info.append(ss.str());
-			log_info.append(" packets");
+			log_info.append(" packets; ");
 
 			return processed;
 		}
@@ -169,10 +169,11 @@ int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 		// log failed packet parsing...!
 		if ( stopped ) {
 			std::stringstream ss;
-			log_info = "bufferParse(): rxPacket() returned error for type=";
+			log_info.append(
+				"bufferParse(): rxPacket() returned error for type=");
 			ss << pkt.type();
 			log_info.append(ss.str());
-			log_info.append(", stopped");
+			log_info.append(", stopped; ");
 		}
 	}
 
@@ -217,17 +218,17 @@ int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 		rc = - (int) processed;
 		// add to "stopped" log info...
 		ss << processed;
-		log_info.append("; had parsed ");
+		log_info.append("had parsed ");
 		log_info.append(ss.str());
-		log_info.append(" packets");
+		log_info.append(" packets; ");
 	}
 	else {
 		rc = (int) processed;
 		// create log info...
 		ss << rc;
-		log_info = "bufferParse(): Done. Parsed ";
+		log_info.append("bufferParse(): Done. Parsed ");
 		log_info.append(ss.str());
-		log_info.append(" packets");
+		log_info.append(" packets; ");
 	}
 
 	return rc;

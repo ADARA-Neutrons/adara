@@ -6,7 +6,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.2.0";
+const std::string VERSION = "1.2.1";
 
 #define ADARA_PKT_TYPE(type, ver)  ((((uint32_t) type) << 8) | (ver))
 namespace PacketType {

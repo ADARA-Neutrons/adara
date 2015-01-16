@@ -276,7 +276,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if (rc == EAI_MEMORY || rc == EAI_SYSTEM) {
 			ERROR("GAI unexpectedly returned " << rc);
 		} else {
-			/* TODO ratelimit lookup error (or just once per
+			/* TODO rate-limited lookup error (or just once per
 			 * failure type?
 			 */
 			INFO("Lookup failed for " << m_node
@@ -316,7 +316,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 
 	switch (rc) {
 	case ECONNREFUSED:
-		/* TODO ratelimited logging of refused connection */
+		/* TODO rate-limited logging of refused connection */
 		INFO("Connection refused");
 		goto error;
 	case EINTR:
@@ -344,7 +344,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	return;
 
 error:
-	/* TODO ratelimited error message? */
+	/* TODO rate-limited error message? */
 	WARN("Failed to initiate connection");
 	connectFailed();
 }
@@ -392,7 +392,7 @@ void STSClientMgr::connectComplete(void)
 		return;
 	}
 
-	/* TODO ratelimited logging of connection issue */
+	/* TODO rate-limited logging of connection issue */
 	WARN("Connection to STS failed: " << strerror(e));
 	connectFailed();
 
@@ -413,7 +413,7 @@ void STSClientMgr::connectFailed(void)
 
 bool STSClientMgr::connectTimeout(void)
 {
-	/* TODO ratelimited log message */
+	/* TODO rate-limited log message */
 	connectFailed();
 	return false;
 }

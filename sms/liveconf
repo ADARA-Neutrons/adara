@@ -147,6 +147,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="sts"
 option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:STSClient:ServiceURI"
+option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_label[$num_options]="[STS Client Service URI]"
 num_options=$(( num_options + 1 ))
@@ -160,10 +161,29 @@ USAGE()
 	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
-	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--repo=/home/controls/config] \\"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   --beamline=BL14B      = explicitly set Beamline PV Prefix"
+	echo "   --config=./smsd.conf  = specify custom SMSD Config file"
+	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
+	echo "   --skiplive            = *don't* set live config option"
+	echo "   --testonly            = *don't* actually change anything!"
+	echo "   --help                = display this help/usage information"
+	echo
+
+	echo "Available Commands:"
+	echo
+	echo "   status                = display overall SMS beamline status"
+	echo "   run_status            = display SMS run status"
+	echo "   data_status           = display SMS data source status"
+	echo "   sys_status            = display SMS internal system status"
 	echo
 
 	echo "Available Options:"
@@ -239,37 +259,61 @@ done
 # the EPICS PV Prefix and Git Config Repo Branch...
 #
 
-if [ ${PRE} == "[NotSet]" ]; then
-
-	config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
-	config_branch=`echo "$config_host" | sed 's/-.*//'`
-	if [[ "$config_host" == "" || "$config_branch" == "" ]]; then
-		echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
-		exit -90
-	fi
-
-	PRE=`echo "$config_branch" | tr '[:lower:]' '[:upper:]'`
-
-	daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
-	if [ "#$daq_ck#" == '#1#' ]; then
-		config_branch=`echo "$config_host" | sed 's/\..*//'`
-		PRE="${PRE}X"
-		echo -n "*** DAQ System - "
-		echo -e "Using Alternate Branch ${config_branch} ($PRE).\n"
-	fi
-
-	echo "Changing Configuration on Host ${config_host}."
-	echo "(Git Config Repository Branch ${config_branch}.)"
-
-	echo "Setting EPICS PV Prefix from Config Branch: ${PRE}."
-
-else
-	config_branch=`echo "${PRE}" | tr '[:upper:]' '[:lower:]'`
-	echo -n "Setting Git Config Repository Branch "
-	echo "from EPICS PV Prefix: ${config_branch}."
+config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+config_blnum=`echo "$config_host" | sed 's/-.*//'`
+if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
+	echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
+	exit -90
 fi
 
-echo
+echo -e "Changing Configuration on Host ${config_host} [$config_blnum].\n"
+
+if [ ${PRE} == "[NotSet]" ]; then
+
+	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+	if [[ "#$bid_ck#" != '#1#' ]]; then
+		echo -e "\nError: Invalid Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo
+		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
+		exit -91
+	fi
+
+	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| awk '{print $1$2$3}'`
+
+	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+		echo -e "\nError Parsing Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo -e "\n   $bid_clean\n"
+		exit -92
+	fi
+
+	PRE="$bid_value"
+	echo "Setting EPICS PV Prefix from SMSD Config File:"
+	echo "   $SMSD_CONFIG"
+	echo "      -> $bid_key = $bid_value"
+	echo "         => [${PRE}]."
+	echo
+
+fi
+
+daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
+if [ "#$daq_ck#" == '#1#' ]; then
+	echo -e "[DAQ Beamline Host.]\n"
+	CONFIG_REPO="${CONFIG_REPO}-daq1"
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
+else
+	config_branch="$config_blnum"
+fi
+
+echo -e "Git Config Repository: [${CONFIG_REPO}].\n"
+
+echo -e "Git Config Repository Branch: [${config_branch}].\n"
 
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \

@@ -31,6 +31,9 @@ if ( $# != 1 ) then
 	exit -1
 endif
 
+# Be Group-Friendly...
+umask 002
+
 # Parse Command Line Options
 
 set IS_STS = 0
@@ -64,7 +67,7 @@ set TMP_DIR = "/tmp"
 
 set INSTALL_BASE = "/home/controls"
 
-set EPICS_BASE = "$INSTALL_BASE/epics/R3.14.12.2/base"
+set EPICS_BASE = "$INSTALL_BASE/epics/base/master"
 
 set CONFIG_REPO = "git+ssh://trac.sns.gov/var/repos/config"
 
@@ -283,7 +286,8 @@ if ( ! -d "$tag_archive" ) then
 	set mkdir_ok = $status
 
 	if ( $mkdir_ok != 0 ) then
-		echo "\nError Making Archive Release Tag Directory! ($mkdir_ok)\n" \
+		echo \
+			"\nError Making Archive Release Tag Directory! ($mkdir_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -9
@@ -303,7 +307,8 @@ if ( $already_deployed_locally == 1 ) then
 
 else if ( -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ) then
 
-	echo "\nWarning! A Build Already Exists for Release Tag $release_tag!" \
+	echo \
+		"\nWarning! A Build Already Exists for Release Tag $release_tag!" \
 		| tee -a $LOG
 
 	echo -n "\nDo you want to Re-Build the Installation...? (yes/No/quit) "
@@ -443,6 +448,25 @@ if ( $need_build == 1 ) then
 
 	ls -l "$tag_archive/smsd" |& tee -a $LOG
 
+	# SMS LiveConf Script
+
+	echo "\nCopying SMS LiveConf Script into Archive Release Tag:\n" \
+		| tee -a $LOG
+
+	cp -i -p sms/liveconf "$tag_archive" |& tee -a $LOG
+
+	set copy_ok = $status
+
+	if ( $copy_ok != 0 ) then
+		echo \
+	"\nError Copying LiveConf into Release Tag Directory! ($copy_ok)\n" \
+			| tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -10
+	endif
+
+	ls -l "$tag_archive/liveconf" |& tee -a $LOG
+
 	# STS Client
 
 	echo "\nCopying STS Client Executable into Archive Release Tag:\n" \
@@ -454,7 +478,7 @@ if ( $need_build == 1 ) then
 
 	if ( $copy_ok != 0 ) then
 		echo \
-			"\nError Copying STS into Release Tag Directory! ($copy_ok)\n" \
+		"\nError Copying STS into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -11
@@ -558,7 +582,8 @@ git checkout "$install_branch" |& tee -a $LOG
 set tag_ok = $status
 
 if ( $tag_ok != 0 ) then
-	echo "\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
+	echo \
+		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -4
 endif
@@ -581,7 +606,8 @@ if ( ! -d "$adara_current" ) then
 	set mkdir_ok = $status
 
 	if ( $mkdir_ok != 0 ) then
-		echo "\nError Making Current Working Set Directory! ($mkdir_ok)\n" \
+		echo \
+			"\nError Making Current Working Set Directory! ($mkdir_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -14
@@ -685,7 +711,8 @@ sleep 3
 # Commit the Current Working Set Changes to the Git Config Repository
 #
 
-echo "\nCommitting Current Working Set changes to $install_branch branch." \
+echo \
+	"\nCommitting Current Working Set changes to $install_branch branch." \
 	| tee -a $LOG
 
 pwd | tee -a $LOG
@@ -708,13 +735,15 @@ if ( $adara_current_new == 1 ) then
 	set add_ok = $status
 
 	if ( $add_ok != 0 ) then
-		echo "\nError Adding New Deployment Directory to Git! ($add_ok)\n" \
+		echo \
+			"\nError Adding New Deployment Directory to Git! ($add_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -20
 	endif
 
-	echo "git commit -m 'Initial Config Deploy Directory Creation' deploy" \
+	echo \
+		"git commit -m 'Initial Config Deploy Directory Creation' deploy" \
 		| tee -a $LOG
 	git commit -m 'Initial Config Deploy Directory Creation' deploy \
 		|& tee -a $LOG
@@ -842,7 +871,8 @@ echo "ADARA/${PROG} Deployment by User: $gcos ($userid)." \
 	>> "$deploy_history"
 
 echo "$HOST_TYPE $install_branch on Host $install_host" | tee -a $LOG
-echo "$HOST_TYPE $install_branch on Host $install_host" >> "$deploy_history"
+echo \
+	"$HOST_TYPE $install_branch on Host $install_host" >> "$deploy_history"
 
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
@@ -857,7 +887,8 @@ echo "\nDeployment Log Description:\n" >> "$deploy_history"
 echo "$log_desc" | tee -a $LOG
 echo "$log_desc" >> "$deploy_history"
 
-echo "\nInstalled into ADARA Archive Release Tag directory:\n" | tee -a $LOG
+echo \
+	"\nInstalled into ADARA Archive Release Tag directory:\n" | tee -a $LOG
 echo "\nInstalled into ADARA Archive Release Tag directory:\n" \
 	>> "$deploy_history"
 
@@ -887,11 +918,13 @@ echo "\n$CONFIG_LINE\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 
-echo "Committing Current Deployment History Additions to Git." | tee -a $LOG
+echo \
+	"Committing Current Deployment History Additions to Git." | tee -a $LOG
 
 echo "\nCommit Log:\n" | tee -a $LOG
 
-echo "Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
+echo \
+	"Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
 	| tee -a $LOG
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
 
@@ -917,7 +950,8 @@ git push |& tee -a $LOG
 set push_ok = $status
 
 if ( $push_ok != 0 ) then
-	echo "\nError Pushing Deployment History File to Origin! ($push_ok)\n" \
+	echo \
+		"\nError Pushing Deployment History File to Origin! ($push_ok)\n" \
 		| tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -23
@@ -946,7 +980,8 @@ if ( $PROG == "SMS" ) then
 	echo "sudo /sbin/service smsd status" | tee -a $LOG
 	sudo /sbin/service smsd status |& tee -a $LOG
 
-	echo -n "\nDo You want to Restart the SMS Daemon service now [yes/No]? "
+	echo -n \
+		"\nDo You want to Restart the SMS Daemon service now [yes/No]? "
 
 	set restart_ck = "$<"
 
@@ -973,7 +1008,8 @@ endif
 
 # Copy Final Log File into ADARA Archive Release Tag Directory
 
-echo "\nDone with Deployment of ADARA/${PROG} Release Tag $release_tag.\n" \
+echo \
+	"\nDone with Deployment of ADARA/${PROG} Release Tag $release_tag.\n" \
 	| tee -a $LOG
 
 if ( $already_deployed_locally == 1 ) then
@@ -986,7 +1022,7 @@ echo "   $LOG\n" | tee -a $LOG
 
 echo "   $tag_archive\n" | tee -a $LOG
 
-cp $LOG $tag_archive
+cp -p $LOG $tag_archive
 
 #
 # Done.

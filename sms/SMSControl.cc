@@ -473,6 +473,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			}
 			// no pulses to record yet, buffer not "full" enough...
 			else {
+				/* D-Oh... Before returning, mark this id for re-use... */
+				m_eventSources.reset(smsId);
 				return;
 			}
 		}
@@ -495,6 +497,19 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			last_recorded = last;
 			recorded++;
 		}
+
+		// Log the size of the remaining internal pulse buffer...
+		// (count the rest of the list we _didn't_ just process...)
+		uint64_t queue_length = 0;
+		while ( it != m_pulses.end() ) {
+			queue_length++;
+			it++;
+		}
+		// account for last pulse, if recorded...
+		if (!m_noEoPPulseBufferSize || num_sources == 1) {
+			queue_length--;
+		}
+		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length);
 
 		// erase any now-recorded pulses
 		if (recorded) {
@@ -529,22 +544,26 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 
 		// Log any Sawtooth pulses... :-o
 		if (id < min_id) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id);
+				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
 		}
 		else if (id >= min_id && id < max_id) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id);
+				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
 		}
 		m_lastPulseId = max_id;
 	}
 	else {
 		if ( id < m_lastPulseId ) {
+			/* TODO rate-limited logging of global sawtooth pulse? */
 			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
 				<< std::hex << id << ", 0x" << dup << ")"
-				<< " versus Last Pulse id=0x" << m_lastPulseId);
+				<< " versus Last Pulse id=0x" << m_lastPulseId
+				<< std::dec);
 		}
 		m_lastPulseId = id;
 	}
@@ -586,6 +605,19 @@ void SMSControl::setSourcesReadDelay(void)
 	for (uint32_t i = 0; i < m_dataSources.size(); i++) {
 		m_dataSources[i]->m_readDelay = true;
 	}
+
+	// Dump Internal Pulse Buffer Size/Info...
+	PulseMap::iterator it, next_to_last;
+	uint64_t queue_length = 0;
+	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+		queue_length++;
+		next_to_last = it;
+	}
+	DEBUG("Internal Pulse Buffer " << std::hex
+		<< " begin()=" << " 0x" << m_pulses.begin()->first.first
+		<< " next_to_last=" << " 0x" << next_to_last->first.first
+		<< std::dec);
+	DEBUG("Internal Pulse Buffer Length = " << queue_length);
 }
 
 // Clear All Packet Statistics...
@@ -601,6 +633,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				 uint32_t pixel, uint32_t tof)
 {
 	uint32_t rising = (pixel & 1) << 31;
+	tof &= ((1U << 21) - 1);
 	tof |= rising;
 
 	uint32_t monId = pixel >> 16;
@@ -867,6 +900,8 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
+	static uint32_t queue_log_count = 0;
+
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
@@ -930,6 +965,21 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		recorded++;
 	}
 
+	// Periodically log the size of the internal pulse buffer...
+	if ( !(++queue_log_count % 5000) ) {
+		// count the rest of the list we _didn't_ just process...
+		uint64_t queue_length = 0;
+		while ( it != m_pulses.end() ) {
+			queue_length++;
+			it++;
+		}
+		// account for last pulse, if recorded...
+		if (!m_noEoPPulseBufferSize) {
+			queue_length--;
+		}
+		DEBUG("Internal Pulse Buffer Length = " << queue_length);
+	}
+
 	// erase any now-recorded pulses
 	if (recorded) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
@@ -951,6 +1001,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 						  pulse->m_rtdl->packet_length(),
 						  false);
 		} else {
+			/* TODO rate-limited logging of no RTDL for pulse? */
 			ERROR("recordPulse(): NO RTDL for Pulse"
 				<< " id=0x" << std::hex << pulse->m_id.first
 				<< " dup=0x" << pulse->m_id.second << std::dec);

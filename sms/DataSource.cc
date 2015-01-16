@@ -44,7 +44,7 @@ public:
 			 */
 			/* TODO rate-limited logging of dropped packets */
 			ERROR("Lost packet from " << m_name << " src 0x"
-				<< std::hex << m_hwId);
+				<< std::hex << m_hwId << std::dec);
 #endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
 			m_trueNew = false;
@@ -83,9 +83,10 @@ public:
 
 		// also check for SAWTOOTH Pulse Times in event packets...
 		if (m_activePulse < m_lastPulse) {
+			/* TODO rate-limited logging of local sawtooth pulses? */
 			ERROR("newPulse(RawDataPkt): Local SAWTOOTH RawData"
-				<< " m_lastPulse=" << m_lastPulse
-				<< " m_activePulse=" << m_activePulse
+				<< std::hex << " m_lastPulse=" << m_lastPulse
+				<< " m_activePulse=" << m_activePulse << std::dec
 				<< " cycle=" << pkt.cycle()
 				<< " veto=" << pkt.veto());
 		}
@@ -131,10 +132,11 @@ public:
 	bool checkSeq(const ADARA::RawDataPkt &pkt) {
 		bool ok = (pkt.pktSeq() == m_pktSeq);
 		/* if ( !ok ) {
+			// TODO rate-limited logging of packet sequence out-of-order?
 			ERROR("checkSeq() Packet Sequence Out-of-Order: "
 				<< pkt.pktSeq() << " != " << m_pktSeq
 				<< std::hex << " m_activePulse=0x" << m_activePulse
-				<< " hwId=0x" << m_hwId);
+				<< " hwId=0x" << m_hwId << std::dec);
 		} */
 		m_pktSeq++;
 		return !ok;
@@ -278,6 +280,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_last_pkt_sec = -1;
 	m_last_pkt_nsec = -1;
 
+	m_rtdl_pkt_counts = -1;
+	m_data_pkt_counts = -1;
+
 	m_readDelay = false;
 
 	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
@@ -300,9 +305,9 @@ void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 	 * of our change of status
 	 */
 	SMSControl *ctrl = SMSControl::getInstance();
-	HWSrcMap::iterator it, end = m_hwSources.end();
+	HWSrcMap::iterator it;
 
-	for (it = m_hwSources.begin(); it != end; it++) {
+	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
 		INFO("Unregistering Event Source " << it->second->smsId()
 			<< " for " << why << " Data Source " << m_name);
 		it->second->endPulse(false);
@@ -509,7 +514,7 @@ void DataSource::startConnect(void)
 
 	switch (rc) {
 		case ECONNREFUSED:
-			/* TODO ratelimited logging of refused connection */
+			/* TODO rate-limited logging of refused connection */
 			WARN("Connection refused by " << m_name);
 			goto error_fd;
 		case EINTR:
@@ -591,7 +596,7 @@ void DataSource::connectComplete(void)
 		return;
 	}
 
-	/* TODO ratelimited logging of connection issue */
+	/* TODO rate-limited logging of connection issue */
 	WARN("Connection request to " << m_name << " failed: " << strerror(e));
 	// Leave m_pvConnected in its current state, latch failures
 	connectionFailed(false, IDLE);
@@ -616,17 +621,20 @@ void DataSource::dataReady(void)
 
 	bool readOk = true;
 
+	m_rtdl_pkt_counts = 0;
+	m_data_pkt_counts = 0;
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
 			INFO("Connection closed with " << m_name
-				<< "(" << log_info << ")");
+				<< " log_info=(" << log_info << ")");
 			m_pvConnected->disconnected();
 			connectionFailed(true, IDLE);
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
-		/* TODO ratelimited log of failure */
+		/* TODO rate-limited log of failure */
 		ERROR("Exception reading from " << m_name << ": " << e.what());
 		m_pvConnected->failed();
 		connectionFailed(true, IDLE);
@@ -643,8 +651,12 @@ void DataSource::dataReady(void)
  		// set read delayed flag...!
 		if ( elapsed > 2.0 )
 		{
+			/* TODO rate-limited logging of read delay threshold? */
 			ERROR("dataReady(): Read Delay Threshold Exceeded"
-				<< " elapsed=" << elapsed << " (" << m_name << ")");
+				<< " elapsed=" << elapsed << " (" << m_name << ")"
+				<< " log_info=(" << log_info << ")"
+				<< " m_rtdl_pkt_counts=" << m_rtdl_pkt_counts
+				<< " m_data_pkt_counts=" << m_data_pkt_counts);
 			ctrl->setSourcesReadDelay();
 			dumpLastReadStats("dataReady() (Read Delay)");
 		}
@@ -717,6 +729,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 * active pulse, and nothing should ever send one to us.
 		 */
 		if (!pkt.pulseId()) {
+			/* TODO rate-limited logging of pulse id 0? */
 			WARN("Received pulse id 0 from " << m_name);
 			return false;
 		}
@@ -729,6 +742,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
+	/* TODO rate-limited logging of unknown packet types? */
 	ERROR("Unknown packet type " << pkt.type() << " from " << m_name);
 	return true;
 }
@@ -739,6 +753,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       unsigned int UNUSED(chunk_len))
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
+	/* TODO rate-limited logging of oversized packets? */
 	if (hdr) {
 		ERROR("Oversized packet of type " << hdr->type()
 			<< " from " << m_name);
@@ -809,6 +824,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
+	m_data_pkt_counts++;
+
 	return false;
 }
 
@@ -821,6 +838,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
+		/* TODO rate-limited logging of duplicate RTDLs? */
 		ERROR("rxPacket(RTDLPkt): Duplicate RTDL from " << m_name
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()
@@ -831,6 +849,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
+		/* TODO rate-limited logging of local sawtooth RTDLs? */
 		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
 			<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 			<< " pulseId=0x" << pkt.pulseId() << std::dec
@@ -843,6 +862,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
+		/* TODO rate-limited logging of RTDL cycle out of sequence? */
 		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from " << m_name
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -853,6 +873,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	SMSControl *ctrl = SMSControl::getInstance();
 	ctrl->pulseRTDL(pkt, m_dupRTDL);
+
+	m_rtdl_pkt_counts++;
 
 	return false;
 }

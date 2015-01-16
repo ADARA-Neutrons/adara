@@ -136,7 +136,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		ADARA::Packet *dev_pkt = dev.m_descriptor.get();
 
 		if (it->second.m_tag != tag) {
-			/* XXX ratelimited log that we got a descriptor from
+			/* TODO rate-limited log that we got a descriptor from
 			 * an incorrect tag (ie, wrong source)
 			 */
 			DEBUG("Got descriptor from incorrect tag "
@@ -179,8 +179,9 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 {
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
+		/* TODO rate-limited logging of adding existing device? */
 		ERROR("addFastMetaDDP() adding existing (mapped) device 0x"
-			<< std::hex << mapped_dev);
+			<< std::hex << mapped_dev << std::dec);
 		return;
 	}
 
@@ -223,9 +224,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
+		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -243,9 +244,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
+		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -263,9 +264,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
+		/* TODO rate-limited logging of unable to remap variable? */
 		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << std::hex << in.varId()
-			<< ":" << std::hex << tag);
+			<< ":" << in.varId() << ":" << tag << std::dec);
 		return;
 	}
 
@@ -295,25 +296,23 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 	DeviceMap::iterator it = m_devices.find(dev);
 
 	if (it == m_devices.end()) {
-		/* XXX ratelimited log that we got a variable update without
+		/* TODO rate-limited log that we got a variable update without
 		 * the corresponding device descriptor.
 		 */
 		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< std::hex << var << ":"
-					<< std::hex << tag
+					<< var << ":" << tag << std::dec
 					<< " without a descriptor");
 		return;
 	}
 
 	if (it->second.m_tag != tag) {
-		/* XXX ratelimited log that we got a variable update with
+		/* TODO rate-limited log that we got a variable update with
 		 * an incorrect tag (ie, wrong source)
 		 */
 		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< std::hex << var << ":"
-					<< std::hex << tag
+					<< var << ":" << tag << std::dec
 					<< " but expected tag "
-					<< std::hex << it->second.m_tag);
+					<< std::hex << it->second.m_tag << std::dec);
 		return;
 	}
 

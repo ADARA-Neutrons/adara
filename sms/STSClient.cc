@@ -205,7 +205,7 @@ void STSClient::sendDataDone(void)
 	// Dang, it didn't work... ;-b
 	if ( !send_status ) {
 
-		ERROR("sendDataDone() failed! (" << log_info << ")");
+		ERROR("sendDataDone() failed! log_info=(" << log_info << ")");
 
 		// Resort to the dreaded shutdown() system call,
 		// which doesn't appear to work through our network setup... ;-b
@@ -261,7 +261,7 @@ void STSClient::readable(void)
 			 * Take care of that case here.
 			 */
 			WARN("Lost connection to STS for run " << m_run->runNumber()
-				 << " (" << log_info << ")");
+				 << " log_info=(" << log_info << ")");
 		}
 	} catch (ADARA::invalid_packet e) {
 		WARN("Got invalid packet from STS: " << e.what());
@@ -289,7 +289,8 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 		return ADARA::Parser::rxPacket(pkt);
 
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
-	WARN("Received unexpected packet type 0x" << std::hex << pkt.type());
+	WARN("Received unexpected packet type 0x"
+		<< std::hex << pkt.type() << std::dec);
 	return true;
 }
 
@@ -330,24 +331,24 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 		if (pkt.reason().length()) {
 			WARN("Run " << m_run->runNumber() << " had a transient "
 				"failure, status 0x" << std::hex
-				<< pkt.status() << ", message \'"
+				<< pkt.status() << std::dec << ", message \'"
 				<< pkt.reason() << "'");
 		} else {
 			WARN("Run " << m_run->runNumber() << " had a transient "
 				"failure, status 0x" << std::hex
-				<< pkt.status());
+				<< pkt.status() << std::dec);
 		}
 	} else {
 		m_disp = STSClientMgr::PERMAMENT_FAIL;
 		if (pkt.reason().length()) {
 			ERROR("Run " << m_run->runNumber() << " had a "
 				"permament failure, status 0x" << std::hex
-				<< pkt.status() << ", message \'"
+				<< pkt.status() << std::dec << ", message \'"
 				<< pkt.reason() << "'");
 		} else {
 			ERROR("Run " << m_run->runNumber() << " had a "
 				"permament failure, status 0x" << std::hex
-				<< pkt.status());
+				<< pkt.status() << std::dec);
 		}
 	}
 	return true;
