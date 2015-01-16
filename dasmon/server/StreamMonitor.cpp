@@ -322,10 +322,6 @@ StreamMonitor::connect()
 
         if ( ::connect( sms_socket, (struct sockaddr*) &server_addr, sizeof(server_addr)) == 0 )
         {
-            // Set to non-blocking
-            int flags = fcntl( sms_socket, F_GETFL, 0 ) | O_NONBLOCK;
-            fcntl( sms_socket, F_SETFL, flags );
-
             // Send client hello to begin stream processing
             uint32_t data[5];
 
