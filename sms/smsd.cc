@@ -124,7 +124,8 @@ static void setcredentials(const char *pname, ptree::ptree &conf)
 	}
 }
 
-static void load_config(const char *pname, ptree::ptree &conf)
+static void load_config(const char *pname, ptree::ptree &conf,
+		std::string version_str)
 {
 	try {
 		ptree::read_ini(config_file, conf);
@@ -138,6 +139,8 @@ static void load_config(const char *pname, ptree::ptree &conf)
 	std::string t = conf.get<std::string>("sms.basedir", "");
 	if (!t.length())
 		conf.put("sms.basedir", "/SNSlocal/sms");
+
+	conf.put("sms.version", version_str);
 
 	setcredentials(pname, conf);
 
@@ -368,11 +371,14 @@ int main(int argc, char **argv)
 	PropertyConfigurator::configure(log_conf);
 	verify_log4cxx_config();
 
-	INFO("SMS Daemon Started, Version " << SMSD_VERSION
-			<< " (ADARA Common Version " << ADARA::VERSION
-			<< ", Tag Name " << ADARA::TAG_NAME << ")");
+	std::string version_str =
+		" SMSD Version " + SMSD_VERSION
+		+ " (ADARA Common Version " + ADARA::VERSION
+		+ ", Tag Name " + ADARA::TAG_NAME + ")";
 
-	load_config(argv[0], conf);
+	INFO("SMS Daemon Started, " << version_str);
+
+	load_config(argv[0], conf, version_str);
 
 	block_signals();
 
