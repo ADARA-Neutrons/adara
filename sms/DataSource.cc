@@ -172,14 +172,15 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
-	m_name(uri), m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
+	m_name(uri), m_basename(name), m_uri(uri),
+	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk)
 {
 	m_name += " (";
-	m_name += name;
+	m_name += m_basename;
 	m_name += ")";
 
 	m_enabled = enabled;
@@ -490,7 +491,8 @@ void DataSource::fdReady(void)
 
 	switch (m_state) {
 		case DISABLED:
-			WARN("Ignoring Data Ready for Disabled Data Source " << m_name);
+			WARN("Ignoring Data Ready for Disabled Data Source "
+				<< m_name);
 			break;
 		case IDLE:
 			throw std::logic_error("Invalid state");
@@ -517,7 +519,17 @@ void DataSource::startConnect(void)
 	if ( uri != m_uri ) {
 		INFO("Setting New Data URI from PV: " << uri);
 		m_uri = uri;
+		// Regenerate DataSource Name...
+		m_name = uri;
+		m_name += " (";
+		m_name += m_basename;
+		m_name += ")";
+		// Parse New URI...
 		parseURI(uri);
+		// Update DataSource Name PV...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		m_pvName->update(m_name, &now);
 	}
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
@@ -571,7 +583,8 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
-		ERROR("Bad Alloc Error for " << m_name << " adapter: " << e.what());
+		ERROR("Bad Alloc Error for " << m_name
+			<< " adapter: " << e.what());
 		goto error_fd;
 	}
 
@@ -854,7 +867,8 @@ bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
 		true) );
 }
 
-bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
+bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
+		bool is_mapped)
 {
 	HWSource &hw_src = getHWSource(pkt->sourceID());
 
@@ -872,7 +886,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 	if (hw_src.checkSeq(*pkt))
 		ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
 
-	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
+	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
 	m_ignore_eop = m_pvIgnoreEoP->value();
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
@@ -916,7 +930,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		/* TODO rate-limited logging of RTDL cycle out of sequence? */
-		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from " << m_name
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from "
+			<< m_name
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()

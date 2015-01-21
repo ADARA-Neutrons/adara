@@ -41,6 +41,7 @@ private:
 	enum State { DISABLED, IDLE, CONNECTING, ACTIVE };
 
 	std::string m_name;
+	std::string m_basename;
 	std::string m_uri;
 	bool m_enabled;
 	ReadyAdapter *m_fdreg;
