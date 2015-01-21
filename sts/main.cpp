@@ -108,7 +108,7 @@ int main( int argc, char** argv )
     g_pid = getpid();
 
     openlog( "sts", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "[%i] Started. STS ver: %s, common ver: %s", g_pid, STS_VERSION, ADARA::VERSION.c_str() );
+    syslog( LOG_INFO, "[%i] Started. STS ver: %s, common ver: %s, tag: %s", g_pid, STS_VERSION, ADARA::VERSION.c_str(), ADARA::TAG_NAME.c_str() );
 
     try
     {
@@ -163,7 +163,8 @@ int main( int argc, char** argv )
         else if ( opt_map.count( "version" ))
         {
             cout << STS_VERSION
-                 << " (ADARA Common " << ADARA::VERSION << ")" << endl;
+                 << " (ADARA Common " << ADARA::VERSION
+				 << ", Tag Name " << ADARA::TAG_NAME << ")" << endl;
             return STS::TS_TRANSIENT_ERROR;
         }
 
@@ -198,6 +199,7 @@ int main( int argc, char** argv )
             cout << "sts information" << endl;
             cout << "  version       : " << STS_VERSION << endl;
             cout << "  ADARA version : " << ADARA::VERSION << endl;
+            cout << "  tag name      : " << ADARA::TAG_NAME << endl;
             cout << "  nexus file    : " << nexus_outfile << endl;
             cout << "  adara file    : " << adara_outfile << endl;
             cout << "  strict        : " << ( move ? "yes" : "no" ) << endl;

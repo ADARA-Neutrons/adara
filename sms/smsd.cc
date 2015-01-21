@@ -70,7 +70,8 @@ static void parse_options(int argc, char **argv)
 	}
 	if (vm.count("version")) {
 		std::cerr << "SMS Daemon Version " << SMSD_VERSION
-			<< " (ADARA Common Version " << ADARA::VERSION << ")"
+			<< " (ADARA Common Version " << ADARA::VERSION
+			<< ", Tag Name " << ADARA::TAG_NAME << ")"
 			<< std::endl;
 		exit(2);
 	}
@@ -368,7 +369,8 @@ int main(int argc, char **argv)
 	verify_log4cxx_config();
 
 	INFO("SMS Daemon Started, Version " << SMSD_VERSION
-			<< " (ADARA Common Version " << ADARA::VERSION << ")");
+			<< " (ADARA Common Version " << ADARA::VERSION
+			<< ", Tag Name " << ADARA::TAG_NAME << ")");
 
 	load_config(argv[0], conf);
 
