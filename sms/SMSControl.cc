@@ -904,7 +904,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 	// Is pulse pending from any data sources...?
 	if (!pulse->m_pending.any()) {
-		DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
+		// DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
 		markComplete(pkt.pulseId(), dup, -1);
 	}
 }
