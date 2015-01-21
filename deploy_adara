@@ -392,7 +392,7 @@ if ( $need_build == 1 ) then
 		exit -5
 	endif
 
-	sed "s/XXX_TAG_NAME_XXX/$release_tag/g" \
+	sed "s@XXX_TAG_NAME_XXX@$release_tag@g" \
 		"$TMP_DIR/ADARA/common/ADARA.h.orig" \
 		> "$TMP_DIR/ADARA/common/ADARA.h"
 
