@@ -41,6 +41,7 @@ private:
 	enum State { DISABLED, IDLE, CONNECTING, ACTIVE };
 
 	std::string m_name;
+	std::string m_uri;
 	bool m_enabled;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
@@ -56,6 +57,7 @@ private:
 	unsigned int m_max_read_chunk;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsStringPV> m_pvDataURI;
 	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
@@ -67,6 +69,8 @@ private:
 	uint64_t m_lastRTDLPulseId;
 	uint16_t m_lastRTDLCycle;
 	uint32_t m_dupRTDL;
+
+	void parseURI(std::string uri);
 
 	void fdReady(void);
 

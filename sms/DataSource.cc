@@ -172,45 +172,19 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
-	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
+	m_name(uri), m_uri(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk)
 {
-	std::string node;
-	std::string service("31416");
-	struct addrinfo hints;
-	size_t pos = uri.find_first_of(':');
-	int rc;
-
 	m_name += " (";
 	m_name += name;
 	m_name += ")";
 
 	m_enabled = enabled;
 
-	if (pos != std::string::npos) {
-		node = uri.substr(0, pos);
-		if (pos != uri.length())
-			service = uri.substr(pos + 1);
-	} else
-		node = uri;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
-
-	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
-	if (rc) {
-		std::string msg("Unable to lookup data source ");
-		msg += m_name;
-		msg += ": ";
-		msg += gai_strerror(rc);
-		throw std::runtime_error(msg);
-	}
+	parseURI(uri);
 
 	// Create Run-Time Status and Configuration PVs Per Data Source...
 
@@ -226,6 +200,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
+
+	m_pvDataURI = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":DataURI"));
 
 	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
 		smsEnabledPV(prefix + ":Enabled", this));
@@ -249,6 +226,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 		smsStringPV(prefix + ":MaxReadChunk"));
 
 	ctrl->addPV(m_pvName);
+	ctrl->addPV(m_pvDataURI);
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvConnectRetry);
@@ -262,6 +240,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvName->update(m_name, &now);
+	m_pvDataURI->update(uri, &now);
 	m_pvConnected->disconnected();
 	m_pvConnectRetry->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
@@ -307,6 +286,37 @@ DataSource::~DataSource()
 		delete m_fdreg;
 	if (m_fd != -1)
 		close(m_fd);
+}
+
+void DataSource::parseURI(std::string uri)
+{
+	std::string node;
+	std::string service("31416");
+	struct addrinfo hints;
+	size_t pos = uri.find_first_of(':');
+	int rc;
+
+	if (pos != std::string::npos) {
+		node = uri.substr(0, pos);
+		if (pos != uri.length())
+			service = uri.substr(pos + 1);
+	} else
+		node = uri;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
+
+	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
+	if (rc) {
+		std::string msg("Unable to lookup data source ");
+		msg += m_name;
+		msg += ": ";
+		msg += gai_strerror(rc);
+		throw std::runtime_error(msg);
+	}
 }
 
 void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
@@ -501,6 +511,14 @@ void DataSource::startConnect(void)
 
 	/* Clear out any old state from the ADARA parser. */
 	reset();
+
+	// Update Data URI from PV...
+	std::string uri = m_pvDataURI->value();
+	if ( uri != m_uri ) {
+		INFO("Setting New Data URI from PV: " << uri);
+		m_uri = uri;
+		parseURI(uri);
+	}
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
