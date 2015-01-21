@@ -15,6 +15,7 @@
 #include "ADARAPackets.h"
 #include "Storage.h"
 
+class smsStringPV;
 class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
@@ -154,6 +155,7 @@ private:
 	uint32_t m_currentRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
+	boost::shared_ptr<smsStringPV> m_pvVersion;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
@@ -177,6 +179,7 @@ private:
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
 
+	static std::string m_version;
 	static std::string m_beamlineId;
 	static std::string m_beamlineShortName;
 	static std::string m_beamlineLongName;

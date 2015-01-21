@@ -44,6 +44,14 @@ idName["sts"]="STS"
 num_options=0
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="uri"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR:IP_PORT(data)"
+option_label[$num_options]="[Data Source URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="enabled"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
 option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
@@ -76,6 +84,14 @@ option_name[$num_options]="ignore_eop"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreEoP"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_label[$num_options]="[Ignore End-of-Pulse]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="readsize"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxReadChunk"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="UINT32_VALUE+[M|K](bytes)"
+option_label[$num_options]="[Max Read Chunk]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
@@ -259,11 +275,19 @@ done
 # the EPICS PV Prefix and Git Config Repo Branch...
 #
 
+not_a_beamline_computer=0
+do_git_config=1
+do_config=1
+
 config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
 config_blnum=`echo "$config_host" | sed 's/-.*//'`
+
 if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
-	echo -e "\nError: This is _Not_ a Beamline SMS Computer!\n"
-	exit -90
+	echo -e "\nWarning: This is _Not_ a Beamline SMS Computer!\n"
+	not_a_beamline_computer=1
+	config_host=`hostname`
+	config_blnum="bl99"
+	do_git_config=0
 fi
 
 echo -e "Changing Configuration on Host ${config_host} [$config_blnum].\n"
@@ -333,6 +357,10 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
+		caget -S $WAIT ${PRE}:SMS:Version
+
+		echo
+
 		caget $WAIT ${PRE}:SMS:Recording
 
 		caget $WAIT ${PRE}:SMS:RunNumber
@@ -379,12 +407,14 @@ if [[ "$command" == "status" \
 			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
 				echo "Data Source id=${ds}:"
 				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
+				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:DataURI
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
 				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
+				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
 				echo
 			done
 		fi
@@ -828,6 +858,7 @@ GET_CONFIG_SETTING()
 			echo "   ${opt_str}"
 			echo "      to ${_opt_config_str}"
 			do_config=0
+			do_git_config=0
 		fi
 	elif [[ ${_found} > 1 ]]; then
 		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
@@ -836,6 +867,7 @@ GET_CONFIG_SETTING()
 		echo "   ${opt_str}"
 		echo "      to ${_opt_config_str}"
 		do_config=0
+		do_git_config=0
 	fi
 
 	if [ "$do_config" == 1 ]; then
@@ -850,8 +882,6 @@ GET_CONFIG_SETTING()
 	#
 
 	echo
-
-	do_config=1
 
 	GET_CONFIG_SETTING "$optId" "$opt_label" "$option" "$opt_config_str"
 
@@ -1098,7 +1128,7 @@ UPDATE_CONFIG_FILE()
 					|| "$ckrepl" == "no" ]]; then
 				echo -e \
 					"\nSkipping Config File Update at User's Request!\n"
-				do_config=0
+				do_git_config=0
 			else
 
 				if [ $testonly == 1 ]; then
@@ -1140,7 +1170,7 @@ UPDATE_CONFIG_FILE()
 
 	echo
 
-	if [ $do_config != 1 ]; then
+	if [ $do_git_config != 1 ]; then
 		echo "Skipping Git Config Repository Update."
 	elif [ $any_change == 0 ]; then
 		echo "No Live/Config Options Changed; Nothing to Commit/Log."

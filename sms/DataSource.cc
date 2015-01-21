@@ -12,6 +12,7 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
+#include "utils.h"
 
 #include "Logging.h"
 
@@ -171,45 +172,20 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk) :
-	m_name(uri), m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
+	m_name(uri), m_basename(name), m_uri(uri),
+	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk)
 {
-	std::string node;
-	std::string service("31416");
-	struct addrinfo hints;
-	size_t pos = uri.find_first_of(':');
-	int rc;
-
 	m_name += " (";
-	m_name += name;
+	m_name += m_basename;
 	m_name += ")";
 
 	m_enabled = enabled;
 
-	if (pos != std::string::npos) {
-		node = uri.substr(0, pos);
-		if (pos != uri.length())
-			service = uri.substr(pos + 1);
-	} else
-		node = uri;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
-
-	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
-	if (rc) {
-		std::string msg("Unable to lookup data source ");
-		msg += m_name;
-		msg += ": ";
-		msg += gai_strerror(rc);
-		throw std::runtime_error(msg);
-	}
+	parseURI(uri);
 
 	// Create Run-Time Status and Configuration PVs Per Data Source...
 
@@ -225,6 +201,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
+
+	m_pvDataURI = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":DataURI"));
 
 	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
 		smsEnabledPV(prefix + ":Enabled", this));
@@ -244,24 +223,35 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
+	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":MaxReadChunk"));
+
 	ctrl->addPV(m_pvName);
+	ctrl->addPV(m_pvDataURI);
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvConnectRetry);
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
+	ctrl->addPV(m_pvMaxReadChunk);
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvName->update(m_name, &now);
+	m_pvDataURI->update(uri, &now);
 	m_pvConnected->disconnected();
 	m_pvConnectRetry->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+
+	// Initialize Max Read Chunk PV (construct string)...
+	std::stringstream ssMRC;
+	ssMRC << m_max_read_chunk;
+	m_pvMaxReadChunk->update(ssMRC.str(), &now);
 
 	// Set Up Data Source Connection Timer...
 	try {
@@ -297,6 +287,37 @@ DataSource::~DataSource()
 		delete m_fdreg;
 	if (m_fd != -1)
 		close(m_fd);
+}
+
+void DataSource::parseURI(std::string uri)
+{
+	std::string node;
+	std::string service("31416");
+	struct addrinfo hints;
+	size_t pos = uri.find_first_of(':');
+	int rc;
+
+	if (pos != std::string::npos) {
+		node = uri.substr(0, pos);
+		if (pos != uri.length())
+			service = uri.substr(pos + 1);
+	} else
+		node = uri;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
+
+	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
+	if (rc) {
+		std::string msg("Unable to lookup data source ");
+		msg += m_name;
+		msg += ": ";
+		msg += gai_strerror(rc);
+		throw std::runtime_error(msg);
+	}
 }
 
 void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
@@ -470,7 +491,8 @@ void DataSource::fdReady(void)
 
 	switch (m_state) {
 		case DISABLED:
-			WARN("Ignoring Data Ready for Disabled Data Source " << m_name);
+			WARN("Ignoring Data Ready for Disabled Data Source "
+				<< m_name);
 			break;
 		case IDLE:
 			throw std::logic_error("Invalid state");
@@ -491,6 +513,24 @@ void DataSource::startConnect(void)
 
 	/* Clear out any old state from the ADARA parser. */
 	reset();
+
+	// Update Data URI from PV...
+	std::string uri = m_pvDataURI->value();
+	if ( uri != m_uri ) {
+		INFO("Setting New Data URI from PV: " << uri);
+		m_uri = uri;
+		// Regenerate DataSource Name...
+		m_name = uri;
+		m_name += " (";
+		m_name += m_basename;
+		m_name += ")";
+		// Parse New URI...
+		parseURI(uri);
+		// Update DataSource Name PV...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		m_pvName->update(m_name, &now);
+	}
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
@@ -543,7 +583,8 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
-		ERROR("Bad Alloc Error for " << m_name << " adapter: " << e.what());
+		ERROR("Bad Alloc Error for " << m_name
+			<< " adapter: " << e.what());
 		goto error_fd;
 	}
 
@@ -623,6 +664,31 @@ void DataSource::dataReady(void)
 
 	m_rtdl_pkt_counts = 0;
 	m_data_pkt_counts = 0;
+
+	// Update Max Read Chunk from PV...
+	std::string val = m_pvMaxReadChunk->value();
+	unsigned int tmp_max_read_chunk;
+	try {
+		tmp_max_read_chunk = parse_size(val);
+	} catch (std::runtime_error e) {
+		std::string msg("Unable to parse read size for source '");
+		msg += m_name;
+		msg += "': ";
+		msg += e.what();
+		// *Don't* throw std::runtime_error(msg);
+		// String parse failed, revert to original value...
+		tmp_max_read_chunk = m_max_read_chunk;
+	}
+	if ( tmp_max_read_chunk != m_max_read_chunk ) {
+		m_max_read_chunk = tmp_max_read_chunk;
+		// Log the change...
+		std::stringstream ssMRC;
+		ssMRC << "Setting Max Read Chunk Size for " << m_name;
+		ssMRC << " to ";
+		ssMRC << m_max_read_chunk;
+		ssMRC << " (" << val << ")";
+		INFO(ssMRC.str());
+	}
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
@@ -801,7 +867,8 @@ bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
 		true) );
 }
 
-bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
+bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
+		bool is_mapped)
 {
 	HWSource &hw_src = getHWSource(pkt->sourceID());
 
@@ -819,7 +886,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 	if (hw_src.checkSeq(*pkt))
 		ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
 
-	// Sometimes we just can't rely on end-of-pulse being set correctly. ;-b
+	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
 	m_ignore_eop = m_pvIgnoreEoP->value();
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
@@ -863,7 +930,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		/* TODO rate-limited logging of RTDL cycle out of sequence? */
-		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from " << m_name
+		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from "
+			<< m_name
 			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 			<< " cycle=" << pkt.cycle()

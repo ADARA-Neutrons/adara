@@ -19,6 +19,7 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
+std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
 std::string SMSControl::m_beamlineShortName;
 std::string SMSControl::m_beamlineLongName;
@@ -44,6 +45,8 @@ static uint32_t pulseEnergy(uint32_t ringPeriod)
 
 void SMSControl::config(const boost::property_tree::ptree &conf)
 {
+	m_version = conf.get<std::string>("sms.version");
+
 	std::string base = conf.get<std::string>("sms.basedir");
 	base += "/conf";
 
@@ -199,6 +202,9 @@ SMSControl::SMSControl() :
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
 
+	m_pvVersion = boost::shared_ptr<smsStringPV>(new
+						smsStringPV(prefix + ":Version"));
+
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
 						smsRecordingPV(prefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
@@ -218,15 +224,21 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
 
+	addPV(m_pvVersion);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvNumDataSources);
 
-	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
+	// Initialize Config/Info PVs...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
+
+	// Initialize Version PV to Usual SMS Daemon Version String...
+	m_pvVersion->update(m_version, &now);
+
+	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
 
 	m_nextRunNumber = StorageManager::getNextRun();
