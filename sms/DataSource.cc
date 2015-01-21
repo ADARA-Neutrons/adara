@@ -12,6 +12,7 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
+#include "utils.h"
 
 #include "Logging.h"
 
@@ -244,6 +245,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
+	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":MaxReadChunk"));
+
 	ctrl->addPV(m_pvName);
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
@@ -251,6 +255,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
+	ctrl->addPV(m_pvMaxReadChunk);
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
@@ -262,6 +267,11 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+
+	// Initialize Max Read Chunk PV (construct string)...
+	std::stringstream ssMRC;
+	ssMRC << m_max_read_chunk;
+	m_pvMaxReadChunk->update(ssMRC.str(), &now);
 
 	// Set Up Data Source Connection Timer...
 	try {
@@ -623,6 +633,31 @@ void DataSource::dataReady(void)
 
 	m_rtdl_pkt_counts = 0;
 	m_data_pkt_counts = 0;
+
+	// Update Max Read Chunk from PV...
+	std::string val = m_pvMaxReadChunk->value();
+	unsigned int tmp_max_read_chunk;
+	try {
+		tmp_max_read_chunk = parse_size(val);
+	} catch (std::runtime_error e) {
+		std::string msg("Unable to parse read size for source '");
+		msg += m_name;
+		msg += "': ";
+		msg += e.what();
+		// *Don't* throw std::runtime_error(msg);
+		// String parse failed, revert to original value...
+		tmp_max_read_chunk = m_max_read_chunk;
+	}
+	if ( tmp_max_read_chunk != m_max_read_chunk ) {
+		m_max_read_chunk = tmp_max_read_chunk;
+		// Log the change...
+		std::stringstream ssMRC;
+		ssMRC << "Setting Max Read Chunk Size for " << m_name;
+		ssMRC << " to ";
+		ssMRC << m_max_read_chunk;
+		ssMRC << " (" << val << ")";
+		INFO(ssMRC.str());
+	}
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
