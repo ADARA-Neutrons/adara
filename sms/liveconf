@@ -44,6 +44,14 @@ idName["sts"]="STS"
 num_options=0
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="uri"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR:IP_PORT(data)"
+option_label[$num_options]="[Data Source URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="enabled"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
 option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
@@ -399,6 +407,7 @@ if [[ "$command" == "status" \
 			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
 				echo "Data Source id=${ds}:"
 				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
+				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:DataURI
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
 				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
