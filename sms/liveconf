@@ -349,6 +349,10 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
+		caget -S $WAIT ${PRE}:SMS:Version
+
+		echo
+
 		caget $WAIT ${PRE}:SMS:Recording
 
 		caget $WAIT ${PRE}:SMS:RunNumber
