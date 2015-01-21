@@ -533,7 +533,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	m_eventSources.reset(smsId);
 }
 
-SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
+SMSControl::PulseMap::iterator SMSControl::getPulse(
+		uint64_t id, uint32_t dup)
 {
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
@@ -900,6 +901,12 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
 
 	pulse->m_rtdl.reset(new ADARA::RTDLPkt(pkt));
+
+	// Is pulse pending from any data sources...?
+	if (!pulse->m_pending.any()) {
+		DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
+		markComplete(pkt.pulseId(), dup, -1);
+	}
 }
 
 void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
@@ -918,7 +925,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
-	pulse->m_pending.reset(smsId);
+	if ( smsId != (uint32_t) -1 )
+		pulse->m_pending.reset(smsId);
 
 	// pulse still pending from other data sources...
 	if (pulse->m_pending.any()) {
