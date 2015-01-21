@@ -61,7 +61,7 @@ echo "\nDeploying ADARA $PROG Target.\n"
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.4"
+set DEPLOY_VERSION = "1.1.5"
 
 set TMP_DIR = "/tmp"
 
@@ -378,6 +378,34 @@ if ( $need_build == 1 ) then
 		exit -4
 	endif
 
+	# Apply Tag Name Substitution for Build...
+
+	mv "$TMP_DIR/ADARA/common/ADARA.h" "$TMP_DIR/ADARA/common/ADARA.h.orig"
+
+	set mv_ok = $status
+
+	if ( $mv_ok != 0 ) then
+		echo "\nError Moving Header for Release Tag Subst! ($mv_ok)\n" \
+			| tee -a $LOG
+		ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -5
+	endif
+
+	sed "s/XXX_TAG_NAME_XXX/$release_tag/g" \
+		"$TMP_DIR/ADARA/common/ADARA.h.orig" \
+		> "$TMP_DIR/ADARA/common/ADARA.h"
+
+	set tagsubst_ok = $status
+
+	if ( $tagsubst_ok != 0 ) then
+		echo "\nError Substituting Release Tag! ($tagsubst_ok)\n" \
+			| tee -a $LOG
+		ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -6
+	endif
+
 	# Build the ADARA software suite, using EPICS in /home/controls/epics
 
 	echo "\nBuilding the ADARA software suite." | tee -a $LOG
@@ -391,7 +419,7 @@ if ( $need_build == 1 ) then
 		echo "\nError Bootstrapping ADARA Software! ($bootstrap_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
-		exit -5
+		exit -7
 	endif
 
 	echo "./configure --with-epics=$EPICS_BASE" | tee -a $LOG
@@ -403,7 +431,7 @@ if ( $need_build == 1 ) then
 		echo "\nError Configuring ADARA Software! ($configure_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
-		exit -6
+		exit -8
 	endif
 
 	echo "make" | tee -a $LOG
@@ -414,7 +442,7 @@ if ( $need_build == 1 ) then
 	if ( $build_ok != 0 ) then
 		echo "\nError Building Release Tag! ($build_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
-		exit -7
+		exit -9
 	endif
 
 	echo "\nADARA Software, Release $release_tag, Successfully Built." \
