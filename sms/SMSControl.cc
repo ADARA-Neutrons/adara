@@ -28,6 +28,34 @@ std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 
+class PopPulseBufferPV : public smsInt32PV {
+public:
+	PopPulseBufferPV(const std::string &name) :
+		smsInt32PV(name) {}
+
+private:
+	void changed(void)
+	{
+		int32_t pop_state = value();
+
+		INFO("PopPulseBufferPV " << m_pv_name << " set to " << pop_state);
+
+		// Do Nothing, Default State...
+		if ( pop_state == 0 )
+			return;
+
+		// Pop Desired Pulse from Buffer by Index...
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->popPulseBuffer(pop_state);
+
+		// Reset Pop Pulse Buffer PV State to Default State (0)...
+		DEBUG("Resetting PopPulseBufferPV " << m_pv_name << " to 0.");
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		update(0, &now);
+	}
+};
+
 SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
@@ -220,6 +248,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
+	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
+						PopPulseBufferPV(prefix + ":Control:"
+							+ "PopPulseBuffer"));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -229,6 +261,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
+	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
 
 	// Initialize Config/Info PVs...
@@ -241,12 +274,15 @@ SMSControl::SMSControl() :
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
 
+	// Initialize Pop Pulse Buffer PV to Zero...
+	m_pvPopPulseBuffer->update(0, &now);
+
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId, m_beamlineShortName,
-					m_beamlineLongName));
+	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId,
+			m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
@@ -531,6 +567,72 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 	/* Mark this id for re-use. */
 	m_eventSources.reset(smsId);
+}
+
+void SMSControl::popPulseBuffer(int32_t pulse_index)
+{
+	PulseMap::iterator it;
+
+	if ( m_pulses.size() == 0 ) {
+		DEBUG("popPulseBuffer: Empty Pulse Buffer, No Pulses to Pop!"
+			<< " pulse_index=" << pulse_index);
+		return;
+	}
+
+	std::string isLast = "";
+
+	// Pop "Last" Pulse...
+	if ( pulse_index < 0 ) {
+		if ( ((uint32_t) -pulse_index) > m_pulses.size() ) {
+			DEBUG("popPulseBuffer: Pop Last - Pulse Index Out of Bounds!"
+				<< " pulse_index=" << pulse_index
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		it = m_pulses.end();
+		it--;
+		int32_t pindex = -1;
+		while ( pindex > pulse_index && it != m_pulses.begin() ) {
+			DEBUG("popPulseBuffer: Skipping Last Pulse pindex=" << pindex
+				<< std::hex << " 0x" << it->first.first << std::dec);
+			pindex--; it--;
+		}
+		if ( pindex > pulse_index ) {
+			DEBUG("popPulseBuffer: Last Pulse Not Found in Buffer"
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		isLast = "Last ";
+	}
+
+	// Pop Pulse of Specific Index...
+	else {
+		if ( ((uint32_t) pulse_index) > m_pulses.size() ) {
+			DEBUG("popPulseBuffer: Pop Index - Pulse Index Out of Bounds!"
+				<< " pulse_index=" << pulse_index
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		it = m_pulses.begin();
+		int32_t pindex = 1;
+		while ( pindex < pulse_index && it != m_pulses.end() ) {
+			DEBUG("popPulseBuffer: Skipping Pulse pindex=" << pindex
+				<< std::hex << " 0x" << it->first.first << std::dec);
+			pindex++; it++;
+		}
+		if ( pindex < pulse_index ) {
+			DEBUG("popPulseBuffer: Pulse Not Found in Buffer"
+				<< " size=" << m_pulses.size());
+			return;
+		}
+	}
+
+	// Pop Given Pulse from Buffer...
+
+	DEBUG("popPulseBuffer: Popping " << isLast << "Pulse "
+			<< " pulse_index=" << pulse_index
+			<< std::hex << " 0x" << it->first.first << std::dec);
+	m_pulses.erase(it);
 }
 
 SMSControl::PulseMap::iterator SMSControl::getPulse(
