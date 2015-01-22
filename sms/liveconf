@@ -101,6 +101,14 @@ option_value_type[$num_options]="UINT32_VALUE(pulses)"
 option_label[$num_options]="[No EoP Pulse Buffer Size]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="pop_pulse_buffer"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:Control:PopPulseBuffer"
+option_value_type[$num_options]="INT32_VALUE(pulse_index)"
+option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
@@ -427,6 +435,10 @@ if [[ "$command" == "status" \
 
 		echo
 
+		caget $WAIT ${PRE}:SMS:Control:PopPulseBuffer
+
+		echo
+
 		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
@@ -512,6 +524,11 @@ GET_OPTION_INFO()
 			opt_value_type="${option_value_type[$i]}"
 
 			opt_label="${option_label[$i]}"
+
+			if [[ ${option_no_config[$i]} == 1 ]]; then
+				do_config=0
+				do_git_config=0
+			fi
 
 			break;
 		fi
@@ -883,7 +900,10 @@ GET_CONFIG_SETTING()
 
 	echo
 
-	GET_CONFIG_SETTING "$optId" "$opt_label" "$option" "$opt_config_str"
+	if [ "$do_config" == 1 ]; then
+		GET_CONFIG_SETTING "$optId" "$opt_label" \
+			"$option" "$opt_config_str"
+	fi
 
 	#
 	# Update Live SMS Daemon Option Setting
