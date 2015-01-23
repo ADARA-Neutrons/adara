@@ -839,8 +839,6 @@ if ( ! -e "$deploy_history" ) then
 	echo "\nADARA ${PROG} Deployment History ($install_branch)" \
 		> "$deploy_history"
 
-	echo "$CONFIG_LINE\n" >> "$deploy_history"
-
 	set create_ok = $status
 
 	if ( $create_ok != 0 ) then
@@ -849,6 +847,8 @@ if ( ! -e "$deploy_history" ) then
 		echo "Bailing Out..." | tee -a $LOG
 		exit -19
 	endif
+
+	echo "$CONFIG_LINE\n" >> "$deploy_history"
 
 	echo "git add $deploy_history_base" | tee -a $LOG
 	git add "$deploy_history_base" |& tee -a $LOG
