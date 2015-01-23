@@ -1184,6 +1184,52 @@ UPDATE_CONFIG_FILE()
 
 	fi
 
+OPEN_CONFIG_REPO()
+{
+	echo "Committing Change to Git Config Repository in:"
+	echo -e "   $CONFIG_REPO\n"
+
+	# Go to the Git Config Repo Directory... (if it exists ;-)
+	cd $CONFIG_REPO
+	if [ $? != 0 ]; then
+		echo -e "\nError: Git Config Repository Path Invalid!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -4
+	fi
+
+	# Make sure we're in the "right" repo...? ;-)
+	config_repo=`git config --get remote.origin.url`
+	repo_ck=`echo "$config_repo" | grep 'config$' \
+		| wc | awk '{print $1}'`
+	if [ "$repo_ck" != 1 ]; then
+		echo -e "\nError: This is _Not_ the Git Config Repository!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -5
+	fi
+
+	# Check Out Beamline Git Config Branch...
+	echo "Checking Out Beamline Git Config Branch: ${config_branch}."
+	git checkout $config_branch
+	if [ $? != 0 ]; then
+		echo -e "\nError Checking Out Git Config Branch $config_branch!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -7
+	fi
+
+	# "Freshen Up" the Local Config Repo Copy... ;-)
+	git pull
+	git diff
+	git status
+
+	echo
+}
+
 	#
 	# Commit Config File Change to Git Repository
 	#
@@ -1196,49 +1242,7 @@ UPDATE_CONFIG_FILE()
 		echo "No Live/Config Options Changed; Nothing to Commit/Log."
 	else
 
-		echo "Committing Change to Git Config Repository in:"
-		echo -e "   $CONFIG_REPO\n"
-
-		# Go to the Git Config Repo Directory... (if it exists ;-)
-		cd $CONFIG_REPO
-		if [ $? != 0 ]; then
-			echo -e "\nError: Git Config Repository Path Invalid!\n"
-			echo -e "$commit_str"
-			/bin/ls -l $LOG
-			/bin/cat $LOG
-			exit -4
-		fi
-
-		# Make sure we're in the "right" repo...? ;-)
-		config_repo=`git config --get remote.origin.url`
-		repo_ck=`echo "$config_repo" | grep 'config$' \
-			| wc | awk '{print $1}'`
-		if [ "$repo_ck" != 1 ]; then
-			echo -e "\nError: This is _Not_ the Git Config Repository!\n"
-			echo -e "$commit_str"
-			/bin/ls -l $LOG
-			/bin/cat $LOG
-			exit -5
-		fi
-
-		# Check Out Beamline Git Config Branch...
-		echo "Checking Out Beamline Git Config Branch: ${config_branch}."
-		git checkout $config_branch
-		if [ $? != 0 ]; then
-			echo -e \
-				"\nError Checking Out Git Config Branch $config_branch!\n"
-			echo -e "$commit_str"
-			/bin/ls -l $LOG
-			/bin/cat $LOG
-			exit -7
-		fi
-
-		# "Freshen Up" the Local Config Repo Copy... ;-)
-		git pull
-		git diff
-		git status
-
-		echo
+		OPEN_CONFIG_REPO
 
 		# Prompt for Actually Updating the Git Config Repo...
 		echo -n "Proceed to Update Git Config Repository (yes/No)? "
@@ -1313,6 +1317,141 @@ UPDATE_CONFIG_FILE()
 
 		if [ $push_ok != 0 ]; then
 			echo -e "\nError Pushing Config Update to Origin! ($push_ok)\n"
+		fi
+
+	fi
+
+	#
+	# At Least Log the System Change Somewhere... ;-D
+	#
+
+	if [[ $do_git_config == 0 && $any_change != 0 ]]; then
+
+		OPEN_CONFIG_REPO
+
+		# Prompt for Actually Updating the Git Config Repo...
+		echo -n "Log Changes to Git Config Repository (yes/No)? "
+		read cklog
+		cklog=`echo "$cklog" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$cklog" == "" || "$cklog" == "n" \
+				|| "$cklog" == "no" ]]; then
+			echo -e \
+			"\nSkipping Git Config Repository Logging at User's Request!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+
+		# Create the Config Logging file, if it doesn't exist...
+
+		CONFIG_LINE="------------------------------------------------"
+
+		config_log="./sms/config_log.txt"
+
+		if [[ ! -e "$config_log" ]]; then
+
+			echo -e -n "\nCreating Config Logging File "
+			echo "for branch $config_branch."
+			echo "\n   $config_log\n"
+
+			echo "\nADARA SMS Configuration Log ($config_branch)" \
+				> "$config_log"
+
+			create_ok=$?
+
+			if [[ $create_ok != 0 ]]; then
+				echo -e \
+					"\nError Creating Config Logging File! ($create_ok)\n"
+				echo "Bailing Out..."
+				exit -9
+			fi
+
+			echo -e "$CONFIG_LINE\n" >> "$config_log"
+
+			echo "git add $config_log"
+			git add "$config_log"
+
+			add_ok=$?
+
+			if [[ $add_ok != 0 ]]; then
+				echo -e \
+				  "\nError Adding Config Logging File to Git! ($add_ok)\n"
+				echo "Bailing Out..."
+				exit -10
+			fi
+
+			echo "git commit -m 'Initial Config Log Creation' $config_log"
+			git commit -m 'Initial Config Log Creation' "$config_log"
+
+			commit_ok=$?
+
+			if [[ $commit_ok != 0 ]]; then
+				echo -e \
+				  "\nError Committing Config Logging File! ($commit_ok)\n"
+				echo "Bailing Out..."
+				exit -11
+			fi
+
+		fi
+
+		# Append to the SMS Config Change to Log File in Git Config Repo...
+
+		if [ -z $commit_str ]; then
+			commit_str="Set SMS Live/Config Option:\n"
+			commit_str="$commit_str   Live PV ${opt_str}\n"
+			commit_str="$commit_str      set to ${opt_value})\n\n"
+		fi
+
+		# Finally Append Required User Log Description...
+		commit_str="$commit_str$log_desc\n"
+
+		if [ $testonly == 1 ]; then
+			echo -n "[TESTONLY]" ; date 
+			echo -n "[TESTONLY]" ; echo -e \
+				"Config Change on Host ${config_host} [$config_blnum]\n"
+			echo -n "[TESTONLY]" ; echo -e "$commit_str"
+		else
+			date >> "$config_log"
+			echo -e \
+				"Config Change on Host ${config_host} [$config_blnum]\n" \
+				>> "$config_log"
+			echo -e "$commit_str" >> "$config_log"
+			echo -e "$CONFIG_LINE\n" >> "$config_log"
+		fi
+
+		if [ $? != 0 ]; then
+			echo -e \
+				"\nError Recording Config Change to Git Config Repo!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -12
+		fi
+
+		# Commit the Config Log Addition...
+		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
+		echo -e "$commit_str"
+		echo "git commit -F - $config_log"
+
+		if [ $testonly != 1 ]; then
+			echo -e "$commit_str" | git commit -F - "$config_log"
+		fi
+		commit_ok=$?
+
+		if [ $commit_ok != 0 ]; then
+			echo -e "\nError Committing Config Log! ($commit_ok)\n"
+		fi
+
+		# Now Push All the Config Commits to Origin
+
+		echo -e "\nPushing Config Commits to Origin:"
+		echo "git push"
+		git push
+		push_ok=$?
+
+		if [ $push_ok != 0 ]; then
+			echo -e "\nError Pushing Config Log to Origin! ($push_ok)\n"
 		fi
 
 	fi
