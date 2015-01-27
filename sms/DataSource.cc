@@ -18,6 +18,25 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
+RateLimitedLogging::History RLLHistory;
+
+// Rate-Limited Logging IDs...
+#define RLL_DROPPED_PACKETS        0
+#define RLL_LOCAL_DUPLICATE_PULSE  1
+#define RLL_LOCAL_SAWTOOTH_PULSE   2
+#define RLL_LOCAL_PACKET_SEQUENCE  3
+#define RLL_CONN_REFUSED           4
+#define RLL_CONN_REQUEST_ERROR     5
+#define RLL_CONN_FAILED            6
+#define RLL_READ_EXCEPTION         7
+#define RLL_READ_DELAY             8
+#define RLL_PULSEID_ZERO           9
+#define RLL_UNKNOWN_PACKET        10
+#define RLL_OVERSIZE_PACKET       11
+#define RLL_LOCAL_DUPLICATE_RTDL  12
+#define RLL_LOCAL_SAWTOOTH_RTDL   13
+#define RLL_LOCAL_RTDL_SEQUENCE   14
+#define RLL_HEARTBEAT             15
 
 class HWSource {
 public:
@@ -44,8 +63,13 @@ public:
 			 * we get a better fix.
 			 */
 			/* TODO rate-limited logging of dropped packets */
-			ERROR("Lost packet from " << m_name << " src 0x"
-				<< std::hex << m_hwId << std::dec);
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_DROPPED_PACKETS, m_name, 2, 100, log_info ) ) {
+				ERROR(log_info
+					<< "Dropped packet from " << m_name << " src 0x"
+					<< std::hex << m_hwId << std::dec);
+			}
 #endif
 			ctrl->markPartial(m_activePulse, m_dupCount);
 			m_trueNew = false;
@@ -73,10 +97,17 @@ public:
 		// check for Duplicate Pulses in event packets...
 		if (m_activePulse == m_lastPulse) {
 			/* TODO rate-limited logging of duplicate pulses? */
-			ERROR("newPulse(RawDataPkt): Duplicate pulse from " << m_name
-				<< std::hex << " src=0x" << m_hwId
-				<< " pulseId=0x" << m_activePulse << std::dec
-				<< " trueNew=" << m_trueNew);
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_LOCAL_DUPLICATE_PULSE, m_name,
+					2, 100, log_info ) ) {
+				ERROR(log_info
+					<< "newPulse(RawDataPkt): Local Duplicate pulse from "
+					<< m_name
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
+					<< " trueNew=" << m_trueNew);
+			}
 			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
@@ -85,11 +116,18 @@ public:
 		// also check for SAWTOOTH Pulse Times in event packets...
 		if (m_activePulse < m_lastPulse) {
 			/* TODO rate-limited logging of local sawtooth pulses? */
-			ERROR("newPulse(RawDataPkt): Local SAWTOOTH RawData"
-				<< std::hex << " m_lastPulse=" << m_lastPulse
-				<< " m_activePulse=" << m_activePulse << std::dec
-				<< " cycle=" << pkt.cycle()
-				<< " veto=" << pkt.veto());
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_LOCAL_SAWTOOTH_PULSE, m_name,
+					2, 100, log_info ) ) {
+				ERROR(log_info
+					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
+					<< " from " << m_name
+					<< std::hex << " m_lastPulse=" << m_lastPulse
+					<< " m_activePulse=" << m_activePulse << std::dec
+					<< " cycle=" << pkt.cycle()
+					<< " veto=" << pkt.veto());
+			}
 		}
 
 		m_flavor = pkt.flavor();
@@ -134,10 +172,16 @@ public:
 		bool ok = (pkt.pktSeq() == m_pktSeq);
 		/* if ( !ok ) {
 			// TODO rate-limited logging of packet sequence out-of-order?
-			ERROR("checkSeq() Packet Sequence Out-of-Order: "
-				<< pkt.pktSeq() << " != " << m_pktSeq
-				<< std::hex << " m_activePulse=0x" << m_activePulse
-				<< " hwId=0x" << m_hwId << std::dec);
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_LOCAL_PACKET_SEQUENCE, m_name,
+					2, 100, log_info ) ) {
+				ERROR(log_info
+					<< "checkSeq() Local Packet Sequence Out-of-Order: "
+					<< pkt.pktSeq() << " != " << m_pktSeq
+					<< std::hex << " m_activePulse=0x" << m_activePulse
+					<< " hwId=0x" << m_hwId << std::dec);
+			}
 		} */
 		m_pktSeq++;
 		return !ok;
@@ -375,11 +419,13 @@ void DataSource::dumpLastReadStats(std::string who)
 			<< Parser::last_last_parse_elapsed_total);
 }
 
-void DataSource::connectionFailed(bool dumpDiscarded, State new_state)
+void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
+		State new_state)
 {
 	m_timer->cancel();
 
-	dumpLastReadStats("connectionFailed()");
+	if (dumpStats)
+		dumpLastReadStats("connectionFailed()");
 
 	if (dumpDiscarded) {
 		// Dump Discarded Packet Statistics...
@@ -457,7 +503,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
 				WARN("Connection request timed out to " << m_name);
-				connectionFailed(false, IDLE);
+				connectionFailed(false, false, IDLE);
 			}
 			break;
 		}
@@ -474,7 +520,7 @@ bool DataSource::timerExpired(void)
 			} else {
 				WARN("Timed out waiting for data from " << m_name);
 				m_pvConnected->failed();
-				connectionFailed(true, IDLE);
+				connectionFailed(true, true, IDLE);
 			}
 			break;
 		}
@@ -509,6 +555,7 @@ void DataSource::fdReady(void)
 
 void DataSource::startConnect(void)
 {
+	std::string log_info;
 	int flags, rc;
 
 	/* Clear out any old state from the ADARA parser. */
@@ -555,7 +602,10 @@ void DataSource::startConnect(void)
 	switch (rc) {
 		case ECONNREFUSED:
 			/* TODO rate-limited logging of refused connection */
-			WARN("Connection refused by " << m_name);
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_CONN_REFUSED, m_name, 600, 10, log_info ) ) {
+				WARN(log_info << "Connection refused by " << m_name);
+			}
 			goto error_fd;
 		case EINTR:
 		case EINPROGRESS:
@@ -568,8 +618,12 @@ void DataSource::startConnect(void)
 			SMSControl::getInstance()->sourceUp(m_smsSourceId);
 			break;
 		default:
-			WARN("Unknown connection request error for " << m_name
-				<< ": " << strerror(rc) << " (Ignoring!)");
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_CONN_REQUEST_ERROR, m_name, 600, 10, log_info ) ) {
+				WARN(log_info
+					<< "Unknown connection request error for " << m_name
+					<< ": " << strerror(rc) << " (Ignoring!)");
+			}
 	}
 
 	/* TODO handle any other error here */
@@ -599,7 +653,7 @@ error_fd:
 
 error:
 	m_pvConnected->failed();
-	connectionFailed(false, IDLE);
+	connectionFailed(false, false, IDLE);
 }
 
 void DataSource::connectComplete(void)
@@ -638,9 +692,14 @@ void DataSource::connectComplete(void)
 	}
 
 	/* TODO rate-limited logging of connection issue */
-	WARN("Connection request to " << m_name << " failed: " << strerror(e));
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory,
+			RLL_CONN_FAILED, m_name, 600, 10, log_info ) ) {
+		WARN(log_info << "Connection request to " << m_name
+			<< " failed: " << strerror(e));
+	}
 	// Leave m_pvConnected in its current state, latch failures
-	connectionFailed(false, IDLE);
+	connectionFailed(false, false, IDLE);
 }
 
 void DataSource::dataReady(void)
@@ -696,14 +755,21 @@ void DataSource::dataReady(void)
 			INFO("Connection closed with " << m_name
 				<< " log_info=(" << log_info << ")");
 			m_pvConnected->disconnected();
-			connectionFailed(true, IDLE);
+			connectionFailed(true, true, IDLE);
 			readOk = false;
 		}
 	} catch (std::runtime_error e) {
 		/* TODO rate-limited log of failure */
-		ERROR("Exception reading from " << m_name << ": " << e.what());
+		std::string log_info;
+		bool dumpStats = false;
+		if ( RateLimitedLogging::checkLog( RLLHistory,
+				RLL_READ_EXCEPTION, m_name, 60, 10, log_info ) ) {
+			ERROR(log_info << "Exception reading from " << m_name
+				<< ": " << e.what());
+			dumpStats = true;
+		}
 		m_pvConnected->failed();
-		connectionFailed(true, IDLE);
+		connectionFailed(dumpStats, true, IDLE);
 		readOk = false;
 	}
 
@@ -718,11 +784,16 @@ void DataSource::dataReady(void)
 		if ( elapsed > 2.0 )
 		{
 			/* TODO rate-limited logging of read delay threshold? */
-			ERROR("dataReady(): Read Delay Threshold Exceeded"
-				<< " elapsed=" << elapsed << " (" << m_name << ")"
-				<< " log_info=(" << log_info << ")"
-				<< " m_rtdl_pkt_counts=" << m_rtdl_pkt_counts
-				<< " m_data_pkt_counts=" << m_data_pkt_counts);
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_READ_DELAY, m_name, 600, 30, log_info ) ) {
+				ERROR(log_info
+					<< "dataReady(): Read Delay Threshold Exceeded"
+					<< " elapsed=" << elapsed << " (" << m_name << ")"
+					<< " log_info=(" << log_info << ")"
+					<< " m_rtdl_pkt_counts=" << m_rtdl_pkt_counts
+					<< " m_data_pkt_counts=" << m_data_pkt_counts);
+			}
 			ctrl->setSourcesReadDelay();
 			dumpLastReadStats("dataReady() (Read Delay)");
 		}
@@ -748,7 +819,7 @@ void DataSource::disabled(void)
 
 	// Close Down Socket, Change Internal State to DISABLED...
 	// (so we won't do anything... ;-)
-	connectionFailed(true, DISABLED);
+	connectionFailed(true, true, DISABLED);
 }
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
@@ -796,7 +867,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 */
 		if (!pkt.pulseId()) {
 			/* TODO rate-limited logging of pulse id 0? */
-			WARN("Received pulse id 0 from " << m_name);
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory,
+					RLL_PULSEID_ZERO, m_name, 2, 100, log_info ) ) {
+				WARN(log_info << "Received pulse id 0 from " << m_name);
+			}
 			return false;
 		}
 		return Parser::rxPacket(pkt);
@@ -809,7 +884,12 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
 	/* TODO rate-limited logging of unknown packet types? */
-	ERROR("Unknown packet type " << pkt.type() << " from " << m_name);
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory,
+			RLL_UNKNOWN_PACKET, m_name, 2, 100, log_info ) ) {
+		ERROR(log_info << "Unknown packet type " << pkt.type()
+			<< " from " << m_name);
+	}
 	return true;
 }
 
@@ -818,13 +898,17 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 				   unsigned int UNUSED(chunk_offset),
 			       unsigned int UNUSED(chunk_len))
 {
-	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* TODO rate-limited logging of oversized packets? */
-	if (hdr) {
-		ERROR("Oversized packet of type " << hdr->type()
-			<< " from " << m_name);
-	} else {
-		ERROR("Oversized packet from " << m_name);
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory,
+			RLL_OVERSIZE_PACKET, m_name, 2, 100, log_info ) ) {
+		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
+		if (hdr) {
+			ERROR(log_info << "Oversized packet of type " << hdr->type()
+				<< " from " << m_name);
+		} else {
+			ERROR(log_info << "Oversized packet from " << m_name);
+		}
 	}
 	return true;
 }
@@ -906,10 +990,16 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
 		/* TODO rate-limited logging of duplicate RTDLs? */
-		ERROR("rxPacket(RTDLPkt): Duplicate RTDL from " << m_name
-			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
-			<< " cycle=" << pkt.cycle()
-			<< " veto=" << pkt.veto());
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory,
+				RLL_LOCAL_DUPLICATE_RTDL, m_name, 2, 100, log_info ) ) {
+			ERROR(log_info
+				<< "rxPacket(RTDLPkt): Local Duplicate RTDL"
+				<< " from " << m_name
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< " cycle=" << pkt.cycle()
+				<< " veto=" << pkt.veto());
+		}
 		m_dupRTDL++;
 	}
 	else m_dupRTDL = 0;
@@ -917,11 +1007,16 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
 		/* TODO rate-limited logging of local sawtooth RTDLs? */
-		ERROR("rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
-			<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
-			<< " pulseId=0x" << pkt.pulseId() << std::dec
-			<< " cycle=" << pkt.cycle()
-			<< " veto=" << pkt.veto());
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory,
+				RLL_LOCAL_SAWTOOTH_RTDL, m_name, 2, 100, log_info ) ) {
+			ERROR(log_info
+				<< "rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
+				<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
+				<< " pulseId=0x" << pkt.pulseId() << std::dec
+				<< " cycle=" << pkt.cycle()
+				<< " veto=" << pkt.veto());
+		}
 	}
 
 	// done with this last pulseid...
@@ -930,12 +1025,17 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
 		/* TODO rate-limited logging of RTDL cycle out of sequence? */
-		WARN("rxPacket(RTDLPkt): RTDL Cycle Out of Sequence from "
-			<< m_name
-			<< " m_lastRTDLCycle=" << m_lastRTDLCycle
-			<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
-			<< " cycle=" << pkt.cycle()
-			<< " veto=" << pkt.veto());
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory,
+				RLL_LOCAL_RTDL_SEQUENCE, m_name, 2, 100, log_info ) ) {
+			WARN(log_info
+				<< "rxPacket(RTDLPkt): Local RTDL Cycle Out of Sequence"
+				<< " from " << m_name
+				<< " m_lastRTDLCycle=" << m_lastRTDLCycle
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< " cycle=" << pkt.cycle()
+				<< " veto=" << pkt.veto());
+		}
 	}
 	m_lastRTDLCycle = pkt.cycle();
 
@@ -984,7 +1084,12 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 
 bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 {
-	INFO("Heartbeat Packet for " << m_name);
+	/* TODO rate-limited logging of heartbeat packets */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory,
+			RLL_HEARTBEAT, m_name, 60, 4, log_info ) ) {
+		INFO(log_info << "Heartbeat Packet for " << m_name);
+	}
 
 	// In case this DataSource was formerly registered and sending events,
 	// we need to *Unregister All Registered SourceIds* when we receive a
