@@ -236,8 +236,27 @@ public:
 			lh->second[i++] = 0;
 		}
 
+		// See if Things have Calmed Down now...
+		// If so, then Reset the Threshold & Flush the Timestamp Vector!
+		bool resetThresh = false;
+		if ( lh->second.size() >= threshold
+				&& lh->second.size() - i < threshold )
+		{
+			std::stringstream ss;
+			ss << "[Reset Threshold, Log Rate has Slowed! ";
+			ss << i;
+			ss << " Timestamps Marked Old out of ";
+			ss << lh->second.size();
+			ss << " Total Saved, Now Under Threshold of ";
+			ss << threshold;
+			ss << ".]";
+			log_info.append(ss.str());
+
+			resetThresh = true;
+		}
+
 		// Check Occurrences in Latest Window Interval...
-		if ( lh->second.size() >= threshold )
+		if ( lh->second.size() >= threshold && !resetThresh )
 		{
 			// While Thrashing, Still Log Every "Nth" One...
 			if ( !( ( lh->second.size() - threshold ) % log_rate) )
@@ -287,7 +306,16 @@ public:
 
 		// It's Ok, Just Log It.
 		else {
+
+			// Be Sure to Erase Any Old ("Marked") Timestamps...! ;-D
+			while ( lh->second.size() > 0 && lh->second[0] == 0 )
+			{
+				log_info.append("[Erasing old time.]");
+				lh->second.erase( lh->second.begin() );
+			}
+
 			// No rate-limited logging commentary required...
+			log_info.append("[Under Threshold, Log Normally.]");
 			return( true );
 		}
 	}
