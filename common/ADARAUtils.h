@@ -220,26 +220,20 @@ public:
 		sss << "] ";
 		log_info.append(sss.str());
 
-		// Remove Any Old Timestamps...
-		for (uint32_t i = 0; i < lh->second.size(); i++)
+		// *Mark* Any Old Timestamps... (Don't "Remove" Until Next Log!)
+		uint32_t i = 0;
+		while ( i < lh->second.size()
+				&& ( ts.tv_sec - lh->second[i] ) > window_seconds )
 		{
-			std::stringstream tt;
-			tt << "[";
-			tt << lh->second[i];
-			tt << "]";
-			log_info.append(tt.str());
+			std::stringstream ss;
+			ss << "[Marking old time i=";
+			ss << i;
+			ss << " time=";
+			ss << lh->second[i];
+			ss << "] ";
+			log_info.append(ss.str());
 
-			if ( ( ts.tv_sec - lh->second[i] ) > window_seconds ) {
-				std::stringstream ss;
-				ss << "[Erasing old time i=";
-				ss << i;
-				ss << "time=";
-				ss << lh->second[i];
-				ss << "] ";
-				log_info.append(ss.str());
-				lh->second.erase( lh->second.begin() + i );
-				i--; // vector just got smaller, re-do current index... :-D
-			}
+			lh->second[i++] = 0;
 		}
 
 		// Check Occurrences in Latest Window Interval...
@@ -261,6 +255,14 @@ public:
 				ss << log_rate;
 				ss << ")] ";
 				log_info.append(ss.str());
+
+				// _NOW_ Erase Any Old ("Marked") Timestamps... ;-D
+				while ( lh->second.size() > 0 && lh->second[0] == 0 )
+				{
+					log_info.append("[Erasing old time.]");
+					lh->second.erase( lh->second.begin() );
+				}
+
 				return( true );
 			}
 
