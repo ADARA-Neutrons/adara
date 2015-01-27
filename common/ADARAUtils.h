@@ -185,7 +185,8 @@ public:
 	 **/
 	static bool checkLog( History & log_history,
 		const uint32_t log_id, const std::string & log_name,
-		const uint32_t window_seconds, const uint32_t log_rate,
+		const uint32_t window_seconds,
+		const uint32_t threshold, const uint32_t log_rate,
 		std::string & log_info )
 	{
 		std::pair<uint32_t,std::string> log(log_id, log_name);
@@ -242,10 +243,10 @@ public:
 		}
 
 		// Check Occurrences in Latest Window Interval...
-		if ( lh->second.size() >= log_rate )
+		if ( lh->second.size() >= threshold )
 		{
 			// While Thrashing, Still Log Every "Nth" One...
-			if ( !(lh->second.size() % log_rate) )
+			if ( !( ( lh->second.size() - threshold ) % log_rate) )
 			{
 				// Log How Badly We're Thrashing on This Log Message...
 				std::stringstream ss;
@@ -254,7 +255,9 @@ public:
 				ss << " Occurrences in Last ";
 				ss << window_seconds;
 				ss << " Seconds!";
-				ss << " (rate=";
+				ss << " (thresh=";
+				ss << threshold;
+				ss << ", rate=";
 				ss << log_rate;
 				ss << ")] ";
 				log_info.append(ss.str());
@@ -269,7 +272,9 @@ public:
 				ss << " Occurrences in Last ";
 				ss << window_seconds;
 				ss << " Seconds!";
-				ss << " (rate=";
+				ss << " (thresh=";
+				ss << threshold;
+				ss << ", rate=";
 				ss << log_rate ;
 				ss << ")] ";
 				log_info.append(ss.str());

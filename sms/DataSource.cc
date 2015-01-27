@@ -65,7 +65,7 @@ public:
 			/* TODO rate-limited logging of dropped packets */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
-					RLL_DROPPED_PACKETS, m_name, 2, 100, log_info ) ) {
+					RLL_DROPPED_PACKETS, m_name, 2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "Dropped packet from " << m_name << " src 0x"
 					<< std::hex << m_hwId << std::dec);
@@ -100,7 +100,7 @@ public:
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
-					2, 100, log_info ) ) {
+					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "newPulse(RawDataPkt): Local Duplicate pulse from "
 					<< m_name
@@ -119,7 +119,7 @@ public:
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
 					RLL_LOCAL_SAWTOOTH_PULSE, m_name,
-					2, 100, log_info ) ) {
+					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
@@ -175,7 +175,7 @@ public:
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
 					RLL_LOCAL_PACKET_SEQUENCE, m_name,
-					2, 100, log_info ) ) {
+					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "checkSeq() Local Packet Sequence Out-of-Order: "
 					<< pkt.pktSeq() << " != " << m_pktSeq
@@ -603,7 +603,8 @@ void DataSource::startConnect(void)
 		case ECONNREFUSED:
 			/* TODO rate-limited logging of refused connection */
 			if ( RateLimitedLogging::checkLog( RLLHistory,
-					RLL_CONN_REFUSED, m_name, 600, 10, log_info ) ) {
+					RLL_CONN_REFUSED, m_name,
+					600, 3, 10, log_info ) ) {
 				WARN(log_info << "Connection refused by " << m_name);
 			}
 			goto error_fd;
@@ -619,7 +620,8 @@ void DataSource::startConnect(void)
 			break;
 		default:
 			if ( RateLimitedLogging::checkLog( RLLHistory,
-					RLL_CONN_REQUEST_ERROR, m_name, 600, 10, log_info ) ) {
+					RLL_CONN_REQUEST_ERROR, m_name,
+					600, 3, 10, log_info ) ) {
 				WARN(log_info
 					<< "Unknown connection request error for " << m_name
 					<< ": " << strerror(rc) << " (Ignoring!)");
@@ -694,7 +696,7 @@ void DataSource::connectComplete(void)
 	/* TODO rate-limited logging of connection issue */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory,
-			RLL_CONN_FAILED, m_name, 600, 10, log_info ) ) {
+			RLL_CONN_FAILED, m_name, 600, 3, 10, log_info ) ) {
 		WARN(log_info << "Connection request to " << m_name
 			<< " failed: " << strerror(e));
 	}
@@ -763,7 +765,7 @@ void DataSource::dataReady(void)
 		std::string log_info;
 		bool dumpStats = false;
 		if ( RateLimitedLogging::checkLog( RLLHistory,
-				RLL_READ_EXCEPTION, m_name, 60, 10, log_info ) ) {
+				RLL_READ_EXCEPTION, m_name, 60, 5, 10, log_info ) ) {
 			ERROR(log_info << "Exception reading from " << m_name
 				<< ": " << e.what());
 			dumpStats = true;
@@ -786,7 +788,7 @@ void DataSource::dataReady(void)
 			/* TODO rate-limited logging of read delay threshold? */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
-					RLL_READ_DELAY, m_name, 600, 30, log_info ) ) {
+					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
 				ERROR(log_info
 					<< "dataReady(): Read Delay Threshold Exceeded"
 					<< " elapsed=" << elapsed << " (" << m_name << ")"
@@ -869,7 +871,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 			/* TODO rate-limited logging of pulse id 0? */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory,
-					RLL_PULSEID_ZERO, m_name, 2, 100, log_info ) ) {
+					RLL_PULSEID_ZERO, m_name, 2, 10, 100, log_info ) ) {
 				WARN(log_info << "Received pulse id 0 from " << m_name);
 			}
 			return false;
@@ -886,7 +888,7 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 	/* TODO rate-limited logging of unknown packet types? */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory,
-			RLL_UNKNOWN_PACKET, m_name, 2, 100, log_info ) ) {
+			RLL_UNKNOWN_PACKET, m_name, 2, 10, 100, log_info ) ) {
 		ERROR(log_info << "Unknown packet type " << pkt.type()
 			<< " from " << m_name);
 	}
@@ -901,7 +903,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	/* TODO rate-limited logging of oversized packets? */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory,
-			RLL_OVERSIZE_PACKET, m_name, 2, 100, log_info ) ) {
+			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
 			ERROR(log_info << "Oversized packet of type " << hdr->type()
@@ -992,7 +994,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		/* TODO rate-limited logging of duplicate RTDLs? */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory,
-				RLL_LOCAL_DUPLICATE_RTDL, m_name, 2, 100, log_info ) ) {
+				RLL_LOCAL_DUPLICATE_RTDL, m_name,
+					2, 10, 100, log_info ) ) {
 			ERROR(log_info
 				<< "rxPacket(RTDLPkt): Local Duplicate RTDL"
 				<< " from " << m_name
@@ -1009,7 +1012,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		/* TODO rate-limited logging of local sawtooth RTDLs? */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory,
-				RLL_LOCAL_SAWTOOTH_RTDL, m_name, 2, 100, log_info ) ) {
+				RLL_LOCAL_SAWTOOTH_RTDL, m_name,
+				2, 10, 100, log_info ) ) {
 			ERROR(log_info
 				<< "rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
 				<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
@@ -1027,7 +1031,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		/* TODO rate-limited logging of RTDL cycle out of sequence? */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory,
-				RLL_LOCAL_RTDL_SEQUENCE, m_name, 2, 100, log_info ) ) {
+				RLL_LOCAL_RTDL_SEQUENCE, m_name,
+				2, 10, 100, log_info ) ) {
 			WARN(log_info
 				<< "rxPacket(RTDLPkt): Local RTDL Cycle Out of Sequence"
 				<< " from " << m_name
@@ -1087,7 +1092,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	/* TODO rate-limited logging of heartbeat packets */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory,
-			RLL_HEARTBEAT, m_name, 60, 4, log_info ) ) {
+			RLL_HEARTBEAT, m_name, 60, 3, 10, log_info ) ) {
 		INFO(log_info << "Heartbeat Packet for " << m_name);
 	}
 
