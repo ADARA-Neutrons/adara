@@ -11,6 +11,7 @@
 #include <math.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <map>
 #include <vector>
 #include <time.h>
 #include <stdint.h>
@@ -162,6 +163,126 @@ public:
 		}
 
 		return true;
+	}
+};
+
+
+/* ---------------------------------------------------------------------- */
+class RateLimitedLogging {
+
+public:
+
+	typedef
+		std::map<std::pair<uint32_t, std::string>, std::vector<time_t> >
+			History;
+
+	/**
+	 * @brief Rate-Limited Logging Method
+	 * @param log_id - log message identification number (caller supplied)
+	 * @param log_name - (optional) additional log originator name
+	 * @param log_info - (any) rate-limited logging commentary to prepend
+	 * @return true on ok-to-log, false on don't-log
+	 **/
+	static bool checkLog( History & log_history,
+		const uint32_t log_id, const std::string & log_name,
+		const uint32_t window_seconds, const uint32_t log_rate,
+		std::string & log_info )
+	{
+		std::pair<uint32_t,std::string> log(log_id, log_name);
+
+		// Append Current Time/Occurrence...
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+
+		History::iterator lh = log_history.find(log);
+
+		if ( lh == log_history.end() )
+		{
+			std::vector<time_t> new_time_vec;
+			lh = log_history.insert( lh,
+				std::pair<std::pair<uint32_t, std::string>,
+					std::vector<time_t> >
+				(log, new_time_vec) );
+		}
+		
+		lh->second.push_back(ts.tv_sec);
+
+		std::stringstream sss;
+		sss << "[checkLog(";
+		sss << log_id;
+		sss << ", ";
+		sss << log_name;
+		sss << ") time=";
+		sss << ts.tv_sec;
+		sss << " size=";
+		sss << lh->second.size();
+		sss << "] ";
+		log_info.append(sss.str());
+
+		// Remove Any Old Timestamps...
+		for (uint32_t i = 0; i < lh->second.size(); i++)
+		{
+			std::stringstream tt;
+			tt << "[";
+			tt << lh->second[i];
+			tt << "]";
+			log_info.append(tt.str());
+
+			if ( ( ts.tv_sec - lh->second[i] ) > window_seconds ) {
+				std::stringstream ss;
+				ss << "[Erasing old time i=";
+				ss << i;
+				ss << "time=";
+				ss << lh->second[i];
+				ss << "] ";
+				log_info.append(ss.str());
+				lh->second.erase( lh->second.begin() + i );
+				i--; // vector just got smaller, re-do current index... :-D
+			}
+		}
+
+		// Check Occurrences in Latest Window Interval...
+		if ( lh->second.size() >= log_rate )
+		{
+			// While Thrashing, Still Log Every "Nth" One...
+			if ( !(lh->second.size() % log_rate) )
+			{
+				// Log How Badly We're Thrashing on This Log Message...
+				std::stringstream ss;
+				ss << "[Rate-Limited Log: ";
+				ss << lh->second.size();
+				ss << " Occurrences in Last ";
+				ss << window_seconds;
+				ss << " Seconds!";
+				ss << " (rate=";
+				ss << log_rate;
+				ss << ")] ";
+				log_info.append(ss.str());
+				return( true );
+			}
+
+			else {
+				// Don't Log! Thrashing... ;-Q
+				std::stringstream ss;
+				ss <<"[DON'T Log: ";
+				ss << lh->second.size();
+				ss << " Occurrences in Last ";
+				ss << window_seconds;
+				ss << " Seconds!";
+				ss << " (rate=";
+				ss << log_rate ;
+				ss << ")] ";
+				log_info.append(ss.str());
+				// return( false );
+				return( true ); // for debugging/testing...
+			}
+		}
+
+		// It's Ok, Just Log It.
+		else {
+			// No rate-limited logging commentary required...
+			return( true );
+		}
 	}
 };
 
