@@ -208,30 +208,30 @@ public:
 		
 		lh->second.push_back(ts.tv_sec);
 
-		std::stringstream sss;
-		sss << "[checkLog(";
-		sss << log_id;
-		sss << ", ";
-		sss << log_name;
-		sss << ") time=";
-		sss << ts.tv_sec;
-		sss << " size=";
-		sss << lh->second.size();
-		sss << "] ";
-		log_info.append(sss.str());
+		// std::stringstream sss;
+		// sss << "[checkLog(";
+		// sss << log_id;
+		// sss << ", ";
+		// sss << log_name;
+		// sss << ") time=";
+		// sss << ts.tv_sec;
+		// sss << " size=";
+		// sss << lh->second.size();
+		// sss << "] ";
+		// log_info.append(sss.str());
 
 		// *Mark* Any Old Timestamps... (Don't "Remove" Until Next Log!)
 		uint32_t i = 0;
 		while ( i < lh->second.size()
 				&& ( ts.tv_sec - lh->second[i] ) > window_seconds )
 		{
-			std::stringstream ss;
-			ss << "[Marking old time i=";
-			ss << i;
-			ss << " time=";
-			ss << lh->second[i];
-			ss << "] ";
-			log_info.append(ss.str());
+			// std::stringstream ss;
+			// ss << "[Marking old time i=";
+			// ss << i;
+			// ss << " time=";
+			// ss << lh->second[i];
+			// ss << "] ";
+			// log_info.append(ss.str());
 
 			lh->second[i++] = 0;
 		}
@@ -249,7 +249,7 @@ public:
 			ss << lh->second.size();
 			ss << " Total Saved, Now Under Threshold of ";
 			ss << threshold;
-			ss << ".]";
+			ss << ".] ";
 			log_info.append(ss.str());
 
 			resetThresh = true;
@@ -278,7 +278,7 @@ public:
 				// _NOW_ Erase Any Old ("Marked") Timestamps... ;-D
 				while ( lh->second.size() > 0 && lh->second[0] == 0 )
 				{
-					log_info.append("[Erasing old time.]");
+					// log_info.append("[Erasing old time.]");
 					lh->second.erase( lh->second.begin() );
 				}
 
@@ -286,21 +286,22 @@ public:
 			}
 
 			else {
+
 				// Don't Log! Thrashing... ;-Q
-				std::stringstream ss;
-				ss <<"[DON'T Log: ";
-				ss << lh->second.size();
-				ss << " Occurrences in Last ";
-				ss << window_seconds;
-				ss << " Seconds!";
-				ss << " (thresh=";
-				ss << threshold;
-				ss << ", rate=";
-				ss << log_rate ;
-				ss << ")] ";
-				log_info.append(ss.str());
-				// return( false );
-				return( true ); // for debugging/testing...
+				// std::stringstream ss;
+				// ss <<"[DON'T Log: ";
+				// ss << lh->second.size();
+				// ss << " Occurrences in Last ";
+				// ss << window_seconds;
+				// ss << " Seconds!";
+				// ss << " (thresh=";
+				// ss << threshold;
+				// ss << ", rate=";
+				// ss << log_rate ;
+				// ss << ")] ";
+				// log_info.append(ss.str());
+
+				return( false );
 			}
 		}
 
@@ -310,12 +311,12 @@ public:
 			// Be Sure to Erase Any Old ("Marked") Timestamps...! ;-D
 			while ( lh->second.size() > 0 && lh->second[0] == 0 )
 			{
-				log_info.append("[Erasing old time.]");
+				// log_info.append("[Erasing old time.]");
 				lh->second.erase( lh->second.begin() );
 			}
 
 			// No rate-limited logging commentary required...
-			log_info.append("[Under Threshold, Log Normally.]");
+			// log_info.append("[Under Threshold, Log Normally.]");
 			return( true );
 		}
 	}
