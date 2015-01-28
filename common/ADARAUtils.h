@@ -11,6 +11,7 @@
 #include <math.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <map>
 #include <vector>
 #include <time.h>
@@ -173,7 +174,7 @@ class RateLimitedLogging {
 public:
 
 	typedef
-		std::map<std::pair<uint32_t, std::string>, std::vector<time_t> >
+		std::map<std::pair<uint32_t, std::string>, std::vector<int64_t> >
 			History;
 
 	/**
@@ -199,14 +200,14 @@ public:
 
 		if ( lh == log_history.end() )
 		{
-			std::vector<time_t> new_time_vec;
+			std::vector<int64_t> new_time_vec;
 			lh = log_history.insert( lh,
 				std::pair<std::pair<uint32_t, std::string>,
-					std::vector<time_t> >
+					std::vector<int64_t> >
 				(log, new_time_vec) );
 		}
 		
-		lh->second.push_back(ts.tv_sec);
+		lh->second.push_back( static_cast<int64_t>(ts.tv_sec) );
 
 		// std::stringstream sss;
 		// sss << "[checkLog(";
@@ -220,31 +221,37 @@ public:
 		// sss << "] ";
 		// log_info.append(sss.str());
 
-		// *Mark* Any Old Timestamps... (Don't "Remove" Until Next Log!)
-		uint32_t i = 0;
-		while ( i < lh->second.size()
-				&& ( ts.tv_sec - lh->second[i] ) > window_seconds )
+		// *Clear* Any Old Timestamps... (Don't "Remove" Until Next Log!)
+		uint32_t old = 0;
+		while ( old < lh->second.size()
+				&& ( ts.tv_sec - labs(lh->second[old]) ) > window_seconds )
 		{
 			// std::stringstream ss;
-			// ss << "[Marking old time i=";
-			// ss << i;
+			// ss << "[Marking old time index=";
+			// ss << old;
 			// ss << " time=";
-			// ss << lh->second[i];
+			// ss << lh->second[old];
 			// ss << "] ";
 			// log_info.append(ss.str());
 
-			lh->second[i++] = 0;
+			// Retain "Already Logged" Information...
+			if ( lh->second[old] < 0 )
+				lh->second[old] = -1;
+			else
+				lh->second[old] = 0;
+
+			old++;
 		}
 
 		// See if Things have Calmed Down now...
 		// If so, then Reset the Threshold & Flush the Timestamp Vector!
 		bool resetThresh = false;
 		if ( lh->second.size() >= threshold
-				&& lh->second.size() - i < threshold )
+				&& lh->second.size() - old < threshold )
 		{
 			std::stringstream ss;
-			ss << "[Reset Threshold, Log Rate has Slowed! ";
-			ss << i;
+			ss << "[*** Reset Threshold, Log Rate has Slowed! ";
+			ss << old;
 			ss << " Timestamps Marked Old out of ";
 			ss << lh->second.size();
 			ss << " Total Saved, Now Under Threshold of ";
@@ -261,25 +268,49 @@ public:
 			// While Thrashing, Still Log Every "Nth" One...
 			if ( !( ( lh->second.size() - threshold ) % log_rate) )
 			{
+				// Count How Many "New" (Unlogged) Timestamps We Have...
+				uint32_t newLogs = 0;
+				int64_t ri = lh->second.size() - 1;
+				while ( ri >= 0 && lh->second[ri] >= 0 ) {
+					newLogs++; ri--;
+				}
+
+				// Mark This Most Recent Timestamp as "Logged"...
+				lh->second[ lh->second.size() - 1 ] *= -1;
+
 				// Log How Badly We're Thrashing on This Log Message...
 				std::stringstream ss;
-				ss << "[Rate-Limited Log: ";
-				ss << lh->second.size();
-				ss << " Occurrences in Last ";
+				ss << "[*** Rate-Limited Log: ";
+				ss << lh->second.size() - old;
+				ss << " Occurrences (";
+				ss << newLogs;
+				ss << " New) in Last ";
 				ss << window_seconds;
 				ss << " Seconds!";
 				ss << " (thresh=";
 				ss << threshold;
 				ss << ", rate=";
 				ss << log_rate;
+				ss << ", old=";
+				ss << old;
 				ss << ")] ";
 				log_info.append(ss.str());
 
-				// _NOW_ Erase Any Old ("Marked") Timestamps... ;-D
-				while ( lh->second.size() > 0 && lh->second[0] == 0 )
+				// _NOW_ Erase Any Old ("Cleared") Timestamps... ;-D
+				// (Yet Only Erase in "Log Rate-Sized" Chunks, to
+				// Prevent Getting "Stuck", i.e. 1 Erase per 1 New Log...)
+				while ( old >= log_rate )
 				{
-					// log_info.append("[Erasing old time.]");
-					lh->second.erase( lh->second.begin() );
+					uint32_t cnt = 0;
+					while ( lh->second.size() > 0
+							&& ( lh->second[0] == 0 || lh->second[0] == -1 )
+							&& cnt++ < log_rate )
+					{
+						// log_info.append("[Erasing old time.]");
+						lh->second.erase( lh->second.begin() );
+					}
+
+					old -= log_rate;
 				}
 
 				return( true );
@@ -297,7 +328,9 @@ public:
 				// ss << " (thresh=";
 				// ss << threshold;
 				// ss << ", rate=";
-				// ss << log_rate ;
+				// ss << log_rate;
+				// ss << ", old=";
+				// ss << old;
 				// ss << ")] ";
 				// log_info.append(ss.str());
 
@@ -308,12 +341,16 @@ public:
 		// It's Ok, Just Log It.
 		else {
 
-			// Be Sure to Erase Any Old ("Marked") Timestamps...! ;-D
-			while ( lh->second.size() > 0 && lh->second[0] == 0 )
+			// Be Sure to Erase Any Old ("Cleared") Timestamps...! ;-D
+			while ( lh->second.size() > 0
+					&& ( lh->second[0] == 0 || lh->second[0] == -1 ) )
 			{
 				// log_info.append("[Erasing old time.]");
 				lh->second.erase( lh->second.begin() );
 			}
+
+			// Mark This Most Recent Timestamp as "Logged"...
+			lh->second[ lh->second.size() - 1 ] *= -1;
 
 			// No rate-limited logging commentary required...
 			// log_info.append("[Under Threshold, Log Normally.]");
