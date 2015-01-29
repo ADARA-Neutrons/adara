@@ -1,11 +1,23 @@
 #include <boost/bind.hpp>
 
+#include "ADARAUtils.h"
 #include "MetaDataMgr.h"
 #include "StorageManager.h"
 
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
+
+RateLimitedLogging::History RLLHistory_MetaDataMgr;
+
+// Rate-Limited Logging IDs...
+#define RLL_DESC_INCORRECT_TAG     0
+#define RLL_ADD_EXISTING_DEVICE    1
+#define RLL_UNABLE_REMAP_U32_VAR   2
+#define RLL_UNABLE_REMAP_DBL_VAR   3
+#define RLL_UNABLE_REMAP_STR_VAR   4
+#define RLL_VAR_UPDATE_NO_DESC     5
+#define RLL_VAR_UPDATE_BAD_TAG     6
 
 MetaDataMgr::MetaDataMgr() : m_nextDevId(1)
 {
@@ -136,11 +148,18 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		ADARA::Packet *dev_pkt = dev.m_descriptor.get();
 
 		if (it->second.m_tag != tag) {
-			/* TODO rate-limited log that we got a descriptor from
+			/* Rate-limited log that we got a descriptor from
 			 * an incorrect tag (ie, wrong source)
 			 */
-			DEBUG("Got descriptor from incorrect tag "
-				<< it->second.m_tag << " != " << tag);
+			std::string log_info;
+			std::stringstream ss;
+			ss << tag;
+			if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+					RLL_DESC_INCORRECT_TAG, ss.str(),
+					2, 10, 100, log_info ) ) {
+				DEBUG(log_info << "Got descriptor from incorrect tag "
+					<< it->second.m_tag << " != " << tag);
+			}
 			return;
 		}
 
@@ -179,9 +198,17 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 {
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
-		/* TODO rate-limited logging of adding existing device? */
-		ERROR("addFastMetaDDP() adding existing (mapped) device 0x"
-			<< std::hex << mapped_dev << std::dec);
+		/* Rate-limited logging of adding existing device? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << mapped_dev;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_ADD_EXISTING_DEVICE, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "addFastMetaDDP() adding existing (mapped) device 0x"
+				<< std::hex << mapped_dev << std::dec);
+		}
 		return;
 	}
 
@@ -224,9 +251,19 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
-		/* TODO rate-limited logging of unable to remap variable? */
-		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << in.varId() << ":" << tag << std::dec);
+		/* Rate-limited logging of unable to remap variable? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << in.devId();
+		ss << "/";
+		ss << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Unable to remap variable 0x" << std::hex << in.devId()
+				<< ":" << in.varId() << ":" << tag << std::dec);
+		}
 		return;
 	}
 
@@ -244,9 +281,19 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
-		/* TODO rate-limited logging of unable to remap variable? */
-		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << in.varId() << ":" << tag << std::dec);
+		/* Rate-limited logging of unable to remap variable? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << in.devId();
+		ss << "/";
+		ss << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Unable to remap variable 0x" << std::hex << in.devId()
+				<< ":" << in.varId() << ":" << tag << std::dec);
+		}
 		return;
 	}
 
@@ -264,9 +311,19 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in, uint32_t tag)
 	uint32_t mapped_dev = remapDevice(in.devId(), tag);
 
 	if (!mapped_dev) {
-		/* TODO rate-limited logging of unable to remap variable? */
-		ERROR("Unable to remap variable 0x" << std::hex << in.devId()
-			<< ":" << in.varId() << ":" << tag << std::dec);
+		/* Rate-limited logging of unable to remap variable? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << in.devId();
+		ss << "/";
+		ss << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_STR_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Unable to remap variable 0x" << std::hex << in.devId()
+				<< ":" << in.varId() << ":" << tag << std::dec);
+		}
 		return;
 	}
 
@@ -296,23 +353,43 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 	DeviceMap::iterator it = m_devices.find(dev);
 
 	if (it == m_devices.end()) {
-		/* TODO rate-limited log that we got a variable update without
+		/* Rate-limited log that we got a variable update without
 		 * the corresponding device descriptor.
 		 */
-		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< var << ":" << tag << std::dec
-					<< " without a descriptor");
+		std::string log_info;
+		std::stringstream ss;
+		ss << dev;
+		ss << "/";
+		ss << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_VAR_UPDATE_NO_DESC, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Got variable 0x" << std::hex << dev << ":"
+				<< var << ":" << tag << std::dec
+				<< " without a descriptor");
+		}
 		return;
 	}
 
 	if (it->second.m_tag != tag) {
-		/* TODO rate-limited log that we got a variable update with
+		/* Rate-limited log that we got a variable update with
 		 * an incorrect tag (ie, wrong source)
 		 */
-		ERROR("Got variable 0x" << std::hex << dev << ":"
-					<< var << ":" << tag << std::dec
-					<< " but expected tag "
-					<< std::hex << it->second.m_tag << std::dec);
+		std::string log_info;
+		std::stringstream ss;
+		ss << dev;
+		ss << "/";
+		ss << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_VAR_UPDATE_BAD_TAG, ss.str(),
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Got variable 0x" << std::hex << dev << ":"
+				<< var << ":" << tag << std::dec
+				<< " but expected tag "
+				<< std::hex << it->second.m_tag << std::dec);
+		}
 		return;
 	}
 
