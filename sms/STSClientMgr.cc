@@ -8,6 +8,7 @@
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "STSClientMgr.h"
@@ -17,6 +18,16 @@
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
+
+RateLimitedLogging::History RLLHistory_STSClientMgr;
+
+// Rate-Limited Logging IDs...
+#define RLL_STS_CLIENT_LOOKUP_FAILED   0
+#define RLL_STS_CONNECTION_REFUSED     1
+#define RLL_STS_UNEXPECTED_CONN_ERROR  2
+#define RLL_STS_FAILED_TO_CONNECT      3
+#define RLL_STS_CONNECTION_FAILED      4
+#define RLL_STS_CONNECTION_TIMED_OUT   5
 
 class MaxConnectionsPV : public smsUint32PV {
 public:
@@ -271,17 +282,20 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				info.ssi_code != SI_ASYNCNL)
 		return;
 
+	std::string log_info;
+
 	rc = gai_error(&m_gai);
 	if (rc) {
 		if (rc == EAI_MEMORY || rc == EAI_SYSTEM) {
 			ERROR("GAI unexpectedly returned " << rc);
 		} else {
-			/* TODO rate-limited lookup error (or just once per
-			 * failure type?
-			 */
-			INFO("Lookup failed for " << m_node
-				<< ":" << m_service <<
-				": " << gai_strerror(rc));
+			/* Rate-limited lookup error (or just once per failure type?) */
+			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+					RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
+					600, 3, 10, log_info ) ) {
+				ERROR(log_info << "Lookup failed for " << m_node
+					<< ":" << m_service << ": " << gai_strerror(rc));
+			}
 		}
 		connectFailed();
 		return;
@@ -316,8 +330,13 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 
 	switch (rc) {
 	case ECONNREFUSED:
-		/* TODO rate-limited logging of refused connection */
-		INFO("Connection refused");
+		/* Rate-limited logging of refused connection */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CONNECTION_REFUSED, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Connection refused for " << m_node
+				<< ":" << m_service);
+		}
 		goto error;
 	case EINTR:
 	case EINPROGRESS:
@@ -327,7 +346,12 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		return;
 	default:
 		/* TODO other errors! */
-		ERROR("Unexpected error " << rc << " from connect");
+		/* Rate-limited logging of unexpected connection error */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_UNEXPECTED_CONN_ERROR, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Unexpected error " << rc << " from connect");
+		}
 		goto error;
 	}
 
@@ -344,8 +368,12 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	return;
 
 error:
-	/* TODO rate-limited error message? */
-	WARN("Failed to initiate connection");
+	/* Rate-limited connection failure message */
+	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+			RLL_STS_FAILED_TO_CONNECT, m_node + ":" + m_service,
+			600, 3, 10, log_info ) ) {
+		ERROR(log_info << "Failed to initiate connection");
+	}
 	connectFailed();
 }
 
@@ -392,8 +420,13 @@ void STSClientMgr::connectComplete(void)
 		return;
 	}
 
-	/* TODO rate-limited logging of connection issue */
-	WARN("Connection to STS failed: " << strerror(e));
+	/* Rate-limited logging of connection issue */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+			RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
+			600, 3, 10, log_info ) ) {
+		ERROR(log_info << "Connection to STS failed: " << strerror(e));
+	}
 	connectFailed();
 
 	DEBUG("connectComplete() failed exit");
@@ -413,7 +446,13 @@ void STSClientMgr::connectFailed(void)
 
 bool STSClientMgr::connectTimeout(void)
 {
-	/* TODO rate-limited log message */
+	/* Rate-limited connection timed out message */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+			RLL_STS_CONNECTION_TIMED_OUT, m_node + ":" + m_service,
+			600, 3, 10, log_info ) ) {
+		ERROR(log_info << "Timed Out Connecting to STS");
+	}
 	connectFailed();
 	return false;
 }
