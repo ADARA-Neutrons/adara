@@ -21,28 +21,37 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 RateLimitedLogging::History RLLHistory_DataSource;
 
 // Rate-Limited Logging IDs...
-#define RLL_DROPPED_PACKETS        0
-#define RLL_LOCAL_DUPLICATE_PULSE  1
-#define RLL_LOCAL_SAWTOOTH_PULSE   2
-#define RLL_LOCAL_PACKET_SEQUENCE  3
-#define RLL_CONN_REFUSED           4
-#define RLL_CONN_REQUEST_ERROR     5
-#define RLL_CONN_FAILED            6
-#define RLL_READ_EXCEPTION         7
-#define RLL_READ_DELAY             8
-#define RLL_PULSEID_ZERO           9
-#define RLL_UNKNOWN_PACKET        10
-#define RLL_OVERSIZE_PACKET       11
-#define RLL_LOCAL_DUPLICATE_RTDL  12
-#define RLL_LOCAL_SAWTOOTH_RTDL   13
-#define RLL_LOCAL_RTDL_SEQUENCE   14
-#define RLL_HEARTBEAT             15
+#define RLL_DROPPED_PACKETS           0
+#define RLL_LOCAL_DUPLICATE_PULSE     1
+#define RLL_LOCAL_SAWTOOTH_PULSE      2
+#define RLL_RAWDATA_PULSE_IN_PAST     3
+#define RLL_RAWDATA_PULSE_IN_FUTURE   4
+#define RLL_LOCAL_PACKET_SEQUENCE     5
+#define RLL_CONN_REFUSED              6
+#define RLL_CONN_REQUEST_ERROR        7
+#define RLL_CONN_FAILED               8
+#define RLL_READ_EXCEPTION            9
+#define RLL_READ_DELAY               10
+#define RLL_PULSEID_ZERO             11
+#define RLL_UNKNOWN_PACKET           12
+#define RLL_OVERSIZE_PACKET          13
+#define RLL_LOCAL_DUPLICATE_RTDL     14
+#define RLL_LOCAL_SAWTOOTH_RTDL      15
+#define RLL_LOCAL_RTDL_SEQUENCE      16
+#define RLL_RTDL_PULSE_IN_PAST       17
+#define RLL_RTDL_PULSE_IN_FUTURE     18
+#define RLL_HEARTBEAT                19
+
+// Pulse Time Sanity Check Constants
+#define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
+#define SECS_PER_WEEK 604800 // 60 * 60 * 24 * 7
 
 class HWSource {
 public:
 	HWSource(const std::string &name, uint32_t hwId, uint32_t smsId) :
 		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
-		m_lastPulse(0), m_dupCount(0), m_trueNew(true)
+		m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
+		m_trueNew(true)
 	{ }
 
 	uint64_t pulse(void) const { return m_activePulse; }
@@ -52,10 +61,12 @@ public:
 	uint32_t smsId(void) const { return m_smsId; }
 
 	void endPulse(bool eop = true) {
+
 		if (!m_activePulse)
 			return;
 
 		SMSControl *ctrl = SMSControl::getInstance();
+
 		if (!eop) {
 #if 0
 			/* We currently get this on every other pulse for
@@ -71,20 +82,24 @@ public:
 					<< std::hex << m_hwId << std::dec);
 			}
 #endif
-			ctrl->markPartial(m_activePulse, m_dupCount);
+			if ( m_pulseGood )
+				ctrl->markPartial(m_activePulse, m_dupCount);
+
 			m_trueNew = false;
 		}
 		else {
 			m_trueNew = true;
 		}
 
-		ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
+		if ( m_pulseGood )
+			ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
 
 		m_lastPulse = m_activePulse;
 		m_activePulse = 0;
 	}
 
-	void newPulse(const ADARA::RawDataPkt &pkt) {
+	bool newPulse(const ADARA::RawDataPkt &pkt) {
+
 		if (m_activePulse) {
 			/* We didn't see an end-of-packet, so clear out
 			 * the previous pulse here.
@@ -94,9 +109,11 @@ public:
 
 		m_activePulse = pkt.pulseId();
 
+		m_pulseGood = true;
+
 		// check for Duplicate Pulses in event packets...
 		if (m_activePulse == m_lastPulse) {
-			/* Rate-limited logging of duplicate pulses? */
+			/* Rate-limited logging of duplicate pulses */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
@@ -115,7 +132,7 @@ public:
 
 		// also check for SAWTOOTH Pulse Times in event packets...
 		if (m_activePulse < m_lastPulse) {
-			/* Rate-limited logging of local sawtooth pulses? */
+			/* Rate-limited logging of local sawtooth pulses */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_SAWTOOTH_PULSE, m_name,
@@ -130,6 +147,50 @@ public:
 			}
 		}
 
+		// strip off pulse nanoseconds...
+		time_t sec = m_activePulse >> 32;
+		// check for "totally bogus" pulses, in distant past/future... ;-b
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		time_t future = 
+			now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
+		// before SNS time began... ;-D
+		if ( sec < FACILITY_START_TIME )
+		{
+			/* Rate-limited logging of Bogus Pulses from Distant Past! */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_RAWDATA_PULSE_IN_PAST, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "*** Dropping Bogus RawData Pulse Time"
+					<< " from Distant Past (Before Facility Start Time)!"
+					<< std::hex << " pulseId=0x"
+						<< m_activePulse << std::dec
+					<< " (" << sec << " < " << FACILITY_START_TIME << ")"
+					<< " (" << m_name << ")");
+			}
+			m_pulseGood = false;
+		}
+		// more than a week into the future...! :-o
+		else if ( sec > future )
+		{
+			/* Rate-limited logging of Bogus Pulses from Distant Future! */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_RAWDATA_PULSE_IN_FUTURE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "*** Dropping Bogus RawData Pulse Time"
+					<< " from Distant Future (Over One Week from Now)!"
+					<< std::hex << " pulseId=0x"
+						<< m_activePulse << std::dec
+					<< " (" << sec << " > " << future << ")"
+					<< " (" << m_name << ")");
+			}
+			m_pulseGood = false;
+		}
+
 		m_flavor = pkt.flavor();
 		m_intraPulse = pkt.intraPulseTime();
 		m_charge = pkt.pulseCharge();
@@ -137,6 +198,8 @@ public:
 		m_veto = pkt.veto();
 		m_timingStatus = pkt.timingStatus();
 		m_pktSeq = 0;
+
+		return( m_pulseGood );
 	}
 
 	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt) {
@@ -151,6 +214,10 @@ public:
 			 pkt.cycle() == m_cycle &&
 			 pkt.timingStatus() == m_timingStatus &&
 			 pkt.intraPulseTime() == m_intraPulse);
+	}
+
+	bool pulseGood() {
+		return( m_pulseGood );
 	}
 
 	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
@@ -196,6 +263,7 @@ private:
 	uint64_t	m_lastPulse;
 	uint32_t	m_dupCount;
 	uint16_t	m_pktSeq;
+	bool		m_pulseGood;
 
 	/* Pulse invariants -- these should not change between raw event
 	 * packets for a given pulse, so we can use them to help detect
@@ -785,7 +853,7 @@ void DataSource::dataReady(void)
  		// set read delayed flag...!
 		if ( elapsed > 2.0 )
 		{
-			/* Rate-limited logging of read delay threshold? */
+			/* Rate-limited logging of read delay threshold */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
@@ -868,7 +936,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		 * active pulse, and nothing should ever send one to us.
 		 */
 		if (!pkt.pulseId()) {
-			/* Rate-limited logging of pulse id 0? */
+			/* Rate-limited logging of pulse id 0 */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_PULSEID_ZERO, m_name, 2, 10, 100, log_info ) ) {
@@ -885,7 +953,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 {
-	/* Rate-limited logging of unknown packet types? */
+	/* Rate-limited logging of unknown packet types */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_UNKNOWN_PACKET, m_name, 2, 10, 100, log_info ) ) {
@@ -900,7 +968,7 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 				   unsigned int UNUSED(chunk_offset),
 			       unsigned int UNUSED(chunk_len))
 {
-	/* Rate-limited logging of oversized packets? */
+	/* Rate-limited logging of oversized packets */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
@@ -963,14 +1031,21 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	 * The HWSource class will take care of missing end-of-pulse
 	 * markers and duplicate pulse ids.
 	 */
+	bool good_pulse = true;
 	if (hw_src.checkPulseInvariants(*pkt))
-		hw_src.newPulse(*pkt);
+		good_pulse = hw_src.newPulse(*pkt);
+	else
+		good_pulse = hw_src.pulseGood();
 
-	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(), is_mapped);
+	if ( good_pulse )
+	{
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
+			is_mapped);
 
-	if (hw_src.checkSeq(*pkt))
-		ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+		if (hw_src.checkSeq(*pkt))
+			ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+	}
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
 	m_ignore_eop = m_pvIgnoreEoP->value();
@@ -989,9 +1064,11 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 * SMSControl.
 	 */
 
+	bool drop_pulse = false;
+
 	// do duplicate checking on a per-datasource basis
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
-		/* Rate-limited logging of duplicate RTDLs? */
+		/* Rate-limited logging of duplicate RTDLs */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_LOCAL_DUPLICATE_RTDL, m_name,
@@ -1009,7 +1086,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
 	if (pkt.pulseId() < m_lastRTDLPulseId) {
-		/* Rate-limited logging of local sawtooth RTDLs? */
+		/* Rate-limited logging of local sawtooth RTDLs */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_LOCAL_SAWTOOTH_RTDL, m_name,
@@ -1026,9 +1103,51 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// done with this last pulseid...
 	m_lastRTDLPulseId = pkt.pulseId();
 
+	// strip off pulse nanoseconds...
+	time_t sec = pkt.pulseId() >> 32;
+	// check for "totally bogus" pulse times, in distant past/future... ;-b
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	time_t future = 
+		now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
+	// before SNS time began... ;-D
+	if ( sec < FACILITY_START_TIME )
+	{
+		/* Rate-limited logging of Bogus RTDLs from the Distant Past! */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+				RLL_RTDL_PULSE_IN_PAST, m_name,
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< "*** Dropping Bogus RTDL Pulse Time"
+				<< " from Distant Past (Before Facility Start Time)!"
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< " (" << sec << " < " << FACILITY_START_TIME << ")"
+				<< " (" << m_name << ")");
+		}
+		drop_pulse = true;
+	}
+	// more than a week into the future...! :-o
+	else if ( sec > future )
+	{
+		/* Rate-limited logging of Bogus RTDLs from the Distant Future! */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+				RLL_RTDL_PULSE_IN_FUTURE, m_name,
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< "*** Dropping Bogus RTDL Pulse Time"
+				<< " from Distant Future (Over One Week from Now)!"
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< " (" << sec << " > " << future << ")"
+				<< " (" << m_name << ")");
+		}
+		drop_pulse = true;
+	}
+
 	// just for yuks, check the cycle sequence
 	if (m_lastRTDLCycle && pkt.cycle() != ((m_lastRTDLCycle + 1) % 600)) {
-		/* Rate-limited logging of RTDL cycle out of sequence? */
+		/* Rate-limited logging of RTDL cycle out of sequence */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_LOCAL_RTDL_SEQUENCE, m_name,
@@ -1044,8 +1163,10 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	}
 	m_lastRTDLCycle = pkt.cycle();
 
-	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->pulseRTDL(pkt, m_dupRTDL);
+	if ( !drop_pulse ) {
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->pulseRTDL(pkt, m_dupRTDL);
+	}
 
 	m_rtdl_pkt_counts++;
 
