@@ -307,6 +307,7 @@ private:
     std::vector<char>           m_comment_data;         /// Comment data buffer
     unsigned long               m_comment_last_offset;  /// Last slab offset written to Nexus
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
+    bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
 };
 
 #endif // NXGEN_H

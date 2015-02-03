@@ -38,7 +38,8 @@ NxGen::NxGen
     m_pulse_info_slab_size(0),
     m_pulse_vetoes_slab_size(0),
     m_pulse_flags_slab_size(0),
-    m_comment_last_offset(0)
+    m_comment_last_offset(0),
+    m_haveRunComment(false)
 {
     if ( !a_nexus_out_file.empty() )
     {
@@ -718,6 +719,13 @@ NxGen::runComment
     const std::string &a_comment    ///< [in] Overall run comments
 )
 {
+    if ( m_haveRunComment ) {
+        syslog( LOG_WARNING,
+            "[%i] Unexpected input: duplicate run comment specified: %s",
+            g_pid, a_comment.c_str() );
+        return;
+    }
+
     try
     {
         writeString( "/entry/", "notes", a_comment );
@@ -726,6 +734,8 @@ NxGen::runComment
     {
         RETHROW_TRACE( e, "runComment() failed." )
     }
+
+    m_haveRunComment = true;
 }
 
 
