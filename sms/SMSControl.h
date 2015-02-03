@@ -20,6 +20,7 @@ class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
 class smsUint32PV;
+class PopPulseBufferPV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -56,6 +57,8 @@ public:
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
 	void markComplete(uint64_t pulseId, uint32_t dup, uint32_t smsId);
+
+	void popPulseBuffer(int32_t pulse_index);
 
 	void resetSourcesReadDelay(void);
 	void setSourcesReadDelay(void);
@@ -188,6 +191,8 @@ private:
 
 	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
 	static uint32_t m_noEoPPulseBufferSize;
+
+	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 

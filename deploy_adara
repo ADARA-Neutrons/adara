@@ -1,4 +1,4 @@
-#!/bin/tcsh
+#!/bin/bash
 #
 # Deploy ADARA Programs
 #
@@ -24,209 +24,212 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-set usage = "   usage:  deploy_adara [ sms | sts | sts_test ]"
+usage="   usage:  deploy_adara [ sms | sts | sts_test ]"
 
-if ( $# != 1 ) then
-	echo "\n$usage\n"
+if [ $# != 1 ]; then
+	echo -e "\n$usage\n"
 	exit -1
-endif
+fi
 
 # Be Group-Friendly...
 umask 002
 
 # Parse Command Line Options
 
-set IS_STS = 0
+IS_STS=0
 
-if ( "$1" == "sms" ) then
-	set PROG = "SMS"
-	set prog = "smsd"
-else if ( "$1" == "sts" ) then
-	set PROG = "STS"
-	set prog = "sts"
-	set IS_STS = 1
-else if ( "$1" == "sts_test" ) then
-	set PROG = "STS_TEST"
-	set prog = "sts"
-	set IS_STS = 1
+if [ "$1" == "sms" ]; then
+	PROG="SMS"
+	prog="smsd"
+elif [ "$1" == "sts" ]; then
+	PROG="STS"
+	prog="sts"
+	IS_STS=1
+elif [ "$1" == "sts_test" ]; then
+	PROG="STS_TEST"
+	prog="sts"
+	IS_STS=1
 else
-	echo "\n   Unknown Deployment Target: $1"
-	echo "\n$usage\n"
+	echo -e "\n   Unknown Deployment Target: $1"
+	echo -e "\n$usage\n"
 	exit -2
-endif
+fi
 
-echo "\nDeploying ADARA $PROG Target.\n"
+echo -e "\nDeploying ADARA $PROG Target.\n"
 
 #
 # Install Defaults
 #
 
-set DEPLOY_VERSION = "1.1.5"
+DEPLOY_VERSION="1.1.5"
 
-set TMP_DIR = "/tmp"
+TMP_DIR="/tmp"
 
-set INSTALL_BASE = "/home/controls"
+INSTALL_BASE="/home/controls"
 
-set EPICS_BASE = "$INSTALL_BASE/epics/base/master"
+EPICS_BASE="$INSTALL_BASE/epics/base/master"
 
-set CONFIG_REPO = "git+ssh://trac.sns.gov/var/repos/config"
+CONFIG_REPO="git+ssh://trac.sns.gov/var/repos/config"
 
-set CONFIG_LINE = \
-	"------------------------------------------------------------------"
+CONFIG_LINE=\
+"------------------------------------------------------------------"
 
-set LOG = "$TMP_DIR/ADARA_${PROG}_Deploy_Log.$$.txt"
+LOG="$TMP_DIR/ADARA_${PROG}_Deploy_Log.$$.txt"
 
 touch $LOG
 
-echo "\nADARA ${PROG} Deployment Log" | tee -a $LOG
+echo -e "\nADARA ${PROG} Deployment Log" | tee -a $LOG
 date | tee -a $LOG
 
 echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
 
 # Determine user identity (for accountability and documentation :-)
 
-set userid = `id -un`
+userid=`id -un`
 
-set gcos = `echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
+gcos=`echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
 	print $gcos' | perl`
 
-echo "\nDeploying User: $gcos ($userid)." | tee -a $LOG
+echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
 # Determine the Beamline/STS Branch associated with this computer system
 
-set CONFIG = "config"
+CONFIG="config"
 
-if ( $IS_STS == 1 ) then
-	set install_host = `hostname`
-	set install_branch = \
-		`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
-	set HOST_TYPE = "STS"
+if [ $IS_STS == 1 ]; then
+	install_host=`hostname`
+	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
+	HOST_TYPE="STS"
 else
-	set install_host = `hostname -A | sed 's/ /\n/g' | grep '^bl'`
-	set install_branch = `echo "$install_host" | sed 's/-.*//'`
-	set install_suffix = \
-		`echo "$install_host" | sed 's/\..*//' | sed 's/bl.*-//'`
-	if ( "#$install_suffix#" != '##' \
-			&& "#$install_suffix#" != '#sms#' ) then
-		set install_branch = "${install_branch}-${install_suffix}"
-		set CONFIG = "${CONFIG}-${install_suffix}"
-	endif
-	set HOST_TYPE = "Beamline"
-endif
+	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	install_branch=`echo "$install_host" | sed 's/-.*//'`
+	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
+	if [[ "#$install_suffix#" != '##' \
+			&& "#$install_suffix#" != '#sms#' ]]; then
+		install_branch="${install_branch}-${install_suffix}"
+		CONFIG="${CONFIG}-${install_suffix}"
+	fi
+	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
+	if [[ -z $install_host || -z $install_branch ]]; then
+		install_host=`hostname`
+		install_branch=`echo "$install_host" | sed 's/\..*//'`
+	fi
+	HOST_TYPE="Beamline"
+fi
 
-echo -n "\nInstalling ADARA/${PROG} " | tee -a $LOG
+echo -e -n "\nInstalling ADARA/${PROG} " | tee -a $LOG
 echo "for $HOST_TYPE $install_branch ($install_host)." | tee -a $LOG
 
 #
 # Prompt for (Non-Null!) User Inputs:
 #
 
-set adara_repo = `git config --get remote.origin.url`
+adara_repo=`git config --get remote.origin.url`
 
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 
 # Make sure we're in the "right" repo...? ;-)
 
-set adara_repo_ck = \
-	`echo "$adara_repo" | grep 'ADARA$' | wc | awk '{print $1}'`
+adara_repo_ck=`echo "$adara_repo" | grep 'ADARA$' | wc | awk '{print $1}'`
 
-if ( $adara_repo_ck != 1 ) then
-	echo "\nError: This is Not the ADARA Git Repository!\n" | tee -a $LOG
-	echo "   $adara_repo\n" | tee -a $LOG
+if [ $adara_repo_ck != 1 ]; then
+	echo -e "\nError: This is Not the ADARA Git Repository!\n" \
+		| tee -a $LOG
+	echo -e "   $adara_repo\n" | tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -1
-endif
+fi
 
 # Release Tag Name
 
-echo "\nEnter Release Tag Name from Git Repository:\n"
+echo -e "\nEnter Release Tag Name from Git Repository:\n"
 
 git tag -l
 
-echo "\n(Or 'Already_Deployed_Locally')"
+echo -e "\n(Or 'Already_Deployed_Locally')"
 
-echo -n "\nRelease Tag Name? "
+echo -e -n "\nRelease Tag Name? "
 
-set release_tag = "$<"
+read release_tag
 
 # Verify valid release tag...
 
-set adara_archive = "$INSTALL_BASE/prod/ADARA"
+adara_archive="$INSTALL_BASE/prod/ADARA"
 
-set already_deployed_locally = 0
-set already_deployed = ""
+already_deployed_locally=0
+already_deployed=""
 
-if ( "#$release_tag#" == '#Already_Deployed_Locally#' ) then
+if [ "#$release_tag#" == '#Already_Deployed_Locally#' ]; then
 
-	echo "\nRelease Tags Already Deployed Locally:\n"
+	echo -e "\nRelease Tags Already Deployed Locally:\n"
 
 	/bin/ls -d $adara_archive/*/* | sed s@$adara_archive/@@
 
-	echo -n "\nRelease Tag Name? "
+	echo -e -n "\nRelease Tag Name? "
 
-	set release_tag = "$<"
+	read release_tag
 
-	if ( ! -d "$adara_archive/$release_tag" ) then
-		echo "\nError: Release Tag Directory Not Found!\n" | tee -a $LOG
-		echo "   $adara_archive/$release_tag\n" | tee -a $LOG
+	if [ ! -d "$adara_archive/$release_tag" ]; then
+		echo -e "\nError: Release Tag Directory Not Found!\n" | tee -a $LOG
+		echo -e "   $adara_archive/$release_tag\n" | tee -a $LOG
 		echo "Not a Valid Release Tag!" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -202
-	endif
+	fi
 
-	set already_deployed_locally = 1
-	set already_deployed = " (Already Deployed Locally)"
+	already_deployed_locally=1
+	already_deployed=" (Already Deployed Locally)"
 
 else
 
-	set tag_ck = `git tag -l | grep "$release_tag" | wc | awk '{print $1}'`
+	tag_ck=`git tag -l | grep "$release_tag" | wc | awk '{print $1}'`
 
-	if ( $tag_ck != 1 ) then
-		echo "\nError: Not a Valid Release Tag!\n" | tee -a $LOG
-		echo "   $release_tag\n" | tee -a $LOG
+	if [ $tag_ck != 1 ]; then
+		echo -e "\nError: Not a Valid Release Tag!\n" | tee -a $LOG
+		echo -e "   $release_tag\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -2
-	endif
+	fi
 
-endif
+fi
 
-echo "\nADARA Release Tag = $release_tag$already_deployed" | tee -a $LOG
+echo -e "\nADARA Release Tag = $release_tag$already_deployed" | tee -a $LOG
 
 # Deployment Log Description Text [Required!]
 
-echo "\nPlease Enter Deployment Log Description Text:\n"
+echo -e "\nPlease Enter Deployment Log Description Text:\n"
 
-echo "(Enter a Blank Line to Finish.)\n"
+echo -e "(Enter a Blank Line to Finish.)\n"
 
-set log_desc = ""
-set empty = 1
-set done = 0
+log_desc=""
+empty=1
+done=0
 
-while ( $done != 1 )
+while [ $done != 1 ]; do
 
 	echo -n " > "
-	set text_line = "$<"
+	read text_line
 
-	if ( "#$text_line#" == '##' ) then
-		if ( $empty != 1 ) then
-			set done = 1
+	if [ "#$text_line#" == '##' ]; then
+		if [ $empty != 1 ]; then
+			done=1
 		else
 			echo "(Deployment Log Must Be Non-Empty! Please Enter Log.)"
-		endif
+		fi
 	else
-		if ( $empty != 1 ) then
-			set log_desc = "$log_desc\n$text_line"
+		if [ $empty != 1 ]; then
+			log_desc="$log_desc\n$text_line"
 		else
-			set log_desc = "$text_line"
-		endif
-		set empty = 0
-	endif
+			log_desc="$text_line"
+		fi
+		empty=0
+	fi
 
-end
+done
 
-echo "\nDeployment Log Description Text:\n" | tee -a $LOG
+echo -e "\nDeployment Log Description Text:\n" | tee -a $LOG
 
-echo "$log_desc" | tee -a $LOG
+echo -e "$log_desc" | tee -a $LOG
 
 #
 # Prepare the ADARA Archive Directories in /home/controls/prod
@@ -234,128 +237,131 @@ echo "$log_desc" | tee -a $LOG
 
 # Make sure the parent ADARA Archive directory exists
 
-if ( ! -d "$adara_archive" ) then
+if [ ! -d "$adara_archive" ]; then
 
-	echo "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
+	echo -e "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
 
-	echo "Creating Parent ADARA Archive Directory:\n" \
+	echo -e "Creating Parent ADARA Archive Directory:\n" \
 		| tee -a $LOG
-	echo "   $adara_archive\n" | tee -a $LOG
+	echo -e "   $adara_archive\n" | tee -a $LOG
 
-	mkdir "$adara_archive" |& tee -a $LOG
+	mkdir -p "$adara_archive" |& tee -a $LOG
 
-	set mkdir_ok = $status
+	mkdir_ok=$?
 
-	if ( $mkdir_ok != 0 ) then
-		echo "\nError Making ADARA Archive Directory! ($mkdir_ok)\n" \
+	if [ $mkdir_ok != 0 ]; then
+		echo -e "\nError Making ADARA Archive Directory! ($mkdir_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -8
-	endif
+	fi
 
 	ls -ld "$adara_archive" |& tee -a $LOG
 
-endif
+fi
 
-if ( $already_deployed_locally == 1 ) then
+if [ $already_deployed_locally == 1 ]; then
 
-	echo "\nUsing Existing Installation in ADARA Archive directory:\n" \
+	echo -e "\nUsing Existing Installation in ADARA Archive directory:\n" \
 		| tee -a $LOG
 	echo "   $adara_archive/$release_tag" | tee -a $LOG
 
 else
 
-	echo "\nInstalling into ADARA Archive directory:\n" \
+	echo -e "\nInstalling into ADARA Archive directory:\n" \
 		| tee -a $LOG
 	echo "   $adara_archive" | tee -a $LOG
 
-endif
+fi
 
 # Create the Release Tag directory structure in the Current Working Set
 
-set tag_archive = "$adara_archive/$release_tag"
+tag_archive="$adara_archive/$release_tag"
 
-if ( ! -d "$tag_archive" ) then
+if [ ! -d "$tag_archive" ]; then
 
-	echo "\nCreating ADARA Archive Release Tag Directory:\n" \
+	echo -e "\nCreating ADARA Archive Release Tag Directory:\n" \
 		| tee -a $LOG
-	echo "   $tag_archive\n" | tee -a $LOG
+	echo -e "   $tag_archive\n" | tee -a $LOG
 
 	mkdir -p "$tag_archive" |& tee -a $LOG
 
-	set mkdir_ok = $status
+	mkdir_ok=$?
 
-	if ( $mkdir_ok != 0 ) then
-		echo \
+	if [ $mkdir_ok != 0 ]; then
+		echo -e \
 			"\nError Making Archive Release Tag Directory! ($mkdir_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -9
-	endif
+	fi
 
 	ls -ld "$tag_archive" |& tee -a $LOG
 
-endif
+fi
 
 # Determine If We Need to (Re-)Build from the Git Repository...
 
-set need_build = 1
+need_build=1
 
-if ( $already_deployed_locally == 1 ) then
+if [ $already_deployed_locally == 1 ]; then
 
-	set need_build = 0
+	need_build=0
 
-else if ( -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ) then
+elif [[ -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ]]; then
 
-	echo \
+	echo -e \
 		"\nWarning! A Build Already Exists for Release Tag $release_tag!" \
 		| tee -a $LOG
 
-	echo -n "\nDo you want to Re-Build the Installation...? (yes/No/quit) "
+	echo -e -n \
+		"\nDo you want to Re-Build the Installation...? (yes/No/quit) "
 
-	set rebuild_ck = "$<"
+	read rebuild_ck
 
-	if ( "#$rebuild_ck#" == '#yes#' ) then
+	if [ "#$rebuild_ck#" == '#yes#' ]; then
 
-		echo "\nRe-Building Release Tag $release_tag at User's Request." \
+		echo -e \
+			"\nRe-Building Release Tag $release_tag at User's Request." \
 			| tee -a $LOG
 
-	else if ( "#$rebuild_ck#" == '#quit#' ) then
+	elif [ "#$rebuild_ck#" == '#quit#' ]; then
 
-		echo "\nExiting Deploy Script at User's Request." | tee -a $LOG
+		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
 		exit 0
 
 	else
 
-		echo "\nRe-Using Existing Release Tag $release_tag Build." \
+		echo -e "\nRe-Using Existing Release Tag $release_tag Build." \
 			| tee -a $LOG
 
-		set need_build = 0
+		need_build=0
 
-	endif
+	fi
 
-endif
+fi
 
 # Need to (Re-)Build from the Git Repository
 
-if ( $need_build == 1 ) then
+if [ $need_build == 1 ]; then
 
 	# Clone a fresh copy of the ADARA Git repository (in /tmp)
 
-	echo "\nCloning a Fresh Copy of the ADARA Git repository (in /tmp):" \
+	echo -e \
+		"\nCloning a Fresh Copy of the ADARA Git repository (in /tmp):" \
 		| tee -a $LOG
 
 	echo "git clone $adara_repo $TMP_DIR/ADARA" | tee -a $LOG
 	git clone "$adara_repo" "$TMP_DIR/ADARA" |& tee -a $LOG
 
-	set clone_ok = $status
+	clone_ok=$?
 
-	if ( $clone_ok != 0 ) then
-		echo "\nError Cloning ADARA Git repository! ($clone_ok)\n" \
+	if [ $clone_ok != 0 ]; then
+		echo -e "\nError Cloning ADARA Git repository! ($clone_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -3
-	endif
+	fi
 
 	cd "$TMP_DIR/ADARA"
 
@@ -365,92 +371,93 @@ if ( $need_build == 1 ) then
 
 	# Check out the desired Release Tag
 
-	echo "\nChecking out the Release Tag: $release_tag" | tee -a $LOG
+	echo -e "\nChecking out the Release Tag: $release_tag" | tee -a $LOG
 
 	echo "git checkout $release_tag" | tee -a $LOG
 	git checkout "$release_tag" |& tee -a $LOG
 
-	set tag_ok = $status
+	tag_ok=$?
 
-	if ( $tag_ok != 0 ) then
-		echo "\nError Checking Out Release Tag! ($tag_ok)\n" | tee -a $LOG
+	if [ $tag_ok != 0 ]; then
+		echo -e "\nError Checking Out Release Tag! ($tag_ok)\n" \
+			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -4
-	endif
+	fi
 
 	# Apply Tag Name Substitution for Build...
 
 	mv "$TMP_DIR/ADARA/common/ADARA.h" "$TMP_DIR/ADARA/common/ADARA.h.orig"
 
-	set mv_ok = $status
+	mv_ok=$?
 
-	if ( $mv_ok != 0 ) then
-		echo "\nError Moving Header for Release Tag Subst! ($mv_ok)\n" \
+	if [ $mv_ok != 0 ]; then
+		echo -e "\nError Moving Header for Release Tag Subst! ($mv_ok)\n" \
 			| tee -a $LOG
 		ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -5
-	endif
+	fi
 
 	sed "s@XXX_TAG_NAME_XXX@$release_tag@g" \
 		"$TMP_DIR/ADARA/common/ADARA.h.orig" \
 		> "$TMP_DIR/ADARA/common/ADARA.h"
 
-	set tagsubst_ok = $status
+	tagsubst_ok=$?
 
-	if ( $tagsubst_ok != 0 ) then
-		echo "\nError Substituting Release Tag! ($tagsubst_ok)\n" \
+	if [ $tagsubst_ok != 0 ]; then
+		echo -e "\nError Substituting Release Tag! ($tagsubst_ok)\n" \
 			| tee -a $LOG
 		ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -6
-	endif
+	fi
 
 	# Build the ADARA software suite, using EPICS in /home/controls/epics
 
-	echo "\nBuilding the ADARA software suite." | tee -a $LOG
+	echo -e "\nBuilding the ADARA software suite." | tee -a $LOG
 
 	echo "./bootstrap" | tee -a $LOG
 	./bootstrap |& tee -a $LOG
 
-	set bootstrap_ok = $status
+	bootstrap_ok=$?
 
-	if ( $bootstrap_ok != 0 ) then
-		echo "\nError Bootstrapping ADARA Software! ($bootstrap_ok)\n" \
+	if [ $bootstrap_ok != 0 ]; then
+		echo -e "\nError Bootstrapping ADARA Software! ($bootstrap_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -7
-	endif
+	fi
 
 	echo "./configure --with-epics=$EPICS_BASE" | tee -a $LOG
 	./configure --with-epics="$EPICS_BASE" |& tee -a $LOG
 
-	set configure_ok = $status
+	configure_ok=$?
 
-	if ( $configure_ok != 0 ) then
-		echo "\nError Configuring ADARA Software! ($configure_ok)\n" \
+	if [ $configure_ok != 0 ]; then
+		echo -e "\nError Configuring ADARA Software! ($configure_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -8
-	endif
+	fi
 
 	echo "make" | tee -a $LOG
 	make |& tee -a $LOG
 
-	set build_ok = $status
+	build_ok=$?
 
-	if ( $build_ok != 0 ) then
-		echo "\nError Building Release Tag! ($build_ok)\n" | tee -a $LOG
+	if [ $build_ok != 0 ]; then
+		echo -e "\nError Building Release Tag! ($build_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -9
-	endif
+	fi
 
-	echo "\nADARA Software, Release $release_tag, Successfully Built." \
+	echo -e "\nADARA Software, Release $release_tag, Successfully Built." \
 		| tee -a $LOG
 
 	date | tee -a $LOG
 
-	echo "\n. . ."
+	echo -e "\n. . ."
 	sleep 3
 
 	#
@@ -459,106 +466,108 @@ if ( $need_build == 1 ) then
 
 	# SMS Daemon
 
-	echo "\nCopying SMS Daemon Executable into Archive Release Tag:\n" \
+	echo -e "\nCopying SMS Daemon Executable into Archive Release Tag:\n" \
 		| tee -a $LOG
 
 	cp -i -p sms/smsd "$tag_archive" |& tee -a $LOG
 
-	set copy_ok = $status
+	copy_ok=$?
 
-	if ( $copy_ok != 0 ) then
-		echo \
+	if [ $copy_ok != 0 ]; then
+		echo -e \
 		"\nError Copying SMSD into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -10
-	endif
+	fi
 
 	ls -l "$tag_archive/smsd" |& tee -a $LOG
 
 	# SMS LiveConf Script
 
-	echo "\nCopying SMS LiveConf Script into Archive Release Tag:\n" \
+	echo -e "\nCopying SMS LiveConf Script into Archive Release Tag:\n" \
 		| tee -a $LOG
 
 	cp -i -p sms/liveconf "$tag_archive" |& tee -a $LOG
 
-	set copy_ok = $status
+	copy_ok=$?
 
-	if ( $copy_ok != 0 ) then
-		echo \
+	if [ $copy_ok != 0 ]; then
+		echo -e \
 	"\nError Copying LiveConf into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -10
-	endif
+	fi
 
 	ls -l "$tag_archive/liveconf" |& tee -a $LOG
 
 	# STS Client
 
-	echo "\nCopying STS Client Executable into Archive Release Tag:\n" \
+	echo -e "\nCopying STS Client Executable into Archive Release Tag:\n" \
 		| tee -a $LOG
 
 	cp -i -p sts/sts "$tag_archive" |& tee -a $LOG
 
-	set copy_ok = $status
+	copy_ok=$?
 
-	if ( $copy_ok != 0 ) then
-		echo \
+	if [ $copy_ok != 0 ]; then
+		echo -e \
 		"\nError Copying STS into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -11
-	endif
+	fi
 
 	ls -l "$tag_archive/sts" |& tee -a $LOG
 
 	# DASMON Server
 
-	echo "\nCopying DASMON Server Executable into Archive Release Tag:\n" \
+	echo -e \
+		"\nCopying DASMON Server Executable into Archive Release Tag:\n" \
 		| tee -a $LOG
 
 	cp -i -p dasmon/server/dasmond "$tag_archive" |& tee -a $LOG
 
-	set copy_ok = $status
+	copy_ok=$?
 
-	if ( $copy_ok != 0 ) then
-		echo \
+	if [ $copy_ok != 0 ]; then
+		echo -e \
 		"\nError Copying DASMON into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -12
-	endif
+	fi
 
 	ls -l "$tag_archive/dasmond" |& tee -a $LOG
 
 	# ADARA Tools
 
-	echo "\nCopying ADARA Tools Executable into Archive Release Tag:\n" \
+	echo -e \
+		"\nCopying ADARA Tools Executable into Archive Release Tag:\n" \
 		| tee -a $LOG
 
 	cp -i -p tools/adara-* "$tag_archive" |& tee -a $LOG
 
-	set copy_ok = $status
+	copy_ok=$?
 
-	if ( $copy_ok != 0 ) then
-		echo \
+	if [ $copy_ok != 0 ]; then
+		echo -e \
 		"\nError Copying Tools into Release Tag Directory! ($copy_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -13
-	endif
+	fi
 
 	# (heh, remove the *.cc files we also copied... ;-)
 	rm -f "$tag_archive"/adara-*.cc >& /dev/null
 
 	ls -l "$tag_archive"/adara-* |& tee -a $LOG
 
-	echo "\n. . ."
+	echo -e "\n. . ."
 	sleep 3
 
-endif
+fi
 
 #
 # Link New Archive Release Tag into Current Working Set for Beamline/STS
@@ -566,32 +575,32 @@ endif
 
 # Make sure the Git Config repository has been cloned for deployment
 
-set adara_config = "$INSTALL_BASE/$CONFIG"
+adara_config="$INSTALL_BASE/$CONFIG"
 
-if ( ! -d "$adara_config" ) then
+if [ ! -d "$adara_config" ]; then
 
 	# Clone a fresh copy of the Git Config repository (in /home/controls)
 
-	echo "\nCloning Git Config repository (in $INSTALL_BASE):" \
+	echo -e "\nCloning Git Config repository (in $INSTALL_BASE):" \
 		| tee -a $LOG
 
 	echo "git clone $CONFIG_REPO $adara_config" | tee -a $LOG
 	git clone "$CONFIG_REPO" "$adara_config" |& tee -a $LOG
 
-	set clone_ok = $status
+	clone_ok=$?
 
-	if ( $clone_ok != 0 ) then
-		echo "\nError Cloning Git Config repository! ($clone_ok)\n" \
+	if [ $clone_ok != 0 ]; then
+		echo -e "\nError Cloning Git Config repository! ($clone_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -3
-	endif
+	fi
 
-endif
+fi
 
 # Make sure the Proper Beamline/STS Branch is checked out in Config
 
-echo "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
+echo -e "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
 
 cd "$adara_config"
 
@@ -601,145 +610,151 @@ ls -l | tee -a $LOG
 
 # Check out the desired Beamline/STS Branch
 
-echo "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
+echo -e "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
 	| tee -a $LOG
 
 echo "git checkout $install_branch" | tee -a $LOG
 git checkout "$install_branch" |& tee -a $LOG
 
-set tag_ok = $status
+tag_ok=$?
 
-if ( $tag_ok != 0 ) then
-	echo \
+if [ $tag_ok != 0 ]; then
+	echo -e \
 		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -4
-endif
+fi
 
 # Make sure the parent ADARA current working set directory exists
 
-set adara_current = "$INSTALL_BASE/$CONFIG/deploy"
-set adara_current_new = 0
+adara_current="$INSTALL_BASE/$CONFIG/deploy"
+adara_current_new=0
 
-if ( ! -d "$adara_current" ) then
+if [ ! -d "$adara_current" ]; then
 
-	echo "\nADARA Current Working Set Directory Not Found.\n" | tee -a $LOG
+	echo -e \
+		"\nADARA Current Working Set Directory Not Found.\n" | tee -a $LOG
 
-	echo "Creating Current Working Set Parent Deploy Directory:\n" \
+	echo -e "Creating Current Working Set Parent Deploy Directory:\n" \
 		| tee -a $LOG
 	echo "   $adara_current" | tee -a $LOG
 
-	mkdir "$adara_current" |& tee -a $LOG
+	mkdir -p "$adara_current" |& tee -a $LOG
 
-	set mkdir_ok = $status
+	mkdir_ok=$?
 
-	if ( $mkdir_ok != 0 ) then
-		echo \
+	if [ $mkdir_ok != 0 ]; then
+		echo -e \
 			"\nError Making Current Working Set Directory! ($mkdir_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -14
-	endif
+	fi
 
-	set adara_current_new = 1
-endif
+	adara_current_new=1
+fi
 
-echo "\nLinking into ADARA Current Working Set directory:\n" \
+echo -e "\nLinking into ADARA Current Working Set directory:\n" \
 	| tee -a $LOG
 echo "   $adara_current" | tee -a $LOG
 
 # Handle each binary in turn...
 
-set previous_versions = ""
+previous_versions=""
 
-foreach exe_path ( "$tag_archive"/* )
+shopt -s nullglob
 
-	set exe = `basename "$exe_path"`
+for exe_path in "$tag_archive"/* ; do
+
+	exe=`basename "$exe_path"`
 
 	# duh... skip over the Log File from any previous installs... :)
-	set log_ck = \
-		`echo "$exe" | grep "_Deploy_Log" | wc | awk '{print $1}'`
-	if ( $log_ck == 1 ) continue
+	log_ck=`echo "$exe" | grep "_Deploy_Log" | wc | awk '{print $1}'`
+	if [ $log_ck == 1 ]; then
+		continue
+	fi
 
 	# Handle Special STS "Test" Version Deployment...
-	if ( $PROG == "STS_TEST" && $exe == $prog ) then
-		echo "\nModifying STS Executable $exe for Test Deployment." \
+	if [[ $PROG == "STS_TEST" && $exe == $prog ]]; then
+		echo -e "\nModifying STS Executable $exe for Test Deployment." \
 			| tee -a $LOG
-		set exe = "${exe}_test"
-	endif
+		exe="${exe}_test"
+	fi
 
-	echo "\nLinking ${exe}:" | tee -a $LOG
+	echo -e "\nLinking ${exe}:" | tee -a $LOG
 
 	# Remove any previous soft links in the Current Working Set
 
-	set tag_link = "$adara_current/$exe"
+	tag_link="$adara_current/$exe"
 
-	if ( -l "$tag_link" ) then
+	if [ -L "$tag_link" ]; then
 
 		# First, save what this previous version originally linked to...!
-		set previous_version = \
-			`ls -l "$tag_link" | awk -F " -> " '{print $2}'`
+		previous_version=`ls -l "$tag_link" | awk -F " -> " '{print $2}'`
 
-		echo "\nPrevious Version:\n" | tee -a $LOG
+		echo -e "\nPrevious Version:\n" | tee -a $LOG
 		echo "   $previous_version" | tee -a $LOG
 
 		# Now remove it... :)
-		echo "\nRemoving previous $exe soft link:\n" | tee -a $LOG
+		echo -e "\nRemoving previous $exe soft link:\n" | tee -a $LOG
 		echo "   $tag_link" | tee -a $LOG
 		/bin/rm "$tag_link" |& tee -a $LOG
 
-	else if ( -e "$tag_link" ) then
+	elif [ -e "$tag_link" ]; then
 
-		echo "\nError: Previous $exe file is _Not_ a link!\n" \
+		echo -e "\nError: Previous $exe file is _Not_ a link!\n" \
 			| tee -a $LOG
 
 		ls -l "$tag_link" | tee -a $LOG
 
-		echo "\nBailing Out..." | tee -a $LOG
+		echo -e "\nBailing Out..." | tee -a $LOG
 
 		exit -15
 
 	else
 
-		echo "\nNo previous $exe link installed." | tee -a $LOG
+		echo -e "\nNo previous $exe link installed." | tee -a $LOG
 
-		set previous_version = "(No previous $exe link installed.)"
+		previous_version="(No previous $exe link installed.)"
 
-	endif
+	fi
 
-	set previous_versions = "$previous_versions${exe}: $previous_version\n"
+	previous_versions="$previous_versions${exe}: $previous_version\n"
 
 	# Create New Link
 
-	echo "\nLinking New Release Tag for Deployment:" | tee -a $LOG
+	echo -e "\nLinking New Release Tag for Deployment:" | tee -a $LOG
 	echo "ln -s $exe_path $tag_link" |& tee -a $LOG
 	ln -s "$exe_path" "$tag_link" |& tee -a $LOG
 
-	set link_ok = $status
+	link_ok=$?
 
-	if ( $link_ok != 0 ) then
-		echo "\nError Linking $exe to Current Working Set! ($link_ok)\n" \
+	if [ $link_ok != 0 ]; then
+		echo -e \
+			"\nError Linking $exe to Current Working Set! ($link_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -16
-	endif
+	fi
 
-end
+done
 
-echo "\nPrevious Versions:\n" | tee -a $LOG
-echo "$previous_versions" | tee -a $LOG
+shopt -u nullglob
 
-echo "New Current Working Set Links ($install_branch):\n" | tee -a $LOG
+echo -e "\nPrevious Versions:\n" | tee -a $LOG
+echo -e "$previous_versions" | tee -a $LOG
+
+echo -e "New Current Working Set Links ($install_branch):\n" | tee -a $LOG
 ls -l "$adara_current"/ | tee -a $LOG
 
-echo "\n. . ."
+echo -e "\n. . ."
 sleep 3
 
 #
 # Commit the Current Working Set Changes to the Git Config Repository
 #
 
-echo \
+echo -e \
 	"\nCommitting Current Working Set changes to $install_branch branch." \
 	| tee -a $LOG
 
@@ -747,9 +762,9 @@ pwd | tee -a $LOG
 
 ls -l | tee -a $LOG
 
-if ( $adara_current_new == 1 ) then
+if [ $adara_current_new == 1 ]; then
 
-	echo "\nNew Deployment Directory to Commit:\n" | tee -a $LOG
+	echo -e "\nNew Deployment Directory to Commit:\n" | tee -a $LOG
 
 	ls -ld "$adara_current" |& tee -a $LOG
 	echo | tee -a $LOG
@@ -760,15 +775,15 @@ if ( $adara_current_new == 1 ) then
 	echo "git add deploy" | tee -a $LOG
 	git add deploy |& tee -a $LOG
 
-	set add_ok = $status
+	add_ok=$?
 
-	if ( $add_ok != 0 ) then
-		echo \
+	if [ $add_ok != 0 ]; then
+		echo -e \
 			"\nError Adding New Deployment Directory to Git! ($add_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -20
-	endif
+	fi
 
 	echo \
 		"git commit -m 'Initial Config Deploy Directory Creation' deploy" \
@@ -776,40 +791,43 @@ if ( $adara_current_new == 1 ) then
 	git commit -m 'Initial Config Deploy Directory Creation' deploy \
 		|& tee -a $LOG
 
-	set commit_ok = $status
+	commit_ok=$?
 
-	if ( $commit_ok != 0 ) then
-		echo "\nError Committing Config Deploy Directory! ($commit_ok)\n" \
+	if [ $commit_ok != 0 ]; then
+		echo -e \
+			"\nError Committing Config Deploy Directory! ($commit_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -21
-	endif
+	fi
 
 else
 
 	git diff . | tee -a $LOG
 
-	echo "Deployed ADARA $release_tag$already_deployed\n\n$log_desc\n" \
+	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc\n" \
 		| tee -a $LOG
 	echo "git commit -F - ." | tee -a $LOG
 
-	echo "Deployed ADARA $release_tag$already_deployed\n\n$log_desc" \
+	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc" \
 		| git commit -F - . |& tee -a $LOG
 
-	set commit_ok = $status
+	commit_ok=$?
 
-	if ( $commit_ok != 0 ) then
-		echo "\nWarning: Current Working Set Commit Fail! ($commit_ok)\n" \
+	if [ $commit_ok != 0 ]; then
+		echo -e \
+			"\nWarning: Current Working Set Commit Fail! ($commit_ok)\n" \
 			| tee -a $LOG
-	endif
+	fi
 
-endif
+fi
 
 #
 # Document the deployment using the "Config" Git repository
 #
 
-echo "\nDocument Deployment History File for $HOST_TYPE $install_branch." \
+echo -e \
+	"\nDocument Deployment History File for $HOST_TYPE $install_branch." \
 	| tee -a $LOG
 
 cd "$adara_config"
@@ -820,73 +838,76 @@ ls -l | tee -a $LOG
 
 # Update the Deployment History File with a Proper Log!
 
-if ( $IS_STS == 1 ) then
-	set deploy_history_base = "sts.deployment.history.txt"
+if [ $IS_STS == 1 ]; then
+	deploy_history_base="sts.deployment.history.txt"
 else
-	set deploy_history_base = "sms/deployment.history.txt"
-endif
+	deploy_history_base="sms/deployment.history.txt"
+fi
 
-set deploy_history = "$INSTALL_BASE/$CONFIG/$deploy_history_base"
+deploy_history="$INSTALL_BASE/$CONFIG/$deploy_history_base"
 
 # Create the History file, if it doesn't exist...
 
-if ( ! -e "$deploy_history" ) then
+if [ ! -e "$deploy_history" ]; then
 
-	echo -n "\nCreating Deployment History File " | tee -a $LOG
+	echo -e -n "\nCreating Deployment History File " | tee -a $LOG
 	echo "for $HOST_TYPE $install_branch." | tee -a $LOG
-	echo "\n   $deploy_history\n" | tee -a $LOG
+	echo -e "\n   $deploy_history\n" | tee -a $LOG
 
-	echo "\nADARA ${PROG} Deployment History ($install_branch)" \
+	echo -e "\nADARA ${PROG} Deployment History ($install_branch)" \
 		> "$deploy_history"
 
-	echo "$CONFIG_LINE\n" >> "$deploy_history"
+	create_ok=$?
 
-	set create_ok = $status
-
-	if ( $create_ok != 0 ) then
-		echo "\nError Creating Deployment History File! ($create_ok)\n" \
+	if [ $create_ok != 0 ]; then
+		echo -e \
+			"\nError Creating Deployment History File! ($create_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -19
-	endif
+	fi
+
+	echo -e "$CONFIG_LINE\n" >> "$deploy_history"
 
 	echo "git add $deploy_history_base" | tee -a $LOG
 	git add "$deploy_history_base" |& tee -a $LOG
 
-	set add_ok = $status
+	add_ok=$?
 
-	if ( $add_ok != 0 ) then
-		echo "\nError Adding Deployment History File to Git! ($add_ok)\n" \
+	if [ $add_ok != 0 ]; then
+		echo -e \
+			"\nError Adding Deployment History File to Git! ($add_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -20
-	endif
+	fi
 
 	echo "git commit -m 'Initial History Creation' $deploy_history_base" \
 		| tee -a $LOG
 	git commit -m 'Initial History Creation' "$deploy_history_base" \
 		|& tee -a $LOG
 
-	set commit_ok = $status
+	commit_ok=$?
 
-	if ( $commit_ok != 0 ) then
-		echo "\nError Committing Deployment History File! ($commit_ok)\n" \
+	if [ $commit_ok != 0 ]; then
+		echo -e \
+			"\nError Committing Deployment History File! ($commit_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -21
-	endif
+	fi
 
-endif
+fi
 
-echo "\n. . ."
+echo -e "\n. . ."
 sleep 3
 
 # Add Current Deployment to History File
 
-echo "\nAppending Current Deployment to History File:\n" | tee -a $LOG
-echo "   $deploy_history\n" | tee -a $LOG
+echo -e "\nAppending Current Deployment to History File:\n" | tee -a $LOG
+echo -e "   $deploy_history\n" | tee -a $LOG
 
-echo "$CONFIG_LINE\n" | tee -a $LOG
+echo -e "$CONFIG_LINE\n" | tee -a $LOG
 
 date | tee -a $LOG
 date >> "$deploy_history"
@@ -909,81 +930,82 @@ echo "ADARA Release Tag = $release_tag$already_deployed" | tee -a $LOG
 echo "ADARA Release Tag = $release_tag$already_deployed" \
 	>> "$deploy_history"
 
-echo "\nDeployment Log Description:\n" | tee -a $LOG
-echo "\nDeployment Log Description:\n" >> "$deploy_history"
+echo -e "\nDeployment Log Description:\n" | tee -a $LOG
+echo -e "\nDeployment Log Description:\n" >> "$deploy_history"
 
-echo "$log_desc" | tee -a $LOG
-echo "$log_desc" >> "$deploy_history"
+echo -e "$log_desc" | tee -a $LOG
+echo -e "$log_desc" >> "$deploy_history"
 
-echo \
+echo -e \
 	"\nInstalled into ADARA Archive Release Tag directory:\n" | tee -a $LOG
-echo "\nInstalled into ADARA Archive Release Tag directory:\n" \
+echo -e "\nInstalled into ADARA Archive Release Tag directory:\n" \
 	>> "$deploy_history"
 
-echo "   $tag_archive\n" | tee -a $LOG
-echo "   $tag_archive\n" >> "$deploy_history"
+echo -e "   $tag_archive\n" | tee -a $LOG
+echo -e "   $tag_archive\n" >> "$deploy_history"
 
 ls -l "$tag_archive"/ |& tee -a $LOG
 ls -l "$tag_archive"/ >> "$deploy_history"
 
-echo "\nPrevious Versions Installed:\n" | tee -a $LOG
-echo "\nPrevious Versions Installed:\n" >> "$deploy_history"
+echo -e "\nPrevious Versions Installed:\n" | tee -a $LOG
+echo -e "\nPrevious Versions Installed:\n" >> "$deploy_history"
 
-echo "$previous_versions" | tee -a $LOG
-echo "$previous_versions" >> "$deploy_history"
+echo -e "$previous_versions" | tee -a $LOG
+echo -e "$previous_versions" >> "$deploy_history"
 
-echo "Current Working Set Links:\n" | tee -a $LOG
-echo "Current Working Set Links:\n" >> "$deploy_history"
+echo -e "Current Working Set Links:\n" | tee -a $LOG
+echo -e "Current Working Set Links:\n" >> "$deploy_history"
 
-echo "   $adara_current\n" | tee -a $LOG
-echo "   $adara_current\n" >> "$deploy_history"
+echo -e "   $adara_current\n" | tee -a $LOG
+echo -e "   $adara_current\n" >> "$deploy_history"
 
 ls -l "$adara_current"/ |& tee -a $LOG
 ls -l "$adara_current"/ >> "$deploy_history"
 
-echo "\n$CONFIG_LINE\n" | tee -a $LOG
-echo "\n$CONFIG_LINE\n" >> "$deploy_history"
+echo -e "\n$CONFIG_LINE\n" | tee -a $LOG
+echo -e "\n$CONFIG_LINE\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 
 echo \
 	"Committing Current Deployment History Additions to Git." | tee -a $LOG
 
-echo "\nCommit Log:\n" | tee -a $LOG
+echo -e "\nCommit Log:\n" | tee -a $LOG
 
-echo \
+echo -e \
 	"Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
 	| tee -a $LOG
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
 
-echo "Deployment History for $release_tag$already_deployed\n\n$log_desc" \
+echo -e \
+	"Deployment History for $release_tag$already_deployed\n\n$log_desc" \
 	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
-set commit_ok = $status
+commit_ok=$?
 
-if ( $commit_ok != 0 ) then
-	echo "\nError Committing Deployment History File! ($commit_ok)\n" \
+if [ $commit_ok != 0 ]; then
+	echo -e "\nError Committing Deployment History File! ($commit_ok)\n" \
 		| tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -22
-endif
+fi
 
 # Now Push All the Config Commits to Origin
 
-echo "\nPushing Config Commits to Origin:" | tee -a $LOG
+echo -e "\nPushing Config Commits to Origin:" | tee -a $LOG
 
 echo "git push" | tee -a $LOG
 git push |& tee -a $LOG
 
-set push_ok = $status
+push_ok=$?
 
-if ( $push_ok != 0 ) then
-	echo \
+if [ $push_ok != 0 ]; then
+	echo -e \
 		"\nError Pushing Deployment History File to Origin! ($push_ok)\n" \
 		| tee -a $LOG
 	echo "Bailing Out..." | tee -a $LOG
 	exit -23
-endif
+fi
 
 #
 # Clean Up... :)
@@ -991,7 +1013,7 @@ endif
 
 # Remove Clone of ADARA Git repository
 
-echo "\nCleaning Up Temporary ADARA Software Repository Clone..." \
+echo -e "\nCleaning Up Temporary ADARA Software Repository Clone..." \
 	| tee -a $LOG
 
 echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
@@ -1001,54 +1023,55 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 # (Optionally restart the SMS Daemon Service...?)
 #
 
-if ( $PROG == "SMS" ) then
+if [ $PROG == "SMS" ]; then
 
-	echo "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
+	echo -e "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
 
 	echo "sudo /sbin/service smsd status" | tee -a $LOG
 	sudo /sbin/service smsd status |& tee -a $LOG
 
-	echo -n \
+	echo -e -n \
 		"\nDo You want to Restart the SMS Daemon service now [yes/No]? "
 
-	set restart_ck = "$<"
+	read restart_ck
 
-	if ( "#$restart_ck#" == '#yes#' ) then
+	if [ "#$restart_ck#" == '#yes#' ]; then
 
-		echo "\nRestarting SMS Daemon service now on `hostname`." \
+		echo -e "\nRestarting SMS Daemon service now on `hostname`." \
 			| tee -a $LOG
 
 		echo "sudo /sbin/service smsd restart" | tee -a $LOG
 		sudo /sbin/service smsd restart |& tee -a $LOG
 
-		set restart_ok = $status
+		restart_ok=$?
 
-		if ( $restart_ok != 0 ) then
-			echo "\nError Restarting SMS Daemon Service! ($restart_ok)\n" \
+		if [ $restart_ok != 0 ]; then
+			echo -e \
+				"\nError Restarting SMS Daemon Service! ($restart_ok)\n" \
 				| tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -24
-		endif
+		fi
 
-	endif
+	fi
 
-endif
+fi
 
 # Copy Final Log File into ADARA Archive Release Tag Directory
 
-echo \
+echo -e \
 	"\nDone with Deployment of ADARA/${PROG} Release Tag $release_tag.\n" \
 	| tee -a $LOG
 
-if ( $already_deployed_locally == 1 ) then
-	echo "  $already_deployed\n" | tee -a $LOG
-endif
+if [ $already_deployed_locally == 1 ]; then
+	echo -e "  $already_deployed\n" | tee -a $LOG
+fi
 
-echo "Copying Deployment Log to Archive:\n" | tee -a $LOG
+echo -e "Copying Deployment Log to Archive:\n" | tee -a $LOG
 
-echo "   $LOG\n" | tee -a $LOG
+echo -e "   $LOG\n" | tee -a $LOG
 
-echo "   $tag_archive\n" | tee -a $LOG
+echo -e "   $tag_archive\n" | tee -a $LOG
 
 cp -p $LOG $tag_archive
 

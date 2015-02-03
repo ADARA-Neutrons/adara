@@ -5,12 +5,18 @@
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "LiveClient.h"
 #include "StorageFile.h"
 #include "Logging.h"
 #include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
+
+RateLimitedLogging::History RLLHistory_LiveClient;
+
+// Rate-Limited Logging IDs...
+#define RLL_LIVE_CLIENT_READ_EXCEPTION   0
 
 /* We only need to receive the hello packet, which is very small, so don't
  * allocate huge buffers for us.
@@ -272,9 +278,14 @@ void LiveClient::readable(void)
 			delete this;
 		}
 	} catch (std::runtime_error e) {
-		/* TODO rate-limited logging of LiveClient read exception? */
-		ERROR("client " << m_clientName
-		      << " exception reading stream: " << e.what());
+		/* Rate-limited logging of LiveClient read exception? */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_LiveClient,
+				RLL_LIVE_CLIENT_READ_EXCEPTION, m_clientName,
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info << "client " << m_clientName
+				<< " exception reading stream: " << e.what());
+		}
 		delete this;
 	}
 

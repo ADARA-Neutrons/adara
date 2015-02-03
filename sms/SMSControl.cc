@@ -1,4 +1,5 @@
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "StorageManager.h"
@@ -19,6 +20,14 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
+RateLimitedLogging::History RLLHistory_SMSControl;
+
+// Rate-Limited Logging IDs...
+#define RLL_GLOBAL_SAWTOOTH_PULSE        0
+#define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
+#define RLL_GLOBAL_SAWTOOTH_LAST         2
+#define RLL_NO_RTDL_FOR_PULSE            3
+
 std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
 std::string SMSControl::m_beamlineShortName;
@@ -27,6 +36,34 @@ std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
+
+class PopPulseBufferPV : public smsInt32PV {
+public:
+	PopPulseBufferPV(const std::string &name) :
+		smsInt32PV(name) {}
+
+private:
+	void changed(void)
+	{
+		int32_t pop_state = value();
+
+		INFO("PopPulseBufferPV " << m_pv_name << " set to " << pop_state);
+
+		// Do Nothing, Default State...
+		if ( pop_state == 0 )
+			return;
+
+		// Pop Desired Pulse from Buffer by Index...
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->popPulseBuffer(pop_state);
+
+		// Reset Pop Pulse Buffer PV State to Default State (0)...
+		DEBUG("Resetting PopPulseBufferPV " << m_pv_name << " to 0.");
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		update(0, &now);
+	}
+};
 
 SMSControl *SMSControl::m_singleton = NULL;
 
@@ -220,6 +257,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
+	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
+						PopPulseBufferPV(prefix + ":Control:"
+							+ "PopPulseBuffer"));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -229,6 +270,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
+	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
 
 	// Initialize Config/Info PVs...
@@ -241,12 +283,15 @@ SMSControl::SMSControl() :
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
 
+	// Initialize Pop Pulse Buffer PV to Zero...
+	m_pvPopPulseBuffer->update(0, &now);
+
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId, m_beamlineShortName,
-					m_beamlineLongName));
+	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId,
+			m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
@@ -533,7 +578,74 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	m_eventSources.reset(smsId);
 }
 
-SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
+void SMSControl::popPulseBuffer(int32_t pulse_index)
+{
+	PulseMap::iterator it;
+
+	if ( m_pulses.size() == 0 ) {
+		DEBUG("popPulseBuffer: Empty Pulse Buffer, No Pulses to Pop!"
+			<< " pulse_index=" << pulse_index);
+		return;
+	}
+
+	std::string isLast = "";
+
+	// Pop "Last" Pulse...
+	if ( pulse_index < 0 ) {
+		if ( ((uint32_t) -pulse_index) > m_pulses.size() ) {
+			DEBUG("popPulseBuffer: Pop Last - Pulse Index Out of Bounds!"
+				<< " pulse_index=" << pulse_index
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		it = m_pulses.end();
+		it--;
+		int32_t pindex = -1;
+		while ( pindex > pulse_index && it != m_pulses.begin() ) {
+			DEBUG("popPulseBuffer: Skipping Last Pulse pindex=" << pindex
+				<< std::hex << " 0x" << it->first.first << std::dec);
+			pindex--; it--;
+		}
+		if ( pindex > pulse_index ) {
+			DEBUG("popPulseBuffer: Last Pulse Not Found in Buffer"
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		isLast = "Last ";
+	}
+
+	// Pop Pulse of Specific Index...
+	else {
+		if ( ((uint32_t) pulse_index) > m_pulses.size() ) {
+			DEBUG("popPulseBuffer: Pop Index - Pulse Index Out of Bounds!"
+				<< " pulse_index=" << pulse_index
+				<< " size=" << m_pulses.size());
+			return;
+		}
+		it = m_pulses.begin();
+		int32_t pindex = 1;
+		while ( pindex < pulse_index && it != m_pulses.end() ) {
+			DEBUG("popPulseBuffer: Skipping Pulse pindex=" << pindex
+				<< std::hex << " 0x" << it->first.first << std::dec);
+			pindex++; it++;
+		}
+		if ( pindex < pulse_index ) {
+			DEBUG("popPulseBuffer: Pulse Not Found in Buffer"
+				<< " size=" << m_pulses.size());
+			return;
+		}
+	}
+
+	// Pop Given Pulse from Buffer...
+
+	DEBUG("popPulseBuffer: Popping " << isLast << "Pulse "
+			<< " pulse_index=" << pulse_index
+			<< std::hex << " 0x" << it->first.first << std::dec);
+	m_pulses.erase(it);
+}
+
+SMSControl::PulseMap::iterator SMSControl::getPulse(
+		uint64_t id, uint32_t dup)
 {
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
@@ -556,26 +668,58 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(uint64_t id, uint32_t dup)
 
 		// Log any Sawtooth pulses... :-o
 		if (id < min_id) {
-			/* TODO rate-limited logging of global sawtooth pulse? */
-			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
-				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
+			/* Rate-limited logging of global sawtooth pulse */
+			std::string log_info;
+			std::stringstream ss;
+			ss << id;
+			ss << "/";
+			ss << dup;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_GLOBAL_SAWTOOTH_PULSE, ss.str(),
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< std::hex << id << ", 0x" << dup << ")"
+					<< " min=0x" << min_id
+					<< " max=0x" << max_id << std::dec);
+			}
 		}
 		else if (id >= min_id && id < max_id) {
-			/* TODO rate-limited logging of global sawtooth pulse? */
-			ERROR("getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
-				<< std::hex << id << ", 0x" << dup << ")"
-				<< " min=0x" << min_id << " max=0x" << max_id << std::dec);
+			/* Rate-limited logging of global sawtooth pulse */
+			std::string log_info;
+			std::stringstream ss;
+			ss << id;
+			ss << "/";
+			ss << dup;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, ss.str(),
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
+					<< std::hex << id << ", 0x" << dup << ")"
+					<< " min=0x" << min_id
+					<< " max=0x" << max_id << std::dec);
+			}
 		}
 		m_lastPulseId = max_id;
 	}
 	else {
 		if ( id < m_lastPulseId ) {
-			/* TODO rate-limited logging of global sawtooth pulse? */
-			ERROR("getPulse(): Global SAWTOOTH Pulse(0x"
-				<< std::hex << id << ", 0x" << dup << ")"
-				<< " versus Last Pulse id=0x" << m_lastPulseId
-				<< std::dec);
+			/* Rate-limited logging of global sawtooth pulse */
+			std::string log_info;
+			std::stringstream ss;
+			ss << id;
+			ss << "/";
+			ss << dup;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_GLOBAL_SAWTOOTH_LAST, ss.str(),
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< std::hex << id << ", 0x" << dup << ")"
+					<< " versus Last Pulse id=0x" << m_lastPulseId
+					<< std::dec);
+			}
 		}
 		m_lastPulseId = id;
 	}
@@ -900,6 +1044,12 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
 
 	pulse->m_rtdl.reset(new ADARA::RTDLPkt(pkt));
+
+	// Is pulse pending from any data sources...?
+	if (!pulse->m_pending.any()) {
+		// DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
+		markComplete(pkt.pulseId(), dup, -1);
+	}
 }
 
 void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
@@ -918,7 +1068,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
-	pulse->m_pending.reset(smsId);
+	if ( smsId != (uint32_t) -1 )
+		pulse->m_pending.reset(smsId);
 
 	// pulse still pending from other data sources...
 	if (pulse->m_pending.any()) {
@@ -1013,10 +1164,20 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 						  pulse->m_rtdl->packet_length(),
 						  false);
 		} else {
-			/* TODO rate-limited logging of no RTDL for pulse? */
-			ERROR("recordPulse(): NO RTDL for Pulse"
-				<< " id=0x" << std::hex << pulse->m_id.first
-				<< " dup=0x" << pulse->m_id.second << std::dec);
+			/* Rate-limited logging of no RTDL for pulse */
+			std::string log_info;
+			std::stringstream ss;
+			ss << pulse->m_id.first;
+			ss << "/";
+			ss << pulse->m_id.second;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_NO_RTDL_FOR_PULSE, ss.str(),
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< "recordPulse(): NO RTDL for Pulse"
+					<< " id=0x" << std::hex << pulse->m_id.first
+					<< " dup=0x" << pulse->m_id.second << std::dec);
+			}
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 		}
 

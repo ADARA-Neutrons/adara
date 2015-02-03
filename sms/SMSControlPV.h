@@ -188,6 +188,26 @@ public:
 	virtual void changed(void);
 };
 
+class smsInt32PV : public smsPV {
+public:
+	smsInt32PV(const std::string &name);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(int32_t val, struct timespec *ts);
+	bool valid(void);
+	int32_t value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
+};
+
 class smsConnectedPV : public smsPV {
 public:
 	smsConnectedPV(const std::string &name);

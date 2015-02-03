@@ -1084,6 +1084,111 @@ void smsUint32PV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
+smsInt32PV::smsInt32PV(const std::string &name) : smsPV(name)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	m_value = new gddScalar(gddAppType_value, aitEnumInt32);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+
+	m_pv_name = name;
+}
+
+aitEnum smsInt32PV::bestExternalType(void) const
+{
+	return aitEnumInt32;
+}
+
+gddAppFuncTableStatus smsInt32PV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
+{
+	aitInt32 uninitialized_var(v);
+	m_value->get(v);
+	DEBUG("smsInt32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	aitInt32 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+	struct timespec ts;
+
+	if (!val.isScalar()) {
+		DEBUG("smsInt32PV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
+		return S_casApp_noSupport;
+	}
+
+	val.get(v);
+	DEBUG("smsInt32PV::write() m_pv_name=" << m_pv_name
+		<< " value=" << v);
+	m_value->get(cur);
+	if (v == cur)
+		return S_casApp_success;
+
+	val.getTimeStamp(&ts);
+	update(v, &ts);
+	changed();
+
+	return S_casApp_success;
+}
+
+bool smsInt32PV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsInt32PV::update(int32_t val, struct timespec *ts)
+{
+	aitInt32 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumInt32);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	notify();
+}
+
+bool smsInt32PV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+int32_t smsInt32PV::value(void)
+{
+	aitInt32 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsInt32PV::changed(void)
+{
+}
+
+/* ----------------------------------------------------------------------- */
+
 smsTriggerPV::smsTriggerPV(const std::string &name)
 {
 	struct timespec ts;

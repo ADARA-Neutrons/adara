@@ -82,7 +82,8 @@ private:
 	void dumpLastReadStats(std::string who);
 
 	void unregisterHWSources(bool isSourceDown, std::string why);
-	void connectionFailed(bool dumpDiscarded, State new_state);
+	void connectionFailed(bool dumpStats, bool dumpDiscarded,
+				State new_state);
 
 	bool timerExpired(void);
 
@@ -90,8 +91,8 @@ private:
 
 	bool rxUnknownPkt(const ADARA::Packet &pkt);
 	bool rxOversizePkt(const ADARA::PacketHeader *hdr,
-			   const uint8_t *chunk, unsigned int chunk_offset,
-			   unsigned int chunk_len);
+				const uint8_t *chunk, unsigned int chunk_offset,
+				unsigned int chunk_len);
 
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
 	bool rxPacket(const ADARA::MappedDataPkt &pkt);
