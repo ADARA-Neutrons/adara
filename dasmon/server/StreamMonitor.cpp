@@ -617,7 +617,6 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
         const uint32_t *epos2;
 
-        uint32_t        base_logical_id;
         uint32_t        pid;
         uint32_t        min_pid = 0;
         uint32_t        max_pid = 0;
@@ -630,7 +629,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         // Build banks and analyze pid range
         while( rpos < epos )
         {
-            base_logical_id = *rpos++;
+            rpos++; // Skip base ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -664,7 +663,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         rpos = (const uint32_t*)a_pkt.payload();
         while( rpos < epos )
         {
-            base_logical_id = *rpos++;
+            rpos++; // Skip base ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -1275,6 +1274,17 @@ StreamMonitor::clearPVs()
 
 
 #ifndef NO_DB
+struct PVInfoLite
+{
+    PVInfoLite( PVInfoBase* a_src )
+        : m_name(a_src->m_name ), m_time(a_src->m_time), m_status(a_src->m_status)
+    {}
+
+    string      m_name;
+    uint32_t    m_time;
+    uint16_t    m_status;
+};
+
 void
 StreamMonitor::dbThread()
 {
@@ -1300,13 +1310,20 @@ StreamMonitor::dbThread()
     PGconn *conn;
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
-    vector<PVInfoBase*> pvs;
-    vector<PVInfoBase*>::iterator ipvv;
+    //vector<PVInfoBase*> pvs;
+    //vector<PVInfoBase*>::iterator ipvv;
     char buf[500];
     bool send_all =  true;
     bool update;
 
-    pvs.reserve(400);
+
+    vector<pair<PVInfoLite,uint32_t> >              int_pvs;
+    vector<pair<PVInfoLite,uint32_t> >::iterator    iintpv;
+    vector<pair<PVInfoLite,double> >                dbl_pvs;
+    vector<pair<PVInfoLite,double> >::iterator      idblpv;
+
+    int_pvs.reserve(200);
+    dbl_pvs.reserve(200);
 
     while ( 1 )
     {
@@ -1318,9 +1335,13 @@ StreamMonitor::dbThread()
             {
                 sleep( m_db_info->period );
 
-                pvs.clear();
+                //pvs.clear();
 
                 // Cache updated PVs
+                // Must ~copy~ data from PVs since they could be deleted before we're done writing them to DB
+                int_pvs.clear();
+                dbl_pvs.clear();
+
                 m_mutex.lock();
 
                 for ( ipvm = m_pvs.begin(); ipvm != m_pvs.end(); ++ipvm )
@@ -1328,29 +1349,49 @@ StreamMonitor::dbThread()
                     if ( ipvm->second->m_updated || send_all )
                     {
                         ipvm->second->m_updated = false;
-                        pvs.push_back( ipvm->second );
+                        switch ( ipvm->second->m_type )
+                        {
+                        case PVT_FLOAT:
+                        case PVT_DOUBLE:
+                            dbl_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<double>*)(ipvm->second))->m_value ));
+                            break;
+                        case PVT_INT:
+                        case PVT_UINT:
+                        case PVT_ENUM:
+                            int_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<uint32_t>*)(ipvm->second))->m_value ));
+                            break;
+                        case PVT_STRING:
+                            continue; // Web monitor db does not support strings yet
+                        }
                     }
                 }
 
                 m_mutex.unlock();
 
-                // Send PV updates to database
-                for ( ipvv = pvs.begin(); ipvv != pvs.end(); ++ipvv )
+                // Send double-value PV updates to database
+                for ( idblpv = dbl_pvs.begin(); idblpv != dbl_pvs.end(); ++idblpv )
                 {
-                    switch ( (*ipvv)->m_type )
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), idblpv->first.m_name.c_str(), idblpv->second, idblpv->first.m_status, idblpv->first.m_time );
+
+                    res = PQexec( conn, buf );
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
-                    case PVT_FLOAT:
-                    case PVT_DOUBLE:
-                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<double>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
+                        syslog( LOG_ERR, "Database update call failed." );
+                        syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        syslog( LOG_ERR, buf );
+
+                        update = false;
                         break;
-                    case PVT_INT:
-                    case PVT_UINT:
-                    case PVT_ENUM:
-                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<uint32_t>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
-                        break;
-                    case PVT_STRING:
-                        continue; // Web monitor db does not support strings yet
                     }
+
+                    PQclear( res );
+                    send_all = false;
+                }
+
+                // Send int-value PV updates to database
+                for ( iintpv = int_pvs.begin(); iintpv != int_pvs.end(); ++iintpv )
+                {
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), iintpv->first.m_name.c_str(), iintpv->second, iintpv->first.m_status, iintpv->first.m_time );
 
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )

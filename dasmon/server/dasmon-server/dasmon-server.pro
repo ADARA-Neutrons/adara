@@ -8,7 +8,7 @@ INCLUDEPATH += ../../common \
     ../../../common \
     ../engine \
     /usr/include/libxml2 \
-    /usr/include/activemq-cpp-3.4.0 \
+    /usr/include/activemq-cpp \
     /usr/include/apr-1
 
 SOURCES += \
@@ -25,7 +25,8 @@ SOURCES += \
     ../engine/muParserCallback.cpp \
     ../engine/muParserBytecode.cpp \
     ../engine/muParserBase.cpp \
-    ../engine/muParser.cpp
+    ../engine/muParser.cpp \
+    ../../../common/POSIXParser.cc
 
 HEADERS += \
     ../StreamMonitor.h \
@@ -46,7 +47,11 @@ HEADERS += \
     ../engine/muParserCallback.h \
     ../engine/muParserBytecode.h \
     ../engine/muParserBase.h \
-    ../engine/muParser.h
+    ../engine/muParser.h \
+    ../../../common/ADARA.h \
+    ../../../common/POSIXParser.h \
+    ../../../common/ADARAPackets.h \
+    ../../../common/ADARAParser.h
 
 LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
 
