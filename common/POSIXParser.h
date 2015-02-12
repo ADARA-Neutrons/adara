@@ -18,7 +18,9 @@ public:
 	 * limits the amount of maximum amount of data read and parsed
 	 * from the file descriptor. The max_packets parameter, if non-zero,
 	 * limits the number of packets parsed. read() will stop if either
-	 * limit is reached.
+	 * limit is reached. The log_info string parameter allows the caller
+	 * to log happenings from inside the shared/common library call;
+	 * note that log_info is *Cleared* on entry to the method...! ;-D
 	 */
 	bool read(int fd, std::string & log_info,
 		unsigned int max_packets = 0, unsigned int max_read = 0);
