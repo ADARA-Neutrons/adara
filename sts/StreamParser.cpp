@@ -115,8 +115,9 @@ StreamParser::processStream()
                 if ( m_processing_state != DONE_PROCESSING )
                 {
                     syslog( LOG_INFO,
-                        "[%i] STS failed %s: %s, Not Done Processing!",
-                        g_pid, "processStream()", "Connection Failed" );
+                    "[%i] STS failed %s: %s, Not Done Processing! (%s)",
+                        g_pid, "processStream()", "Connection Failed",
+                        log_info.c_str() );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
@@ -624,7 +625,7 @@ StreamParser::processPulseInfo
             syslog( LOG_INFO,
                 "[%i] Unexpected input: %s at pulse #%ld ID=0x%lx, %s.",
                 g_pid, "Pulse time went backwards",
-				m_pulse_info.times.size(), a_pkt.pulseId(),
+                m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
             pulse_time = 0;
         }
