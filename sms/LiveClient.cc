@@ -150,6 +150,11 @@ void LiveClient::writable(void)
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
 
+		if (!cur_offset) {
+			DEBUG("writable(): sending new file=" << f->path()
+				<< " size=" << f->size());
+		}
+
 		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
