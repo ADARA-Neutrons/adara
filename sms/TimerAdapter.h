@@ -8,7 +8,7 @@
 
 template<class T> class TimerAdapter : public epicsTimerNotify {
 public:
-        explicit TimerAdapter(T *obj, bool (T::*f)(void) = &T::timerExpired) :
+	explicit TimerAdapter(T *obj, bool (T::*f)(void) = &T::timerExpired) :
 			m_timer(fileDescriptorManager.createTimer()),
 			m_obj(obj), m_f(f), m_delay(0.0) { }
 	virtual ~TimerAdapter() { m_timer.destroy(); }
