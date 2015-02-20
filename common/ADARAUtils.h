@@ -192,6 +192,8 @@ public:
 	{
 		std::pair<uint32_t,std::string> log(log_id, log_name);
 
+		log_info.clear();
+
 		// Append Current Time/Occurrence...
 		struct timespec ts;
 		clock_gettime(CLOCK_REALTIME, &ts);
