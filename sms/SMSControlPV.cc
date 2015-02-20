@@ -10,6 +10,15 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
 
+RateLimitedLogging::History RLLHistory_SMSControlPV;
+
+// Rate-Limited Logging IDs...
+#define RLL_CONNPV_CONNECTED          0
+#define RLL_CONNPV_DISCONNECTED       1
+#define RLL_CONNPV_FAILED             2
+#define RLL_CONNPV_TRYING             3
+#define RLL_CONNPV_WAITING            4
+
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
  * using -Werror, but we can quiet the compiler easily.
@@ -941,7 +950,13 @@ void smsConnectedPV::connected() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(0, &ts);
 
-	DEBUG("smsConnectedPV::connected() m_pv_name=" << m_pv_name << " (0)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_CONNECTED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::connected() m_pv_name="
+			<< m_pv_name << " (0)");
+	}
 }
 
 void smsConnectedPV::disconnected() {
@@ -951,8 +966,13 @@ void smsConnectedPV::disconnected() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(1, &ts);
 
-	DEBUG("smsConnectedPV::disconnected() m_pv_name=" << m_pv_name
-		<< " (1)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_DISCONNECTED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::disconnected() m_pv_name="
+			<< m_pv_name << " (1)");
+	}
 }
 
 void smsConnectedPV::failed() {
@@ -962,7 +982,13 @@ void smsConnectedPV::failed() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(2, &ts);
 
-	DEBUG("smsConnectedPV::failed() m_pv_name=" << m_pv_name << " (2)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_FAILED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::failed() m_pv_name="
+			<< m_pv_name << " (2)");
+	}
 }
 
 void smsConnectedPV::trying_to_connect() {
@@ -972,8 +998,13 @@ void smsConnectedPV::trying_to_connect() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(3, &ts);
 
-	DEBUG("smsConnectedPV::trying_to_connect() m_pv_name=" << m_pv_name
-		<< " (3)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_TRYING, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::trying_to_connect() m_pv_name="
+			<< m_pv_name << " (3)");
+	}
 }
 
 void smsConnectedPV::waiting_for_connect_ack() {
@@ -983,8 +1014,14 @@ void smsConnectedPV::waiting_for_connect_ack() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(3, &ts);
 
-	DEBUG("smsConnectedPV::waiting_for_connect_ack() m_pv_name="
-		<< m_pv_name << " (4)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_WAITING, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info
+			<< "smsConnectedPV::waiting_for_connect_ack() m_pv_name="
+			<< m_pv_name << " (4)");
+	}
 }
 
 bool smsConnectedPV::valid(void)
