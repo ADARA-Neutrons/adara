@@ -27,20 +27,21 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_RAWDATA_PULSE_IN_PAST     3
 #define RLL_RAWDATA_PULSE_IN_FUTURE   4
 #define RLL_LOCAL_PACKET_SEQUENCE     5
-#define RLL_CONN_REFUSED              6
-#define RLL_CONN_REQUEST_ERROR        7
-#define RLL_CONN_FAILED               8
-#define RLL_READ_EXCEPTION            9
-#define RLL_READ_DELAY               10
-#define RLL_PULSEID_ZERO             11
-#define RLL_UNKNOWN_PACKET           12
-#define RLL_OVERSIZE_PACKET          13
-#define RLL_LOCAL_DUPLICATE_RTDL     14
-#define RLL_LOCAL_SAWTOOTH_RTDL      15
-#define RLL_LOCAL_RTDL_SEQUENCE      16
-#define RLL_RTDL_PULSE_IN_PAST       17
-#define RLL_RTDL_PULSE_IN_FUTURE     18
-#define RLL_HEARTBEAT                19
+#define RLL_TRYING_CONN               6
+#define RLL_CONN_REFUSED              7
+#define RLL_CONN_REQUEST_ERROR        8
+#define RLL_CONN_FAILED               9
+#define RLL_READ_EXCEPTION           10
+#define RLL_READ_DELAY               11
+#define RLL_PULSEID_ZERO             12
+#define RLL_UNKNOWN_PACKET           13
+#define RLL_OVERSIZE_PACKET          14
+#define RLL_LOCAL_DUPLICATE_RTDL     15
+#define RLL_LOCAL_SAWTOOTH_RTDL      16
+#define RLL_LOCAL_RTDL_SEQUENCE      17
+#define RLL_RTDL_PULSE_IN_PAST       18
+#define RLL_RTDL_PULSE_IN_FUTURE     19
+#define RLL_HEARTBEAT                20
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -646,6 +647,14 @@ void DataSource::startConnect(void)
 		clock_gettime(CLOCK_REALTIME, &now);
 		m_pvName->update(m_name, &now);
 	}
+
+	// Ready to Connect...
+	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+			RLL_TRYING_CONN, m_name,
+			600, 3, 10, log_info ) ) {
+		INFO(log_info << "Trying connection to " << m_name);
+	}
+	m_pvConnected->trying_to_connect();
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
