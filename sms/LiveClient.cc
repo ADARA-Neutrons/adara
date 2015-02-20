@@ -76,6 +76,9 @@ LiveClient::LiveClient(int fd) :
 	m_clientName += ":";
 	m_clientName += service;
 
+	SMSControl *ctrl = SMSControl::getInstance();
+	m_clientId = ctrl->registerLiveClient(m_clientName);
+
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
@@ -96,6 +99,11 @@ LiveClient::LiveClient(int fd) :
 LiveClient::~LiveClient()
 {
 	INFO("client " << m_clientName << " disconnected");
+
+	if ( m_clientId >= 0 ) {
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->unregisterLiveClient(m_clientId);
+	}
 
 	m_mgrConnection.disconnect();
 	m_contConnection.disconnect();
