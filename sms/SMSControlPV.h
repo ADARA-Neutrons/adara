@@ -222,6 +222,8 @@ public:
 	void connected(void);
 	void disconnected(void);
 	void failed(void);
+	void trying_to_connect(void);
+	void waiting_for_connect_ack(void);
 
 	bool valid(void);
 	bool value(void);
