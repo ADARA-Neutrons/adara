@@ -265,6 +265,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
 
+	m_pvLiveClientIndices = boost::shared_ptr<smsStringPV>(new
+						smsStringPV(prefix + ":Control:"
+							+ "LiveClientIndices"));
+
 	addPV(m_pvVersion);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
@@ -272,6 +276,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
+	addPV(m_pvLiveClientIndices);
 
 	// Initialize Config/Info PVs...
 	struct timespec now;
@@ -285,6 +290,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
+
+	// Initialize the Live Client Index List PV...
+	setLiveClientIndexList();
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -785,8 +793,72 @@ void SMSControl::resetPacketStats(void)
 	}
 }
 
-void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-				 uint32_t pixel, uint32_t tof)
+int32_t SMSControl::registerLiveClient(std::string clientName)
+{
+	DEBUG("registerLiveClient clientName=" << clientName);
+
+	/* We're called when a new Live Client connects to the SMS,
+	 * and needs to allocate a bit index for naming status PVs.
+	 * All of this is for convenience and external monitoring only.
+	 * We don't have to be terribly fast here.
+	 */
+	size_t i, max = m_liveClients.size();
+	int32_t clientId = -1; // default, if no free Ids remain...
+	for (i = 0; i < max && clientId < 0; i++) {
+		if (!m_liveClients[i]) {
+			m_liveClients.set(i);
+			DEBUG("registerLiveClient returning clientId=" << i);
+			clientId = i;
+		}
+	}
+
+	// Update the Live Client Index List PV...
+	setLiveClientIndexList();
+
+	if ( clientId < 0 ) {
+		DEBUG("registerLiveClient Out of Live Client Ids!");
+		// *Don't* throw an exception here, this is _Not_ mission critical!
+		// throw std::runtime_error("No more Live Client Ids available");
+	}
+	return( clientId );
+}
+
+void SMSControl::unregisterLiveClient(int32_t clientId)
+{
+	DEBUG("unregisterLiveClient: clientId=" << clientId);
+
+	/* Mark this id for re-use. */
+	m_liveClients.reset(clientId);
+
+	// Update the Live Client Index List PV...
+	setLiveClientIndexList();
+}
+
+void SMSControl::setLiveClientIndexList(void)
+{
+	// Construct a New Live Client PV Index list...
+	size_t i, max = m_liveClients.size();
+	std::stringstream ss;
+	bool first = true;
+	for (i = 0; i < max; i++) {
+		if (m_liveClients[i]) {
+			if ( first )
+				first = false;
+			else
+				ss << ":";
+			ss << i;
+		}
+	}
+	DEBUG("setLiveClientIndexList new clientIndexStr=" << ss.str());
+
+	// Update Live Client Indices PV...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvLiveClientIndices->update(ss.str(), &now);
+}
+
+void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
+				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t rising = (pixel & 1) << 31;
 	tof &= ((1U << 21) - 1);
@@ -821,7 +893,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 }
 
 void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
-				 PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;

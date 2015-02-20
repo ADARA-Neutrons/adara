@@ -65,6 +65,11 @@ public:
 
 	void resetPacketStats(void);
 
+	int32_t registerLiveClient(std::string clientName);
+	void unregisterLiveClient(int32_t clientId);
+
+	void setLiveClientIndexList(void);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
@@ -165,6 +170,7 @@ private:
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
+	SourceSet m_liveClients;
 	PulseMap m_pulses;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
@@ -195,6 +201,8 @@ private:
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
+
+	boost::shared_ptr<smsStringPV> m_pvLiveClientIndices;
 
 	static SMSControl *m_singleton;
 
