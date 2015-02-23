@@ -73,8 +73,6 @@ public:
 			boost::shared_ptr<smsConnectedPV> & pvStatus);
 	void unregisterLiveClient(int32_t clientId);
 
-	void setLiveClientIndexList(void);
-
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
@@ -207,7 +205,7 @@ private:
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
-	boost::shared_ptr<smsStringPV> m_pvLiveClientIndices;
+	boost::shared_ptr<smsUint32PV> m_pvNumLiveClients;
 
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientNames;
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;

@@ -266,9 +266,9 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
 
-	m_pvLiveClientIndices = boost::shared_ptr<smsStringPV>(new
-						smsStringPV(prefix + ":Control:"
-							+ "LiveClientIndices"));
+	m_pvNumLiveClients = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "NumLiveClients"));
 
 	addPV(m_pvVersion);
 	addPV(m_pvRecording);
@@ -277,7 +277,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
-	addPV(m_pvLiveClientIndices);
+	addPV(m_pvNumLiveClients);
 
 	// Initialize Config/Info PVs...
 	struct timespec now;
@@ -293,7 +293,7 @@ SMSControl::SMSControl() :
 	m_pvPopPulseBuffer->update(0, &now);
 
 	// Initialize the Live Client Index List PV...
-	setLiveClientIndexList();
+	m_pvNumLiveClients->update(0, &now);
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -808,7 +808,7 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 	 * We don't have to be terribly fast here.
 	 */
 	size_t i, max = m_liveClients.size();
-	int32_t clientId = -1; // default, if no free Ids remain...
+	int32_t clientId = -1; // default, result if no free Ids remain...
 	for (i = 0; i < max && clientId < 0; i++) {
 		if (!m_liveClients[i]) {
 			m_liveClients.set(i);
@@ -858,6 +858,14 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 				boost::shared_ptr<smsConnectedPV>(new
 					smsConnectedPV(prefix + ":Status"));
 			addPV(m_pvLiveClientStatuses[clientId]);
+
+			// Update the Number of Live Clients PV... (we just added one)
+			// Note: don't ever decrement Number of Live Client PVs,
+			// monotonically increasing... (we leave the old Live Client
+			// index/PVs around for information on their demise... ;-D)
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_pvNumLiveClients->update(clientId + 1, &now);
 		}
 
 		// Return Proper Indexed PVs to Live Client...
@@ -865,9 +873,6 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 		pvRequestedStartTime = m_pvLiveClientStartTimes[clientId];
 		pvCurrentFilePath = m_pvLiveClientFilePaths[clientId];
 		pvStatus = m_pvLiveClientStatuses[clientId];
-
-		// Update the Live Client Index List PV...
-		setLiveClientIndexList();
 	}
 
 	else {
@@ -886,31 +891,9 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 	/* Mark this id for re-use. */
 	m_liveClients.reset(clientId);
 
-	// Update the Live Client Index List PV...
-	setLiveClientIndexList();
-}
-
-void SMSControl::setLiveClientIndexList(void)
-{
-	// Construct a New Live Client PV Index list...
-	size_t i, max = m_liveClients.size();
-	std::stringstream ss;
-	bool first = true;
-	for (i = 0; i < max; i++) {
-		if (m_liveClients[i]) {
-			if ( first )
-				first = false;
-			else
-				ss << ":";
-			ss << i;
-		}
-	}
-	DEBUG("setLiveClientIndexList new clientIndexStr=" << ss.str());
-
-	// Update Live Client Indices PV...
-	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
-	m_pvLiveClientIndices->update(ss.str(), &now);
+	// Note: Leave the Number of Live Client PVs, Monotonically Increasing
+	// (because we leave the old Live Client index/PVs around for
+	// hysterical reasons, that is to see how they died... ;-D)
 }
 
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
