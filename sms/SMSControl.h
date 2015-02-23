@@ -20,6 +20,7 @@ class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
 class smsUint32PV;
+class smsConnectedPV;
 class PopPulseBufferPV;
 class RunInfo;
 class Geometry;
@@ -65,7 +66,11 @@ public:
 
 	void resetPacketStats(void);
 
-	int32_t registerLiveClient(std::string clientName);
+	int32_t registerLiveClient(std::string clientName,
+			boost::shared_ptr<smsStringPV> & pvName,
+			boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
+			boost::shared_ptr<smsStringPV> & pvCurrentFilePath,
+			boost::shared_ptr<smsConnectedPV> & pvStatus);
 	void unregisterLiveClient(int32_t clientId);
 
 	void setLiveClientIndexList(void);
@@ -203,6 +208,11 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<smsStringPV> m_pvLiveClientIndices;
+
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientNames;
+	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
+	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
 
 	static SMSControl *m_singleton;
 

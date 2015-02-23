@@ -98,7 +98,8 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
 	m_beamlineShortName =
 			conf.get<std::string>("sms.beamline_shortname", "");
-	m_beamlineLongName = conf.get<std::string>("sms.beamline_longname", "");
+	m_beamlineLongName =
+			conf.get<std::string>("sms.beamline_longname", "");
 
 	/* Addendum 7/2014: for some legacy dcomserver implementations,
 	 * the neutron events and meta-data events can interleave and/or
@@ -793,7 +794,11 @@ void SMSControl::resetPacketStats(void)
 	}
 }
 
-int32_t SMSControl::registerLiveClient(std::string clientName)
+int32_t SMSControl::registerLiveClient(std::string clientName,
+		boost::shared_ptr<smsStringPV> & pvName,
+		boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
+		boost::shared_ptr<smsStringPV> & pvCurrentFilePath,
+		boost::shared_ptr<smsConnectedPV> & pvStatus)
 {
 	DEBUG("registerLiveClient clientName=" << clientName);
 
@@ -812,14 +817,65 @@ int32_t SMSControl::registerLiveClient(std::string clientName)
 		}
 	}
 
-	// Update the Live Client Index List PV...
-	setLiveClientIndexList();
+	// Create/Get Persistent EPICS PVs for This Live Client Instance...
+	if ( clientId >= 0 ) {
 
-	if ( clientId < 0 ) {
+		// Allocate Next Index of PVs...
+		if ( (uint32_t) clientId >= m_pvLiveClientNames.size() ) {
+
+			std::string prefix(m_beamlineId);
+			prefix += ":SMS";
+			prefix += ":LiveClient:";
+
+			std::stringstream ss;
+			ss << clientId;
+			prefix += ss.str();
+
+			// Live Client Name...
+			m_pvLiveClientNames.resize(clientId + 1);
+			m_pvLiveClientNames[clientId] =
+				boost::shared_ptr<smsStringPV>(new
+					smsStringPV(prefix + ":Name"));
+			addPV(m_pvLiveClientNames[clientId]);
+
+			// Live Client Requested Start Time...
+			m_pvLiveClientStartTimes.resize(clientId + 1);
+			m_pvLiveClientStartTimes[clientId] =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix + ":RequestedStartTime"));
+			addPV(m_pvLiveClientStartTimes[clientId]);
+
+			// Live Client Current File Path...
+			m_pvLiveClientFilePaths.resize(clientId + 1);
+			m_pvLiveClientFilePaths[clientId] =
+				boost::shared_ptr<smsStringPV>(new
+					smsStringPV(prefix + ":CurrentFilePath"));
+			addPV(m_pvLiveClientFilePaths[clientId]);
+
+			// Live Client Status...
+			m_pvLiveClientStatuses.resize(clientId + 1);
+			m_pvLiveClientStatuses[clientId] =
+				boost::shared_ptr<smsConnectedPV>(new
+					smsConnectedPV(prefix + ":Status"));
+			addPV(m_pvLiveClientStatuses[clientId]);
+		}
+
+		// Return Proper Indexed PVs to Live Client...
+		pvName = m_pvLiveClientNames[clientId];
+		pvRequestedStartTime = m_pvLiveClientStartTimes[clientId];
+		pvCurrentFilePath = m_pvLiveClientFilePaths[clientId];
+		pvStatus = m_pvLiveClientStatuses[clientId];
+
+		// Update the Live Client Index List PV...
+		setLiveClientIndexList();
+	}
+
+	else {
 		DEBUG("registerLiveClient Out of Live Client Ids!");
 		// *Don't* throw an exception here, this is _Not_ mission critical!
 		// throw std::runtime_error("No more Live Client Ids available");
 	}
+
 	return( clientId );
 }
 
