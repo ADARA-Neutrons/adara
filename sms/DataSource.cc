@@ -10,8 +10,6 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "DataSource.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 #include "utils.h"
 
 #include "Logging.h"
