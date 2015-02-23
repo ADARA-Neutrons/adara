@@ -1012,7 +1012,7 @@ void smsConnectedPV::waiting_for_connect_ack() {
 	struct timespec ts;
 
 	clock_gettime(CLOCK_REALTIME, &ts);
-	update(3, &ts);
+	update(4, &ts);
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
