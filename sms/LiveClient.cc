@@ -97,7 +97,8 @@ LiveClient::LiveClient(int fd) :
 		m_timer = new TimerAdapter<LiveClient>(this);
 		m_timer->start(m_hello_timeout);
 	} catch (...) {
-		ERROR("Unknown Exception in LiveClient() Hello Timeout");
+		ERROR("Unknown Exception in LiveClient() Hello Timeout"
+			<< " client=" << m_clientName);
 		delete m_read;
 		throw;
 	}
@@ -110,7 +111,7 @@ LiveClient::~LiveClient()
 	INFO("client " << m_clientName << " disconnected");
 
 	if ( m_clientId >= 0 ) {
-		m_pvStatus->waiting_for_connect_ack();
+		m_pvStatus->disconnected();
 
 		SMSControl *ctrl = SMSControl::getInstance();
 		ctrl->unregisterLiveClient(m_clientId);
@@ -183,7 +184,7 @@ void LiveClient::writable(void)
 
 		if (!cur_offset) {
 			DEBUG("writable(): sending new file=" << f->path()
-				<< " size=" << f->size());
+				<< " size=" << f->size() << " to client " << m_clientName);
 			if ( m_clientId >= 0 ) {
 				struct timespec now;
 				clock_gettime(CLOCK_REALTIME, &now);
@@ -316,14 +317,6 @@ void LiveClient::readable(void)
 			 */
 			DEBUG("client " << m_clientName
 				<< " error reading stream log_info=(" << log_info << ")");
-			if ( m_clientId >= 0 ) {
-				m_pvStatus->failed();
-
-				SMSControl *ctrl = SMSControl::getInstance();
-				ctrl->unregisterLiveClient(m_clientId);
-
-				m_clientId = -1;
-			}
 			delete this;
 		}
 	} catch (std::runtime_error e) {
@@ -334,6 +327,14 @@ void LiveClient::readable(void)
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info << "client " << m_clientName
 				<< " exception reading stream: " << e.what());
+			if ( m_clientId >= 0 ) {
+				m_pvStatus->failed();
+
+				SMSControl *ctrl = SMSControl::getInstance();
+				ctrl->unregisterLiveClient(m_clientId);
+
+				m_clientId = -1;
+			}
 		}
 		delete this;
 	}
@@ -381,8 +382,8 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	m_timer->cancel();
 	m_hello_received = true;
 
-	INFO("LiveClient Hello Received, Requested Start Time "
-		<< pkt.requestedStartTime());
+	INFO("LiveClient Hello Received from " << m_clientName
+		<< ", Requested Start Time " << pkt.requestedStartTime());
 
 	if ( m_clientId >= 0 ) {
 		struct timespec now;
