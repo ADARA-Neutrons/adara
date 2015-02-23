@@ -182,11 +182,13 @@ num_options=$(( num_options + 1 ))
 
 USAGE()
 {
+	substatuses="[run_status] [data_status] [sys_status] [live_status]"
+
 	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [status] [run_status] [data_status] [sys_status] [live_status] \\"
+	echo "            [status] $substatuses \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -461,21 +463,20 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
 
-		lcivar="${PRE}:SMS:Control:LiveClientIndices"
-		caget $WAIT -S $lcivar
+		nlcvar="${PRE}:SMS:Control:NumLiveClients"
+		caget $WAIT -S $nlcvar
 		if [ $? == 0 ]; then
 			echo
-			liveClientIndicesStr=`caget $WAIT -S $lcivar | grep $lcivar \
+			numLiveClients=`caget $WAIT $nlcvar | grep $nlcvar \
 				| awk '{print $2}'`
-			liveClientIndices=`echo $liveClientIndicesStr | sed "s/:/ /g"`
-			for lci in $liveClientIndices ; do
-				echo "Live Client id=${lci}:"
-				caget $WAIT -S ${PRE}:SMS:LiveClient:${lci}:Name
-				caget $WAIT ${PRE}:SMS:LiveClient:${lci}:RequestedStartTime
-				cfp="${PRE}:SMS:LiveClient:${lci}:CurrentFilePath"
+			for (( lc=0 ; lc < numLiveClients ; lc++ )); do
+				echo "Live Client id=${lc}:"
+				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
+				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
+				cfp="${PRE}:SMS:LiveClient:${lc}:CurrentFilePath"
 				caget $WAIT -S $cfp | grep $cfp \
 					| awk '{ printf("%s\n   ", $1); for (i=2; i<NF; i++) printf("%s ", $(i)); printf("%s\n", $NF); }'
-				caget $WAIT -a ${PRE}:SMS:LiveClient:${lci}:Status
+				caget $WAIT -a ${PRE}:SMS:LiveClient:${lc}:Status
 				echo
 			done
 		fi
