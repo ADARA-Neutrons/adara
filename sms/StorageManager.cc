@@ -186,6 +186,11 @@ uint64_t StorageManager::m_purgedBlocks;
 bool StorageManager::m_dailyExhausted;
 std::list<std::string> StorageManager::m_dailyCache;
 
+std::string StorageManager::m_broker_uri;
+std::string StorageManager::m_broker_user;
+std::string StorageManager::m_broker_pass;
+ComBusSMSMon *StorageManager::m_combus;
+
 /* These get passed through an eventfd(), and need to be above the
  * range of blocks possibly up for purge.
  */
@@ -289,6 +294,10 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	set_max_blocks_allowed(max_blocks_allowed);
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
+
+        m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
+        m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
+        m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
 
 	StorageFile::config(conf);
 }
@@ -443,6 +452,12 @@ void StorageManager::lateInit(void)
 	 * to note that it has not been overlooked.
 	 */
 	m_pulseTime = m_nextIndexTime = 1;
+
+        /* start the monitor thread so that it will be available from 
+         * backgroundIo thread
+         */
+        m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
+        m_combus->start(m_broker_uri, m_broker_user, m_broker_pass );
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -710,6 +725,8 @@ void StorageManager::startContainer(uint32_t run)
 	 * it to the state index at that point.
 	 */
 	m_cur_container->newFile();
+
+        m_combus->sendOriginal(run, now, std::string("SMS run started"));
 }
 
 void StorageManager::endCurrentContainer(void)
@@ -765,6 +782,8 @@ void StorageManager::startRecording(uint32_t run)
 
 void StorageManager::stopRecording(void)
 {
+	m_combus->sendUpdate(m_cur_container->runNumber(),
+                                std::string("SMS run stopped"));
 	endCurrentContainer();
 	startContainer();
 }
@@ -951,12 +970,27 @@ void StorageManager::scanDaily(const std::string &dir)
 		if (c) {
 			m_scannedBlocks += c->blocks();
 
-			/* If this is a (non-manual) run pending translation,
-			 * note it for later.
-			 */
-			if (c->runNumber() && !c->isTranslated() &&
-							!c->isManual())
-				m_pendingRuns.push_back(c);
+                        if (c->runNumber()) {
+                           if (c->isTranslated()) {
+                               /* send sts succeeded message */
+                               m_combus->sendOriginal(c->runNumber(),
+                                                       c->startTime(),
+                                       std::string("STS send succeeded"));
+                           } else if (c->isManual()) {
+                               /* send sts failed message */
+                               m_combus->sendOriginal(c->runNumber(),
+                                                       c->startTime(),
+                                       std::string("Manual Translation"));
+                           } else {
+                                /* note pending for later translation */
+                               m_pendingRuns.push_back(c);
+                               /* send run stopped message */
+                               m_combus->sendOriginal(c->runNumber(),
+                                                       c->startTime(),
+                                       std::string("STS send pending"));
+                           }
+                        }
+
 		}
 	}
 }
@@ -1179,6 +1213,14 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 * it is the last one in the last daily directory -- ie,
 		 * if it could be the current container.
 		 */
+                uint32_t run;
+                if (1 == sscanf((*cit).root_name().c_str(),
+                                  "%*8c-%*6c.%d", &run)) {
+                    m_combus->sendUpdate(run, std::string("SMS run purged"));
+                } else {
+                    WARN("sscanf of " << (*cit).root_name() << " failed");
+                }
+
 		++cit;
 		purged += StorageContainer::purge(cpath.string(),
 							goal - purged,
