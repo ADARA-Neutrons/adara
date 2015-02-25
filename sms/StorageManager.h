@@ -153,6 +153,7 @@ private:
 	static bool m_dailyExhausted;
 	static std::list<std::string> m_dailyCache;
 
+        static std::string m_domain;
         static std::string m_broker_uri;
         static std::string m_broker_user;
         static std::string m_broker_pass;

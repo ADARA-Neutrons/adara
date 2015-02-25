@@ -17,6 +17,7 @@ ComBusSMSMon::ComBusSMSMon(std::string a_beam_sname,
                     m_combus(0),
                     m_beam_sname(a_beam_sname), 
                     m_facility(a_facility),
+                    m_comm_thread(0),
                     m_stop(false),
                     m_inqueue(
                           new epicsMessageQueue(100,sizeof(SMSRunStatus *)))
@@ -27,6 +28,7 @@ ComBusSMSMon::~ComBusSMSMon() {
       m_stop = true;
       m_comm_thread->join();
       delete m_comm_thread;
+      m_comm_thread = 0;
    }
 }
 
@@ -52,16 +54,17 @@ void ComBusSMSMon::sendUpdate ( uint32_t a_run_num,
 
 
 void
-ComBusSMSMon::start( const std::string &a_broker_uri,
+ComBusSMSMon::start( const std::string &a_domain,
+                     const std::string &a_broker_uri, 
                      const std::string &a_broker_user, 
                      const std::string &a_broker_pass)
 {
     if ( !m_comm_thread )
     {
+        m_domain = a_domain;
         m_broker_uri = a_broker_uri;
         m_broker_user = a_broker_user;
         m_broker_pass = a_broker_pass;
-        m_domain = m_facility + "." + m_beam_sname;
         m_stop = false;
 
         m_comm_thread = new boost::thread( boost::bind( &ComBusSMSMon::commThread, this ));
@@ -92,8 +95,10 @@ void ComBusSMSMon::commThread() {
       bytesrec = m_inqueue->receive(&inpu, sizeof(SMSRunStatus *), 1.0);
       if (bytesrec == -1) {
           // Send status every 5 seconds
-          if ( !( hb % 5 ))
+          if ( !( hb % 5 )) {
              m_combus->status( ADARA::ComBus::STATUS_OK );
+             syslog( LOG_WARNING, "SMS ComBus queue read timeout" );
+          }
           ++hb;
           continue;
       }
@@ -112,6 +117,9 @@ void ComBusSMSMon::commThread() {
                                           lookup->m_run_num,
                                           lookup->m_status);
       m_combus->broadcast(newmsg);
+      syslog( LOG_INFO, "SMS Combus run %ld status <%s> sent", 
+		lookup->m_run_num, lookup->m_status.c_str());
+                           
    }
    syslog( LOG_INFO, "ComBus SMS thread exiting" );
 }

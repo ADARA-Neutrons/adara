@@ -27,7 +27,8 @@ public:
     ComBusSMSMon(std::string a_beam_sname, std::string a_facility);
     ~ComBusSMSMon();
 
-    void start ( const std::string &a_broker_uri, 
+    void start ( const std::string &a_domain, 
+                 const std::string &a_broker_uri, 
                  const std::string &a_broker_user, 
                  const std::string &a_broker_pass); 
 

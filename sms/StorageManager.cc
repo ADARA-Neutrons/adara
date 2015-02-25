@@ -186,6 +186,7 @@ uint64_t StorageManager::m_purgedBlocks;
 bool StorageManager::m_dailyExhausted;
 std::list<std::string> StorageManager::m_dailyCache;
 
+std::string StorageManager::m_domain;
 std::string StorageManager::m_broker_uri;
 std::string StorageManager::m_broker_user;
 std::string StorageManager::m_broker_pass;
@@ -295,6 +296,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
+        m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
         m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
         m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
         m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
@@ -457,7 +459,7 @@ void StorageManager::lateInit(void)
          * backgroundIo thread
          */
         m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
-        m_combus->start(m_broker_uri, m_broker_user, m_broker_pass );
+        m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass );
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -726,7 +728,8 @@ void StorageManager::startContainer(uint32_t run)
 	 */
 	m_cur_container->newFile();
 
-        m_combus->sendOriginal(run, now, std::string("SMS run started"));
+        if (run)
+           m_combus->sendOriginal(run, now, std::string("SMS run started"));
 }
 
 void StorageManager::endCurrentContainer(void)
