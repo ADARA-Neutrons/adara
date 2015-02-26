@@ -729,7 +729,7 @@ void StorageManager::startContainer(uint32_t run)
 	m_cur_container->newFile();
 
         if (run)
-           m_combus->sendOriginal(run, now, std::string("SMS run started"));
+           m_combus->sendOriginal(run, std::string("SMS run started"), now);
 }
 
 void StorageManager::endCurrentContainer(void)
@@ -977,20 +977,20 @@ void StorageManager::scanDaily(const std::string &dir)
                            if (c->isTranslated()) {
                                /* send sts succeeded message */
                                m_combus->sendOriginal(c->runNumber(),
-                                                       c->startTime(),
-                                       std::string("STS send succeeded"));
+                                       std::string("STS send succeeded"),
+                                                       c->startTime());
                            } else if (c->isManual()) {
                                /* send sts failed message */
                                m_combus->sendOriginal(c->runNumber(),
-                                                       c->startTime(),
-                                       std::string("Needs Manual Translation"));
+                                       std::string("Needs Manual Translation"),
+                                                       c->startTime());
                            } else {
                                 /* note pending for later translation */
                                m_pendingRuns.push_back(c);
                                /* send run stopped message */
                                m_combus->sendOriginal(c->runNumber(),
-                                                       c->startTime(),
-                                       std::string("STS send pending"));
+                                       std::string("STS send pending"),
+                                                       c->startTime());
                            }
                         }
 
@@ -1394,5 +1394,5 @@ void StorageManager::sendComBus(uint32_t a_run_num,
    if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
       m_combus->sendUpdate(a_run_num, a_run_state);
    else
-      m_combus->sendOriginal(a_run_num, a_start_time, a_run_state);
+      m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
 }

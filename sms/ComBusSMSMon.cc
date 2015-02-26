@@ -33,8 +33,8 @@ ComBusSMSMon::~ComBusSMSMon() {
 }
 
 void ComBusSMSMon::sendOriginal ( uint32_t a_run_num,
-                     const struct timespec &a_start_time,
-                     std::string a_run_state )
+                     std::string a_run_state,
+                     const struct timespec &a_start_time)
 {
    SMSRunStatus *outp = new SMSRunStatus(a_run_num, a_run_state, a_start_time);
 

@@ -35,8 +35,8 @@ public:
     // sendOriginal() is called at startup scan time, or when a new run is
     // started.  
     void sendOriginal ( uint32_t a_run_num, 
-                     const struct timespec &a_start_time,
-                     std::string a_run_state );
+                     std::string a_run_state,
+                     const struct timespec &a_start_time);
     // sendUpdate() sends subsequent developments. Must be preceded by a 
     // sendOriginal for a given run.
     void sendUpdate ( uint32_t a_run_num, 
