@@ -983,7 +983,7 @@ void StorageManager::scanDaily(const std::string &dir)
                                /* send sts failed message */
                                m_combus->sendOriginal(c->runNumber(),
                                                        c->startTime(),
-                                       std::string("Manual Translation"));
+                                       std::string("Needs Manual Translation"));
                            } else {
                                 /* note pending for later translation */
                                m_pendingRuns.push_back(c);
