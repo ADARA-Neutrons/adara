@@ -18,6 +18,8 @@
 
 #include "ComBusSMSMon.h"
 
+static struct timespec combuszerotime = {0,0};
+
 class EventFd;
 
 class PoolsizePV;
@@ -92,6 +94,12 @@ public:
 	static bool set_max_blocks_allowed(uint64_t maxSize);
 
 	static void update_max_blocks_allowed_pv(void);
+
+
+        static void sendComBus ( uint32_t a_run_num,
+                     std::string a_run_state,
+                     const struct timespec &a_start_time = 
+                                            combuszerotime);
 
 private:
 	typedef boost::signals2::connection connection;

@@ -1386,3 +1386,13 @@ bool StorageManager::cleanupIndexes(void)
 
 	return false;
 }
+
+void StorageManager::sendComBus(uint32_t a_run_num,
+                     std::string a_run_state,
+                     const struct timespec &a_start_time) 
+{
+   if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
+      m_combus->sendUpdate(a_run_num, a_run_state);
+   else
+      m_combus->sendOriginal(a_run_num, a_start_time, a_run_state);
+}
