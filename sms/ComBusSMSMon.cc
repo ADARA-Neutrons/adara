@@ -12,6 +12,10 @@ SMSRunStatus::SMSRunStatus(unsigned long a_run_num, std::string &a_status) :
                 m_run_num(a_run_num), m_status(a_status)
 {}
    
+bool SMSRunStatus::hasTime() {
+   return m_start_time.tv_sec || m_start_time.tv_nsec;
+}
+
 ComBusSMSMon::ComBusSMSMon(std::string a_beam_sname, 
                            std::string a_facility = std::string("SNS")) :
                     m_combus(0),
@@ -106,6 +110,9 @@ void ComBusSMSMon::commThread() {
       if (m_run_dict.count(inpu->m_run_num)) {
          lookup = m_run_dict[inpu->m_run_num];
          lookup->m_status = inpu->m_status;
+         if (inpu->hasTime()) {
+            lookup->m_start_time = inpu->m_start_time;
+         }
          delete inpu; inpu = 0;
       } else {
          m_run_dict[inpu->m_run_num] = inpu;

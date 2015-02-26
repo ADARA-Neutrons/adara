@@ -15,6 +15,9 @@ public:
    // The usual item
    SMSRunStatus(unsigned long a_run_num, std::string &a_status);
 
+   /* check if we have time */
+   bool hasTime();
+
    // data is public for use by ComBusSMSMon
    unsigned long m_run_num;
    std::string m_status;
