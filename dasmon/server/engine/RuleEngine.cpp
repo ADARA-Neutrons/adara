@@ -231,7 +231,7 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
 {
     //cout << "eval " << m_id << "{" << m_expr << "}: ";
 
-    if ( a_updated_fact )
+    /*if ( a_updated_fact )
     {
         cout << "update fact {" << a_updated_fact->m_id << "} ";
 
@@ -239,7 +239,7 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
             cout << "asserted ";
         else
             cout << "retracted ";
-    }
+    }*/
 
     if ( a_updated_fact )
     {
