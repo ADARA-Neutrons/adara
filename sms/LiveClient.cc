@@ -76,6 +76,18 @@ LiveClient::LiveClient(int fd) :
 	m_clientName += ":";
 	m_clientName += service;
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	m_clientId = ctrl->registerLiveClient(m_clientName,
+		m_pvName, m_pvRequestedStartTime, m_pvCurrentFilePath, m_pvStatus);
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvName->update(m_clientName, &now);
+	m_pvRequestedStartTime->update(-1, &now);
+	m_pvCurrentFilePath->update("(none)", &now);
+	m_pvStatus->waiting_for_connect_ack();
+
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
@@ -85,7 +97,8 @@ LiveClient::LiveClient(int fd) :
 		m_timer = new TimerAdapter<LiveClient>(this);
 		m_timer->start(m_hello_timeout);
 	} catch (...) {
-		ERROR("Unknown Exception in LiveClient() Hello Timeout");
+		ERROR("Unknown Exception in LiveClient() Hello Timeout"
+			<< " client=" << m_clientName);
 		delete m_read;
 		throw;
 	}
@@ -96,6 +109,15 @@ LiveClient::LiveClient(int fd) :
 LiveClient::~LiveClient()
 {
 	INFO("client " << m_clientName << " disconnected");
+
+	if ( m_clientId >= 0 ) {
+		m_pvStatus->disconnected();
+
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->unregisterLiveClient(m_clientId);
+
+		m_clientId = -1;
+	}
 
 	m_mgrConnection.disconnect();
 	m_contConnection.disconnect();
@@ -111,6 +133,16 @@ LiveClient::~LiveClient()
 bool LiveClient::timerExpired(void)
 {
 	WARN("client " << m_clientName << " did not send hello");
+
+	if ( m_clientId >= 0 ) {
+		m_pvStatus->failed();
+
+		SMSControl *ctrl = SMSControl::getInstance();
+		ctrl->unregisterLiveClient(m_clientId);
+
+		m_clientId = -1;
+	}
+
 	delete this;
 	return false;
 }
@@ -149,6 +181,16 @@ void LiveClient::writable(void)
 		len = f->size() - cur_offset;
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
+
+		if (!cur_offset) {
+			DEBUG("writable(): sending new file=" << f->path()
+				<< " size=" << f->size() << " to client " << m_clientName);
+			if ( m_clientId >= 0 ) {
+				struct timespec now;
+				clock_gettime(CLOCK_REALTIME, &now);
+				m_pvCurrentFilePath->update(f->path(), &now);
+			}
+		}
 
 		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
 		if (rc < 0) {
@@ -285,6 +327,14 @@ void LiveClient::readable(void)
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info << "client " << m_clientName
 				<< " exception reading stream: " << e.what());
+			if ( m_clientId >= 0 ) {
+				m_pvStatus->failed();
+
+				SMSControl *ctrl = SMSControl::getInstance();
+				ctrl->unregisterLiveClient(m_clientId);
+
+				m_clientId = -1;
+			}
 		}
 		delete this;
 	}
@@ -332,8 +382,15 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	m_timer->cancel();
 	m_hello_received = true;
 
-	INFO("LiveClient Hello Received, Requested Start Time "
-		<< pkt.requestedStartTime());
+	INFO("LiveClient Hello Received from " << m_clientName
+		<< ", Requested Start Time " << pkt.requestedStartTime());
+
+	if ( m_clientId >= 0 ) {
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		m_pvRequestedStartTime->update(pkt.requestedStartTime(), &now);
+		m_pvStatus->connected();
+	}
 
 	m_mgrConnection = StorageManager::onContainerChange(
 		boost::bind(&LiveClient::containerChange, this, _1, _2));

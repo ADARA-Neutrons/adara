@@ -332,7 +332,10 @@ StreamMonitor::connect()
     int sms_socket = socket( AF_INET, SOCK_STREAM, 0);
 
     if ( sms_socket < 0 )
+    {
+        syslog( LOG_ERR, "Failed to Create SMS Socket!" );
         return -1;
+    }
 
     struct hostent *server = gethostbyname( m_sms_host.c_str() );
     if ( server )
@@ -360,7 +363,22 @@ StreamMonitor::connect()
                 syslog( LOG_NOTICE, "Connected to SMS." );
                 return sms_socket;
             }
+            else
+            {
+                syslog( LOG_ERR, "Failed to Write Hello to SMS at %s!",
+                    m_sms_host.c_str() );
+            }
         }
+        else
+        {
+            syslog( LOG_ERR, "Failed to Connect to SMS at %s!",
+                m_sms_host.c_str() );
+        }
+    }
+    else
+    {
+        syslog( LOG_ERR, "Failed to Get Host by Name for %s!",
+            m_sms_host.c_str() );
     }
 
     close( sms_socket );

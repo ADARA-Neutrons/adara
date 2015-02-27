@@ -182,11 +182,13 @@ num_options=$(( num_options + 1 ))
 
 USAGE()
 {
+	substatuses="[run_status] [data_status] [sys_status] [live_status]"
+
 	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [status] [run_status] [data_status] [sys_status] \\"
+	echo "            [status] $substatuses \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -208,6 +210,7 @@ USAGE()
 	echo "   run_status            = display SMS run status"
 	echo "   data_status           = display SMS data source status"
 	echo "   sys_status            = display SMS internal system status"
+	echo "   live_status           = display SMS live client status"
 	echo
 
 	echo "Available Options:"
@@ -298,7 +301,8 @@ if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
 	do_git_config=0
 fi
 
-echo -e "Changing Configuration on Host ${config_host} [$config_blnum].\n"
+echo -e \
+"Changing/Checking Configuration on Host ${config_host} [$config_blnum].\n"
 
 if [ ${PRE} == "[NotSet]" ]; then
 
@@ -351,7 +355,8 @@ echo -e "Git Config Repository Branch: [${config_branch}].\n"
 if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
 		|| "$command" == "data_status" \
-		|| "$command" == "sys_status" ]]; then
+		|| "$command" == "sys_status" \
+		|| "$command" == "live_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
@@ -453,6 +458,28 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "live_status" ]]; then
+
+		nlcvar="${PRE}:SMS:Control:NumLiveClients"
+		caget $WAIT -S $nlcvar
+		if [ $? == 0 ]; then
+			echo
+			numLiveClients=`caget $WAIT $nlcvar | grep $nlcvar \
+				| awk '{print $2}'`
+			for (( lc=0 ; lc < numLiveClients ; lc++ )); do
+				echo "Live Client id=${lc}:"
+				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
+				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
+				cfp="${PRE}:SMS:LiveClient:${lc}:CurrentFilePath"
+				caget $WAIT -S $cfp | grep $cfp \
+					| awk '{ printf("%s\n   ", $1); for (i=2; i<NF; i++) printf("%s ", $(i)); printf("%s\n", $NF); }'
+				caget $WAIT -a ${PRE}:SMS:LiveClient:${lc}:Status
+				echo
+			done
+		fi
 	fi
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...

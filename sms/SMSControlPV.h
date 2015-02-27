@@ -95,7 +95,7 @@ private:
 
 class smsStringPV : public smsPV {
 public:
-	enum { MAX_LENGTH = 1024 };
+	enum { MAX_LENGTH = 2048 };
 
 	smsStringPV(const std::string &name);
 
@@ -222,6 +222,8 @@ public:
 	void connected(void);
 	void disconnected(void);
 	void failed(void);
+	void trying_to_connect(void);
+	void waiting_for_connect_ack(void);
 
 	bool valid(void);
 	bool value(void);

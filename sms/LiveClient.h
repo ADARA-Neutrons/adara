@@ -11,6 +11,12 @@
 #include "StorageFile.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
+
+class smsStringPV;
+class smsUint32PV;
+class smsConnectedPV;
 
 class LiveClient : public ADARA::POSIXParser {
 public:
@@ -35,6 +41,12 @@ private:
 	connection m_contConnection;
 	connection m_fileConnection;
 	std::string m_clientName;
+	int32_t m_clientId;
+
+	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsUint32PV> m_pvRequestedStartTime;
+	boost::shared_ptr<smsStringPV> m_pvCurrentFilePath;
+	boost::shared_ptr<smsConnectedPV> m_pvStatus;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
 	void historicalFile(StorageFile::SharedPtr &f, off_t start);
