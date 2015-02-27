@@ -41,7 +41,6 @@ public:
     void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
     bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals, std::map<std::string,std::string> &a_errors );
     void    getInputFacts( std::set<std::string> &a_facts ) const;
-    bool    isOK() const { return m_ok; }
     void    assertFact( const std::string &a_fact );
     template<class T>
     void    assertFact( const std::string &a_fact, T a_value );
@@ -129,7 +128,6 @@ private:
     boost::thread                      *m_debounce_thread;
     uint32_t                            m_debounce_sec;
     uint32_t                            m_batch_mask;
-    bool                                m_ok;
 };
 
 }}

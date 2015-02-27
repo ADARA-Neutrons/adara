@@ -34,7 +34,7 @@ namespace DASMON {
   */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
-      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0), m_ok(true)
+      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0)
 {
     if ( !m_cfg_dir.empty() && m_cfg_dir[m_cfg_dir.length()-1] != '/' )
          m_cfg_dir += "/";
