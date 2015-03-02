@@ -101,7 +101,6 @@ void ComBusSMSMon::commThread() {
           // Send status every 5 seconds
           if ( !( hb % 5 )) {
              m_combus->status( ADARA::ComBus::STATUS_OK );
-             syslog( LOG_WARNING, "SMS ComBus queue read timeout" );
           }
           ++hb;
           continue;
@@ -123,8 +122,8 @@ void ComBusSMSMon::commThread() {
                                           lookup->m_start_time, 
                                           lookup->m_run_num,
                                           lookup->m_status);
-      m_combus->broadcast(newmsg);
-      syslog( LOG_INFO, "SMS Combus run %ld status <%s> sent", 
+      if (!m_combus->broadcast(newmsg))
+         syslog( LOG_INFO, "SMS Combus run %ld status <%s> send failed", 
 		lookup->m_run_num, lookup->m_status.c_str());
                            
    }
