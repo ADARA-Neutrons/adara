@@ -712,6 +712,9 @@ void StorageManager::startContainer(uint32_t run)
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run);
 
+        if (run)
+           m_combus->sendOriginal(run, std::string("SMS run started"), now);
+
 	m_contChange(m_cur_container, true);
 
 	/* Containers need to be sure to always have a file; otherwise
@@ -727,9 +730,6 @@ void StorageManager::startContainer(uint32_t run)
 	 * it to the state index at that point.
 	 */
 	m_cur_container->newFile();
-
-        if (run)
-           m_combus->sendOriginal(run, std::string("SMS run started"), now);
 }
 
 void StorageManager::endCurrentContainer(void)

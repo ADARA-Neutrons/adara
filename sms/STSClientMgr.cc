@@ -149,7 +149,7 @@ void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
 
 	if (starting) {
                 StorageManager::sendComBus(c->runNumber(), 
-					std::string("SMS sent to STS"));
+					std::string("SMS start run sent to STS"));
 		queueRun(c);
 		startConnect();
 	} else
