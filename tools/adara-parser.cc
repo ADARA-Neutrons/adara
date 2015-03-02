@@ -134,7 +134,8 @@ class Parser : public ADARA::Parser {
 public:
 	Parser() :
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
-		m_showVars(true), m_showDDP(false), m_lowRate(false )
+		m_showVars(true), m_showDDP(false), m_lowRate(false ),
+		m_showRunInfo(false), m_showGeom(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -182,6 +183,8 @@ private:
 	bool m_showVars;
 	bool m_showDDP;
 	bool m_lowRate;
+	bool m_showRunInfo;
+	bool m_showGeom;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
@@ -519,6 +522,12 @@ bool Parser::rxPacket(const ADARA::RunInfoPkt &pkt)
 	// TODO display more fields (check that the contents do not change)
 	printf("%u.%09u RUN INFO\n", (uint32_t) (pkt.pulseId() >> 32),
 		(uint32_t) pkt.pulseId());
+
+	if ( m_showRunInfo )
+	{
+		printf( "%s\n", pkt.info().c_str() );
+	}
+
 	return false;
 }
 
@@ -591,6 +600,12 @@ bool Parser::rxPacket(const ADARA::GeometryPkt &pkt)
 	// TODO display more fields (check that the contents do not change)
 	printf("%u.%09u GEOMETRY\n", (uint32_t) (pkt.pulseId() >> 32),
 		(uint32_t) pkt.pulseId());
+
+	if ( m_showGeom )
+	{
+		printf( "%s\n", pkt.info().c_str() );
+	}
+
 	return false;
 }
 
@@ -733,7 +748,9 @@ void Parser::parse(int argc, char **argv)
 		("hidevars,H", "Hide variable update packets")
 		("showddp,D", "Show payload of device descriptor packets")
 		("low,l", "Set low data rate mode (uses very small buffer size)")
-		("events,e", "Show events");
+		("events,e", "Show events")
+		("showrun,R", "Show payload of RunInfo packets")
+		("showgeom,G", "Show payload of Geometry packets");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -767,6 +784,8 @@ void Parser::parse(int argc, char **argv)
 	m_showVars = !vm.count("hidevars");
 	m_showDDP = vm.count("showddp");
 	m_lowRate = vm.count("low");
+	m_showRunInfo = vm.count("showrun");
+	m_showGeom = vm.count("showgeom");
 
 	if (!vm.count("file")) {
 		try {
