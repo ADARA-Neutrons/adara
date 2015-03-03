@@ -418,6 +418,7 @@ private:
     static uint32_t                 m_proc_state;       ///< General state/step of stream processing thread.
     uint32_t                        m_metrics_ticker;   ///< "Alive" indicator for stream metrics thread
     uint32_t                        m_metrics_state;    ///< General state/step of stream metrics thread.
+
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;

@@ -608,6 +608,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
     case ADARA::RunStatus::NEW_RUN:
         recording = true;
         break;
+
     case ADARA::RunStatus::STATE:
         if ( a_pkt.runNumber())
             recording = true;
@@ -658,6 +659,11 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
+    }
+    else
+    {
+        // Let all listeners know a "transition" occured.
+        m_notify.runStatus( m_recording, m_run_num, m_run_timestamp );
     }
 
     return false;

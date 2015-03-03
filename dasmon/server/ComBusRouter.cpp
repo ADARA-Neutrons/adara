@@ -309,13 +309,10 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
-    if ( a_recording != m_recording )
-    {
-        // On run state transitions, clear PVs
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        m_pvs.clear();
-        lock.unlock();
-    }
+    // On ANY run state notification (start, stop, file boundary), clear PVs
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    m_pvs.clear();
+    lock.unlock();
 
     ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
     m_combus.broadcast( msg );
