@@ -309,15 +309,18 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
-    // On ANY run state notification (start, stop, file boundary), clear PVs
-    boost::unique_lock<boost::mutex> lock(m_mutex);
-    m_pvs.clear();
-    lock.unlock();
+    // Only respond if recording state has changed
+    if ( a_recording != m_recording )
+    {
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+        m_pvs.clear();
+        lock.unlock();
 
-    ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
-    m_combus.broadcast( msg );
+        ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
+        m_combus.broadcast( msg );
 
-    m_recording = a_recording;
+        m_recording = a_recording;
+    }
 }
 
 
