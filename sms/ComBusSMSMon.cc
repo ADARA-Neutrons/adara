@@ -75,6 +75,19 @@ ComBusSMSMon::start( const std::string &a_domain,
     }
 }
 
+void ComBusSMSMon::openComm() 
+{
+   m_combus = new ADARA::ComBus::Connection( m_domain, "SMS", getpid(), 
+                                             m_broker_uri, m_broker_user, 
+                                             m_broker_pass );
+   if (!m_combus->waitForConnect( 5 )) {
+      syslog( LOG_WARNING, "SMS ComBus Connection Timeout" );
+   } else {
+      syslog( LOG_INFO, "SMS ComBus Connection Succeeded" );
+   }
+}
+
+
 void ComBusSMSMon::commThread() {
 
    unsigned long hb = 0;
@@ -83,49 +96,52 @@ void ComBusSMSMon::commThread() {
 
    syslog( LOG_INFO, "SMS ComBus thread started" );
 
-   if (m_combus) {
-      delete m_combus;
-      m_combus = 0;
-   }
- 
-   m_combus = new ADARA::ComBus::Connection( m_domain, "SMS", getpid(), 
-                                             m_broker_uri, m_broker_user, 
-                                             m_broker_pass );
-   if (!m_combus->waitForConnect( 5 )) {
-      syslog( LOG_WARNING, "SMS ComBus Connection Timeout" );
-   }
+   while(!m_stop) {	// loop 1
 
-   while(!m_stop) {
       bytesrec = m_inqueue->receive(&inpu, sizeof(SMSRunStatus *), 1.0);
-      if (bytesrec == -1) {
-          // Send status every 5 seconds
-          if ( !( hb % 5 )) {
-             m_combus->status( ADARA::ComBus::STATUS_OK );
-          }
-          ++hb;
-          continue;
-      }
-      if (!inpu) continue;
-      if (m_run_dict.count(inpu->m_run_num)) {
-         lookup = m_run_dict[inpu->m_run_num];
-         lookup->m_status = inpu->m_status;
-         if (inpu->hasTime()) {
-            lookup->m_start_time = inpu->m_start_time;
+
+      while(!m_stop) {	// loop 2
+         
+         if (bytesrec == -1 || !inpu) {
+             if (!m_combus) {
+                openComm();
+             } else {
+                // Send status every 5 seconds
+                if ( !( hb % 5 )) {
+                   m_combus->status( ADARA::ComBus::STATUS_OK );
+                }
+             }
+             ++hb;
+             break;		// repeat loop 1
          }
-         delete inpu; inpu = 0;
-      } else {
-         m_run_dict[inpu->m_run_num] = inpu;
-         lookup = inpu;
-      }
+         if (!m_combus) {
+                openComm();
+                continue; 	// repeat loop 2
+         } else {
+            if (m_run_dict.count(inpu->m_run_num)) {
+               lookup = m_run_dict[inpu->m_run_num];
+               lookup->m_status = inpu->m_status;
+               if (inpu->hasTime()) {
+                  lookup->m_start_time = inpu->m_start_time;
+               }
+               delete inpu; inpu = 0;
+            } else {
+               m_run_dict[inpu->m_run_num] = inpu;
+               lookup = inpu;
+            }
       
-      ADARA::ComBus::SMS::StatusUpdateMsg newmsg(m_facility, m_beam_sname, 
+            ADARA::ComBus::SMS::StatusUpdateMsg newmsg(m_facility, 
+ 					  m_beam_sname, 
                                           lookup->m_start_time, 
                                           lookup->m_run_num,
                                           lookup->m_status);
-      if (!m_combus->broadcast(newmsg))
-         syslog( LOG_INFO, "SMS Combus run %ld status <%s> send failed", 
-		lookup->m_run_num, lookup->m_status.c_str());
+            if (!m_combus->broadcast(newmsg))
+               syslog( LOG_INFO, "SMS Combus run %ld status <%s> send failed", 
+		      lookup->m_run_num, lookup->m_status.c_str());
                            
+            break;		// repeat loop 1
+         }
+      }
    }
    syslog( LOG_INFO, "ComBus SMS thread exiting" );
 }

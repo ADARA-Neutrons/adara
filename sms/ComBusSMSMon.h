@@ -46,6 +46,7 @@ public:
                      std::string a_run_state );
 
 private:
+    void openComm();
     void commThread();
 
     std::map<uint32_t, SMSRunStatus *> m_run_dict;
