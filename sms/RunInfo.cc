@@ -6,6 +6,10 @@
 #include "RunInfo.h"
 #include "StorageManager.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+
 class RunInfoResetPV : public smsTriggerPV {
 public:
 	RunInfoResetPV(const std::string &prefix, RunInfo *master) :
@@ -127,12 +131,31 @@ static void xmlEncodeTo(std::string &out, const std::string &in,
 	/* From stackoverflow.com */
 	for( ; pos != end; pos++) {
 		switch(in[pos]) {
-		case '&':	out.append("&amp;");	break;
-		case '\"':	out.append("&quot;");	break;
-		case '\'':	out.append("&apos;");	break;
-		case '<':	out.append("&lt;");	break;
-		case '>':	out.append("&gt;");	break;
-		default:	out.append(1, in[pos]);break;
+			// The usual suspects... (supported directly by latest XML spec)
+			case '&':	out.append("&amp;");	break;
+			case '\"':	out.append("&quot;");	break;
+			case '\'':	out.append("&apos;");	break;
+			case '<':	out.append("&lt;");	break;
+			case '>':	out.append("&gt;");	break;
+			// Everything Else (Normal and Odd)...
+			default:
+				// Carefully convert chars to ints (without sign extension!)
+				int keycode = (unsigned char) in[pos];
+				int thresh = (unsigned char) '\x7F';
+				// Odd characters a la UTF-*...
+				if ( keycode >= thresh ) {
+					// Convert to literal HTML key code "&#ddd" (decimal!)
+					std::stringstream ss;
+					ss << "&#";
+					ss << std::dec << keycode << std::dec;
+					ss << ";";
+					out.append(ss.str());
+				}
+				// Plain text character...
+				else {
+					out.append(1, in[pos]);
+				}
+				break;
 		}
 	}
 }
