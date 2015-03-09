@@ -34,12 +34,15 @@ namespace DASMON {
   */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
-      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0)
+      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_batch_mask(0)
 {
     if ( !m_cfg_dir.empty() && m_cfg_dir[m_cfg_dir.length()-1] != '/' )
          m_cfg_dir += "/";
 
     m_engine = new RuleEngine();
+    // Suppress all output until stream is connected and event data received
+    m_engine->beginBatch();
+
     m_monitor.addListener( *this );
     m_engine->attach( *this );
 
@@ -80,8 +83,6 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
 
     loadConfig();
-
-    m_debounce_thread = new boost::thread( boost::bind( &StreamAnalyzer::runDebounceThread, this ));
 }
 
 
@@ -712,35 +713,6 @@ StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
 }
 
 
-/** \brief This method debounces fact "noise" at run boundaries
-  *
-  * When a run is started or stopped, many facts in the rule engine must be
-  * retracted due to PVs being redefined. The PVs that are unchanged will be
-  * asserted again very quickly and would causes the associated rules or signals
-  * to flicker. To avoid this, the rule engine is place in batch mode on run
-  * transition, and this thread is used to end the batch mode after a specified
-  * debounce time.
-  */
-void
-StreamAnalyzer::runDebounceThread()
-{
-    while ( 1 )
-    {
-        sleep( 1 );
-
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        if ( m_debounce_sec )
-        {
-            --m_debounce_sec;
-            if ( !m_debounce_sec )
-            {
-                endBatch( RUN_BATCH_MASK );
-            }
-        }
-    }
-}
-
-
 /** \brief This method starts batch mode for the rule engine
   * \param a_mask - Bitmask for batch context
   *
@@ -752,7 +724,9 @@ void
 StreamAnalyzer::beginBatch( uint32_t a_mask )
 {
     if ( !m_batch_mask )
+    {
         m_engine->beginBatch();
+    }
 
     m_batch_mask |= a_mask;
 }
@@ -773,7 +747,9 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
         m_batch_mask &= ~a_mask;
 
         if ( !m_batch_mask )
+        {
             m_engine->endBatch();
+        }
     }
 }
 
@@ -802,14 +778,6 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
     // For both starting and stopping a run, facts associated with PVs must be cleared
     // as the SMS will re-broadcast only active PVs at these transitions. This allows
     // stale PVs (from disconnected devices) to be cleared out.
-
-    // In order to "debounce" signals that may flicker when this happens, batch mode
-    // is initiated here, then ended a few seconds later by a timer. This way only
-    // more persistent signal changes will be emitted rather than the bounce
-    // caused by the clear and reassertion of facts.
-
-    beginBatch( RUN_BATCH_MASK );
-    m_debounce_sec = 2;
 
     // Retract all PV facts
     m_engine->retractPrefix( m_pv_prefix );
@@ -848,6 +816,20 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
 
         //TODO Add retraction of beam and run info when protocol is changed
     }
+}
+
+
+void
+StreamAnalyzer::beginProlog()
+{
+    beginBatch( RUN_BATCH_MASK );
+}
+
+
+void
+StreamAnalyzer::endProlog()
+{
+    endBatch( RUN_BATCH_MASK );
 }
 
 
