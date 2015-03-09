@@ -88,6 +88,8 @@ private:
 
     // IStreamListener Interface
     void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
+    void beginProlog();
+    void endProlog();
     void pauseStatus( bool a_paused );
     void scanStatus( bool a_scanning, uint32_t a_scan_number );
     void beamInfo( const BeamInfo &a_info );
@@ -107,7 +109,6 @@ private:
     void onRetract( const std::string &a_fact );
 
     void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
-    void runDebounceThread();
     void beginBatch( uint32_t a_mask );
     void endBatch( uint32_t a_mask );
 
@@ -125,8 +126,6 @@ private:
     std::set<std::string>               m_limit_pvs;
     RuleEngine::HFACT                   m_fact[BIF_COUNT];
     std::string                         m_fact_name[BIF_COUNT];
-    boost::thread                      *m_debounce_thread;
-    uint32_t                            m_debounce_sec;
     uint32_t                            m_batch_mask;
 };
 

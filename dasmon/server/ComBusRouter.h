@@ -55,6 +55,8 @@ private:
 
     // IStreamListener Interface
     void    runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
+    void    beginProlog() {}
+    void    endProlog() {}
     void    pauseStatus( bool a_paused );
     void    scanStatus( bool a_scanning, uint32_t a_scan_number );
     void    beamInfo( const BeamInfo &a_info );

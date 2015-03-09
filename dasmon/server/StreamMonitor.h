@@ -30,6 +30,8 @@ class IStreamListener
 public:
     virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
     virtual void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp ) = 0;
+    virtual void beginProlog() = 0;
+    virtual void endProlog() = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
     virtual void scanStatus( bool a_scanning, uint32_t a_scan_number ) = 0;
     virtual void beamInfo( const BeamInfo &a_info ) = 0;
@@ -257,6 +259,8 @@ enum ThreadState
     TS_NOTIFY_BEAM_INFO,
     TS_NOTIFY_CONN_STATUS,
     TS_NOTIFY_RUN_STATUS,
+    TS_NOTIFY_BEGIN_PROLOG,
+    TS_NOTIFY_END_PROLOG,
     TS_NOTIFY_SCAN_STATUS,
     TS_NOTIFY_PAUSE_STATUS,
     TS_NOTIFY_RUN_METRICS,
@@ -310,6 +314,8 @@ private:
         void removeListener( IStreamListener &a_listener );
 
         void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp  );
+        void beginProlog();
+        void endProlog();
         void pauseStatus( bool a_paused );
         void scanStatus( bool a_scanning, uint32_t a_scan_number );
         void beamInfo( const BeamInfo &a_info );
@@ -418,6 +424,7 @@ private:
     static uint32_t                 m_proc_state;       ///< General state/step of stream processing thread.
     uint32_t                        m_metrics_ticker;   ///< "Alive" indicator for stream metrics thread
     uint32_t                        m_metrics_state;    ///< General state/step of stream metrics thread.
+    bool                            m_in_prolog;
 
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;

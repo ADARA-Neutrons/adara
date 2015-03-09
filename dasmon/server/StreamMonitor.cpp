@@ -53,7 +53,7 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
       m_paused(false), m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
       m_stream_rate(0), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
       m_bnk_pkt_count(0), m_mon_pkt_count(0), m_maxtof(a_maxtof), m_pixmap_processed(false),
-      m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT)
+      m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT), m_in_prolog(false)
 
 #ifndef NO_DB
      ,m_db_info(a_db_info), m_db_ticker(0), m_db_state(TS_INIT)
@@ -602,6 +602,10 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
     switch (a_pkt.status())
     {
     case ADARA::RunStatus::RUN_BOF:
+        m_in_prolog = true;
+        m_notify.beginProlog();
+        return false;
+
     case ADARA::RunStatus::RUN_EOF:
         return false;
 
@@ -619,6 +623,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         break;
     }
 
+    m_in_prolog = true;
+    m_notify.beginProlog();
+
     if ( recording && !m_recording )
     {
         boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -629,6 +636,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         m_pixmap_processed = false;
         resetRunStats();
+
 
         m_notify.runStatus( true, m_run_num, m_run_timestamp );
         m_proc_state = TS_RUNNING;
@@ -659,11 +667,6 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
-    }
-    else
-    {
-        // Let all listeners know a "transition" occured.
-        m_notify.runStatus( m_recording, m_run_num, m_run_timestamp );
     }
 
     return false;
@@ -756,6 +759,12 @@ bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
     m_proc_state = TS_PKT_BANKED_EVENT;
+
+    if ( m_in_prolog )
+    {
+        m_in_prolog = false;
+        m_notify.endProlog();
+    }
 
     ++m_bnk_pkt_count;
 
@@ -918,6 +927,12 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
+    if ( m_in_prolog )
+    {
+        m_in_prolog = false;
+        m_notify.endProlog();
+    }
+
     m_proc_state = TS_PKT_BEAM_MONITOR_EVENT;
 
     ++m_mon_pkt_count;
@@ -1487,6 +1502,7 @@ StreamMonitor::dbThread()
 
                     PQclear( res );
                     send_all = false;
+                    ++m_db_ticker;
                 }
 
                 ++m_db_ticker;
@@ -1509,6 +1525,7 @@ StreamMonitor::dbThread()
 
                     PQclear( res );
                     send_all = false;
+                    ++m_db_ticker;
                 }
             }
             PQfinish( conn );
@@ -1614,6 +1631,24 @@ StreamMonitor::Notifier::runStatus( bool a_recording, uint32_t a_run_number, uin
 
     for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->runStatus( a_recording, a_run_number, a_timestamp );
+}
+
+void
+StreamMonitor::Notifier::beginProlog()
+{
+    StreamMonitor::m_proc_state = TS_NOTIFY_BEGIN_PROLOG;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+        (*l)->beginProlog();
+}
+
+void
+StreamMonitor::Notifier::endProlog()
+{
+    StreamMonitor::m_proc_state = TS_NOTIFY_END_PROLOG;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+        (*l)->endProlog();
 }
 
 void
