@@ -21,14 +21,14 @@ public:
                             unsigned long a_run_num,
                             const std::string &a_status) 
         : m_facility(a_facility), m_beam_sname(a_beam_sname), 
-          m_start_time(a_start_time), m_run_num(a_run_num), m_status(a_status) 
+          m_start_time(a_start_time), m_run_num(a_run_num), m_reason(a_status) 
     {}
 
     std::string         m_facility;
     std::string         m_beam_sname;
     struct timespec	m_start_time;
     unsigned long       m_run_num;
-    std::string		m_status;
+    std::string		m_reason;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -44,7 +44,7 @@ protected:
         m_start_time.tv_sec = a_prop_tree.get( "start_sec", 0 );
         m_start_time.tv_nsec = a_prop_tree.get( "start_nsec", 0 );
         m_run_num = a_prop_tree.get( "run_number", 0 );
-        m_status = a_prop_tree.get( "status", "" );
+        m_reason = a_prop_tree.get( "reason", "" );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -56,7 +56,7 @@ protected:
         a_prop_tree.put( "start_nsec", m_start_time.tv_nsec );
         a_prop_tree.put( "start_sec", m_start_time.tv_sec );
         a_prop_tree.put( "run_number", m_run_num );
-        a_prop_tree.put( "status", m_status );
+        a_prop_tree.put( "reason", m_reason );
     }
 };
 
