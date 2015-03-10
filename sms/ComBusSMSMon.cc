@@ -138,6 +138,9 @@ void ComBusSMSMon::commThread() {
             if (!m_combus->broadcast(newmsg))
                syslog( LOG_INFO, "SMS Combus run %ld status <%s> send failed", 
 		      lookup->m_run_num, lookup->m_status.c_str());
+            else
+               syslog( LOG_INFO, "SMS Combus run %ld status <%s> sent", 
+		      lookup->m_run_num, lookup->m_status.c_str());
                            
             break;		// repeat loop 1
          }
