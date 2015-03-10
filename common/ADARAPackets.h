@@ -362,6 +362,25 @@ private:
 	friend class Parser;
 };
 
+class BeamMonitorConfigPkt : public Packet {
+public:
+	BeamMonitorConfigPkt(const BeamMonitorConfigPkt &pkt);
+
+	uint32_t bmonId(void) const { return m_fields[0]; }
+	uint32_t tofOffset(void) const { return m_fields[1]; }
+	uint32_t tofMax(void) const { return m_fields[2]; }
+	uint32_t tofBin(void) const { return m_fields[3]; }
+
+	double distance(void) const { return *(const double *) &m_fields[4]; }
+
+private:
+	const uint32_t *m_fields;
+
+	BeamMonitorConfigPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
 class DataDonePkt : public Packet {
 public:
 	DataDonePkt(const DataDonePkt &pkt);
