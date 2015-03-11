@@ -141,6 +141,7 @@ protected:
 	virtual bool rxPacket(const HeartbeatPkt &pkt);
 	virtual bool rxPacket(const GeometryPkt &pkt);
 	virtual bool rxPacket(const BeamlineInfoPkt &pkt);
+	virtual bool rxPacket(const BeamMonitorConfigPkt &pkt);
 	virtual bool rxPacket(const DataDonePkt &pkt);
 	virtual bool rxPacket(const DeviceDescriptorPkt &pkt);
 	virtual bool rxPacket(const VariableU32Pkt &pkt);

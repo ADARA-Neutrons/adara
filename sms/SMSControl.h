@@ -27,6 +27,7 @@ class Geometry;
 class DataSource;
 class PixelMap;
 class BeamlineInfo;
+class BeamMonitorConfig;
 class MetaDataMgr;
 class FastMeta;
 class Markers;
@@ -182,6 +183,7 @@ private:
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
+	boost::shared_ptr<BeamMonitorConfig> m_bmonConfig;
 	boost::shared_ptr<MetaDataMgr> m_meta;
 	boost::shared_ptr<FastMeta> m_fastmeta;
 	boost::shared_ptr<Markers> m_markers;

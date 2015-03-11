@@ -194,10 +194,11 @@ StreamParser::printStats
 //---------------------------------------------------------------------------------------------------------------------
 
 // These bitmasks are used to monitor one-time processing of the associated packet type
-#define PKT_BIT_PIXELMAP    0x0001
-#define PKT_BIT_RUNINFO     0x0002
-#define PKT_BIT_BEAMINFO    0x0004
-#define PKT_BIT_GEOMETRY    0x0008
+#define PKT_BIT_PIXELMAP                0x0001
+#define PKT_BIT_RUNINFO                 0x0002
+#define PKT_BIT_BEAMINFO                0x0004
+#define PKT_BIT_GEOMETRY                0x0008
+#define PKT_BIT_BEAM_MONITOR_CONFIG     0x0010
 
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
@@ -263,6 +264,9 @@ StreamParser::rxPacket
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
+
+    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAM_MONITOR_CONFIG)
 
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
@@ -1076,6 +1080,30 @@ StreamParser::rxPacket
     m_run_info.instr_longname =  a_pkt.longName();
 
     receivedInfo( INSTR_INFO_BIT );
+
+    return false;
+}
+
+
+/*! \brief This method processes Beam Monitor Config ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Beam Monitor Config packets,
+ * to optionally define Histogramming parameters for
+ * processing/accumulating Beam Monitor data.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
+)
+{
+    syslog( LOG_INFO,
+        "[%i] Beam Monitor %d Config Received:", g_pid, a_pkt.bmonId() );
+    syslog( LOG_INFO,
+        "[%i] distance=%lf histo=(%d to %d by %d).",
+        g_pid, a_pkt.distance(),
+        a_pkt.tofOffset(), a_pkt.tofMax(), a_pkt.tofBin() );
 
     return false;
 }

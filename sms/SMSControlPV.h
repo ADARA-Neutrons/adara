@@ -95,7 +95,7 @@ private:
 
 class smsStringPV : public smsPV {
 public:
-	enum { MAX_LENGTH = 1024 };
+	enum { MAX_LENGTH = 2048 };
 
 	smsStringPV(const std::string &name);
 
