@@ -3,13 +3,13 @@
 #include <string>
 #include "ComBusSMSMon.h"
 
-SMSRunStatus::SMSRunStatus(unsigned long a_run_num, std::string &a_status,
+SMSRunStatus::SMSRunStatus(unsigned long a_run_num, std::string &a_reason,
                 struct timespec a_start_time) :
-                m_run_num(a_run_num), m_status(a_status),
+                m_run_num(a_run_num), m_reason(a_reason),
                 m_start_time(a_start_time) 
 {}
-SMSRunStatus::SMSRunStatus(unsigned long a_run_num, std::string &a_status) :
-                m_run_num(a_run_num), m_status(a_status)
+SMSRunStatus::SMSRunStatus(unsigned long a_run_num, std::string &a_reason) :
+                m_run_num(a_run_num), m_reason(a_reason)
 {}
    
 bool SMSRunStatus::hasTime() {
@@ -106,7 +106,7 @@ void ComBusSMSMon::commThread() {
              if (!m_combus) {
                 openComm();
              } else {
-                // Send status every 5 seconds
+                // Send status (heartbeat) every 5 seconds
                 if ( !( hb % 5 )) {
                    m_combus->status( ADARA::ComBus::STATUS_OK );
                 }
@@ -120,7 +120,7 @@ void ComBusSMSMon::commThread() {
          } else {
             if (m_run_dict.count(inpu->m_run_num)) {
                lookup = m_run_dict[inpu->m_run_num];
-               lookup->m_status = inpu->m_status;
+               lookup->m_reason = inpu->m_reason;
                if (inpu->hasTime()) {
                   lookup->m_start_time = inpu->m_start_time;
                }
@@ -134,13 +134,13 @@ void ComBusSMSMon::commThread() {
  					  m_beam_sname, 
                                           lookup->m_start_time, 
                                           lookup->m_run_num,
-                                          lookup->m_status);
+                                          lookup->m_reason);
             if (!m_combus->broadcast(newmsg))
                syslog( LOG_INFO, "SMS Combus run %ld status <%s> send failed", 
-		      lookup->m_run_num, lookup->m_status.c_str());
+		      lookup->m_run_num, lookup->m_reason.c_str());
             else
                syslog( LOG_INFO, "SMS Combus run %ld status <%s> sent", 
-		      lookup->m_run_num, lookup->m_status.c_str());
+		      lookup->m_run_num, lookup->m_reason.c_str());
                            
             break;		// repeat loop 1
          }

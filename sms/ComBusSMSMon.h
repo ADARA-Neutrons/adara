@@ -10,17 +10,17 @@
 class SMSRunStatus {
 public:
    // Only needs to be sent once 
-   SMSRunStatus(unsigned long a_run_num, std::string &a_status,
+   SMSRunStatus(unsigned long a_run_num, std::string &a_reason,
                 struct timespec a_start_time);
    // The usual item
-   SMSRunStatus(unsigned long a_run_num, std::string &a_status);
+   SMSRunStatus(unsigned long a_run_num, std::string &a_reason);
 
    /* check if we have time */
    bool hasTime();
 
    // data is public for use by ComBusSMSMon
    unsigned long m_run_num;
-   std::string m_status;
+   std::string m_reason;
    struct timespec m_start_time;
 };
 

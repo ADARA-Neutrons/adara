@@ -19,9 +19,9 @@ public:
     StatusUpdateMsg( const std::string &a_facility, const std::string &a_beam_sname,
                             struct timespec a_start_time, 
                             unsigned long a_run_num,
-                            const std::string &a_status) 
+                            const std::string &a_reason) 
         : m_facility(a_facility), m_beam_sname(a_beam_sname), 
-          m_start_time(a_start_time), m_run_num(a_run_num), m_reason(a_status) 
+          m_start_time(a_start_time), m_run_num(a_run_num), m_reason(a_reason) 
     {}
 
     std::string         m_facility;
