@@ -366,12 +366,19 @@ class BeamMonitorConfigPkt : public Packet {
 public:
 	BeamMonitorConfigPkt(const BeamMonitorConfigPkt &pkt);
 
-	uint32_t bmonId(void) const { return m_fields[0]; }
-	uint32_t tofOffset(void) const { return m_fields[1]; }
-	uint32_t tofMax(void) const { return m_fields[2]; }
-	uint32_t tofBin(void) const { return m_fields[3]; }
+	uint32_t beamMonCount(void) const { return m_fields[0]; }
 
-	double distance(void) const { return *(const double *) &m_fields[4]; }
+	uint32_t bmonId(uint32_t index) const
+		{ return m_fields[(index * 6) + 1]; }
+	uint32_t tofOffset(uint32_t index) const
+		{ return m_fields[(index * 6) + 2]; }
+	uint32_t tofMax(uint32_t index) const
+		{ return m_fields[(index * 6) + 3]; }
+	uint32_t tofBin(uint32_t index) const
+		{ return m_fields[(index * 6) + 4]; }
+
+	double distance(uint32_t index) const
+		{ return *(const double *) &m_fields[(index * 6) + 5]; }
 
 private:
 	const uint32_t *m_fields;

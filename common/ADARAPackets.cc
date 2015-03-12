@@ -356,7 +356,10 @@ BeamMonitorConfigPkt::BeamMonitorConfigPkt(const uint8_t *data,
 		uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
-	if (m_payload_len != (sizeof(double) + (4 * sizeof(uint32_t)))) {
+	size_t sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
+
+	if (m_payload_len !=
+			(sizeof(uint32_t) + (beamMonCount() * sectionSize))) {
 		std::string msg("BeamMonitorConfig packet is incorrect length: ");
 		msg += boost::lexical_cast<std::string>(m_payload_len);
 		throw invalid_packet(msg);
