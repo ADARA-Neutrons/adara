@@ -11,6 +11,23 @@
 class DataSource;
 class SMSControl;
 
+/* We need to a specialized destructor to delete allocated data when
+ * the gdd holding them drops its last reference.
+ */
+class fixedStringDestructor : public gddDestructor {
+	virtual void run(void *p) {
+		aitFixedString *s = (aitFixedString *)p;
+		delete [] s;
+	}
+};
+
+class charArrayDestructor : public gddDestructor {
+	virtual void run(void *p) {
+		char *s = (char *)p;
+		delete [] s;
+	}
+};
+
 class smsPV : public casPV {
 public:
 	smsPV();

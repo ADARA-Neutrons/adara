@@ -25,23 +25,6 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
  */
 #define uninitialized_var(x) x = 0
 
-/* We need to a specialized destructor to delete allocated data when
- * the gdd holding them drops its last reference.
- */
-class fixedStringDestructor : public gddDestructor {
-	virtual void run(void *p) {
-		aitFixedString *s = (aitFixedString *)p;
-		delete [] s;
-	}
-};
-
-class charArrayDestructor : public gddDestructor {
-	virtual void run(void *p) {
-		char *s = (char *)p;
-		delete [] s;
-	}
-};
-
 /* ----------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getBooleanEnums(gdd &in)
