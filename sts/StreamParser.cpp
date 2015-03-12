@@ -1099,11 +1099,14 @@ StreamParser::rxPacket
 )
 {
     syslog( LOG_INFO,
-        "[%i] Beam Monitor %d Config Received:", g_pid, a_pkt.bmonId() );
-    syslog( LOG_INFO,
-        "[%i] distance=%lf histo=(%d to %d by %d).",
-        g_pid, a_pkt.distance(),
-        a_pkt.tofOffset(), a_pkt.tofMax(), a_pkt.tofBin() );
+        "[%i] Beam Monitor Config Received: %d Monitors",
+        g_pid, a_pkt.beamMonCount() );
+    for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
+        syslog( LOG_INFO,
+            "[%i] Beam Monitor %d: distance=%lf histo=(%d to %d by %d).",
+            g_pid, a_pkt.bmonId(i), a_pkt.distance(i),
+            a_pkt.tofOffset(i), a_pkt.tofMax(i), a_pkt.tofBin(i) );
+    }
 
     return false;
 }
