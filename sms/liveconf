@@ -144,7 +144,7 @@ option_id_type[$num_options]="monitor"
 option_name[$num_options]="bin"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofBin"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
-option_label[$num_options]="[Linear TOF Bin Size for Beam Mon Histogramm]"
+option_label[$num_options]="[Linear TOF Bin Size for Beam Mon Histogram]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
@@ -935,6 +935,20 @@ GET_CONFIG_SETTING()
 					opt_id_name=" (Monitor${_monitor_id})"
 				fi
 				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect."
+				# Special Case: Monitor Id Stored in Section Id...!
+				if [[ "${_option}" == "id"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: Monitor Id in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_monitor_id}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
 			elif [ "${_id_type}" == "sms" ]; then
 				_id_num="-1"
 				# echo "SMS Section."
