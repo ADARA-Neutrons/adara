@@ -32,6 +32,9 @@ idName["source"]="Source"
 is_indexed["ctrl"]=0
 idName["ctrl"]="Control"
 
+is_indexed["monitor"]=1
+idName["monitor"]="BeamMonitor"
+
 is_indexed["storage"]=0
 idName["storage"]="Storage"
 
@@ -109,6 +112,48 @@ option_value_type[$num_options]="INT32_VALUE(pulse_index)"
 option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="id"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
+option_value_type[$num_options]="UINT32_VALUE(Never Use This :-)"
+option_label[$num_options]="[Manually Override Beam Monitor Id in Config]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="format"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Format"
+option_value_type[$num_options]="BOOL_VALUE(event/histo)"
+option_label[$num_options]="[Switch Beam Monitor Output Formatting]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="offset"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofOffset"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[TOF Offset for Histogramming Beam Monitor]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="max"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:MaxTof"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Max TOF Beam Monitor Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="bin"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofBin"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Linear TOF Bin Size for Beam Mon Histogramm]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="distance"
+option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Distance"
+option_value_type[$num_options]="FLOAT64_VALUE(meters)"
+option_label[$num_options]="[Beam Monitor Distance from Sample]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
@@ -182,13 +227,12 @@ num_options=$(( num_options + 1 ))
 
 USAGE()
 {
-	substatuses="[run_status] [data_status] [sys_status] [live_status]"
-
 	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [status] $substatuses \\"
+	echo "            [status] [run_status] [data_status] \\"
+	echo "            [sys_status] [live_status] [bmon_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -210,6 +254,7 @@ USAGE()
 	echo "   run_status            = display SMS run status"
 	echo "   data_status           = display SMS data source status"
 	echo "   sys_status            = display SMS internal system status"
+	echo "   bmon_status           = display SMS BeamMonitorConfig status"
 	echo "   live_status           = display SMS live client status"
 	echo
 
@@ -356,6 +401,7 @@ if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
 		|| "$command" == "data_status" \
 		|| "$command" == "sys_status" \
+		|| "$command" == "bmon_status" \
 		|| "$command" == "live_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
@@ -458,6 +504,29 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "bmon_status" ]]; then
+
+		nbmvar="${PRE}:SMS:Control:NumBeamMonitors"
+		caget $WAIT $nbmvar
+		if [ $? == 0 ]; then
+			echo
+			numBeamMonitors=`caget $WAIT $nbmvar | grep $nbmvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( bm=1 ; bm <= numBeamMonitors ; bm++ )); do
+				echo "Beam Monitor index=${bm}:"
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Id
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Format
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:TofOffset
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:MaxTof
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:TofBin
+				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Distance
+				echo
+			done
+		fi
 	fi
 
 	if [[ "$command" == "status" \
@@ -742,6 +811,8 @@ GET_CONFIG_SETTING()
 
 	local _source_cnt=0
 
+	local _monitor_cnt=0
+
 	opt_id_name=""
 
 	local _id_type=""
@@ -854,6 +925,16 @@ GET_CONFIG_SETTING()
 					opt_id_name=" (${_source_name})"
 				fi
 				# echo "Source #${_source_cnt}: ${_source_name} Section."
+			elif [ "${_id_type}" == "monitor" ]; then
+				local _monitor_id=`echo "${_line_id}" \
+					| sed "s/^monitor //"`
+				_monitor_cnt=$(( _monitor_cnt + 1 ))
+				_id_num="$_monitor_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name=" (Monitor${_monitor_id})"
+				fi
+				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect."
 			elif [ "${_id_type}" == "sms" ]; then
 				_id_num="-1"
 				# echo "SMS Section."
