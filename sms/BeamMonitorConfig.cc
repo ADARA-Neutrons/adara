@@ -98,6 +98,9 @@ public:
 
 			m_info->setFormat(newFormat);
 
+			// Update Event/Histo Counts in Config...
+			m_config->updateFormatCounts(do_histo);
+
 			// Reset Timestamp on Prologue Packet...
 			m_config->resetPacketTime();
 		}
@@ -474,6 +477,18 @@ BeamMonitorConfig::~BeamMonitorConfig()
 	bmonInfos.clear();
 
 	m_connection.disconnect();
+}
+
+void BeamMonitorConfig::updateFormatCounts(bool new_histo)
+{
+	if ( new_histo ) {
+		m_numHisto++;
+		m_numEvent--;
+	}
+	else {
+		m_numEvent++;
+		m_numHisto--;
+	}
 }
 
 void BeamMonitorConfig::resetPacketTime(void)

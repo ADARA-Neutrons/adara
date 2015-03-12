@@ -18,6 +18,8 @@ public:
 	BeamMonitorConfig(const boost::property_tree::ptree & conf);
 	~BeamMonitorConfig();
 
+	void updateFormatCounts(bool new_histo);
+
 	void resetPacketTime(void);
 
 private:
