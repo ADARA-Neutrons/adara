@@ -13,66 +13,38 @@ static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
 
 class BeamMonitorInfo {
 public:
-	BeamMonitorInfo(uint32_t id,
+	BeamMonitorInfo(uint32_t index, uint32_t id,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
-			double distance) : m_id(id),
+			double distance) : m_index(index), m_id(id),
 		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
 		m_distance(distance)
-	{
-		DEBUG("Beam Monitor " << id << " Histo Config:"
-			<< " tofOffset=" << m_tofOffset
-			<< " tofMax=" << m_tofMax
-			<< " tofBin=" << m_tofBin
-			<< " distance=" << m_distance);
-
-		m_payloadSize = 24;   // 4 x uint32_t and 1 double...
-		m_packetSize = m_payloadSize + sizeof(ADARA::Header);
-
-		m_packet = new uint8_t[m_packetSize];
-
-		updatePacket();
-	}
-
-	~BeamMonitorInfo() { delete [] m_packet; }
+	{ }
 
 	uint32_t getId(void) const { return m_id; }
-	uint8_t *getPacket(void) const { return m_packet; }
-	uint32_t getPacketSize(void) const { return m_packetSize; }
 
-	void updatePacket(void)
+	void updatePacket(uint8_t *m_packet)
 	{
-		struct timespec ts;
+		uint32_t *fields = (uint32_t *) m_packet;
 
-		uint32_t *fields;
+		fields[(m_index * 6) + 5] = m_id;
 
-		fields = (uint32_t *) m_packet;
+		fields[(m_index * 6) + 6] = m_tofOffset;
+		fields[(m_index * 6) + 7] = m_tofMax;
+		fields[(m_index * 6) + 8] = m_tofBin;
 
-		clock_gettime(CLOCK_REALTIME, &ts);
-
-		fields[0] = m_payloadSize;
-		fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0;
-		fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
-		fields[3] = ts.tv_nsec;
-
-		fields[4] = m_id;
-
-		fields[5] = m_tofOffset;
-		fields[6] = m_tofMax;
-		fields[7] = m_tofBin;
-
-		*((double *) &(fields[8])) = m_distance;
+		*((double *) &(fields[(m_index * 6) + 9])) = m_distance;
 	}
 
 private:
+	uint32_t m_index;
+
 	uint32_t m_id;
+
 	uint32_t m_tofOffset;
 	uint32_t m_tofMax;
 	uint32_t m_tofBin;
-	double m_distance;
 
-	uint32_t m_payloadSize;
-	uint32_t m_packetSize;
-	uint8_t *m_packet;
+	double m_distance;
 };
 
 BeamMonitorConfig::BeamMonitorConfig(
@@ -83,19 +55,45 @@ BeamMonitorConfig::BeamMonitorConfig(
 	size_t plen = prefix.length();
 
 	// Count how many Beam Monitors we have defined...
-	uint32_t numBeamMonitors = 0;
+	m_numBeamMonitors = 0;
 	for (it = conf.begin(); it != conf.end(); ++it) {
 		if (!it->first.compare(0, plen, prefix))
-			numBeamMonitors++;
+			m_numBeamMonitors++;
 	}
 
 	// We're saving Beam Monitor Events...
-	if ( numBeamMonitors == 0 ) {
+	if ( m_numBeamMonitors == 0 ) {
 		INFO("No Beam Monitor Histogramming Configurations Found.");
 		return;
 	}
 
+	// Allocate Prologue Packet...
+	m_sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
+	m_payloadSize = sizeof(uint32_t) + (m_numBeamMonitors * m_sectionSize);
+	m_packetSize = m_payloadSize + sizeof(ADARA::Header);
+
+	m_packet = new uint8_t[m_packetSize];
+
+	// Initialize Prologue Packet...
+
+	struct timespec ts;
+
+	uint32_t *fields;
+
+	fields = (uint32_t *) m_packet;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	fields[0] = m_payloadSize;
+	fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0;
+	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	fields[3] = ts.tv_nsec;
+
+	fields[4] = m_numBeamMonitors;
+
 	// Extract Each Beam Monitor Config...
+
+	uint32_t index = 0;
 
 	uint32_t bmonId;
 
@@ -118,9 +116,18 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 		distance = it->second.get<double>("distance", 0.0);
 
-		bmonInfo.push_back(
-			new BeamMonitorInfo(bmonId,
-				tofOffset, tofMax, tofBin, distance) );
+		DEBUG("Beam Monitor " << bmonId << " Histo Config:"
+			<< " tofOffset=" << tofOffset
+			<< " tofMax=" << tofMax
+			<< " tofBin=" << tofBin
+			<< " distance=" << distance);
+
+		BeamMonitorInfo *bmonInfo = new BeamMonitorInfo(index++,
+			bmonId, tofOffset, tofMax, tofBin, distance);
+
+		bmonInfo->updatePacket(m_packet);
+
+		bmonInfos.push_back(bmonInfo);
 	}
 
 	m_connection = StorageManager::onPrologue(
@@ -130,10 +137,10 @@ BeamMonitorConfig::BeamMonitorConfig(
 BeamMonitorConfig::~BeamMonitorConfig()
 {
 	std::vector<BeamMonitorInfo *>::iterator bmi;
-	for (bmi=bmonInfo.begin(); bmi != bmonInfo.end(); ++bmi) {
+	for (bmi=bmonInfos.begin(); bmi != bmonInfos.end(); ++bmi) {
 		delete (*bmi);
 	}
-	bmonInfo.clear();
+	bmonInfos.clear();
 
 	m_connection.disconnect();
 }
@@ -141,12 +148,12 @@ BeamMonitorConfig::~BeamMonitorConfig()
 void BeamMonitorConfig::onPrologue(void)
 {
 	std::vector<BeamMonitorInfo *>::iterator bmi;
-	
-	for (bmi=bmonInfo.begin(); bmi != bmonInfo.end(); ++bmi) {
-		DEBUG("Adding Beam Monitor " << (*bmi)->getId()
-			<< " Config to Prologue.");
-		StorageManager::addPrologue(
-			(*bmi)->getPacket(), (*bmi)->getPacketSize());
+	for (bmi=bmonInfos.begin(); bmi != bmonInfos.end(); ++bmi) {
+		DEBUG("Updating Beam Monitor " << (*bmi)->getId()
+			<< " Config for Prologue.");
+		(*bmi)->updatePacket(m_packet);
 	}
+
+	StorageManager::addPrologue(m_packet, m_packetSize);
 }
 

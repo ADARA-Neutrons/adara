@@ -13,7 +13,15 @@ public:
 	~BeamMonitorConfig();
 
 private:
-	std::vector<BeamMonitorInfo *> bmonInfo;
+	std::vector<BeamMonitorInfo *> bmonInfos;
+
+	uint32_t m_numBeamMonitors;
+
+	uint32_t m_sectionSize;
+	uint32_t m_payloadSize;
+	uint32_t m_packetSize;
+
+	uint8_t *m_packet;
 
 	boost::signals2::connection m_connection;
 
