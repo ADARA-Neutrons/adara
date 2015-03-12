@@ -168,6 +168,7 @@ public:
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 	bool rxPacket(const ADARA::GeometryPkt &pkt);
 	bool rxPacket(const ADARA::BeamlineInfoPkt &pkt);
+	bool rxPacket(const ADARA::BeamMonitorConfigPkt &pkt);
 	bool rxPacket(const ADARA::DataDonePkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
@@ -616,6 +617,19 @@ bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 		pkt.id().c_str(), pkt.shortName().c_str(),
 		pkt.longName().c_str());
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BeamMonitorConfigPkt &pkt)
+{
+	printf("%u.%09u BEAM MONITOR CONFIG\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	printf("    num %d\n", pkt.beamMonCount());
+	for (uint32_t i = 0; i < pkt.beamMonCount(); i++) {
+		printf("    id %d tofOffset %d tofMax %d tofBin %d distance %lf\n",
+			pkt.bmonId(i), pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
+			pkt.distance(i));
+	}
 	return false;
 }
 
