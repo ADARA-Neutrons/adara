@@ -1099,7 +1099,7 @@ StreamParser::rxPacket
 )
 {
     syslog( LOG_INFO,
-        "[%i] Beam Monitor Config Received: %d Monitors",
+        "[%i] Beam Monitor Config Received: %d Histo Monitors",
         g_pid, a_pkt.beamMonCount() );
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
         syslog( LOG_INFO,
