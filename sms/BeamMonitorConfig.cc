@@ -55,11 +55,28 @@ BeamMonitorConfig::BeamMonitorConfig(
 	size_t plen = prefix.length();
 
 	// Count how many Beam Monitors we have defined...
-	m_numBeamMonitors = 0;
+	std::string format;
+	uint32_t numEvent = 0, numHisto = 0;
 	for (it = conf.begin(); it != conf.end(); ++it) {
-		if (!it->first.compare(0, plen, prefix))
-			m_numBeamMonitors++;
+		if (!it->first.compare(0, plen, prefix)) {
+			format = it->second.get<std::string>("format", "event");
+			if ( !format.compare("event") )
+				numEvent++;
+			else if ( !format.compare("histo") )
+				numHisto++;
+		}
 	}
+
+	// Make Sure it's "All or Nothing"...! ;-D
+	if ( numEvent > 0 && numHisto > 0 ) {
+		ERROR("*Mixed* Beam Monitor Output Format Configurations! "
+			<< numEvent << " Monitor(s) with Event Format, "
+			<< numHisto << " Monitor(s) with Histogram Format."
+			<< " Defaulting to ALL Event-Based Beam Monitor Formatting!");
+		return;
+	}
+
+	m_numBeamMonitors = numHisto;
 
 	// We're saving Beam Monitor Events...
 	if ( m_numBeamMonitors == 0 ) {
