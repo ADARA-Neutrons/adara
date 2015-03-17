@@ -61,7 +61,7 @@ StreamParser::StreamParser
 }
 
 
-/*! \brief Destructor for StremParser class.
+/*! \brief Destructor for StreamParser class.
  *
  */
 StreamParser::~StreamParser()
@@ -77,6 +77,8 @@ StreamParser::~StreamParser()
         if ( imi->second )
             delete imi->second;
 
+    m_monitor_config.clear();
+
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
         if ( ipv->second )
             delete ipv->second;
@@ -85,7 +87,7 @@ StreamParser::~StreamParser()
 
 /*! \brief This method initiates ADARA stream processing.
  *
- * This method initiates ADARA stream processing on the calling thread and does not return until the strem is fuly
+ * This method initiates ADARA stream processing on the calling thread and does not return until the stream is fully
  * translated, or an error occurs (an exception may be thrown). This method can only be called once for a given
  * StreamParser instance.
  */
@@ -845,7 +847,8 @@ StreamParser::processMonitorEvents
     map<Identifier,MonitorInfo*>::iterator imi = m_monitors.find( a_monitor_id );
     if ( imi == m_monitors.end())
     {
-        MonitorInfo *mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh );
+        STS::BeamMonitorConfig *config = getBeamMonitorConfig(a_monitor_id);
+        MonitorInfo *mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
         imi = m_monitors.insert( m_monitors.begin(), pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
     }
 
@@ -1102,13 +1105,63 @@ StreamParser::rxPacket
         "[%i] Beam Monitor Config Received: %d Histo Monitors",
         g_pid, a_pkt.beamMonCount() );
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
+        STS::BeamMonitorConfig config;
         syslog( LOG_INFO,
             "[%i] Beam Monitor %d: distance=%lf histo=(%d to %d by %d).",
             g_pid, a_pkt.bmonId(i), a_pkt.distance(i),
             a_pkt.tofOffset(i), a_pkt.tofMax(i), a_pkt.tofBin(i) );
+        config.id = a_pkt.bmonId(i);
+        config.tofOffset = a_pkt.tofOffset(i);
+        config.tofMax = a_pkt.tofMax(i);
+        config.tofBin = a_pkt.tofBin(i);
+        config.distance = a_pkt.distance(i);
+        m_monitor_config.push_back(config);
     }
 
     return false;
+}
+
+
+/*! \brief This method looks up any Histogram Config for a Beam Monitor
+ *  \return Pointer to element of the BeamMonitorConfig vector or NULL
+ *
+ * This method looks for a Beam Monitor Histogramming Config amongst
+ * any optionally received prologue information, to define proper
+ * Histogramming parameters for processing/accumulating Beam Monitor data.
+ */
+STS::BeamMonitorConfig *
+StreamParser::getBeamMonitorConfig
+(
+    Identifier a_monitor_id   ///< [in] Beam Monitor Id (uint32_t)
+)
+{
+    STS::BeamMonitorConfig *config = (STS::BeamMonitorConfig *) NULL;
+
+    // Any Beam Monitor Histogramming Parameters...?
+    if (m_monitor_config.size() == 0)
+        return(config);
+
+    // Look for a matching Beam Monitor Id in Any Config...
+    for ( vector<STS::BeamMonitorConfig>::iterator bmc =
+                m_monitor_config.begin();
+            bmc != m_monitor_config.end() && config == NULL ; ++bmc )
+    {
+        if (bmc->id == a_monitor_id)
+            config = &(*bmc);
+    }
+
+    // If we didn't find one, then there's Trouble... ;-b
+    if (config == NULL)
+    {
+        syslog( LOG_ERR,
+        "[%i] Beam Monitor Error: Missing Histogramming Config for Id=%d.",
+            g_pid, a_monitor_id );
+		// TODO Now What??!!!
+		// - flag this Beam Monitor as Erroneous (still save events/where?)
+		// - un-histogram _All_ previous Beam Monitors? (if events saved)
+    }
+
+    return(config);
 }
 
 

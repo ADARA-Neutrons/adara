@@ -99,6 +99,8 @@ private:
     void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
     void        processMonitorEvents( Identifier a_monitor_id, uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
+    STS::BeamMonitorConfig *
+                getBeamMonitorConfig( Identifier a_monitor_id );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
     //void        processPulseID( uint64_t a_pulse_id );
@@ -117,6 +119,7 @@ private:
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
+    std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
     std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
