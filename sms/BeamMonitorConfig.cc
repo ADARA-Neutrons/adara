@@ -28,7 +28,7 @@ public:
 
 		void changed(void)
 		{
-			int32_t id = value();
+			uint32_t id = value();
 
 			WARN("BeamMonIdPV: CHANGING BEAM MONITOR ID in Config! "
 				<< m_pv_name << " Re-Numbered from " << m_info->getId()
@@ -118,7 +118,7 @@ public:
 
 		void changed(void)
 		{
-			int32_t tofOffset = value();
+			uint32_t tofOffset = value();
 
 			INFO("BeamMonOffsetPV: Changing Beam Monitor "
 				<< m_info->getId() << " TOF Offset for "
@@ -144,7 +144,7 @@ public:
 
 		void changed(void)
 		{
-			int32_t tofMax = value();
+			uint32_t tofMax = value();
 
 			INFO("BeamMonMaxPV: Changing Beam Monitor "
 				<< m_info->getId() << " Maximum TOF for "
@@ -170,12 +170,19 @@ public:
 
 		void changed(void)
 		{
-			int32_t tofBin = value();
+			uint32_t tofBin = value();
 
 			INFO("BeamMonBinPV: Changing Beam Monitor "
 				<< m_info->getId() << " TOF Histogram Bin Size for "
 				<< m_pv_name << " from " << m_info->getTofBin()
 				<< " to " << tofBin);
+
+			if ( tofBin < 1 )
+			{
+				ERROR("BeamMonBinPV: TOF Histogram Bin Size < 1!"
+					<< " Setting to 1.");
+				tofBin = 1;
+			}
 
 			m_info->setTofBin(tofBin);
 
@@ -422,6 +429,13 @@ BeamMonitorConfig::BeamMonitorConfig(
 		tofOffset = it->second.get<uint32_t>("offset", 0);
 		tofMax = it->second.get<uint32_t>("max", -1);
 		tofBin = it->second.get<uint32_t>("bin", 1);
+
+		if ( tofBin < 1 )
+		{
+			ERROR("BeamMonitorConfig: TOF Histogram Bin Size < 1!"
+				<< " Setting to 1.");
+			tofBin = 1;
+		}
 
 		distance = it->second.get<double>("distance", 0.0);
 
