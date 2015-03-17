@@ -68,6 +68,16 @@ public:
 };
 
 
+/// Beam Monitor Configuration information (used in MonitorInfo)
+struct BeamMonitorConfig
+{
+    uint32_t                id;
+    uint32_t                tofOffset;
+    uint32_t                tofMax;
+    uint32_t                tofBin;
+    double                  distance;
+};
+
 /// Base class for monitor info
 class MonitorInfo
 {
@@ -75,14 +85,16 @@ public:
     ///< MonitorInfo constructor
     MonitorInfo
     (
-        uint16_t a_id,              ///< [in] ID of detector bank
-        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+        uint16_t a_id,               ///< [in] ID of detector bank
+        uint32_t a_buf_reserve,      ///< [in] Event buffer initial capacity
+        uint32_t a_idx_buf_reserve,  ///< [in] Index buffer initial capacity
+        BeamMonitorConfig *a_config  ///< [in] Beam Mon Histo Config (opt)
     )
     :
         m_id(a_id),
         m_event_count(0),
-        m_last_pulse_with_data(0)
+        m_last_pulse_with_data(0),
+        m_config(a_config)
     {
         m_tof_buffer.reserve(a_buf_reserve);
         m_index_buffer.reserve(a_idx_buf_reserve);
@@ -97,7 +109,10 @@ public:
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this monitor
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
+
+    BeamMonitorConfig      *m_config;               ///< Any (Histogram) config info for this monitor
 };
+
 
 /// User information (part of RunInfo)
 struct UserInfo
@@ -127,6 +142,7 @@ struct RunInfo
     std::string             sample_environment;
     std::vector<UserInfo>   users;
 };
+
 
 /// Run metrics collected by STS during translation
 struct RunMetrics
@@ -272,7 +288,7 @@ public:
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
     virtual PVInfoBase*     makePVInfo( const std::string & a_name, const std::string & a_device_name, Identifier a_device_id, Identifier a_pv_id, PVType a_type, const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
-    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
+    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve, STS::BeamMonitorConfig *a_config ) = 0;
     virtual void            processRunInfo( const RunInfo & a_run_info ) = 0;
     virtual void            processGeometry( const std::string & a_xml ) = 0;
     virtual void            pulseBuffersReady( STS::PulseInfo &a_pulse_info ) = 0;
