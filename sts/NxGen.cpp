@@ -166,8 +166,10 @@ NxGen::makeBankInfo
 /*! \brief Factory method for MonitorInfo instances
  *  \return A new MonitorInfo derived instance
  *
- * This method constructs Nexus-specific MonitorInfo objects. The Nexus-specific NxMonitorInfo class extends the
- * BankInfo class to include a number of attributes needed for writing monito event data efficiently to a Nexus file.
+ * This method constructs Nexus-specific MonitorInfo objects.
+ * The Nexus-specific NxMonitorInfo class extends the
+ * BankInfo class to include a number of attributes needed
+ * for writing monito event data efficiently to a Nexus file.
  */
 STS::MonitorInfo*
 NxGen::makeMonitorInfo
@@ -180,7 +182,8 @@ NxGen::makeMonitorInfo
 {
     try
     {
-        NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config );
+        NxMonitorInfo* mi = new NxMonitorInfo(
+            a_id, a_buf_reserve, a_idx_buf_reserve, a_config );
 
         if ( m_gen_nexus)
         {
@@ -640,7 +643,8 @@ NxGen::bankFinalize
 
 /*! \brief Writes monitor event buffers to Nexus file
  *
- * This method writes time of flight and index data in monitor buffers to the Nexus file.
+ * This method writes time of flight and index data in monitor buffers
+ * to the Nexus file.
  */
 void
 NxGen::monitorBuffersReady
@@ -655,24 +659,35 @@ NxGen::monitorBuffersReady
     {
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorBuffersReady()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid monitor object passed to monitorBuffersReady()" )
+        }
 
-        writeSlab( mi->m_tof_slab_path, a_monitor.m_tof_buffer, mi->m_event_slab_size );
-        mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
+        // Event-based Monitors Only...
+        if ( mi->m_config == NULL )
+        {
+            writeSlab( mi->m_tof_slab_path,
+                a_monitor.m_tof_buffer, mi->m_event_slab_size );
+            mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
 
-        writeSlab( mi->m_index_slab_path, a_monitor.m_index_buffer, mi->m_index_slab_size );
-        mi->m_index_slab_size += a_monitor.m_index_buffer.size();
+            writeSlab( mi->m_index_slab_path,
+                a_monitor.m_index_buffer, mi->m_index_slab_size );
+            mi->m_index_slab_size += a_monitor.m_index_buffer.size();
+        }
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "monitorBuffersReady() failed for monitor id: " << a_monitor.m_id )
+        RETHROW_TRACE( e, "monitorBuffersReady() failed for monitor id: "
+            << a_monitor.m_id )
     }
 }
 
 
 /*! \brief Fills pulse gaps in monitor index slab
  *
- * This method fills pulse gaps in the index slab for a given monitor in the Nexus file.
+ * This method fills pulse gaps in the index slab for a given monitor
+ * in the Nexus file.
  */
 void
 NxGen::monitorPulseGap
@@ -688,21 +703,31 @@ NxGen::monitorPulseGap
 
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorPulseGap()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid monitor object passed to monitorPulseGap()" )
+        }
 
-        fillSlab( mi->m_index_slab_path, mi->m_event_count, a_count, mi->m_index_slab_size );
-        mi->m_index_slab_size += a_count;
+        // Event-based Monitors Only...
+        if ( mi->m_config == NULL )
+        {
+            fillSlab( mi->m_index_slab_path, mi->m_event_count,
+                a_count, mi->m_index_slab_size );
+            mi->m_index_slab_size += a_count;
+        }
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "monitorPulseGap() failed for monitor id: " << a_monitor.m_id << ", gap count: " << a_count )
+        RETHROW_TRACE( e, "monitorPulseGap() failed for monitor id: "
+            << a_monitor.m_id << ", gap count: " << a_count )
     }
 }
 
 
 /*! \brief Finalizes monitor data in Nexus file
  *
- * This method writes event counts for the specified monitor to the Nexus file.
+ * This method writes event counts for the specified monitor
+ * to the Nexus file.
  */
 void
 NxGen::monitorFinalize
@@ -717,13 +742,27 @@ NxGen::monitorFinalize
     {
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid monitor object passed to monitorFinalize()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid monitor object passed to monitorFinalize()" )
+        }
 
-        writeScalar( string("/entry/") + mi->m_name, "total_counts", mi->m_event_count, "" );
+        // Histo-based Monitor
+        if ( mi->m_config != NULL )
+        {
+        }
+
+        // Event-based Monitor
+        else
+        {
+            writeScalar( string("/entry/") + mi->m_name, "total_counts",
+                mi->m_event_count, "" );
+        }
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "monitorFinalize() failed for monitor id: " << a_monitor.m_id )
+        RETHROW_TRACE( e, "monitorFinalize() failed for monitor id: "
+            << a_monitor.m_id )
     }
 }
 
@@ -1160,5 +1199,5 @@ NxGen::writeScalarAttribute
     }
 }
 
-
+// vim: expandtab
 
