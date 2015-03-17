@@ -120,3 +120,6 @@ private:
 }
 
 #endif // TRACEEXCEPTION_H
+
+// vim: expandtab
+

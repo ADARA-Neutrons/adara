@@ -213,3 +213,6 @@ ComBusTransMon::commThread()
 
     syslog( LOG_INFO, "[%i] ComBus thread exiting", g_pid );
 }
+
+// vim: expandtab
+

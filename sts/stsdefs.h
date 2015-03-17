@@ -325,3 +325,6 @@ enum ErrorCodes
 } // End STS Namespace
 
 #endif // STSDEFS_H
+
+// vim: expandtab
+

@@ -312,3 +312,6 @@ private:
 };
 
 #endif // NXGEN_H
+
+// vim: expandtab
+

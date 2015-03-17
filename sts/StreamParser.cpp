@@ -1791,5 +1791,7 @@ StreamParser::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
         a_value = "";
 }
 
-
 } // End namespace STS
+
+// vim: expandtab
+

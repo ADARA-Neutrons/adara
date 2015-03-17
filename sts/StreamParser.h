@@ -1,5 +1,5 @@
 #ifndef STREAMPARSER_H
-#define	STREAMPARSER_H
+#define STREAMPARSER_H
 
 #include <iostream>
 #include <fstream>
@@ -244,5 +244,7 @@ StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
 
 } // End namespace STS
 
-#endif	/* STREAMPARSER_H */
+#endif /* STREAMPARSER_H */
+
+// vim: expandtab
 

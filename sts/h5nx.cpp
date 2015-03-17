@@ -1342,4 +1342,5 @@ int H5nx::H5NXflush()
     return SUCCEED;
 }
 
+// vim: expandtab
 

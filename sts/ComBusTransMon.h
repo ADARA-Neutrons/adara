@@ -41,3 +41,6 @@ private:
 
 
 #endif // COMBUSTRANSMON_H
+
+// vim: expandtab
+
