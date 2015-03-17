@@ -172,25 +172,44 @@ NxGen::makeBankInfo
 STS::MonitorInfo*
 NxGen::makeMonitorInfo
 (
-    uint16_t a_id,              ///< [in] ID of detector bank
-    uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-    uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+    uint16_t a_id,                   ///< [in] ID of detector bank
+    uint32_t a_buf_reserve,          ///< [in] Event buffer initial capacity
+    uint32_t a_idx_buf_reserve,      ///< [in] Index buffer initial capacity
+    STS::BeamMonitorConfig *a_config ///< [in] Beam Monitor Histo Config (opt)
 )
 {
     try
     {
-        NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve );
+        NxMonitorInfo* mi = new NxMonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config );
 
         if ( m_gen_nexus)
         {
             // create instrument/bank# group
             string path = "/entry/" + mi->m_name;
-
             makeGroup( path, "NXmonitor" );
-            makeDataset( path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
-            makeDataset( path, "event_index", NeXus::UINT64 );
 
-            makeLink( "/entry/DASlogs/frequency/time", path + "/event_time_zero" );
+            // Histo-based Monitor
+            if ( mi->m_config != NULL )
+            {
+                makeDataset( path, "data", NeXus::UINT32, "" );
+                makeDataset( path, "time_of_flight",
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+
+                writeScalar( path, "distance",
+                    mi->m_config->distance, "" );
+                writeString( path, "mode", "monitor" );
+            }
+
+            // Event-based Monitor
+            else
+            {
+                makeDataset( path, "event_time_offset",
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                makeDataset( path, "event_index", NeXus::UINT64 );
+
+                makeLink( "/entry/DASlogs/frequency/time",
+                    path + "/event_time_zero" );
+            }
         }
 
         return mi;

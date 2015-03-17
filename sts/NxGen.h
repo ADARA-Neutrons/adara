@@ -66,12 +66,13 @@ private:
         /// NxMonitorInfo constructor
         NxMonitorInfo
         (
-            uint16_t a_id,              ///< [in] ID of detector bank
-            uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+            uint16_t a_id,                   ///< [in] ID of detector bank
+            uint32_t a_buf_reserve,          ///< [in] Event buffer initial capacity
+            uint32_t a_idx_buf_reserve,      ///< [in] Index buffer initial capacity
+			STS::BeamMonitorConfig *a_config ///< [in] Beam Mon Histo Config (opt)
         )
         :
-            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve ),
+            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
             m_index_slab_size(0),
             m_event_slab_size(0)
         {
@@ -198,7 +199,7 @@ protected:
     void                finalize( const STS::RunMetrics &a_run_metrics );
     STS::PVInfoBase*    makePVInfo( const std::string & a_name, const std::string & a_device_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
     STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve, STS::BeamMonitorConfig *a_config );
     void                processRunInfo( const STS::RunInfo & a_run_info );
     void                processGeometry( const std::string & a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
