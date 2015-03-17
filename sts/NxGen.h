@@ -69,7 +69,7 @@ private:
             uint16_t a_id,                   ///< [in] ID of detector bank
             uint32_t a_buf_reserve,          ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve,      ///< [in] Index buffer initial capacity
-			STS::BeamMonitorConfig *a_config ///< [in] Beam Mon Histo Config (opt)
+            STS::BeamMonitorConfig *a_config ///< [in] Beam Mon Histo Config (opt)
         )
         :
             MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
