@@ -36,27 +36,45 @@ private:
             uint16_t a_id,              ///< [in] ID of detector bank
             uint16_t a_pixel_count,     ///< [in] Pixel count of bank
             uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+            uint32_t a_idx_buf_reserve, ///< [in] Index buffer initial capacity
+            NxGen &a_nxgen              ///< [in] Parent NxGen instance
         )
         :
             BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve),
             m_event_slab_size(0),
-            m_index_slab_size(0)
+            m_index_slab_size(0),
+            m_nxgen(a_nxgen)
         {
-            m_name = std::string("bank") + boost::lexical_cast<std::string>(a_id);
-            m_eventname = m_name + "_events";
-            m_tof_slab_path = "/entry/instrument/" + m_name + "/event_time_offset";
-            m_pid_slab_path = "/entry/instrument/" + m_name + "/event_id";
-            m_index_slab_path = "/entry/instrument/" + m_name + "/event_index";
+            m_name = std::string("bank")
+                + boost::lexical_cast<std::string>(a_id);
+
+            m_instr_path = m_nxgen.m_instrument_path + "/" + m_name;
+
+            m_tof_slab_path = m_instr_path + "/" + m_nxgen.m_tof_name;
+
+            m_pid_slab_path = m_instr_path + "/" + m_nxgen.m_pid_name;
+
+            m_index_slab_path = m_instr_path + "/" + m_nxgen.m_index_name;
+
+            m_eventname = m_name + std::string("_events");
+
+            m_event_path = m_nxgen.m_entry_path + "/" + m_eventname;
+
+            m_time_path = m_nxgen.m_daslogs_freq_path
+                + std::string("/time");
         }
 
         std::string             m_name;             ///< Name of bank in Nexus file
         std::string             m_eventname;        ///< Name of bank events entry in Nexus file
+        std::string             m_instr_path;       ///< Nexus path to "NXdetector" instrument group
+        std::string             m_event_path;       ///< Nexus path to "NXevent_data" group
+        std::string             m_time_path;        ///< Nexus path to Pulse Time array
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         std::string             m_pid_slab_path;    ///< Nexus path to PID slab
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
         uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
+        NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
     /// MonitorInfo subclass that adds Nexus-required attributes
@@ -66,19 +84,24 @@ private:
         /// NxMonitorInfo constructor
         NxMonitorInfo
         (
-            uint16_t a_id,                   ///< [in] ID of detector bank
-            uint32_t a_buf_reserve,          ///< [in] Event buffer initial capacity
-            uint32_t a_idx_buf_reserve,      ///< [in] Index buffer initial capacity
-            STS::BeamMonitorConfig *a_config ///< [in] Beam Mon Histo Config (opt)
+            uint16_t a_id,                    ///< [in] ID of detector bank
+            uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
+            uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
+            STS::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
+            NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
             MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
             m_index_slab_size(0),
-            m_event_slab_size(0)
+            m_event_slab_size(0),
+            m_nxgen(a_nxgen)
         {
-            m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
-            m_index_slab_path = "/entry/" + m_name + "/event_index";
-            m_tof_slab_path = "/entry/" + m_name + "/event_time_offset";
+            m_name = std::string("monitor")
+                + boost::lexical_cast<std::string>(a_id);
+            m_index_slab_path = m_nxgen.m_entry_path + "/" + m_name
+                + "/" + m_nxgen.m_index_name;
+            m_tof_slab_path = m_nxgen.m_entry_path + "/" + m_name
+                + "/" + m_nxgen.m_tof_name;
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
@@ -86,6 +109,7 @@ private:
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
         uint64_t                m_event_slab_size;  ///< Running size of TOF slab
+        NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
@@ -103,7 +127,7 @@ private:
             STS::Identifier     a_pv_id,        ///< [in] ID of the PV
             STS::PVType         a_type,         ///< [in] Type of PV
             const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
-            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus ouput
+            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units ),
@@ -111,7 +135,7 @@ private:
             m_internal_name(a_internal_name),
             m_slab_size(0)
         {
-            m_log_path = std::string("/entry/DASlogs/") + m_internal_name;
+            m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
         }
 
         /// NxPVInfo destructor
@@ -190,7 +214,17 @@ private:
 
 public:
 
-    NxGen( int a_fd_in, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_event_buf_chunk_count = 20, unsigned short a_ancillary_buf_chunk_count = 5, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
+    NxGen(
+        int a_fd_in,
+        std::string & a_adara_out_file,
+        std::string & a_nexus_out_file,
+        bool a_strict,
+        bool a_gather_stats,
+        unsigned long a_chunk_size = 2048,
+        unsigned short a_event_buf_chunk_count = 20,
+        unsigned short a_ancillary_buf_chunk_count = 5,
+        unsigned long a_cache_size = 10485760,
+        unsigned short a_compression_level = 0 );
     ~NxGen();
 
 protected:
@@ -288,6 +322,15 @@ private:
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file
+    std::string         m_entry_path;           ///< Path to Nexus NXentry
+    std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
+    std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
+    std::string         m_daslogs_freq_path;    ///< Path to Nexus Frequency DAS Log
+    std::string         m_daslogs_pchg_path;    ///< Path to Nexus Proton Charge DAS Log
+    std::string         m_pid_name;             ///< Name of PID data in Nexus file
+    std::string         m_tof_name;             ///< Name of TOF data in Nexus file
+    std::string         m_index_name;           ///< Name of Event Index data in Nexus file
+    std::string         m_pulse_time_name;      ///< Name of Pulse Time data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)

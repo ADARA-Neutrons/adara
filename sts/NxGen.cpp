@@ -33,6 +33,15 @@ NxGen::NxGen
                   a_chunk_size*a_anc_buf_chunk_count ),
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
+    m_entry_path(string("/entry")),
+    m_instrument_path(m_entry_path + string("/instrument")),
+    m_daslogs_path(m_entry_path + string("/DASlogs")),
+    m_daslogs_freq_path(m_daslogs_path + string("/frequency")),
+    m_daslogs_pchg_path(m_daslogs_path + string("/proton_charge")),
+    m_pid_name(string("event_id")),
+    m_tof_name(string("event_time_offset")),
+    m_index_name(string("event_index")),
+    m_pulse_time_name(string("event_time_zero")),
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
@@ -131,27 +140,33 @@ NxGen::makeBankInfo
 {
     try
     {
-        NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve );
+        NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count,
+            a_buf_reserve, a_idx_buf_reserve, *this );
 
         if ( m_gen_nexus)
         {
             // Instrument bank group
-            string instr_path = string("/entry/instrument/") + bi->m_name;
-            makeGroup( instr_path, "NXdetector" );
-            makeDataset( instr_path, "event_time_offset", NeXus::FLOAT32, TIME_USEC_UNITS );
-            makeDataset( instr_path, "event_id", NeXus::UINT32 );
-            makeDataset( instr_path, "event_index", NeXus::UINT64 );
+            makeGroup( bi->m_instr_path, "NXdetector" );
+            makeDataset( bi->m_instr_path, m_tof_name,
+                NeXus::FLOAT32, TIME_USEC_UNITS );
+            makeDataset( bi->m_instr_path, m_pid_name, NeXus::UINT32 );
+            makeDataset( bi->m_instr_path, m_index_name,
+                NeXus::UINT64 );
 
             // Event data group
-            string event_path = string("/entry/") + bi->m_eventname;
-            makeGroup( event_path, "NXevent_data" );
-            makeLink( instr_path + "/event_time_offset", event_path + "/event_time_offset" );
-            makeLink( instr_path + "/event_id", event_path + "/event_id" );
-            makeLink( instr_path + "/event_index", event_path + "/event_index" );
+            makeGroup( bi->m_event_path, "NXevent_data" );
+            makeLink( bi->m_tof_slab_path,
+                bi->m_event_path + "/" + m_tof_name );
+            makeLink( bi->m_pid_slab_path,
+                bi->m_event_path + "/" + m_pid_name );
+            makeLink( bi->m_index_slab_path,
+                bi->m_event_path + "/" + m_index_name );
 
             // Link pulse time to bank event times
-            makeLink( "/entry/DASlogs/frequency/time", instr_path + "/event_time_zero" );
-            makeLink( "/entry/DASlogs/frequency/time", event_path + "/event_time_zero" );
+            makeLink( bi->m_time_path,
+                bi->m_instr_path + "/" + m_pulse_time_name );
+            makeLink( bi->m_time_path,
+                bi->m_event_path + "/" + m_pulse_time_name );
         }
 
         return bi;
@@ -183,12 +198,12 @@ NxGen::makeMonitorInfo
     try
     {
         NxMonitorInfo* mi = new NxMonitorInfo(
-            a_id, a_buf_reserve, a_idx_buf_reserve, a_config );
+            a_id, a_buf_reserve, a_idx_buf_reserve, a_config, *this );
 
         if ( m_gen_nexus)
         {
             // create instrument/bank# group
-            string path = "/entry/" + mi->m_name;
+            string path = m_entry_path + "/" + mi->m_name;
             makeGroup( path, "NXmonitor" );
 
             // Histo-based Monitor
@@ -206,12 +221,12 @@ NxGen::makeMonitorInfo
             // Event-based Monitor
             else
             {
-                makeDataset( path, "event_time_offset",
+                makeDataset( path, m_tof_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
-                makeDataset( path, "event_index", NeXus::UINT64 );
+                makeDataset( path, m_index_name, NeXus::UINT64 );
 
-                makeLink( "/entry/DASlogs/frequency/time",
-                    path + "/event_time_zero" );
+                makeLink( m_daslogs_freq_path + "/time",
+                    path + "/" + m_pulse_time_name );
             }
         }
 
@@ -241,45 +256,58 @@ NxGen::initialize()
         m_h5nx.H5NXcreate_file( m_nexus_filename );
 
         // Create general Nexus entries
-        makeGroup( "/entry", "NXentry" );
-        makeGroup( "/entry/instrument", "NXinstrument" );
-        makeGroup( "/entry/DASlogs", "NXcollection" );
+        makeGroup( m_entry_path, "NXentry" );
+        makeGroup( m_instrument_path, "NXinstrument" );
+        makeGroup( m_daslogs_path, "NXcollection" );
 
         // Create pulse frequency log
-        makeGroup( "/entry/DASlogs/frequency", "NXlog" );
-        makeDataset( "/entry/DASlogs/frequency", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/frequency", "value", NeXus::FLOAT64, FREQ_UNITS );
+        makeGroup( m_daslogs_freq_path, "NXlog" );
+        makeDataset( m_daslogs_freq_path, "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_daslogs_freq_path, "value",
+            NeXus::FLOAT64, FREQ_UNITS );
 
         // Create proton charge log (time same as pulse frequency)
-        makeGroup( "/entry/DASlogs/proton_charge", "NXlog" );
-        makeDataset( "/entry/DASlogs/proton_charge", "value", NeXus::FLOAT64, CHARGE_UNITS );
-        makeLink( "/entry/DASlogs/frequency/time", "/entry/DASlogs/proton_charge/time" );
+        makeGroup( m_daslogs_pchg_path, "NXlog" );
+        makeDataset( m_daslogs_pchg_path, "value",
+            NeXus::FLOAT64, CHARGE_UNITS );
+        makeLink( m_daslogs_freq_path + "/time",
+            m_daslogs_pchg_path + "/time" );
 
         // Create pulse veto log
-        makeGroup( "/entry/DASlogs/Veto_pulse", "NXcollection" );
-        makeDataset( "/entry/DASlogs/Veto_pulse", "veto_pulse_time", NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeGroup( m_daslogs_path + "/Veto_pulse", "NXcollection" );
+        makeDataset( m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
 
         // Create pulse flag log
-        makeGroup( "/entry/DASlogs/pulse_flags", "NXcollection" );
-        makeDataset( "/entry/DASlogs/pulse_flags", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/pulse_flags", "value", NeXus::UINT32 );
+        makeGroup( m_daslogs_path + "/pulse_flags", "NXcollection" );
+        makeDataset( m_daslogs_path + "/pulse_flags", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_daslogs_path + "/pulse_flags", "value",
+            NeXus::UINT32 );
 
         // Create pause event log
-        makeGroup( "/entry/DASlogs/pause", "NXlog" );
-        makeDataset( "/entry/DASlogs/pause/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/pause/", "value", NeXus::UINT16 );
+        makeGroup( m_daslogs_path + "/pause", "NXlog" );
+        makeDataset( m_daslogs_path + "/pause", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_daslogs_path + "/pause", "value", NeXus::UINT16 );
 
         // Create scan event log
-        makeGroup( "/entry/DASlogs/scan_index", "NXlog" );
-        makeDataset( "/entry/DASlogs/scan_index/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/scan_index/", "value", NeXus::UINT32 );
+        makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
+        makeDataset( m_daslogs_path + "/scan_index", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_daslogs_path + "/scan_index", "value",
+            NeXus::UINT32 );
 
-        // Creare comment event log
-        makeGroup( "/entry/DASlogs/comments", "NXcollection" );
-        makeDataset( "/entry/DASlogs/comments/", "time", NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( "/entry/DASlogs/comments/", "offset", NeXus::UINT32 );
-        makeDataset( "/entry/DASlogs/comments/", "length", NeXus::UINT32 );
-        makeDataset( "/entry/DASlogs/comments/", "data", NeXus::CHAR );
+        // Create comment event log
+        makeGroup( m_daslogs_path + "/comments", "NXcollection" );
+        makeDataset( m_daslogs_path + "/comments", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS );
+        makeDataset( m_daslogs_path + "/comments", "offset",
+            NeXus::UINT32 );
+        makeDataset( m_daslogs_path + "/comments", "length",
+            NeXus::UINT32 );
+        makeDataset( m_daslogs_path + "/comments", "data", NeXus::CHAR );
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -291,7 +319,8 @@ NxGen::initialize()
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "initialization of nexus file (" << m_nexus_filename << ") failed." )
+        RETHROW_TRACE( e, "initialization of nexus file ("
+            << m_nexus_filename << ") failed." )
     }
 }
 
@@ -311,22 +340,31 @@ NxGen::finalize
 
     try
     {
-        writeString( "/entry/", "definition", "NXsnsevent" );
+        writeString( m_entry_path, "definition", "NXsnsevent" );
 
-        writeScalar( "/entry/DASlogs/frequency", "minimum_value", a_run_metrics.freq_stats.min(), FREQ_UNITS );
-        writeScalar( "/entry/DASlogs/frequency", "maximum_value", a_run_metrics.freq_stats.max(), FREQ_UNITS );
-        writeScalar( "/entry/DASlogs/frequency", "average_value", a_run_metrics.freq_stats.mean(), FREQ_UNITS );
-        writeScalar( "/entry/DASlogs/frequency", "average_value_error", a_run_metrics.freq_stats.stdDev(), FREQ_UNITS );
+        writeScalar( m_daslogs_freq_path, "minimum_value",
+            a_run_metrics.freq_stats.min(), FREQ_UNITS );
+        writeScalar( m_daslogs_freq_path, "maximum_value",
+            a_run_metrics.freq_stats.max(), FREQ_UNITS );
+        writeScalar( m_daslogs_freq_path, "average_value",
+            a_run_metrics.freq_stats.mean(), FREQ_UNITS );
+        writeScalar( m_daslogs_freq_path, "average_value_error",
+            a_run_metrics.freq_stats.stdDev(), FREQ_UNITS );
 
-        writeScalar( "/entry/DASlogs/proton_charge", "minimum_value", a_run_metrics.charge_stats.min(), CHARGE_UNITS );
-        writeScalar( "/entry/DASlogs/proton_charge", "maximum_value", a_run_metrics.charge_stats.max(), CHARGE_UNITS );
-        writeScalar( "/entry/DASlogs/proton_charge", "average_value", a_run_metrics.charge_stats.mean(), CHARGE_UNITS );
-        writeScalar( "/entry/DASlogs/proton_charge", "average_value_error", a_run_metrics.charge_stats.stdDev(), CHARGE_UNITS );
+        writeScalar( m_daslogs_pchg_path, "minimum_value",
+            a_run_metrics.charge_stats.min(), CHARGE_UNITS );
+        writeScalar( m_daslogs_pchg_path, "maximum_value",
+            a_run_metrics.charge_stats.max(), CHARGE_UNITS );
+        writeScalar( m_daslogs_pchg_path, "average_value",
+            a_run_metrics.charge_stats.mean(), CHARGE_UNITS );
+        writeScalar( m_daslogs_pchg_path, "average_value_error",
+            a_run_metrics.charge_stats.stdDev(), CHARGE_UNITS );
 
         // Flush any remaining pulse vetos
         if ( m_pulse_vetoes.size() )
         {
-            writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
+            writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
+                m_pulse_vetoes, m_pulse_vetoes_slab_size );
             m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
@@ -334,8 +372,10 @@ NxGen::finalize
         // Flush any remaining pulse flags
         if ( m_pulse_flags_time.size() )
         {
-            writeSlab( "/entry/DASlogs/pulse_flags/time", m_pulse_flags_time, m_pulse_flags_slab_size );
-            writeSlab( "/entry/DASlogs/pulse_flags/value", m_pulse_flags_value, m_pulse_flags_slab_size );
+            writeSlab( m_daslogs_path + "/pulse_flags/time",
+                m_pulse_flags_time, m_pulse_flags_slab_size );
+            writeSlab( m_daslogs_path + "/pulse_flags/value",
+                m_pulse_flags_value, m_pulse_flags_slab_size );
             m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
@@ -346,49 +386,90 @@ NxGen::finalize
         flushScanData();
         flushCommentData();
 
-        float duration = calcDiffSeconds( a_run_metrics.end_time, a_run_metrics.start_time );
+        float duration = calcDiffSeconds(
+            a_run_metrics.end_time, a_run_metrics.start_time );
 
-        writeScalar( "/entry/", "duration", duration, TIME_SEC_UNITS );
-        writeScalar( "/entry/", "total_pulses", a_run_metrics.charge_stats.count(), "" );
+        writeScalar( m_entry_path, "duration", duration, TIME_SEC_UNITS );
+        writeScalar( m_entry_path, "total_pulses",
+            a_run_metrics.charge_stats.count(), "" );
+
         // Link raw_frames to total_pulses for backward compatibility
-        makeLink( "/entry/total_pulses", "/entry/raw_frames" );
-        writeScalar( "/entry/", "total_counts", a_run_metrics.events_counted, "" );
-        writeScalar( "/entry/", "total_uncounted_counts", a_run_metrics.events_uncounted, "" );
-        writeScalar( "/entry/", "total_other_counts", a_run_metrics.non_events_counted, "" );
-        writeScalar( "/entry/", "proton_charge", a_run_metrics.total_charge, CHARGE_UNITS );
+        makeLink( m_entry_path + "/total_pulses",
+            m_entry_path + "/raw_frames" );
+        writeScalar( m_entry_path, "total_counts",
+            a_run_metrics.events_counted, "" );
+        writeScalar( m_entry_path, "total_uncounted_counts",
+            a_run_metrics.events_uncounted, "" );
+        writeScalar( m_entry_path, "total_other_counts",
+            a_run_metrics.non_events_counted, "" );
+        writeScalar( m_entry_path, "proton_charge",
+            a_run_metrics.total_charge, CHARGE_UNITS );
 
         // Start time
         string time = timeToISO8601( a_run_metrics.start_time );
-        writeString( "/entry/", "start_time", time );
+        writeString( m_entry_path, "start_time", time );
 
         // Add start time (offset) properties to all time axis in DAS logs
-        writeStringAttribute( "/entry/DASlogs/frequency/time", "offset", time );
-        writeScalarAttribute( "/entry/DASlogs/frequency/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/frequency/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute( m_daslogs_freq_path + "/time",
+            "offset", time );
+        writeScalarAttribute( m_daslogs_freq_path + "/time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( m_daslogs_freq_path + "/time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
-        writeStringAttribute( "/entry/DASlogs/pause/time", "start", time );
-        writeScalarAttribute( "/entry/DASlogs/pause/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/pause/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute( m_daslogs_path + "/pause/time",
+            "start", time );
+        writeScalarAttribute( m_daslogs_path + "/pause/time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( m_daslogs_path + "/pause/time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
-        writeStringAttribute( "/entry/DASlogs/scan_index/time", "start", time );
-        writeScalarAttribute( "/entry/DASlogs/scan_index/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/scan_index/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute( m_daslogs_path + "/scan_index/time",
+            "start", time );
+        writeScalarAttribute( m_daslogs_path + "/scan_index/time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( m_daslogs_path + "/scan_index/time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
-        writeStringAttribute( "/entry/DASlogs/comments/time", "start", time );
-        writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/comments/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute( m_daslogs_path + "/comments/time",
+            "start", time );
+        writeScalarAttribute( m_daslogs_path + "/comments/time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( m_daslogs_path + "/comments/time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
-        writeStringAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "start", time );
-        writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/Veto_pulse/veto_pulse_time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute(
+            m_daslogs_path + "/Veto_pulse/veto_pulse_time",
+            "start", time );
+        writeScalarAttribute(
+            m_daslogs_path + "/Veto_pulse/veto_pulse_time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute(
+            m_daslogs_path + "/Veto_pulse/veto_pulse_time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
-        writeStringAttribute( "/entry/DASlogs/pulse_flags/time", "start", time );
-        writeScalarAttribute( "/entry/DASlogs/pulse_flags/time", "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-        writeScalarAttribute( "/entry/DASlogs/pulse_flags/time", "offset_nanoseconds", (uint32_t)a_run_metrics.start_time.tv_nsec );
+        writeStringAttribute( m_daslogs_path + "/pulse_flags/time",
+            "start", time );
+        writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
+            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET );
+        writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
+            "offset_nanoseconds",
+            (uint32_t)a_run_metrics.start_time.tv_nsec );
 
         // End time
         time = timeToISO8601( a_run_metrics.end_time );
-        writeString( "/entry/", "end_time", time );
+        writeString( m_entry_path, "end_time", time );
 
         m_h5nx.H5NXclose_file();
     }
@@ -414,37 +495,43 @@ NxGen::processRunInfo
 
     try
     {
-        writeString( "/entry/instrument", "beamline", a_run_info.instr_id );
+        writeString( m_instrument_path, "beamline", a_run_info.instr_id );
 
         if ( a_run_info.instr_longname.size())
         {
-            writeString( "/entry/instrument", "name", a_run_info.instr_longname );
+            writeString( m_instrument_path, "name", a_run_info.instr_longname );
 
             if ( a_run_info.instr_shortname.size())
-                writeStringAttribute( "/entry/instrument/name", "short_name", a_run_info.instr_shortname );
+            {
+                writeStringAttribute( m_instrument_path + "/name",
+                    "short_name", a_run_info.instr_shortname );
+            }
         }
 
-        string group_path = "/entry";
-
         string tmp = boost::lexical_cast<string>(a_run_info.run_number);
-        writeString( group_path, "run_number", tmp );
-        writeString( group_path, "/entry_identifier", tmp );
+        writeString( m_entry_path, "run_number", tmp );
+        writeString( m_entry_path, "entry_identifier", tmp );
 
-        writeString( group_path, "experiment_identifier", a_run_info.proposal_id );
-        writeString( group_path, "title", a_run_info.run_title );
+        writeString( m_entry_path, "experiment_identifier",
+            a_run_info.proposal_id );
+        writeString( m_entry_path, "title", a_run_info.run_title );
 
-        makeGroup( "/entry/sample", "NXsample" );
-        writeString( "/entry/sample", "identifier", a_run_info.sample_id );
-        writeString( "/entry/sample", "name", a_run_info.sample_name );
-        writeString( "/entry/sample", "nature", a_run_info.sample_nature );
-        writeString( "/entry/sample", "chemical_formula", a_run_info.sample_formula );
-        writeString( "/entry/sample", "environment", a_run_info.sample_environment );
+        string sample_path = m_entry_path + "/sample";
+        makeGroup( sample_path, "NXsample" );
+        writeString( sample_path, "identifier", a_run_info.sample_id );
+        writeString( sample_path, "name", a_run_info.sample_name );
+        writeString( sample_path, "nature", a_run_info.sample_nature );
+        writeString( sample_path, "chemical_formula",
+            a_run_info.sample_formula );
+        writeString( sample_path, "environment",
+            a_run_info.sample_environment );
 
         size_t user_count = 0;
         string path;
         for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
         {
-            path = group_path + "/user" + boost::lexical_cast<string>(++user_count);
+            path = m_entry_path + "/user"
+                + boost::lexical_cast<string>(++user_count);
             makeGroup( path, "NXuser" );
 
             writeString( path, "facility_user_id", u->id );
@@ -474,10 +561,12 @@ NxGen::processGeometry
 
     try
     {
-        makeGroup( "/entry/instrument/instrument_xml", "NXnote" );
-        writeString( "/entry/instrument/instrument_xml", "description", "XML contents of the instrument IDF" );
-        writeString( "/entry/instrument/instrument_xml", "type", "text/xml" );
-        writeString( "/entry/instrument/instrument_xml", "data", a_xml );
+        std::string geom_path = m_instrument_path + "/instrument_xml";
+        makeGroup( geom_path, "NXnote" );
+        writeString( geom_path, "description",
+            "XML contents of the instrument IDF" );
+        writeString( geom_path, "type", "text/xml" );
+        writeString( geom_path, "data", a_xml );
     }
     catch( TraceException &e )
     {
@@ -501,9 +590,12 @@ NxGen::pulseBuffersReady
 
     try
     {
-        writeSlab( "/entry/DASlogs/frequency/time", a_pulse_info.times, m_pulse_info_slab_size );
-        writeSlab( "/entry/DASlogs/frequency/value", a_pulse_info.freqs, m_pulse_info_slab_size );
-        writeSlab( "/entry/DASlogs/proton_charge/value", a_pulse_info.charges, m_pulse_info_slab_size );
+        writeSlab( m_daslogs_freq_path + "/time",
+            a_pulse_info.times, m_pulse_info_slab_size );
+        writeSlab( m_daslogs_freq_path + "/value",
+            a_pulse_info.freqs, m_pulse_info_slab_size );
+        writeSlab( m_daslogs_pchg_path + "/value",
+            a_pulse_info.charges, m_pulse_info_slab_size );
 
         m_pulse_info_slab_size += a_pulse_info.times.size();
 
@@ -525,15 +617,18 @@ NxGen::pulseBuffersReady
 
         if ( m_pulse_vetoes.size() > m_chunk_size )
         {
-            writeSlab( "/entry/DASlogs/Veto_pulse/veto_pulse_time", m_pulse_vetoes, m_pulse_vetoes_slab_size );
+            writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
+                m_pulse_vetoes, m_pulse_vetoes_slab_size );
             m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
         if ( m_pulse_flags_value.size() > m_chunk_size )
         {
-            writeSlab( "/entry/DASlogs/pulse_flags/time", m_pulse_flags_time, m_pulse_flags_slab_size );
-            writeSlab( "/entry/DASlogs/pulse_flags/value", m_pulse_flags_value, m_pulse_flags_slab_size );
+            writeSlab( m_daslogs_path + "/pulse_flags/time",
+                m_pulse_flags_time, m_pulse_flags_slab_size );
+            writeSlab( m_daslogs_path + "/pulse_flags/value",
+                m_pulse_flags_value, m_pulse_flags_slab_size );
             m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
@@ -630,9 +725,10 @@ NxGen::bankFinalize
         if ( !bi )
             THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
 
-        string total_path = "/entry/instrument/" + bi->m_name;
+        string total_path = m_instrument_path + "/" + bi->m_name;
         writeScalar( total_path, "total_counts", bi->m_event_count, "" );
-        makeLink( total_path + "/total_counts", "/entry/" + bi->m_eventname + "/total_counts" );
+        makeLink( total_path + "/total_counts",
+            m_entry_path + "/" + bi->m_eventname + "/total_counts" );
     }
     catch( TraceException &e )
     {
@@ -755,8 +851,8 @@ NxGen::monitorFinalize
         // Event-based Monitor
         else
         {
-            writeScalar( string("/entry/") + mi->m_name, "total_counts",
-                mi->m_event_count, "" );
+            writeScalar( m_entry_path + "/" + mi->m_name,
+                "total_counts", mi->m_event_count, "" );
         }
     }
     catch( TraceException &e )
@@ -786,7 +882,7 @@ NxGen::runComment
 
     try
     {
-        writeString( "/entry/", "notes", a_comment );
+        writeString( m_entry_path, "notes", a_comment );
     }
     catch( TraceException &e )
     {
@@ -944,8 +1040,8 @@ NxGen::flushPauseData()
 {
     try
     {
-        writeSlab( "/entry/DASlogs/pause/time", m_pause_time, 0 );
-        writeSlab( "/entry/DASlogs/pause/value", m_pause_value, 0 );
+        writeSlab( m_daslogs_path + "/pause/time", m_pause_time, 0 );
+        writeSlab( m_daslogs_path + "/pause/value", m_pause_value, 0 );
 
         m_pause_time.clear();
         m_pause_value.clear();
@@ -966,8 +1062,8 @@ NxGen::flushScanData()
 {
     try
     {
-        writeSlab( "/entry/DASlogs/scan_index/time", m_scan_time, 0 );
-        writeSlab( "/entry/DASlogs/scan_index/value", m_scan_value, 0 );
+        writeSlab( m_daslogs_path + "/scan_index/time", m_scan_time, 0 );
+        writeSlab( m_daslogs_path + "/scan_index/value", m_scan_value, 0 );
 
         m_scan_time.clear();
         m_scan_value.clear();
@@ -988,12 +1084,17 @@ NxGen::flushCommentData()
 {
     try
     {
-        writeSlab( "/entry/DASlogs/comments/time", m_comment_time, 0 );
-        writeSlab( "/entry/DASlogs/comments/offset", m_comment_offset, 0 );
-        writeSlab( "/entry/DASlogs/comments/length", m_comment_length, 0 );
+        writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
+        writeSlab( m_daslogs_path + "/comments/offset",
+            m_comment_offset, 0 );
+        writeSlab( m_daslogs_path + "/comments/length",
+            m_comment_length, 0 );
 
         if ( m_comment_data.size())
-            writeSlab( "/entry/DASlogs/comments/data", m_comment_data, 0 );
+        {
+            writeSlab( m_daslogs_path + "/comments/data",
+                m_comment_data, 0 );
+        }
 
         m_comment_time.clear();
         m_comment_offset.clear();
