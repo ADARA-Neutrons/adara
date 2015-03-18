@@ -98,15 +98,35 @@ private:
         {
             m_name = std::string("monitor")
                 + boost::lexical_cast<std::string>(a_id);
+
+            // Event Monitor Paths
+
             m_index_slab_path = m_nxgen.m_entry_path + "/" + m_name
                 + "/" + m_nxgen.m_index_name;
+
             m_tof_slab_path = m_nxgen.m_entry_path + "/" + m_name
                 + "/" + m_nxgen.m_tof_name;
+
+            // Histogram Monitor Paths
+
+            m_data_name = std::string("data");
+
+            m_tofbin_name = std::string("time_of_flight");
+
+            m_data_slab_path = m_nxgen.m_entry_path + "/" + m_name
+                + "/" + m_data_name;
+
+            m_tofbin_slab_path = m_nxgen.m_entry_path + "/" + m_name
+                + "/" + m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
+        std::string             m_data_name;        ///< Name of monitor Histo data in Nexus file
+        std::string             m_tofbin_name;      ///< Name of monitor Histo TOF Bins in Nexus file
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
+        std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
+        std::string             m_tofbin_slab_path; ///< Nexus path to Histo TOF Bins slab
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
         uint64_t                m_event_slab_size;  ///< Running size of TOF slab
         NxGen&                  m_nxgen;            ///< NxGen parent class
@@ -267,7 +287,7 @@ private:
                         (
                             const std::string & a_path, ///< [in] Nexus path to slab
                             std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes)
+                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
                             if ( a_buffer.size())

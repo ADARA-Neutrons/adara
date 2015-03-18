@@ -209,8 +209,8 @@ NxGen::makeMonitorInfo
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( path, "data", NeXus::UINT32, "" );
-                makeDataset( path, "time_of_flight",
+                makeDataset( path, mi->m_data_name, NeXus::UINT32, "" );
+                makeDataset( path, mi->m_tofbin_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
 
                 writeScalar( path, "distance",
@@ -846,6 +846,15 @@ NxGen::monitorFinalize
         // Histo-based Monitor
         if ( mi->m_config != NULL )
         {
+            writeSlab( mi->m_data_slab_path, mi->m_data_buffer, 0 );
+
+            writeSlab( mi->m_tofbin_slab_path, mi->m_tofbin_buffer, 0 );
+
+            // Write Out Total Counts for Histogram Mode, too... ;-D
+            writeScalar( m_entry_path + "/" + mi->m_name,
+                "total_counts", mi->m_event_count, "" );
+            writeScalar( m_entry_path + "/" + mi->m_name,
+                "total_uncounted_counts", mi->m_event_uncounted, "" );
         }
 
         // Event-based Monitor
