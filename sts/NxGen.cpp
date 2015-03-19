@@ -241,7 +241,8 @@ NxGen::makeMonitorInfo
 
 /*! \brief Initializes Nexus output file
  *
- * This method performs Nexus-specific initialization (creates file and several HDF5 entries).
+ * This method performs Nexus-specific initialization (creates file and
+ * several HDF5 entries).
  */
 void
 NxGen::initialize()
@@ -251,7 +252,8 @@ NxGen::initialize()
 
     try
     {
-        syslog( LOG_INFO, "[%i] Creating Nexus file: %s", g_pid, m_nexus_filename.c_str() );
+        syslog( LOG_INFO, "[%i] Creating Nexus file: %s",
+            g_pid, m_nexus_filename.c_str() );
 
         m_h5nx.H5NXcreate_file( m_nexus_filename );
 
@@ -884,8 +886,8 @@ NxGen::runComment
 {
     if ( m_haveRunComment ) {
         syslog( LOG_WARNING,
-            "[%i] Unexpected input: duplicate run comment specified: %s",
-            g_pid, a_comment.c_str() );
+        "[%i] %s Unexpected input: duplicate run comment specified: %s",
+            g_pid, "STS Error:", a_comment.c_str() );
         return;
     }
 

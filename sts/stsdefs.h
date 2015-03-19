@@ -117,8 +117,9 @@ public:
             if ( m_num_tof_bins < 2 )
             {
                 syslog( LOG_ERR,
-                "[%i] Beam Monitor %u Histo Warning: num_tof_bins=%u < 2!",
-                    g_pid, m_id, m_num_tof_bins);
+                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
+                    g_pid, "STS Error:", "Beam Monitor", m_id,
+                    m_num_tof_bins);
                 m_num_tof_bins = 2;
             }
 

@@ -116,16 +116,16 @@ StreamParser::processStream()
             {
                 if ( m_processing_state != DONE_PROCESSING )
                 {
-                    syslog( LOG_INFO,
+                    syslog( LOG_ERR,
                     "[%i] STS failed %s: %s, Not Done Processing! (%s)",
                         g_pid, "processStream()", "Connection Failed",
                         log_info.c_str() );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
-                        syslog( LOG_INFO,
-                            "[%i] %s: %s, Still Processing Events!",
-                            g_pid, "processStream()",
+                        syslog( LOG_ERR,
+                            "[%i] %s %s: %s, Still Processing Events!",
+                            g_pid, "STS Error:", "processStream()",
                             "Connection Failed" );
 
                         // On fatal error, flush buffers to Nexus
@@ -331,8 +331,8 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_WARNING,
-                "[%i] Run Status Error: Start-of-Run with state=0x%x.",
-                g_pid, m_processing_state );
+                "[%i] %s Run Status Error: Start-of-Run with state=0x%x.",
+                g_pid, "STS Error:", m_processing_state );
             bad_state = true;
         }
     }
@@ -359,8 +359,8 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_WARNING,
-                "[%i] Run Status Error: End-of-Run with state=0x%x.",
-                g_pid, m_processing_state );
+                "[%i] %s Run Status Error: End-of-Run with state=0x%x.",
+                g_pid, "STS Error:", m_processing_state );
             bad_state = true;
         }
     }
@@ -535,7 +535,8 @@ StreamParser::rxOversizePkt
     if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
-        "[%i] OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u", g_pid,
+            "[%i] %s %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+            g_pid, "OversizePkt:",
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
@@ -897,8 +898,9 @@ StreamParser::processMonitorEvents
                 if ( tofbin >= imi->second->m_num_tof_bins - 1 )
                 {
                     syslog( LOG_ERR,
-                "[%i] Beam Monitor %u Histo Error tof=%u index=%u >= %u.",
-                        g_pid, imi->second->m_id, tof, tofbin,
+                    "[%i] %s %s %u Histogram Error tof=%u index=%u >= %u",
+                        g_pid, "STS Error:", "Beam Monitor",
+                        imi->second->m_id, tof, tofbin,
                         imi->second->m_num_tof_bins - 1 );
                     // Count Uncounted Beam Monitor Events...
                     (imi->second->m_event_uncounted)++;
@@ -1203,10 +1205,12 @@ StreamParser::rxPacket
         if ( config.tofOffset >= config.tofMax )
         {
             syslog( LOG_ERR,
-                "[%i] Beam Monitor %u Config Error: Offset %u >= Max %u",
-                g_pid, config.id, config.tofOffset, config.tofMax );
+                "[%i] %s %s %u Config Error: Offset %u >= Max %u",
+                g_pid, "STS Error:", "Beam Monitor", config.id,
+                config.tofOffset, config.tofMax );
             syslog( LOG_ERR,
-                "[%i] Reverting to Beam Monitor Event Mode!", g_pid );
+                "[%i] %s Reverting to Beam Monitor Event Mode!",
+                g_pid, "STS Error:" );
             m_monitor_config.clear();
             break;
         }
@@ -1215,8 +1219,9 @@ StreamParser::rxPacket
         if ( config.tofBin < 1 )
         {
             syslog( LOG_ERR,
-                "[%i] Beam Monitor %u Histo Config Issue: Time Bin %u < 1",
-                g_pid, config.id, config.tofBin );
+                "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
+                g_pid, "STS Error:", "Beam Monitor", config.id,
+                config.tofBin );
             config.tofBin = 1;
         }
 
@@ -1259,8 +1264,8 @@ StreamParser::getBeamMonitorConfig
     if (config == NULL)
     {
         syslog( LOG_ERR,
-        "[%i] Beam Monitor Error: Missing Histogramming Config for Id=%d.",
-            g_pid, a_monitor_id );
+            "[%i] %s %s %d Missing in Histogramming Config!",
+            g_pid, "STS Error:", "Beam Monitor", a_monitor_id );
         // TODO Now What??!!!
         // - flag this Beam Monitor as Erroneous (still save events/where?)
         // - un-histogram _All_ previous Beam Monitors? (if events saved)
