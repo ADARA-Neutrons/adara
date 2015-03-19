@@ -863,18 +863,13 @@ StreamParser::processMonitorEvents
             pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
     }
 
-    // Detect gaps in event data and fill event index if present
-    if ( imi->second->m_last_pulse_with_data < ( m_pulse_count - 1 ) )
-    {
-        handleMonitorPulseGap( *imi->second,
-            ( m_pulse_count - 1 ) - imi->second->m_last_pulse_with_data );
-    }
-
     const uint32_t *epos = a_rpos + a_event_count;
 
     // Histo-based Monitors...
     if ( imi->second->m_config != NULL )
     {
+        // Process Monitor Events (into Histogram)... :-D
+
         uint32_t tofbin;
         uint32_t tof;
 
@@ -925,6 +920,16 @@ StreamParser::processMonitorEvents
     // Event-based Monitors...
     else
     {
+        // Detect gaps in event data and fill event index if present
+        if ( imi->second->m_last_pulse_with_data < ( m_pulse_count - 1 ) )
+        {
+            handleMonitorPulseGap( *imi->second,
+                ( m_pulse_count - 1 )
+                    - imi->second->m_last_pulse_with_data );
+        }
+
+        // Process Monitor Events...
+
         size_t sz = imi->second->m_tof_buffer.size();
 
         imi->second->m_tof_buffer.resize( sz + a_event_count );
@@ -1752,18 +1757,25 @@ StreamParser::finalizeStreamProcessing()
     // Make sure neutron pulses were received
 
     if ( !m_run_metrics.charge_stats.count() && m_strict )
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "No neutron pulses received in stream.")
+    {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "No neutron pulses received in stream.")
+    }
 
     // Write any remaining data in bank buffers
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi )
     {
         if ( !*ibi )
             continue;
 
         // Detect gaps in bank data and fill event index if present
         if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
-            handleBankPulseGap( **ibi, m_pulse_count - (*ibi)->m_last_pulse_with_data );
+        {
+            handleBankPulseGap( **ibi,
+                m_pulse_count - (*ibi)->m_last_pulse_with_data );
+        }
 
         // Flush bank buffers
         if ( (*ibi)->m_tof_buffer.size() || (*ibi)->m_index_buffer.size() )
@@ -1774,19 +1786,30 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in monitor buffers
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+            imi != m_monitors.end(); ++imi )
     {
-        // Detect gaps in monitor data and fill event index if present
-        if ( imi->second->m_last_pulse_with_data < m_pulse_count )
-            handleMonitorPulseGap( *imi->second, m_pulse_count - imi->second->m_last_pulse_with_data );
+        // Event-based Monitors Only...
+        if ( imi->second->m_config == NULL )
+        {
+            // Detect gaps in monitor data and fill event index if present
+            if ( imi->second->m_last_pulse_with_data < m_pulse_count )
+            {
+                handleMonitorPulseGap( *imi->second,
+                    m_pulse_count - imi->second->m_last_pulse_with_data );
+            }
 
-        // Flush monitor buffers
-        if ( imi->second->m_tof_buffer.size() || imi->second->m_index_buffer.size() )
-            monitorBuffersReady( *imi->second );
+            // Flush monitor buffers
+            if ( imi->second->m_tof_buffer.size()
+                || imi->second->m_index_buffer.size() )
+            {
+                monitorBuffersReady( *imi->second );
+            }
+        }
 
+        // All Beam Monitors...
         monitorFinalize( *imi->second );
     }
-
 
     // Write remaining pulse info and statistics
 
@@ -1795,7 +1818,8 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in PV buffers
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
+            ipv != m_pvs_by_key.end(); ++ipv )
     {
         if ( ipv->second->m_time_buffer.size() > 0 )
             ipv->second->flushBuffers( &m_run_metrics );
