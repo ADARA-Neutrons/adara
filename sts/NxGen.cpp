@@ -189,44 +189,45 @@ NxGen::makeBankInfo
 STS::MonitorInfo*
 NxGen::makeMonitorInfo
 (
-    uint16_t a_id,                   ///< [in] ID of detector bank
-    uint32_t a_buf_reserve,          ///< [in] Event buffer initial capacity
-    uint32_t a_idx_buf_reserve,      ///< [in] Index buffer initial capacity
-    STS::BeamMonitorConfig *a_config ///< [in] Beam Monitor Histo Config (opt)
+    uint16_t a_id,                    ///< [in] ID of detector bank
+    uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
+    uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
+    STS::BeamMonitorConfig *a_config, ///< [in] Beam Monitor Histo Config (opt)
+    bool a_known_monitor              ///< [in] Is this a "Known" Monitor?
 )
 {
     try
     {
         NxMonitorInfo* mi = new NxMonitorInfo(
-            a_id, a_buf_reserve, a_idx_buf_reserve, a_config, *this );
+            a_id, a_buf_reserve, a_idx_buf_reserve,
+            a_config, a_known_monitor, *this );
 
         if ( m_gen_nexus)
         {
-            // create instrument/bank# group
-            string path = m_entry_path + "/" + mi->m_name;
-            makeGroup( path, "NXmonitor" );
+            makeGroup( mi->m_path, mi->m_group_type );
 
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( path, mi->m_data_name, NeXus::UINT32, "" );
-                makeDataset( path, mi->m_tofbin_name,
+                makeDataset( mi->m_path, mi->m_data_name,
+                    NeXus::UINT32, "" );
+                makeDataset( mi->m_path, mi->m_tofbin_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
 
-                writeScalar( path, "distance",
+                writeScalar( mi->m_path, "distance",
                     mi->m_config->distance, "" );
-                writeString( path, "mode", "monitor" );
+                writeString( mi->m_path, "mode", "monitor" );
             }
 
             // Event-based Monitor
             else
             {
-                makeDataset( path, m_tof_name,
+                makeDataset( mi->m_path, m_tof_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
-                makeDataset( path, m_index_name, NeXus::UINT64 );
+                makeDataset( mi->m_path, m_index_name, NeXus::UINT64 );
 
                 makeLink( m_daslogs_freq_path + "/time",
-                    path + "/" + m_pulse_time_name );
+                    mi->m_path + "/" + m_pulse_time_name );
             }
         }
 
