@@ -346,24 +346,49 @@ class IStreamAdapter
 public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
-    virtual PVInfoBase*     makePVInfo( const std::string & a_name, const std::string & a_device_name, Identifier a_device_id, Identifier a_pv_id, PVType a_type, const std::string & a_units ) = 0;
-    virtual BankInfo*       makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
-    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve, STS::BeamMonitorConfig *a_config ) = 0;
-    virtual void            processRunInfo( const RunInfo & a_run_info ) = 0;
-    virtual void            processGeometry( const std::string & a_xml ) = 0;
-    virtual void            pulseBuffersReady( STS::PulseInfo &a_pulse_info ) = 0;
+    virtual PVInfoBase*     makePVInfo( const std::string & a_name,
+                                const std::string & a_device_name,
+                                Identifier a_device_id,
+                                Identifier a_pv_id, PVType a_type,
+                                const std::string & a_units ) = 0;
+    virtual BankInfo*       makeBankInfo( uint16_t a_id,
+                                uint16_t a_pixel_count,
+                                uint32_t a_buf_reserve,
+                                uint32_t a_idx_buf_reserve ) = 0;
+    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
+                                uint32_t a_buf_reserve,
+                                uint32_t a_idx_buf_reserve,
+                                STS::BeamMonitorConfig *a_config,
+                                bool a_known_monitor ) = 0;
+    virtual void            processRunInfo(
+                                const RunInfo & a_run_info ) = 0;
+    virtual void            processGeometry(
+                                const std::string & a_xml ) = 0;
+    virtual void            pulseBuffersReady(
+                                STS::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
-    virtual void            bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count ) = 0;
+    virtual void            bankPulseGap( STS::BankInfo &a_bank,
+                                uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady( STS::MonitorInfo &a_monitor_info ) = 0;
-    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
-    virtual void            monitorFinalize( STS::MonitorInfo &a_monitor ) = 0;
+    virtual void            monitorBuffersReady(
+                                STS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
+                                uint64_t a_count ) = 0;
+    virtual void            monitorFinalize(
+                                STS::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment ) = 0;
-    virtual void            markerPause( double a_time, const std::string &a_comment ) = 0;
-    virtual void            markerResume( double a_time, const std::string &a_comment ) = 0;
-    virtual void            markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment ) = 0;
-    virtual void            markerScanStop( double a_time, unsigned long a_scan_index, const std::string &a_comment ) = 0;
-    virtual void            markerComment( double a_time, const std::string &a_comment ) = 0;
+    virtual void            markerPause( double a_time,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerResume( double a_time,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerScanStart( double a_time,
+                                unsigned long a_scan_index,
+                                const std::string &a_scan_comment ) = 0;
+    virtual void            markerScanStop( double a_time,
+                                unsigned long a_scan_index,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerComment( double a_time,
+                                const std::string &a_comment ) = 0;
 };
 
 // ============================================================================
