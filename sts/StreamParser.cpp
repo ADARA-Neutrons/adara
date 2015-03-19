@@ -853,10 +853,12 @@ StreamParser::processMonitorEvents
         m_monitors.find( a_monitor_id );
     if ( imi == m_monitors.end())
     {
+        bool known_monitor = true;
         STS::BeamMonitorConfig *config =
-            getBeamMonitorConfig(a_monitor_id);
+            getBeamMonitorConfig(a_monitor_id, known_monitor);
         MonitorInfo *mi = makeMonitorInfo( a_monitor_id,
-            m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
+            m_event_buf_write_thresh, m_anc_buf_write_thresh,
+            config, known_monitor );
         imi = m_monitors.insert( m_monitors.begin(),
             pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
     }
@@ -1242,14 +1244,19 @@ StreamParser::rxPacket
 STS::BeamMonitorConfig *
 StreamParser::getBeamMonitorConfig
 (
-    Identifier a_monitor_id   ///< [in] Beam Monitor Id (uint32_t)
+    Identifier a_monitor_id,    ///< [in] Beam Monitor Id (uint32_t)
+    bool & known_monitor        ///< [in] Flag for "Unknown" Monitors...
 )
 {
     STS::BeamMonitorConfig *config = (STS::BeamMonitorConfig *) NULL;
 
-    // Any Beam Monitor Histogramming Parameters...?
+    // Innocent until Presumed Guilty...
+    // (or like, if there isn't any Beam Monitor Config info... :-)
+    known_monitor = true;
+
+    // Any Beam Monitor Histogramming Parameters...? (If not, we're done.)
     if (m_monitor_config.size() == 0)
-        return(config);
+        return(config); // NULL...
 
     // Look for a matching Beam Monitor Id in Any Config...
     for ( vector<STS::BeamMonitorConfig>::iterator bmc =
@@ -1263,12 +1270,16 @@ StreamParser::getBeamMonitorConfig
     // If we didn't find one, then there's Trouble... ;-b
     if (config == NULL)
     {
+        // "Trouble"...
         syslog( LOG_ERR,
-            "[%i] %s %s %d Missing in Histogramming Config!",
-            g_pid, "STS Error:", "Beam Monitor", a_monitor_id );
-        // TODO Now What??!!!
-        // - flag this Beam Monitor as Erroneous (still save events/where?)
-        // - un-histogram _All_ previous Beam Monitors? (if events saved)
+            "[%i] %s %s %d Missing in Histogramming Config! %s",
+            g_pid, "STS Error:", "Beam Monitor", a_monitor_id,
+            "[Unknown Monitor]" );
+
+        // Now What?!
+        // - flag this Beam Monitor as "Unknown"
+        //   (still save events, just _Not_ in an official NXmonitor...)
+        known_monitor = false;
     }
 
     return(config);
