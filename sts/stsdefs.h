@@ -3,10 +3,11 @@
 
 #include <unistd.h>
 #include <vector>
+#include <syslog.h>
 #include "ADARAUtils.h"
 
 // Global syslog info
-#define STS_VERSION "1.2.1"
+#define STS_VERSION "1.2.2"
 extern pid_t g_pid;
 
 namespace STS {
@@ -68,6 +69,16 @@ public:
 };
 
 
+/// Beam Monitor Configuration information (used in MonitorInfo)
+struct BeamMonitorConfig
+{
+    uint32_t                id;
+    uint32_t                tofOffset;
+    uint32_t                tofMax;
+    uint32_t                tofBin;
+    double                  distance;
+};
+
 /// Base class for monitor info
 class MonitorInfo
 {
@@ -75,17 +86,73 @@ public:
     ///< MonitorInfo constructor
     MonitorInfo
     (
-        uint16_t a_id,              ///< [in] ID of detector bank
-        uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-        uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+        uint16_t a_id,               ///< [in] ID of detector bank
+        uint32_t a_buf_reserve,      ///< [in] Event buffer initial capacity
+        uint32_t a_idx_buf_reserve,  ///< [in] Index buffer initial capacity
+        BeamMonitorConfig *a_config  ///< [in] Beam Mon Histo Config (opt)
     )
     :
         m_id(a_id),
         m_event_count(0),
-        m_last_pulse_with_data(0)
+        m_event_uncounted(0),
+        m_last_pulse_with_data(0),
+        m_config(a_config)
     {
-        m_tof_buffer.reserve(a_buf_reserve);
-        m_index_buffer.reserve(a_idx_buf_reserve);
+        // Histo-based Monitor
+        if ( m_config != NULL )
+        {
+            // Number of Time Bin Values Needed...
+            m_num_tof_bins = ( ( m_config->tofMax - m_config->tofOffset )
+                / m_config->tofBin ) + 1;
+
+            // If Max TOF doesn't divide evenly into TOF Bin size,
+            // then need "One Extra" Bin Value...
+            if ( ( m_config->tofMax - m_config->tofOffset )
+                    % m_config->tofBin )
+            {
+                m_num_tof_bins++;
+            }
+
+            // Fail Safe: Make Sure We Get At Least One Actual TOF Bin!
+            if ( m_num_tof_bins < 2 )
+            {
+                syslog( LOG_ERR,
+                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
+                    g_pid, "STS Error:", "Beam Monitor", m_id,
+                    m_num_tof_bins);
+                m_num_tof_bins = 2;
+            }
+
+            // Actual Histogram Storage, Non-Inclusive Max TOF Bin...
+            m_data_buffer.reserve(m_num_tof_bins - 1);
+
+            // TOF Bin Values...
+            m_tofbin_buffer.reserve(m_num_tof_bins);
+
+            syslog( LOG_INFO,
+            "[%i] Beam Monitor %u Histogram: %u Time Bin Values, %u to %u.",
+                g_pid, m_id, m_num_tof_bins,
+                m_config->tofOffset, m_config->tofMax );
+
+            uint32_t tofbin = m_config->tofOffset;
+            for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
+            {
+                m_data_buffer.push_back(0);
+
+                m_tofbin_buffer.push_back((float)tofbin);
+                tofbin += m_config->tofBin;
+            }
+
+            // Max TOF Bin Value...
+            m_tofbin_buffer.push_back((float)(m_config->tofMax));
+        }
+
+        // Event-based Monitor
+        else
+        {
+            m_tof_buffer.reserve(a_buf_reserve);
+            m_index_buffer.reserve(a_idx_buf_reserve);
+        }
     }
 
     ///< MonitorInfo destructor
@@ -94,10 +161,18 @@ public:
 
     uint16_t                m_id;                   ///< ID of monitor
     uint64_t                m_event_count;          ///< Running event count
+    uint64_t                m_event_uncounted;      ///< Events not counted in Histogram for this monitor
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this monitor
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
+
+    uint32_t                m_num_tof_bins;         ///< Histo Number of TOF Bins
+    std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
+    std::vector<float>      m_tofbin_buffer;        ///< Histo TOF Bin buffer
+
+    BeamMonitorConfig      *m_config;               ///< Any (Histogram) config info for this monitor
 };
+
 
 /// User information (part of RunInfo)
 struct UserInfo
@@ -127,6 +202,7 @@ struct RunInfo
     std::string             sample_environment;
     std::vector<UserInfo>   users;
 };
+
 
 /// Run metrics collected by STS during translation
 struct RunMetrics
@@ -270,24 +346,49 @@ class IStreamAdapter
 public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
-    virtual PVInfoBase*     makePVInfo( const std::string & a_name, const std::string & a_device_name, Identifier a_device_id, Identifier a_pv_id, PVType a_type, const std::string & a_units ) = 0;
-    virtual BankInfo*       makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
-    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve ) = 0;
-    virtual void            processRunInfo( const RunInfo & a_run_info ) = 0;
-    virtual void            processGeometry( const std::string & a_xml ) = 0;
-    virtual void            pulseBuffersReady( STS::PulseInfo &a_pulse_info ) = 0;
+    virtual PVInfoBase*     makePVInfo( const std::string & a_name,
+                                const std::string & a_device_name,
+                                Identifier a_device_id,
+                                Identifier a_pv_id, PVType a_type,
+                                const std::string & a_units ) = 0;
+    virtual BankInfo*       makeBankInfo( uint16_t a_id,
+                                uint16_t a_pixel_count,
+                                uint32_t a_buf_reserve,
+                                uint32_t a_idx_buf_reserve ) = 0;
+    virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
+                                uint32_t a_buf_reserve,
+                                uint32_t a_idx_buf_reserve,
+                                STS::BeamMonitorConfig *a_config,
+                                bool a_known_monitor ) = 0;
+    virtual void            processRunInfo(
+                                const RunInfo & a_run_info ) = 0;
+    virtual void            processGeometry(
+                                const std::string & a_xml ) = 0;
+    virtual void            pulseBuffersReady(
+                                STS::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
-    virtual void            bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count ) = 0;
+    virtual void            bankPulseGap( STS::BankInfo &a_bank,
+                                uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady( STS::MonitorInfo &a_monitor_info ) = 0;
-    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count ) = 0;
-    virtual void            monitorFinalize( STS::MonitorInfo &a_monitor ) = 0;
+    virtual void            monitorBuffersReady(
+                                STS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
+                                uint64_t a_count ) = 0;
+    virtual void            monitorFinalize(
+                                STS::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment ) = 0;
-    virtual void            markerPause( double a_time, const std::string &a_comment ) = 0;
-    virtual void            markerResume( double a_time, const std::string &a_comment ) = 0;
-    virtual void            markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_scan_comment ) = 0;
-    virtual void            markerScanStop( double a_time, unsigned long a_scan_index, const std::string &a_comment ) = 0;
-    virtual void            markerComment( double a_time, const std::string &a_comment ) = 0;
+    virtual void            markerPause( double a_time,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerResume( double a_time,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerScanStart( double a_time,
+                                unsigned long a_scan_index,
+                                const std::string &a_scan_comment ) = 0;
+    virtual void            markerScanStop( double a_time,
+                                unsigned long a_scan_index,
+                                const std::string &a_comment ) = 0;
+    virtual void            markerComment( double a_time,
+                                const std::string &a_comment ) = 0;
 };
 
 // ============================================================================
@@ -309,3 +410,6 @@ enum ErrorCodes
 } // End STS Namespace
 
 #endif // STSDEFS_H
+
+// vim: expandtab
+

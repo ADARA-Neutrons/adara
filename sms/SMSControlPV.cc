@@ -10,28 +10,20 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
 
+RateLimitedLogging::History RLLHistory_SMSControlPV;
+
+// Rate-Limited Logging IDs...
+#define RLL_CONNPV_CONNECTED          0
+#define RLL_CONNPV_DISCONNECTED       1
+#define RLL_CONNPV_FAILED             2
+#define RLL_CONNPV_TRYING             3
+#define RLL_CONNPV_WAITING            4
+
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
  * using -Werror, but we can quiet the compiler easily.
  */
 #define uninitialized_var(x) x = 0
-
-/* We need to a specialized destructor to delete allocated data when
- * the gdd holding them drops its last reference.
- */
-class fixedStringDestructor : public gddDestructor {
-	virtual void run(void *p) {
-		aitFixedString *s = (aitFixedString *)p;
-		delete [] s;
-	}
-};
-
-class charArrayDestructor : public gddDestructor {
-	virtual void run(void *p) {
-		char *s = (char *)p;
-		delete [] s;
-	}
-};
 
 /* ----------------------------------------------------------------------- */
 
@@ -119,7 +111,7 @@ static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 	aitFixedString *str;
 	fixedStringDestructor *des;
 
-	str = new aitFixedString[3];
+	str = new aitFixedString[5];
 	if (!str)
 		return S_casApp_noMemory;
 
@@ -132,9 +124,13 @@ static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 	strncpy(str[1].fixed_string, "Disconnected",
 		sizeof(str[1].fixed_string));
 	strncpy(str[2].fixed_string, "Failed", sizeof(str[2].fixed_string));
+	strncpy(str[3].fixed_string, "TryingToConnect",
+		sizeof(str[3].fixed_string));
+	strncpy(str[4].fixed_string, "WaitingForConnectAck",
+		sizeof(str[4].fixed_string));
 
 	in.setDimension(1);
-	in.setBound(0, 0, 3);
+	in.setBound(0, 0, 5);
 	in.putRef(str, des);
 
 	return S_cas_success;
@@ -916,6 +912,7 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 	nval->put(val);
 	nval->setTimeStamp(ts);
 
+	// Failed...
 	if (val == 2) {
 		nval->setStat(epicsAlarmState);
 		nval->setSevr(epicsSevMajor);
@@ -936,7 +933,13 @@ void smsConnectedPV::connected() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(0, &ts);
 
-	DEBUG("smsConnectedPV::connected() m_pv_name=" << m_pv_name << " (0)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_CONNECTED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::connected() m_pv_name="
+			<< m_pv_name << " (0)");
+	}
 }
 
 void smsConnectedPV::disconnected() {
@@ -946,8 +949,13 @@ void smsConnectedPV::disconnected() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(1, &ts);
 
-	DEBUG("smsConnectedPV::disconnected() m_pv_name=" << m_pv_name
-		<< " (1)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_DISCONNECTED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::disconnected() m_pv_name="
+			<< m_pv_name << " (1)");
+	}
 }
 
 void smsConnectedPV::failed() {
@@ -957,7 +965,46 @@ void smsConnectedPV::failed() {
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(2, &ts);
 
-	DEBUG("smsConnectedPV::failed() m_pv_name=" << m_pv_name << " (2)");
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_FAILED, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::failed() m_pv_name="
+			<< m_pv_name << " (2)");
+	}
+}
+
+void smsConnectedPV::trying_to_connect() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(3, &ts);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_TRYING, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::trying_to_connect() m_pv_name="
+			<< m_pv_name << " (3)");
+	}
+}
+
+void smsConnectedPV::waiting_for_connect_ack() {
+
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(4, &ts);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_CONNPV_WAITING, m_pv_name,
+			600, 3, 10, log_info ) ) {
+		DEBUG(log_info
+			<< "smsConnectedPV::waiting_for_connect_ack() m_pv_name="
+			<< m_pv_name << " (4)");
+	}
 }
 
 bool smsConnectedPV::valid(void)

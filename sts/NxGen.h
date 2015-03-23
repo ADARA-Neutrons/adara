@@ -36,27 +36,45 @@ private:
             uint16_t a_id,              ///< [in] ID of detector bank
             uint16_t a_pixel_count,     ///< [in] Pixel count of bank
             uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+            uint32_t a_idx_buf_reserve, ///< [in] Index buffer initial capacity
+            NxGen &a_nxgen              ///< [in] Parent NxGen instance
         )
         :
             BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve),
             m_event_slab_size(0),
-            m_index_slab_size(0)
+            m_index_slab_size(0),
+            m_nxgen(a_nxgen)
         {
-            m_name = std::string("bank") + boost::lexical_cast<std::string>(a_id);
-            m_eventname = m_name + "_events";
-            m_tof_slab_path = "/entry/instrument/" + m_name + "/event_time_offset";
-            m_pid_slab_path = "/entry/instrument/" + m_name + "/event_id";
-            m_index_slab_path = "/entry/instrument/" + m_name + "/event_index";
+            m_name = std::string("bank")
+                + boost::lexical_cast<std::string>(a_id);
+
+            m_instr_path = m_nxgen.m_instrument_path + "/" + m_name;
+
+            m_tof_slab_path = m_instr_path + "/" + m_nxgen.m_tof_name;
+
+            m_pid_slab_path = m_instr_path + "/" + m_nxgen.m_pid_name;
+
+            m_index_slab_path = m_instr_path + "/" + m_nxgen.m_index_name;
+
+            m_eventname = m_name + std::string("_events");
+
+            m_event_path = m_nxgen.m_entry_path + "/" + m_eventname;
+
+            m_time_path = m_nxgen.m_daslogs_freq_path
+                + std::string("/time");
         }
 
         std::string             m_name;             ///< Name of bank in Nexus file
         std::string             m_eventname;        ///< Name of bank events entry in Nexus file
+        std::string             m_instr_path;       ///< Nexus path to "NXdetector" instrument group
+        std::string             m_event_path;       ///< Nexus path to "NXevent_data" group
+        std::string             m_time_path;        ///< Nexus path to Pulse Time array
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         std::string             m_pid_slab_path;    ///< Nexus path to PID slab
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
         uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
+        NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
     /// MonitorInfo subclass that adds Nexus-required attributes
@@ -66,25 +84,70 @@ private:
         /// NxMonitorInfo constructor
         NxMonitorInfo
         (
-            uint16_t a_id,              ///< [in] ID of detector bank
-            uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
-            uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
+            uint16_t a_id,                    ///< [in] ID of detector bank
+            uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
+            uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
+            STS::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
+            bool a_known_monitor,             ///< [in] Valid Beam Mon Config?
+            NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
-            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve ),
+            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
             m_index_slab_size(0),
-            m_event_slab_size(0)
+            m_event_slab_size(0),
+            m_nxgen(a_nxgen)
         {
-            m_name = std::string("monitor") + boost::lexical_cast<std::string>(a_id);
-            m_index_slab_path = "/entry/" + m_name + "/event_index";
-            m_tof_slab_path = "/entry/" + m_name + "/event_time_offset";
+            // "Known" Monitor - Valid Histo Config or No Configs at All
+            if ( a_known_monitor )
+            {
+                m_name = std::string("monitor")
+                    + boost::lexical_cast<std::string>(a_id);
+
+                m_group_type = std::string("NXmonitor");
+            }
+
+            // "Unknown" Monitor - Invalid or Missing Histo Config
+            // (Make it obvious on casual visual inspection that
+            //    this monitor is whack... ;-)
+            else
+            {
+                m_name = std::string("UnknownMonitor")
+                    + boost::lexical_cast<std::string>(a_id);
+
+                m_group_type = std::string("NXcollection");
+            }
+
+            m_path = m_nxgen.m_entry_path + "/" + m_name;
+
+            // Event Monitor Paths
+
+            m_index_slab_path = m_path + "/" + m_nxgen.m_index_name;
+
+            m_tof_slab_path = m_path + "/" + m_nxgen.m_tof_name;
+
+            // Histogram Monitor Paths
+
+            m_data_name = std::string("data");
+
+            m_tofbin_name = std::string("time_of_flight");
+
+            m_data_slab_path = m_path + "/" + m_data_name;
+
+            m_tofbin_slab_path = m_path + "/" + m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
+        std::string             m_path;             ///< Nexus path to monitor group
+        std::string             m_group_type;       ///< Type of encompassing group in Nexus file
+        std::string             m_data_name;        ///< Name of monitor Histo data in Nexus file
+        std::string             m_tofbin_name;      ///< Name of monitor Histo TOF Bins in Nexus file
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
+        std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
+        std::string             m_tofbin_slab_path; ///< Nexus path to Histo TOF Bins slab
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
         uint64_t                m_event_slab_size;  ///< Running size of TOF slab
+        NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
@@ -102,15 +165,16 @@ private:
             STS::Identifier     a_pv_id,        ///< [in] ID of the PV
             STS::PVType         a_type,         ///< [in] Type of PV
             const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
-            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus ouput
+            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
-            STS::PVInfo<T>( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units ),
+            STS::PVInfo<T>( a_name, a_device_name,
+                a_device_id, a_pv_id, a_type, a_units ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_slab_size(0)
         {
-            m_log_path = std::string("/entry/DASlogs/") + m_internal_name;
+            m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
         }
 
         /// NxPVInfo destructor
@@ -130,39 +194,63 @@ private:
                     if ( !m_slab_size )
                     {
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
-                        m_nxgen.makeDataset( m_log_path, "value", m_nxgen.toNxType( this->m_type ), this->m_units );
-                        m_nxgen.makeDataset( m_log_path, "time", NeXus::FLOAT64, TIME_SEC_UNITS );
+                        m_nxgen.makeDataset( m_log_path, "value",
+                            m_nxgen.toNxType( this->m_type ),
+                            this->m_units );
+                        m_nxgen.makeDataset( m_log_path, "time",
+                            NeXus::FLOAT64, TIME_SEC_UNITS );
                     }
 
-                    // TODO - This code may need to be optimized when fast metadata is supported
-                    m_nxgen.writeSlab( m_log_path + "/value", this->m_value_buffer, m_slab_size );
-                    m_nxgen.writeSlab( m_log_path + "/time", this->m_time_buffer, m_slab_size );
+                    // TODO - This code may need to be optimized
+                    // when fast metadata is supported
+                    m_nxgen.writeSlab( m_log_path + "/value",
+                        this->m_value_buffer, m_slab_size );
+                    m_nxgen.writeSlab( m_log_path + "/time",
+                        this->m_time_buffer, m_slab_size );
 
                     m_slab_size += this->m_value_buffer.size();
 
                     if ( a_run_metrics )
                     {
-                        // Add start time (offset) properties to all time axis in DAS logs
-                        std::string time = timeToISO8601( a_run_metrics->start_time );
+                        // Add start time (offset) properties
+                        // to all time axis in DAS logs
+                        std::string time = timeToISO8601(
+                            a_run_metrics->start_time );
                         std::string time_path = m_log_path + "/time";
-                        m_nxgen.writeStringAttribute( time_path, "start", time );
-                        m_nxgen.writeScalarAttribute( time_path, "offset_seconds", (uint32_t)a_run_metrics->start_time.tv_sec - ADARA::EPICS_EPOCH_OFFSET );
-                        m_nxgen.writeScalarAttribute( time_path, "offset_nanoseconds", (uint32_t)a_run_metrics->start_time.tv_nsec );
+                        m_nxgen.writeStringAttribute( time_path,
+                            "start", time );
+                        m_nxgen.writeScalarAttribute( time_path,
+                            "offset_seconds",
+                            (uint32_t)a_run_metrics->start_time.tv_sec
+                                - ADARA::EPICS_EPOCH_OFFSET );
+                        m_nxgen.writeScalarAttribute( time_path,
+                            "offset_nanoseconds",
+                            (uint32_t)a_run_metrics->start_time.tv_nsec );
 
                         if ( m_slab_size )
                         {
                             // Data has been writen, so also write statistics
-                            m_nxgen.writeScalar( m_log_path, "minimum_value", this->m_stats.min(), this->m_units );
-                            m_nxgen.writeScalar( m_log_path, "maximum_value", this->m_stats.max(), this->m_units );
-                            m_nxgen.writeScalar( m_log_path, "average_value", this->m_stats.mean(), this->m_units );
-                            m_nxgen.writeScalar( m_log_path, "average_value_error", this->m_stats.stdDev(), this->m_units );
+                            m_nxgen.writeScalar( m_log_path,
+                                "minimum_value", this->m_stats.min(),
+                                this->m_units );
+                            m_nxgen.writeScalar( m_log_path,
+                                "maximum_value", this->m_stats.max(),
+                                this->m_units );
+                            m_nxgen.writeScalar( m_log_path,
+                                "average_value", this->m_stats.mean(),
+                                this->m_units );
+                            m_nxgen.writeScalar( m_log_path,
+                                "average_value_error",
+                                this->m_stats.stdDev(), this->m_units );
                         }
                     }
                 }
             }
             catch( TraceException &e )
             {
-                RETHROW_TRACE( e, "NxPVInfo::flushBuffers (pv: " << this->m_device_id << "." << this->m_pv_id << ") failed." )
+                RETHROW_TRACE( e, "NxPVInfo::flushBuffers (pv: "
+                    << this->m_device_id << "." << this->m_pv_id
+                    << ") failed." )
             }
 
             this->m_value_buffer.clear();
@@ -189,42 +277,81 @@ private:
 
 public:
 
-    NxGen( int a_fd_in, std::string & a_adara_out_file, std::string &a_nexus_out_file, bool a_strict, bool a_gather_stats, unsigned long a_chunk_size = 2048, unsigned short a_event_buf_chunk_count = 20, unsigned short a_ancillary_buf_chunk_count = 5, unsigned long a_cache_size = 10485760, unsigned short a_compression_level = 0 );
+    NxGen(
+        int a_fd_in,
+        std::string & a_adara_out_file,
+        std::string & a_nexus_out_file,
+        bool a_strict,
+        bool a_gather_stats,
+        unsigned long a_chunk_size = 2048,
+        unsigned short a_event_buf_chunk_count = 20,
+        unsigned short a_ancillary_buf_chunk_count = 5,
+        unsigned long a_cache_size = 10485760,
+        unsigned short a_compression_level = 0 );
     ~NxGen();
 
 protected:
 
     void                initialize();
     void                finalize( const STS::RunMetrics &a_run_metrics );
-    STS::PVInfoBase*    makePVInfo( const std::string & a_name, const std::string & a_device_name, STS::Identifier a_device_id, STS::Identifier a_pv_id, STS::PVType a_type, const std::string & a_units );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
-    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id, uint32_t a_buf_reserve, uint32_t a_idx_buf_reserve );
+    STS::PVInfoBase*    makePVInfo( const std::string & a_name,
+                            const std::string & a_device_name,
+                            STS::Identifier a_device_id,
+                            STS::Identifier a_pv_id, STS::PVType a_type,
+                            const std::string & a_units );
+    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count,
+                            uint32_t a_buf_reserve,
+                            uint32_t a_idx_buf_reserve );
+    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
+                            uint32_t a_buf_reserve,
+                            uint32_t a_idx_buf_reserve,
+                            STS::BeamMonitorConfig *a_config,
+                            bool a_known_monitor );
     void                processRunInfo( const STS::RunInfo & a_run_info );
     void                processGeometry( const std::string & a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankBuffersReady( STS::BankInfo &a_bank );
-    void                bankPulseGap( STS::BankInfo &a_bank, uint64_t a_count );
+    void                bankPulseGap( STS::BankInfo &a_bank,
+                            uint64_t a_count );
     void                bankFinalize( STS::BankInfo &a_bank );
-    void                monitorBuffersReady( STS::MonitorInfo &a_monitor_info );
-    void                monitorPulseGap( STS::MonitorInfo &a_monitor, uint64_t a_count );
+    void                monitorBuffersReady(
+                            STS::MonitorInfo &a_monitor_info );
+    void                monitorPulseGap( STS::MonitorInfo &a_monitor,
+                            uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment );
-    void                markerPause( double a_time, const std::string &a_comment  );
-    void                markerResume( double a_time, const std::string &a_comment  );
-    void                markerScanStart( double a_time, unsigned long a_scan_index, const std::string &a_comment );
-    void                markerScanStop( double a_time, unsigned long a_scan_index, const std::string &a_comment  );
-    void                markerComment( double a_time, const std::string &a_comment );
+    void                markerPause( double a_time,
+                            const std::string &a_comment  );
+    void                markerResume( double a_time,
+                            const std::string &a_comment  );
+    void                markerScanStart( double a_time,
+                            unsigned long a_scan_index,
+                            const std::string &a_comment );
+    void                markerScanStop( double a_time,
+                            unsigned long a_scan_index,
+                            const std::string &a_comment  );
+    void                markerComment( double a_time,
+                            const std::string &a_comment );
 
 private:
     void                flushPauseData();
     void                flushScanData();
     void                flushCommentData();
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
-    void                makeGroup( const std::string &a_path, const std::string &a_type );
-    void                makeDataset( const std::string &dataset_path, const std::string &dataset_name, NeXus::NXnumtype nxdatatype, const std::string units = "" );
-    void                makeLink( const std::string &source_path, const std::string &dest_name );
-    void                writeString( const std::string &a_path, const std::string &a_dataset, const std::string &a_value );
-    void                writeStringAttribute( const std::string &a_path, const std::string &a_attrib, const std::string &a_value );
+    void                makeGroup( const std::string &a_path,
+                            const std::string &a_type );
+    void                makeDataset( const std::string &dataset_path,
+                            const std::string &dataset_name,
+                            NeXus::NXnumtype nxdatatype,
+                            const std::string units = "" );
+    void                makeLink( const std::string &source_path,
+                            const std::string &dest_name );
+    void                writeString( const std::string &a_path,
+                            const std::string &a_dataset,
+                            const std::string &a_value );
+    void                writeStringAttribute( const std::string &a_path,
+                            const std::string &a_attrib,
+                            const std::string &a_value );
 
     /// Writes data values to a Nexus (HDF5) one-dimension slab
     template<class T>
@@ -232,14 +359,17 @@ private:
                         (
                             const std::string & a_path, ///< [in] Nexus path to slab
                             std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes)
+                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
                             if ( a_buffer.size())
                             {
-                                if ( m_h5nx.H5NXwrite_slab( a_path, a_buffer, a_slab_size ) != SUCCEED )
+                                if ( m_h5nx.H5NXwrite_slab( a_path,
+                                        a_buffer, a_slab_size ) != SUCCEED )
                                 {
-                                    THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXwrite_slab FAILED for path: " << a_path );
+                                    THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                                        "H5NXwrite_slab FAILED for path: "
+                                            << a_path );
                                 }
                             }
                         }
@@ -281,12 +411,24 @@ private:
                         }
 
     template<typename T>
-    void                writeScalar( const std::string & a_path, const std::string & a_name, T a_value, const std::string & a_units );
+    void                writeScalar( const std::string & a_path,
+                            const std::string & a_name, T a_value,
+                            const std::string & a_units );
     template<typename T>
-    void                writeScalarAttribute( const std::string & a_path, const std::string & a_attribute, T a_value );
+    void                writeScalarAttribute( const std::string & a_path,
+                            const std::string & a_attribute, T a_value );
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file
+    std::string         m_entry_path;           ///< Path to Nexus NXentry
+    std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
+    std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
+    std::string         m_daslogs_freq_path;    ///< Path to Nexus Frequency DAS Log
+    std::string         m_daslogs_pchg_path;    ///< Path to Nexus Proton Charge DAS Log
+    std::string         m_pid_name;             ///< Name of PID data in Nexus file
+    std::string         m_tof_name;             ///< Name of TOF data in Nexus file
+    std::string         m_index_name;           ///< Name of Event Index data in Nexus file
+    std::string         m_pulse_time_name;      ///< Name of Pulse Time data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
@@ -311,3 +453,6 @@ private:
 };
 
 #endif // NXGEN_H
+
+// vim: expandtab
+

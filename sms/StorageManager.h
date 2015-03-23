@@ -16,6 +16,10 @@
 #include "StorageContainer.h"
 #include "StorageFile.h"
 
+#include "ComBusSMSMon.h"
+
+static struct timespec combuszerotime = {0,0};
+
 class EventFd;
 
 class PoolsizePV;
@@ -91,6 +95,12 @@ public:
 
 	static void update_max_blocks_allowed_pv(void);
 
+
+        static void sendComBus ( uint32_t a_run_num,
+                     std::string a_run_state,
+                     const struct timespec &a_start_time = 
+                                            combuszerotime);
+
 private:
 	typedef boost::signals2::connection connection;
 
@@ -150,6 +160,12 @@ private:
 
 	static bool m_dailyExhausted;
 	static std::list<std::string> m_dailyCache;
+
+        static std::string m_domain;
+        static std::string m_broker_uri;
+        static std::string m_broker_user;
+        static std::string m_broker_pass;
+        static ComBusSMSMon *m_combus;
 
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);

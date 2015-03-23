@@ -148,6 +148,8 @@ void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
 		return;
 
 	if (starting) {
+                StorageManager::sendComBus(c->runNumber(), 
+					std::string("SMS start run sent to STS"));
 		queueRun(c);
 		startConnect();
 	} else
@@ -482,6 +484,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* STSClient already logged our success, we just need to
 		 * note that we've completed translation.
 		 */
+                StorageManager::sendComBus(c->runNumber(),
+                     std::string("Translation succeeded"));
 		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
@@ -495,6 +499,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
+                StorageManager::sendComBus(c->runNumber(),
+                     std::string("STS Connection Error"));
 		queueRun(c); // re-queue run...
 		break;
 	case TRANSIENT_FAIL:
@@ -512,14 +518,18 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			ERROR("Maximum Re-Queue Count Reached!"
 				<< " Marking Run " << c->runNumber()
 				<< " for Manual Translation");
+                        StorageManager::sendComBus(c->runNumber(),
+                                   std::string("Needs Manual Translation"));
 			c->markManual();
-		}
+		}  
 		// Re-Queue Run to Try Again...
 		else {
 			// Increment Re-Queue Count
 			c->incrRequeueCount();
 			ERROR("Requeueing Run " << c->runNumber()
 				<< ", Re-Queue #" << c->getRequeueCount());
+                        StorageManager::sendComBus(c->runNumber(),
+                                   std::string("STS transient Error"));
 			/* We shouldn't pound on the STS if we keep hitting problems,
 			 * back off and give it time to breathe.
 			 */
@@ -536,6 +546,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* STSClient already logged the failure, we just need to
 		 * mark it for manual processing.
 		 */
+                StorageManager::sendComBus(c->runNumber(),
+                       std::string("Needs Manual Translation"));
 		c->markManual();
 		break;
 	}

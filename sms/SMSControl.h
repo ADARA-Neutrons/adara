@@ -20,12 +20,14 @@ class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
 class smsUint32PV;
+class smsConnectedPV;
 class PopPulseBufferPV;
 class RunInfo;
 class Geometry;
 class DataSource;
 class PixelMap;
 class BeamlineInfo;
+class BeamMonitorConfig;
 class MetaDataMgr;
 class FastMeta;
 class Markers;
@@ -64,6 +66,13 @@ public:
 	void setSourcesReadDelay(void);
 
 	void resetPacketStats(void);
+
+	int32_t registerLiveClient(std::string clientName,
+			boost::shared_ptr<smsStringPV> & pvName,
+			boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
+			boost::shared_ptr<smsStringPV> & pvCurrentFilePath,
+			boost::shared_ptr<smsConnectedPV> & pvStatus);
+	void unregisterLiveClient(int32_t clientId);
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
@@ -165,6 +174,7 @@ private:
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
+	SourceSet m_liveClients;
 	PulseMap m_pulses;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
@@ -173,6 +183,7 @@ private:
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
+	boost::shared_ptr<BeamMonitorConfig> m_bmonConfig;
 	boost::shared_ptr<MetaDataMgr> m_meta;
 	boost::shared_ptr<FastMeta> m_fastmeta;
 	boost::shared_ptr<Markers> m_markers;
@@ -195,6 +206,13 @@ private:
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
+
+	boost::shared_ptr<smsUint32PV> m_pvNumLiveClients;
+
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientNames;
+	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
+	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
 
 	static SMSControl *m_singleton;
 

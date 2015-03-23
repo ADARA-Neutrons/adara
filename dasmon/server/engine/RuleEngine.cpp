@@ -229,10 +229,9 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
 void
 RuleEngine::Rule::evaluate( Fact *a_updated_fact )
 {
-    /*
-    cout << "eval " << m_id << "{" << m_expr << "}: ";
+    //cout << "eval " << m_id << "{" << m_expr << "}: ";
 
-    if ( a_updated_fact )
+    /*if ( a_updated_fact )
     {
         cout << "update fact {" << a_updated_fact->m_id << "} ";
 
@@ -301,12 +300,10 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
         }
     }
 
-    /*
-    if ( !m_valid )
+    /*if ( !m_valid )
         cout << " expr is NOT valid." << endl;
     else
-        cout << " expr is valid - ";
-        */
+        cout << " expr is valid - ";*/
 
     if ( m_valid )
     {
@@ -329,6 +326,8 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
                 m_engine.retract( m_rule_fact );
         }
     }
+    else if ( m_rule_fact->m_asserted )
+        m_engine.retract( m_rule_fact );
 }
 
 /**

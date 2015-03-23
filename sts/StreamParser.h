@@ -1,5 +1,5 @@
 #ifndef STREAMPARSER_H
-#define	STREAMPARSER_H
+#define STREAMPARSER_H
 
 #include <iostream>
 #include <fstream>
@@ -83,30 +83,41 @@ private:
     bool        rxPacket( const ADARA::RunInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::GeometryPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
+    bool        rxPacket( const ADARA::BeamMonitorConfigPkt &a_pkt );
     bool        rxPacket( const ADARA::DataDonePkt &a_pkt );
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
-    bool        rxOversizePkt( const ADARA::PacketHeader *hdr, const uint8_t *chunk, unsigned int chunk_offset, unsigned int chunk_len);
+    bool        rxOversizePkt( const ADARA::PacketHeader *hdr,
+                    const uint8_t *chunk, unsigned int chunk_offset,
+                    unsigned int chunk_len );
 
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
 
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
-    void        processBankEvents( uint32_t a_bank_id, uint32_t a_event_count, const uint32_t *a_rpos );
+    void        processBankEvents( uint32_t a_bank_id,
+                    uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
-    void        processMonitorEvents( Identifier a_monitor_id, uint32_t a_event_count, const uint32_t *a_rpos );
-    void        handleMonitorPulseGap( MonitorInfo &a_mi, uint64_t a_count );
+    void        processMonitorEvents( Identifier a_monitor_id,
+                    uint32_t a_event_count, const uint32_t *a_rpos );
+    void        handleMonitorPulseGap( MonitorInfo &a_mi,
+                    uint64_t a_count );
+    STS::BeamMonitorConfig *
+                getBeamMonitorConfig( Identifier a_monitor_id,
+                    bool & known_monitor );
     template<class T>
-    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp );
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
+                    T a_value, const timespec &a_timestamp );
     //void        processPulseID( uint64_t a_pulse_id );
     void        receivedInfo( InfoBit a_bit );
     void        finalizeStreamProcessing();
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &a_pkt ) const;
     const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
-    void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
+    void        getXmlNodeValue( xmlNode *a_node,
+                    std::string & a_value ) const;
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
@@ -116,6 +127,7 @@ private:
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
+    std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
     std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
@@ -240,5 +252,7 @@ StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
 
 } // End namespace STS
 
-#endif	/* STREAMPARSER_H */
+#endif /* STREAMPARSER_H */
+
+// vim: expandtab
 

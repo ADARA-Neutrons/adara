@@ -10,7 +10,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.3.5"
+#define DASMON_VERSION "1.3.6"
 
 
 bool g_child_signal = false;
@@ -208,7 +208,11 @@ int main(int argc, char *argv[])
 
     try
     {
-        combus->waitForConnect( 5 );
+        if ( !combus->waitForConnect( 5 ) )
+            syslog( LOG_ERR, "ComBus: Failed to Connect to AMQP!" );
+        else
+            syslog( LOG_NOTICE, "ComBus: Connected to AMQP." );
+
 #ifndef NO_DB
         StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info, max_tof );
 #else

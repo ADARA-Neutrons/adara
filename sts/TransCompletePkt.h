@@ -109,3 +109,6 @@ private:
 }
 
 #endif // TRANSCOMPLETEPKT_H
+
+// vim: expandtab
+

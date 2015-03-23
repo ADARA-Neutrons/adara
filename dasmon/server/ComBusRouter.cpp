@@ -94,18 +94,77 @@ ComBusRouter::run()
     unsigned short  count = 0;
     uint32_t        t;
     map<string,ProcInfo>::iterator ip;
+    uint32_t last_proc_ticker = 0;
+    uint32_t proc_stall = 0;
+    uint32_t last_metrics_ticker = 0;
+    uint32_t metrics_stall = 0;
+    uint32_t last_db_ticker = 0;
+    uint32_t db_stall = 0;
 
     while(1)
     {
+
         sleep(1);
 
         t = time(0);
+
+        if ( last_proc_ticker == m_monitor.getProcTicker() )
+        {
+            if ( ++proc_stall == 3 )
+            {
+                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u", m_monitor.getProcState() );
+            }
+        }
+        else
+        {
+            if ( proc_stall >= 3 )
+                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to have recovered." );
+
+            last_proc_ticker = m_monitor.getProcTicker();
+            proc_stall = 0;
+        }
+
+        if ( last_metrics_ticker == m_monitor.getMetricsTicker() )
+        {
+            if ( ++metrics_stall == 3 )
+                syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u", m_monitor.getMetricsState() );
+        }
+        else
+        {
+            if ( metrics_stall >= 3 )
+                syslog( LOG_ERR, "StreamMonitor metrics thread appears to have recovered." );
+
+            last_metrics_ticker = m_monitor.getMetricsTicker();
+            metrics_stall = 0;
+        }
+
+#ifndef NO_DB
+        if ( m_monitor.getDbState() > 0 ) // Only monitor DB Thread if it has been started
+        {
+            if ( last_db_ticker == m_monitor.getDbTicker() )
+            {
+                if ( ++db_stall == 3 )
+                    syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u", m_monitor.getDbState() );
+            }
+            else
+            {
+                if ( db_stall >= 3 )
+                    syslog( LOG_ERR, "StreamMonitor DB thread appears to have recovered." );
+
+                last_db_ticker = m_monitor.getDbTicker();
+                db_stall = 0;
+            }
+        }
+#endif
 
         // Test/send status every 5 seconds
 
         if ( !(count % COMBUS_STATUS_PERIOD ))
         {
-            if ( m_monitor.isOK() && m_analyzer.isOK() )
+            // Check to be sure all threads are running (i.e. ticker values should be changing)
+            // If a thread is stuck, set fault condition and log failed thread state
+
+            if ( proc_stall < 3 && metrics_stall < 3 && db_stall < 3 )
                 m_combus.status( ADARA::ComBus::STATUS_OK );
             else
                 m_combus.status( ADARA::ComBus::STATUS_FAULT );
@@ -250,18 +309,18 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
 void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
+    // Only respond if recording state has changed
     if ( a_recording != m_recording )
     {
-        // On run state transitions, clear PVs
         boost::unique_lock<boost::mutex> lock(m_mutex);
         m_pvs.clear();
         lock.unlock();
+
+        ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
+        m_combus.broadcast( msg );
+
+        m_recording = a_recording;
     }
-
-    ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
-    m_combus.broadcast( msg );
-
-    m_recording = a_recording;
 }
 
 

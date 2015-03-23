@@ -6,7 +6,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.2.1";
+const std::string VERSION = "1.2.2";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 #define ADARA_PKT_TYPE(type, ver)  ((((uint32_t) type) << 8) | (ver))
@@ -29,6 +29,7 @@ namespace PacketType {
 		GEOMETRY_V0		= ADARA_PKT_TYPE(0x400A, 0),
 		BEAMLINE_INFO_V0	= ADARA_PKT_TYPE(0x400B, 0),
 		DATA_DONE_V0		= ADARA_PKT_TYPE(0x400C, 0),
+		BEAM_MONITOR_CONFIG_V0	= ADARA_PKT_TYPE(0x400D, 0),
 		DEVICE_DESC_V0		= ADARA_PKT_TYPE(0x8000, 0),
 		VAR_VALUE_U32_V0	= ADARA_PKT_TYPE(0x8001, 0),
 		VAR_VALUE_DOUBLE_V0	= ADARA_PKT_TYPE(0x8002, 0),

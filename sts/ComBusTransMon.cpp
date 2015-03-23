@@ -189,7 +189,10 @@ ComBusTransMon::commThread()
                     m_domain = m_stream_parser->getFacilityName() + "." + m_stream_parser->getBeamShortName();
 
                 m_combus = new ADARA::ComBus::Connection( m_domain, "STS", getpid(), m_broker_uri, m_broker_user, m_broker_pass );
-                m_combus->waitForConnect( 5 );
+                if (!m_combus->waitForConnect( 5 )) { 
+      syslog( LOG_WARNING, "STS Error: ComBus Connection Timeout" );
+   }
+
 
                 // Send Translation Started message
                 ADARA::ComBus::STS::TranslationStartedMsg msg( m_stream_parser->getRunNumber(), m_host );
@@ -210,3 +213,6 @@ ComBusTransMon::commThread()
 
     syslog( LOG_INFO, "[%i] ComBus thread exiting", g_pid );
 }
+
+// vim: expandtab
+

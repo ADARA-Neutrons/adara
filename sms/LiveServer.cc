@@ -83,7 +83,8 @@ LiveServer::LiveServer()
 		goto error_fd;
 	}
 
-	INFO("LiveServer() listening for connections...");
+	INFO("LiveServer() listening for connections at "
+		<< m_service << "...");
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,

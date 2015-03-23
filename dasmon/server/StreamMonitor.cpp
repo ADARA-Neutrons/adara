@@ -27,10 +27,13 @@ namespace DASMON {
 #define ADARA_IN_BUF_SIZE 0x100000
 
 
+
 bool PixPairComp( const pair<uint32_t,uint16_t> a, const pair<uint32_t,uint16_t> b )
 {
     return a.first < b.first;
 }
+
+uint32_t StreamMonitor::m_proc_state = TS_INIT;
 
 /**
  * \brief StreamMonitor constructor.
@@ -48,10 +51,12 @@ StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_po
     : POSIXParser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
       m_process_stream(true), m_mon_event_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0),
       m_paused(false), m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
-      m_stream_rate(0), m_ok(true), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
-      m_bnk_pkt_count(0), m_mon_pkt_count(0), m_maxtof(a_maxtof), m_pixmap_processed(false)
+      m_stream_rate(0), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
+      m_bnk_pkt_count(0), m_mon_pkt_count(0), m_maxtof(a_maxtof), m_pixmap_processed(false),
+      m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT), m_in_prolog(false)
+
 #ifndef NO_DB
-     ,m_db_info(a_db_info)
+     ,m_db_info(a_db_info), m_db_ticker(0), m_db_state(TS_INIT)
 #endif
 {
     m_maxtof *= 10; // Convert from usec to 100 nsec units
@@ -230,24 +235,36 @@ StreamMonitor::stopProcessing()
 void
 StreamMonitor::processThread()
 {
+    m_proc_state = TS_ENTER;
+    m_proc_ticker = 0;
+
     std::string log_info;
 
     syslog( LOG_INFO, "Stream monitor process thread started." );
 
+
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
+    m_proc_state = TS_RUNNING;
 
     while ( m_process_stream )
     {
+        ++m_proc_ticker;
+
         try
         {
             while( m_process_stream )
             {
                 if ( m_fd_in < 0 )
                 {
+                    m_proc_state = TS_CONNECTING;
+
                     // Not connected - attempt connection periodically
                     m_fd_in = connect();
                     if ( m_fd_in > -1 )
+                    {
                         m_notify.connectionStatus( true, m_sms_host, m_sms_port );
+                        m_proc_state = TS_RUNNING;
+                    }
                     else
                         sleep(5);
                 }
@@ -262,8 +279,7 @@ StreamMonitor::processThread()
         }
         catch( std::exception &e )
         {
-            // Primitive fault detection / reporting
-            m_ok = false;
+            m_proc_state = TS_EXCEPTION;
 
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): std::exception caught. Dropping connection. Exception = %s", e.what() );
@@ -271,12 +287,15 @@ StreamMonitor::processThread()
             handleLostConnection();
             // This is probably a misbehaving data source, wait a bit before retrying
             // (This will rate limit syslog spamming somewhat)
-            sleep(10);
+            for ( int i = 0; i < 10; ++i )
+            {
+                sleep(1);
+                ++m_proc_ticker;
+            }
         }
         catch(...)
         {
-            // Primitive fault detection / reporting
-            m_ok = false;
+            m_proc_state = TS_EXCEPTION;
 
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): Unknown exception type caught. Dropping connection." );
@@ -284,11 +303,16 @@ StreamMonitor::processThread()
             handleLostConnection();
             // This is probably a misbehaving data source, wait a bit before retrying
             // (This will rate limit syslog spamming somewhat)
-            sleep(10);
+            for ( int i = 0; i < 10; ++i )
+            {
+                sleep(1);
+                ++m_proc_ticker;
+            }
         }
     }
 
     syslog( LOG_INFO, "Stream monitor process thread stopping." );
+    m_proc_state = TS_EXIT;
 }
 
 
@@ -308,7 +332,10 @@ StreamMonitor::connect()
     int sms_socket = socket( AF_INET, SOCK_STREAM, 0);
 
     if ( sms_socket < 0 )
+    {
+        syslog( LOG_ERR, "Failed to Create SMS Socket!" );
         return -1;
+    }
 
     struct hostent *server = gethostbyname( m_sms_host.c_str() );
     if ( server )
@@ -336,7 +363,22 @@ StreamMonitor::connect()
                 syslog( LOG_NOTICE, "Connected to SMS." );
                 return sms_socket;
             }
+            else
+            {
+                syslog( LOG_ERR, "Failed to Write Hello to SMS at %s!",
+                    m_sms_host.c_str() );
+            }
         }
+        else
+        {
+            syslog( LOG_ERR, "Failed to Connect to SMS at %s!",
+                m_sms_host.c_str() );
+        }
+    }
+    else
+    {
+        syslog( LOG_ERR, "Failed to Get Host by Name for %s!",
+            m_sms_host.c_str() );
     }
 
     close( sms_socket );
@@ -351,6 +393,7 @@ void
 StreamMonitor::handleLostConnection()
 {
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
+    m_proc_state = TS_RUNNING;
     close( m_fd_in );
     m_fd_in = -1;
 
@@ -408,6 +451,8 @@ StreamMonitor::resetStreamStats()
 void
 StreamMonitor::metricsThread()
 {
+    m_metrics_state = TS_ENTER;
+
     unsigned short  count = 0;
     BeamMetrics     beam_metrics;
     RunMetrics      run_metrics;
@@ -417,11 +462,14 @@ StreamMonitor::metricsThread()
 
     while( m_process_stream )
     {
+        m_metrics_state = TS_SLEEP;
+        ++m_metrics_ticker;
         sleep(1);
 
         // If connected, send beam info and beam metrics
         if ( m_fd_in > -1 )
         {
+            m_metrics_state = TS_RUNNING;
             boost::unique_lock<boost::mutex> lock(m_mutex);
 
             // Check low-count rate on banked events
@@ -467,10 +515,15 @@ StreamMonitor::metricsThread()
             // Send stream metrics every 4 seconds
             if ( !(++count & 0x3 ))
                 m_notify.streamMetrics( m_stream_metrics );
+
+            m_proc_state = TS_RUNNING;
         }
     }
 
     syslog( LOG_INFO, "Stream metrics thread stopping." );
+
+    ++m_metrics_ticker;
+    m_metrics_state = TS_EXIT;
 }
 
 
@@ -485,6 +538,8 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     // Check stop flag (set by stop() method)
     if ( !m_process_stream )
         return false;
+
+    ++m_proc_ticker;
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
     m_stream_size += a_pkt.packet_length();
@@ -541,16 +596,23 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_RUN_STATUS;
+
     bool recording = false;
     switch (a_pkt.status())
     {
     case ADARA::RunStatus::RUN_BOF:
+        m_in_prolog = true;
+        m_notify.beginProlog();
+        return false;
+
     case ADARA::RunStatus::RUN_EOF:
         return false;
 
     case ADARA::RunStatus::NEW_RUN:
         recording = true;
         break;
+
     case ADARA::RunStatus::STATE:
         if ( a_pkt.runNumber())
             recording = true;
@@ -560,6 +622,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
     case ADARA::RunStatus::END_RUN:
         break;
     }
+
+    m_in_prolog = true;
+    m_notify.beginProlog();
 
     if ( recording && !m_recording )
     {
@@ -572,7 +637,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_pixmap_processed = false;
         resetRunStats();
 
+
         m_notify.runStatus( true, m_run_num, m_run_timestamp );
+        m_proc_state = TS_RUNNING;
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
@@ -596,6 +663,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
             m_scan_index = 0;
             m_notify.scanStatus( false, 0 );
         }
+        m_proc_state = TS_RUNNING;
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
@@ -611,13 +679,14 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_PIXEL_MAPPING;
+
     if ( !m_pixmap_processed )
     {
         const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
         const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
         const uint32_t *epos2;
 
-        uint32_t        base_logical_id;
         uint32_t        pid;
         uint32_t        min_pid = 0;
         uint32_t        max_pid = 0;
@@ -630,7 +699,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         // Build banks and analyze pid range
         while( rpos < epos )
         {
-            base_logical_id = *rpos++;
+            rpos++; // Skip base ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -664,7 +733,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         rpos = (const uint32_t*)a_pkt.payload();
         while( rpos < epos )
         {
-            base_logical_id = *rpos++;
+            rpos++; // Skip base ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -689,6 +758,14 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_BANKED_EVENT;
+
+    if ( m_in_prolog )
+    {
+        m_in_prolog = false;
+        m_notify.endProlog();
+    }
+
     ++m_bnk_pkt_count;
 
     m_this_time = timespec_to_nsec(a_pkt.timestamp());
@@ -850,6 +927,14 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
+    if ( m_in_prolog )
+    {
+        m_in_prolog = false;
+        m_notify.endProlog();
+    }
+
+    m_proc_state = TS_PKT_BEAM_MONITOR_EVENT;
+
     ++m_mon_pkt_count;
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
@@ -903,6 +988,8 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_RUN_INFO;
+
     xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -979,8 +1066,6 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
         }
         catch( ... )
         {
-            // Primitive fault detection / reporting
-            m_ok = false;
             ++m_stream_metrics.m_bad_runinfo_xml;
         }
 
@@ -997,6 +1082,7 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
     {
         m_notify.beamInfo( m_beam_info );
         m_notify.runInfo( m_run_info );
+        m_proc_state = TS_RUNNING;
     }
 
     return false;
@@ -1009,6 +1095,8 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_BEAMLINE_INFO;
+
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     m_beam_info.m_beam_id = a_pkt.id();
@@ -1021,6 +1109,7 @@ StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
     {
         m_notify.beamInfo( m_beam_info );
         m_notify.runInfo( m_run_info );
+        m_proc_state = TS_RUNNING;
     }
 
     return false;
@@ -1061,6 +1150,8 @@ StreamMonitor::toPVType
 bool
 StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_DEVICE_DESC;
+
     const string &xml =  a_pkt.description();
 
     xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
@@ -1125,6 +1216,7 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                     // a run (or while idle). At the start of a run, all pvs are cleared
                                     // before DDP are processed, so they won't be found in the m_pvs map.
                                     m_notify.pvUndefined( ipv->second->m_name );
+                                    m_proc_state = TS_RUNNING;
 
                                     delete ipv->second;
                                     m_pvs.erase( ipv );
@@ -1147,6 +1239,7 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                 }
 
                                 m_notify.pvDefined( pv_name );
+                                m_proc_state = TS_RUNNING;
                             }
                         }
                     }
@@ -1155,8 +1248,6 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
         }
         catch( std::exception &e )
         {
-            // Primitive fault detection / reporting
-            m_ok = false;
             ++m_stream_metrics.m_bad_ddp_xml;
         }
 
@@ -1178,6 +1269,8 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 {
+    m_proc_state = TS_PKT_VAR_VALUE_U32;
+
     pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
@@ -1190,6 +1283,8 @@ StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
+    m_proc_state = TS_PKT_VAR_VALUE_DOUBLE;
+
     pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
@@ -1202,6 +1297,8 @@ StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::VariableStringPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_VAR_VALUE_STRING;
+
     pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
@@ -1248,6 +1345,7 @@ StreamMonitor::pvValueUpdate
             pv->m_status = a_status;
             pv->m_updated = true;
             m_notify.pvValue( pv->m_name, a_value, a_status, pv->m_time );
+            m_proc_state = TS_RUNNING;
         }
     }
 }
@@ -1267,6 +1365,7 @@ StreamMonitor::clearPVs()
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
     {
         m_notify.pvUndefined( ipv->second->m_name );
+        m_proc_state = TS_RUNNING;
         delete ipv->second;
     }
 
@@ -1275,9 +1374,22 @@ StreamMonitor::clearPVs()
 
 
 #ifndef NO_DB
+struct PVInfoLite
+{
+    PVInfoLite( PVInfoBase* a_src )
+        : m_name(a_src->m_name ), m_time(a_src->m_time), m_status(a_src->m_status)
+    {}
+
+    string      m_name;
+    uint32_t    m_time;
+    uint16_t    m_status;
+};
+
 void
 StreamMonitor::dbThread()
 {
+    m_db_state = TS_ENTER;
+
     syslog( LOG_INFO, "Database update thread started." );
 
     // Attempt to connect
@@ -1300,27 +1412,49 @@ StreamMonitor::dbThread()
     PGconn *conn;
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
-    vector<PVInfoBase*> pvs;
-    vector<PVInfoBase*>::iterator ipvv;
     char buf[500];
     bool send_all =  true;
     bool update;
+    int  i;
 
-    pvs.reserve(400);
+    vector<pair<PVInfoLite,uint32_t> >              int_pvs;
+    vector<pair<PVInfoLite,uint32_t> >::iterator    iintpv;
+    vector<pair<PVInfoLite,double> >                dbl_pvs;
+    vector<pair<PVInfoLite,double> >::iterator      idblpv;
+
+    int_pvs.reserve(200);
+    dbl_pvs.reserve(200);
 
     while ( 1 )
     {
+        ++m_db_ticker;
+        m_db_state = TS_CONNECTING;
+
         conn = PQconnectdb( connect_string.c_str() );
         if ( conn )
         {
+            ++m_db_ticker;
+            m_db_state = TS_RUNNING;
+
             update = true;
             while ( update )
             {
-                sleep( m_db_info->period );
+                ++m_db_ticker;
+                m_db_state = TS_SLEEP;
 
-                pvs.clear();
+                for ( i = 0; i < m_db_info->period; ++i )
+                {
+                    ++m_db_ticker;
+                    sleep( 1 );
+                }
+
+                m_db_state = TS_RUNNING;
 
                 // Cache updated PVs
+                // Must ~copy~ data from PVs since they could be deleted before we're done writing them to DB
+                int_pvs.clear();
+                dbl_pvs.clear();
+
                 m_mutex.lock();
 
                 for ( ipvm = m_pvs.begin(); ipvm != m_pvs.end(); ++ipvm )
@@ -1328,29 +1462,32 @@ StreamMonitor::dbThread()
                     if ( ipvm->second->m_updated || send_all )
                     {
                         ipvm->second->m_updated = false;
-                        pvs.push_back( ipvm->second );
+                        switch ( ipvm->second->m_type )
+                        {
+                        case PVT_FLOAT:
+                        case PVT_DOUBLE:
+                            dbl_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<double>*)(ipvm->second))->m_value ));
+                            break;
+                        case PVT_INT:
+                        case PVT_UINT:
+                        case PVT_ENUM:
+                            int_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<uint32_t>*)(ipvm->second))->m_value ));
+                            break;
+                        case PVT_STRING:
+                            continue; // Web monitor db does not support strings yet
+                        }
                     }
                 }
 
                 m_mutex.unlock();
 
-                // Send PV updates to database
-                for ( ipvv = pvs.begin(); ipvv != pvs.end(); ++ipvv )
+                m_db_state = TS_DB_UPDATE;
+                ++m_db_ticker;
+
+                // Send double-value PV updates to database
+                for ( idblpv = dbl_pvs.begin(); idblpv != dbl_pvs.end(); ++idblpv )
                 {
-                    switch ( (*ipvv)->m_type )
-                    {
-                    case PVT_FLOAT:
-                    case PVT_DOUBLE:
-                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<double>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
-                        break;
-                    case PVT_INT:
-                    case PVT_UINT:
-                    case PVT_ENUM:
-                        sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), (*ipvv)->m_name.c_str(), ((PVInfo<uint32_t>*)(*ipvv))->m_value, (unsigned short)(*ipvv)->m_status, (*ipvv)->m_time );
-                        break;
-                    case PVT_STRING:
-                        continue; // Web monitor db does not support strings yet
-                    }
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), idblpv->first.m_name.c_str(), idblpv->second, idblpv->first.m_status, idblpv->first.m_time );
 
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
@@ -1365,17 +1502,48 @@ StreamMonitor::dbThread()
 
                     PQclear( res );
                     send_all = false;
+                    ++m_db_ticker;
+                }
+
+                ++m_db_ticker;
+
+                // Send int-value PV updates to database
+                for ( iintpv = int_pvs.begin(); iintpv != int_pvs.end(); ++iintpv )
+                {
+                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), iintpv->first.m_name.c_str(), iintpv->second, iintpv->first.m_status, iintpv->first.m_time );
+
+                    res = PQexec( conn, buf );
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                    {
+                        syslog( LOG_ERR, "Database update call failed." );
+                        syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        syslog( LOG_ERR, buf );
+
+                        update = false;
+                        break;
+                    }
+
+                    PQclear( res );
+                    send_all = false;
+                    ++m_db_ticker;
                 }
             }
             PQfinish( conn );
+            m_db_state = TS_DB_ERROR;
+            ++m_db_ticker;
         }
 
         // Error may have been caused by DB being off-line, or network error
         // wait a bit and try connecting again
-        sleep( 15 );
+        for ( i = 0; i < 15; ++i )
+        {
+            sleep( 1 );
+            ++m_db_ticker;
+        }
     }
 
     syslog( LOG_INFO, "Database update thread stopping." );
+    m_db_state = TS_EXIT;
 }
 #endif
 
@@ -1386,6 +1554,8 @@ StreamMonitor::dbThread()
 bool
 StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_STREAM_ANNOTATION;
+
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     switch( a_pkt.marker_type() )
@@ -1412,6 +1582,7 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
         break;
     }
 
+    m_proc_state = TS_RUNNING;
 
     return false;
 }
@@ -1456,35 +1627,63 @@ StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 void
 StreamMonitor::Notifier::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_STATUS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->runStatus( a_recording, a_run_number, a_timestamp );
+}
+
+void
+StreamMonitor::Notifier::beginProlog()
+{
+    StreamMonitor::m_proc_state = TS_NOTIFY_BEGIN_PROLOG;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+        (*l)->beginProlog();
+}
+
+void
+StreamMonitor::Notifier::endProlog()
+{
+    StreamMonitor::m_proc_state = TS_NOTIFY_END_PROLOG;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+        (*l)->endProlog();
 }
 
 void
 StreamMonitor::Notifier::pauseStatus( bool a_paused )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PAUSE_STATUS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pauseStatus( a_paused );
 }
 
 void
 StreamMonitor::Notifier::scanStatus( bool a_scanning, uint32_t a_scan_number )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_SCAN_STATUS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->scanStatus( a_scanning, a_scan_number );
 }
 
 void
 StreamMonitor::Notifier::beamInfo( const BeamInfo &a_info )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_BEAM_INFO;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->beamInfo( a_info );
 }
 
 void
 StreamMonitor::Notifier::runInfo( const RunInfo &a_info )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_INFO;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->runInfo( a_info );
 }
 
@@ -1492,63 +1691,81 @@ StreamMonitor::Notifier::runInfo( const RunInfo &a_info )
 void
 StreamMonitor::Notifier::beamMetrics( const BeamMetrics &a_metrics )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_BEAM_METRICS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->beamMetrics( a_metrics );
 }
 
 void
 StreamMonitor::Notifier::runMetrics( const RunMetrics &a_metrics )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_METRICS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->runMetrics( a_metrics );
 }
 
 void
 StreamMonitor::Notifier::streamMetrics( const StreamMetrics &a_metrics )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_STREAM_METRICS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->streamMetrics( a_metrics );
 }
 
 void
 StreamMonitor::Notifier::pvDefined( const std::string &a_name )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PV_DEF;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pvDefined( a_name );
 }
 
 void
 StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PV_UNDEF;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pvUndefined( a_name );
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_UINT;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_DBL;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_STR;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
 }
 
 void
 StreamMonitor::Notifier::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
+    StreamMonitor::m_proc_state = TS_NOTIFY_CONN_STATUS;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
         (*l)->connectionStatus( a_connected, a_host, a_port );
 }
 

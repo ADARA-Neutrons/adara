@@ -30,6 +30,8 @@ class IStreamListener
 public:
     virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
     virtual void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp ) = 0;
+    virtual void beginProlog() = 0;
+    virtual void endProlog() = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
     virtual void scanStatus( bool a_scanning, uint32_t a_scan_number ) = 0;
     virtual void beamInfo( const BeamInfo &a_info ) = 0;
@@ -233,6 +235,46 @@ struct DBConnectInfo
 };
 #endif
 
+enum ThreadState
+{
+    TS_INIT = 0,
+    TS_ENTER,
+    TS_CONNECTING,
+    TS_RUNNING,
+    TS_EXCEPTION,
+    TS_SLEEP,
+    TS_EXIT,
+    TS_PKT_RUN_STATUS           = 100,
+    TS_PKT_PIXEL_MAPPING,
+    TS_PKT_RUN_INFO,
+    TS_PKT_BEAMLINE_INFO,
+    TS_PKT_DEVICE_DESC,
+    TS_PKT_VAR_VALUE_U32,
+    TS_PKT_VAR_VALUE_DOUBLE,
+    TS_PKT_VAR_VALUE_STRING,
+    TS_PKT_STREAM_ANNOTATION,
+    TS_PKT_BEAM_MONITOR_EVENT,
+    TS_PKT_BANKED_EVENT,
+    TS_NOTIFY_RUN_INFO          = 200,
+    TS_NOTIFY_BEAM_INFO,
+    TS_NOTIFY_CONN_STATUS,
+    TS_NOTIFY_RUN_STATUS,
+    TS_NOTIFY_BEGIN_PROLOG,
+    TS_NOTIFY_END_PROLOG,
+    TS_NOTIFY_SCAN_STATUS,
+    TS_NOTIFY_PAUSE_STATUS,
+    TS_NOTIFY_RUN_METRICS,
+    TS_NOTIFY_BEAM_METRICS,
+    TS_NOTIFY_STREAM_METRICS,
+    TS_NOTIFY_PV_DEF,
+    TS_NOTIFY_PV_UNDEF,
+    TS_NOTIFY_PV_VAL_UINT,
+    TS_NOTIFY_PV_VAL_DBL,
+    TS_NOTIFY_PV_VAL_STR,
+    TS_DB_UPDATE                = 300,
+    TS_DB_ERROR
+};
+
 class StreamMonitor : public ADARA::POSIXParser
 {
 public:
@@ -252,8 +294,17 @@ public:
     void            removeListener( IStreamListener &a_listener )
                     { m_notify.removeListener( a_listener ); }
     void            resendState( IStreamListener &a_listener ) const;
-    bool            isOK() const { return m_ok; }
     void            enableDiagnostics( bool a_diagnostics ) { m_diagnostics = a_diagnostics; }
+
+
+    inline uint32_t getProcTicker() { return m_proc_ticker; }
+    inline uint32_t getProcState() { return m_proc_state; }
+    inline uint32_t getMetricsTicker() { return m_metrics_ticker; }
+    inline uint32_t getMetricsState() { return m_metrics_state; }
+#ifndef NO_DB
+    inline uint32_t getDbTicker() { return m_db_ticker; }
+    inline uint32_t getDbState() { return m_db_state; }
+#endif
 
 private:
     class Notifier : public IStreamListener
@@ -263,6 +314,8 @@ private:
         void removeListener( IStreamListener &a_listener );
 
         void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp  );
+        void beginProlog();
+        void endProlog();
         void pauseStatus( bool a_paused );
         void scanStatus( bool a_scanning, uint32_t a_scan_number );
         void beamInfo( const BeamInfo &a_info );
@@ -313,6 +366,16 @@ private:
     PVType      toPVType( const char *a_source ) const;
     void        clearPVs();
 
+    struct BankInfo
+    {
+        BankInfo() : m_bank_id(0), m_source_id(0), m_last_pulse_time(0) {}
+        BankInfo( uint16_t a_bank_id ) : m_bank_id(a_bank_id), m_source_id(0), m_last_pulse_time(0) {}
+
+        uint16_t    m_bank_id;
+        uint32_t    m_source_id;
+        uint64_t    m_last_pulse_time;
+    };
+
     int                             m_fd_in;
     std::string                     m_sms_host;
     unsigned short                  m_sms_port;
@@ -326,7 +389,7 @@ private:
     std::map<uint32_t,uint64_t>     m_mon_last_pulse;
     uint64_t                        m_mon_event_count;
     bool                            m_recording;
-    uint32_t                          m_run_num;
+    uint32_t                        m_run_num;
     uint32_t                        m_run_timestamp;
     bool                            m_paused;
     short                           m_info_rcv;
@@ -344,7 +407,6 @@ private:
     uint64_t                        m_stream_size;
     uint64_t                        m_stream_rate;
     std::map<PVKey,PVInfoBase*>     m_pvs;
-    bool                            m_ok;
     mutable boost::mutex            m_mutex;
     mutable boost::mutex            m_api_mutex;
     bool                            m_diagnostics;
@@ -354,24 +416,21 @@ private:
     uint32_t                        m_bnk_pkt_count;
     uint32_t                        m_mon_pkt_count;
     uint32_t                        m_maxtof;
-
-    struct BankInfo
-    {
-        BankInfo() : m_bank_id(0), m_source_id(0), m_last_pulse_time(0) {}
-        BankInfo( uint16_t a_bank_id ) : m_bank_id(a_bank_id), m_source_id(0), m_last_pulse_time(0) {}
-
-        uint16_t    m_bank_id;
-        uint32_t    m_source_id;
-        uint64_t    m_last_pulse_time;
-    };
-
     std::map<int16_t,BankInfo>      m_bank_info;
     std::vector<uint32_t>           m_sources;
     std::vector<int16_t>            m_pixmap;
     bool                            m_pixmap_processed;
+    uint32_t                        m_proc_ticker;      ///< "Alive" indicator for stream processing thread
+    static uint32_t                 m_proc_state;       ///< General state/step of stream processing thread.
+    uint32_t                        m_metrics_ticker;   ///< "Alive" indicator for stream metrics thread
+    uint32_t                        m_metrics_state;    ///< General state/step of stream metrics thread.
+    bool                            m_in_prolog;
+
 #ifndef NO_DB
     DBConnectInfo*                  m_db_info;
     boost::thread                  *m_db_thread;
+    uint32_t                        m_db_ticker;        ///< "Alive" indicator for db thread
+    uint32_t                        m_db_state;         ///< General state/step of db thread.
 #endif
 };
 

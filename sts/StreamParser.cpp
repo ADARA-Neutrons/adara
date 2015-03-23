@@ -61,7 +61,7 @@ StreamParser::StreamParser
 }
 
 
-/*! \brief Destructor for StremParser class.
+/*! \brief Destructor for StreamParser class.
  *
  */
 StreamParser::~StreamParser()
@@ -77,6 +77,8 @@ StreamParser::~StreamParser()
         if ( imi->second )
             delete imi->second;
 
+    m_monitor_config.clear();
+
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
         if ( ipv->second )
             delete ipv->second;
@@ -85,7 +87,7 @@ StreamParser::~StreamParser()
 
 /*! \brief This method initiates ADARA stream processing.
  *
- * This method initiates ADARA stream processing on the calling thread and does not return until the strem is fuly
+ * This method initiates ADARA stream processing on the calling thread and does not return until the stream is fully
  * translated, or an error occurs (an exception may be thrown). This method can only be called once for a given
  * StreamParser instance.
  */
@@ -114,15 +116,16 @@ StreamParser::processStream()
             {
                 if ( m_processing_state != DONE_PROCESSING )
                 {
-                    syslog( LOG_INFO,
-                        "[%i] STS failed %s: %s, Not Done Processing!",
-                        g_pid, "processStream()", "Connection Failed" );
+                    syslog( LOG_ERR,
+                    "[%i] STS failed %s: %s, Not Done Processing! (%s)",
+                        g_pid, "processStream()", "Connection Failed",
+                        log_info.c_str() );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
-                        syslog( LOG_INFO,
-                            "[%i] %s: %s, Still Processing Events!",
-                            g_pid, "processStream()",
+                        syslog( LOG_ERR,
+                            "[%i] %s %s: %s, Still Processing Events!",
+                            g_pid, "STS Error:", "processStream()",
                             "Connection Failed" );
 
                         // On fatal error, flush buffers to Nexus
@@ -193,10 +196,11 @@ StreamParser::printStats
 //---------------------------------------------------------------------------------------------------------------------
 
 // These bitmasks are used to monitor one-time processing of the associated packet type
-#define PKT_BIT_PIXELMAP    0x0001
-#define PKT_BIT_RUNINFO     0x0002
-#define PKT_BIT_BEAMINFO    0x0004
-#define PKT_BIT_GEOMETRY    0x0008
+#define PKT_BIT_PIXELMAP                0x0001
+#define PKT_BIT_RUNINFO                 0x0002
+#define PKT_BIT_BEAMINFO                0x0004
+#define PKT_BIT_GEOMETRY                0x0008
+#define PKT_BIT_BEAM_MONITOR_CONFIG     0x0010
 
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
@@ -263,6 +267,9 @@ StreamParser::rxPacket
     case ADARA::PacketType::BEAMLINE_INFO_V0:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
 
+    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAM_MONITOR_CONFIG)
+
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
@@ -324,8 +331,8 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_WARNING,
-                "[%i] Run Status Error: Start-of-Run with state=0x%x.",
-                g_pid, m_processing_state );
+                "[%i] %s Run Status Error: Start-of-Run with state=0x%x.",
+                g_pid, "STS Error:", m_processing_state );
             bad_state = true;
         }
     }
@@ -352,8 +359,8 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_WARNING,
-                "[%i] Run Status Error: End-of-Run with state=0x%x.",
-                g_pid, m_processing_state );
+                "[%i] %s Run Status Error: End-of-Run with state=0x%x.",
+                g_pid, "STS Error:", m_processing_state );
             bad_state = true;
         }
     }
@@ -528,7 +535,8 @@ StreamParser::rxOversizePkt
     if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
-        "[%i] OversizePkt: %u.%09u type=0x%x payload_len=%u offset=%u len=%u", g_pid,
+            "[%i] %s %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+            g_pid, "OversizePkt:",
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
@@ -624,7 +632,7 @@ StreamParser::processPulseInfo
             syslog( LOG_INFO,
                 "[%i] Unexpected input: %s at pulse #%ld ID=0x%lx, %s.",
                 g_pid, "Pulse time went backwards",
-				m_pulse_info.times.size(), a_pkt.pulseId(),
+                m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
             pulse_time = 0;
         }
@@ -822,11 +830,15 @@ StreamParser::rxPacket
 
 /*! \brief This method processes the neutron events for a specific monitor.
  *
- * This method processes incoming neutron events for a specified monitor. The events are read from the packet
- * and placed into internal event buffers (units are converted for event time of flight). When the event buffers are
- * full, they are flushed to a subclassed stream adapter via the monitorBuffersReady() virtual method. This method also
- * detects pulse gaps and corrects the event index as required (see handleMonitorPulseGap() method for more details).
- * Note that unlike banked events, monitors events do not contain a pixel ID field (pid) as all events originate from
+ * This method processes incoming neutron events for a specified monitor.
+ * The events are read from the packet and placed into internal
+ * event buffers (units are converted for event time of flight).
+ * When the event buffers are full, they are flushed to a subclassed
+ * stream adapter via the monitorBuffersReady() virtual method.
+ * This method also detects pulse gaps and corrects the event index
+ * as required (see handleMonitorPulseGap() method for more details).
+ * Note that unlike banked events, monitors events do not contain a
+ * pixel ID field (pid) as all events originate from
  * one source (i.e. the monitor).
  */
 void
@@ -837,55 +849,132 @@ StreamParser::processMonitorEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    map<Identifier,MonitorInfo*>::iterator imi = m_monitors.find( a_monitor_id );
+    map<Identifier,MonitorInfo*>::iterator imi =
+        m_monitors.find( a_monitor_id );
     if ( imi == m_monitors.end())
     {
-        MonitorInfo *mi = makeMonitorInfo( a_monitor_id, m_event_buf_write_thresh, m_anc_buf_write_thresh );
-        imi = m_monitors.insert( m_monitors.begin(), pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
+        bool known_monitor = true;
+        STS::BeamMonitorConfig *config =
+            getBeamMonitorConfig(a_monitor_id, known_monitor);
+        MonitorInfo *mi = makeMonitorInfo( a_monitor_id,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh,
+            config, known_monitor );
+        imi = m_monitors.insert( m_monitors.begin(),
+            pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
     }
 
-    // Detect gaps in event data and fill event index if present
-    if ( imi->second->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-        handleMonitorPulseGap( *imi->second, ( m_pulse_count - 1 ) - imi->second->m_last_pulse_with_data );
+    const uint32_t *epos = a_rpos + a_event_count;
 
-    size_t sz = imi->second->m_tof_buffer.size();
-
-    imi->second->m_tof_buffer.resize( sz + a_event_count );
-
-    float           *tof_ptr = &imi->second->m_tof_buffer[sz];
-    const uint32_t  *epos = a_rpos + a_event_count;
-
-    while ( a_rpos != epos )
+    // Histo-based Monitors...
+    if ( imi->second->m_config != NULL )
     {
-        // ADARA TOF values are in units of 100 ns - convert to microseconds
-        // TOF values is lower 21 bits
-        *tof_ptr++ = ((*a_rpos++)&0x1fffff) / 10.0;
+        // Process Monitor Events (into Histogram)... :-D
+
+        uint32_t tofbin;
+        uint32_t tof;
+
+        while ( a_rpos != epos )
+        {
+            // ADARA TOF values are in units of 100 ns,
+            //    convert to microseconds
+            // TOF values is lower 21 bits
+            tof = ((*a_rpos++) & 0x1fffff) / 10;
+
+            // Ignore TOF Less than Minimum Offset
+            //    and Greater than or Equal to Maximum TOF...
+            //    (Non-Inclusive Max...! ;-D)
+            if ( tof >= imi->second->m_config->tofOffset
+                    && tof < imi->second->m_config->tofMax )
+            {
+                // Calculate index into Histogram based on TOF...
+                tofbin = ( tof - imi->second->m_config->tofOffset )
+                    / imi->second->m_config->tofBin;
+
+                // Sanity Test, Just to Be Sure... ;-b
+                // (This should never happen, but the logic is confusing.)
+                if ( tofbin >= imi->second->m_num_tof_bins - 1 )
+                {
+                    syslog( LOG_ERR,
+                    "[%i] %s %s %u Histogram Error tof=%u index=%u >= %u",
+                        g_pid, "STS Error:", "Beam Monitor",
+                        imi->second->m_id, tof, tofbin,
+                        imi->second->m_num_tof_bins - 1 );
+                    // Count Uncounted Beam Monitor Events...
+                    (imi->second->m_event_uncounted)++;
+                    continue;
+                }
+
+                // Increment Histogram Time Slot...
+                (imi->second->m_data_buffer[tofbin])++;
+
+                // Count Beam Monitor Events for Histogram Mode Too... ;-D
+                (imi->second->m_event_count)++;
+            }
+
+            // Count Uncounted Beam Monitor Events for Histogram Mode...
+            else
+                (imi->second->m_event_uncounted)++;
+        }
     }
 
-    // Cache event index until large enough to write
-    imi->second->m_index_buffer.push_back( imi->second->m_event_count );
-    imi->second->m_event_count += a_event_count;
-    imi->second->m_last_pulse_with_data = m_pulse_count;
-
-    // Check to see if buffers are ready to write
-    if ( imi->second->m_tof_buffer.size() >= m_event_buf_write_thresh || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+    // Event-based Monitors...
+    else
     {
-        monitorBuffersReady( *imi->second );
+        // Detect gaps in event data and fill event index if present
+        if ( imi->second->m_last_pulse_with_data < ( m_pulse_count - 1 ) )
+        {
+            handleMonitorPulseGap( *imi->second,
+                ( m_pulse_count - 1 )
+                    - imi->second->m_last_pulse_with_data );
+        }
 
-        imi->second->m_index_buffer.clear();
-        imi->second->m_tof_buffer.clear();
+        // Process Monitor Events...
+
+        size_t sz = imi->second->m_tof_buffer.size();
+
+        imi->second->m_tof_buffer.resize( sz + a_event_count );
+
+        float *tof_ptr = &imi->second->m_tof_buffer[sz];
+
+        while ( a_rpos != epos )
+        {
+            // ADARA TOF values are in units of 100 ns,
+            //    convert to microseconds
+            // TOF values is lower 21 bits
+            *tof_ptr++ = ((*a_rpos++) & 0x1fffff) / 10.0;
+        }
+
+        // Cache event index until large enough to write
+        imi->second->m_index_buffer.push_back(
+            imi->second->m_event_count );
+        imi->second->m_event_count += a_event_count;
+        imi->second->m_last_pulse_with_data = m_pulse_count;
+
+        // Check to see if buffers are ready to write
+        if ( imi->second->m_tof_buffer.size() >= m_event_buf_write_thresh
+          || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        {
+            monitorBuffersReady( *imi->second );
+    
+            imi->second->m_index_buffer.clear();
+            imi->second->m_tof_buffer.clear();
+        }
     }
 }
 
 
 /*! \brief This method handles pulse gaps for a specified monitor
  *
- * This method handles pulse gaps in the event stream for the specified monitor. When a gap is detected, the event
- * index for the monitor must be corrected for the missing pulses to keep in synchronized with the event stream. If a
- * small gap is detected, values are inserted directly into the internal index buffer; otherwise, gap processing is
- * deferred to the stream adatapter subclass via the monitorPulseGap() virtual method. (It is expected that the virtual
- * method should write index values directly into the destination format to prevent excessive memory consumption that
- * would be caused by buffering the corrected index.)
+ * This method handles pulse gaps in the event stream for the specified
+ * monitor. When a gap is detected, the event index for the monitor
+ * must be corrected for the missing pulses to keep in synchronized
+ * with the event stream. If a small gap is detected, values are inserted
+ * directly into the internal index buffer; otherwise, gap processing is
+ * deferred to the stream adatapter subclass via the monitorPulseGap()
+ * virtual method. (It is expected that the virtual method should write
+ * index values directly into the destination format to prevent excessive
+ * memory consumption that would be caused by buffering the corrected
+ * index.)
  */
 void
 StreamParser::handleMonitorPulseGap
@@ -894,16 +983,23 @@ StreamParser::handleMonitorPulseGap
     uint64_t        a_count     ///< [in] The size of the pulse gap
 )
 {
+    // Event-based Monitors Only...
+    if ( a_mi.m_config != NULL )
+        return;
+
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
     if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
     {
-        a_mi.m_index_buffer.resize( a_mi.m_index_buffer.size() + a_count, a_mi.m_event_count );
+        a_mi.m_index_buffer.resize( a_mi.m_index_buffer.size() + a_count,
+            a_mi.m_event_count );
     }
     else
     {
-        // Otherwise, if the gap is too large - flush current buffered data & fill index directly
-        // Note: it is acceptable to call monitorBuffersReady even if they are empty.
+        // Otherwise, if the gap is too large - flush current buffered data
+        // & fill index directly
+        // Note: it is acceptable to call monitorBuffersReady even if
+        // they are empty.
         monitorBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
 
@@ -1077,6 +1173,121 @@ StreamParser::rxPacket
     receivedInfo( INSTR_INFO_BIT );
 
     return false;
+}
+
+
+/*! \brief This method processes Beam Monitor Config ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Beam Monitor Config packets,
+ * to optionally define Histogramming parameters for
+ * processing/accumulating Beam Monitor data.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
+)
+{
+    syslog( LOG_INFO,
+        "[%i] Beam Monitor Config Received: %u Histo Monitors",
+        g_pid, a_pkt.beamMonCount() );
+
+    for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
+
+        STS::BeamMonitorConfig config;
+
+        config.id = a_pkt.bmonId(i);
+        config.tofOffset = a_pkt.tofOffset(i);
+        config.tofMax = a_pkt.tofMax(i);
+        config.tofBin = a_pkt.tofBin(i);
+        config.distance = a_pkt.distance(i);
+
+        syslog( LOG_INFO,
+            "[%i] Beam Monitor %u: distance=%lf histo=(%u to %u by %u).",
+            g_pid, config.id, config.distance,
+            config.tofOffset, config.tofMax, config.tofBin );
+
+        // Basic Sanity Check...
+        if ( config.tofOffset >= config.tofMax )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u Config Error: Offset %u >= Max %u",
+                g_pid, "STS Error:", "Beam Monitor", config.id,
+                config.tofOffset, config.tofMax );
+            syslog( LOG_ERR,
+                "[%i] %s Reverting to Beam Monitor Event Mode!",
+                g_pid, "STS Error:" );
+            m_monitor_config.clear();
+            break;
+        }
+
+        // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
+        if ( config.tofBin < 1 )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
+                g_pid, "STS Error:", "Beam Monitor", config.id,
+                config.tofBin );
+            config.tofBin = 1;
+        }
+
+        m_monitor_config.push_back(config);
+    }
+
+    return false;
+}
+
+
+/*! \brief This method looks up any Histogram Config for a Beam Monitor
+ *  \return Pointer to element of the BeamMonitorConfig vector or NULL
+ *
+ * This method looks for a Beam Monitor Histogramming Config amongst
+ * any optionally received prologue information, to define proper
+ * Histogramming parameters for processing/accumulating Beam Monitor data.
+ */
+STS::BeamMonitorConfig *
+StreamParser::getBeamMonitorConfig
+(
+    Identifier a_monitor_id,    ///< [in] Beam Monitor Id (uint32_t)
+    bool & known_monitor        ///< [in] Flag for "Unknown" Monitors...
+)
+{
+    STS::BeamMonitorConfig *config = (STS::BeamMonitorConfig *) NULL;
+
+    // Innocent until Presumed Guilty...
+    // (or like, if there isn't any Beam Monitor Config info... :-)
+    known_monitor = true;
+
+    // Any Beam Monitor Histogramming Parameters...? (If not, we're done.)
+    if (m_monitor_config.size() == 0)
+        return(config); // NULL...
+
+    // Look for a matching Beam Monitor Id in Any Config...
+    for ( vector<STS::BeamMonitorConfig>::iterator bmc =
+                m_monitor_config.begin();
+            bmc != m_monitor_config.end() && config == NULL ; ++bmc )
+    {
+        if (bmc->id == a_monitor_id)
+            config = &(*bmc);
+    }
+
+    // If we didn't find one, then there's Trouble... ;-b
+    if (config == NULL)
+    {
+        // "Trouble"...
+        syslog( LOG_ERR,
+            "[%i] %s %s %d Missing in Histogramming Config! %s",
+            g_pid, "STS Error:", "Beam Monitor", a_monitor_id,
+            "[Unknown Monitor]" );
+
+        // Now What?!
+        // - flag this Beam Monitor as "Unknown"
+        //   (still save events, just _Not_ in an official NXmonitor...)
+        known_monitor = false;
+    }
+
+    return(config);
 }
 
 
@@ -1546,18 +1757,25 @@ StreamParser::finalizeStreamProcessing()
     // Make sure neutron pulses were received
 
     if ( !m_run_metrics.charge_stats.count() && m_strict )
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "No neutron pulses received in stream.")
+    {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "No neutron pulses received in stream.")
+    }
 
     // Write any remaining data in bank buffers
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi )
     {
         if ( !*ibi )
             continue;
 
         // Detect gaps in bank data and fill event index if present
         if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
-            handleBankPulseGap( **ibi, m_pulse_count - (*ibi)->m_last_pulse_with_data );
+        {
+            handleBankPulseGap( **ibi,
+                m_pulse_count - (*ibi)->m_last_pulse_with_data );
+        }
 
         // Flush bank buffers
         if ( (*ibi)->m_tof_buffer.size() || (*ibi)->m_index_buffer.size() )
@@ -1568,19 +1786,30 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in monitor buffers
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+            imi != m_monitors.end(); ++imi )
     {
-        // Detect gaps in monitor data and fill event index if present
-        if ( imi->second->m_last_pulse_with_data < m_pulse_count )
-            handleMonitorPulseGap( *imi->second, m_pulse_count - imi->second->m_last_pulse_with_data );
+        // Event-based Monitors Only...
+        if ( imi->second->m_config == NULL )
+        {
+            // Detect gaps in monitor data and fill event index if present
+            if ( imi->second->m_last_pulse_with_data < m_pulse_count )
+            {
+                handleMonitorPulseGap( *imi->second,
+                    m_pulse_count - imi->second->m_last_pulse_with_data );
+            }
 
-        // Flush monitor buffers
-        if ( imi->second->m_tof_buffer.size() || imi->second->m_index_buffer.size() )
-            monitorBuffersReady( *imi->second );
+            // Flush monitor buffers
+            if ( imi->second->m_tof_buffer.size()
+                || imi->second->m_index_buffer.size() )
+            {
+                monitorBuffersReady( *imi->second );
+            }
+        }
 
+        // All Beam Monitors...
         monitorFinalize( *imi->second );
     }
-
 
     // Write remaining pulse info and statistics
 
@@ -1589,7 +1818,8 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in PV buffers
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
+            ipv != m_pvs_by_key.end(); ++ipv )
     {
         if ( ipv->second->m_time_buffer.size() > 0 )
             ipv->second->flushBuffers( &m_run_metrics );
@@ -1706,5 +1936,7 @@ StreamParser::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
         a_value = "";
 }
 
-
 } // End namespace STS
+
+// vim: expandtab
+

@@ -42,6 +42,9 @@ bool POSIXParser::read(int fd, std::string & log_info,
 	last_parse_elapsed_total = 0;
 	last_read_elapsed_total = 0;
 
+	// *No Memory Leaks* if POSIX::read() is called in a *Loop*...! ;-b
+	log_info.clear();
+
 	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
 	while (to_read && total_packets < to_parse && read_count < 10) {

@@ -8,6 +8,7 @@
 #include "Geometry.h"
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
+#include "BeamMonitorConfig.h"
 #include "MetaDataMgr.h"
 #include "FastMeta.h"
 #include "Markers.h"
@@ -98,7 +99,8 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
 	m_beamlineShortName =
 			conf.get<std::string>("sms.beamline_shortname", "");
-	m_beamlineLongName = conf.get<std::string>("sms.beamline_longname", "");
+	m_beamlineLongName =
+			conf.get<std::string>("sms.beamline_longname", "");
 
 	/* Addendum 7/2014: for some legacy dcomserver implementations,
 	 * the neutron events and meta-data events can interleave and/or
@@ -131,6 +133,8 @@ void SMSControl::late_config(const boost::property_tree::ptree &conf)
 	SMSControl *sms = getInstance();
 	if (!sms)
 		throw std::logic_error("late_config on uninitialized obj");
+
+	sms->m_bmonConfig.reset(new BeamMonitorConfig(conf));
 
 	sms->addSources(conf);
 	sms->m_fastmeta->addDevices(conf);
@@ -265,6 +269,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
 
+	m_pvNumLiveClients = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "NumLiveClients"));
+
 	addPV(m_pvVersion);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
@@ -272,6 +280,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
+	addPV(m_pvNumLiveClients);
 
 	// Initialize Config/Info PVs...
 	struct timespec now;
@@ -285,6 +294,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
+
+	// Initialize the Live Client Index List PV...
+	m_pvNumLiveClients->update(0, &now);
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -785,8 +797,110 @@ void SMSControl::resetPacketStats(void)
 	}
 }
 
-void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
-				 uint32_t pixel, uint32_t tof)
+int32_t SMSControl::registerLiveClient(std::string clientName,
+		boost::shared_ptr<smsStringPV> & pvName,
+		boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
+		boost::shared_ptr<smsStringPV> & pvCurrentFilePath,
+		boost::shared_ptr<smsConnectedPV> & pvStatus)
+{
+	DEBUG("registerLiveClient clientName=" << clientName);
+
+	/* We're called when a new Live Client connects to the SMS,
+	 * and needs to allocate a bit index for naming status PVs.
+	 * All of this is for convenience and external monitoring only.
+	 * We don't have to be terribly fast here.
+	 */
+	size_t i, max = m_liveClients.size();
+	int32_t clientId = -1; // default, result if no free Ids remain...
+	for (i = 0; i < max && clientId < 0; i++) {
+		if (!m_liveClients[i]) {
+			m_liveClients.set(i);
+			DEBUG("registerLiveClient returning clientId=" << i);
+			clientId = i;
+		}
+	}
+
+	// Create/Get Persistent EPICS PVs for This Live Client Instance...
+	if ( clientId >= 0 ) {
+
+		// Allocate Next Index of PVs...
+		if ( (uint32_t) clientId >= m_pvLiveClientNames.size() ) {
+
+			std::string prefix(m_beamlineId);
+			prefix += ":SMS";
+			prefix += ":LiveClient:";
+
+			std::stringstream ss;
+			ss << clientId;
+			prefix += ss.str();
+
+			// Live Client Name...
+			m_pvLiveClientNames.resize(clientId + 1);
+			m_pvLiveClientNames[clientId] =
+				boost::shared_ptr<smsStringPV>(new
+					smsStringPV(prefix + ":Name"));
+			addPV(m_pvLiveClientNames[clientId]);
+
+			// Live Client Requested Start Time...
+			m_pvLiveClientStartTimes.resize(clientId + 1);
+			m_pvLiveClientStartTimes[clientId] =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix + ":RequestedStartTime"));
+			addPV(m_pvLiveClientStartTimes[clientId]);
+
+			// Live Client Current File Path...
+			m_pvLiveClientFilePaths.resize(clientId + 1);
+			m_pvLiveClientFilePaths[clientId] =
+				boost::shared_ptr<smsStringPV>(new
+					smsStringPV(prefix + ":CurrentFilePath"));
+			addPV(m_pvLiveClientFilePaths[clientId]);
+
+			// Live Client Status...
+			m_pvLiveClientStatuses.resize(clientId + 1);
+			m_pvLiveClientStatuses[clientId] =
+				boost::shared_ptr<smsConnectedPV>(new
+					smsConnectedPV(prefix + ":Status"));
+			addPV(m_pvLiveClientStatuses[clientId]);
+
+			// Update the Number of Live Clients PV... (we just added one)
+			// Note: don't ever decrement Number of Live Client PVs,
+			// monotonically increasing... (we leave the old Live Client
+			// index/PVs around for information on their demise... ;-D)
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_pvNumLiveClients->update(clientId + 1, &now);
+		}
+
+		// Return Proper Indexed PVs to Live Client...
+		pvName = m_pvLiveClientNames[clientId];
+		pvRequestedStartTime = m_pvLiveClientStartTimes[clientId];
+		pvCurrentFilePath = m_pvLiveClientFilePaths[clientId];
+		pvStatus = m_pvLiveClientStatuses[clientId];
+	}
+
+	else {
+		DEBUG("registerLiveClient Out of Live Client Ids!");
+		// *Don't* throw an exception here, this is _Not_ mission critical!
+		// throw std::runtime_error("No more Live Client Ids available");
+	}
+
+	return( clientId );
+}
+
+void SMSControl::unregisterLiveClient(int32_t clientId)
+{
+	DEBUG("unregisterLiveClient: clientId=" << clientId);
+
+	/* Mark this id for re-use. */
+	m_liveClients.reset(clientId);
+
+	// Note: Leave the Number of Live Client PVs, Monotonically Increasing
+	// (because we leave the old Live Client index/PVs around for
+	// hysterical reasons, that is to see how they died... ;-D)
+}
+
+void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
+				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t rising = (pixel & 1) << 31;
 	tof &= ((1U << 21) - 1);
@@ -821,7 +935,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 }
 
 void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
-				 PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;

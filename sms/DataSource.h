@@ -7,6 +7,8 @@
 #include "POSIXParser.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 
 extern "C" {
 struct addrinfo;

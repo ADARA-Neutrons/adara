@@ -164,7 +164,7 @@ int main( int argc, char** argv )
         {
             cout << STS_VERSION
                  << " (ADARA Common " << ADARA::VERSION
-				 << ", Tag Name " << ADARA::TAG_NAME << ")" << endl;
+                 << ", Tag Name " << ADARA::TAG_NAME << ")" << endl;
             return STS::TS_TRANSIENT_ERROR;
         }
 
@@ -460,4 +460,6 @@ int main( int argc, char** argv )
 
     return sms_code != STS::TS_SUCCESS;
 }
+
+// vim: expandtab
 
