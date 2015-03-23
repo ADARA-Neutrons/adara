@@ -6,7 +6,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.2.1";
+const std::string VERSION = "1.2.2";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 #define ADARA_PKT_TYPE(type, ver)  ((((uint32_t) type) << 8) | (ver))
