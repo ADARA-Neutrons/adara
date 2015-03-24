@@ -97,6 +97,31 @@ void Markers::newRun(void)
 	m_commentPV->unset();
 }
 
+void Markers::runStop(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	/* Reset the scan index, comment, and paused flag at the end of
+	 * each run, if it was stopped _Without_ first unpausing/stopping
+	 * the scan... We'll emit markers if we were paused or in a scan so
+	 * that any live clients can follow our state.
+	 * Resume the pause _before_ stopping the scan, if that makes sense. :)
+	 */
+	if (m_pausedPV->value()) {
+		emitPacket(now, ADARA::MarkerType::RESUME, false);
+		m_pausedPV->update(false, &now);
+	}
+
+	if (m_scanIndex) {
+		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		m_indexPV->update(0, &now);
+		m_scanIndex = 0;
+	}
+
+	m_commentPV->unset();
+}
+
 void Markers::pause(void)
 {
 	emitPacket(ADARA::MarkerType::PAUSE);

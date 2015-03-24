@@ -17,6 +17,7 @@ public:
 	~Markers();
 
 	void newRun(void);
+	void runStop(void);
 	void pause(void);
 	void resume(void);
 

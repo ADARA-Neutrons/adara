@@ -436,6 +436,10 @@ bool SMSControl::setRecording(bool v)
 		m_runInfo->unlock();
 
 		try {
+			/* Let our marker control code have a shot at
+			 * fixing up current state before we stop recording.
+			 */
+			m_markers->runStop();
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
 			ERROR("Unable to stop recording: " << e.what());

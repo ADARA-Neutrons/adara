@@ -12,10 +12,10 @@ sms_smsd_SOURCES = sms/smsd.cc sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/utils.cc \
 		sms/ComBusSMSMon.cc combus/ComBus.cpp $(POSIX_PARSER)
-sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS)$(COMMON_CPPFLAGS) \
+sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS)$(COMMON_CPPFLAGS) \
 		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
 sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
-sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS)$(liblog4cxx_LIBS) \
+sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_signals \
 		-lboost_program_options -lboost_filesystem -lboost_system \
 		-lboost_thread-mt -lpthread
@@ -30,7 +30,7 @@ sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/SignalEvents.cc sms/BeamMonitorConfig.cc \
 		sms/utils.cc sms/ComBusSMSMon.cc \
 		combus/ComBus.cpp $(POSIX_PARSER)
-sms_test_storage_test_CPPFLAGS = -Isms $(activemq_CPPFLAGS) \
+sms_test_storage_test_CPPFLAGS = -Isms $(activemq_CPPFLAGS) $(apr_CPPFLAGS)\
 		$(COMMON_CPPFLAGS) \
 		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
 sms_test_storage_test_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) \

@@ -28,7 +28,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.2.9";
+const std::string SMSD_VERSION = "1.2.10-devel";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
@@ -292,13 +292,13 @@ static void daemonize(const char *pname)
 			int e = errno;
 			ERROR("unable to receive child signal: "
 			      << strerror(e));
-			exit(1);
+			_exit(1);
 		}
 
 		if (ok != CHILD_INIT_SUCCESS)
-			exit(1);
+			_exit(1);
 
-		exit(0);
+		_exit(0);
 	}
 
 	/* We're the child process, become a daemon.
@@ -311,7 +311,7 @@ static void daemonize(const char *pname)
 		int e = errno;
 		ERROR("unable to setsid: " << strerror(e));
 		release_parent(CHILD_INIT_FAILED);
-		exit(1);
+		_exit(1);
 	}
 
 	pid = fork();
@@ -319,10 +319,10 @@ static void daemonize(const char *pname)
 		int e = errno;
 		ERROR("second fork failed: " << strerror(e));
 		release_parent(CHILD_INIT_FAILED);
-		exit(1);
+		_exit(1);
 	} else if (pid) {
 		/* Parent process just exits */
-		exit(0);
+		_exit(0);
 	}
 
 	/* We're the second child now; we are in our own session, but
