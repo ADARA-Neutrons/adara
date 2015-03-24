@@ -368,6 +368,24 @@ BeamMonitorConfig::BeamMonitorConfig(
 		}
 	}
 
+	// Create PV for Number of Beam Monitors...
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	std::string prefix(ctrl->getBeamlineId());
+	prefix += ":SMS";
+
+	m_pvNumBeamMonitors = boost::shared_ptr<smsUint32PV>( new
+						smsUint32PV(prefix + ":Control:NumBeamMonitors") );
+								// yeah, we're not really "Control" here...
+
+	ctrl->addPV(m_pvNumBeamMonitors);
+
+	m_pvNumBeamMonitors->update(m_numBeamMonitors, &now);
+
 	// Are We _Only_ Ever Saving Beam Monitor Events...?
 	if ( m_numBeamMonitors == 0 ) {
 		INFO("No Beam Monitor Histogramming Configurations Found.");
@@ -384,15 +402,12 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 	// Initialize Prologue Packet...
 
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-
 	uint32_t *fields = (uint32_t *) m_packet;
 
 	fields[0] = m_payloadSize;
 	fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0;
-	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
-	fields[3] = ts.tv_nsec;
+	fields[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	fields[3] = now.tv_nsec;
 
 	fields[4] = m_numBeamMonitors;
 
@@ -461,21 +476,6 @@ BeamMonitorConfig::BeamMonitorConfig(
 			<< m_numHisto << " Monitor(s) with Histogram Format."
 			<< " Defaulting to ALL Event-Based Beam Monitor Formatting!");
 	}
-
-	// Create PV for Number of Beam Monitors...
-
-	SMSControl *ctrl = SMSControl::getInstance();
-
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
-
-	m_pvNumBeamMonitors = boost::shared_ptr<smsUint32PV>( new
-						smsUint32PV(prefix + ":Control:NumBeamMonitors") );
-								// yeah, we're not really "Control" here...
-
-	ctrl->addPV(m_pvNumBeamMonitors);
-
-	m_pvNumBeamMonitors->update(m_numBeamMonitors, &ts);  // use time above
 
 	// Set Up Callback for Adding Beam Monitor Config to Prologue...
 	m_connection = StorageManager::onPrologue(
