@@ -12,8 +12,9 @@ sms_smsd_SOURCES = sms/smsd.cc sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/utils.cc \
 		sms/ComBusSMSMon.cc combus/ComBus.cpp $(POSIX_PARSER)
-sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS)$(COMMON_CPPFLAGS) \
-		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
+sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
+		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
+		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS)
 sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
 sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_signals \
