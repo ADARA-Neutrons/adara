@@ -9,6 +9,7 @@
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
 #include "BeamMonitorConfig.h"
+#include "DetectorBankSet.h"
 #include "MetaDataMgr.h"
 #include "FastMeta.h"
 #include "Markers.h"
@@ -135,6 +136,8 @@ void SMSControl::late_config(const boost::property_tree::ptree &conf)
 		throw std::logic_error("late_config on uninitialized obj");
 
 	sms->m_bmonConfig.reset(new BeamMonitorConfig(conf));
+
+	sms->m_detBankSets.reset(new DetectorBankSet(conf));
 
 	sms->addSources(conf);
 	sms->m_fastmeta->addDevices(conf);
