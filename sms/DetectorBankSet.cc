@@ -47,6 +47,41 @@ public:
 		DetectorBankSetInfo *m_info;
 	};
 
+	class DetBankSetBanklistPV : public smsStringPV {
+	public:
+		DetBankSetBanklistPV(const std::string &name,
+				DetectorBankSet *config, DetectorBankSetInfo *info) :
+			smsStringPV(name), m_config(config), m_info(info) {}
+
+		void changed(void)
+		{
+			std::string rawBanklist = value();
+
+			std::vector<uint32_t> banks =
+				m_config->extractBankList( rawBanklist );
+
+			std::string oldBanklist =
+				m_config->getBanklistStr( m_info->getBanks() );
+
+			std::string newBanklist =
+				m_config->getBanklistStr( banks );
+
+			INFO("DetBankSetBanklistPV: Changing Detector Bank Set "
+				<< m_info->getName() << " Banks List for "
+				<< m_pv_name << " from " << oldBanklist
+				<< " to " << newBanklist);
+
+			m_info->setBanks( banks );
+
+			// Reset Timestamp on Prologue Packet...
+			m_config->resetPacketTime();
+		}
+
+	private:
+		DetectorBankSet *m_config;
+		DetectorBankSetInfo *m_info;
+	};
+
 	static gddAppFuncTableStatus getFormatEnums(gdd &in)
 	{
 		aitFixedString *str;
@@ -268,12 +303,13 @@ public:
 		DetectorBankSetInfo *m_info;
 	};
 
-	DetectorBankSetInfo(DetectorBankSet *config,
-			uint32_t index, std::string name, uint32_t flags,
+	DetectorBankSetInfo(DetectorBankSet *config, uint32_t index,
+			std::string name, std::vector<uint32_t> banks, uint32_t flags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
 			double throttle, std::string suffix) :
-		m_config(config), m_index(index), m_name(name), m_flags(flags),
-		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
+		m_config(config), m_index(index), m_name(name), m_banks(banks),
+		m_flags(flags), m_tofOffset(tofOffset),
+		m_tofMax(tofMax), m_tofBin(tofBin),
 		m_throttle(throttle), m_suffix(suffix)
 	{
 		// Create PVs for Live Detector Bank Set Config Controls...
@@ -290,6 +326,9 @@ public:
 
 		m_pvName = boost::shared_ptr<DetBankSetNamePV>( new
 			DetBankSetNamePV(prefix + ":Name", m_config, this) );
+
+		m_pvBanks = boost::shared_ptr<DetBankSetBanklistPV>( new
+			DetBankSetBanklistPV(prefix + ":Banklist", m_config, this) );
 
 		m_pvFormat = boost::shared_ptr<DetBankSetFormatPV>( new
 			DetBankSetFormatPV(prefix + ":Format", m_config, this) );
@@ -310,6 +349,7 @@ public:
 			DetBankSetSuffixPV(prefix + ":Suffix", m_config, this) );
 
 		ctrl->addPV(m_pvName);
+		ctrl->addPV(m_pvBanks);
 		ctrl->addPV(m_pvFormat);
 		ctrl->addPV(m_pvOffset);
 		ctrl->addPV(m_pvMax);
@@ -323,6 +363,8 @@ public:
 		clock_gettime(CLOCK_REALTIME, &ts);
 
 		m_pvName->update(m_name, &ts);
+
+		m_pvBanks->update(m_config->getBanklistStr(m_banks), &ts);
 
 		m_pvFormat->update(m_flags, &ts);
 
@@ -342,6 +384,8 @@ public:
 
 	std::string getName(void) const { return m_name; }
 
+	std::vector<uint32_t> getBanks(void) const { return m_banks; }
+
 	uint32_t getFlags(void) const { return m_flags; }
 
 	uint32_t getTofOffset(void) const { return m_tofOffset; }
@@ -356,6 +400,9 @@ public:
 
 	void setName(std::string name)
 		{ m_name = name; m_changed = true; }
+
+	void setBanks(std::vector<uint32_t> banks)
+		{ m_banks = banks; m_changed = true; }
 
 	void setFlags(uint32_t flags)
 		{ m_flags = flags; m_changed = true; }
@@ -390,17 +437,29 @@ public:
 	{
 		uint32_t *fields = (uint32_t *) m_packet;
 
+		uint32_t index = 5;  // past prologue packet header & numDetBankSets
+
 		// fields[(m_index * 6) + 5] = m_name; // TODO XXX Whoa...
 
-		fields[(m_index * 6) + 6] = m_tofOffset;
-		fields[(m_index * 6) + 7] = m_tofMax;
-		fields[(m_index * 6) + 8] = m_tofBin;
+		fields[(m_index * 6) + index++] = m_banks.size();
 
-		*((double *) &(fields[(m_index * 6) + 9])) = m_throttle;
+		for (std::vector<uint32_t>::iterator b=m_banks.begin();
+				b != m_banks.end(); ++b)
+		{
+			fields[(m_index * 6) + index++] = *b;
+		}
 
-		memset((void *) &(fields[(m_index * 6) + 11]), '\0', 16 ); // XXX...
-		strncpy((char *) &(fields[(m_index * 6) + 11]),
+		fields[(m_index * 6) + index++] = m_tofOffset;
+		fields[(m_index * 6) + index++] = m_tofMax;
+		fields[(m_index * 6) + index++] = m_tofBin;
+
+		*((double *) &(fields[(m_index * 6) + index])) = m_throttle;
+		index += 2;
+
+		memset((void *) &(fields[(m_index * 6) + index]), '\0', 16 ); // XXX...
+		strncpy((char *) &(fields[(m_index * 6) + index]),
 			m_suffix.c_str(), 16); // XXX...
+		index += 4;
 
 		m_changed = false;
 	}
@@ -413,6 +472,8 @@ private:
 	uint32_t m_index;
 
 	std::string m_name;
+
+	std::vector<uint32_t> m_banks;
 
 	uint32_t m_flags;
 
@@ -427,6 +488,7 @@ private:
 	bool m_changed;
 
 	boost::shared_ptr<DetBankSetNamePV> m_pvName;
+	boost::shared_ptr<DetBankSetBanklistPV> m_pvBanks;
 	boost::shared_ptr<DetBankSetFormatPV> m_pvFormat;
 	boost::shared_ptr<DetBankSetOffsetPV> m_pvOffset;
 	boost::shared_ptr<DetBankSetMaxPV> m_pvMax;
@@ -480,6 +542,7 @@ DetectorBankSet::DetectorBankSet(
 
 	m_sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
 	m_payloadSize = sizeof(uint32_t) + (m_numDetBankSets * m_sectionSize);
+m_payloadSize = 10000;
 	m_packetSize = m_payloadSize + sizeof(ADARA::Header);
 
 	m_packet = new uint8_t[m_packetSize];
@@ -559,6 +622,10 @@ DetectorBankSet::DetectorBankSet(
 		std::string banklist =
 			it->second.get<std::string>("banklist", "none");
 
+		std::vector<uint32_t> banks = extractBankList(banklist);
+
+		std::string newBanklist = getBanklistStr( banks );
+
 		tofOffset = it->second.get<uint32_t>("offset", 0);
 		tofMax = it->second.get<uint32_t>("max", -1);
 		tofBin = it->second.get<uint32_t>("bin", 1);
@@ -575,7 +642,7 @@ DetectorBankSet::DetectorBankSet(
 		suffix = it->second.get<std::string>("suffix", "throttled");
 
 		DEBUG("Detector Bank Set " << detBankSetName << " Config:"
-			<< " banklist=[" << banklist << "]"
+			<< " banks=" << newBanklist
 			<< " format=" << format
 			<< " flags=" << flags
 			<< " tofOffset=" << tofOffset
@@ -585,8 +652,8 @@ DetectorBankSet::DetectorBankSet(
 			<< " suffix=" << suffix);
 
 		DetectorBankSetInfo *detBankSetInfo = new DetectorBankSetInfo(this,
-			index++, detBankSetName, flags, tofOffset, tofMax, tofBin,
-			throttle, suffix);
+			index++, detBankSetName, banks,
+			flags, tofOffset, tofMax, tofBin, throttle, suffix);
 
 		detBankSetInfo->updatePacket(m_packet);
 
@@ -607,6 +674,67 @@ DetectorBankSet::~DetectorBankSet()
 	detBankSetInfos.clear();
 
 	m_connection.disconnect();
+}
+
+// Inspired by Jilles De Wit on StackOverflow... ;-D
+std::vector<uint32_t> DetectorBankSet::extractBankList(
+		std::string banklist )
+{
+	std::vector<uint32_t> banks;
+
+	std::string sep = "[, ]";
+
+	uint32_t bank;
+
+	size_t b, e;
+
+	b = 0;
+
+	while ( b < banklist.length() )
+	{
+		e = banklist.find_first_of( sep, b );
+
+		if ( e == std::string::npos )
+			e = banklist.length();
+
+		// Discard Empty Tokens...
+		if ( b != e )
+		{
+			std::istringstream buffer( banklist.substr(b, e - b) );
+			buffer >> bank;
+
+			banks.push_back(bank);
+
+			b = e + 1;
+		}
+
+		else b++;
+	}
+
+	return banks;
+}
+
+std::string DetectorBankSet::getBanklistStr( std::vector<uint32_t> banks )
+{
+	std::stringstream ss;
+
+	ss << "[";
+
+	bool first = true;
+	for (std::vector<uint32_t>::iterator b=banks.begin();
+			b != banks.end(); ++b)
+	{
+		if ( first )
+			first = false;
+		else
+			ss << ", ";
+
+		ss << *b;
+	}
+
+	ss << "]";
+
+	return ss.str();
 }
 
 void DetectorBankSet::resetPacketTime(void)

@@ -18,6 +18,10 @@ public:
 	DetectorBankSet(const boost::property_tree::ptree & conf);
 	~DetectorBankSet();
 
+	static std::vector<uint32_t> extractBankList( std::string banklist );
+
+	static std::string getBanklistStr( std::vector<uint32_t> banks );
+
 	void resetPacketTime(void);
 
 private:
