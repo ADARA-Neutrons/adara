@@ -430,7 +430,7 @@ DetectorBankSet::DetectorBankSet(
 {
 	boost::property_tree::ptree::const_iterator it;
 	std::string conf_prefix("bankset ");
-	size_t plen = conf_prefix.length();
+	size_t b, e, plen = conf_prefix.length();
 
 	// Count how many Detector Bank Sets we have defined...
 	m_numDetBankSets = 0;
@@ -506,7 +506,32 @@ DetectorBankSet::DetectorBankSet(
 		if (it->first.compare(0, plen, conf_prefix))
 			continue;
 
-		detBankSetName = it->first.substr(plen);
+		b = it->first.find_first_of('\"', plen);
+		// Starting Quote Found...
+		if (b != std::string::npos) {
+			e = it->first.find_first_of('\"', ++b); // strip off quote...
+			// No Ending Quote Found... (Just use string length...)
+			if (e == std::string::npos) {
+				e = it->first.length();
+			}
+			else e--; // strip off quote...
+		}
+		// No Starting Quote (Malformed, but try to wing it...)
+		else {
+			b = plen;
+			e = it->first.length();
+		}
+
+		// Handle Empty or Missing Name...
+		// (Apparently this never happens, as ptree eats the trailing space
+		//    and we fail to match the prefix, so the section is ignored.)
+		if ( b == e ) {
+			detBankSetName = "NoName";
+		}
+		// Extract Name String from (Any) Quotes...
+		else {
+			detBankSetName = it->first.substr(b, e - b + 1);
+		}
 
 		format = it->second.get<std::string>("format", "event");
 
