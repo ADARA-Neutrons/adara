@@ -24,8 +24,6 @@ private:
 	std::vector<DetectorBankSetInfo *> detBankSetInfos;
 
 	uint32_t m_numDetBankSets;
-	uint32_t m_numEvent;
-	uint32_t m_numHisto;
 
 	uint32_t m_sectionSize;
 	uint32_t m_payloadSize;

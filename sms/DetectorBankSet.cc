@@ -2,6 +2,7 @@
 #include <boost/bind.hpp>
 #include <sstream>
 #include <string>
+#include <string.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -241,13 +242,39 @@ public:
 		DetectorBankSetInfo *m_info;
 	};
 
+	class DetBankSetSuffixPV : public smsStringPV {
+	public:
+		DetBankSetSuffixPV(const std::string &name,
+				DetectorBankSet *config, DetectorBankSetInfo *info) :
+			smsStringPV(name), m_config(config), m_info(info) {}
+
+		void changed(void)
+		{
+			std::string suffix = value();
+
+			WARN("DetBankSetSuffixPV: Changing Detector Bank Set"
+				<< m_info->getName() << " Throttle NXentry Suffix for "
+				<< m_pv_name << " from " << m_info->getSuffix()
+				<< " to " << suffix);
+
+			m_info->setSuffix(suffix);
+
+			// Reset Timestamp on Prologue Packet...
+			m_config->resetPacketTime();
+		}
+
+	private:
+		DetectorBankSet *m_config;
+		DetectorBankSetInfo *m_info;
+	};
+
 	DetectorBankSetInfo(DetectorBankSet *config,
 			uint32_t index, std::string name, uint32_t flags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
-			double throttle) :
+			double throttle, std::string suffix) :
 		m_config(config), m_index(index), m_name(name), m_flags(flags),
 		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
-		m_throttle(throttle)
+		m_throttle(throttle), m_suffix(suffix)
 	{
 		// Create PVs for Live Detector Bank Set Config Controls...
 
@@ -279,12 +306,16 @@ public:
 		m_pvThrottle = boost::shared_ptr<DetBankSetThrottlePV>( new
 			DetBankSetThrottlePV(prefix + ":Throttle", m_config, this) );
 
+		m_pvSuffix = boost::shared_ptr<DetBankSetSuffixPV>( new
+			DetBankSetSuffixPV(prefix + ":Suffix", m_config, this) );
+
 		ctrl->addPV(m_pvName);
 		ctrl->addPV(m_pvFormat);
 		ctrl->addPV(m_pvOffset);
 		ctrl->addPV(m_pvMax);
 		ctrl->addPV(m_pvBin);
 		ctrl->addPV(m_pvThrottle);
+		ctrl->addPV(m_pvSuffix);
 
 		// Initialize Detector Bank Set Config PVs...
 
@@ -299,7 +330,9 @@ public:
 		m_pvMax->update(m_tofMax, &ts);
 		m_pvBin->update(m_tofBin, &ts);
 
-		m_pvBin->update(m_throttle, &ts);
+		m_pvThrottle->update(m_throttle, &ts);
+
+		m_pvSuffix->update(m_suffix, &ts);
 	}
 
 	// Gets...
@@ -313,6 +346,8 @@ public:
 	uint32_t getTofBin(void) const { return m_tofBin; }
 
 	double getThrottle(void) const { return m_throttle; }
+
+	std::string getSuffix(void) const { return m_suffix; }
 
 	// Sets...
 
@@ -331,6 +366,17 @@ public:
 	void setThrottle(uint32_t throttle)
 		{ m_throttle = throttle; }
 
+	void setSuffix(std::string suffix)
+	{
+		if ( suffix.length() > 16 - 1 ) { // XXX...
+			ERROR("setSuffix(): Throttle NXentry Suffix Too Long!"
+				<< " length(" << suffix << ")=" << suffix.length()
+				<< " > " << ( 16 - 1 ) << ", truncated to: "
+				<< suffix.substr( 0, 16 - 1 ) );
+		}
+		m_suffix = suffix.substr( 0, 16 - 1 ); // XXX...
+	}
+
 	// Update Prologue Packet Contents for This Detector Bank Set Index...
 	void updatePacket(uint8_t *m_packet)
 	{
@@ -343,6 +389,10 @@ public:
 		fields[(m_index * 6) + 8] = m_tofBin;
 
 		*((double *) &(fields[(m_index * 6) + 9])) = m_throttle;
+
+		memset((void *) &(fields[(m_index * 6) + 11]), '\0', 16 ); // XXX...
+		strncpy((char *) &(fields[(m_index * 6) + 11]),
+			m_suffix.c_str(), 16); // XXX...
 	}
 
 private:
@@ -362,6 +412,8 @@ private:
 
 	double m_throttle;
 
+	std::string m_suffix;
+
 	boost::shared_ptr<DetBankSetNamePV> m_pvName;
 	boost::shared_ptr<DetBankSetFormatPV> m_pvFormat;
 	boost::shared_ptr<DetBankSetOffsetPV> m_pvOffset;
@@ -369,6 +421,8 @@ private:
 	boost::shared_ptr<DetBankSetBinPV> m_pvBin;
 
 	boost::shared_ptr<DetBankSetThrottlePV> m_pvThrottle;
+
+	boost::shared_ptr<DetBankSetSuffixPV> m_pvSuffix;
 };
 
 DetectorBankSet::DetectorBankSet(
@@ -443,6 +497,8 @@ DetectorBankSet::DetectorBankSet(
 
 	double throttle;
 
+	std::string suffix;
+
 	// Accumulate Format Request Counts...
 	std::string format;
 
@@ -479,18 +535,21 @@ DetectorBankSet::DetectorBankSet(
 
 		throttle = it->second.get<double>("throttle", 0.0);
 
-		DEBUG("Detector Bank Set " << detBankSetName << " Histo Config:"
+		suffix = it->second.get<std::string>("suffix", "throttled");
+
+		DEBUG("Detector Bank Set " << detBankSetName << " Config:"
 			<< " banklist=[" << banklist << "]"
 			<< " format=" << format
 			<< " flags=" << flags
 			<< " tofOffset=" << tofOffset
 			<< " tofMax=" << tofMax
 			<< " tofBin=" << tofBin
-			<< " throttle=" << throttle);
+			<< " throttle=" << throttle
+			<< " suffix=" << suffix);
 
 		DetectorBankSetInfo *detBankSetInfo = new DetectorBankSetInfo(this,
 			index++, detBankSetName, flags, tofOffset, tofMax, tofBin,
-			throttle);
+			throttle, suffix);
 
 		detBankSetInfo->updatePacket(m_packet);
 
@@ -526,23 +585,16 @@ void DetectorBankSet::resetPacketTime(void)
 
 void DetectorBankSet::onPrologue(void)
 {
-	// We are in Histogram Detector Bank Set Mode, Add to Prologue...!
-	// TODO: *Only* _Start_ Sending Detector Bank Set Config on
-	//    New Run Boundary!
-	if ( m_numEvent == 0 && m_numHisto > 0 ) {
-
-		// Update Prologue Packet with Latest Detector Bank Set Configs...
-		std::vector<DetectorBankSetInfo *>::iterator dbs;
-		for (dbs=detBankSetInfos.begin();
-				dbs != detBankSetInfos.end(); ++dbs)
-		{
-			DEBUG("Updating Detector Bank Set " << (*dbs)->getName()
-				<< " Config for Prologue.");
-			(*dbs)->updatePacket(m_packet);
-		}
-
-		// Add Combined Detector Bank Set Config Packet to Prologue
-		StorageManager::addPrologue(m_packet, m_packetSize);
+	// Update Prologue Packet with Latest Detector Bank Set Configs...
+	std::vector<DetectorBankSetInfo *>::iterator dbs;
+	for (dbs=detBankSetInfos.begin(); dbs != detBankSetInfos.end(); ++dbs)
+	{
+		DEBUG("Updating Detector Bank Set " << (*dbs)->getName()
+			<< " Config for Prologue.");
+		(*dbs)->updatePacket(m_packet);
 	}
+
+	// Add Combined Detector Bank Set Config Packet to Prologue
+	StorageManager::addPrologue(m_packet, m_packetSize);
 }
 
