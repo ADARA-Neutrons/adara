@@ -154,19 +154,31 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 			continue;
 
 		b = it->first.find_first_of('\"', plen);
-		if (b != std::string::npos)
-			e = it->first.find_first_of('\"', b + 1);
-		else
-			e = std::string::npos;
-
-		if (b == std::string::npos || e == std::string::npos) {
-			std::string msg("Invalid source section name '");
-			msg += it->first;
-			msg += "'";
-			throw std::runtime_error(msg);
+		// Starting Quote Found...
+		if (b != std::string::npos) {
+			e = it->first.find_first_of('\"', ++b); // strip off quote...
+			// No Ending Quote Found... (Just use string length...)
+			if (e == std::string::npos) {
+				e = it->first.length();
+			}
+			else e--; // strip off quote...
+		}
+		// No Starting Quote (Malformed, but try to wing it...)
+		else {
+			b = plen;
+			e = it->first.length();
 		}
 
-		name = it->first.substr(b + 1, e - b - 1);
+		// Handle Empty or Missing Name...
+		// (Apparently this never happens, as ptree eats the trailing space
+		//    and we fail to match the prefix, so the section is ignored.)
+		if ( b == e ) {
+			name = "NoName";
+		}
+		// Extract Name String from (Any) Quotes...
+		else {
+			name = it->first.substr(b, e - b + 1);
+		}
 
 		bool enabled = !(it->second.count("disabled"));
 
