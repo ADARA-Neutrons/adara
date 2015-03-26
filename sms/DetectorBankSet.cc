@@ -333,6 +333,9 @@ public:
 		m_pvThrottle->update(m_throttle, &ts);
 
 		m_pvSuffix->update(m_suffix, &ts);
+
+		// Initialize Changed Flag...
+		m_changed = true;
 	}
 
 	// Gets...
@@ -351,20 +354,21 @@ public:
 
 	// Sets...
 
-	void setName(std::string name) { m_name = name; }
+	void setName(std::string name)
+		{ m_name = name; m_changed = true; }
 
 	void setFlags(uint32_t flags)
-		{ m_flags = flags; }
+		{ m_flags = flags; m_changed = true; }
 
 	void setTofOffset(uint32_t tofOffset)
-		{ m_tofOffset = tofOffset; }
+		{ m_tofOffset = tofOffset; m_changed = true; }
 	void setTofMax(uint32_t tofMax)
-		{ m_tofMax = tofMax; }
+		{ m_tofMax = tofMax; m_changed = true; }
 	void setTofBin(uint32_t tofBin)
-		{ m_tofBin = tofBin; }
+		{ m_tofBin = tofBin; m_changed = true; }
 
 	void setThrottle(uint32_t throttle)
-		{ m_throttle = throttle; }
+		{ m_throttle = throttle; m_changed = true; }
 
 	void setSuffix(std::string suffix)
 	{
@@ -375,7 +379,11 @@ public:
 				<< suffix.substr( 0, 16 - 1 ) );
 		}
 		m_suffix = suffix.substr( 0, 16 - 1 ); // XXX...
+		m_changed = true;
 	}
+
+	// Did Anything Change since the last Prologue Packet Update...?
+	bool changed() { return m_changed; }
 
 	// Update Prologue Packet Contents for This Detector Bank Set Index...
 	void updatePacket(uint8_t *m_packet)
@@ -393,6 +401,8 @@ public:
 		memset((void *) &(fields[(m_index * 6) + 11]), '\0', 16 ); // XXX...
 		strncpy((char *) &(fields[(m_index * 6) + 11]),
 			m_suffix.c_str(), 16); // XXX...
+
+		m_changed = false;
 	}
 
 private:
@@ -413,6 +423,8 @@ private:
 	double m_throttle;
 
 	std::string m_suffix;
+
+	bool m_changed;
 
 	boost::shared_ptr<DetBankSetNamePV> m_pvName;
 	boost::shared_ptr<DetBankSetFormatPV> m_pvFormat;
@@ -614,9 +626,11 @@ void DetectorBankSet::onPrologue(void)
 	std::vector<DetectorBankSetInfo *>::iterator dbs;
 	for (dbs=detBankSetInfos.begin(); dbs != detBankSetInfos.end(); ++dbs)
 	{
-		DEBUG("Updating Detector Bank Set " << (*dbs)->getName()
-			<< " Config for Prologue.");
-		(*dbs)->updatePacket(m_packet);
+		if ( (*dbs)->changed() ) {
+			DEBUG("Updating Detector Bank Set " << (*dbs)->getName()
+				<< " Config for Prologue.");
+			(*dbs)->updatePacket(m_packet);
+		}
 	}
 
 	// Add Combined Detector Bank Set Config Packet to Prologue

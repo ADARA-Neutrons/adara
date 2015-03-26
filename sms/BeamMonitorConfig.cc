@@ -283,6 +283,9 @@ public:
 		m_pvBin->update(m_tofBin, &ts);
 
 		m_pvDistance->update(m_distance, &ts);
+
+		// Initialize Changed Flag...
+		m_changed = true;
 	}
 
 	// Gets...
@@ -299,20 +302,24 @@ public:
 
 	// Sets...
 
-	void setId(uint32_t id) { m_id = id; }
+	void setId(uint32_t id)
+		{ m_id = id; m_changed = true; }
 
 	void setFormat(std::string format)
-		{ m_format = format; }
+		{ m_format = format; m_changed = true; }
 
 	void setTofOffset(uint32_t tofOffset)
-		{ m_tofOffset = tofOffset; }
+		{ m_tofOffset = tofOffset; m_changed = true; }
 	void setTofMax(uint32_t tofMax)
-		{ m_tofMax = tofMax; }
+		{ m_tofMax = tofMax; m_changed = true; }
 	void setTofBin(uint32_t tofBin)
-		{ m_tofBin = tofBin; }
+		{ m_tofBin = tofBin; m_changed = true; }
 
 	void setDistance(double distance)
-		{ m_distance = distance; }
+		{ m_distance = distance; m_changed = true; }
+
+	// Did Anything Change since the last Prologue Packet Update...?
+	bool changed() { return m_changed; }
 
 	// Update Prologue Packet Contents for This Beam Monitor Index...
 	void updatePacket(uint8_t *m_packet)
@@ -326,6 +333,8 @@ public:
 		fields[(m_index * 6) + 8] = m_tofBin;
 
 		*((double *) &(fields[(m_index * 6) + 9])) = m_distance;
+
+		m_changed = false;
 	}
 
 private:
@@ -344,6 +353,8 @@ private:
 	uint32_t m_tofBin;
 
 	double m_distance;
+
+	bool m_changed;
 
 	boost::shared_ptr<BeamMonIdPV> m_pvId;
 	boost::shared_ptr<BeamMonFormatPV> m_pvFormat;
@@ -525,9 +536,11 @@ void BeamMonitorConfig::onPrologue(void)
 		// Update Prologue Packet with Latest Beam Monitor Configs...
 		std::vector<BeamMonitorInfo *>::iterator bmi;
 		for (bmi=bmonInfos.begin(); bmi != bmonInfos.end(); ++bmi) {
-			DEBUG("Updating Beam Monitor " << (*bmi)->getId()
-				<< " Config for Prologue.");
-			(*bmi)->updatePacket(m_packet);
+			if ( (*bmi)->changed() ) {
+				DEBUG("Updating Beam Monitor " << (*bmi)->getId()
+					<< " Config for Prologue.");
+				(*bmi)->updatePacket(m_packet);
+			}
 		}
 
 		// Add Combined Beam Monitor Config Packet to Prologue
