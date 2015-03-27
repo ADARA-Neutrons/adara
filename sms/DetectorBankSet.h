@@ -29,7 +29,6 @@ private:
 
 	uint32_t m_numDetBankSets;
 
-	uint32_t m_sectionSize;
 	uint32_t m_payloadSize;
 	uint32_t m_packetSize;
 

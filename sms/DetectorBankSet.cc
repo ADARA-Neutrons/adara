@@ -303,13 +303,14 @@ public:
 		DetectorBankSetInfo *m_info;
 	};
 
-	DetectorBankSetInfo(DetectorBankSet *config, uint32_t index,
+	DetectorBankSetInfo(DetectorBankSet *config,
+			uint32_t index, uint32_t sectionOffset,
 			std::string name, std::vector<uint32_t> banks, uint32_t flags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
 			double throttle, std::string suffix) :
-		m_config(config), m_index(index), m_name(name), m_banks(banks),
-		m_flags(flags), m_tofOffset(tofOffset),
-		m_tofMax(tofMax), m_tofBin(tofBin),
+		m_config(config), m_index(index), m_sectionOffset(sectionOffset),
+		m_name(name), m_banks(banks), m_flags(flags),
+		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
 		m_throttle(throttle), m_suffix(suffix)
 	{
 		// Create PVs for Live Detector Bank Set Config Controls...
@@ -437,27 +438,33 @@ public:
 	{
 		uint32_t *fields = (uint32_t *) m_packet;
 
-		uint32_t index = 5;  // past prologue packet header & numDetBankSets
+		uint32_t index = 0;
 
-		// fields[(m_index * 6) + 5] = m_name; // TODO XXX Whoa...
+		// Detector Bank Set Name (limited to 16 characters total, with \0)
+		memset((void *) &(fields[m_sectionOffset + index]),
+			'\0', 16 ); // XXX...
+		strncpy((char *) &(fields[m_sectionOffset + index]),
+			m_name.c_str(), 16); // XXX...
+		index += 4;
 
-		fields[(m_index * 6) + index++] = m_banks.size();
+		fields[m_sectionOffset + index++] = m_banks.size();
 
 		for (std::vector<uint32_t>::iterator b=m_banks.begin();
 				b != m_banks.end(); ++b)
 		{
-			fields[(m_index * 6) + index++] = *b;
+			fields[m_sectionOffset + index++] = *b;
 		}
 
-		fields[(m_index * 6) + index++] = m_tofOffset;
-		fields[(m_index * 6) + index++] = m_tofMax;
-		fields[(m_index * 6) + index++] = m_tofBin;
+		fields[m_sectionOffset + index++] = m_tofOffset;
+		fields[m_sectionOffset + index++] = m_tofMax;
+		fields[m_sectionOffset + index++] = m_tofBin;
 
-		*((double *) &(fields[(m_index * 6) + index])) = m_throttle;
+		*((double *) &(fields[m_sectionOffset + index])) = m_throttle;
 		index += 2;
 
-		memset((void *) &(fields[(m_index * 6) + index]), '\0', 16 ); // XXX...
-		strncpy((char *) &(fields[(m_index * 6) + index]),
+		memset((void *) &(fields[m_sectionOffset + index]),
+			'\0', 16 ); // XXX...
+		strncpy((char *) &(fields[m_sectionOffset + index]),
 			m_suffix.c_str(), 16); // XXX...
 		index += 4;
 
@@ -470,6 +477,8 @@ private:
 	DetectorBankSet *m_config;
 
 	uint32_t m_index;
+
+	uint32_t m_sectionOffset;
 
 	std::string m_name;
 
@@ -538,31 +547,13 @@ DetectorBankSet::DetectorBankSet(
 		return;
 	}
 
-	// Allocate Prologue Packet...
-
-	m_sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
-	m_payloadSize = sizeof(uint32_t) + (m_numDetBankSets * m_sectionSize);
-m_payloadSize = 10000;
-	m_packetSize = m_payloadSize + sizeof(ADARA::Header);
-
-	m_packet = new uint8_t[m_packetSize];
-
-	// Initialize Prologue Packet...
-
-	uint32_t *fields = (uint32_t *) m_packet;
-
-	fields[0] = m_payloadSize;
-	fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0;
-	fields[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
-	fields[3] = now.tv_nsec;
-
-	fields[4] = m_numDetBankSets;
-
 	// Extract Each Detector Bank Set Config...
 
 	uint32_t index = 0;
 
 	std::string detBankSetName;
+
+	std::string format;
 
 	uint32_t flags;
 
@@ -574,8 +565,21 @@ m_payloadSize = 10000;
 
 	std::string suffix;
 
-	// Accumulate Format Request Counts...
-	std::string format;
+	// Starting Section Offset
+	//    - step past Prologue Packet Header & numDetBankSets (1)...
+	uint32_t headerOffset = sizeof(ADARA::Header) / sizeof(uint32_t);
+	uint32_t sectionOffset = headerOffset + 1;
+
+	// Base Section Count (in terms of 4-byte field array elements)
+	//    - leaves space for specific number of banks in a given list...
+	uint32_t baseSectionCount = 0
+		+ 4	// name, 16 characters XXX...
+		+ 1 // bank list size
+		+ 0 // # of banks in list, t.b.d. per set via m_banks.size()...
+		+ 3 // histogram parameters (offset, max, bin)
+		+ 2 // throttle rate (double)
+		+ 4 // suffice, 16 characters XXX...
+		;
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
 		if (it->first.compare(0, plen, conf_prefix))
@@ -642,6 +646,8 @@ m_payloadSize = 10000;
 		suffix = it->second.get<std::string>("suffix", "throttled");
 
 		DEBUG("Detector Bank Set " << detBankSetName << " Config:"
+			<< " index=" << index
+			<< " sectionOffset=" << sectionOffset
 			<< " banks=" << newBanklist
 			<< " format=" << format
 			<< " flags=" << flags
@@ -652,15 +658,43 @@ m_payloadSize = 10000;
 			<< " suffix=" << suffix);
 
 		DetectorBankSetInfo *detBankSetInfo = new DetectorBankSetInfo(this,
-			index++, detBankSetName, banks,
-			flags, tofOffset, tofMax, tofBin, throttle, suffix);
-
-		detBankSetInfo->updatePacket(m_packet);
+			index++, sectionOffset, detBankSetName, banks, flags,
+			tofOffset, tofMax, tofBin, throttle, suffix);
 
 		detBankSetInfos.push_back(detBankSetInfo);
+
+		// Increment Section Offset for Next Detector Bank Set...
+		sectionOffset += baseSectionCount + banks.size();
+	}
+
+	// Allocate Prologue Packet...
+
+	m_payloadSize = ( sectionOffset - headerOffset ) * sizeof(uint32_t);
+	m_packetSize = m_payloadSize + sizeof(ADARA::Header);
+
+	m_packet = new uint8_t[m_packetSize];
+
+	// Initialize Prologue Packet...
+
+	uint32_t *fields = (uint32_t *) m_packet;
+
+	fields[0] = m_payloadSize;
+	fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0; // XXX...
+	fields[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	fields[3] = now.tv_nsec;
+
+	fields[4] = m_numDetBankSets;
+
+	// Update Prologue Packet for Each Detector Bank Set...
+
+	std::vector<DetectorBankSetInfo *>::iterator dbs;
+	for (dbs=detBankSetInfos.begin(); dbs != detBankSetInfos.end(); ++dbs)
+	{
+		(*dbs)->updatePacket(m_packet);
 	}
 
 	// Set Up Callback for Adding Detector Bank Set Config to Prologue...
+
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&DetectorBankSet::onPrologue, this));
 }
