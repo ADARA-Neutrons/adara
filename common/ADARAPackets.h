@@ -388,6 +388,34 @@ private:
 	friend class Parser;
 };
 
+class DetectorBankSetsPkt : public Packet {
+public:
+	DetectorBankSetsPkt(const DetectorBankSetsPkt &pkt);
+
+	/*
+	uint32_t beamMonCount(void) const { return m_fields[0]; }
+
+	uint32_t bmonId(uint32_t index) const
+		{ return m_fields[(index * 6) + 1]; }
+	uint32_t tofOffset(uint32_t index) const
+		{ return m_fields[(index * 6) + 2]; }
+	uint32_t tofMax(uint32_t index) const
+		{ return m_fields[(index * 6) + 3]; }
+	uint32_t tofBin(uint32_t index) const
+		{ return m_fields[(index * 6) + 4]; }
+
+	double distance(uint32_t index) const
+		{ return *(const double *) &m_fields[(index * 6) + 5]; }
+	*/
+
+private:
+	const uint32_t *m_fields;
+
+	DetectorBankSetsPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
 class DataDonePkt : public Packet {
 public:
 	DataDonePkt(const DataDonePkt &pkt);

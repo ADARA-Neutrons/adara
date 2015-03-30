@@ -169,6 +169,7 @@ public:
 	bool rxPacket(const ADARA::GeometryPkt &pkt);
 	bool rxPacket(const ADARA::BeamlineInfoPkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorConfigPkt &pkt);
+	bool rxPacket(const ADARA::DetectorBankSetsPkt &pkt);
 	bool rxPacket(const ADARA::DataDonePkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
@@ -630,6 +631,21 @@ bool Parser::rxPacket(const ADARA::BeamMonitorConfigPkt &pkt)
 			pkt.bmonId(i), pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
 			pkt.distance(i));
 	}
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::DetectorBankSetsPkt &pkt)
+{
+	printf("%u.%09u DETECTOR BANK SETS\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	/*
+	printf("    num %d\n", pkt.beamMonCount());
+	for (uint32_t i = 0; i < pkt.beamMonCount(); i++) {
+		printf("    id %d tofOffset %d tofMax %d tofBin %d distance %lf\n",
+			pkt.bmonId(i), pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
+			pkt.distance(i));
+	}
+	*/
 	return false;
 }
 
