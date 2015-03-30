@@ -291,6 +291,7 @@ StreamParser::rxPacket
     case ADARA::PacketType::CLIENT_HELLO_V0:
     case ADARA::PacketType::SYNC_V0:
     case ADARA::PacketType::HEARTBEAT_V0:
+    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
     case ADARA::PacketType::VAR_VALUE_STRING_V0:
       if ( m_gather_stats )
           ++m_skipped_pkt_count;
