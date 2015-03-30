@@ -657,6 +657,7 @@ void DataSource::startConnect(void)
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
 		ERROR("Error creating socket for " << m_name);
+		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
 

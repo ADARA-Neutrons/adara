@@ -317,8 +317,10 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	}
 
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
-	if (m_fd < 0)
+	if (m_fd < 0) {
+		m_fd = -1;   // just to be sure... ;-b
 		goto error;
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0)
