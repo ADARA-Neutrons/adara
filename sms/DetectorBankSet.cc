@@ -447,6 +447,8 @@ public:
 			m_name.c_str(), 16); // XXX...
 		index += 4;
 
+		fields[m_sectionOffset + index++] = m_flags;
+
 		fields[m_sectionOffset + index++] = m_banks.size();
 
 		for (std::vector<uint32_t>::iterator b=m_banks.begin();
@@ -568,17 +570,17 @@ DetectorBankSet::DetectorBankSet(
 	// Starting Section Offset
 	//    - step past Prologue Packet Header & numDetBankSets (1)...
 	uint32_t headerOffset = sizeof(ADARA::Header) / sizeof(uint32_t);
-	uint32_t sectionOffset = headerOffset + 1;
+	uint32_t sectionOffset = headerOffset + 1;   // numDetBankSets...
 
 	// Base Section Count (in terms of 4-byte field array elements)
 	//    - leaves space for specific number of banks in a given list...
 	uint32_t baseSectionCount = 0
 		+ 4	// name, 16 characters XXX...
-		+ 1 // bank list size
+		+ 2 // format flags & bank list count
 		+ 0 // # of banks in list, t.b.d. per set via m_banks.size()...
 		+ 3 // histogram parameters (offset, max, bin)
 		+ 2 // throttle rate (double)
-		+ 4 // suffice, 16 characters XXX...
+		+ 4 // suffix, 16 characters XXX...
 		;
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
