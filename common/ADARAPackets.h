@@ -392,6 +392,17 @@ class DetectorBankSetsPkt : public Packet {
 public:
 	DetectorBankSetsPkt(const DetectorBankSetsPkt &pkt);
 
+	// Detector Bank Set Name, alphanumeric characters...
+	static const size_t SET_NAME_SIZE = 16;
+
+	// Throttle Suffix, alphanumeric, no spaces/punctuation...
+	static const size_t THROTTLE_SUFFIX_SIZE = 16;
+
+	enum Flags {
+		EVENT_FORMAT    = 0x0001,
+		HISTO_FORMAT    = 0x0002,
+	};
+
 	/*
 	uint32_t beamMonCount(void) const { return m_fields[0]; }
 

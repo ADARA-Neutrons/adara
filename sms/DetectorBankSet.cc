@@ -420,13 +420,15 @@ public:
 
 	void setSuffix(std::string suffix)
 	{
-		if ( suffix.length() > 16 - 1 ) { // XXX...
+		size_t suffix_sz =
+			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE - 1;
+		if ( suffix.length() > suffix_sz ) {
 			ERROR("setSuffix(): Throttle NXentry Suffix Too Long!"
 				<< " length(" << suffix << ")=" << suffix.length()
-				<< " > " << ( 16 - 1 ) << ", truncated to: "
-				<< suffix.substr( 0, 16 - 1 ) );
+				<< " > " << ( suffix_sz ) << ", truncated to: "
+				<< suffix.substr( 0, suffix_sz ) );
 		}
-		m_suffix = suffix.substr( 0, 16 - 1 ); // XXX...
+		m_suffix = suffix.substr( 0, suffix_sz );
 		m_changed = true;
 	}
 
@@ -440,12 +442,14 @@ public:
 
 		uint32_t index = 0;
 
-		// Detector Bank Set Name (limited to 16 characters total, with \0)
+		// Detector Bank Set Name
+		//    - limited to SET_NAME_SIZE characters total, with \0's...)
 		memset((void *) &(fields[m_sectionOffset + index]),
-			'\0', 16 ); // XXX...
+			'\0', ADARA::DetectorBankSetsPkt::SET_NAME_SIZE );
 		strncpy((char *) &(fields[m_sectionOffset + index]),
-			m_name.c_str(), 16); // XXX...
-		index += 4;
+			m_name.c_str(), ADARA::DetectorBankSetsPkt::SET_NAME_SIZE );
+		index += ADARA::DetectorBankSetsPkt::SET_NAME_SIZE
+			/ sizeof(uint32_t);
 
 		fields[m_sectionOffset + index++] = m_flags;
 
@@ -465,10 +469,12 @@ public:
 		index += 2;
 
 		memset((void *) &(fields[m_sectionOffset + index]),
-			'\0', 16 ); // XXX...
+			'\0', ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE );
 		strncpy((char *) &(fields[m_sectionOffset + index]),
-			m_suffix.c_str(), 16); // XXX...
-		index += 4;
+			m_suffix.c_str(),
+			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE );
+		index += ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE
+			/ sizeof(uint32_t);
 
 		m_changed = false;
 	}
@@ -575,12 +581,15 @@ DetectorBankSet::DetectorBankSet(
 	// Base Section Count (in terms of 4-byte field array elements)
 	//    - leaves space for specific number of banks in a given list...
 	uint32_t baseSectionCount = 0
-		+ 4	// name, 16 characters XXX...
+		// name, SET_NAME_SIZE characters...
+		+ ( ADARA::DetectorBankSetsPkt::SET_NAME_SIZE / sizeof(uint32_t) )
 		+ 2 // format flags & bank list count
 		+ 0 // # of banks in list, t.b.d. per set via m_banks.size()...
 		+ 3 // histogram parameters (offset, max, bin)
 		+ 2 // throttle rate (double)
-		+ 4 // suffix, 16 characters XXX...
+		// throttle suffix, THROTTLE_SUFFIX_SIZE characters...
+		+ ( ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE
+			/ sizeof(uint32_t) )
 		;
 
 	for (it = conf.begin(); it != conf.end(); ++it) {
