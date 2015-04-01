@@ -442,12 +442,17 @@ public:
 
 		uint32_t index = 0;
 
+		size_t len;
+
 		// Detector Bank Set Name
-		//    - limited to SET_NAME_SIZE characters total, with \0's...)
+		//    - limited to SET_NAME_SIZE characters total, incl \0's...)
 		memset((void *) &(fields[m_sectionOffset + index]),
 			'\0', ADARA::DetectorBankSetsPkt::SET_NAME_SIZE );
+		len = m_name.length();
+		if ( len >= ADARA::DetectorBankSetsPkt::SET_NAME_SIZE )
+			len = ADARA::DetectorBankSetsPkt::SET_NAME_SIZE - 1;
 		strncpy((char *) &(fields[m_sectionOffset + index]),
-			m_name.c_str(), ADARA::DetectorBankSetsPkt::SET_NAME_SIZE );
+			m_name.c_str(), len );
 		index += ADARA::DetectorBankSetsPkt::SET_NAME_SIZE
 			/ sizeof(uint32_t);
 
@@ -468,11 +473,15 @@ public:
 		*((double *) &(fields[m_sectionOffset + index])) = m_throttle;
 		index += 2;
 
+		// Throttle NeXus NXentry Suffix
+		//    - limited to THROTTLE_SUFFIX_SIZE char total, incl \0's...)
 		memset((void *) &(fields[m_sectionOffset + index]),
 			'\0', ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE );
+		len = m_suffix.length();
+		if ( len >= ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE )
+			len = ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE - 1;
 		strncpy((char *) &(fields[m_sectionOffset + index]),
-			m_suffix.c_str(),
-			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE );
+			m_suffix.c_str(), len );
 		index += ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE
 			/ sizeof(uint32_t);
 
