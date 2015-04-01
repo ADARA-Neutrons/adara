@@ -2,6 +2,7 @@
 #define __ADARA_PACKETS_H
 
 #include <stdint.h>
+#include <string.h>
 
 #include "ADARA.h"
 
@@ -403,24 +404,80 @@ public:
 		HISTO_FORMAT    = 0x0002,
 	};
 
-	/*
-	uint32_t beamMonCount(void) const { return m_fields[0]; }
+	uint32_t detBankSetCount(void) const { return m_fields[0]; }
 
-	uint32_t bmonId(uint32_t index) const
-		{ return m_fields[(index * 6) + 1]; }
+	uint32_t sectionOffset(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return( m_sectionOffsets[index] );
+		else
+			return( 0 );   // Minimum Valid offset is always past Header...
+	}
+
+	std::string name(uint32_t index) const
+	{
+		char name_c[SET_NAME_SIZE];
+		strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
+			SET_NAME_SIZE);
+		name_c[SET_NAME_SIZE - 1] = '\0';   // just making sure we terminate
+		return( std::string(name_c) );
+	}
+
+	uint32_t flags(uint32_t index) const
+		{ return m_fields[ m_sectionOffsets[index] + m_name_offset ]; }
+
+	uint32_t bankCount(uint32_t index) const
+		{ return m_fields[ m_sectionOffsets[index] + m_name_offset + 1 ]; }
+
+	const uint32_t *banks(uint32_t index) const
+	{
+		return (const uint32_t *) &m_fields[ m_sectionOffsets[index]
+			+ m_name_offset + 2 ];
+	}
+
 	uint32_t tofOffset(uint32_t index) const
-		{ return m_fields[(index * 6) + 2]; }
-	uint32_t tofMax(uint32_t index) const
-		{ return m_fields[(index * 6) + 3]; }
-	uint32_t tofBin(uint32_t index) const
-		{ return m_fields[(index * 6) + 4]; }
+	{
+		return m_fields[ m_after_banks_offset[index] ];
+	}
 
-	double distance(uint32_t index) const
-		{ return *(const double *) &m_fields[(index * 6) + 5]; }
-	*/
+	uint32_t tofMax(uint32_t index) const
+	{
+		return m_fields[ m_after_banks_offset[index] + 1 ];
+	}
+
+	uint32_t tofBin(uint32_t index) const
+	{
+		return m_fields[ m_after_banks_offset[index] + 2 ];
+	}
+
+	double throttle(uint32_t index) const
+	{
+		return *(const double *) &m_fields[
+			m_after_banks_offset[index] + 3 ];
+	}
+
+	std::string suffix(uint32_t index) const
+	{
+		char suffix_c[THROTTLE_SUFFIX_SIZE];
+		strncpy(suffix_c,
+			(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
+			THROTTLE_SUFFIX_SIZE);
+		suffix_c[THROTTLE_SUFFIX_SIZE - 1] = '\0';   // just making sure...
+		return( std::string(suffix_c) );
+	}
 
 private:
 	const uint32_t *m_fields;
+
+	static const uint32_t m_name_offset =
+		SET_NAME_SIZE / sizeof(uint32_t);
+
+	static const uint32_t m_suffix_offset =
+		THROTTLE_SUFFIX_SIZE / sizeof(uint32_t);
+
+	uint32_t *m_sectionOffsets;
+
+	uint32_t *m_after_banks_offset;
 
 	DetectorBankSetsPkt(const uint8_t *data, uint32_t len);
 

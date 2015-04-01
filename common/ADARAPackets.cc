@@ -375,24 +375,112 @@ BeamMonitorConfigPkt::BeamMonitorConfigPkt(
 
 DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 		uint32_t len) :
-	Packet(data, len), m_fields((const uint32_t *)payload())
+	Packet(data, len), m_fields((const uint32_t *)payload()),
+	m_sectionOffsets(NULL), m_after_banks_offset(NULL)
 {
-	/*
-	size_t sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
+	// Get Number of Detector Bank Sets...
+	//    - Basic Packet Size Sanity Check
 
-	if (m_payload_len !=
-			(sizeof(uint32_t) + (beamMonCount() * sectionSize))) {
-		std::string msg("BeamMonitorConfig packet is incorrect length: ");
+	if ( m_payload_len < sizeof(uint32_t) ) {
+		std::string msg("DetectorBankSets packet is too short for Count! ");
 		msg += boost::lexical_cast<std::string>(m_payload_len);
 		throw invalid_packet(msg);
 	}
-	*/
+
+	uint32_t numSets = detBankSetCount();
+
+	// Don't Allocate Anything if there are No Detector Bank Sets...
+	if ( numSets < 1 )
+		return;
+
+	m_sectionOffsets = new uint32_t[numSets];
+
+	m_after_banks_offset = new uint32_t[numSets];
+
+	// Traverse Detector Bank Sets...
+	//    - Set Section Offsets
+	//    - Set "After Banks" Offsets
+
+	// Base Section Sizes (w/o Bank Ids)
+	uint32_t baseSectionOffsetPart1 = 0
+		+ m_name_offset   // name
+		+ 2;   // flags & bank id count
+	uint32_t baseSectionOffsetPart2 = 0
+		+ 3   // histo params
+		+ 2   // throttle rate (double)
+		+ m_suffix_offset;
+	uint32_t baseSectionOffsetNoBanks =
+		baseSectionOffsetPart1 + baseSectionOffsetPart2;
+
+	// Running Section Offset (in number of uint32_t elements)
+	uint32_t sectionOffset = 1;   // for Detector Bank Set Count...
+
+	for ( uint32_t i=0 ; i < numSets ; i++ )
+	{
+		// Section Offset
+		m_sectionOffsets[i] = sectionOffset;
+
+		if ( m_payload_len < ( ( sectionOffset + baseSectionOffsetNoBanks )
+				* sizeof(uint32_t) ) ) {
+			std::string msg("DetectorBankSets packet: too short for Set ");
+			msg += boost::lexical_cast<std::string>( i + 1 );
+			msg += " of ";
+			msg += boost::lexical_cast<std::string>(numSets);
+			msg += " sectionOffset=";
+			msg += boost::lexical_cast<std::string>(sectionOffset);
+			msg += " baseSectionOffsetNoBanks=";
+			msg += boost::lexical_cast<std::string>(
+				baseSectionOffsetNoBanks);
+			msg += " payload_len=";
+			msg += boost::lexical_cast<std::string>(m_payload_len);
+			delete[] m_sectionOffsets;
+			m_sectionOffsets = (uint32_t *) NULL;
+			delete[] m_after_banks_offset;
+			m_after_banks_offset = (uint32_t *) NULL;
+			throw invalid_packet(msg);
+		}
+
+		// Offset thru end of Bank Ids list...
+		sectionOffset += baseSectionOffsetPart1
+			+ bankCount(i);   // just in time m_sectionOffset delivery...!
+
+		// Save as "After Banks" Offset...
+		m_after_banks_offset[i] = sectionOffset;
+
+		// Rest of Set Offset...
+		sectionOffset += baseSectionOffsetPart2;
+	}
+
+	// Final Payload Size Check... ;-D
+	if ( m_payload_len < ( sectionOffset * sizeof(uint32_t) ) ) {
+		std::string msg("DetectorBankSets packet: overall too short ");
+		msg += " numSets=";
+		msg += boost::lexical_cast<std::string>(numSets);
+		msg += " baseSectionOffsetNoBanks=";
+		msg += boost::lexical_cast<std::string>(
+			baseSectionOffsetNoBanks);
+		msg += " final sectionOffset=";
+		msg += boost::lexical_cast<std::string>(sectionOffset);
+		msg += " payload_len=";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		delete[] m_sectionOffsets;
+		m_sectionOffsets = (uint32_t *) NULL;
+		delete[] m_after_banks_offset;
+		m_after_banks_offset = (uint32_t *) NULL;
+		throw invalid_packet(msg);
+	}
 }
 
 DetectorBankSetsPkt::DetectorBankSetsPkt(
 		const DetectorBankSetsPkt &pkt ) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
-{}
+{
+	if ( m_sectionOffsets != NULL )
+		delete[] m_sectionOffsets;
+
+	if ( m_after_banks_offset != NULL )
+		delete[] m_after_banks_offset;
+}
 
 /* ------------------------------------------------------------------------ */
 
