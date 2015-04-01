@@ -84,6 +84,7 @@ private:
     bool        rxPacket( const ADARA::GeometryPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorConfigPkt &a_pkt );
+    bool        rxPacket( const ADARA::DetectorBankSetsPkt &a_pkt );
     bool        rxPacket( const ADARA::DataDonePkt &a_pkt );
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );

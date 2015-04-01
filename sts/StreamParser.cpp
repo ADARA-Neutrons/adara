@@ -201,6 +201,7 @@ StreamParser::printStats
 #define PKT_BIT_BEAMINFO                0x0004
 #define PKT_BIT_GEOMETRY                0x0008
 #define PKT_BIT_BEAM_MONITOR_CONFIG     0x0010
+#define PKT_BIT_DETECTOR_BANK_SETS      0x0020
 
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
@@ -270,6 +271,9 @@ StreamParser::rxPacket
     case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAM_MONITOR_CONFIG)
 
+    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_DETECTOR_BANK_SETS)
+
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
     case ADARA::PacketType::VAR_VALUE_U32_V0:
@@ -291,7 +295,6 @@ StreamParser::rxPacket
     case ADARA::PacketType::CLIENT_HELLO_V0:
     case ADARA::PacketType::SYNC_V0:
     case ADARA::PacketType::HEARTBEAT_V0:
-    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
     case ADARA::PacketType::VAR_VALUE_STRING_V0:
       if ( m_gather_stats )
           ++m_skipped_pkt_count;
@@ -1177,6 +1180,11 @@ StreamParser::rxPacket
 }
 
 
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Beam Monitor Config packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
 /*! \brief This method processes Beam Monitor Config ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
@@ -1187,7 +1195,7 @@ StreamParser::rxPacket
 bool
 StreamParser::rxPacket
 (
-    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
+    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beam Monitor Config Packet to process
 )
 {
     syslog( LOG_INFO,
@@ -1289,6 +1297,97 @@ StreamParser::getBeamMonitorConfig
     }
 
     return(config);
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Detector Bank Sets packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes Detector Bank Sets ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Detector Bank Sets packets,
+ * to optionally define Histogramming & Rate-Throttled Event parameters
+ * for processing/accumulating special subsets of Neutron Detector Banks.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::DetectorBankSetsPkt &a_pkt     ///< [in] The ADARA Detector Bank Sets Packet to process
+)
+{
+    syslog( LOG_INFO,
+        "[%i] Detector Bank Sets Packet Received: %u Detector Bank Sets",
+        g_pid, a_pkt.detBankSetCount() );
+
+    for (uint32_t i=0 ; i < a_pkt.detBankSetCount() ; i++) {
+
+        const uint32_t *banks = a_pkt.banks(i);
+        std::stringstream ss;
+        bool first = true;
+        ss << "[";
+        for (uint32_t b=0 ; b < a_pkt.bankCount(i) ; b++) {
+            if ( first ) first = false;
+            else ss << ",";
+            ss << banks[b];
+        }
+        ss << "]";
+
+        syslog( LOG_INFO,
+  "[%i] %s %s (%u=%s): flags=%u histo=(%u to %u by %u) throttle=%lf (%s).",
+            g_pid, "Detector Bank Set", a_pkt.name(i).c_str(),
+            a_pkt.bankCount(i), ss.str().c_str(), a_pkt.flags(i),
+            a_pkt.tofOffset(i), a_pkt.tofMax(i), a_pkt.tofBin(i),
+            a_pkt.throttle(i), a_pkt.suffix(i).c_str() );
+
+        // STS::DetectorBankSet set;
+
+        // set.name = a_pkt.name(i);
+        // set.flags = a_pkt.flags(i);
+        // set.tofOffset = a_pkt.tofOffset(i);
+        // set.tofMax = a_pkt.tofMax(i);
+        // set.tofBin = a_pkt.tofBin(i);
+        // set.throttle = a_pkt.throttle(i);
+
+        // syslog( LOG_INFO,
+            // "[%i] Detector Bank Set %s: histo=(%u to %u by %u).",
+            // g_pid, set.id,
+            // set.tofOffset, set.tofMax, set.tofBin );
+
+        // Basic Sanity Check...
+        /*
+        if ( set.tofOffset >= set.tofMax )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s Config Error: Offset %u >= Max %u",
+                g_pid, "STS Error:", "Detector Bank Set", set.name.c_str(),
+                set.tofOffset, set.tofMax );
+            syslog( LOG_ERR,
+                "[%i] %s Reverting to Detector Bank Set Event Mode!",
+                g_pid, "STS Error:" );
+            XXX m_monitor_config.clear();
+            break;
+        }
+        */
+
+        // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
+        /*
+        if ( set.tofBin < 1 )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
+                g_pid, "STS Error:", "Detector Bank Set", set.name.c_str(),
+                set.tofBin );
+            set.tofBin = 1;
+        }
+        */
+
+        // m_monitor_config.push_back(config);
+    }
+
+    return false;
 }
 
 
