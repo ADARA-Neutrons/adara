@@ -625,9 +625,9 @@ bool Parser::rxPacket(const ADARA::BeamMonitorConfigPkt &pkt)
 {
 	printf("%u.%09u BEAM MONITOR CONFIG\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
-	printf("    num %d\n", pkt.beamMonCount());
+	printf("    num %u\n", pkt.beamMonCount());
 	for (uint32_t i = 0; i < pkt.beamMonCount(); i++) {
-		printf("    id %d tofOffset %d tofMax %d tofBin %d distance %lf\n",
+		printf("    id %u tofOffset %u tofMax %u tofBin %u distance %lf\n",
 			pkt.bmonId(i), pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
 			pkt.distance(i));
 	}
@@ -638,14 +638,24 @@ bool Parser::rxPacket(const ADARA::DetectorBankSetsPkt &pkt)
 {
 	printf("%u.%09u DETECTOR BANK SETS\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
-	/*
-	printf("    num %d\n", pkt.beamMonCount());
-	for (uint32_t i = 0; i < pkt.beamMonCount(); i++) {
-		printf("    id %d tofOffset %d tofMax %d tofBin %d distance %lf\n",
-			pkt.bmonId(i), pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
-			pkt.distance(i));
+	printf("    num %u\n", pkt.detBankSetCount());
+	for (uint32_t i = 0; i < pkt.detBankSetCount(); i++) {
+		printf("    name %s bankCount %u flags %u\n",
+			pkt.name(i).c_str(), pkt.bankCount(i), pkt.flags(i));
+		printf("        banks [");
+		const uint32_t *banks = pkt.banks(i);
+		bool first = true;
+		for (uint32_t b = 0; b < pkt.bankCount(i); b++) {
+			if ( first ) first = false;
+			else printf(",");
+			printf("%u", banks[b]);
+		}
+		printf("]\n");
+		printf(
+		"        tofOffset %u tofMax %u tofBin %u throttle %lf suffix %s\n",
+			pkt.tofOffset(i), pkt.tofMax(i), pkt.tofBin(i),
+			pkt.throttle(i), pkt.suffix(i).c_str());
 	}
-	*/
 	return false;
 }
 
