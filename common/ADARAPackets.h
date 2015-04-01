@@ -2,6 +2,8 @@
 #define __ADARA_PACKETS_H
 
 #include <stdint.h>
+#include <string>
+#include <sstream>
 #include <string.h>
 
 #include "ADARA.h"
@@ -370,16 +372,44 @@ public:
 	uint32_t beamMonCount(void) const { return m_fields[0]; }
 
 	uint32_t bmonId(uint32_t index) const
-		{ return m_fields[(index * 6) + 1]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 1];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofOffset(uint32_t index) const
-		{ return m_fields[(index * 6) + 2]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 2];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofMax(uint32_t index) const
-		{ return m_fields[(index * 6) + 3]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 3];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofBin(uint32_t index) const
-		{ return m_fields[(index * 6) + 4]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 4];
+		else
+			return( 0 );
+	}
 
 	double distance(uint32_t index) const
-		{ return *(const double *) &m_fields[(index * 6) + 5]; }
+	{
+		if ( index < beamMonCount() )
+			return *(const double *) &m_fields[(index * 6) + 5];
+		else
+			return( 0.0 );
+	}
 
 private:
 	const uint32_t *m_fields;
@@ -416,54 +446,94 @@ public:
 
 	std::string name(uint32_t index) const
 	{
-		char name_c[SET_NAME_SIZE];
-		strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
-			SET_NAME_SIZE);
-		name_c[SET_NAME_SIZE - 1] = '\0';   // just making sure we terminate
-		return( std::string(name_c) );
+		if ( index < detBankSetCount() ) {
+			char name_c[SET_NAME_SIZE];
+			strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
+				SET_NAME_SIZE);
+			name_c[SET_NAME_SIZE - 1] = '\0';   // make sure we terminate
+			return( std::string(name_c) );
+		} else {
+			return( "<Out Of Range!>" );
+		}
 	}
 
 	uint32_t flags(uint32_t index) const
-		{ return m_fields[ m_sectionOffsets[index] + m_name_offset ]; }
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_sectionOffsets[index] + m_name_offset ];
+		else
+			return( 0 );
+	}
 
 	uint32_t bankCount(uint32_t index) const
-		{ return m_fields[ m_sectionOffsets[index] + m_name_offset + 1 ]; }
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_sectionOffsets[index] + m_name_offset + 1 ];
+		else
+			return( 0 );
+	}
 
 	const uint32_t *banks(uint32_t index) const
 	{
-		return (const uint32_t *) &m_fields[ m_sectionOffsets[index]
-			+ m_name_offset + 2 ];
+		if ( index < detBankSetCount() ) {
+			return (const uint32_t *) &m_fields[ m_sectionOffsets[index]
+				+ m_name_offset + 2 ];
+		}
+		else {
+			// Shouldn't be asking for this if bankCount() returned 0...!
+			return( (const uint32_t *) NULL );
+		}
 	}
 
 	uint32_t tofOffset(uint32_t index) const
 	{
-		return m_fields[ m_after_banks_offset[index] ];
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] ];
+		else
+			return( 0 );
 	}
 
 	uint32_t tofMax(uint32_t index) const
 	{
-		return m_fields[ m_after_banks_offset[index] + 1 ];
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] + 1 ];
+		else
+			return( 0 );
 	}
 
 	uint32_t tofBin(uint32_t index) const
 	{
-		return m_fields[ m_after_banks_offset[index] + 2 ];
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] + 2 ];
+		else
+			return( 0 );
 	}
 
 	double throttle(uint32_t index) const
 	{
-		return *(const double *) &m_fields[
-			m_after_banks_offset[index] + 3 ];
+		if ( index < detBankSetCount() ) {
+			return *(const double *) &m_fields[
+				m_after_banks_offset[index] + 3 ];
+		}
+		else
+			return( 0.0 );
 	}
 
 	std::string suffix(uint32_t index) const
 	{
-		char suffix_c[THROTTLE_SUFFIX_SIZE];
-		strncpy(suffix_c,
-			(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
-			THROTTLE_SUFFIX_SIZE);
-		suffix_c[THROTTLE_SUFFIX_SIZE - 1] = '\0';   // just making sure...
-		return( std::string(suffix_c) );
+		if ( index < detBankSetCount() ) {
+			char suffix_c[THROTTLE_SUFFIX_SIZE];
+			strncpy(suffix_c,
+				(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
+				THROTTLE_SUFFIX_SIZE);
+			suffix_c[THROTTLE_SUFFIX_SIZE - 1] = '\0';   // make sure...
+			return( std::string(suffix_c) );
+		} else {
+			std::stringstream ss;
+			ss << "out-of-range-";
+			ss << index;
+			return( ss.str() );
+		}
 	}
 
 private:
