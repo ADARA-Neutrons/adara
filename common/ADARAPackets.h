@@ -447,10 +447,10 @@ public:
 	std::string name(uint32_t index) const
 	{
 		if ( index < detBankSetCount() ) {
-			char name_c[SET_NAME_SIZE];
+			char name_c[SET_NAME_SIZE + 1];   // give them an inch...
+			memset( (void *) name_c, '\0', SET_NAME_SIZE + 1 );
 			strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
 				SET_NAME_SIZE);
-			name_c[SET_NAME_SIZE - 1] = '\0';   // make sure we terminate
 			return( std::string(name_c) );
 		} else {
 			return( "<Out Of Range!>" );
@@ -522,11 +522,11 @@ public:
 	std::string suffix(uint32_t index) const
 	{
 		if ( index < detBankSetCount() ) {
-			char suffix_c[THROTTLE_SUFFIX_SIZE];
+			char suffix_c[THROTTLE_SUFFIX_SIZE + 1];   // give them an inch
+			memset( (void *) suffix_c, '\0', THROTTLE_SUFFIX_SIZE + 1 );
 			strncpy(suffix_c,
 				(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
 				THROTTLE_SUFFIX_SIZE);
-			suffix_c[THROTTLE_SUFFIX_SIZE - 1] = '\0';   // make sure...
 			return( std::string(suffix_c) );
 		} else {
 			std::stringstream ss;
