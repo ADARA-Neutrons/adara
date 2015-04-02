@@ -1,6 +1,8 @@
 #include "StreamParser.h"
 #include "TransCompletePkt.h"
 #include <iomanip>
+#include <sstream>
+#include <string.h>
 #include <boost/algorithm/string.hpp>
 #include <syslog.h>
 #include "ADARAUtils.h"

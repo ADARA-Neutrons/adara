@@ -3,6 +3,7 @@
 
 #include "stsdefs.h"
 #include "combus/ComBus.h"
+#include <string>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 
