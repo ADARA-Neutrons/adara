@@ -400,7 +400,20 @@ public:
 	// Sets...
 
 	void setName(std::string name)
-		{ m_name = name; m_changed = true; }
+	{
+		// Just generate a warning if the name is too long...
+		//    - only for human consumption anyway...
+		size_t name_sz =
+			ADARA::DetectorBankSetsPkt::SET_NAME_SIZE;
+		if ( name.length() > name_sz ) {
+			WARN("setName(): Detector Bank Set Name Too Long"
+				<< " length(" << name << ")=" << name.length()
+				<< " > " << ( name_sz ) << ", will be truncated to: "
+				<< name.substr( 0, name_sz ) );
+		}
+		m_name = name;
+		m_changed = true;
+	}
 
 	void setBanks(std::vector<uint32_t> banks)
 		{ m_banks = banks; m_changed = true; }
@@ -421,7 +434,7 @@ public:
 	void setSuffix(std::string suffix)
 	{
 		size_t suffix_sz =
-			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE - 1;
+			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE;
 		if ( suffix.length() > suffix_sz ) {
 			ERROR("setSuffix(): Throttle NXentry Suffix Too Long!"
 				<< " length(" << suffix << ")=" << suffix.length()
@@ -445,12 +458,13 @@ public:
 		size_t len;
 
 		// Detector Bank Set Name
-		//    - limited to SET_NAME_SIZE characters total, incl \0's...)
+		//    - limited to SET_NAME_SIZE characters total (not incl '\0')
+		//    - (don't send '\0' over the network, use all the space :-)
 		memset((void *) &(fields[m_sectionOffset + index]),
 			'\0', ADARA::DetectorBankSetsPkt::SET_NAME_SIZE );
 		len = m_name.length();
-		if ( len >= ADARA::DetectorBankSetsPkt::SET_NAME_SIZE )
-			len = ADARA::DetectorBankSetsPkt::SET_NAME_SIZE - 1;
+		if ( len > ADARA::DetectorBankSetsPkt::SET_NAME_SIZE )
+			len = ADARA::DetectorBankSetsPkt::SET_NAME_SIZE;
 		strncpy((char *) &(fields[m_sectionOffset + index]),
 			m_name.c_str(), len );
 		index += ADARA::DetectorBankSetsPkt::SET_NAME_SIZE
@@ -474,12 +488,13 @@ public:
 		index += 2;
 
 		// Throttle NeXus NXentry Suffix
-		//    - limited to THROTTLE_SUFFIX_SIZE char total, incl \0's...)
+		//    - limited to THROTTLE_SUFFIX_SIZE chars total (not incl '\0')
+		//    - (don't send '\0' over the network, use all the space :-)
 		memset((void *) &(fields[m_sectionOffset + index]),
 			'\0', ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE );
 		len = m_suffix.length();
-		if ( len >= ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE )
-			len = ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE - 1;
+		if ( len > ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE )
+			len = ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE;
 		strncpy((char *) &(fields[m_sectionOffset + index]),
 			m_suffix.c_str(), len );
 		index += ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE
