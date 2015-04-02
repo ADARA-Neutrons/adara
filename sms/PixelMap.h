@@ -4,9 +4,12 @@
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/signals2.hpp>
+#include <stdint.h>
 #include <utility>
 #include <vector>
 #include <string>
+
+#include <stdint.h>
 
 class PixelMap : boost::noncopyable {
 public:

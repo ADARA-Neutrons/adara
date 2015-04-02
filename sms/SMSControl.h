@@ -3,6 +3,7 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
 #include <string>
 #include <map>
 #include <vector>

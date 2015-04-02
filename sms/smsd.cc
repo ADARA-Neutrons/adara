@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/eventfd.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include <grp.h>
 #include <pwd.h>
 

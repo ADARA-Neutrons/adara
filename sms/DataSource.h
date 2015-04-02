@@ -2,13 +2,13 @@
 #define __DATA_SOURCE_H
 
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
 #include <map>
+#include <string>
 
 #include "POSIXParser.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 
 extern "C" {
 struct addrinfo;

@@ -6,6 +6,8 @@
 #include <boost/signals2.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+#include <stdint.h>
+
 #include "ADARA.h"
 #include "Storage.h"
 

@@ -16,9 +16,13 @@
 #include "Logging.h"
 #include "utils.h"
 
+#include <string>
+#include <sstream>
+#include <map>
 #include <time.h>
 #include <math.h>
 #include <boost/lexical_cast.hpp>
+#include <stdint.h>
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 

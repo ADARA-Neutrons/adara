@@ -7,7 +7,6 @@
 #include <boost/signals2.hpp>
 #include <boost/thread.hpp>
 #include <stdint.h>
-#include <sys/uio.h>
 #include <string>
 #include <vector>
 

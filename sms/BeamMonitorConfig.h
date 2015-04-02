@@ -7,8 +7,7 @@
 
 #include <boost/smart_ptr.hpp>
 
-#include "SMSControl.h"
-#include "SMSControlPV.h"
+#include <stdint.h>
 
 class BeamMonitorInfo;
 class smsUint32PV;

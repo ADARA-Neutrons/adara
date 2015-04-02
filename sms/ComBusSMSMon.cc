@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <syslog.h>
+#include <stdint.h>
 #include <string>
 #include "ComBusSMSMon.h"
 

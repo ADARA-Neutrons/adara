@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <stdint.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -6,9 +7,12 @@
 #include <time.h>
 
 #include <boost/bind.hpp>
+#include <string>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "StorageManager.h"
+#include "StorageContainer.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "STSClientMgr.h"

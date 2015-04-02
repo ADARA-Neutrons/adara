@@ -1,5 +1,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <stdint.h>
+#include <string>
+#include <sstream>
 #include <netdb.h>
 #include <fcntl.h>
 #include <time.h>
@@ -10,6 +13,9 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "DataSource.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
+
 #include "utils.h"
 
 #include "Logging.h"

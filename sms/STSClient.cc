@@ -2,8 +2,10 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <stdint.h>
 
 #include <boost/bind.hpp>
+#include <string>
 
 #include "EPICS.h"
 #include "STSClient.h"

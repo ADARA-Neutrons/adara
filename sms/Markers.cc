@@ -1,8 +1,11 @@
 #include <boost/function.hpp>
+#include <stdint.h>
 #include <string>
 
 #include "Markers.h"
 #include "StorageManager.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 
 class MarkerPausedPV : public smsBooleanPV {
 public:

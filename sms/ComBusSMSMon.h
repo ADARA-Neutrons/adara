@@ -1,6 +1,8 @@
 #ifndef COMBUSSMSMON_H
 #define COMBUSSMSMON_H
 
+#include <stdint.h>
+#include <string>
 #include <time.h>
 #include <map>
 #include <epicsMessageQueue.h>

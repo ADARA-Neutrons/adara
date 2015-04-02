@@ -3,6 +3,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>
+#include <stdint.h>
 #include <string>
 
 class BeamlineInfo : boost::noncopyable {

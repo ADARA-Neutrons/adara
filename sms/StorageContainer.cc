@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>

@@ -5,8 +5,12 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/signals2.hpp>
 
+#include <stdint.h>
+
+#include <string>
+#include <map>
+
 #include "SMSControl.h"
-#include "SMSControlPV.h"
 
 class RunUserInfoPV;
 class RunInfoResetPV;

@@ -7,8 +7,10 @@
 
 #include <boost/smart_ptr.hpp>
 
-#include "SMSControl.h"
-#include "SMSControlPV.h"
+#include <stdint.h>
+
+#include <string>
+#include <vector>
 
 class DetectorBankSetInfo;
 class smsUint32PV;

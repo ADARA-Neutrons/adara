@@ -5,6 +5,7 @@
 #include <sys/vfs.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include <string>
 #include <stdexcept>
@@ -14,12 +15,12 @@
 
 #include <time.h>
 
+#include "ADARA.h"
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-#include "ADARA.h"
 #include "ADARAUtils.h"
 #include "EventFd.h"
 #include "STSClientMgr.h"

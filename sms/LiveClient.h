@@ -3,16 +3,15 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
+#include <string>
 #include <list>
 
 #include "POSIXParser.h"
-#include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 
 class smsStringPV;
 class smsUint32PV;

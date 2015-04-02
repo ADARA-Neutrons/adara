@@ -1,13 +1,18 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
+#include <stdint.h>
+#include <string>
 
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "LiveClient.h"
+#include "StorageManager.h"
 #include "StorageFile.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "Logging.h"
 #include "utils.h"
 

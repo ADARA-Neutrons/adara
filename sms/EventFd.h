@@ -4,6 +4,7 @@
 #include <boost/function.hpp>
 #include <fdManager.h>
 #include <sys/eventfd.h>
+#include <stdint.h>
 #include <errno.h>
 
 #include <memory>

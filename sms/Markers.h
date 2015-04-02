@@ -5,11 +5,14 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/signals2.hpp>
 
+#include <stdint.h>
+
 #include "SMSControl.h"
-#include "SMSControlPV.h"
 
 class MarkerPausedPV;
 class MarkerTriggerPV;
+class smsStringPV;
+class smsUint32PV;
 
 class Markers : boost::noncopyable {
 public:
