@@ -297,10 +297,10 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
-        m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
-        m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
-        m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
-        m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
+	m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
+	m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
+	m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
+	m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
 
 	StorageFile::config(conf);
 }
@@ -456,11 +456,11 @@ void StorageManager::lateInit(void)
 	 */
 	m_pulseTime = m_nextIndexTime = 1;
 
-        /* start the monitor thread so that it will be available from 
-         * backgroundIo thread
-         */
-        m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
-        m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass );
+	/* start the monitor thread so that it will be available from 
+	 * backgroundIo thread
+	 */
+	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
+	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass );
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -713,8 +713,8 @@ void StorageManager::startContainer(uint32_t run)
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run);
 
-        if (run)
-           m_combus->sendOriginal(run, std::string("SMS run started"), now);
+	if (run)
+		m_combus->sendOriginal(run, std::string("SMS run started"), now);
 
 	m_contChange(m_cur_container, true);
 
@@ -787,7 +787,7 @@ void StorageManager::startRecording(uint32_t run)
 void StorageManager::stopRecording(void)
 {
 	m_combus->sendUpdate(m_cur_container->runNumber(),
-                                std::string("SMS run stopped"));
+		std::string("SMS run stopped"));
 	endCurrentContainer();
 	startContainer();
 }
@@ -974,26 +974,26 @@ void StorageManager::scanDaily(const std::string &dir)
 		if (c) {
 			m_scannedBlocks += c->blocks();
 
-                        if (c->runNumber()) {
-                           if (c->isTranslated()) {
-                               /* send sts succeeded message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("STS send succeeded"),
-                                                       c->startTime());
-                           } else if (c->isManual()) {
-                               /* send sts failed message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("Needs Manual Translation"),
-                                                       c->startTime());
-                           } else {
-                                /* note pending for later translation */
-                               m_pendingRuns.push_back(c);
-                               /* send run stopped message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("STS send pending"),
-                                                       c->startTime());
-                           }
-                        }
+			if (c->runNumber()) {
+				if (c->isTranslated()) {
+					/* send sts succeeded message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("STS send succeeded"),
+							c->startTime());
+				} else if (c->isManual()) {
+					/* send sts failed message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("Needs Manual Translation"),
+							c->startTime());
+				} else {
+					/* note pending for later translation */
+					m_pendingRuns.push_back(c);
+					/* send run stopped message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("STS send pending"),
+							c->startTime());
+				}
+			}
 
 		}
 	}
@@ -1217,14 +1217,16 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 * it is the last one in the last daily directory -- ie,
 		 * if it could be the current container.
 		 */
-                uint32_t run;
-                if (1 == sscanf((*cit).root_name().c_str(),
-                                  "%*8c-%*6c.%d", &run)) {
-                    m_combus->sendUpdate(run, std::string("SMS run purged"));
-                } else {
-                    WARN("sscanf of [" << (*cit).root_name()
-						<< "] in " << dir << " failed");
-                }
+		uint32_t run;
+		if (1 == sscanf((*cit).root_name().c_str(),
+				"%*8c-%*6c.%d", &run)) {
+			m_combus->sendUpdate(run, std::string("SMS run purged"));
+		} else {
+			WARN("Failed to Parse Run Number of"
+						<< " [" << (*cit).root_name() << "]"
+						<< " from [" << cpath.string() << "]"
+						<< " in [" << dir << "]");
+		}
 
 		++cit;
 		purged += StorageContainer::purge(cpath.string(),
@@ -1390,11 +1392,12 @@ bool StorageManager::cleanupIndexes(void)
 }
 
 void StorageManager::sendComBus(uint32_t a_run_num,
-                     std::string a_run_state,
-                     const struct timespec &a_start_time) 
+		std::string a_run_state,
+		const struct timespec &a_start_time) 
 {
-   if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
-      m_combus->sendUpdate(a_run_num, a_run_state);
-   else
-      m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
+	if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
+		m_combus->sendUpdate(a_run_num, a_run_state);
+	else
+		m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
 }
+
