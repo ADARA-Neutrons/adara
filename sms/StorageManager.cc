@@ -1222,7 +1222,8 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
                                   "%*8c-%*6c.%d", &run)) {
                     m_combus->sendUpdate(run, std::string("SMS run purged"));
                 } else {
-                    WARN("sscanf of " << (*cit).root_name() << " failed");
+                    WARN("sscanf of [" << (*cit).root_name()
+						<< "] in " << dir << " failed");
                 }
 
 		++cit;
