@@ -1189,7 +1189,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
 	 * reasonably small, so go for the simple code for now. We
-	 * can revist if CPU usage is too high.
+	 * can revisit if CPU usage is too high.
 	 */
 	std::list<fs::path> containers;
 	fs::directory_iterator end, it(dir);
@@ -1212,22 +1212,41 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	for (cit = containers.begin(); purged < goal && cit != cend; ) {
 		fs::path &cpath = *cit;
 
+		uint32_t date=-1, secs=-1, nanosecs=-1;
+		uint32_t run;
+		int numParsed = -1;
+		if ( (numParsed = sscanf((*cit).filename().c_str(),
+				"%8u-%6u.%9u-run-%u",
+				&date, &secs, &nanosecs, &run)) == 4 ) {
+			INFO("purgeDaily(): Parsed Run Number of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " as " << run
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+			m_combus->sendUpdate(run, std::string("SMS run purged"));
+		}
+		else if ( numParsed < 3 ) {
+			ERROR("purgeDaily():"
+				<< " Failed to Parse Run Number (or Date/Time) of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+		}
+		else {
+			INFO("purgeDaily(): Parsed In-Between-Run Date/Time of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+		}
+
 		/* We do the iterator increment in the loop, as we don't
 		 * want the container purge to delete the container when
 		 * it is the last one in the last daily directory -- ie,
 		 * if it could be the current container.
 		 */
-		uint32_t run;
-		if (1 == sscanf((*cit).root_name().c_str(),
-				"%*8c-%*6c.%d", &run)) {
-			m_combus->sendUpdate(run, std::string("SMS run purged"));
-		} else {
-			WARN("Failed to Parse Run Number of"
-						<< " [" << (*cit).root_name() << "]"
-						<< " from [" << cpath.string() << "]"
-						<< " in [" << dir << "]");
-		}
-
 		++cit;
 		purged += StorageContainer::purge(cpath.string(),
 							goal - purged,
