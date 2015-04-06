@@ -408,8 +408,11 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	uint32_t run;
 
 	/* If we're not a valid container, then there's nothing to purge. */
-	if (!validatePath(path, cpath, ts, run))
+	if (!validatePath(path, cpath, ts, run)) {
+		ERROR("Tried to purge invalid storage container at '"
+			<< path << "'");
 		return 0;
+	}
 
 	fs::directory_iterator end, it(path);
 	std::list<fs::path> files;
