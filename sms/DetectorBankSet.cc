@@ -31,11 +31,11 @@ public:
 		{
 			std::string name = value();
 
-			WARN("DetBankSetNamePV:"
-				<< " CHANGING Detector Bank Set Name in Config! "
+			INFO("DetBankSetNamePV:"
+				<< " Changing Detector Bank Set Name in Config - "
 				<< m_pv_name << " Re-Named from " << m_info->getName()
-				<< " to " << name << "! (Never Use This. :-)");
-
+				<< " to " << name);
+ 
 			m_info->setName(name);
 
 			// Reset Timestamp on Prologue Packet...
@@ -287,12 +287,19 @@ public:
 		{
 			std::string suffix = value();
 
-			WARN("DetBankSetSuffixPV: Changing Detector Bank Set"
+			INFO("DetBankSetSuffixPV: Changing Detector Bank Set "
 				<< m_info->getName() << " Throttle NXentry Suffix for "
 				<< m_pv_name << " from " << m_info->getSuffix()
 				<< " to " << suffix);
 
 			m_info->setSuffix(suffix);
+
+			// The Suffix String got Sanitized or Truncated, Update PV...!
+			if ( suffix.compare( m_info->getSuffix() ) ) {
+				struct timespec ts;
+				clock_gettime(CLOCK_REALTIME, &ts);
+				update(m_info->getSuffix(), &ts);
+			}
 
 			// Reset Timestamp on Prologue Packet...
 			m_config->resetPacketTime();
@@ -403,14 +410,9 @@ public:
 	{
 		// Just generate a warning if the name is too long...
 		//    - only for human consumption anyway...
-		size_t name_sz =
-			ADARA::DetectorBankSetsPkt::SET_NAME_SIZE;
-		if ( name.length() > name_sz ) {
-			WARN("setName(): Detector Bank Set Name Too Long"
-				<< " length(" << name << ")=" << name.length()
-				<< " > " << ( name_sz ) << ", will be truncated to: "
-				<< name.substr( 0, name_sz ) );
-		}
+		m_config->truncateString(
+			name, ADARA::DetectorBankSetsPkt::SET_NAME_SIZE,
+			"setName()", "Detector Bank Set Name", false );
 		m_name = name;
 		m_changed = true;
 	}
@@ -433,15 +435,20 @@ public:
 
 	void setSuffix(std::string suffix)
 	{
-		size_t suffix_sz =
-			ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE;
-		if ( suffix.length() > suffix_sz ) {
-			ERROR("setSuffix(): Throttle NXentry Suffix Too Long!"
-				<< " length(" << suffix << ")=" << suffix.length()
-				<< " > " << ( suffix_sz ) << ", truncated to: "
-				<< suffix.substr( 0, suffix_sz ) );
+		// Sanitize Suffix String for NeXus File NXentry Usage...
+		if ( m_config->sanitizeSuffix( suffix ) ) {
+			ERROR("setSuffix(): Sanitized"
+				<< " Throttle NXentry Suffix for Detector Bank Set "
+				<< m_suffix << " to " << suffix);
 		}
-		m_suffix = suffix.substr( 0, suffix_sz );
+
+		// Truncate Suffix String to Max Size for Network Packet...
+		m_config->truncateString(
+			suffix, ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE,
+			"setSuffix()", "Throttle NXentry Suffix", true );
+
+		m_suffix = suffix;
+
 		m_changed = true;
 	}
 
@@ -647,6 +654,11 @@ DetectorBankSet::DetectorBankSet(
 			detBankSetName = it->first.substr(b, e - b + 1);
 		}
 
+		// Warn of Impending String Truncation...
+		truncateString(
+			detBankSetName, ADARA::DetectorBankSetsPkt::SET_NAME_SIZE,
+			"DetectorBankSet()", "Detector Bank Set Name", false );
+
 		format = it->second.get<std::string>("format", "event");
 
 		// Set Format Flags...
@@ -679,6 +691,19 @@ DetectorBankSet::DetectorBankSet(
 		throttle = it->second.get<double>("throttle", 0.0);
 
 		suffix = it->second.get<std::string>("suffix", "throttled");
+
+		// Sanitize Suffix String for NeXus File NXentry Usage...
+		if ( sanitizeSuffix( suffix ) ) {
+			WARN("DetectorBankSet: Sanitized"
+				<< " Throttle NXentry Suffix for Detector Bank Set "
+				<< detBankSetName
+				<< " to " << suffix);
+		}
+
+		// Truncate Suffix String to Max Size for Network Packet...
+		truncateString(
+			suffix, ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE,
+			"DetectorBankSet()", "Throttle NXentry Suffix", true );
 
 		DEBUG("Detector Bank Set " << detBankSetName << " Config:"
 			<< " index=" << index
@@ -804,6 +829,60 @@ std::string DetectorBankSet::getBanklistStr( std::vector<uint32_t> banks )
 	ss << "]";
 
 	return ss.str();
+}
+
+bool DetectorBankSet::truncateString( std::string & str, size_t sz,
+		std::string caller, std::string desc, bool is_error )
+{
+	bool changed = false;
+
+	if ( str.length() > sz ) {
+		std::stringstream ss;
+		ss << caller << ": " << desc << " Too Long!"
+			<< " length(" << str << ")=" << str.length()
+			<< " > " << ( sz ) << ", ";
+		// Error! Actually Change the String...!
+		if ( is_error ) {
+			ss << "truncated to: " << str.substr( 0, sz );
+			ERROR( ss.str() );
+			str = str.substr( 0, sz );
+			changed = true;
+		}
+		// Just a Warning, Leave String "As Is"...
+		else {
+			ss << "will be truncated to: " << str.substr( 0, sz );
+			WARN( ss.str() );
+		}
+	}
+
+	return( changed );
+}
+
+bool DetectorBankSet::sanitizeSuffix( std::string & suffix )
+{
+	std::string bad = " \t";
+
+	size_t next, last;
+
+	bool changed = false;
+
+	last = 0;
+
+	while ( (next = suffix.find_first_of( bad, last ))
+			!= std::string::npos )
+	{
+		if ( next != last + 1 || last == 0 )
+			suffix.replace( next, 1, "-" );   // replace space with '-'...
+		else {
+			suffix.replace( next, 1, "" );   // just remove double-spaces...
+		}
+
+		changed = true;
+
+		last = next;
+	}
+
+	return( changed );
 }
 
 void DetectorBankSet::resetPacketTime(void)
