@@ -860,7 +860,7 @@ bool DetectorBankSet::truncateString( std::string & str, size_t sz,
 
 bool DetectorBankSet::sanitizeSuffix( std::string & suffix )
 {
-	std::string bad = " \t";
+	std::string bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
 
 	size_t next, last;
 
