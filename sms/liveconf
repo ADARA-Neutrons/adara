@@ -231,8 +231,8 @@ USAGE()
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [status] [run_status] [data_status] \\"
-	echo "            [sys_status] [live_status] [bmon_status] \\"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
+	echo "            [bmon_status] [detset_status] [live_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -255,13 +255,23 @@ USAGE()
 	echo "   data_status           = display SMS data source status"
 	echo "   sys_status            = display SMS internal system status"
 	echo "   bmon_status           = display SMS BeamMonitorConfig status"
+	echo "   detset_status         = display SMS DetectorBankSet status"
 	echo "   live_status           = display SMS live client status"
 	echo
 
 	echo "Available Options:"
-	echo
 
+	last_option_id_type=""
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+		if [[ $last_option_id_type != ${option_id_type[$i]} ]]; then
+			echo
+			echo -n "   [${option_id_type[$i]}"
+			if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
+				echo -n "<N>"
+			fi
+			echo "]"
+		fi
+		last_option_id_type="${option_id_type[$i]}"
 		echo -n "   --option=\"${option_id_type[$i]}"
 		if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
 			echo -n "<N>"
@@ -396,12 +406,21 @@ echo -e "Git Config Repository: [${CONFIG_REPO}].\n"
 
 echo -e "Git Config Repository Branch: [${config_branch}].\n"
 
+awkLineBreak=" \
+	{ \
+		printf(\"%s\n   \", \$1); \
+		for (i=2; i<NF; i++) \
+			printf(\"%s \", \$(i)); \
+		printf(\"%s\n\", \$NF); \
+	}"
+
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
 		|| "$command" == "data_status" \
 		|| "$command" == "sys_status" \
 		|| "$command" == "bmon_status" \
+		|| "$command" == "detset_status" \
 		|| "$command" == "live_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
@@ -416,7 +435,7 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
-		caget -S $WAIT ${PRE}:SMS:Version
+		caget -S $WAIT ${PRE}:SMS:Version | sed "s/ (/\n   (/"
 
 		echo
 
@@ -530,6 +549,32 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
+			|| "$command" == "detset_status" ]]; then
+
+		ndbsvar="${PRE}:SMS:Control:NumDetBankSets"
+		caget $WAIT $ndbsvar
+		if [ $? == 0 ]; then
+			echo
+			numDetBankSets=`caget $WAIT $ndbsvar | grep $ndbsvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( dbs=1 ; dbs <= numDetBankSets ; dbs++ )); do
+				echo "Detector Bank Set index=${dbs}:"
+				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Name
+				bl="${PRE}:SMS:DetectorBankSet:${dbs}:Banklist"
+				caget $WAIT -S $bl | grep $bl | awk "$awkLineBreak"
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Format
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofOffset
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:MaxTof
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofBin
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Throttle
+				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Suffix
+				echo
+			done
+		fi
+	fi
+
+	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
 
 		nlcvar="${PRE}:SMS:Control:NumLiveClients"
@@ -543,8 +588,7 @@ if [[ "$command" == "status" \
 				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
 				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
 				cfp="${PRE}:SMS:LiveClient:${lc}:CurrentFilePath"
-				caget $WAIT -S $cfp | grep $cfp \
-					| awk '{ printf("%s\n   ", $1); for (i=2; i<NF; i++) printf("%s ", $(i)); printf("%s\n", $NF); }'
+				caget $WAIT -S $cfp | grep $cfp | awk "$awkLineBreak"
 				caget $WAIT -a ${PRE}:SMS:LiveClient:${lc}:Status
 				echo
 			done
