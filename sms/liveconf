@@ -364,7 +364,7 @@ fi
 skiplive=0
 testonly=0
 PRE="[NotSet]"
-for arg in $* ; do
+for arg in "$@" ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
 	value=`echo "$arg" | awk -F = '{print $2}'`
@@ -382,7 +382,7 @@ for arg in $* ; do
 	elif [ "#$key#" == '#--option#' ]; then
 		command="option"
 		opt_arg="$value"
-		echo -e "Setting Command to: $command $opt_arg\n"
+		echo -e "Setting Command to:\n   $command $opt_arg\n"
 	elif [ "#$key#" == '#--skiplive#' ]; then
 		skiplive=1
 		echo -e "*** Skipping Live Config - Update Config File Only!\n"
@@ -394,7 +394,7 @@ for arg in $* ; do
 		exit -1
 	else
 		command="$key"
-		echo -e "Setting Command to: $command\n"
+		echo -e "Setting Command to:\n   $command\n"
 	fi
 done
 
@@ -1025,7 +1025,11 @@ GET_CONFIG_SETTING()
 
 				config_value=`echo "${_line_rest}" \
 					| awk -F '=' '{print $2}'`
-				config_value=`echo "$config_value" | sed "s/ //g"`
+
+				# Strip Only _Preceding_ White Space from Value...!
+				# (some options could be Character Strings now...! ;-D)
+				config_value=`echo "$config_value" | sed "s/^[ ]*//"`
+
 				# echo -n "Config File Option "
 				# echo "${_optId}:${_opt_label} = ${config_value}."
 
