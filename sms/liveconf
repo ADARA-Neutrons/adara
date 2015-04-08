@@ -856,6 +856,7 @@ GET_OPTION_INFO()
 				/bin/cat $LOG
 				exit -3
 			fi
+			echo
 			# Continue, But Skip Live Option Setting...
 			do_live=0
 		else
@@ -886,7 +887,8 @@ GET_OPTION_INFO()
 #    $config_end_of_section $config_use_comment
 #
 
-opt_id_name="(Option Id Name Not Set.)"
+opt_id_name=""
+id_name_indent=""
 
 GET_CONFIG_SETTING()
 {
@@ -923,7 +925,8 @@ GET_CONFIG_SETTING()
 
 	local _bankset_cnt=0
 
-	opt_id_name="(Option Id Name Not Set.)"
+	opt_id_name=""
+	id_name_indent=""
 
 	local _id_type=""
 	local _id_num=0
@@ -1033,6 +1036,7 @@ GET_CONFIG_SETTING()
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
 					opt_id_name="(${_source_name})"
+					id_name_indent="   "
 				fi
 				# echo "Source #${_source_cnt}: ${_source_name} Section."
 			elif [ "${_id_type}" == "monitor" ]; then
@@ -1043,6 +1047,7 @@ GET_CONFIG_SETTING()
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
 					opt_id_name="(Monitor${_monitor_id})"
+					id_name_indent="   "
 				fi
 				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect."
 				# Special Case: Monitor Id Stored in Section Id...!
@@ -1067,6 +1072,7 @@ GET_CONFIG_SETTING()
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
 					opt_id_name="(BankSet ${_bankset_id})"
+					id_name_indent="   "
 				fi
 				# echo "BankSet #${_bankset_cnt}: Id ${_bankset_id} Sect."
 				# Special Case: BankSet Id Stored in Section Id...!
@@ -1129,8 +1135,10 @@ GET_CONFIG_SETTING()
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
 			echo "   ${opt_str}"
-			echo "      ${opt_id_name}"
-			echo "         to ${_opt_config_str}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${_opt_config_str}"
 			do_config=0
 			do_git_config=0
 		fi
@@ -1139,8 +1147,10 @@ GET_CONFIG_SETTING()
 		echo "\"${_option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
-		echo "         to ${_opt_config_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${_opt_config_str}"
 		do_config=0
 		do_git_config=0
 	fi
@@ -1148,7 +1158,9 @@ GET_CONFIG_SETTING()
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
 		echo "   ${_option} = ${config_value}."
 	fi
 }
@@ -1175,15 +1187,19 @@ GET_CONFIG_SETTING()
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
 		echo "   ${optId}:${opt_label}"
-		echo "      ${opt_id_name}"
-		echo "         = ${opt_value}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Live Option:"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
-		echo -n "         to ${opt_value} (yes/No)? "
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_value} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -1193,11 +1209,14 @@ GET_CONFIG_SETTING()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		echo "Setting Live SMS Daemon Option:"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
-		echo "         to ${opt_value}."
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_value}."
 		if [ $testonly == 1 ]; then
 			echo "[TESTONLY] caput $opt_pv_opt ${PRE}:${PV} $opt_value"
 		else
@@ -1206,8 +1225,10 @@ GET_CONFIG_SETTING()
 		if [ $? != 0 ]; then
 			echo "Error Setting Live SMS Daemon Option:"
 			echo "   ${optId}:${opt_label}"
-			echo "      ${opt_id_name}"
-			echo "         to ${opt_value}...!"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${opt_value}...!"
 			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -1263,7 +1284,9 @@ UPDATE_CONFIG_FILE()
 			local _new_opt=""
 			_new_opt="|; Option Auto-Added by LiveConf!\n"
 			_new_opt="${_new_opt}|; ${optId}:${opt_label}\n"
-			_new_opt="${_new_opt}|;    ${opt_id_name}\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				_new_opt="${_new_opt}|;    ${opt_id_name}\n"
+			fi
 			_new_opt="${_new_opt}|;\n"
 			_new_opt="${_new_opt}|; $option = $opt_config_value\n"
 			_new_opt="${_new_opt}|$option = $opt_config_value\n"
@@ -1322,15 +1345,19 @@ UPDATE_CONFIG_FILE()
 	elif [ "$opt_config_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
 		echo "   ${optId}:${opt_label}"
-		echo "      ${opt_id_name}"
-		echo "         = ${opt_config_value}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_config_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Config File Option:"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
-		echo -n "         to ${opt_config_str} (yes/No)? "
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_config_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -1340,12 +1367,14 @@ UPDATE_CONFIG_FILE()
 			/bin/cat $LOG
 			exit -3
 		fi
-
 		echo
+
 		echo "Setting SMS Daemon Config File Option:"
 		echo "   ${opt_str}"
-		echo "      ${opt_id_name}"
-		echo "         to ${opt_config_str}."
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_config_str}."
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
@@ -1357,8 +1386,11 @@ UPDATE_CONFIG_FILE()
 		# (with _Original_ option name/value, before we muck with them...!)
 		commit_str="Set SMS Live/Config Option:\n"
 		commit_str="$commit_str   ${opt_str}\n"
-		commit_str="$commit_str      ${opt_id_name}\n"
-		commit_str="$commit_str         to ${opt_config_str}\n"
+		if [[ ${opt_id_name} != "" ]]; then
+			commit_str="$commit_str      ${opt_id_name}\n"
+		fi
+		commit_str="$commit_str      ${id_name_indent}to"
+		commit_str="$commit_str ${opt_config_str}\n"
 		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
 
 		# Handle Any Higher Precedence Config File Options...!
@@ -1391,8 +1423,11 @@ UPDATE_CONFIG_FILE()
 			temp="Also Disabled Superceding Config File Option"
 			commit_str="${commit_str}${temp}:\n"
 			commit_str="$commit_str   ${opt_str}\n"
-			commit_str="$commit_str      ${opt_id_name}\n"
-			commit_str="$commit_str         set to ${opt_config_str}\n\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_config_str}\n\n"
 
 			# Switch to New Temp Config...
 
@@ -1528,6 +1563,7 @@ OPEN_CONFIG_REPO()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		# Update the SMS Daemon Config File in the Git Config Repo...
 		if [ $testonly == 1 ]; then
@@ -1561,6 +1597,7 @@ OPEN_CONFIG_REPO()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		# Finally Append Required User Log Description...
 		commit_str="$commit_str$log_desc\n"
@@ -1671,8 +1708,11 @@ OPEN_CONFIG_REPO()
 		if [ -z $commit_str ]; then
 			commit_str="Set SMS Live/Config Option:\n"
 			commit_str="$commit_str   Live PV ${opt_str}\n"
-			commit_str="$commit_str      ${opt_id_name}\n"
-			commit_str="$commit_str         set to ${opt_value})\n\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_value})\n\n"
 		fi
 
 		# Finally Append Required User Log Description...
