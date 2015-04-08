@@ -35,6 +35,9 @@ idName["ctrl"]="Control"
 is_indexed["monitor"]=1
 idName["monitor"]="BeamMonitor"
 
+is_indexed["bankset"]=1
+idName["bankset"]="DetectorBankSet"
+
 is_indexed["storage"]=0
 idName["storage"]="Storage"
 
@@ -130,14 +133,14 @@ option_id_type[$num_options]="monitor"
 option_name[$num_options]="offset"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofOffset"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
-option_label[$num_options]="[TOF Offset for Histogramming Beam Monitor]"
+option_label[$num_options]="[TOF Offset for Beam Monitor Histogram]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="max"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:MaxTof"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
-option_label[$num_options]="[Max TOF Beam Monitor Histogram]"
+option_label[$num_options]="[Max TOF for Beam Monitor Histogram]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
@@ -152,6 +155,65 @@ option_name[$num_options]="distance"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Distance"
 option_value_type[$num_options]="FLOAT64_VALUE(meters)"
 option_label[$num_options]="[Beam Monitor Distance from Sample]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="name"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Name"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(human-readable description)"
+option_label[$num_options]="[Name of Given Detector Bank Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="banklist"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Banklist"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="[UINT32_VALUE, ...](detector bank ids)"
+option_label[$num_options]="[List of Detector Bank Ids in the Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="format"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Format"
+option_value_type[$num_options]="ENUM_VALUE(event/histo/both)"
+option_label[$num_options]="[Set Detector Bank Set Output Formatting]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="offset"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofOffset"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[TOF Offset for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="max"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:MaxTof"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Max TOF for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="bin"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofBin"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Linear TOF Bin Size for Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="throttle"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Throttle"
+option_value_type[$num_options]="FLOAT64_VALUE(Hz)"
+option_label[$num_options]="[Detector Set Throttled Event Sampling Rate]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="suffix"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Suffix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
+option_label[$num_options]="[NeXus File NXentry Suffix for Detector Set]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
@@ -857,6 +919,8 @@ GET_CONFIG_SETTING()
 
 	local _monitor_cnt=0
 
+	local _bankset_cnt=0
+
 	opt_id_name=""
 
 	local _id_type=""
@@ -989,6 +1053,30 @@ GET_CONFIG_SETTING()
 					config_line_num="${_line_num}"
 					# echo "Config File Line Number = ${config_line_num}."
 					config_value="${_monitor_id}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "bankset" ]; then
+				local _bankset_id=`echo "${_line_id}" \
+					| sed "s/^bankset //"`
+				_bankset_cnt=$(( _bankset_cnt + 1 ))
+				_id_num="$_bankset_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name=" (BankSet ${_bankset_id})"
+				fi
+				# echo "BankSet #${_bankset_cnt}: Id ${_bankset_id} Sect."
+				# Special Case: BankSet Id Stored in Section Id...!
+				if [[ "${_option}" == "id"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: BankSet Id in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_bankset_id}"
 					# echo -n "Config File Option "
 					# echo "${_optId}:${_opt_label} = ${config_value}."
 					_found=$(( _found + 1 ))
