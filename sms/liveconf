@@ -1092,16 +1092,16 @@ GET_CONFIG_SETTING()
 					_found=$(( _found + 1 ))
 				fi
 			elif [ "${_id_type}" == "bankset" ]; then
-				local _bankset_id=`echo "${_line_id}" \
+				local _bankset_name=`echo "${_line_id}" \
 					| sed "s/^bankset //"`
 				_bankset_cnt=$(( _bankset_cnt + 1 ))
 				_id_num="$_bankset_cnt"
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name="(BankSet ${_bankset_id})"
+					opt_id_name="(BankSet ${_bankset_name})"
 					id_name_indent="   "
 				fi
-				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_id} Sect"
+				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_name}"
 				# Special Case: BankSet Name Stored in Section Id...!
 				if [[ "${_option}" == "name"
 						&& "${_id_num}" == "$opt_id_num" ]]; then
@@ -1111,7 +1111,7 @@ GET_CONFIG_SETTING()
 					# echo "Config File Line = ${config_current_line}."
 					config_line_num="${_line_num}"
 					# echo "Config File Line Number = ${config_line_num}."
-					config_value="${_bankset_id}"
+					config_value="${_bankset_name}"
 					# echo -n "Config File Option "
 					# echo "${_optId}:${_opt_label} = ${config_value}."
 					_found=$(( _found + 1 ))
@@ -1267,6 +1267,28 @@ GET_CONFIG_SETTING()
 	fi
 
 #
+# Sanitize Original Config File Value String (for Sed)
+#
+
+SANITIZE_ORIGINAL_CONFIG_VALUE()
+{
+	local _orig_config_value="$1"
+
+	echo "${_orig_config_value}" | sed -e 's/[]\/$*.^|[]/\\&/g'
+}
+
+#
+# Sanitize New Config File Value String (for Sed)
+#
+
+SANITIZE_NEW_CONFIG_VALUE()
+{
+	local _new_config_value="$1"
+
+	echo "${_new_config_value}" | sed -e 's/[\/&]/\\&/g'
+}
+
+#
 # Update Current SMS Daemon Config File Setting
 #
 # Uses:
@@ -1294,8 +1316,11 @@ UPDATE_CONFIG_FILE()
 			echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
 			_no_change=1
 		else
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
 			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${last_comment_line_num}a"|$option = $opt_config_value" \
+			sed ${last_comment_line_num}a"|$option = ${_config_value}" \
 				${_src_config} | tr '|' '\t' > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
@@ -1307,6 +1332,10 @@ UPDATE_CONFIG_FILE()
 			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
 			_no_change=1
 		else
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+
 			# Construct New Comment and Option Setting...
 			local _new_opt=""
 			_new_opt="|; Option Auto-Added by LiveConf!\n"
@@ -1315,8 +1344,8 @@ UPDATE_CONFIG_FILE()
 				_new_opt="${_new_opt}|;    ${opt_id_name}\n"
 			fi
 			_new_opt="${_new_opt}|;\n"
-			_new_opt="${_new_opt}|; $option = $opt_config_value\n"
-			_new_opt="${_new_opt}|$option = $opt_config_value\n"
+			_new_opt="${_new_opt}|; $option = ${_config_value}\n"
+			_new_opt="${_new_opt}|$option = ${_config_value}\n"
 
 			# Goofy Incantation to get Sed to insert a Tab... ;-b
 			sed ${end_of_section_line_num}a"${_new_opt}" \
@@ -1336,11 +1365,29 @@ UPDATE_CONFIG_FILE()
 
 		else
 
-			local _new_config_line=`echo "$config_current_line" \
-				| sed "s/$config_value/$opt_config_value/"`
+			# Sanitize Any Special Characters in Original Config Value
+			local _old_config_value=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_value")
 
+			# Sanitize Any Special Characters in New Config Value
+			local _new_config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+
+			# Construct New Config File Line...
+			local _new_config_line=`echo "$config_current_line" \
+				| sed "s/${_old_config_value}/${_new_config_value}/"`
+
+			# Sanitize Any Special Characters in Original Config Line
+			local _old_config_line=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_current_line")
+
+			# Sanitize Any Special Characters in New Config Line
+			_new_config_line=$(SANITIZE_NEW_CONFIG_VALUE \
+				"${_new_config_line}")
+
+			# Replace the Original Config Line with New one...
 			sed \
-		"${config_line_num}s/^$config_current_line/${_new_config_line}/" \
+		"${config_line_num}s/^${_old_config_line}/${_new_config_line}/" \
 				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 
