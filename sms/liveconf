@@ -1319,9 +1319,10 @@ UPDATE_CONFIG_FILE()
 			# Sanitize Any Special Characters in New Config Value
 			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
 				"$opt_config_value")
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${last_comment_line_num}a"|$option = ${_config_value}" \
-				${_src_config} | tr '|' '\t' > ${_dst_config}
+			# Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D
+			sed ${last_comment_line_num}a"\	$option = ${_config_value}" \
+				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
 
@@ -1337,19 +1338,20 @@ UPDATE_CONFIG_FILE()
 				"$opt_config_value")
 
 			# Construct New Comment and Option Setting...
+			# (Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D)
 			local _new_opt=""
-			_new_opt="|; Option Auto-Added by LiveConf!\n"
-			_new_opt="${_new_opt}|; ${optId}:${opt_label}\n"
+			_new_opt="\	; Option Auto-Added by LiveConf!\n"
+			_new_opt="${_new_opt}	; ${optId}:${opt_label}\n"
 			if [[ ${opt_id_name} != "" ]]; then
-				_new_opt="${_new_opt}|;    ${opt_id_name}\n"
+				_new_opt="${_new_opt}	;    ${opt_id_name}\n"
 			fi
-			_new_opt="${_new_opt}|;\n"
-			_new_opt="${_new_opt}|; $option = ${_config_value}\n"
-			_new_opt="${_new_opt}|$option = ${_config_value}\n"
+			_new_opt="${_new_opt}	;\n"
+			_new_opt="${_new_opt}	; $option = ${_config_value}\n"
+			_new_opt="${_new_opt}	$option = ${_config_value}\n"
 
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
 			sed ${end_of_section_line_num}a"${_new_opt}" \
-				${_src_config} | tr '|' '\t' > ${_dst_config}
+				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
 
