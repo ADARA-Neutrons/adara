@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <vector>
+#include <string>
 #include <syslog.h>
 #include "ADARAUtils.h"
 
@@ -29,6 +30,20 @@ struct PulseInfo
     std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
     std::vector<double>     charges;            ///< Pulse charge buffer
     std::vector<uint32_t>   flags;              ///< Pulse flags (defined in BankedEventPkt class)
+};
+
+
+/// Detector Bank Set information (used in BankInfo)
+struct DetectorBankSet
+{
+    std::string             name;
+    std::vector<uint32_t>   banklist;
+    uint32_t                flags;
+    uint32_t                tofOffset;
+    uint32_t                tofMax;
+    uint32_t                tofBin;
+    double                  throttle;
+    std::string             suffix;
 };
 
 
@@ -66,6 +81,8 @@ public:
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
     std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
+
+    std::vector<DetectorBankSet *>  m_bank_sets;    ///< Any Detector Bank Set info for this detector bank
 };
 
 
@@ -78,6 +95,7 @@ struct BeamMonitorConfig
     uint32_t                tofBin;
     double                  distance;
 };
+
 
 /// Base class for monitor info
 class MonitorInfo
@@ -182,6 +200,7 @@ struct UserInfo
     std::string             role;
 };
 
+
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
@@ -219,6 +238,7 @@ struct RunMetrics
     Statistics              charge_stats;       ///< Pulse charge statistics
     Statistics              freq_stats;         ///< Pulse frequency statistics
 };
+
 
 // ============================================================================
 // Process Variable Classes and Types
@@ -391,10 +411,10 @@ public:
                                 const std::string &a_comment ) = 0;
 };
 
+
 // ============================================================================
 // Error Codes for TraceExceptions
 // ============================================================================
-
 
 enum ErrorCodes
 {
