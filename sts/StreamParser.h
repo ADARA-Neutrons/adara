@@ -107,6 +107,10 @@ private:
     STS::BeamMonitorConfig *
                 getBeamMonitorConfig( Identifier a_monitor_id,
                     bool & known_monitor );
+    std::vector<STS::DetectorBankSet *>
+                getDetectorBankSets( Identifier a_bank_id );
+    void        associateDetectorBankSet(
+                    STS::DetectorBankSet *a_bank_set );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
                     T a_value, const timespec &a_timestamp );
@@ -126,6 +130,7 @@ private:
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
+    std::vector<STS::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information

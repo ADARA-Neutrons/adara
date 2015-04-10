@@ -71,19 +71,31 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open())
         m_ofs_adara.close();
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi ) {
         if ( *ibi )
             delete *ibi;
+    }
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+            m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs ) {
+        if ( *dbs )
+            delete *dbs;
+    }
+
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+            imi != m_monitors.end(); ++imi ) {
         if ( imi->second )
             delete imi->second;
+    }
 
     m_monitor_config.clear();
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
+            ipv != m_pvs_by_key.end(); ++ipv ) {
         if ( ipv->second )
             delete ipv->second;
+    }
 }
 
 
@@ -387,9 +399,11 @@ StreamParser::rxPacket
 /*! \brief This method processes Pixel Mapping ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA PixelMapping packets. Detector source and bank information is extracted from the received
- * packet and BankInfo instances are created (using the makeBankInfo() virtual factory method) to capture essential bank
- * parameters need for subsequent bnked event processing. The receipt of a Pixel Mapping packets also triggers
+ * This method processes ADARA PixelMapping packets. Detector source and
+ * bank information is extracted from the received packet and BankInfo
+ * instances are created (using the makeBankInfo() virtual factory method)
+ * to capture essential bank parameters need for subsequent banked event
+ * processing. The receipt of a Pixel Mapping packets also triggers
  * progression to the internal event processing state.
  */
 bool
@@ -399,17 +413,23 @@ StreamParser::rxPacket
 )
 {
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
+        + a_pkt.payload_length());
+
     uint16_t        bank_id;
     uint16_t        pix_count;
 
-    // Note: a vector is used for BankInfo instances where the bank_id is the offset into the vector. This is safe
-    // as bank IDs are monotonically increasing integers starting at 0. IF this ever changes, then the bank
-    // container will need to be changed to a map (which would result in a slight performance drop). Also note that
-    // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
-    // over the container.
+    // Note: a vector is used for BankInfo instances where the bank_id
+    // is the offset into the vector. This is safe as bank IDs are
+    // monotonically increasing integers starting at 0. IF this ever
+    // changes, then the bank container will need to be changed to a map
+    // (which would result in a slight performance drop). Also note that
+    // the current code accommodates gaps in the banks by zeroing and
+    // subsequently checking entries when iterating over the container.
 
-    // Count number of banks (largest bank id) in payload and reserve bank container storage
+    // Count number of banks (largest bank id) in payload and
+    // reserve bank container storage
+
     uint16_t bank_count = 0;
     const uint32_t *rpos2 = rpos;
 
@@ -424,7 +444,7 @@ StreamParser::rxPacket
         rpos2 += pix_count;
     }
 
-    m_banks.resize(bank_count+1,0);
+    m_banks.resize( bank_count + 1, 0 );
 
     // Now build banks and populate bank container
     while( rpos < epos )
@@ -435,7 +455,16 @@ StreamParser::rxPacket
         rpos++;
 
         if ( !m_banks[bank_id] )
-            m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_write_thresh, m_anc_buf_write_thresh );
+        {
+            // Create BankInfo Instance
+            m_banks[bank_id] = makeBankInfo( bank_id, pix_count,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            m_banks[bank_id]->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+        }
 
         rpos += pix_count;
     }
@@ -775,16 +804,17 @@ StreamParser::handleBankPulseGap
 // ADARA Beam Monitor packet processing
 //---------------------------------------------------------------------------------------------------------------------
 
-/*! \brief This method processes Monitor Event ADARA packets
+/*! \brief This method processes Beam Monitor Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Monitor Event packets. The payload of the Monitor Event packet is parsed for neutron
- * events which are then handled by the processMonitorEvents() method.
+ * This method processes ADARA Beam Monitor Event packets. The payload
+ * of the Monitor Event packet is parsed for neutron events which are
+ * then handled by the processMonitorEvents() method.
  */
 bool
 StreamParser::rxPacket
 (
-    const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
+    const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BeamMonitorPkt object to process
 )
 {
     // Ignore duplicate pulses
@@ -1324,72 +1354,157 @@ StreamParser::rxPacket
         "[%i] Detector Bank Sets Packet Received: %u Detector Bank Sets",
         g_pid, a_pkt.detBankSetCount() );
 
+    std::vector<uint32_t> banklist;
+
     for (uint32_t i=0 ; i < a_pkt.detBankSetCount() ; i++) {
 
-        const uint32_t *banks = a_pkt.banks(i);
+        banklist.clear();
+
+        const uint32_t *rawBanklist = a_pkt.banklist(i);
         std::stringstream ss;
         bool first = true;
         ss << "[";
         for (uint32_t b=0 ; b < a_pkt.bankCount(i) ; b++) {
             if ( first ) first = false;
             else ss << ",";
-            ss << banks[b];
+            ss << rawBanklist[b];
+            banklist.push_back( rawBanklist[b] );
         }
         ss << "]";
 
+        STS::DetectorBankSet *set = new STS::DetectorBankSet;
+
+        set->name = a_pkt.name(i);
+        set->banklist = banklist;
+        set->flags = a_pkt.flags(i);
+        set->tofOffset = a_pkt.tofOffset(i);
+        set->tofMax = a_pkt.tofMax(i);
+        set->tofBin = a_pkt.tofBin(i);
+        set->throttle = a_pkt.throttle(i);
+        set->suffix = a_pkt.suffix(i);
+
         syslog( LOG_INFO,
   "[%i] %s %s (%u=%s): flags=%u histo=(%u to %u by %u) throttle=%lf (%s).",
-            g_pid, "Detector Bank Set", a_pkt.name(i).c_str(),
-            a_pkt.bankCount(i), ss.str().c_str(), a_pkt.flags(i),
-            a_pkt.tofOffset(i), a_pkt.tofMax(i), a_pkt.tofBin(i),
-            a_pkt.throttle(i), a_pkt.suffix(i).c_str() );
-
-        // STS::DetectorBankSet set;
-
-        // set.name = a_pkt.name(i);
-        // set.flags = a_pkt.flags(i);
-        // set.tofOffset = a_pkt.tofOffset(i);
-        // set.tofMax = a_pkt.tofMax(i);
-        // set.tofBin = a_pkt.tofBin(i);
-        // set.throttle = a_pkt.throttle(i);
-
-        // syslog( LOG_INFO,
-            // "[%i] Detector Bank Set %s: histo=(%u to %u by %u).",
-            // g_pid, set.id,
-            // set.tofOffset, set.tofMax, set.tofBin );
+            g_pid, "Detector Bank Set", set->name.c_str(),
+            a_pkt.bankCount(i), ss.str().c_str(), set->flags,
+            set->tofOffset, set->tofMax, set->tofBin,
+            set->throttle, set->suffix.c_str() );
 
         // Basic Sanity Check...
-        /*
-        if ( set.tofOffset >= set.tofMax )
+        if ( set->tofOffset >= set->tofMax )
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %s Config Error: Offset %u >= Max %u",
-                g_pid, "STS Error:", "Detector Bank Set", set.name.c_str(),
-                set.tofOffset, set.tofMax );
+                g_pid, "STS Error:", "Detector Bank Set",
+                set->name.c_str(), set->tofOffset, set->tofMax );
             syslog( LOG_ERR,
-                "[%i] %s Reverting to Detector Bank Set Event Mode!",
+                "[%i] %s Restricting Detector Bank Set to Event Mode!",
                 g_pid, "STS Error:" );
-            XXX m_monitor_config.clear();
-            break;
+            set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
         }
-        */
 
         // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
-        /*
-        if ( set.tofBin < 1 )
+        if ( set->tofBin < 1 )
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
-                g_pid, "STS Error:", "Detector Bank Set", set.name.c_str(),
-                set.tofBin );
-            set.tofBin = 1;
+                g_pid, "STS Error:", "Detector Bank Set",
+                set->name.c_str(), set->tofBin );
+            set->tofBin = 1;
         }
-        */
 
-        // m_monitor_config.push_back(config);
+        // Associate This Detector Bank Set with Any Existing BankInfo...
+        associateDetectorBankSet( set );
+
+        // Save for Posterity
+        m_bank_sets.push_back(set);
     }
 
     return false;
+}
+
+
+/*! \brief This method looks up any Bank Sets for a Neutron Detector
+ *  \return Vector of pointers to elements of the DetectorBankSets vector
+ *
+ * This method looks for a Detector Bank Set amongst
+ * any optionally received prologue information, to define proper
+ * Histogramming parameters for processing/accumulating Neutron Detector
+ * data.
+ */
+vector<STS::DetectorBankSet *>
+StreamParser::getDetectorBankSets
+(
+    uint32_t a_bank_id    ///< [in] Detector Bank Id (uint32_t)
+)
+{
+    vector<STS::DetectorBankSet *> bank_sets;
+
+    // Any Detector Bank Sets...? (If not, we're done.)
+    if (m_bank_sets.size() == 0)
+        return(bank_sets); // empty...
+
+    // Look for Detector Bank Sets with matching Detector Bank Ids...
+    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+                m_bank_sets.begin();
+            dbs != m_bank_sets.end() ; ++dbs )
+    {
+        if ( !*dbs )
+            continue;
+
+        for ( vector<uint32_t>::iterator b = (*dbs)->banklist.begin();
+                b != (*dbs)->banklist.end(); ++b )
+        {
+            if ((*b) == a_bank_id)
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Bank Id %d Found in \"%s\" Bank Set.",
+                    g_pid, "StreamParser::getDetectorBankSets()",
+                    a_bank_id, (*dbs)->name.c_str() );
+
+                bank_sets.push_back(*dbs);
+            }
+        }
+    }
+
+    return(bank_sets);
+}
+
+
+/*! \brief This method associates Detector Bank Set with Any Included Banks
+ *
+ * This method looks for BankInfo instances which match a Bank Id in the
+ * given Detector Bank Set, and append the Set to the vector for the Bank.
+ */
+void
+StreamParser::associateDetectorBankSet
+(
+    STS::DetectorBankSet *a_bank_set  ///< [in] Detector Bank Set (ptr)
+)
+{
+    // Look for Detector Banks that are Listed in This Set...
+    //    - append to given BankInfo Bank Sets vector
+
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi )
+    {
+        if ( !*ibi )
+            continue;
+
+        for ( vector<uint32_t>::iterator b = a_bank_set->banklist.begin();
+                b != a_bank_set->banklist.end(); ++b )
+        {
+            if ((*b) == (*ibi)->m_id)
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
+                    g_pid, "StreamParser::associateDetectorBankSet()",
+                    a_bank_set->name.c_str(), (*ibi)->m_id );
+
+                (*ibi)->m_bank_sets.push_back(a_bank_set);
+            }
+        }
+    }
 }
 
 
@@ -1976,6 +2091,10 @@ StreamParser::getPktName(
         return "Geom Info";
     case ADARA::PacketType::BEAMLINE_INFO_V0:
         return "Beam Info";
+    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
+        return "Beam Monitor Config";
+    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
+        return "Detector Bank Sets";
     case ADARA::PacketType::DATA_DONE_V0:
         return "Data Done";
     case ADARA::PacketType::DEVICE_DESC_V0:
