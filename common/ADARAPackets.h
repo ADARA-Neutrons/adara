@@ -473,7 +473,7 @@ public:
 			return( 0 );
 	}
 
-	const uint32_t *banks(uint32_t index) const
+	const uint32_t *banklist(uint32_t index) const
 	{
 		if ( index < detBankSetCount() ) {
 			return (const uint32_t *) &m_fields[ m_sectionOffsets[index]

@@ -57,21 +57,21 @@ public:
 		{
 			std::string rawBanklist = value();
 
-			std::vector<uint32_t> banks =
+			std::vector<uint32_t> banklist =
 				m_config->extractBankList( rawBanklist );
 
 			std::string oldBanklist =
-				m_config->getBanklistStr( m_info->getBanks() );
+				m_config->getBanklistStr( m_info->getBanklist() );
 
 			std::string newBanklist =
-				m_config->getBanklistStr( banks );
+				m_config->getBanklistStr( banklist );
 
 			INFO("DetBankSetBanklistPV: Changing Detector Bank Set "
 				<< m_info->getName() << " Banks List for "
 				<< m_pv_name << " from " << oldBanklist
 				<< " to " << newBanklist);
 
-			m_info->setBanks( banks );
+			m_info->setBanklist( banklist );
 
 			// Reset Timestamp on Prologue Packet...
 			m_config->resetPacketTime();
@@ -311,12 +311,12 @@ public:
 	};
 
 	DetectorBankSetInfo(DetectorBankSet *config,
-			uint32_t index, uint32_t sectionOffset,
-			std::string name, std::vector<uint32_t> banks, uint32_t flags,
+			uint32_t index, uint32_t sectionOffset, std::string name,
+			std::vector<uint32_t> banklist, uint32_t flags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
 			double throttle, std::string suffix) :
 		m_config(config), m_index(index), m_sectionOffset(sectionOffset),
-		m_name(name), m_banks(banks), m_flags(flags),
+		m_name(name), m_banklist(banklist), m_flags(flags),
 		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
 		m_throttle(throttle), m_suffix(suffix)
 	{
@@ -372,7 +372,7 @@ public:
 
 		m_pvName->update(m_name, &ts);
 
-		m_pvBanks->update(m_config->getBanklistStr(m_banks), &ts);
+		m_pvBanks->update(m_config->getBanklistStr( m_banklist ), &ts);
 
 		m_pvFormat->update(m_flags, &ts);
 
@@ -392,7 +392,7 @@ public:
 
 	std::string getName(void) const { return m_name; }
 
-	std::vector<uint32_t> getBanks(void) const { return m_banks; }
+	std::vector<uint32_t> getBanklist(void) const { return m_banklist; }
 
 	uint32_t getFlags(void) const { return m_flags; }
 
@@ -417,8 +417,8 @@ public:
 		m_changed = true;
 	}
 
-	void setBanks(std::vector<uint32_t> banks)
-		{ m_banks = banks; m_changed = true; }
+	void setBanklist(std::vector<uint32_t> banklist)
+		{ m_banklist = banklist; m_changed = true; }
 
 	void setFlags(uint32_t flags)
 		{ m_flags = flags; m_changed = true; }
@@ -479,10 +479,10 @@ public:
 
 		fields[m_sectionOffset + index++] = m_flags;
 
-		fields[m_sectionOffset + index++] = m_banks.size();
+		fields[m_sectionOffset + index++] = m_banklist.size();
 
-		for (std::vector<uint32_t>::iterator b=m_banks.begin();
-				b != m_banks.end(); ++b)
+		for (std::vector<uint32_t>::iterator b=m_banklist.begin();
+				b != m_banklist.end(); ++b)
 		{
 			fields[m_sectionOffset + index++] = *b;
 		}
@@ -521,7 +521,7 @@ private:
 
 	std::string m_name;
 
-	std::vector<uint32_t> m_banks;
+	std::vector<uint32_t> m_banklist;
 
 	uint32_t m_flags;
 
@@ -615,7 +615,7 @@ DetectorBankSet::DetectorBankSet(
 		// name, SET_NAME_SIZE characters...
 		+ ( ADARA::DetectorBankSetsPkt::SET_NAME_SIZE / sizeof(uint32_t) )
 		+ 2 // format flags & bank list count
-		+ 0 // # of banks in list, t.b.d. per set via m_banks.size()...
+		+ 0 // # of banks in list, t.b.d. per set via m_banklist.size()...
 		+ 3 // histogram parameters (offset, max, bin)
 		+ 2 // throttle rate (double)
 		// throttle suffix, THROTTLE_SUFFIX_SIZE characters...
@@ -670,12 +670,12 @@ DetectorBankSet::DetectorBankSet(
 		else // if ( !format.compare("event") )
 			flags |= 1;
 
-		std::string banklist =
+		std::string banklistStr =
 			it->second.get<std::string>("banklist", "none");
 
-		std::vector<uint32_t> banks = extractBankList(banklist);
+		std::vector<uint32_t> banklist = extractBankList(banklistStr);
 
-		std::string newBanklist = getBanklistStr( banks );
+		std::string newBanklist = getBanklistStr( banklist );
 
 		tofOffset = it->second.get<uint32_t>("offset", 0);
 		tofMax = it->second.get<uint32_t>("max", -1);
@@ -708,7 +708,7 @@ DetectorBankSet::DetectorBankSet(
 		DEBUG("Detector Bank Set " << detBankSetName << " Config:"
 			<< " index=" << index
 			<< " sectionOffset=" << sectionOffset
-			<< " banks=" << newBanklist
+			<< " banklist=" << newBanklist
 			<< " format=" << format
 			<< " flags=" << flags
 			<< " tofOffset=" << tofOffset
@@ -718,13 +718,13 @@ DetectorBankSet::DetectorBankSet(
 			<< " suffix=" << suffix);
 
 		DetectorBankSetInfo *detBankSetInfo = new DetectorBankSetInfo(this,
-			index++, sectionOffset, detBankSetName, banks, flags,
+			index++, sectionOffset, detBankSetName, banklist, flags,
 			tofOffset, tofMax, tofBin, throttle, suffix);
 
 		detBankSetInfos.push_back(detBankSetInfo);
 
 		// Increment Section Offset for Next Detector Bank Set...
-		sectionOffset += baseSectionCount + banks.size();
+		sectionOffset += baseSectionCount + banklist.size();
 	}
 
 	// Allocate Prologue Packet...
@@ -772,9 +772,9 @@ DetectorBankSet::~DetectorBankSet()
 
 // Inspired by Jilles De Wit on StackOverflow... ;-D
 std::vector<uint32_t> DetectorBankSet::extractBankList(
-		std::string banklist )
+		std::string banklistStr )
 {
-	std::vector<uint32_t> banks;
+	std::vector<uint32_t> banklist;
 
 	std::string sep = "[, ]";
 
@@ -784,20 +784,20 @@ std::vector<uint32_t> DetectorBankSet::extractBankList(
 
 	b = 0;
 
-	while ( b < banklist.length() )
+	while ( b < banklistStr.length() )
 	{
-		e = banklist.find_first_of( sep, b );
+		e = banklistStr.find_first_of( sep, b );
 
 		if ( e == std::string::npos )
-			e = banklist.length();
+			e = banklistStr.length();
 
 		// Discard Empty Tokens...
 		if ( b != e )
 		{
-			std::istringstream buffer( banklist.substr(b, e - b) );
+			std::istringstream buffer( banklistStr.substr(b, e - b) );
 			buffer >> bank;
 
-			banks.push_back(bank);
+			banklist.push_back(bank);
 
 			b = e + 1;
 		}
@@ -805,18 +805,19 @@ std::vector<uint32_t> DetectorBankSet::extractBankList(
 		else b++;
 	}
 
-	return banks;
+	return banklist;
 }
 
-std::string DetectorBankSet::getBanklistStr( std::vector<uint32_t> banks )
+std::string DetectorBankSet::getBanklistStr(
+		std::vector<uint32_t> banklist )
 {
 	std::stringstream ss;
 
 	ss << "[";
 
 	bool first = true;
-	for (std::vector<uint32_t>::iterator b=banks.begin();
-			b != banks.end(); ++b)
+	for (std::vector<uint32_t>::iterator b=banklist.begin();
+			b != banklist.end(); ++b)
 	{
 		if ( first )
 			first = false;

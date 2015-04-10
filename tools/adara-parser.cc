@@ -642,13 +642,13 @@ bool Parser::rxPacket(const ADARA::DetectorBankSetsPkt &pkt)
 	for (uint32_t i = 0; i < pkt.detBankSetCount(); i++) {
 		printf("    name %s bankCount %u flags %u\n",
 			pkt.name(i).c_str(), pkt.bankCount(i), pkt.flags(i));
-		printf("        banks [");
-		const uint32_t *banks = pkt.banks(i);
+		printf("        banklist [");
+		const uint32_t *banklist = pkt.banklist(i);
 		bool first = true;
 		for (uint32_t b = 0; b < pkt.bankCount(i); b++) {
 			if ( first ) first = false;
 			else printf(",");
-			printf("%u", banks[b]);
+			printf("%u", banklist[b]);
 		}
 		printf("]\n");
 		printf(
