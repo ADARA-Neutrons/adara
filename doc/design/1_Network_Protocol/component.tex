@@ -1804,12 +1804,7 @@ on a given beamline.
 Normally in ADARA, individual neutron events are stored explicitly,
 per detector bank, in NeXus data files,
 to enable flexible time-series analysis of a run.
-However, with the information provided in this optional
-prologue packet~\footnote{Note that this optional ``Detector Bank Sets''
-prologue packet must occur {\it after} the ``Pixel Map Table'' packet
-in the prologue, e.g. for the Streaming Translation Service (STS)
-to simplify its association of any Detector Bank Sets with the ``BankInfo''
-Neutron Detector Banks, which must already have been defined.},
+However, with the information provided in this optional prologue packet,
 an alternate Histogram-based data format can be requested
 for certain subsets of the neutron detectors at a beamline,
 on a run-by-run basis.
