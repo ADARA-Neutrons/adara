@@ -1383,12 +1383,24 @@ StreamParser::rxPacket
         set->throttle = a_pkt.throttle(i);
         set->suffix = a_pkt.suffix(i);
 
+        std::string format;
+        if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+                && set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            format = "both";
+        else if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            format = "event";
+        else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            format = "histo";
+        else
+            format = "[Unknown!]";
+
         syslog( LOG_INFO,
-  "[%i] %s %s (%u=%s): flags=%u histo=(%u to %u by %u) throttle=%lf (%s).",
+        "[%i] %s %s (%u=%s): %s=%u (%s) %s=(%u to %u by %u) %s=%lf (%s).",
             g_pid, "Detector Bank Set", set->name.c_str(),
-            a_pkt.bankCount(i), ss.str().c_str(), set->flags,
-            set->tofOffset, set->tofMax, set->tofBin,
-            set->throttle, set->suffix.c_str() );
+            a_pkt.bankCount(i), ss.str().c_str(),
+            "flags", set->flags, format.c_str(),
+            "histo", set->tofOffset, set->tofMax, set->tofBin,
+            "throttle", set->throttle, set->suffix.c_str() );
 
         // Basic Sanity Check...
         if ( set->tofOffset >= set->tofMax )
