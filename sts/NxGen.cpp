@@ -183,8 +183,8 @@ NxGen::makeBankInfo
  *
  * This method constructs Nexus-specific MonitorInfo objects.
  * The Nexus-specific NxMonitorInfo class extends the
- * BankInfo class to include a number of attributes needed
- * for writing monito event data efficiently to a Nexus file.
+ * MonitorInfo class to include a number of attributes needed
+ * for writing monitor event data efficiently to a Nexus file.
  */
 STS::MonitorInfo*
 NxGen::makeMonitorInfo
@@ -661,20 +661,27 @@ NxGen::bankBuffersReady
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankBuffers()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankBuffersReady()" )
+        }
 
-        writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
-        writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
+        writeSlab( bi->m_tof_slab_path,
+            a_bank.m_tof_buffer, bi->m_event_slab_size );
+        writeSlab( bi->m_pid_slab_path,
+            a_bank.m_pid_buffer, bi->m_event_slab_size );
 
         bi->m_event_slab_size += a_bank.m_tof_buffer.size();
 
-        writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
+        writeSlab( bi->m_index_slab_path,
+            a_bank.m_index_buffer, bi->m_index_slab_size );
 
         bi->m_index_slab_size += a_bank.m_index_buffer.size();
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: " << a_bank.m_id )
+        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: "
+            << a_bank.m_id )
     }
 }
 
@@ -697,14 +704,19 @@ NxGen::bankPulseGap
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankPulseGap()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankPulseGap()" )
+        }
 
-        fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
+        fillSlab( bi->m_index_slab_path,
+            bi->m_event_count, a_count, bi->m_index_slab_size );
         bi->m_index_slab_size += a_count;
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankPulseGap() failed for bank id: " << a_bank.m_id << ", gap count: " << a_count )
+        RETHROW_TRACE( e, "bankPulseGap() failed for bank id: "
+            << a_bank.m_id << ", gap count: " << a_count )
     }
 }
 
@@ -726,7 +738,10 @@ NxGen::bankFinalize
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankFinalize()" )
+        }
 
         string total_path = m_instrument_path + "/" + bi->m_name;
         writeScalar( total_path, "total_counts", bi->m_event_count, "" );
@@ -735,7 +750,8 @@ NxGen::bankFinalize
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankFinalize() failed for bank id: " << a_bank.m_id )
+        RETHROW_TRACE( e, "bankFinalize() failed for bank id: "
+            << a_bank.m_id )
     }
 }
 
