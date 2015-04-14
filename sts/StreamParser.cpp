@@ -469,7 +469,8 @@ StreamParser::rxPacket
         rpos += pix_count;
     }
 
-    // The receipt of a pixel mapping packet allows state to progress to event processing
+    // The receipt of a pixel mapping packet allows state to progress
+    // to event processing
     m_processing_state = PROCESSING_EVENTS;
 
     return false;
@@ -706,10 +707,13 @@ StreamParser::processPulseInfo
 
 /*! \brief This method processes the neutron events for a specific detector bank.
  *
- * This method processes incoming neutron events for a specified detector bank. The events are read from the packet
- * and placed into internal event buffers (units are converted for event time of flight). When the event buffers are
- * full, they are flushed to a subclassed stream adapter via the bankBuffersReady() virtual method. This method also
- * detects pulse gaps and corrects the event index as required (see handleBankPulseGap() method for more details).
+ * This method processes incoming neutron events for a specified detector
+ * bank. The events are read from the packet and placed into internal event
+ * buffers (units are converted for event time of flight). When the event
+ * buffers are full, they are flushed to a subclassed stream adapter via
+ * the bankBuffersReady() virtual method. This method also detects pulse
+ * gaps and corrects the event index as required (see handleBankPulseGap()
+ * method for more details).
  */
 void
 StreamParser::processBankEvents
@@ -725,7 +729,10 @@ StreamParser::processBankEvents
 
         // Detect gaps in event data and fill event index if present
         if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-            handleBankPulseGap( *bi, ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+        {
+            handleBankPulseGap( *bi,
+                ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+        }
 
         size_t sz = bi->m_tof_buffer.size();
 
@@ -738,7 +745,8 @@ StreamParser::processBankEvents
 
         while ( a_rpos != epos )
         {
-            // ADARA TOF values are in units of 100 ns - convert to microseconds
+            // ADARA TOF values are in units of 100 ns
+            // - convert to microseconds
             *tof_ptr++ = *a_rpos++ / 10.0;
             *pid_ptr++ = *a_rpos++;
         }
@@ -750,7 +758,8 @@ StreamParser::processBankEvents
         bi->m_last_pulse_with_data = m_pulse_count;
 
         // Check to see if buffers are ready to write
-        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh
+                || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
         {
             bankBuffersReady( *bi );
 
@@ -767,12 +776,15 @@ StreamParser::processBankEvents
 
 /*! \brief This method handles pulse gaps for a specified detector bank
  *
- * This method handles pulse gaps in the event stream for the specified detectpr bank. When a gap is detected, the event
- * index for the bank must be corrected for the missing pulses to keep in synchronized with the event stream. If a small
- * gap is detected, values are inserted directly into the internal index buffer; otherwise, gap processing is deferred
- * to the stream adatapter subclass via the bankPulseGap() virtual method. (It is expected that the virtual method
- * should write index values directly into the destination format to prevent excessive memory consumption that would
- * be caused by buffering the corrected index.)
+ * This method handles pulse gaps in the event stream for the specified
+ * detectpr bank. When a gap is detected, the event index for the bank
+ * must be corrected for the missing pulses to keep in synchronized with
+ * the event stream. If a small gap is detected, values are inserted
+ * directly into the internal index buffer; otherwise, gap processing is
+ * deferred to the stream adatapter subclass via the bankPulseGap() virtual
+ * method. (It is expected that the virtual method should write index
+ * values directly into the destination format to prevent excessive memory
+ * consumption that would be caused by buffering the corrected index.)
  */
 void
 StreamParser::handleBankPulseGap
@@ -785,12 +797,14 @@ StreamParser::handleBankPulseGap
     // then just insert values into index buffer
     if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
     {
-        a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count, a_bi.m_event_count );
+        a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count,
+            a_bi.m_event_count );
     }
     else
     {
         // Otherwise, if the gap is too large - flush buffers & fill gap
-        // Note: it is acceptable to call bankBuffersReady even if they are empty.
+        // Note: it is acceptable to call bankBuffersReady
+        // even if they are empty.
         bankBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
 
@@ -1976,9 +1990,11 @@ StreamParser::receivedInfo( InfoBit a_bit )
 
 /*! \brief This method performs final stream processing.
  *
- * This method is called after the internal processing state progreses to "DONE_PROCESSING" and permits a variety of
- * final processing tasks to be performed (primarily flushing data buffers). This method also calls the virtual
- * finalize() method to allow the stream adapter to also perform final output operations.
+ * This method is called after the internal processing state progreses
+ * to "DONE_PROCESSING" and permits a variety of final processing tasks
+ * to be performed (primarily flushing data buffers). This method also
+ * calls the virtual finalize() method to allow the stream adapter to
+ * also perform final output operations.
  */
 void
 StreamParser::finalizeStreamProcessing()
