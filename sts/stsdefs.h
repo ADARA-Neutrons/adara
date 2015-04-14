@@ -6,6 +6,7 @@
 #include <string>
 #include <syslog.h>
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 // Global syslog info
 #define STS_VERSION "1.2.2"
@@ -62,25 +63,151 @@ public:
     :
         m_id(a_id),
         m_pixel_count(a_pixel_count),
+        m_buf_reserve(a_buf_reserve),
+        m_idx_buf_reserve(a_idx_buf_reserve),
+        m_initialized(false),
         m_event_count(0),
-        m_last_pulse_with_data(0)
+        m_last_pulse_with_data(0),
+        m_has_event(false),
+        m_has_histo(false)
     {
-        m_index_buffer.reserve(a_idx_buf_reserve);
-        m_tof_buffer.reserve(a_buf_reserve);
-        m_pid_buffer.reserve(a_buf_reserve);
+        // Save Initialization for initializeBank() method...
     }
 
     /// BankInfo destructor
     virtual ~BankInfo()
     {}
 
+    void initializeBank(void)
+    {
+        // Already Initialized...
+        if ( m_initialized )
+            return;
+
+        // Iterate Thru All Detector Bank Sets & Set Up Appropriate Data
+        for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+                m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs )
+        {
+            if ( !*dbs )
+                continue;
+
+            // Histo-based Detector Bank
+            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            {
+                // Only Room for *One* Histogram per Detector Bank (for now)
+                if ( m_has_histo )
+                {
+                    syslog( LOG_ERR,
+                    "[%i] %s %s %u %s! Ignoring %s %s (%u to %u by %u).",
+                        g_pid, "STS Error:", "Detector Bank", m_id,
+                        "Duplicate Histogram Request",
+                        (*dbs)->name.c_str(), "Bank Set",
+                        (*dbs)->tofOffset, (*dbs)->tofMax, (*dbs)->tofBin );
+                }
+
+                else
+                {
+                    // Number of Time Bin Values Needed...
+                    m_num_tof_bins =
+                        ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                            / (*dbs)->tofBin ) + 1;
+
+                    // If Max TOF doesn't divide evenly into TOF Bin size,
+                    // then need "One Extra" Bin Value...
+                    if ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                            % (*dbs)->tofBin )
+                    {
+                        m_num_tof_bins++;
+                    }
+
+                    // Fail Safe: Make Sure We Get At Least One
+                    // Actual TOF Bin!
+                    if ( m_num_tof_bins < 2 )
+                    {
+                        syslog( LOG_ERR,
+                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
+                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            m_num_tof_bins);
+                        m_num_tof_bins = 2;
+                    }
+
+                    // Actual Histogram Storage, Non-Inclusive Max TOF Bin
+                    m_data_buffer.reserve(m_num_tof_bins - 1);
+
+                    // TOF Bin Values...
+                    m_tofbin_buffer.reserve(m_num_tof_bins);
+
+                    syslog( LOG_INFO,
+                    "[%i] %s %u Histogram: %u Time Bin Values, %u to %u.",
+                        g_pid, "Detector Bank", m_id, m_num_tof_bins,
+                        (*dbs)->tofOffset, (*dbs)->tofMax );
+
+                    uint32_t tofbin = (*dbs)->tofOffset;
+                    for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
+                    {
+                        m_data_buffer.push_back(0);
+
+                        m_tofbin_buffer.push_back((float)tofbin);
+                        tofbin += (*dbs)->tofBin;
+                    }
+
+                    // Max TOF Bin Value...
+                    m_tofbin_buffer.push_back((float)((*dbs)->tofMax));
+
+                    // Got One, That's All We'll Ever Need... ;-D
+                    m_has_histo = true;
+                }
+            }
+
+            // Event-based Monitor
+            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            {
+                // Only Allocate Event Storage *Once*...
+                if ( !m_has_event )
+                {
+                    m_index_buffer.reserve(m_idx_buf_reserve);
+                    m_tof_buffer.reserve(m_buf_reserve);
+                    m_pid_buffer.reserve(m_buf_reserve);
+
+                    // Got One, That's All We'll Ever Need... ;-D
+                    m_has_event = true;
+                }
+            }
+        }
+
+        // Handle *Default* Case, No Detector Bank Sets at All...! ;-D
+        // (We _Always_ Save Events Unless Specifically Directed Not To!)
+        if ( m_bank_sets.size() == 0 )
+        {
+            m_index_buffer.reserve(m_idx_buf_reserve);
+            m_tof_buffer.reserve(m_buf_reserve);
+            m_pid_buffer.reserve(m_buf_reserve);
+
+            m_has_event = true;
+        }
+
+        // Done Initializing
+        m_initialized = true;
+    }
+
     uint32_t                m_id;                   ///< ID of detector bank
     uint16_t                m_pixel_count;          ///< Number of pixels in bank
+    uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
+    uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
+    bool                    m_initialized;          ///< Has detector bank been initialized yet?
+
     uint64_t                m_event_count;          ///< Running event count
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this bank
+
+    bool                    m_has_event;            ///< Has an Event output already been defined?
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
     std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
+
+    bool                    m_has_histo;            ///< Has a Histogram output already been defined?
+    uint32_t                m_num_tof_bins;         ///< Histo Number of TOF Bins
+    std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
+    std::vector<float>      m_tofbin_buffer;        ///< Histo TOF Bin buffer
 
     std::vector<DetectorBankSet *>  m_bank_sets;    ///< Any Detector Bank Set info for this detector bank
 };
