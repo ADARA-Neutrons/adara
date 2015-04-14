@@ -5,6 +5,7 @@
 #include "NxGen.h"
 #include "TraceException.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 using namespace std;
 
@@ -143,37 +144,82 @@ NxGen::makeBankInfo
         NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count,
             a_buf_reserve, a_idx_buf_reserve, *this );
 
-        if ( m_gen_nexus)
-        {
-            // Instrument bank group
-            makeGroup( bi->m_instr_path, "NXdetector" );
-            makeDataset( bi->m_instr_path, m_tof_name,
-                NeXus::FLOAT32, TIME_USEC_UNITS );
-            makeDataset( bi->m_instr_path, m_pid_name, NeXus::UINT32 );
-            makeDataset( bi->m_instr_path, m_index_name,
-                NeXus::UINT64 );
-
-            // Event data group
-            makeGroup( bi->m_event_path, "NXevent_data" );
-            makeLink( bi->m_tof_slab_path,
-                bi->m_event_path + "/" + m_tof_name );
-            makeLink( bi->m_pid_slab_path,
-                bi->m_event_path + "/" + m_pid_name );
-            makeLink( bi->m_index_slab_path,
-                bi->m_event_path + "/" + m_index_name );
-
-            // Link pulse time to bank event times
-            makeLink( bi->m_time_path,
-                bi->m_instr_path + "/" + m_pulse_time_name );
-            makeLink( bi->m_time_path,
-                bi->m_event_path + "/" + m_pulse_time_name );
-        }
+        // "Late" Initialization Now via NxGen::initializeNxBank()...
+        // (after All BankInfos & Any Detector Bank Sets have been defined)
 
         return bi;
     }
     catch ( TraceException &e )
     {
-        RETHROW_TRACE( e, "makeBankInfo (bank: " << a_id << ") failed." )
+        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id << " ) failed." )
+    }
+}
+
+
+/*! \brief Initialization method for BankInfo NeXus file groups & datasets
+ *
+ * Late Initialization of NeXus Groups and Datasets, specific to whether
+ * Events or Histograms (or Both) are to be Output.  Called after both the
+ * BankInfo instances have all been created (PixelMapPkt) and any
+ * Detector Bank Sets have been defined (DetectorBankSetsPkt).
+ */
+void
+NxGen::initializeNxBank
+(
+    NxBankInfo* a_bi            ///< [in] Ptr to NeXus detector bank info
+)
+{
+    // Make Sure BankInfo has been (Late) Initialized...
+    // (to know whether Events, Histo or Both...?)
+    if ( !(a_bi->m_initialized) )
+        a_bi->initializeBank();
+
+    try
+    {
+        if ( m_gen_nexus)
+        {
+            // NeXus Event-based Structures
+            if ( a_bi->m_has_event )
+            {
+                // Instrument bank group
+                makeGroup( a_bi->m_instr_path, "NXdetector" );
+                makeDataset( a_bi->m_instr_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                makeDataset( a_bi->m_instr_path, m_pid_name,
+                    NeXus::UINT32 );
+                makeDataset( a_bi->m_instr_path, m_index_name,
+                    NeXus::UINT64 );
+
+                // Event data group
+                makeGroup( a_bi->m_event_path, "NXevent_data" );
+                makeLink( a_bi->m_tof_slab_path,
+                    a_bi->m_event_path + "/" + m_tof_name );
+                makeLink( a_bi->m_pid_slab_path,
+                    a_bi->m_event_path + "/" + m_pid_name );
+                makeLink( a_bi->m_index_slab_path,
+                    a_bi->m_event_path + "/" + m_index_name );
+
+                // Link pulse time to bank event times
+                makeLink( a_bi->m_time_path,
+                    a_bi->m_instr_path + "/" + m_pulse_time_name );
+                makeLink( a_bi->m_time_path,
+                    a_bi->m_event_path + "/" + m_pulse_time_name );
+            }
+
+            // NeXus Histogram-based Structures
+            if ( a_bi->m_has_histo )
+            {
+                // TODO...
+            }
+
+            // NeXus Structures are Now Initialized
+            a_bi->m_nexus_init = true;
+        }
+    }
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "initializeNxBank( bank: " << a_bi->m_id
+            << " ) initialization failed." )
     }
 }
 
@@ -502,7 +548,8 @@ NxGen::processRunInfo
 
         if ( a_run_info.instr_longname.size())
         {
-            writeString( m_instrument_path, "name", a_run_info.instr_longname );
+            writeString( m_instrument_path, "name",
+                a_run_info.instr_longname );
 
             if ( a_run_info.instr_shortname.size())
             {
@@ -531,7 +578,9 @@ NxGen::processRunInfo
 
         size_t user_count = 0;
         string path;
-        for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+        for ( vector<STS::UserInfo>::const_iterator u =
+                a_run_info.users.begin();
+                u != a_run_info.users.end(); ++u )
         {
             path = m_entry_path + "/user"
                 + boost::lexical_cast<string>(++user_count);
@@ -666,17 +715,35 @@ NxGen::bankBuffersReady
                 "Invalid bank object passed to bankBuffersReady()" )
         }
 
-        writeSlab( bi->m_tof_slab_path,
-            a_bank.m_tof_buffer, bi->m_event_slab_size );
-        writeSlab( bi->m_pid_slab_path,
-            a_bank.m_pid_buffer, bi->m_event_slab_size );
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank();
 
-        bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi );
 
-        writeSlab( bi->m_index_slab_path,
-            a_bank.m_index_buffer, bi->m_index_slab_size );
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            writeSlab( bi->m_tof_slab_path,
+                a_bank.m_tof_buffer, bi->m_event_slab_size );
+            writeSlab( bi->m_pid_slab_path,
+                a_bank.m_pid_buffer, bi->m_event_slab_size );
 
-        bi->m_index_slab_size += a_bank.m_index_buffer.size();
+            bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+
+            writeSlab( bi->m_index_slab_path,
+                a_bank.m_index_buffer, bi->m_index_slab_size );
+
+            bi->m_index_slab_size += a_bank.m_index_buffer.size();
+        }
+
+        // NeXus Histogram-based Data...
+        if ( bi->m_has_histo )
+        {
+            // TODO...
+        }
     }
     catch( TraceException &e )
     {
@@ -709,9 +776,23 @@ NxGen::bankPulseGap
                 "Invalid bank object passed to bankPulseGap()" )
         }
 
-        fillSlab( bi->m_index_slab_path,
-            bi->m_event_count, a_count, bi->m_index_slab_size );
-        bi->m_index_slab_size += a_count;
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            fillSlab( bi->m_index_slab_path,
+                bi->m_event_count, a_count, bi->m_index_slab_size );
+            bi->m_index_slab_size += a_count;
+        }
+
+        // NeXus Histogram-based Data...
+        if ( bi->m_has_histo )
+        {
+            // TODO...
+        }
     }
     catch( TraceException &e )
     {
@@ -743,10 +824,25 @@ NxGen::bankFinalize
                 "Invalid bank object passed to bankFinalize()" )
         }
 
-        string total_path = m_instrument_path + "/" + bi->m_name;
-        writeScalar( total_path, "total_counts", bi->m_event_count, "" );
-        makeLink( total_path + "/total_counts",
-            m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            string total_path = m_instrument_path + "/" + bi->m_name;
+            writeScalar( total_path, "total_counts",
+                bi->m_event_count, "" );
+            makeLink( total_path + "/total_counts",
+                m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+        }
+
+        // NeXus Histogram-based Data...
+        if ( bi->m_has_histo )
+        {
+            // TODO...
+        }
     }
     catch( TraceException &e )
     {

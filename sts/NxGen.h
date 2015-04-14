@@ -41,6 +41,7 @@ private:
         )
         :
             BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve),
+            m_nexus_init(false),
             m_event_slab_size(0),
             m_index_slab_size(0),
             m_nxgen(a_nxgen)
@@ -72,6 +73,7 @@ private:
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         std::string             m_pid_slab_path;    ///< Nexus path to PID slab
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
+        bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
         uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
         NxGen&                  m_nxgen;            ///< NxGen parent class
@@ -302,6 +304,7 @@ protected:
     STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
+    void                initializeNxBank( NxBankInfo *a_bi );
     STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve,
