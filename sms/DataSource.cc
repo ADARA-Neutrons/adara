@@ -12,6 +12,7 @@
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"

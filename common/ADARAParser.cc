@@ -1,6 +1,7 @@
 #include <sstream>
 #include <string.h>
 #include "ADARAParser.h"
+#include "ADARAPackets.h"
 
 using namespace ADARA;
 

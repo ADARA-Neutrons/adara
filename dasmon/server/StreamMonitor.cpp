@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include <syslog.h>
 
 

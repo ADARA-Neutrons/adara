@@ -8,6 +8,7 @@
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "LiveClient.h"
 #include "StorageManager.h"
 #include "StorageFile.h"

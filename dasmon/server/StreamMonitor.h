@@ -10,6 +10,7 @@
 #include <boost/thread/locks.hpp>
 #include <libxml/tree.h>
 #include "DASMonDefs.h"
+#include "ADARAPackets.h"
 
 namespace ADARA {
 namespace DASMON {

@@ -13,6 +13,7 @@
 #include "ReadyAdapter.h"
 #include "Logging.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "utils.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));

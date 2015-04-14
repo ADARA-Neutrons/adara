@@ -7,6 +7,7 @@
 #include <string>
 #include <list>
 
+#include "ADARAPackets.h"
 #include "POSIXParser.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"

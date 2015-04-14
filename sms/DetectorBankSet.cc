@@ -7,6 +7,7 @@
 #include <time.h>
 
 #include "ADARA.h"
+#include "ADARAPackets.h"
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"

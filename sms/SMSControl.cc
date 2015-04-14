@@ -1,5 +1,6 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "StorageManager.h"

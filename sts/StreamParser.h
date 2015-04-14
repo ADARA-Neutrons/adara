@@ -11,6 +11,7 @@
 #include <libxml/tree.h>
 #include "POSIXParser.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "stsdefs.h"
 #include "TraceException.h"
 
