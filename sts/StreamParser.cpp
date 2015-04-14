@@ -6,6 +6,7 @@
 #include <boost/algorithm/string.hpp>
 #include <syslog.h>
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 
 using namespace std;
@@ -727,6 +728,10 @@ StreamParser::processBankEvents
     {
         BankInfo *bi = m_banks[a_bank_id];
 
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank();
+
         // Detect gaps in event data and fill event index if present
         if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
         {
@@ -793,6 +798,10 @@ StreamParser::handleBankPulseGap
     uint64_t a_count    ///< [in] The size of the pulse gap
 )
 {
+    // Make Sure Data has been (Late) Initialized...
+    if ( !(a_bi.m_initialized) )
+        a_bi.initializeBank();
+
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
     if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
@@ -2014,6 +2023,10 @@ StreamParser::finalizeStreamProcessing()
     {
         if ( !*ibi )
             continue;
+
+        // Make Sure Data has been (Late) Initialized...
+        if ( !((*ibi)->m_initialized) )
+            (*ibi)->initializeBank();
 
         // Detect gaps in bank data and fill event index if present
         if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
