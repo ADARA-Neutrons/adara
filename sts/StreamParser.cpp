@@ -417,6 +417,7 @@ StreamParser::rxPacket
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
         + a_pkt.payload_length());
 
+    uint32_t        base_logical;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
@@ -434,7 +435,8 @@ StreamParser::rxPacket
     uint16_t bank_count = 0;
     const uint32_t *rpos2 = rpos;
 
-    while( rpos2 < epos )
+    // Determine Max Bank ID...
+    while ( rpos2 < epos )
     {
         rpos2++;
         bank_id = (uint16_t)(*rpos2 >> 16);
@@ -448,13 +450,14 @@ StreamParser::rxPacket
     m_banks.resize( bank_count + 1, 0 );
 
     // Now build banks and populate bank container
-    while( rpos < epos )
+    while ( rpos < epos )
     {
-        rpos++;  // TODO This infomation is not currently processed.
+        base_logical = *rpos++;
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
+        // Create New BankInfo...
         if ( !m_banks[bank_id] )
         {
             // Create BankInfo Instance
@@ -467,6 +470,19 @@ StreamParser::rxPacket
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
         }
 
+        // Append This Section's Logical PixelIds...
+        for (uint32_t i=0 ; i < pix_count ; ++i)
+        {
+            m_banks[bank_id]->m_logical_pixelids.push_back(
+                base_logical + i );
+        }
+
+        syslog( LOG_INFO,
+       "[%i] PixelMappingPkt: bank_id=%u base_logical=%u count=%u tot=%lu",
+            g_pid, bank_id, base_logical, pix_count,
+            m_banks[bank_id]->m_logical_pixelids.size() );
+
+        // Next Section
         rpos += pix_count;
     }
 

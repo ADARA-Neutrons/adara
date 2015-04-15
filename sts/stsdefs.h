@@ -129,8 +129,17 @@ public:
                         m_num_tof_bins = 2;
                     }
 
+                    // Determine Total Number of Logical PixelIds in Bank
+                    uint32_t num_pids = m_logical_pixelids.size();
+
+                    syslog( LOG_ERR,
+                   "[%i] %s %u Histogram: num_tof_bins=%u num_pids=%u (%u)",
+                        g_pid, "Detector Bank", m_id, m_num_tof_bins,
+                        num_pids, num_pids * ( m_num_tof_bins - 1 ) );
+
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
-                    m_data_buffer.reserve(m_num_tof_bins - 1);
+                    m_data_buffer.reserve( num_pids
+                        * ( m_num_tof_bins - 1 ) );
 
                     // TOF Bin Values...
                     m_tofbin_buffer.reserve(m_num_tof_bins);
@@ -174,7 +183,7 @@ public:
         }
 
         // Handle *Default* Case, No Detector Bank Sets at All...! ;-D
-        // (We _Always_ Save Events Unless Specifically Directed Not To!)
+        // (We _Always_ Save Events, Unless Specifically Directed Not To!)
         if ( m_bank_sets.size() == 0 )
         {
             m_index_buffer.reserve(m_idx_buf_reserve);
@@ -189,6 +198,7 @@ public:
     }
 
     uint32_t                m_id;                   ///< ID of detector bank
+    std::vector<uint32_t>   m_logical_pixelids;     ///< Logical PixelIds in detector bank
     uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
     uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
     bool                    m_initialized;          ///< Has detector bank been initialized yet?
