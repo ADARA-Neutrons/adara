@@ -458,7 +458,7 @@ StreamParser::rxPacket
         if ( !m_banks[bank_id] )
         {
             // Create BankInfo Instance
-            m_banks[bank_id] = makeBankInfo( bank_id, pix_count,
+            m_banks[bank_id] = makeBankInfo( bank_id,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
             // Try to Associate Any Detector Bank Sets that

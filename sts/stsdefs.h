@@ -56,13 +56,11 @@ public:
     BankInfo
     (
         uint16_t a_id,              ///< [in] ID of detector bank
-        uint16_t a_pixel_count,     ///< [in] Pixel count of bank
         uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
         uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
     )
     :
         m_id(a_id),
-        m_pixel_count(a_pixel_count),
         m_buf_reserve(a_buf_reserve),
         m_idx_buf_reserve(a_idx_buf_reserve),
         m_initialized(false),
@@ -191,7 +189,6 @@ public:
     }
 
     uint32_t                m_id;                   ///< ID of detector bank
-    uint16_t                m_pixel_count;          ///< Number of pixels in bank
     uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
     uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
     bool                    m_initialized;          ///< Has detector bank been initialized yet?
@@ -499,7 +496,6 @@ public:
                                 Identifier a_pv_id, PVType a_type,
                                 const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
-                                uint16_t a_pixel_count,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve ) = 0;
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,

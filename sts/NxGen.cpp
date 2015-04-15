@@ -134,14 +134,13 @@ STS::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
-    uint16_t a_pixel_count,     ///< [in] Pixel count of bank
     uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
     try
     {
-        NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count,
+        NxBankInfo* bi = new NxBankInfo( a_id,
             a_buf_reserve, a_idx_buf_reserve, *this );
 
         // "Late" Initialization Now via NxGen::initializeNxBank()...

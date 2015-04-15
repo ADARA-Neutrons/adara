@@ -34,13 +34,12 @@ private:
         NxBankInfo
         (
             uint16_t a_id,              ///< [in] ID of detector bank
-            uint16_t a_pixel_count,     ///< [in] Pixel count of bank
             uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve, ///< [in] Index buffer initial capacity
             NxGen &a_nxgen              ///< [in] Parent NxGen instance
         )
         :
-            BankInfo(a_id, a_pixel_count, a_buf_reserve, a_idx_buf_reserve),
+            BankInfo(a_id, a_buf_reserve, a_idx_buf_reserve),
             m_nexus_init(false),
             m_event_slab_size(0),
             m_index_slab_size(0),
@@ -301,7 +300,7 @@ protected:
                             STS::Identifier a_device_id,
                             STS::Identifier a_pv_id, STS::PVType a_type,
                             const std::string & a_units );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint16_t a_pixel_count,
+    STS::BankInfo*      makeBankInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
     void                initializeNxBank( NxBankInfo *a_bi );
