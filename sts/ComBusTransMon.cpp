@@ -59,7 +59,7 @@ ComBusTransMon::~ComBusTransMon()
 /** \brief Starts the background ComBus comm thread
   *
   * This method starts the background communication thread which will begin
-  * the delyaed process of connecting to the ComBus service. The ComBus service
+  * the delayed process of connecting to the ComBus service. The ComBus service
   * can ONLY be joined after sufficient information has bee extracted from the
   * ADARA stream.
   */
