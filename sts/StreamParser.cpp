@@ -501,7 +501,7 @@ StreamParser::rxPacket
 /*! \brief This method processes Banked Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by ths method with the
+ * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by this method with the
  * pulse data attached to the received Banked Event packet. The payload of the Banked Event packet is parsed for neutron
  * events which are then handled by the processBankEvents() method.
  */
@@ -740,6 +740,7 @@ StreamParser::processBankEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
+    // Valid Detector Bank ID...
     if ( a_bank_id < m_banks.size() )
     {
         BankInfo *bi = m_banks[a_bank_id];
@@ -748,49 +749,143 @@ StreamParser::processBankEvents
         if ( !(bi->m_initialized) )
             bi->initializeBank();
 
-        // Detect gaps in event data and fill event index if present
-        if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
+        // Event-based Data Processing
+        if ( bi->m_has_event )
         {
-            handleBankPulseGap( *bi,
-                ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+            // Detect gaps in event data and fill event index if present
+            if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
+            {
+                handleBankPulseGap( *bi,
+                    ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+            }
+
+            size_t sz = bi->m_tof_buffer.size();
+
+            bi->m_tof_buffer.resize( sz + a_event_count );
+            bi->m_pid_buffer.resize( sz + a_event_count );
+
+            float           *tof_ptr = &bi->m_tof_buffer[sz];
+            uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
+            const uint32_t  *rpos = a_rpos;
+            const uint32_t  *epos = a_rpos + (a_event_count<<1);
+
+            while ( rpos != epos )
+            {
+                // ADARA TOF values are in units of 100 ns
+                // - convert to microseconds
+                *tof_ptr++ = *rpos++ / 10.0;
+                *pid_ptr++ = *rpos++;
+            }
+
+            // Cache event index until large enough to write
+            bi->m_index_buffer.push_back( bi->m_event_count );
+            bi->m_event_count += a_event_count;
+
+            bi->m_last_pulse_with_data = m_pulse_count;
+
+            // Check to see if buffers are ready to write
+            if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh
+                   || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            {
+                bankBuffersReady( *bi );
+
+                bi->m_tof_buffer.clear();
+                bi->m_pid_buffer.clear();
+                bi->m_index_buffer.clear();
+            }
+
+            m_run_metrics.events_counted += a_event_count;
         }
 
-        size_t sz = bi->m_tof_buffer.size();
-
-        bi->m_tof_buffer.resize( sz + a_event_count );
-        bi->m_pid_buffer.resize( sz + a_event_count );
-
-        float           *tof_ptr = &bi->m_tof_buffer[sz];
-        uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
-        const uint32_t  *epos = a_rpos + (a_event_count<<1);
-
-        while ( a_rpos != epos )
+        // Histogram-based Data Processing
+        if ( bi->m_has_histo )
         {
-            // ADARA TOF values are in units of 100 ns
-            // - convert to microseconds
-            *tof_ptr++ = *a_rpos++ / 10.0;
-            *pid_ptr++ = *a_rpos++;
-        }
+            const uint32_t  *rpos = a_rpos;
+            const uint32_t  *epos = a_rpos + (a_event_count<<1);
 
-        // Cache event index until large enough to write
-        bi->m_index_buffer.push_back( bi->m_event_count );
-        bi->m_event_count += a_event_count;
+            // Find Detector Bank Set We're Using for Histogram
+            // (Only *One* Histogram per Detector Bank (for now)...)
+            for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+                        bi->m_bank_sets.begin();
+                    dbs != bi->m_bank_sets.end() ; ++dbs )
+            {
+                if ( !*dbs )
+                    continue;
 
-        bi->m_last_pulse_with_data = m_pulse_count;
+                // Histo-based Detector Bank
+                if ( (*dbs)->flags
+                        & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+                {
+                    uint32_t tofbin;
+                    uint32_t tof;
+                    uint32_t pid;
 
-        // Check to see if buffers are ready to write
-        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh
-                || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
-        {
-            bankBuffersReady( *bi );
+                    while ( rpos != epos )
+                    {
+                        // ADARA TOF values are in units of 100 ns,
+                        //    convert to microseconds
+                        tof = *rpos++ / 10;
+                        pid = *rpos++;
 
-            bi->m_tof_buffer.clear();
-            bi->m_pid_buffer.clear();
-            bi->m_index_buffer.clear();
-        }
+                        // Ignore TOF Less than Minimum Offset
+                        //    and Greater than or Equal to Maximum TOF...
+                        //    (Non-Inclusive Max...! ;-D)
+                        if ( tof >= (*dbs)->tofOffset
+                                && tof < (*dbs)->tofMax
+                                && bi->m_histo_pid_offset[
+                                    pid - bi->m_base_pid ] >= 0 )
+                        {
+                            // Calculate index into Histogram based on TOF
+                            tofbin = ( tof - (*dbs)->tofOffset )
+                                / (*dbs)->tofBin;
 
-        m_run_metrics.events_counted += a_event_count;
-    }
+                            // Sanity Test, Just to Be Sure... ;-b
+                            // (This should never happen,
+                            //    but the logic is confusing.)
+                            if ( tofbin >= bi->m_num_tof_bins - 1 )
+                            {
+                                syslog( LOG_ERR,
+                                "[%i] %s %s %u %s tof=%u index=%u >= %u",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Error",
+                                    tof, tofbin, bi->m_num_tof_bins - 1 );
+                                // Count Uncounted Detector Histo Events...
+                                (bi->m_histo_event_uncounted)++;
+                                continue;
+                            }
+
+                            // Increment Histogram Time Slot...
+                            (bi->m_data_buffer[
+                                bi->m_histo_pid_offset[
+                                        pid - bi->m_base_pid ]
+                                    + tofbin ])++;
+
+                            // Count Detector Events for Histogram Mode Too
+                            (bi->m_histo_event_count)++;
+                        }
+
+                        // Count Uncounted Detector Events for Histogram...
+                        else
+                            (bi->m_histo_event_uncounted)++;
+
+                        // TODO: Log Any Bogus PixelId Offsets...?
+                        // (definitely need to be rate-limited... ;-)
+
+                    }   // event processing loop...
+
+                    // Only *One* Histogram per Detector Bank (for now)...
+                    break;
+
+                }   // histo-based detector bank...
+
+            }   // m_bank_sets loop...
+
+        }   // m_has_histo
+
+    }   // Valid Detector Bank ID...
+
+    // Not a Valid Detector Bank ID...
     else
         m_run_metrics.events_uncounted += a_event_count;
 }
