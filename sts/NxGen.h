@@ -48,7 +48,15 @@ private:
             m_name = std::string("bank")
                 + boost::lexical_cast<std::string>(a_id);
 
+            // Entry Instrument Path
+
             m_instr_path = m_nxgen.m_instrument_path + "/" + m_name;
+
+            // Detector Event Paths
+
+            m_eventname = m_name + std::string("_events");
+
+            m_event_path = m_nxgen.m_entry_path + "/" + m_eventname;
 
             m_tof_slab_path = m_instr_path + "/" + m_nxgen.m_tof_name;
 
@@ -56,22 +64,36 @@ private:
 
             m_index_slab_path = m_instr_path + "/" + m_nxgen.m_index_name;
 
-            m_eventname = m_name + std::string("_events");
-
-            m_event_path = m_nxgen.m_entry_path + "/" + m_eventname;
-
             m_time_path = m_nxgen.m_daslogs_freq_path
                 + std::string("/time");
+
+            // Detector Histogram Paths
+
+            m_histoname = m_name;
+
+            m_histo_path = m_nxgen.m_entry_path + "/" + m_histoname;
+
+            m_data_slab_path = m_instr_path + "/" + m_nxgen.m_data_name;
+
+            m_histo_pid_slab_path = m_instr_path + "/"
+                + m_nxgen.m_histo_pid_name;
+
+            m_tofbin_slab_path = m_instr_path + "/" + m_nxgen.m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of bank in Nexus file
-        std::string             m_eventname;        ///< Name of bank events entry in Nexus file
         std::string             m_instr_path;       ///< Nexus path to "NXdetector" instrument group
+        std::string             m_eventname;        ///< Name of bank events entry in Nexus file
         std::string             m_event_path;       ///< Nexus path to "NXevent_data" group
-        std::string             m_time_path;        ///< Nexus path to Pulse Time array
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         std::string             m_pid_slab_path;    ///< Nexus path to PID slab
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
+        std::string             m_time_path;        ///< Nexus path to Pulse Time array
+        std::string             m_histoname;        ///< Name of bank histo entry in Nexus file
+        std::string             m_histo_path;       ///< Nexus path to histo "NXdata" group
+        std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
+        std::string             m_histo_pid_slab_path; ///< Nexus path to Histo PID slab
+        std::string             m_tofbin_slab_path; ///< Nexus path to Histo TOF Bin slab
         bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
         uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
         uint64_t                m_index_slab_size;  ///< Running size of event index slab
@@ -120,28 +142,22 @@ private:
 
             m_path = m_nxgen.m_entry_path + "/" + m_name;
 
-            // Event Monitor Paths
+            // Monitor Event Paths
 
             m_index_slab_path = m_path + "/" + m_nxgen.m_index_name;
 
             m_tof_slab_path = m_path + "/" + m_nxgen.m_tof_name;
 
-            // Histogram Monitor Paths
+            // Monitor Histogram Paths
 
-            m_data_name = std::string("data");
+            m_data_slab_path = m_path + "/" + m_nxgen.m_data_name;
 
-            m_tofbin_name = std::string("time_of_flight");
-
-            m_data_slab_path = m_path + "/" + m_data_name;
-
-            m_tofbin_slab_path = m_path + "/" + m_tofbin_name;
+            m_tofbin_slab_path = m_path + "/" + m_nxgen.m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
         std::string             m_path;             ///< Nexus path to monitor group
         std::string             m_group_type;       ///< Type of encompassing group in Nexus file
-        std::string             m_data_name;        ///< Name of monitor Histo data in Nexus file
-        std::string             m_tofbin_name;      ///< Name of monitor Histo TOF Bins in Nexus file
         std::string             m_index_slab_path;  ///< Nexus path to event index slab
         std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
         std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
@@ -346,6 +362,12 @@ private:
                             const std::string &dataset_name,
                             NeXus::NXnumtype nxdatatype,
                             const std::string units = "" );
+    void                writeMultidimDataset(
+                            const std::string &dataset_path,
+                            const std::string &dataset_name,
+                            std::vector<uint32_t> &a_data,
+                            std::vector<hsize_t> &a_dims,
+                            const std::string units = "" );
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
     void                writeString( const std::string &a_path,
@@ -431,6 +453,9 @@ private:
     std::string         m_tof_name;             ///< Name of TOF data in Nexus file
     std::string         m_index_name;           ///< Name of Event Index data in Nexus file
     std::string         m_pulse_time_name;      ///< Name of Pulse Time data in Nexus file
+    std::string         m_data_name;            ///< Name of Histo data in Nexus file
+    std::string         m_histo_pid_name;       ///< Name of Histo PixelId data in Nexus file
+    std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)

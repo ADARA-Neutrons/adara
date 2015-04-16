@@ -43,6 +43,9 @@ NxGen::NxGen
     m_tof_name(string("event_time_offset")),
     m_index_name(string("event_index")),
     m_pulse_time_name(string("event_time_zero")),
+    m_data_name(string("data")),
+    m_histo_pid_name(string("pixel_id")),
+    m_tofbin_name(string("time_of_flight")),
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
@@ -177,11 +180,13 @@ NxGen::initializeNxBank
     {
         if ( m_gen_nexus)
         {
+            // Instrument bank group (contains *Both* Event and Histo data)
+            makeGroup( a_bi->m_instr_path, "NXdetector" );
+
             // NeXus Event-based Structures
             if ( a_bi->m_has_event )
             {
-                // Instrument bank group
-                makeGroup( a_bi->m_instr_path, "NXdetector" );
+                // Event data
                 makeDataset( a_bi->m_instr_path, m_tof_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
                 makeDataset( a_bi->m_instr_path, m_pid_name,
@@ -189,7 +194,7 @@ NxGen::initializeNxBank
                 makeDataset( a_bi->m_instr_path, m_index_name,
                     NeXus::UINT64 );
 
-                // Event data group
+                // Top-level Event data group
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
                 makeLink( a_bi->m_tof_slab_path,
                     a_bi->m_event_path + "/" + m_tof_name );
@@ -208,7 +213,27 @@ NxGen::initializeNxBank
             // NeXus Histogram-based Structures
             if ( a_bi->m_has_histo )
             {
-                // TODO...
+                // Histo data
+
+                // (defer creation/writing of actual histogram data
+                //     to bankFinalize(), create & write in one shot...)
+
+                makeDataset( a_bi->m_instr_path, m_histo_pid_name,
+                    NeXus::UINT32 );
+                makeDataset( a_bi->m_instr_path, m_tofbin_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+
+                // Top-level Histo data group
+
+                makeGroup( a_bi->m_histo_path, "NXdata" );
+
+                // (defer linking of histogram data, which won't exist
+                //     until later in bankFinalize()... :-)
+
+                makeLink( a_bi->m_histo_pid_slab_path,
+                    a_bi->m_histo_path + "/" + m_histo_pid_name );
+                makeLink( a_bi->m_tofbin_slab_path,
+                    a_bi->m_histo_path + "/" + m_tofbin_name );
             }
 
             // NeXus Structures are Now Initialized
@@ -254,9 +279,9 @@ NxGen::makeMonitorInfo
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( mi->m_path, mi->m_data_name,
+                makeDataset( mi->m_path, m_data_name,
                     NeXus::UINT32, "" );
-                makeDataset( mi->m_path, mi->m_tofbin_name,
+                makeDataset( mi->m_path, m_tofbin_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
 
                 writeScalar( mi->m_path, "distance",
@@ -738,11 +763,8 @@ NxGen::bankBuffersReady
             bi->m_index_slab_size += a_bank.m_index_buffer.size();
         }
 
-        // NeXus Histogram-based Data...
-        if ( bi->m_has_histo )
-        {
-            // TODO...
-        }
+        // No NeXus Histogram-based Handling Needed Here...
+
     }
     catch( TraceException &e )
     {
@@ -787,11 +809,8 @@ NxGen::bankPulseGap
             bi->m_index_slab_size += a_count;
         }
 
-        // NeXus Histogram-based Data...
-        if ( bi->m_has_histo )
-        {
-            // TODO...
-        }
+        // No NeXus Histogram-based Handling Needed Here...
+
     }
     catch( TraceException &e )
     {
@@ -840,7 +859,29 @@ NxGen::bankFinalize
         // NeXus Histogram-based Data...
         if ( bi->m_has_histo )
         {
-            // TODO...
+            // Create & Write Histogram Multi-dimensional Data...
+            std::vector<hsize_t> dims;
+            dims.push_back( bi->m_logical_pixelids.size() );
+            dims.push_back( bi->m_num_tof_bins - 1 );
+            writeMultidimDataset( bi->m_instr_path, m_data_name,
+                bi->m_data_buffer, dims );
+
+            // Link Multi-dimensional Data into NXdata Histo group...
+            makeLink( bi->m_data_slab_path,
+                bi->m_histo_path + "/" + m_data_name );
+
+            // Write out Bank PixelIds...
+            writeSlab( bi->m_histo_pid_slab_path,
+                bi->m_logical_pixelids, 0 );
+
+            // Write out TOF Bins...
+            writeSlab( bi->m_tofbin_slab_path, bi->m_tofbin_buffer, 0 );
+
+            // Write Out Total Counts for Histograms, too... ;-D
+            writeScalar( bi->m_histo_path, "total_counts",
+                bi->m_histo_event_count, "" );
+            writeScalar( bi->m_histo_path, "total_uncounted_counts",
+                bi->m_histo_event_uncounted, "" );
         }
     }
     catch( TraceException &e )
@@ -1279,9 +1320,10 @@ NxGen::makeGroup
 }
 
 
-/*! \brief Creates a Nexus dataset
+/*! \brief Creates a Nexus Dataset
  *
- * This method creates a Nexus dataset with the specified type and (optional) units in the output Nexus file.
+ * This method creates a Nexus Dataset with the specified type and
+ * (optional) units in the output Nexus file.
  */
 void
 NxGen::makeDataset
@@ -1292,18 +1334,62 @@ NxGen::makeDataset
     const string        a_units     ///< [in] Optional units of new dataset
 )
 {
-    if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type, m_chunk_size ) != SUCCEED )
+    if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type,
+            m_chunk_size ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcreate_dataset_extend() failed for path: " << a_path << ", name: "
-                     << a_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXcreate_dataset_extend() failed for path: " << a_path
+                << ", name: " << a_name )
     }
 
     if ( a_units.size() )
     {
-        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
+        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
+                "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
-                         << ", name: " << a_name )
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                "H5NXmake_attribute_string() failed for path: " << a_path
+                     << ", name: " << a_name )
+        }
+    }
+}
+
+
+/*! \brief Creates and Writes a Nexus Multi-dimensional Dataset
+ *
+ * This method Creates and Writes a Nexus Multi-dimensional Dataset
+ * with the specified type and (optional) units in the output Nexus file.
+ *
+ * Note: We just need this for Histogram data, which is "UINT32",
+ * so no need to template-ize this method "yet"... ;-D
+ */
+void
+NxGen::writeMultidimDataset
+(
+    const std::string       &a_path,    ///< [in] Nexus path of new dataset
+    const std::string       &a_name,    ///< [in] Name of new dataset
+    std::vector<uint32_t>   &a_data,    ///< [in] Multi-dim Data Array
+    std::vector<hsize_t>    &a_dims,    ///< [in] Dimensions of Data
+    const string            a_units     ///< [in] Optional units of dataset
+)
+{
+    int cc;
+    if ( (cc = m_h5nx.H5NXmake_dataset_vector( a_path, a_name, a_data,
+            a_dims.size(), a_dims )) != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_dataset_vector() failed for path: " << a_path
+                << ", name: " << a_name )
+    }
+
+    if ( a_units.size() )
+    {
+        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
+                "units", a_units ) != SUCCEED )
+        {
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                "H5NXmake_attribute_string() failed for path: " << a_path
+                     << ", name: " << a_name )
         }
     }
 }
