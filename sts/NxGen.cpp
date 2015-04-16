@@ -866,6 +866,10 @@ NxGen::bankFinalize
             writeMultidimDataset( bi->m_instr_path, m_data_name,
                 bi->m_data_buffer, dims );
 
+            // Add "Axes" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
+                "axes", m_histo_pid_name + "," + m_tofbin_name );
+
             // Link Multi-dimensional Data into NXdata Histo group...
             makeLink( bi->m_data_slab_path,
                 bi->m_histo_path + "/" + m_data_name );
@@ -874,8 +878,16 @@ NxGen::bankFinalize
             writeSlab( bi->m_histo_pid_slab_path,
                 bi->m_logical_pixelids, 0 );
 
+            // Add "Axis" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute(
+                bi->m_instr_path + "/" + m_histo_pid_name, "axis", "1" );
+
             // Write out TOF Bins...
             writeSlab( bi->m_tofbin_slab_path, bi->m_tofbin_buffer, 0 );
+
+            // Add "Axis" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute(
+                bi->m_instr_path + "/" + m_tofbin_name, "axis", "2" );
 
             // Write Out Total Counts for Histograms, too... ;-D
             writeScalar( bi->m_histo_path, "total_counts",
