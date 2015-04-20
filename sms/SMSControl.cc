@@ -27,7 +27,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_PULSE        0
 #define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
-#define RLL_NO_RTDL_FOR_PULSE            3
+#define RLL_SET_SOURCES_READ_DELAY       3
+#define RLL_NO_RTDL_FOR_PULSE            4
 
 std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
@@ -785,11 +786,24 @@ void SMSControl::setSourcesReadDelay(void)
 		queue_length++;
 		next_to_last = it;
 	}
-	DEBUG("Internal Pulse Buffer " << std::hex
-		<< " begin()=" << " 0x" << m_pulses.begin()->first.first
-		<< " next_to_last=" << " 0x" << next_to_last->first.first
-		<< std::dec);
-	DEBUG("Internal Pulse Buffer Length = " << queue_length);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+			RLL_SET_SOURCES_READ_DELAY, "none",
+			600, 10, 30, log_info ) ) {
+		if ( m_pulses.begin() != m_pulses.end() ) {
+			DEBUG(log_info
+				<< "Internal Pulse Buffer " << std::hex
+				<< " begin()=" << "0x" << m_pulses.begin()->first.first
+				<< " next_to_last=" << "0x" << next_to_last->first.first
+				<< std::dec
+				<< ", Internal Pulse Buffer Length = " << queue_length);
+		} else {
+			DEBUG(log_info
+				<< "Internal Pulse Buffer is Empty"
+				<< ", Internal Pulse Buffer Length = " << queue_length);
+		}
+	}
 }
 
 // Clear All Packet Statistics...
