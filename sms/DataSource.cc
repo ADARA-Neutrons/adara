@@ -862,6 +862,7 @@ void DataSource::dataReady(void)
 		{
 			/* Rate-limited logging of read delay threshold */
 			std::string log_info;
+			bool dumpStats = false;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
 				ERROR(log_info
@@ -870,9 +871,10 @@ void DataSource::dataReady(void)
 					<< " log_info=(" << log_info << ")"
 					<< " m_rtdl_pkt_counts=" << m_rtdl_pkt_counts
 					<< " m_data_pkt_counts=" << m_data_pkt_counts);
+				dumpStats = true;
 			}
 			ctrl->setSourcesReadDelay();
-			dumpLastReadStats("dataReady() (Read Delay)");
+			if ( dumpStats ) dumpLastReadStats("dataReady() (Read Delay)");
 		}
 	}
 }
