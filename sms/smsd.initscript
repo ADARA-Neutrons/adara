@@ -27,6 +27,8 @@ lockfile=/var/lock/subsys/$prog
 
 export PATH=/usr/local/bin:$PATH
 
+export DAEMON_COREFILE_LIMIT='unlimited'
+
 start() {
 	[ "$EUID" != "0" ] && exit 4
 	[ "$NETWORKING" = "no" ] && exit 1
