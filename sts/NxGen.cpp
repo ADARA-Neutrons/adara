@@ -870,6 +870,10 @@ NxGen::bankFinalize
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
                 "axes", m_histo_pid_name + "," + m_tofbin_name );
 
+            // Add "Signal" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
+                "signal", "1" );
+
             // Link Multi-dimensional Data into NXdata Histo group...
             makeLink( bi->m_data_slab_path,
                 bi->m_histo_path + "/" + m_data_name );
