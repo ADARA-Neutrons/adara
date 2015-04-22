@@ -182,6 +182,18 @@ public:
                     // Max TOF Bin Value...
                     m_tofbin_buffer.push_back((float)((*dbs)->tofMax));
 
+                    // Verify Histogram Data Size
+                    if ( m_data_buffer.size() !=
+                            num_pids * ( m_num_tof_bins - 1 ) )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s %s %u %s: %s %s.size()=%lu vs. %s %u",
+                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            "Histogram", "Verifying",
+                            "m_data_buffer", m_data_buffer.size(),
+                            "expected", num_pids * ( m_num_tof_bins - 1 ) );
+                    }
+
                     // Calculate Per-PixelId Offset Index
                     //    into Histogram Data Buffer...
                     // (saves time, and we sorta _Have_ to do this
@@ -234,9 +246,11 @@ public:
                                 offset++ * ( m_num_tof_bins - 1 );
 
                             // syslog( LOG_ERR,
-                            // "[%i] %s %u Histogram: Offset[%lu] = %d",
+                            // "[%i] %s %u Histogram: p=%u offset[%lu]=%d",
                                 // g_pid, "Detector Bank", m_id,
-                                // index, m_histo_pid_offset[ index ] );
+                                // p, index, m_histo_pid_offset[ index ] );
+                            // give sleep a chance...
+                            // usleep(10000);
                         }
 
                         // Duplicate PixelId!  (shouldn't happen...)

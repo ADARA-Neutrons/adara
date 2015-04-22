@@ -817,6 +817,7 @@ StreamParser::processBankEvents
                         & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
                 {
                     uint32_t tofbin;
+                    uint32_t index;
                     uint32_t tof;
                     uint32_t pid;
 
@@ -839,13 +840,13 @@ StreamParser::processBankEvents
                             tofbin = ( tof - (*dbs)->tofOffset )
                                 / (*dbs)->tofBin;
 
-                            // Sanity Test, Just to Be Sure... ;-b
+                            // TOF Sanity Test, Just to Be Sure... ;-b
                             // (This should never happen,
                             //    but the logic is confusing.)
                             if ( tofbin >= bi->m_num_tof_bins - 1 )
                             {
                                 syslog( LOG_ERR,
-                                "[%i] %s %s %u %s tof=%u index=%u >= %u",
+                                "[%i] %s %s %u %s tof=%u tofbin=%u >= %u",
                                     g_pid, "STS Error:",
                                     "Detector Bank", bi->m_id,
                                     "Histogram Error",
@@ -855,11 +856,32 @@ StreamParser::processBankEvents
                                 continue;
                             }
 
-                            // Increment Histogram Time Slot...
-                            (bi->m_data_buffer[
-                                bi->m_histo_pid_offset[
+                            // Calculate Overall Histogram Index
+                            index = bi->m_histo_pid_offset[
                                         pid - bi->m_base_pid ]
-                                    + tofbin ])++;
+                                    + tofbin;
+
+                            // Index Sanity Test, Just to Be Sure... ;-b
+                            // (This should never happen...)
+                            if ( index >= ( bi->m_logical_pixelids.size()
+                                    * ( bi->m_num_tof_bins - 1 ) ) )
+                            {
+                                syslog( LOG_ERR,
+                             "[%i] %s %s %u %s pid=%u tofbin=%u %u >= %lu",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Index Overflow",
+                                    pid, tofbin, index,
+                                    bi->m_logical_pixelids.size()
+                                        * ( bi->m_num_tof_bins - 1 )
+                                    );
+                                // Count Uncounted Detector Histo Events...
+                                (bi->m_histo_event_uncounted)++;
+                                continue;
+                            }
+
+                            // Increment Histogram Time Slot...
+                            (bi->m_data_buffer[ index ])++;
 
                             // Count Detector Events for Histogram Mode Too
                             (bi->m_histo_event_count)++;
@@ -867,10 +889,24 @@ StreamParser::processBankEvents
 
                         // Count Uncounted Detector Events for Histogram...
                         else
-                            (bi->m_histo_event_uncounted)++;
+                        {
+                            // Log Any Bogus PixelId Offsets...?
+                            // (TODO definitely need to be rate-limited ;-)
+                            if ( bi->m_histo_pid_offset[
+                                    pid - bi->m_base_pid ] < 0 )
+                            {
+                                syslog( LOG_ERR,
+                           "[%i] %s %s %u %s pid=%u base=%u offset=%u < 0",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Offset Error",
+                                    pid, bi->m_base_pid,
+                                    bi->m_histo_pid_offset[
+                                        pid - bi->m_base_pid ] );
+                            }
 
-                        // TODO: Log Any Bogus PixelId Offsets...?
-                        // (definitely need to be rate-limited... ;-)
+                            (bi->m_histo_event_uncounted)++;
+                        }
 
                     }   // event processing loop...
 
