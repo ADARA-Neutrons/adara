@@ -78,7 +78,7 @@ public:
     virtual ~BankInfo()
     {}
 
-    void initializeBank(void)
+    void initializeBank( bool a_end_of_run )
     {
         // Already Initialized...
         if ( m_initialized )
@@ -127,28 +127,41 @@ public:
                         continue;
                     }
 
-                    // Number of Time Bin Values Needed...
-                    m_num_tof_bins =
-                        ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
-                            / (*dbs)->tofBin ) + 1;
-
-                    // If Max TOF doesn't divide evenly into TOF Bin size,
-                    // then need "One Extra" Bin Value...
-                    if ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
-                            % (*dbs)->tofBin )
+                    // Did we reach End of Run with No Data for this Bank?
+                    if ( a_end_of_run )
                     {
-                        m_num_tof_bins++;
+                        m_num_tof_bins = 2;
+                        syslog( LOG_ERR,
+                            "[%i] %s %u %s: Setting num_tof_bins to %u",
+                            g_pid, "Detector Bank", m_id,
+                            "Empty Histogram", m_num_tof_bins);
                     }
 
-                    // Fail Safe: Make Sure We Get At Least One
-                    // Actual TOF Bin!
-                    if ( m_num_tof_bins < 2 )
+                    else
                     {
-                        syslog( LOG_ERR,
-                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
-                            g_pid, "STS Error:", "Detector Bank", m_id,
-                            m_num_tof_bins);
-                        m_num_tof_bins = 2;
+                        // Number of Time Bin Values Needed...
+                        m_num_tof_bins =
+                            ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                                / (*dbs)->tofBin ) + 1;
+
+                        // If Max TOF doesn't divide evenly into TOF Bin
+                        // then need "One Extra" Bin Value...
+                        if ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                                % (*dbs)->tofBin )
+                        {
+                            m_num_tof_bins++;
+                        }
+
+                        // Fail Safe: Make Sure We Get At Least One
+                        // Actual TOF Bin!
+                        if ( m_num_tof_bins < 2 )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s %u %s: num_tof_bins=%u < 2!",
+                                g_pid, "STS Error:", "Detector Bank", m_id,
+                                "Histogram Warning", m_num_tof_bins);
+                            m_num_tof_bins = 2;
+                        }
                     }
 
                     syslog( LOG_ERR,

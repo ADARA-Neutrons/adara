@@ -319,7 +319,8 @@ protected:
     STS::BankInfo*      makeBankInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
-    void                initializeNxBank( NxBankInfo *a_bi );
+    void                initializeNxBank( NxBankInfo *a_bi,
+                            bool a_end_of_run );
     STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve,

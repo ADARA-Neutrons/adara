@@ -168,13 +168,14 @@ NxGen::makeBankInfo
 void
 NxGen::initializeNxBank
 (
-    NxBankInfo* a_bi            ///< [in] Ptr to NeXus detector bank info
+    NxBankInfo* a_bi,           ///< [in] Ptr to NeXus detector bank info
+    bool a_end_of_run           ///< [in] Is there more data yet to come?
 )
 {
     // Make Sure BankInfo has been (Late) Initialized...
     // (to know whether Events, Histo or Both...?)
     if ( !(a_bi->m_initialized) )
-        a_bi->initializeBank();
+        a_bi->initializeBank( a_end_of_run );
 
     try
     {
@@ -243,6 +244,7 @@ NxGen::initializeNxBank
     catch ( TraceException &e )
     {
         RETHROW_TRACE( e, "initializeNxBank( bank: " << a_bi->m_id
+            << ", end_of_run=" << a_end_of_run
             << " ) initialization failed." )
     }
 }
@@ -741,11 +743,11 @@ NxGen::bankBuffersReady
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank();
+            bi->initializeBank( false );
 
         // Make Sure NeXus Structures have been (Late) Initialized...
         if ( !(bi->m_nexus_init) )
-            initializeNxBank( bi );
+            initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
         if ( bi->m_has_event )
@@ -799,7 +801,7 @@ NxGen::bankPulseGap
 
         // Make Sure NeXus Structures have been (Late) Initialized...
         if ( !(bi->m_nexus_init) )
-            initializeNxBank( bi );
+            initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
         if ( bi->m_has_event )
@@ -844,7 +846,7 @@ NxGen::bankFinalize
 
         // Make Sure NeXus Structures have been (Late) Initialized...
         if ( !(bi->m_nexus_init) )
-            initializeNxBank( bi );
+            initializeNxBank( bi, true );
 
         // NeXus Event-based Data...
         if ( bi->m_has_event )
