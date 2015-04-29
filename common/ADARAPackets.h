@@ -82,7 +82,7 @@ public:
 						((m_fields[2] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[2] & 0x00ffffff; }
-	bool badVeto(void) const { return !!(m_fields[3] & 0x8000000); }
+	bool badVeto(void) const { return !!(m_fields[3] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[3] & 0x40000000); }
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[3] >> 22);
@@ -126,7 +126,7 @@ public:
 						((m_fields[0] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
-	bool badVeto(void) const { return !!(m_fields[1] & 0x8000000); }
+	bool badVeto(void) const { return !!(m_fields[1] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[1] & 0x40000000); }
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[1] >> 22);
