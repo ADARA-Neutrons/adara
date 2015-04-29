@@ -17,6 +17,8 @@
 #include "Logging.h"
 #include "utils.h"
 
+#include "snsTiming.h"
+
 #include <string>
 #include <sstream>
 #include <map>
@@ -35,6 +37,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_SET_SOURCES_READ_DELAY       3
 #define RLL_NO_RTDL_FOR_PULSE            4
+
+uint32_t SMSControl::m_targetNumber;
 
 std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
@@ -102,6 +106,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_pixelMapPath = conf.get<std::string>("sms.pixelmap_file", "");
 	if (!m_pixelMapPath.length())
 		m_pixelMapPath = base + "/pixelmap";
+
+	m_targetNumber = conf.get<uint32_t>("sms.target", 1);
+	INFO("Operating on Neutron Facility Target " << m_targetNumber << ".");
 
 	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
 	m_beamlineShortName =

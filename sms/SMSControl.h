@@ -47,6 +47,8 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
+	uint32_t getTargetNumber(void) { return m_targetNumber; }
+
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
 	void sourceUp(uint32_t smsId);
@@ -195,6 +197,8 @@ private:
 	uint32_t m_maxBanks;
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
+
+	static uint32_t m_targetNumber;
 
 	static std::string m_version;
 	static std::string m_beamlineId;
