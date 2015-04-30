@@ -283,10 +283,17 @@ the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a bad (previous) veto frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
 \item{\bf Veto} contains the veto information for this frame as defined
 in the SNS Timing Master Functional Description. A non-zero value indicates
@@ -581,10 +588,17 @@ the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a bad (previous) veto frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
 \item{\bf Veto} contains the veto information for this frame as defined
 in the SNS Timing Master Functional Description. A non-zero value indicates
@@ -665,10 +679,17 @@ accelerator.
 the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the previous pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a bad (previous) veto frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
 \item{\bf Veto} contains the veto information for the previous frame as defined
 in the SNS Timing Master Functional Description. A non-zero value indicates
