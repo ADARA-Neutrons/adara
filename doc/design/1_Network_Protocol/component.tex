@@ -1743,6 +1743,17 @@ intervening NULLs. This field must be padded to a multiple of 4 bytes.
 
 The ``Beamline Info'' (Version 1) packet contains information
 to identify the beamline that created the event data in this stream.
+Note that this version of the Beamline Info packet is wire-compatible
+with the original ``Version 0'' packet type
+(Section~\ref{section:protocol_beamline_info_v0}),
+as the ``Unused'' field is simply replaced with ``real information,''
+namely the ``Target Number'' (see below).
+It shall be that any ADARA components supporting the new Version 1
+structure of the Beamline Info packet are made
+backwards compatible to components that might
+deliver the Version 0 packet structure,
+by ensuring that the Target Number simply defaults to ``1''
+if not specified (i.e. left as ``0'' in the ``Unused'' field).
 
 \begin{itemize}
 \item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
