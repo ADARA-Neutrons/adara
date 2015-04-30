@@ -171,8 +171,10 @@ system.
 		\ref{section:protocol_heartbeat} \\
 	0x400A.0 & Geometry &
 		\ref{section:protocol_geometry} \\
-	0x400B.0 & Beamline Info &
-		\ref{section:protocol_beamline_info} \\
+	0x400B.0 & Beamline Info V0 &
+		\ref{section:protocol_beamline_info_v0} \\
+	0x400B.1 & Beamline Info V1 &
+		\ref{section:protocol_beamline_info_v1} \\
 	0x400D.0 & Beam Monitor Config &
 		\ref{section:protocol_beam_monitor_config} \\
 	0x400E.0 & Detector Bank Sets &
@@ -775,7 +777,7 @@ for the run, the SMS will send the following prologue:
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Run Information (Section~\ref{section:protocol_run_information})
 \item Geometry (Section~\ref{section:protocol_geometry})
-\item Beamline Info (Section~\ref{section:protocol_beamline_info})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
 \item Beam Monitor Config (Optional, Section~\ref{section:protocol_beam_monitor_config})
 \item Detector Bank Sets (Optional, Section~\ref{section:protocol_detector_bank_sets})
 \item one or more Device Descriptors and Variable Value packets
@@ -817,7 +819,7 @@ Hello, it will send the following prologue:
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table})
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Geometry (Section~\ref{section:protocol_geometry})
-\item Beamline Info (Section~\ref{section:protocol_beamline_info})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
 \item Beam Monitor Config (Optional, Section~\ref{section:protocol_beam_monitor_config})
 \item Detector Bank Sets (Optional, Section~\ref{section:protocol_detector_bank_sets})
 \item one or more Device Descriptors and Variable Value packets
@@ -1672,8 +1674,8 @@ this field must be padded to a multple of 4 bytes.
 
 
 \newpage
-\subsubsection{Beamline Info Packet}
-\label{section:protocol_beamline_info}
+\subsubsection{Beamline Info Packet - Version 0 (Original)}
+\label{section:protocol_beamline_info_v0}
 
 \begin{figure}[h]
   \centering
@@ -1691,18 +1693,70 @@ this field must be padded to a multple of 4 bytes.
     \bitbox{8}{Long Len} \\
     \wordbox{2}{Beamline Data ($N$ byte string data)}
   \end{bytefield}
-  \caption{Packet Type 0x400B.0: Beamline Info Packet}
-  \label{fig:protocol_packet_beamline_info}
+  \caption{Packet Type 0x400B.0: Beamline Info Packet V0}
+  \label{fig:protocol_packet_beamline_info_v0}
 \end{figure}
 
-The ``Beamline Info'' packet contains information to identify the beamline that
-created the event data in this stream.
+The ``Beamline Info'' (Version 0) packet contains information
+to identify the beamline that created the event data in this stream.
 
 \begin{itemize}
 \item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
 \item{\bf Timestamp} does not carry significant information and may be the
 startup time of the SMS, or the time the packet was send, if not another value
 altogether.
+\item{\bf Id Len} gives the length of the numeric beamline identifier in the
+{\bf Beamline Data} field.
+\item{\bf Short Len} gives the length of the short name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Long Len} gives the length of the long name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Beamline Data} contains the numeric identifier, short name, and long
+name for the beamline. These strings are concatenated together without
+intervening NULLs. This field must be padded to a multiple of 4 bytes.
+\end{itemize}
+
+
+\newpage
+\subsubsection{Beamline Info Packet - Version 1}
+\label{section:protocol_beamline_info_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{0x00400B01} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,24,23,16,15,8,7,0} \\
+    \bitbox{8}{Target Number} &
+    \bitbox{8}{Id Len} &
+    \bitbox{8}{Short Len} &
+    \bitbox{8}{Long Len} \\
+    \wordbox{2}{Beamline Data ($N$ byte string data)}
+  \end{bytefield}
+  \caption{Packet Type 0x400B.1: Beamline Info Packet V1}
+  \label{fig:protocol_packet_beamline_info_v1}
+\end{figure}
+
+The ``Beamline Info'' (Version 1) packet contains information
+to identify the beamline that created the event data in this stream.
+
+\begin{itemize}
+\item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
+\item{\bf Timestamp} does not carry significant information and may be the
+startup time of the SMS, or the time the packet was send, if not another value
+altogether.
+\item{\bf Target Number} specifies the Neutron Target Station Number
+for the given Neutron Facility,
+e.g. in the case of the Spallation Neutron Source (SNS) there are
+two potential Target Stations, Target Station 1 and Target Station 2;
+this distinction is already relevant based on Timing information
+that distinguishes between the two Target Stations in the RTDL
+(Real Time Data Link, Section~\ref{section:protocol_rtdl_packet})
+packet bits.
 \item{\bf Id Len} gives the length of the numeric beamline identifier in the
 {\bf Beamline Data} field.
 \item{\bf Short Len} gives the length of the short name for the beamline in the
