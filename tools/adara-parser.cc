@@ -614,10 +614,10 @@ bool Parser::rxPacket(const ADARA::GeometryPkt &pkt)
 bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 {
 	printf("%u.%09u BEAMLINE INFO\n"
-		"    id '%s' short '%s' long '%s'\n",
+		"    target '%u' id '%s' short '%s' long '%s'\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-		pkt.id().c_str(), pkt.shortName().c_str(),
-		pkt.longName().c_str());
+		pkt.targetNumber(),
+		pkt.id().c_str(), pkt.shortName().c_str(), pkt.longName().c_str());
 	return false;
 }
 
