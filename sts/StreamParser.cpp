@@ -629,7 +629,7 @@ StreamParser::rxOversizePkt
             }
             else if ( ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
                             || hdr->type() ==
-                                ADARA::PacketType::BANKED_EVENT_V0 )
+                                ADARA::PacketType::BANKED_EVENT_V1 )
                         && m_pulse_flag == 2 )
                     || ( ( hdr->type() ==
                                 ADARA::PacketType::BEAM_MONITOR_EVENT_V0
