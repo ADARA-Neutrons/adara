@@ -260,6 +260,7 @@ bool Parser::rxPacket(const Packet &pkt)
 		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
 		MAP_TYPE(PacketType::GEOMETRY_V0, GeometryPkt);
 		MAP_TYPE(PacketType::BEAMLINE_INFO_V0, BeamlineInfoPkt);
+		MAP_TYPE(PacketType::BEAMLINE_INFO_V1, BeamlineInfoPkt);
 		MAP_TYPE(PacketType::BEAM_MONITOR_CONFIG_V0, BeamMonitorConfigPkt);
 		MAP_TYPE(PacketType::DETECTOR_BANK_SETS_V0, DetectorBankSetsPkt);
 		MAP_TYPE(PacketType::DATA_DONE_V0, DataDonePkt);

@@ -351,11 +351,15 @@ class BeamlineInfoPkt : public Packet {
 public:
 	BeamlineInfoPkt(const BeamlineInfoPkt &pkt);
 
+	const uint32_t &targetNumber(void) const { return m_targetNumber; }
+
 	const std::string &id(void) const { return m_id; }
 	const std::string &shortName(void) const { return m_shortName; }
 	const std::string &longName(void) const { return m_longName; }
 
 private:
+	uint32_t m_targetNumber;
+
 	std::string m_id;
 	std::string m_shortName;
 	std::string m_longName;

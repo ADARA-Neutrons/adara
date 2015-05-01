@@ -332,6 +332,11 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 	longName_len = sizes & 0xff;
 	shortName_len = (sizes >> 8) & 0xff;
 	id_len = (sizes >> 16) & 0xff;
+	m_targetNumber = (sizes >> 24) & 0xff;	// formerly "Unused" in V0...
+
+	// Unspecified (Version 0 Packet) Target Number Defaults to 1.
+	if ( m_targetNumber == 0 )
+		m_targetNumber = 1;
 
 	info_len = id_len + shortName_len + longName_len;
 
@@ -346,8 +351,8 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 }
 
 BeamlineInfoPkt::BeamlineInfoPkt(const BeamlineInfoPkt &pkt) :
-	Packet(pkt), m_id(pkt.m_id), m_shortName(pkt.m_shortName),
-	m_longName(pkt.m_longName)
+	Packet(pkt), m_targetNumber(pkt.m_targetNumber),
+	m_id(pkt.m_id), m_shortName(pkt.m_shortName), m_longName(pkt.m_longName)
 {}
 
 /* ------------------------------------------------------------------------ */
