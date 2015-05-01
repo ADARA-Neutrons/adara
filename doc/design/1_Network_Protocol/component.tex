@@ -249,7 +249,7 @@ developers will fill them in at a later date.}
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -299,7 +299,7 @@ specific bits in the ``Veto'' field].
 \item{\bf TSTAT} contains the timing status
 (e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information
+\item{\bf Veto Flags} contains the veto information
 for the {\it previous pulse} frame,
 as defined in the SNS Timing Master Functional Description,
 see Table~\ref{table:sns_timing_master_veto_bits}.
@@ -538,7 +538,7 @@ fast metadata pixel ID formats.}
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -637,7 +637,7 @@ specific bits in the ``Veto'' field].
 \item{\bf TSTAT} contains the timing status
 (e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information
+\item{\bf Veto Flags} contains the veto information
 for the {\it previous pulse} frame,
 as defined in the SNS Timing Master Functional Description,
 see Table~\ref{table:sns_timing_master_veto_bits}.
@@ -696,7 +696,7 @@ to deal with reordering should it be necessary.
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -737,7 +737,7 @@ specific bits in the ``Veto'' field].
 \item{\bf TSTAT} contains the timing status
 (e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information
+\item{\bf Veto Flags} contains the veto information
 for the {\it previous pulse} frame,
 as defined in the SNS Timing Master Functional Description,
 see Table~\ref{table:sns_timing_master_veto_bits}.
@@ -1148,7 +1148,7 @@ packet due to frame skew.
 given in electron volts. This value is calculated from the Ring Period
 field of the RTDL packet and depends on the accumulator ring geometry. This
 value may not be the voltage for the events in this packet due to frame skew.
-\item{\bf Veto} contains the veto information
+\item{\bf Veto Flags} contains the veto information
 for the {\it previous pulse} frame,
 as defined in the SNS Timing Master Functional Description,
 see Table~\ref{table:sns_timing_master_veto_bits}.
