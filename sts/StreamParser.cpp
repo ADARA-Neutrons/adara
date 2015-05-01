@@ -281,6 +281,7 @@ StreamParser::rxPacket
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
+    case ADARA::PacketType::BEAMLINE_INFO_V1:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
 
     case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
@@ -477,10 +478,10 @@ StreamParser::rxPacket
                 base_logical + i );
         }
 
-        syslog( LOG_INFO,
-       "[%i] PixelMappingPkt: bank_id=%u base_logical=%u count=%u tot=%lu",
-            g_pid, bank_id, base_logical, pix_count,
-            m_banks[bank_id]->m_logical_pixelids.size() );
+        // syslog( LOG_INFO,
+            // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
+            // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
+            // m_banks[bank_id]->m_logical_pixelids.size() );
 
         // Next Section
         rpos += pix_count;
@@ -1372,9 +1373,11 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    m_run_info.instr_id =  a_pkt.id();
-    m_run_info.instr_shortname =  a_pkt.shortName();
-    m_run_info.instr_longname =  a_pkt.longName();
+    m_run_info.target_number = a_pkt.targetNumber();
+
+    m_run_info.instr_id = a_pkt.id();
+    m_run_info.instr_shortname = a_pkt.shortName();
+    m_run_info.instr_longname = a_pkt.longName();
 
     receivedInfo( INSTR_INFO_BIT );
 
@@ -2137,9 +2140,13 @@ StreamParser::receivedInfo( InfoBit a_bit )
         processRunInfo( m_run_info );
         m_info_rcvd |= INFO_SENT;
 
-        syslog( LOG_INFO, "[%i] beam: %s:%s, prop: %s, run: %lu", g_pid,
-            m_run_info.facility_name.c_str(), m_run_info.instr_shortname.c_str(),
-            m_run_info.proposal_id.c_str(), m_run_info.run_number );
+        syslog( LOG_INFO,
+            "[%i] target: %u, beam: %s:%s, prop: %s, run: %lu", g_pid,
+            m_run_info.target_number,
+            m_run_info.facility_name.c_str(),
+            m_run_info.instr_shortname.c_str(),
+            m_run_info.proposal_id.c_str(),
+            m_run_info.run_number );
     }
 }
 
@@ -2278,7 +2285,9 @@ StreamParser::getPktName(
     case ADARA::PacketType::GEOMETRY_V0:
         return "Geom Info";
     case ADARA::PacketType::BEAMLINE_INFO_V0:
-        return "Beam Info";
+        return "Beamline Info V0";
+    case ADARA::PacketType::BEAMLINE_INFO_V1:
+        return "Beamline Info V1";
     case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
         return "Beam Monitor Config";
     case ADARA::PacketType::DETECTOR_BANK_SETS_V0:

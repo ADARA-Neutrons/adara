@@ -523,6 +523,9 @@ template
 int H5nx::H5NXmake_dataset_scalar( const std::string &group_path, const std::string &dataset_name, const float &value );
 
 template
+int H5nx::H5NXmake_dataset_scalar( const std::string &group_path, const std::string &dataset_name, const uint32_t &value );
+
+template
 int H5nx::H5NXmake_dataset_scalar( const std::string &group_path, const std::string &dataset_name, const uint64_t &value );
 
 template <typename NumT>

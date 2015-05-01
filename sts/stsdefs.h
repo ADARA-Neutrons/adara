@@ -465,9 +465,10 @@ struct UserInfo
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : run_number(0)
+    RunInfo() : target_number(1), run_number(0)
     {}
 
+    uint32_t                target_number;
     std::string             instr_id;
     std::string             instr_shortname;
     std::string             instr_longname;
