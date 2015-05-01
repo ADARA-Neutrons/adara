@@ -925,6 +925,9 @@ MainWindow::updateBeamInfo( const ADARA::DASMON::BeamInfo &a_beam_info )
     QMetaObject::invokeMethod( ui->beamIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_id.c_str()));
     QMetaObject::invokeMethod( ui->beamNameShortEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_sname.c_str()));
     QMetaObject::invokeMethod( ui->beamNameLongEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_lname.c_str()));
+
+    // Note: BeamInfo now contains "Target Number", m_target_number.
+
     QMetaObject::invokeMethod( ui->facilityNameEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_facility.c_str()));
 }
 

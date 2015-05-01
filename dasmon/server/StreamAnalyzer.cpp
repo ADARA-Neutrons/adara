@@ -896,6 +896,9 @@ StreamAnalyzer::beamInfo( const ADARA::DASMON::BeamInfo &a_info )
 
     if ( !a_info.m_facility.empty() )
         m_engine->assert( m_fact[BIF_FAC_NAME] );
+
+    // Note: BeamInfo now includes "Target Number" field, m_target_number.
+
     if ( !a_info.m_beam_id.empty() )
         m_engine->assert( m_fact[BIF_BEAM_ID] );
     if ( !a_info.m_beam_sname.empty() )

@@ -555,6 +555,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         case ADARA::PacketType::PIXEL_MAPPING_V0:
         case ADARA::PacketType::RUN_INFO_V0:
         case ADARA::PacketType::BEAMLINE_INFO_V0:
+        case ADARA::PacketType::BEAMLINE_INFO_V1:
         case ADARA::PacketType::DEVICE_DESC_V0:
         case ADARA::PacketType::VAR_VALUE_U32_V0:
         case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
@@ -1100,6 +1101,8 @@ StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
+    m_beam_info.m_target_number = a_pkt.targetNumber();
+
     m_beam_info.m_beam_id = a_pkt.id();
     m_beam_info.m_beam_sname = a_pkt.shortName();
     m_beam_info.m_beam_lname = a_pkt.longName();
@@ -1488,7 +1491,13 @@ StreamMonitor::dbThread()
                 // Send double-value PV updates to database
                 for ( idblpv = dbl_pvs.begin(); idblpv != dbl_pvs.end(); ++idblpv )
                 {
-                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%g,%u,%u)", m_beam_info.m_beam_sname.c_str(), idblpv->first.m_name.c_str(), idblpv->second, idblpv->first.m_status, idblpv->first.m_time );
+                    sprintf( buf,
+                        "select \"pvUpdate\"('%s','%s',%g,%u,%u)",
+                        m_beam_info.m_beam_sname.c_str(),
+                        idblpv->first.m_name.c_str(),
+                        idblpv->second,
+                        idblpv->first.m_status,
+                        idblpv->first.m_time );
 
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
@@ -1511,7 +1520,13 @@ StreamMonitor::dbThread()
                 // Send int-value PV updates to database
                 for ( iintpv = int_pvs.begin(); iintpv != int_pvs.end(); ++iintpv )
                 {
-                    sprintf( buf, "select \"pvUpdate\"('%s','%s',%u,%u,%u)", m_beam_info.m_beam_sname.c_str(), iintpv->first.m_name.c_str(), iintpv->second, iintpv->first.m_status, iintpv->first.m_time );
+                    sprintf( buf,
+                        "select \"pvUpdate\"('%s','%s',%u,%u,%u)",
+                        m_beam_info.m_beam_sname.c_str(),
+                        iintpv->first.m_name.c_str(),
+                        iintpv->second,
+                        iintpv->first.m_status,
+                        iintpv->first.m_time );
 
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
