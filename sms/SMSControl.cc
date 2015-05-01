@@ -330,8 +330,8 @@ SMSControl::SMSControl() :
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId,
-			m_beamlineShortName, m_beamlineLongName));
+	m_beamlineInfo.reset(new BeamlineInfo(m_targetNumber,
+			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
