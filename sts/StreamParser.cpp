@@ -299,7 +299,9 @@ StreamParser::rxPacket
 
     // These packets shall only be processed during event processing
     case ADARA::PacketType::BANKED_EVENT_V0:
+    case ADARA::PacketType::BANKED_EVENT_V1:
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
         PROCESS_IN_STATES(PROCESSING_EVENTS)
 
     // Packet types that are not processes by StreamParser
@@ -599,7 +601,9 @@ StreamParser::rxOversizePkt
         // (so we don't get "out of sync" when we throw it away... :-)
 
         if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+            || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1
+            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
         {
             // Pulse flag should be 0 (no data processed yet) or 2 (monitor
             // data processed) any other value indicates an error with
@@ -610,31 +614,41 @@ StreamParser::rxOversizePkt
                 // First packet of new pulse - count it and set flag
                 // indicating it was counted
                 ++m_pulse_count;
-                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                    || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
                 {
                     m_pulse_flag |= 1;
                 }
                 else if ( hdr->type() ==
-                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                    || hdr->type() ==
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
                 {
                     m_pulse_flag |= 2;
                 }
             }
-            else if ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+            else if ( ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                            || hdr->type() ==
+                                ADARA::PacketType::BANKED_EVENT_V0 )
                         && m_pulse_flag == 2 )
-                    || ( hdr->type() ==
-                            ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                    || ( ( hdr->type() ==
+                                ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                            || hdr->type() ==
+                                ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
                         && m_pulse_flag == 1 ) )
             {
                 m_pulse_flag = 0;
             }
-            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid banked event packet sequence received" )
             }
             else if ( hdr->type() ==
-                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                || hdr->type() ==
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid beam monitor packet sequence received" )
@@ -2263,9 +2277,13 @@ StreamParser::getPktName(
     case ADARA::PacketType::SOURCE_LIST_V0:
         return "Src List";
     case ADARA::PacketType::BANKED_EVENT_V0:
-        return "Bank Event";
+        return "Banked Event V0";
+    case ADARA::PacketType::BANKED_EVENT_V1:
+        return "Banked Event V1";
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return "Beam Mon";
+        return "Beam Monitor Event V0";
+    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
+        return "Beam Monitor Event V1";
     case ADARA::PacketType::PIXEL_MAPPING_V0:
         return "Pix Map";
     case ADARA::PacketType::RUN_STATUS_V0:

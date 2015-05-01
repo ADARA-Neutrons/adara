@@ -562,7 +562,9 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
         case ADARA::PacketType::VAR_VALUE_STRING_V0:
         case ADARA::PacketType::STREAM_ANNOTATION_V0:
         case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+        case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
         case ADARA::PacketType::BANKED_EVENT_V0:
+        case ADARA::PacketType::BANKED_EVENT_V1:
             return Parser::rxPacket(a_pkt);
 
         // Packet types that are not processes by StreamParser
