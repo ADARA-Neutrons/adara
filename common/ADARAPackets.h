@@ -87,7 +87,7 @@ public:
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[3] >> 22);
 	}
-	uint16_t veto(void) const { return (m_fields[3] >> 10) & 0xfff; }
+	uint16_t vetoFlags(void) const { return (m_fields[3] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[3] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[4]; }
 	bool tofCorrected(void) const { return !!(m_fields[5] & 0x80000000); }
@@ -131,7 +131,7 @@ public:
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[1] >> 22);
 	}
-	uint16_t veto(void) const { return (m_fields[1] >> 10) & 0xfff; }
+	uint16_t vetoFlags(void) const { return (m_fields[1] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[1] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
 	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
@@ -179,7 +179,8 @@ public:
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
 	uint32_t cycle(void) const { return m_fields[2]; }
-	uint32_t flags(void) const { return m_fields[3]; }
+	uint32_t vetoFlags(void) const { return (m_fields[3] >> 20) & 0xfff; }
+	uint32_t flags(void) const { return m_fields[3] & 0xfffff; }
 
 	// TODO implment bank/event accessors
 
@@ -198,7 +199,8 @@ public:
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
 	uint32_t cycle(void) const { return m_fields[2]; }
-	uint32_t flags(void) const { return m_fields[3]; }
+	uint32_t vetoFlags(void) const { return (m_fields[3] >> 20) & 0xfff; }
+	uint32_t flags(void) const { return m_fields[3] & 0xfffff; }
 
 	// TODO implment monitor/event accessors
 
