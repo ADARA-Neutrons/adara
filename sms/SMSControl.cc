@@ -1065,10 +1065,11 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		/* Hmm, no RTDL; save the raw packet's concept of values
 		 * we'll need for the banked event packets.
 		 */
+		pulse->m_vetoFlags = pkt.vetoFlags();
 		pulse->m_cycle = pkt.cycle();
 		pulse->m_ringPeriod = m_lastRingPeriod;
 
-		/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
+		/* Note: pkt.badCycle() and pkt.badVeto() are Deprecated. */
 	}
 
 	/* Find this source in the current pulse; if it doesn't exist
@@ -1085,9 +1086,17 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		src = pulse->m_pulseSources.insert(val).first;
 	}
 
-	/* We'll save this time and time again, but we can't use the one
+	/* We'll say this time and time again, but we can't use the one
 	 * from the RTDL packet -- that was for the previous pulse.
 	 * XXX validate that assertion when we have beam again
+	 * Note: Nope, the charge in the RawDataPkt/MappedDataPkt is
+	 * "Off By One" too, for Previous Pulse, just like the RTDL...
+	 * FIXME -Jeeeem
+	 * Also Note: By capturing the charge from RawDataPkt/MappedDataPkt,
+	 * there is a subtle side benefit, which is that any Pulses with
+	 * No Events will go thru _Without_ any Proton Charge (set to 0.0),
+	 * which is Very Convenient for Sub-60Hz Operation, where we don't
+	 * _Want_ any Proton Charge for those Pulses... ;-D  "Lucky."
 	 */
 	pulse->m_charge = pkt.pulseCharge();
 
@@ -1193,14 +1202,17 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 	/* Save off information about this pulse for the incoming pulse.
 	 * We don't save the pulse charge here, as that is for the
-	 * previous pulse.
+	 * previous pulse. (Same is true for RawDataPkt/MappedDataPkt tho,
+	 * however doing it this way is "Better"... Please see comment
+	 * in pulseEvents() above... ;-)
 	 */
+	pulse->m_vetoFlags = pkt.vetoFlags();
 	pulse->m_cycle = pkt.cycle();
 	pulse->m_ringPeriod = pkt.ringPeriod();
 
 	m_lastRingPeriod = pkt.ringPeriod();
 
-	/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
+	/* Note: pkt.badCycle() and pkt.badVeto() are Deprecated. */
 
 	pulse->m_rtdl.reset(new ADARA::RTDLPkt(pkt));
 
@@ -1340,6 +1352,25 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 		}
 
+		// Properly Set Veto Bit in Flags, Based on Timing Master Header
+		// (Don't Worry, This Just Sets an "Aggregation" Veto Bit;
+		//    the Full Veto Flags are _Also_ Included Now...! ;-D)
+		bool is_veto = false;
+		if ( m_targetNumber == 1 ) {
+			if ( pulse->m_vetoFlags & TARGET_1_VETO_MASK ) {
+				is_veto = true;
+			}
+		}
+		else if ( m_targetNumber == 2 ) {
+			if ( pulse->m_vetoFlags & TARGET_2_VETO_MASK ) {
+				is_veto = true;
+			}
+		}
+		if ( is_veto ) {
+			pulse->m_flags |= ADARA::BankedEventPkt::PULSE_VETO;
+		}
+
+		// Build Various Packets for Pulse...
 		buildMonitorPacket(pulse);
 		buildBankedPacket(pulse);
 		buildChopperPackets(pulse);
@@ -1380,7 +1411,7 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	size *= sizeof(uint32_t);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V0);
+	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V1);
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1388,7 +1419,10 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_charge);
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
-	m_hdrs.push_back(pulse->m_flags);
+
+	uint32_t flags = pulse->m_flags
+		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
+	m_hdrs.push_back(flags);
 
 	struct iovec iov;
 	iov.iov_base = &m_hdrs.front();
@@ -1444,7 +1478,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	size += pulse->m_numEvents * sizeof(ADARA::Event);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V0);
+	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V1);
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1452,7 +1486,10 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_charge);
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
-	m_hdrs.push_back(pulse->m_flags);
+
+	uint32_t flags = pulse->m_flags
+		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
+	m_hdrs.push_back(flags);
 
 	struct iovec iov;
 	iov.iov_base = &m_hdrs.front();
