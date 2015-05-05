@@ -136,10 +136,10 @@ private:
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
 				m_id(id), m_pending(srcs), m_numEvents(0),
 				m_numBanks(0), m_numMonEvents(0), m_charge(0),
-				m_cycle(0), m_ringPeriod(0), m_flags(0)
+				m_vetoFlags(0), m_cycle(0), m_ringPeriod(0), m_flags(0)
 		{ }
 
-		PulseIdentifier				m_id;
+		PulseIdentifier			m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
 		SourceMap				m_pulseSources;
@@ -150,6 +150,7 @@ private:
 		uint32_t				m_numBanks;
 		uint32_t				m_numMonEvents;
 		uint32_t				m_charge;
+		uint32_t				m_vetoFlags;
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
 		uint32_t				m_flags;
