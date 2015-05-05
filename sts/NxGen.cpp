@@ -658,7 +658,8 @@ NxGen::processGeometry
 
 /*! \brief Writes pulse buffers to Nexus file
  *
- * This method writes time, frequency, and charge data in pulse buffers to the Nexus file.
+ * This method writes time, frequency, and charge data in pulse buffers
+ * to the Nexus file.
  */
 void
 NxGen::pulseBuffersReady
@@ -682,13 +683,18 @@ NxGen::pulseBuffersReady
 
         // Must process pulse flags linearly
         vector<double>::iterator t = a_pulse_info.times.begin();
-        for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin(); f != a_pulse_info.flags.end(); ++f, ++t )
+        for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin();
+                f != a_pulse_info.flags.end(); ++f, ++t )
         {
-            // If any pulse flags are set (except veto), write them to pulse_flags DASLog
-            if ( *f & ~ADARA::BankedEventPkt::PULSE_VETO )
+            // If any pulse flags are set (except veto),
+            // write them to pulse_flags DASLog
+            // (For Forward-/Backwards-Compatibility, Strip Off Veto Flags
+            //  in top 12 bits of flags...)
+            if ( (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO )
             {
                 m_pulse_flags_time.push_back( *t );
-                m_pulse_flags_value.push_back( *f & ~ADARA::BankedEventPkt::PULSE_VETO );
+                m_pulse_flags_value.push_back(
+                    (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
             }
 
             // Write pulse vetoes to dedicated DASlog area
