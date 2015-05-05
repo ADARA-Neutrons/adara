@@ -149,7 +149,7 @@ public:
 					<< std::hex << " m_lastPulse=" << m_lastPulse
 					<< " m_activePulse=" << m_activePulse << std::dec
 					<< " cycle=" << pkt.cycle()
-					<< " veto=" << pkt.veto());
+					<< " vetoFlags=" << pkt.vetoFlags());
 			}
 		}
 
@@ -201,7 +201,7 @@ public:
 		m_intraPulse = pkt.intraPulseTime();
 		m_charge = pkt.pulseCharge();
 		m_cycle = pkt.cycle();
-		m_veto = pkt.veto();
+		m_vetoFlags = pkt.vetoFlags();
 		m_timingStatus = pkt.timingStatus();
 		m_pktSeq = 0;
 
@@ -216,7 +216,7 @@ public:
 		return !(pkt.pulseId() == m_activePulse &&
 			 pkt.flavor() == m_flavor &&
 			 pkt.pulseCharge() == m_charge &&
-			 pkt.veto() == m_veto &&
+			 pkt.vetoFlags() == m_vetoFlags &&
 			 pkt.cycle() == m_cycle &&
 			 pkt.timingStatus() == m_timingStatus &&
 			 pkt.intraPulseTime() == m_intraPulse);
@@ -233,7 +233,8 @@ public:
 			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
 			<< " pulseCharge=" << pkt.pulseCharge()
 				<< "(" << m_charge << ")"
-			<< " veto=" << pkt.veto() << "(" << m_veto << ")"
+			<< " vetoFlags=" << pkt.vetoFlags()
+				<< "(" << m_vetoFlags << ")"
 			<< " cycle=" << pkt.cycle() << "(" << m_cycle << ")"
 			<< " timingStatus=" << (uint32_t) pkt.timingStatus()
 				<< "(" << (uint32_t) m_timingStatus << ")"
@@ -279,7 +280,7 @@ private:
 	uint32_t	m_intraPulse;
 	uint32_t	m_charge;
 	uint16_t	m_cycle;
-	uint16_t	m_veto;
+	uint16_t	m_vetoFlags;
 	uint8_t		m_timingStatus;
 	bool		m_trueNew;
 };
@@ -1095,7 +1096,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				<< " from " << m_name
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 				<< " cycle=" << pkt.cycle()
-				<< " veto=" << pkt.veto());
+				<< " vetoFlags=" << pkt.vetoFlags());
 		}
 		m_dupRTDL++;
 	}
@@ -1113,7 +1114,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 				<< " pulseId=0x" << pkt.pulseId() << std::dec
 				<< " cycle=" << pkt.cycle()
-				<< " veto=" << pkt.veto());
+				<< " vetoFlags=" << pkt.vetoFlags());
 		}
 	}
 
@@ -1175,7 +1176,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				<< " m_lastRTDLCycle=" << m_lastRTDLCycle
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 				<< " cycle=" << pkt.cycle()
-				<< " veto=" << pkt.veto());
+				<< " vetoFlags=" << pkt.vetoFlags());
 		}
 	}
 	m_lastRTDLCycle = pkt.cycle();
