@@ -256,7 +256,7 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 {
 	printf("%u.%09u %s EVENT DATA\n"
 		"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
-		"    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
+		"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
 		"    charge %lupC, %u events\n",
 		(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
@@ -264,7 +264,7 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 		pkt->sourceID(), pkt->pktSeq(), pkt->dspSeq(),
 		pkt->endOfPulse() ? " EOP" : "",
 		pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
-		pkt->veto(), pkt->badVeto() ? " (BAD)" : "",
+		pkt->vetoFlags(), pkt->badVeto() ? " (BAD)" : "",
 		pkt->timingStatus(), (int) pkt->flavor(),
 		pulseFlavor(pkt->flavor()), (uint64_t) pkt->intraPulseTime() * 100,
 		(uint64_t) pkt->tofOffset() * 100,
@@ -310,12 +310,12 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
 	// TODO display FNA X fields
 	printf("%u.%09u RTDL\n"
-		"    cycle %u%s veto 0x%x%s timing 0x%x flavor %d (%s)\n"
+		"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
 		"    charge %lupC period %ups\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 		pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
-		pkt.veto(), pkt.badVeto() ? " (BAD)" : "",
+		pkt.vetoFlags(), pkt.badVeto() ? " (BAD)" : "",
 		pkt.timingStatus(), (int) pkt.flavor(),
 		pulseFlavor(pkt.flavor()), (uint64_t) pkt.intraPulseTime() * 100,
 		(uint64_t) pkt.tofOffset() * 100,
@@ -328,10 +328,10 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 {
 	printf("%u.%09u BANKED EVENT DATA\n"
-		"    cycle %u charge %lupC energy %ueV\n",
+		"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 		pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
-		pkt.pulseEnergy());
+		pkt.pulseEnergy(), pkt.vetoFlags());
 	if (pkt.flags()) {
 		printf("    flags");
 		if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
@@ -349,50 +349,50 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 		printf("\n");
 	}
 
-	if (m_showEvents) {
-		uint32_t len = pkt.payload_length();
-		uint32_t *p = (uint32_t *) pkt.payload();
-		uint32_t nBanks, nEvents;
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+	uint32_t nBanks, nEvents;
 
-		/* Skip the header we handled above */
+	/* Skip the header we handled above */
+	p += 4;
+	len -= 4 * sizeof(uint32_t);
+
+	while (len) {
+		if (len < 16) {
+			fprintf(stderr, "Banked event packet too short "
+					"(source section header)\n");
+			return true;
+		}
+
+		printf("    Source %08x intrapulse %luns "
+			"tofOffset %luns%s\n", p[0],
+			(uint64_t) p[1] * 100,
+			((uint64_t) p[2] & 0x7fffffff) * 100,
+			(p[2] & 0x80000000) ? "" : " (raw)");
+		nBanks = p[3];
 		p += 4;
-		len -= 4 * sizeof(uint32_t);
+		len -= 16;
 
-		while (len) {
-			if (len < 16) {
-				fprintf(stderr, "Banked event packet too short "
-						"(source section header)\n");
+		for (uint32_t i = 0; i < nBanks; i++) {
+			if (len < 8) {
+				fprintf(stderr, "Banked event packet "
+					"too short (bank section "
+					"header)\n");
 				return true;
 			}
 
-			printf("    Source %08x intrapulse %luns "
-				"tofOffset %luns%s\n", p[0],
-				(uint64_t) p[1] * 100,
-				((uint64_t) p[2] & 0x7fffffff) * 100,
-				(p[2] & 0x80000000) ? "" : " (raw)");
-			nBanks = p[3];
-			p += 4;
-			len -= 16;
+			printf("\tBank 0x%x (%u events)\n", p[0], p[1]);
+			nEvents = p[1];
+			p += 2;
+			len -= 8;
 
-			for (uint32_t i = 0; i < nBanks; i++) {
-				if (len < 8) {
-					fprintf(stderr, "Banked event packet "
-						"too short (bank section "
-						"header)\n");
-					return true;
-				}
+			if (len < (nEvents * 2 * sizeof(uint32_t))) {
+				fprintf(stderr, "Banked event packet "
+					"too short (events)\n");
+				return true;
+			}
 
-				printf("\tBank 0x%x (%u events)\n", p[0], p[1]);
-				nEvents = p[1];
-				p += 2;
-				len -= 8;
-
-				if (len < (nEvents * 2 * sizeof(uint32_t))) {
-					fprintf(stderr, "Banked event packet "
-						"too short (events)\n");
-					return true;
-				}
-
+			if (m_showEvents) {
 				for (uint32_t j = 0; j < nEvents; j++) {
 					printf("\t  %u: %08x %08x"
 						"    (%0.7f seconds)\n",
@@ -401,6 +401,10 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 					p += 2;
 					len -= 8;
 				}
+			}
+			else {
+				p += 2 * nEvents;
+				len -= 8 * nEvents;
 			}
 		}
 	}
@@ -411,10 +415,10 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 {
 	printf("%u.%09u BEAM MONITOR DATA\n"
-		"    cycle %u charge %lupC energy %ueV\n",
+		"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 		pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
-		pkt.pulseEnergy());
+		pkt.pulseEnergy(), pkt.vetoFlags());
 	if (pkt.flags()) {
 		printf("    flags");
 		if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
@@ -432,45 +436,48 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 		printf("\n");
 	}
 
-	if (m_showEvents) {
-		uint32_t len = pkt.payload_length();
-		uint32_t *p = (uint32_t *) pkt.payload();
-		uint32_t nEvents;
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+	uint32_t nEvents;
 
-		/* Skip the header we handled above */
-		p += 4;
-		len -= 4 * sizeof(uint32_t);
+	/* Skip the header we handled above */
+	p += 4;
+	len -= 4 * sizeof(uint32_t);
 
-		while (len) {
-			if (len < 12) {
-				fprintf(stderr, "Beam monitor event packet "
-						"too short (monitor header)\n");
-				return true;
-			}
+	while (len) {
+		if (len < 12) {
+			fprintf(stderr, "Beam monitor event packet "
+					"too short (monitor header)\n");
+			return true;
+		}
 
-			printf("    Monitor %u source %08x "
-				"tofOffset %luns%s\n", p[0] >> 22, p[1],
-				((uint64_t) p[2] & 0x7fffffff) * 100,
-				(p[2] & 0x80000000) ? "" : " (raw)");
-			nEvents = p[0] & ((1 << 22) - 1);
-			p += 3;
-			len -= 12;
+		printf("    Monitor %u source %08x "
+			"tofOffset %luns%s\n", p[0] >> 22, p[1],
+			((uint64_t) p[2] & 0x7fffffff) * 100,
+			(p[2] & 0x80000000) ? "" : " (raw)");
+		nEvents = p[0] & ((1 << 22) - 1);
+		p += 3;
+		len -= 12;
 
-			if (len < (nEvents * sizeof(uint32_t))) {
-				fprintf(stderr, "Beam monitor event packet "
-						"too short (events)\n");
-				return true;
-			}
+		if (len < (nEvents * sizeof(uint32_t))) {
+			fprintf(stderr, "Beam monitor event packet "
+					"too short (events)\n");
+			return true;
+		}
 
+		if (m_showEvents) {
 			for (uint32_t i = 0; i < nEvents; p++, i++) {
 				printf("\t  %u: %0.7f seconds cycle %d%s\n", i,
 					1e-9 * 100 * (*p & ((1U << 21) - 1)),
 					(*p & ~(1U << 31)) >> 21,
 					(*p & (1U << 31)) ? "" : " (trailing)");
 			}
-
-			len -= nEvents * sizeof(uint32_t);
 		}
+		else {
+			p += nEvents;
+		}
+
+		len -= nEvents * sizeof(uint32_t);
 	}
 
 	return false;
