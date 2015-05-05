@@ -879,8 +879,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		 */
 		break;
 	case ADARA::PacketType::RTDL_V0:
-	case ADARA::PacketType::BANKED_EVENT_V0:
-	case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+	case ADARA::PacketType::BANKED_EVENT_V1:
+	case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
 		m_pulseTime = hdr->ts_sec;
 		break;
 	}
