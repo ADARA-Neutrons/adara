@@ -396,7 +396,7 @@ bool SMSControl::setRecording(bool v)
 	 * It is not an error for a caller to try to stop recording if
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
-	 * false for that case.  
+	 * false for that case.
 	 */
 
 	if (v == m_recording) {
@@ -1332,8 +1332,8 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			 * event packet with the RTDL packet.
 			 */
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
-						  pulse->m_rtdl->packet_length(),
-						  false);
+						pulse->m_rtdl->packet_length(),
+						false);
 		} else {
 			/* Rate-limited logging of no RTDL for pulse */
 			std::string log_info;
@@ -1596,7 +1596,7 @@ void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
-				  uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateDescriptor(pkt, sourceId);
 }

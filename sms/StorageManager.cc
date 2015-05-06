@@ -103,8 +103,8 @@ private:
 		uint64_t maxSize;
 
 		/* If the user doesn't specify a size, we'll use a percentage
-	 	 * of the total space, 80% by default.
-	 	 */
+		 * of the total space, 80% by default.
+		 */
 		struct statfs fsstats;
 		if (statfs(m_baseDir.c_str(), &fsstats)) {
 			int err = errno;
@@ -191,6 +191,7 @@ std::string StorageManager::m_domain;
 std::string StorageManager::m_broker_uri;
 std::string StorageManager::m_broker_user;
 std::string StorageManager::m_broker_pass;
+
 ComBusSMSMon *StorageManager::m_combus;
 
 /* These get passed through an eventfd(), and need to be above the
@@ -399,8 +400,7 @@ void StorageManager::init(void)
 	 */
 	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
 		if (retireIndexDir(false)) {
-			throw std::runtime_error("Unable to retire stale "
-						 "index");
+			throw std::runtime_error("Unable to retire stale index");
 		}
 	}
 }
@@ -456,11 +456,11 @@ void StorageManager::lateInit(void)
 	 */
 	m_pulseTime = m_nextIndexTime = 1;
 
-	/* start the monitor thread so that it will be available from 
+	/* start the monitor thread so that it will be available from
 	 * backgroundIo thread
 	 */
 	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
-	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass );
+	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass);
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -929,7 +929,7 @@ void StorageManager::addPrologue(IoVector &iovec)
 	 */
 	if (!m_prologueFile) {
 		throw std::logic_error("Invalid use of "
-					 "StorageManager::addPrologue");
+					"StorageManager::addPrologue");
 	}
 
 	uint32_t len = validatePacket(iovec);
@@ -1412,9 +1412,9 @@ bool StorageManager::cleanupIndexes(void)
 
 void StorageManager::sendComBus(uint32_t a_run_num,
 		std::string a_run_state,
-		const struct timespec &a_start_time) 
+		const struct timespec & a_start_time)
 {
-	if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
+	if ( a_start_time.tv_sec == 0 && a_start_time.tv_nsec == 0 )
 		m_combus->sendUpdate(a_run_num, a_run_state);
 	else
 		m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
