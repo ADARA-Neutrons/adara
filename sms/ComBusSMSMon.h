@@ -34,20 +34,20 @@ public:
 	ComBusSMSMon( std::string a_beam_sname, std::string a_facility );
 	~ComBusSMSMon();
 
-	void start ( const std::string & a_domain,
+	void start( const std::string & a_domain,
 		const std::string & a_broker_uri,
 		const std::string & a_broker_user,
 		const std::string & a_broker_pass );
 
 	// sendOriginal() is called at startup scan time,
 	// or when a new run is started.
-	void sendOriginal ( uint32_t a_run_num,
+	void sendOriginal( uint32_t a_run_num,
 		std::string a_run_state,
 		const struct timespec & a_start_time );
 
 	// sendUpdate() sends subsequent developments.
 	// Must be preceded by a sendOriginal for a given run.
-	void sendUpdate ( uint32_t a_run_num, std::string a_run_state );
+	void sendUpdate( uint32_t a_run_num, std::string a_run_state );
 
 private:
 	void openComm();
