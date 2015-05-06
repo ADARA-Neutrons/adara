@@ -1224,7 +1224,12 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 				<< " in [" << dir << "]"
 				<< " as " << run
 				<< " (" << date << ", " << secs << "." << nanosecs << ")");
-			m_combus->sendUpdate(run, std::string("SMS run purged"));
+			// Better Send Original ComBus Message Here...
+			// - who knows whether we've touched this run before...
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_combus->sendOriginal(run,
+				std::string("SMS run purged"), now);
 		}
 		else if ( numParsed < 3 ) {
 			ERROR("purgeDaily():"
