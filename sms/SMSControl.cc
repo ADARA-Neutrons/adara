@@ -1420,7 +1420,7 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 
-	uint32_t flags = pulse->m_flags
+	uint32_t flags = ( pulse->m_flags & 0xfffff )
 		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
 	m_hdrs.push_back(flags);
 
@@ -1487,7 +1487,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 
-	uint32_t flags = pulse->m_flags
+	uint32_t flags = ( pulse->m_flags & 0xfffff )
 		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
 	m_hdrs.push_back(flags);
 
