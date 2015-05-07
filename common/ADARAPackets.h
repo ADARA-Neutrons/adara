@@ -138,7 +138,25 @@ public:
 	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
 	uint32_t ringPeriod(void) const { return m_fields[4] & 0xffffff; }
 
-	// TODO implement accessor for optional fields
+	// accessor methods for optional FNA/Frame Data fields
+
+	uint32_t FNA(uint32_t index) const
+	{
+		// If out of bounds, just return "0" for "Unused Frame"... ;-D
+		if ( index > 24 )
+			return( 0 );
+		else
+			return ( m_fields[ 5 + index ] >> 24 ) & 0xff;
+	}
+
+	uint32_t frameData(uint32_t index) const
+	{
+		// Out of bounds, return "-1" (0xffffff) for Bogus "Frame Data" ;-b
+		if ( index > 24 )
+			return( -1 );
+		else
+			return m_fields[ 5 + index ] & 0xffffff;
+	}
 
 private:
 	const uint32_t *m_fields;
