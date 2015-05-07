@@ -135,7 +135,7 @@ public:
 	Parser() :
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
 		m_showVars(true), m_showDDP(false), m_lowRate(false ),
-		m_showRunInfo(false), m_showGeom(false)
+		m_showRunInfo(false), m_showGeom(false), m_showFrame(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -187,6 +187,7 @@ private:
 	bool m_lowRate;
 	bool m_showRunInfo;
 	bool m_showGeom;
+	bool m_showFrame;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
@@ -308,7 +309,6 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 
 bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
-	// TODO display FNA X fields
 	printf("%u.%09u RTDL\n"
 		"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
@@ -321,6 +321,16 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 		(uint64_t) pkt.tofOffset() * 100,
 		pkt.tofCorrected() ? "" : " (raw)",
 		(uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod());
+
+	// display FNA/Frame Data fields...
+	if ( m_showFrame )
+	{
+		for ( uint32_t i=0 ; i < 25 ; i++ )
+		{
+			printf("    FNA%u %u FrameData %u\n",
+				i, pkt.FNA(i), pkt.frameData(i));
+		}
+	}
 
 	return false;
 }
@@ -797,7 +807,8 @@ void Parser::parse(int argc, char **argv)
 		("low,l", "Set low data rate mode (uses very small buffer size)")
 		("events,e", "Show events")
 		("showrun,R", "Show payload of RunInfo packets")
-		("showgeom,G", "Show payload of Geometry packets");
+		("showgeom,G", "Show payload of Geometry packets")
+		("showframe,F", "Show FNA/Frame Data of RTDL packets");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -833,6 +844,7 @@ void Parser::parse(int argc, char **argv)
 	m_lowRate = vm.count("low");
 	m_showRunInfo = vm.count("showrun");
 	m_showGeom = vm.count("showgeom");
+	m_showFrame = vm.count("showframe");
 
 	if (!vm.count("file")) {
 		try {
