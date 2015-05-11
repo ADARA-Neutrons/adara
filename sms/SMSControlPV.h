@@ -140,7 +140,6 @@ public:
 class smsParamStrPV : public smsStringPV {
 public:
 	smsParamStrPV(const std::string &name);
-	~smsParamStrPV();
 	caStatus write(const casCtx &ctx, const gdd &value);
 	void update(const std::string str, struct timespec *ts);
 	void unset(void);

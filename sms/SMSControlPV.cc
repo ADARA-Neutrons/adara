@@ -610,15 +610,11 @@ void smsStringPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
-smsParamStrPV::smsParamStrPV(const std::string &name) : smsStringPV(name) 
+smsParamStrPV::smsParamStrPV(const std::string &name) : smsStringPV(name),
+ 						m_readLock(new epicsMutex()) 
 {
 	m_pv_name = name;
 	unset();
-        m_readLock = new epicsMutex();
-}
-smsParamStrPV::~smsParamStrPV() 
-{
-  	delete(m_readLock);
 }
 
 caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
