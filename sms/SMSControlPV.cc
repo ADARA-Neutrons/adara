@@ -610,6 +610,154 @@ void smsStringPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
+smsParamStrPV::smsParamStrPV(const std::string &name) : smsStringPV(name) 
+{
+	m_pv_name = name;
+	unset();
+        m_readLock = new epicsMutex();
+}
+smsParamStrPV::~smsParamStrPV() 
+{
+  	delete(m_readLock);
+}
+
+caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	unsigned int start, nelem;
+
+	/* caput sends a null string as a scalar, so interpret that
+	 * as an unset request.
+	 */
+	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
+		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Null String, Unset Value.");
+		unset();
+		return S_cas_success;
+	}
+
+	if (!val.isAtomic()) {
+		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not Atomic!");
+		return S_casApp_noSupport;
+	}
+
+	if (val.dimension() != 1) {
+		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Out of Bounds (Multi-Dimensional)!");
+		return S_casApp_outOfBounds;
+	}
+
+	val.getBound(0, start, nelem);
+	if (start || nelem > MAX_LENGTH) {
+		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Out of Bounds (" << nelem << " > MAX_LENGTH)!");
+		return S_casApp_outOfBounds;
+	}
+
+	/* Writing no elements will be considered an unset request.
+	 */
+	if (!nelem) {
+		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Writing No Elements, Unset Value.");
+		unset();
+		return S_cas_success;
+	}
+
+	if (!allowUpdate(val)) {
+		/* We don't want to update the PV at this time; still
+		 * send a notification to any watchers, and just return
+		 * success.
+		 */
+		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+			<< " Updates Not Allowed, Ignore Value.");
+		notify();
+		return S_casApp_success;
+	}
+
+	/* We ensure we have room for MAX_LENGTH characters, plus a
+	 * trailing nul to make live easier when converting to a std::string.
+	 */
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	memcpy(new_str, val.dataPointer(), nelem);
+
+	DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		<< " value=" << new_str);
+
+	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
+					MAX_LENGTH);
+	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
+
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+	nv->setTimeStamp(&ts);
+	nv->setStat(epicsAlarmNone);
+	nv->setSevr(epicsSevNone);
+
+	m_readLock->lock();
+	m_value = nv;
+	m_readLock->unlock();
+	notify();
+	changed();
+
+	return S_casApp_success;
+}
+
+void smsParamStrPV::update(const std::string str, struct timespec *ts)
+{
+	/* We ensure we have room for MAX_LENGTH characters, plus a
+	 * trailing nul to make live easier when converting to a std::string.
+	 */
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	memcpy(new_str, (void *)str.c_str(), str.length());
+
+	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
+					MAX_LENGTH);
+	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
+	nv->setTimeStamp(ts);
+	nv->setStat(epicsAlarmNone);
+	nv->setSevr(epicsSevNone);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+        m_readLock->lock();
+	m_value = nv;
+        m_readLock->unlock();
+
+	notify();
+}
+
+void smsParamStrPV::unset(void)
+{
+	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
+		return;
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	char *new_str = new char[MAX_LENGTH+1];
+	memset(new_str, 0, MAX_LENGTH+1);
+	strcpy(new_str, "(unset)");
+
+	m_readLock->lock();
+	m_value = new gddAtomic(gddAppType_value, aitEnumUint8, 1, MAX_LENGTH);
+	m_value->putRef((const aitUint8 *) new_str, new charArrayDestructor);
+	m_value->setStat(epicsAlarmUDF);
+	m_value->setSevr(epicsSevNone);
+	m_value->setTimeStamp(&ts);
+
+	unsigned int start, nelem;
+	m_value->getBound(0, start, nelem);
+	m_readLock->unlock();
+
+	notify();
+	changed();
+}
+
+/* ----------------------------------------------------------------------- */
+
 smsBooleanPV::smsBooleanPV(const std::string &name) : smsPV(name)
 {
 	struct timespec ts;
