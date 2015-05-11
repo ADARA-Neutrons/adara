@@ -109,6 +109,16 @@ void ComBusSMSMon::commThread()
 
 	INFO( "SMS ComBus thread started" );
 
+	while (!m_stop) {
+		if (!m_combus) {
+			//m_domain = m_
+			openComm();
+			continue; 	// to top
+		}
+	}
+
+// OLD CODE STARTS HERE
+
 	// Loop 1
 	while ( !m_stop )
 	{
