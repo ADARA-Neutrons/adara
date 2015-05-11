@@ -460,6 +460,7 @@ void StorageManager::lateInit(void)
 	 * backgroundIo thread
 	 */
 	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
+        // pass SMSControlPV references to these PVs in, rather than this...
 	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass);
 
 	boost::thread io(backgroundIo);
