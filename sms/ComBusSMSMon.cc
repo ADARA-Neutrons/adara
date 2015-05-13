@@ -101,90 +101,100 @@ void ComBusSMSMon::openComm()
 	}
 }
 
+void ComBusSMSMon::reOpenComm()
+{
+	m_combus->setConnection(m_domain, m_broker_uri, m_broker_user, 
+				m_broker_pass);
+
+	if ( !m_combus->waitForConnect( 5 ) )
+	{
+		ERROR( "SMS ComBus Reconnection Timeout"
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user );
+	}
+	else
+	{
+		INFO( "SMS ComBus Reconnection Succeeded"
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user );
+	}
+}
+
 void ComBusSMSMon::commThread()
 {
 	unsigned long hb = 0;
 	SMSRunStatus *inpu, *lookup;
 	int bytesrec = 0;
+	struct timespec now;
 
 	INFO( "SMS ComBus thread started" );
 
 	while (!m_stop) {
 		if (!m_combus) {
-			//m_domain = m_
+			m_domain = m_SM->m_pv_domain.value();
+			m_broker_uri = m_SM->m_pv_broker_uri.value();
+  			m_broker_user = m_SM->m_pv_broker_user.value();
+			m_broker_pass = m_SM->m_pv_broker_pass.value();
 			openComm();
-			continue; 	// to top
+			continue; 
 		}
-	}
+		m_restart_combus = m_SM->m_pvRestart_combus.value();
+ 		if (m_restart_combus) {
+			m_domain = m_SM->m_pv_domain.value();
+			m_broker_uri = m_SM->m_pv_broker_uri.value();
+  			m_broker_user = m_SM->m_pv_broker_user.value();
+			m_broker_pass = m_SM->m_pv_broker_pass.value();
+ 			reOpenComm();
+			// this next probably requires an EventFD callback
+			// (update() not thread safe or easy to make so)
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_SM->m_pv_restart_combus->update(0, &now);
+			m_restart_combus = 0;
+			continue;
+		}
+		bytesrec = m_inqueue->receive( &inpu, sizeof(SMSRunStatus *), 
+		1.0 );
+		if ( bytesrec == -1 || !inpu ) {
+			hb++;
+			if (hv > 5) {
+				m_combus->status( ADARA::ComBus::STATUS_OK );
+				hb = 0;
+			}
+			continue;
+		}
+		if ( m_run_dict.count( inpu->m_run_num ) ) {
+			lookup = m_run_dict[ inpu->m_run_num ];
+			lookup->m_reason = inpu->m_reason;
+			if ( inpu->hasTime() ) {
+				lookup->m_start_time = inpu->m_start_time;
+			}
+			delete inpu; inpu = 0;
+		}
+		else {
+			m_run_dict[ inpu->m_run_num ] = inpu;
+			lookup = inpu;
+		}
 
-// OLD CODE STARTS HERE
+		ADARA::ComBus::SMS::StatusUpdateMsg newmsg( m_facility,
+			m_beam_sname,
+			lookup->m_start_time,
+			lookup->m_run_num,
+			lookup->m_reason );
 
-	// Loop 1
-	while ( !m_stop )
-	{
-		bytesrec = m_inqueue->receive( &inpu, sizeof(SMSRunStatus *), 1.0 );
-
-		// Loop 2
-		while ( !m_stop )
+		if ( !m_combus->broadcast( newmsg ) )
 		{
-			if ( bytesrec == -1 || !inpu )
-			{
-				if ( !m_combus ) {
-					openComm();
-				}
-				else {
-					// Send status (heartbeat) every 5 seconds
-					if ( !( hb % 5 ) ) {
-						m_combus->status( ADARA::ComBus::STATUS_OK );
-					}
-				}
-				++hb;
-				break;	// Repeat Loop 1
-			}
-
-			if (!m_combus) {
-				openComm();
-				continue; 	// Repeat Loop 2
-			}
-			else
-			{
-				if ( m_run_dict.count( inpu->m_run_num ) ) {
-					lookup = m_run_dict[ inpu->m_run_num ];
-					lookup->m_reason = inpu->m_reason;
-					if ( inpu->hasTime() ) {
-						lookup->m_start_time = inpu->m_start_time;
-					}
-					delete inpu; inpu = 0;
-				}
-				else {
-					m_run_dict[ inpu->m_run_num ] = inpu;
-					lookup = inpu;
-				}
-
-				ADARA::ComBus::SMS::StatusUpdateMsg newmsg( m_facility,
-					m_beam_sname,
-					lookup->m_start_time,
-					lookup->m_run_num,
-					lookup->m_reason );
-
-				if ( !m_combus->broadcast( newmsg ) )
-				{
-					WARN( "SMS ComBus run " << lookup->m_run_num
-						<< " status <" << lookup->m_reason
-						<< "> send failed"
-						<< " to URI " << m_broker_uri
-						<< " as User " << m_broker_user );
-				}
-				else
-				{
-					INFO( "SMS ComBus run " << lookup->m_run_num
-						<< " status <" << lookup->m_reason << "> sent"
-						<< " to URI " << m_broker_uri
-						<< " as User " << m_broker_user );
-				}
-
-				break;	// Repeat Loop 1
-			}
+			WARN( "SMS ComBus run " << lookup->m_run_num
+				<< " status <" << lookup->m_reason
+				<< "> send failed"
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user );
+		}
+		else
+		{
+			INFO( "SMS ComBus run " << lookup->m_run_num
+				<< " status <" << lookup->m_reason << "> sent"
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user );
 		}
 	}
 
