@@ -714,12 +714,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		if (id < min_id) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_GLOBAL_SAWTOOTH_PULSE, ss.str(),
+					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Global SAWTOOTH Pulse(0x"
@@ -731,12 +727,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		else if (id >= min_id && id < max_id) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, ss.str(),
+					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
@@ -751,12 +743,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		if ( id < m_lastPulseId ) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_GLOBAL_SAWTOOTH_LAST, ss.str(),
+					RLL_GLOBAL_SAWTOOTH_LAST, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Global SAWTOOTH Pulse(0x"
@@ -1337,12 +1325,8 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		} else {
 			/* Rate-limited logging of no RTDL for pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << pulse->m_id.first;
-			ss << "/";
-			ss << pulse->m_id.second;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_NO_RTDL_FOR_PULSE, ss.str(),
+					RLL_NO_RTDL_FOR_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "recordPulse(): NO RTDL for Pulse"
