@@ -12,6 +12,7 @@
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "StorageManager.h"
+#include "ComBusSMSMon.h"
 #include "LiveServer.h"
 #include "STSClientMgr.h"
 #include "Logging.h"
@@ -146,6 +147,7 @@ static void load_config(const char *pname, ptree::ptree &conf,
 	setcredentials(pname, conf);
 
 	StorageManager::config(conf);
+	ComBusSMSMon::config(conf);
 	SMSControl::config(conf);
 	STSClientMgr::config(conf);
 	LiveServer::config(conf);

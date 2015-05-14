@@ -159,18 +159,6 @@ private:
 	static bool m_dailyExhausted;
 	static std::list<std::string> m_dailyCache;
 
-	static std::string m_domain;
-	static std::string m_broker_uri;
-	static std::string m_broker_user;
-	static std::string m_broker_pass;
-	static bool m_restart_combus;
-
-   	static boost::shared_ptr<smsMTBoolPV> m_pvRestartCombus;
-   	static boost::shared_ptr<smsMTStrPV> m_pvDomain;
-   	static boost::shared_ptr<smsMTStrPV> m_pvBrokerUri;
-   	static boost::shared_ptr<smsMTStrPV> m_pvBrokerUser;
-   	static boost::shared_ptr<smsMTStrPV> m_pvBrokerPass;
-
 	static ComBusSMSMon *m_combus;
 
 	static uint32_t readRunFile(const char *path, bool notify);

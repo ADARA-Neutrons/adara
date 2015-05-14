@@ -1,10 +1,17 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <sys/eventfd.h>
 #include <string>
 #include "Logging.h"
 #include "ComBusSMSMon.h"
+#include "SMSControl.h"
 
 static LoggerPtr logger( Logger::getLogger("SMS.ComBus") );
+
+std::string ComBusSMSMon::m_domain;
+std::string ComBusSMSMon::m_broker_uri;
+std::string ComBusSMSMon::m_broker_user;
+std::string ComBusSMSMon::m_broker_pass;
 
 SMSRunStatus::SMSRunStatus( unsigned long a_run_num, std::string &a_reason,
 		struct timespec a_start_time ) :
@@ -42,6 +49,16 @@ ComBusSMSMon::~ComBusSMSMon()
 	}
 }
 
+void ComBusSMSMon::config(const boost::property_tree::ptree &conf) {
+
+	m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
+	m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
+	m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
+	m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
+}
+
+
+
 void ComBusSMSMon::sendOriginal( uint32_t a_run_num,
 		std::string a_run_state,
 		const struct timespec &a_start_time )
@@ -63,20 +80,48 @@ void ComBusSMSMon::sendUpdate( uint32_t a_run_num,
 }
 
 void
-ComBusSMSMon::start( const std::string &a_domain,
-					const std::string &a_broker_uri,
-					const std::string &a_broker_user,
-					const std::string &a_broker_pass )
+ComBusSMSMon::start(void)
 {
 	if ( !m_comm_thread )
 	{
-		m_domain = a_domain;
-		m_broker_uri = a_broker_uri;
-		m_broker_user = a_broker_user;
-		m_broker_pass = a_broker_pass;
+		SMSControl *ctrl = SMSControl::getInstance();
+		if (!ctrl) {
+			throw std::logic_error(
+	       		"uninitialized SMSControl obj for ComBusSMSMon!");
+		}
+		std::string prefix(ctrl->getBeamlineId());
+		prefix += ":SMS";
+		prefix += ":Combus";
 
-		m_stop = false;
+		SOCKET newfd = eventfd(1, EFD_NONBLOCK);
+		if (newfd <= 0) { 
+			throw std::logic_error(
+	       		"uninitialized restart fd ComBusSMSMon!");
+		}
+		m_pvRestartCombus = boost::shared_ptr<smsMTBoolPV>(new 
+			smsMTBoolPV( prefix + ":RestartCombus", newfd));
+		m_pvDomain = boost::shared_ptr<smsMTStrPV>( new
+			smsMTStrPV(prefix + ":Domain"));
+		m_pvBrokerUri = boost::shared_ptr<smsMTStrPV>( new
+			smsMTStrPV(prefix + ":BrokerUri"));
+		m_pvBrokerUser = boost::shared_ptr<smsMTStrPV>( new
+			smsMTStrPV(prefix + ":BrokerUser"));
+		m_pvBrokerPass = boost::shared_ptr<smsMTStrPV>( new
+			smsMTStrPV(prefix + ":BrokerPass"));
 
+		ctrl->addPV(m_pvRestartCombus);
+		ctrl->addPV(m_pvDomain);
+		ctrl->addPV(m_pvBrokerUri);
+		ctrl->addPV(m_pvBrokerUser);
+		ctrl->addPV(m_pvBrokerPass);
+
+ 		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+  		m_pvDomain->update(m_domain, &now);
+		m_pvBrokerUri->update(m_broker_uri, &now);
+		m_pvBrokerUser->update(m_broker_user, &now);
+		m_pvBrokerPass->update(m_broker_pass, &now);
+	
 		m_comm_thread = new boost::thread(
 			boost::bind( &ComBusSMSMon::commThread, this ) );
 	}
@@ -131,24 +176,22 @@ void ComBusSMSMon::commThread()
 
 	while (!m_stop) {
 		if (!m_combus) {
-			m_domain = m_SM->m_pv_domain.value();
-			m_broker_uri = m_SM->m_pv_broker_uri.value();
-  			m_broker_user = m_SM->m_pv_broker_user.value();
-			m_broker_pass = m_SM->m_pv_broker_pass.value();
+			m_domain = m_pvDomain->value();
+			m_broker_uri = m_pvBrokerUri->value();
+  			m_broker_user = m_pvBrokerUser->value();
+			m_broker_pass = m_pvBrokerPass->value();
 			openComm();
 			continue; 
 		}
-		m_restart_combus = m_SM->m_pvRestart_combus.value();
+		m_restart_combus = m_pvRestartCombus->value();
  		if (m_restart_combus) {
-			m_domain = m_SM->m_pv_domain.value();
-			m_broker_uri = m_SM->m_pv_broker_uri.value();
-  			m_broker_user = m_SM->m_pv_broker_user.value();
-			m_broker_pass = m_SM->m_pv_broker_pass.value();
+			m_domain = m_pvDomain->value();
+			m_broker_uri = m_pvBrokerUri->value();
+  			m_broker_user = m_pvBrokerUser->value();
+			m_broker_pass = m_pvBrokerPass->value();
  			reOpenComm();
-			// this next probably requires an EventFD callback
-			// (update() not thread safe or easy to make so)
 			clock_gettime(CLOCK_REALTIME, &now);
-			m_SM->m_pv_restart_combus->update(0, &now);
+			m_pvRestartCombus->mtUpdate(0, &now);
 			m_restart_combus = 0;
 			continue;
 		}
@@ -156,7 +199,7 @@ void ComBusSMSMon::commThread()
 		1.0 );
 		if ( bytesrec == -1 || !inpu ) {
 			hb++;
-			if (hv > 5) {
+			if (hb > 5) {
 				m_combus->status( ADARA::ComBus::STATUS_OK );
 				hb = 0;
 			}

@@ -187,18 +187,6 @@ uint64_t StorageManager::m_purgedBlocks;
 bool StorageManager::m_dailyExhausted;
 std::list<std::string> StorageManager::m_dailyCache;
 
-std::string StorageManager::m_domain;
-std::string StorageManager::m_broker_uri;
-std::string StorageManager::m_broker_user;
-std::string StorageManager::m_broker_pass;
-bool StorageManager::m_restart_combus;
-
-boost::shared_ptr<smsMTBoolPV> m_pv_restart_combus;
-boost::shared_ptr<smsMTStrPV> m_pv_domain;
-boost::shared_ptr<smsMTStrPV> m_pv_broker_uri;
-boost::shared_ptr<smsMTStrPV> m_pv_broker_user;
-boost::shared_ptr<smsMTStrPV> m_pv_broker_pass;
-
 ComBusSMSMon *StorageManager::m_combus;
 
 /* These get passed through an eventfd(), and need to be above the
@@ -305,11 +293,6 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
-	m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
-	m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
-	m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
-	m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
-
 	StorageFile::config(conf);
 }
 
@@ -412,16 +395,6 @@ void StorageManager::init(void)
 	}
 }
 
-static smsMTBoolPV *newMTBoolPV(const std::string &name) {
-
-        SOCKET newfd = eventfd(1, EFD_NONBLOCK);
-        if (newfd > 0) {
-                return new smsMTBoolPV(name, newfd);
-        } else {
-                return 0;
-        }
-}
-
 void StorageManager::lateInit(void)
 {
 	/* Clean up any lingering index directories in the background. */
@@ -453,29 +426,6 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
 
-	m_pvRestartCombus = boost::shared_ptr<smsMTBoolPV>(newMTBoolPV(
-		prefix + ":RestartCombus"));
-	m_pvDomain = boost::shared_ptr<smsMTStrPV>( new
-		smsMTStrPV(prefix + ":Domain"));
-	m_pvBrokerUri = boost::shared_ptr<smsMTStrPV>( new
-		smsMTStrPV(prefix + ":BrokerUri"));
-	m_pvBrokerUser = boost::shared_ptr<smsMTStrPV>( new
-		smsMTStrPV(prefix + ":BrokerUser"));
-	m_pvBrokerPass = boost::shared_ptr<smsMTStrPV>( new
-		smsMTStrPV(prefix + ":BrokerPass"));
-
-	ctrl->addPV(m_pvRestartCombus);
-	ctrl->addPV(m_pvDomain);
-	ctrl->addPV(m_pvBrokerUri);
-	ctrl->addPV(m_pvBrokerUser);
-	ctrl->addPV(m_pvBrokerPass);
-
- 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
-  	m_pvDomain->update(m_domain, &now);
-	m_pvBrokerUri->update(m_broker_uri, &now);
-	m_pvBrokerUser->update(m_broker_user, &now);
-	m_pvBrokerPass->update(m_broker_pass, &now);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -502,7 +452,7 @@ void StorageManager::lateInit(void)
 	 */
 	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
         // pass SMSControlPV references to these PVs in, rather than this...
-	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass);
+	m_combus->start();
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);

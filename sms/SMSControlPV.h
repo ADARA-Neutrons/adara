@@ -177,7 +177,7 @@ public:
 
 	smsMTBoolPV(const std::string &name, const SOCKET fdIn);
 	virtual void update(bool val, struct timespec *ts);
-        virtual void MTupdate(bool val, struct timespec *ts);
+        virtual void mtUpdate(bool val, struct timespec *ts);
 
 	bool value(void);
 

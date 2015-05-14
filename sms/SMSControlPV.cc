@@ -914,7 +914,7 @@ void smsMTBoolPV::update(bool val, struct timespec *ts)
 	notify();
 }
 
-void smsMTBoolPV::MTupdate(bool val, struct timespec *ts)
+void smsMTBoolPV::mtUpdate(bool val, struct timespec *ts)
 {
    	uint64_t uval = val+1;
 
