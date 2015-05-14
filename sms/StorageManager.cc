@@ -470,8 +470,12 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvBrokerUser);
 	ctrl->addPV(m_pvBrokerPass);
 
-	// still need to initialize these, except restart which presumeably
-	// starts out at 0.
+ 	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+  	m_pvDomain->update(m_domain, &now);
+	m_pvBrokerUri->update(m_broker_uri, &now);
+	m_pvBrokerUser->update(m_broker_user, &now);
+	m_pvBrokerPass->update(m_broker_pass, &now);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
