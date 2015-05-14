@@ -137,9 +137,9 @@ public:
 	virtual void changed(void);
 };
 
-class smsParamStrPV : public smsStringPV {
+class smsMTStrPV : public smsStringPV {
 public:
-	smsParamStrPV(const std::string &name);
+	smsMTStrPV(const std::string &name);
 	caStatus write(const casCtx &ctx, const gdd &value);
 	void update(const std::string str, struct timespec *ts);
 	void unset(void);
@@ -169,6 +169,28 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+};
+
+class EventFd;
+
+class smsMTBoolPV : public smsBooleanPV {
+public:
+	smsMTBoolPV(const std::string &name);
+
+	virtual void update(bool val, struct timespec *ts);
+        virtual void MTupdate(bool val, struct timespec *ts);
+
+	bool value(void);
+
+protected:
+	
+	void remoteUpdate();
+ 	EventFd *m_updateEvent;
+	epicsMutex *m_readLock;
+	epicsMutex *m_updateLock;
+	epicsEvent *m_doneEvent;
+ 
+	struct timespec *m_update_ts;
 };
 
 class smsEnabledPV : public smsBooleanPV {

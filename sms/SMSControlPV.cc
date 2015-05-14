@@ -9,6 +9,7 @@
 #include <gddApps.h>
 
 #include "Logging.h"
+#include "EventFd.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
 
@@ -610,14 +611,12 @@ void smsStringPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
-smsParamStrPV::smsParamStrPV(const std::string &name) : smsStringPV(name),
+smsMTStrPV::smsMTStrPV(const std::string &name) : smsStringPV(name),
  						m_readLock(new epicsMutex()) 
 {
-	m_pv_name = name;
-	unset();
 }
 
-caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
+caStatus smsMTStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	unsigned int start, nelem;
 
@@ -625,27 +624,27 @@ caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	 * as an unset request.
 	 */
 	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
-		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		DEBUG("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Null String, Unset Value.");
 		unset();
 		return S_cas_success;
 	}
 
 	if (!val.isAtomic()) {
-		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		ERROR("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Value is Not Atomic!");
 		return S_casApp_noSupport;
 	}
 
 	if (val.dimension() != 1) {
-		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		ERROR("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Value is Out of Bounds (Multi-Dimensional)!");
 		return S_casApp_outOfBounds;
 	}
 
 	val.getBound(0, start, nelem);
 	if (start || nelem > MAX_LENGTH) {
-		ERROR("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		ERROR("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Value is Out of Bounds (" << nelem << " > MAX_LENGTH)!");
 		return S_casApp_outOfBounds;
 	}
@@ -653,7 +652,7 @@ caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	/* Writing no elements will be considered an unset request.
 	 */
 	if (!nelem) {
-		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		DEBUG("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Writing No Elements, Unset Value.");
 		unset();
 		return S_cas_success;
@@ -664,7 +663,7 @@ caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		 * send a notification to any watchers, and just return
 		 * success.
 		 */
-		DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+		DEBUG("smsMTStrPV::write() m_pv_name=" << m_pv_name
 			<< " Updates Not Allowed, Ignore Value.");
 		notify();
 		return S_casApp_success;
@@ -677,7 +676,7 @@ caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
 
-	DEBUG("smsParamStrPV::write() m_pv_name=" << m_pv_name
+	DEBUG("smsMTStrPV::write() m_pv_name=" << m_pv_name
 		<< " value=" << new_str);
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
@@ -699,7 +698,7 @@ caStatus smsParamStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	return S_casApp_success;
 }
 
-void smsParamStrPV::update(const std::string str, struct timespec *ts)
+void smsMTStrPV::update(const std::string str, struct timespec *ts)
 {
 	/* We ensure we have room for MAX_LENGTH characters, plus a
 	 * trailing nul to make live easier when converting to a std::string.
@@ -725,7 +724,7 @@ void smsParamStrPV::update(const std::string str, struct timespec *ts)
 	notify();
 }
 
-void smsParamStrPV::unset(void)
+void smsMTStrPV::unset(void)
 {
 	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
 		return;
@@ -868,7 +867,88 @@ void smsBooleanPV::changed(void)
 }
 
 /* ----------------------------------------------------------------------- */
+smsMTBoolPV::smsMTBoolPV(const std::string &name) : smsBooleanPV(name),
+ 						m_readLock(new epicsMutex()),
+						m_doneEvent(new epicsEvent()) 
+{
+}
 
+bool smsMTBoolPV::value(void)
+{
+	aitUint16 v = 0;
+	if (m_value.valid())
+		m_readLock->lock();
+		m_value->get(v);
+		m_readLock->unlock();
+	return v;
+}
+
+void smsMTBoolPV::update(bool val, struct timespec *ts)
+{
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val)
+		return;
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_readLock->lock();
+	m_value = nval;
+	m_readLock->unlock();
+
+	notify();
+}
+
+void smsMTBoolPV::MTupdate(bool val, struct timespec *ts)
+{
+
+        m_updateLock->lock();	
+
+	// do this late, after CAS running
+	if (!m_updateEvent) {
+		m_updateEvent = new EventFd(boost::bind(
+					&smsMTBoolPV::remoteUpdate));
+	}
+ 	m_update_ts = ts;
+        m_updateEvent->signal(val);	// have it done in CAS thread
+
+        m_doneEvent->wait();		// for remoteUpdate to be done
+        m_updateLock->unlock();	
+}
+
+void smsMTBoolPV::remoteUpdate() {
+
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+ 	bool val = m_updateEvent->read();
+
+
+	m_value->get(v);
+	if (v == val) {
+		m_doneEvent->signal();
+		return;
+ 	}
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(m_update_ts);
+
+	m_readLock->lock();
+	m_value = nval;
+	m_readLock->unlock();
+
+	notify();
+	m_doneEvent->signal();
+}
+
+/* ----------------------------------------------------------------------- */
 smsEnabledPV::smsEnabledPV(const std::string &name,
 		DataSource *dataSource) :
 	smsBooleanPV(name), m_dataSource(dataSource) { }
