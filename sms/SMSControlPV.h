@@ -175,8 +175,6 @@ public:
 class smsMTBoolPV : public smsBooleanPV, public fdReg {
 public:
 
-	static smsMTBoolPV *newMTBoolPV(const std::string &name);
-
 	smsMTBoolPV(const std::string &name, const SOCKET fdIn);
 	virtual void update(bool val, struct timespec *ts);
         virtual void MTupdate(bool val, struct timespec *ts);

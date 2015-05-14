@@ -191,6 +191,13 @@ std::string StorageManager::m_domain;
 std::string StorageManager::m_broker_uri;
 std::string StorageManager::m_broker_user;
 std::string StorageManager::m_broker_pass;
+bool StorageManager::m_restart_combus;
+
+boost::shared_ptr<smsMTBoolPV> m_pv_restart_combus;
+boost::shared_ptr<smsMTStrPV> m_pv_domain;
+boost::shared_ptr<smsMTStrPV> m_pv_broker_uri;
+boost::shared_ptr<smsMTStrPV> m_pv_broker_user;
+boost::shared_ptr<smsMTStrPV> m_pv_broker_pass;
 
 ComBusSMSMon *StorageManager::m_combus;
 
@@ -405,6 +412,16 @@ void StorageManager::init(void)
 	}
 }
 
+static smsMTBoolPV *newMTBoolPV(const std::string &name) {
+
+        SOCKET newfd = eventfd(1, EFD_NONBLOCK);
+        if (newfd > 0) {
+                return new smsMTBoolPV(name, newfd);
+        } else {
+                return 0;
+        }
+}
+
 void StorageManager::lateInit(void)
 {
 	/* Clean up any lingering index directories in the background. */
@@ -435,6 +452,26 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
+
+	m_pvRestartCombus = boost::shared_ptr<smsMTBoolPV>(newMTBoolPV(
+		prefix + ":RestartCombus"));
+	m_pvDomain = boost::shared_ptr<smsMTStrPV>( new
+		smsMTStrPV(prefix + ":Domain"));
+	m_pvBrokerUri = boost::shared_ptr<smsMTStrPV>( new
+		smsMTStrPV(prefix + ":BrokerUri"));
+	m_pvBrokerUser = boost::shared_ptr<smsMTStrPV>( new
+		smsMTStrPV(prefix + ":BrokerUser"));
+	m_pvBrokerPass = boost::shared_ptr<smsMTStrPV>( new
+		smsMTStrPV(prefix + ":BrokerPass"));
+
+	ctrl->addPV(m_pvRestartCombus);
+	ctrl->addPV(m_pvDomain);
+	ctrl->addPV(m_pvBrokerUri);
+	ctrl->addPV(m_pvBrokerUser);
+	ctrl->addPV(m_pvBrokerPass);
+
+	// still need to initialize these, except restart which presumeably
+	// starts out at 0.
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this

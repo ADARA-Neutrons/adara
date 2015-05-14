@@ -881,17 +881,6 @@ smsMTBoolPV::smsMTBoolPV(const std::string &name, const SOCKET fdIn) :
 {
 }
 
-static smsMTBoolPV *newMTBoolPV(const std::string &name) {
-
-	SOCKET newfd = eventfd(1, EFD_NONBLOCK);
- 	if (newfd > 0) {
-		return new smsMTBoolPV(name, newfd);
-	} else {
- 		return 0;
-	}
-}
-
-	
 bool smsMTBoolPV::value(void)
 {
 	aitUint16 v = 0;
