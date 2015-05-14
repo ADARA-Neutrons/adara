@@ -881,6 +881,17 @@ smsMTBoolPV::smsMTBoolPV(const std::string &name, const SOCKET fdIn) :
 {
 }
 
+static smsMTBoolPV *newMTBoolPV(const std::string &name) {
+
+	SOCKET newfd = eventfd(1, EFD_NONBLOCK);
+ 	if (newfd > 0) {
+		return new smsMTBoolPV(name, newfd);
+	} else {
+ 		return 0;
+	}
+}
+
+	
 bool smsMTBoolPV::value(void)
 {
 	aitUint16 v = 0;
@@ -921,7 +932,6 @@ void smsMTBoolPV::MTupdate(bool val, struct timespec *ts)
         m_updateLock->lock();	
 
  	m_update_ts = ts;
-        m_updateEvent->signal(val);	// have it done in CAS thread
         ::write(m_updatefd, &uval, sizeof(uint64_t));
         m_doneEvent->wait();		// for remoteUpdate to be done
         m_updateLock->unlock();	
@@ -930,9 +940,11 @@ void smsMTBoolPV::MTupdate(bool val, struct timespec *ts)
 void smsMTBoolPV::callBack() {
 
 	aitUint16 uninitialized_var(v);
+    	uint64_t val;
 	gdd *nval;
- 	bool val = m_updateEvent->read();
 
+        ::read(m_updatefd, &val, sizeof(uint64_t));
+	val = val - 5;
 
 	m_value->get(v);
 	if (v == val) {
@@ -941,7 +953,7 @@ void smsMTBoolPV::callBack() {
  	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
-	nval->put(val);
+	nval->put((uint16_t)val);
 	nval->setTimeStamp(m_update_ts);
 
 	m_readLock->lock();

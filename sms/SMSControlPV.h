@@ -172,12 +172,12 @@ public:
 	virtual void changed(void);
 };
 
-class EventFd;
-
 class smsMTBoolPV : public smsBooleanPV, public fdReg {
 public:
-	smsMTBoolPV(const std::string &name, const SOCKET fdIn);
 
+	static smsMTBoolPV *newMTBoolPV(const std::string &name);
+
+	smsMTBoolPV(const std::string &name, const SOCKET fdIn);
 	virtual void update(bool val, struct timespec *ts);
         virtual void MTupdate(bool val, struct timespec *ts);
 
@@ -185,8 +185,6 @@ public:
 
 protected:
 	
-	//void remoteUpdate();
- 	EventFd *m_updateEvent;
 	epicsMutex *m_readLock;
 	epicsMutex *m_updateLock;
 	epicsEvent *m_doneEvent;
@@ -194,6 +192,7 @@ protected:
 	struct timespec *m_update_ts;
 
 private: 
+
 	void callBack();
 	SOCKET m_updatefd;
 };
