@@ -867,9 +867,17 @@ void smsBooleanPV::changed(void)
 }
 
 /* ----------------------------------------------------------------------- */
-smsMTBoolPV::smsMTBoolPV(const std::string &name) : smsBooleanPV(name),
- 						m_readLock(new epicsMutex()),
-						m_doneEvent(new epicsEvent()) 
+//
+// fdIn must be produced by 
+// #include <sys/eventfd.h>
+// fdIn = eventfd(1, EFD_NONBLOCK);
+//
+smsMTBoolPV::smsMTBoolPV(const std::string &name, const SOCKET fdIn) : 
+			smsBooleanPV(name),
+			fdReg(fdIn, fdrRead),
+ 			m_readLock(new epicsMutex()),
+			m_doneEvent(new epicsEvent()),
+			m_updatefd(fdIn)
 {
 }
 
@@ -908,22 +916,18 @@ void smsMTBoolPV::update(bool val, struct timespec *ts)
 
 void smsMTBoolPV::MTupdate(bool val, struct timespec *ts)
 {
+   	uint64_t uval = val+1;
 
         m_updateLock->lock();	
 
-	// do this late, after CAS running
-	if (!m_updateEvent) {
-		m_updateEvent = new EventFd(boost::bind(
-					&smsMTBoolPV::remoteUpdate));
-	}
  	m_update_ts = ts;
         m_updateEvent->signal(val);	// have it done in CAS thread
-
+        ::write(m_updatefd, &uval, sizeof(uint64_t));
         m_doneEvent->wait();		// for remoteUpdate to be done
         m_updateLock->unlock();	
 }
 
-void smsMTBoolPV::remoteUpdate() {
+void smsMTBoolPV::callBack() {
 
 	aitUint16 uninitialized_var(v);
 	gdd *nval;

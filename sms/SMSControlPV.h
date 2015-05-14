@@ -8,6 +8,7 @@
 #include <gddAppFuncTable.h>
 #include <smartGDDPointer.h>
 #include <casdef.h>
+#include <fdManager.h>
 
 class DataSource;
 class SMSControl;
@@ -173,9 +174,9 @@ public:
 
 class EventFd;
 
-class smsMTBoolPV : public smsBooleanPV {
+class smsMTBoolPV : public smsBooleanPV, public fdReg {
 public:
-	smsMTBoolPV(const std::string &name);
+	smsMTBoolPV(const std::string &name, const SOCKET fdIn);
 
 	virtual void update(bool val, struct timespec *ts);
         virtual void MTupdate(bool val, struct timespec *ts);
@@ -184,13 +185,17 @@ public:
 
 protected:
 	
-	void remoteUpdate();
+	//void remoteUpdate();
  	EventFd *m_updateEvent;
 	epicsMutex *m_readLock;
 	epicsMutex *m_updateLock;
 	epicsEvent *m_doneEvent;
  
 	struct timespec *m_update_ts;
+
+private: 
+	void callBack();
+	SOCKET m_updatefd;
 };
 
 class smsEnabledPV : public smsBooleanPV {
