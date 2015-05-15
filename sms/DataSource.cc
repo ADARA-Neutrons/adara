@@ -58,7 +58,10 @@ public:
 		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
 		m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
-	{ }
+	{
+		// Initialize "RTDL Packets with No Data Packets" Count...
+		m_rtdlNoDataCount = 0;
+	}
 
 	uint64_t pulse(void) const { return m_activePulse; }
 	uint64_t lastPulse(void) const { return m_lastPulse; }
@@ -260,6 +263,8 @@ public:
 		m_pktSeq++;
 		return !ok;
 	}
+
+	uint32_t	m_rtdlNoDataCount;
 
 private:
 	const std::string &m_name;
@@ -1044,6 +1049,9 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 {
 	HWSource &hw_src = getHWSource(pkt->sourceID());
 
+	// Reset "RTDL Packets with No Data Packets" Count...
+	hw_src.m_rtdlNoDataCount = 0;
+
 	/* Check that the fields are consistent with the pulse we are
 	 * currently processing. If not, then we've started a new pulse.
 	 * The HWSource class will take care of missing end-of-pulse
@@ -1123,11 +1131,13 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// strip off pulse nanoseconds...
 	time_t sec = pkt.pulseId() >> 32;
+
 	// check for "totally bogus" pulse times, in distant past/future... ;-b
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	time_t future = 
 		now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
+
 	// before SNS time began... ;-D
 	if ( sec < FACILITY_START_TIME )
 	{
@@ -1145,6 +1155,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		}
 		drop_pulse = true;
 	}
+
 	// more than a week into the future...! :-o
 	else if ( sec > future )
 	{
@@ -1188,6 +1199,29 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	m_rtdl_pkt_counts++;
 
+	// Check for Run-Away Data Sources...
+	// (Lots of RTDLs filling up our internal Pulse Buffer,
+	// with No RawDataPkts to release them... ;-b)
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it = m_hwSources.begin();
+
+	while ( it != m_hwSources.end() ) {
+		if ( ++(it->second->m_rtdlNoDataCount) > 100 ) {
+			ERROR("Run-Away Data Source " << m_name << ", "
+				<< it->second->m_rtdlNoDataCount
+				<< " RTDL Pulses without a Corresponding RawDataPkt!"
+				<< " Unregistering Event Source " << it->second->smsId());
+			ctrl->unregisterEventSource(it->second->smsId());
+			// Remove Hardware Source from Map...
+			// (Note: iterator increments to next element,
+			// but returns current element for deletion... :-)
+			m_hwSources.erase(it++);
+		}
+		else {
+			++it;
+		}
+	}
 	return false;
 }
 
