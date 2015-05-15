@@ -36,7 +36,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_SET_SOURCES_READ_DELAY       3
-#define RLL_NO_RTDL_FOR_PULSE            4
+#define RLL_RTDL_NO_DATA                 4
+#define RLL_NO_RTDL_FOR_PULSE            5
 
 uint32_t SMSControl::m_targetNumber;
 
@@ -1206,7 +1207,17 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 	// Is pulse pending from any data sources...?
 	if (!pulse->m_pending.any()) {
-		// DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+				RLL_RTDL_NO_DATA, "none",
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< "pulseRTDL(): Pulse with No Registered Event Sources!"
+				<< " Marking Partial...");
+		}
+		// Mark Pulse "Partial" Because there's No Event Data,
+		// but then go ahead and mark it "Complete" to record it, lol...!
+		pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 		markComplete(pkt.pulseId(), dup, -1);
 	}
 }
