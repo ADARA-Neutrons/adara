@@ -616,6 +616,15 @@ smsMTStrPV::smsMTStrPV(const std::string &name) : smsStringPV(name),
 {
 }
 
+std::string smsMTStrPV::value(void)
+{
+	m_readLock->lock();
+	std::string retval((char *) m_value->dataPointer());
+	m_readLock->unlock();
+	return retval;
+}
+
+
 caStatus smsMTStrPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	unsigned int start, nelem;
