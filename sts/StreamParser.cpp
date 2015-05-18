@@ -853,7 +853,7 @@ StreamParser::processBankEvents
                         {
                             // Calculate index into Histogram based on TOF
                             tofbin = ( tof - (*dbs)->tofOffset )
-                                / (*dbs)->tofBin;
+                                / bi->m_tof_bin_size;
 
                             // TOF Sanity Test, Just to Be Sure... ;-b
                             // (This should never happen,
