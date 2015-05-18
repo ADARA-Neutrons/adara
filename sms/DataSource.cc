@@ -295,13 +295,13 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
-			unsigned int read_chunk) :
+			unsigned int read_chunk, uint32_t rtdlNoDataThresh) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
-	m_max_read_chunk(read_chunk)
+	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh)
 {
 	m_name += " (";
 	m_name += m_basename;
@@ -350,6 +350,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk"));
 
+	m_pvRTDLNoDataThresh = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":RTDLNoDataThresh"));
+
 	ctrl->addPV(m_pvName);
 	ctrl->addPV(m_pvDataURI);
 	ctrl->addPV(m_pvEnabled);
@@ -359,6 +362,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
 	ctrl->addPV(m_pvMaxReadChunk);
+	ctrl->addPV(m_pvRTDLNoDataThresh);
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
@@ -371,6 +375,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 
 	// Initialize Max Read Chunk PV (construct string)...
 	std::stringstream ssMRC;
@@ -1203,13 +1208,18 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// (Lots of RTDLs filling up our internal Pulse Buffer,
 	// with No RawDataPkts to release them... ;-b)
 
+	// Update RTDL "No Data" Threshold from PV...
+	m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
+
 	SMSControl *ctrl = SMSControl::getInstance();
 	HWSrcMap::iterator it = m_hwSources.begin();
 
 	while ( it != m_hwSources.end() ) {
-		if ( ++(it->second->m_rtdlNoDataCount) > 100 ) {
-			ERROR("Run-Away Data Source " << m_name << ", "
-				<< it->second->m_rtdlNoDataCount
+		if ( ++(it->second->m_rtdlNoDataCount) > m_rtdlNoDataThresh ) {
+			ERROR("Run-Away Data Source " << m_name
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< ", " << it->second->m_rtdlNoDataCount
+				<< " (> " << m_rtdlNoDataThresh << ")"
 				<< " RTDL Pulses without a Corresponding RawDataPkt!"
 				<< " Unregistering Event Source " << it->second->smsId());
 			ctrl->unregisterEventSource(it->second->smsId());
