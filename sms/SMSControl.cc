@@ -211,6 +211,7 @@ void SMSControl::addSource(const std::string &name,
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	uint32_t rtdlNoDataThresh;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
@@ -235,6 +236,7 @@ void SMSControl::addSource(const std::string &name,
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
@@ -251,7 +253,8 @@ void SMSControl::addSource(const std::string &name,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
-							 chunk_size));
+							 chunk_size,
+							 rtdlNoDataThresh));
 	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
