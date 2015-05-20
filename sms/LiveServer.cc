@@ -14,11 +14,19 @@
 static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
 std::string LiveServer::m_service;
+std::string LiveServer::m_host;
+char *LiveServer::m_node;
+
 LiveServer *LiveServer::m_singleton;
 
 void LiveServer::config(const boost::property_tree::ptree &conf)
 {
 	m_service = conf.get<std::string>("livestream.service", "31415");
+	m_host = conf.get<std::string>("livestream.uri", "ANY");
+	if ( !m_host.compare("ANY") )
+		m_node = (char *) NULL;
+	else
+		m_node = (char *) m_host.c_str();
 	LiveClient::config(conf);
 }
 
@@ -39,9 +47,11 @@ LiveServer::LiveServer()
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(NULL, m_service.c_str(), &hints, &ai);
+	rc = getaddrinfo(m_node, m_service.c_str(), &hints, &ai);
 	if (rc) {
-		msg = "Unable to convert service '";
+		msg = "Unable to convert host/service '";
+		msg += m_host;
+		msg += ":";
 		msg += m_service;
 		msg += "' to a port: ";
 		msg += gai_strerror(rc);
@@ -71,6 +81,8 @@ LiveServer::LiveServer()
 
 	if (bind(m_fd, ai->ai_addr, ai->ai_addrlen)) {
 		msg = "Unable to bind to port ";
+		msg += m_host;
+		msg += ":";
 		msg += m_service;
 		msg += ": ";
 		msg += strerror(errno);
@@ -84,7 +96,7 @@ LiveServer::LiveServer()
 	}
 
 	INFO("LiveServer() listening for connections at "
-		<< m_service << "...");
+		<< m_host << ":" << m_service << "...");
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
