@@ -300,7 +300,7 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *UNUSED(chunk),
 			       unsigned int UNUSED(chunk_offset),
-			       unsigned int UNUSED(chunk_len))
+			       unsigned int chunk_len)
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Ok, this is much bigger than we expected, stop processing
@@ -308,10 +308,14 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	 */
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
 	if (hdr) {
-		WARN("Received unexpected oversize packet of type " << hdr->type()
-			<< " and length " << hdr->packet_length());
+		ERROR("Received Unexpected Oversize Packet"
+			<< " at " << hdr->timestamp().tv_sec
+			<< "." << hdr->timestamp().tv_nsec
+			<< " of type 0x" << std::hex << hdr->type() << std::dec
+			<< " payload_length=" << hdr->payload_length());
 	} else {
-		WARN("Received unexpected oversize packet");
+		ERROR("Received Unexpected Oversize Packet"
+			<< " chunk_len=" << chunk_len);
 	}
 	return true;
 }

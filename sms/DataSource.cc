@@ -994,7 +994,7 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr, 
 			       const uint8_t *UNUSED(chunk),
 				   unsigned int UNUSED(chunk_offset),
-			       unsigned int UNUSED(chunk_len))
+			       unsigned int chunk_len)
 {
 	/* Rate-limited logging of oversized packets */
 	std::string log_info;
@@ -1002,10 +1002,16 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
-			ERROR(log_info << "Oversized packet of type " << hdr->type()
+			ERROR(log_info << "Oversized packet"
+				<< " at " << hdr->timestamp().tv_sec
+				<< "." << hdr->timestamp().tv_nsec
+				<< " of type 0x" << std::hex << hdr->type() << std::dec
+				<< " payload_length=" << hdr->payload_length()
 				<< " from " << m_name);
 		} else {
-			ERROR(log_info << "Oversized packet from " << m_name);
+			ERROR(log_info << "Oversized packet"
+				<< " chunk_len=" << chunk_len
+				<< " from " << m_name);
 		}
 	}
 	return true;
