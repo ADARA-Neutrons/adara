@@ -376,10 +376,12 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			<< " at " << hdr->timestamp().tv_sec
 			<< "." << hdr->timestamp().tv_nsec
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
-			<< " payload_length=" << hdr->payload_length());
+			<< " payload_length=" << hdr->payload_length()
+			<< " max=" << MAX_PKT_SIZE);
 	} else {
 		ERROR("LiveClient " << m_clientName << " sent us an Oversize Packet"
-			<< " chunk_len=" << chunk_len);
+			<< " chunk_len=" << chunk_len
+			<< " max=" << MAX_PKT_SIZE);
 	}
 	return true;
 }

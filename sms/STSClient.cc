@@ -312,10 +312,12 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			<< " at " << hdr->timestamp().tv_sec
 			<< "." << hdr->timestamp().tv_nsec
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
-			<< " payload_length=" << hdr->payload_length());
+			<< " payload_length=" << hdr->payload_length()
+			<< " max=" << MAX_PACKET_SIZE);
 	} else {
 		ERROR("Received Unexpected Oversize Packet"
-			<< " chunk_len=" << chunk_len);
+			<< " chunk_len=" << chunk_len
+			<< " max=" << MAX_PACKET_SIZE);
 	}
 	return true;
 }
