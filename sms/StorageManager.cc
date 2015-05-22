@@ -1207,9 +1207,10 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	 */
 	containers.sort();
 
-	uint64_t purged = 0;
+	uint64_t total_purged = 0;
+	uint64_t purged;
 	std::list<fs::path>::iterator cit, cend = containers.end();
-	for (cit = containers.begin(); purged < goal && cit != cend; ) {
+	for (cit = containers.begin(); total_purged < goal && cit != cend; ) {
 		fs::path &cpath = *cit;
 
 		uint32_t date=-1, secs=-1, nanosecs=-1;
@@ -1224,12 +1225,6 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 				<< " in [" << dir << "]"
 				<< " as " << run
 				<< " (" << date << ", " << secs << "." << nanosecs << ")");
-			// Better Send Original ComBus Message Here...
-			// - who knows whether we've touched this run before...
-			struct timespec now;
-			clock_gettime(CLOCK_REALTIME, &now);
-			m_combus->sendOriginal(run,
-				std::string("SMS run purged"), now);
 		}
 		else if ( numParsed < 3 ) {
 			ERROR("purgeDaily():"
@@ -1253,9 +1248,30 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 * if it could be the current container.
 		 */
 		++cit;
-		purged += StorageContainer::purge(cpath.string(),
-							goal - purged,
-							last && cit == cend);
+
+		// Try to Purge this Container...
+		bool path_deleted = false;
+		purged = StorageContainer::purge(cpath.string(),
+							goal - total_purged,
+							last && cit == cend,
+							path_deleted);
+
+		// Send ComBus Message if Purged and Run Number Known...
+		if ( purged > 0 && numParsed == 4 ) {
+			std::string purgeMsg;
+			if ( path_deleted )
+				purgeMsg = "SMS run backup purged.";
+			else
+				purgeMsg = "SMS run backup purging...";
+			// Better Send Original ComBus Message Here...
+			// - who knows whether we've touched this run before...
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_combus->sendOriginal(run, purgeMsg, now);
+		}
+
+		// Accumulate Total Blocks Purged
+		total_purged += purged;
 	}
 
 	/* Try to remove the directory, but expect to fail. */
@@ -1264,7 +1280,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	} catch (fs::filesystem_error e) {
 	}
 
-	return purged;
+	return total_purged;
 }
 
 uint64_t StorageManager::purgeData(uint64_t purgeRequested)
