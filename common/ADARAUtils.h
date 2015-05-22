@@ -208,7 +208,7 @@ public:
 					std::vector<int64_t> >
 				(log, new_time_vec) );
 		}
-		
+
 		lh->second.push_back( static_cast<int64_t>(ts.tv_sec) );
 
 		// std::stringstream sss;
