@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
@@ -400,15 +401,18 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 }
 
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
-				 bool keep)
+				 bool keep, bool &path_deleted )
 {
 	std::string cpath;
 	struct timespec ts;
 	uint32_t run;
 
 	/* If we're not a valid container, then there's nothing to purge. */
-	if (!validatePath(path, cpath, ts, run))
+	if (!validatePath(path, cpath, ts, run)) {
+		ERROR("Tried to purge invalid storage container at '"
+			<< path << "'");
 		return 0;
+	}
 
 	fs::directory_iterator end, it(path);
 	std::list<fs::path> files;
@@ -488,6 +492,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		fs::path base(path), completed(path);
 		completed /= m_completed_marker;
 
+		path_deleted = true;
 		try {
 			if (run)
 				remove(completed);
@@ -496,7 +501,12 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			DEBUG("Removed container " << base);
 		} catch(fs::filesystem_error err) {
 			WARN("Error removing container: " << err.what());
+			path_deleted = false;
 		}
+	}
+	// Not Done Yet with This Container Path...
+	else {
+		path_deleted = false;
 	}
 
 	return purged;

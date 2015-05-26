@@ -1,10 +1,13 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
+#include <stdint.h>
 #include <string>
-#include <map>
+#include <sstream>
 
 #include "RunInfo.h"
 #include "StorageManager.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 
 #include "Logging.h"
 

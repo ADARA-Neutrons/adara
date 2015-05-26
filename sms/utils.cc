@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <stdlib.h>
+#include <stdint.h>
 #include "utils.h"
 
 static uint64_t checked_multiply(uint64_t x, uint64_t y)

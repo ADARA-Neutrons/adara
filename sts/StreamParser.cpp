@@ -1,9 +1,12 @@
 #include "StreamParser.h"
 #include "TransCompletePkt.h"
 #include <iomanip>
+#include <sstream>
+#include <string.h>
 #include <boost/algorithm/string.hpp>
 #include <syslog.h>
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 
 using namespace std;
@@ -69,19 +72,31 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open())
         m_ofs_adara.close();
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin(); ibi != m_banks.end(); ++ibi )
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi ) {
         if ( *ibi )
             delete *ibi;
+    }
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin(); imi != m_monitors.end(); ++imi )
+    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+            m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs ) {
+        if ( *dbs )
+            delete *dbs;
+    }
+
+    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+            imi != m_monitors.end(); ++imi ) {
         if ( imi->second )
             delete imi->second;
+    }
 
     m_monitor_config.clear();
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin(); ipv != m_pvs_by_key.end(); ++ipv )
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
+            ipv != m_pvs_by_key.end(); ++ipv ) {
         if ( ipv->second )
             delete ipv->second;
+    }
 }
 
 
@@ -201,6 +216,7 @@ StreamParser::printStats
 #define PKT_BIT_BEAMINFO                0x0004
 #define PKT_BIT_GEOMETRY                0x0008
 #define PKT_BIT_BEAM_MONITOR_CONFIG     0x0010
+#define PKT_BIT_DETECTOR_BANK_SETS      0x0020
 
 #define PROCESS_IN_STATES(s)            \
     if ( m_processing_state & (s))      \
@@ -265,10 +281,14 @@ StreamParser::rxPacket
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
 
     case ADARA::PacketType::BEAMLINE_INFO_V0:
+    case ADARA::PacketType::BEAMLINE_INFO_V1:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
 
     case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
         PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAM_MONITOR_CONFIG)
+
+    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
+        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_DETECTOR_BANK_SETS)
 
     // These packets shall be processed during header & event processing
     case ADARA::PacketType::DEVICE_DESC_V0:
@@ -279,7 +299,9 @@ StreamParser::rxPacket
 
     // These packets shall only be processed during event processing
     case ADARA::PacketType::BANKED_EVENT_V0:
+    case ADARA::PacketType::BANKED_EVENT_V1:
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
         PROCESS_IN_STATES(PROCESSING_EVENTS)
 
     // Packet types that are not processes by StreamParser
@@ -381,9 +403,11 @@ StreamParser::rxPacket
 /*! \brief This method processes Pixel Mapping ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA PixelMapping packets. Detector source and bank information is extracted from the received
- * packet and BankInfo instances are created (using the makeBankInfo() virtual factory method) to capture essential bank
- * parameters need for subsequent bnked event processing. The receipt of a Pixel Mapping packets also triggers
+ * This method processes ADARA PixelMapping packets. Detector source and
+ * bank information is extracted from the received packet and BankInfo
+ * instances are created (using the makeBankInfo() virtual factory method)
+ * to capture essential bank parameters need for subsequent banked event
+ * processing. The receipt of a Pixel Mapping packets also triggers
  * progression to the internal event processing state.
  */
 bool
@@ -393,21 +417,29 @@ StreamParser::rxPacket
 )
 {
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
+        + a_pkt.payload_length());
+
+    uint32_t        base_logical;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
-    // Note: a vector is used for BankInfo instances where the bank_id is the offset into the vector. This is safe
-    // as bank IDs are monotonically increasing integers starting at 0. IF this ever changes, then the bank
-    // container will need to be changed to a map (which would result in a slight performance drop). Also note that
-    // the current code accommodates gaps in the banks by zeroing and subsequently checking entries when iterating
-    // over the container.
+    // Note: a vector is used for BankInfo instances where the bank_id
+    // is the offset into the vector. This is safe as bank IDs are
+    // monotonically increasing integers starting at 0. IF this ever
+    // changes, then the bank container will need to be changed to a map
+    // (which would result in a slight performance drop). Also note that
+    // the current code accommodates gaps in the banks by zeroing and
+    // subsequently checking entries when iterating over the container.
 
-    // Count number of banks (largest bank id) in payload and reserve bank container storage
+    // Count number of banks (largest bank id) in payload and
+    // reserve bank container storage
+
     uint16_t bank_count = 0;
     const uint32_t *rpos2 = rpos;
 
-    while( rpos2 < epos )
+    // Determine Max Bank ID...
+    while ( rpos2 < epos )
     {
         rpos2++;
         bank_id = (uint16_t)(*rpos2 >> 16);
@@ -418,23 +450,47 @@ StreamParser::rxPacket
         rpos2 += pix_count;
     }
 
-    m_banks.resize(bank_count+1,0);
+    m_banks.resize( bank_count + 1, 0 );
 
     // Now build banks and populate bank container
-    while( rpos < epos )
+    while ( rpos < epos )
     {
-        rpos++;  // TODO This infomation is not currently processed.
+        base_logical = *rpos++;
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
+        // Create New BankInfo...
         if ( !m_banks[bank_id] )
-            m_banks[bank_id] = makeBankInfo( bank_id, pix_count, m_event_buf_write_thresh, m_anc_buf_write_thresh );
+        {
+            // Create BankInfo Instance
+            m_banks[bank_id] = makeBankInfo( bank_id,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            m_banks[bank_id]->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+        }
+
+        // Append This Section's Logical PixelIds...
+        for (uint32_t i=0 ; i < pix_count ; ++i)
+        {
+            m_banks[bank_id]->m_logical_pixelids.push_back(
+                base_logical + i );
+        }
+
+        // syslog( LOG_INFO,
+            // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
+            // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
+            // m_banks[bank_id]->m_logical_pixelids.size() );
+
+        // Next Section
         rpos += pix_count;
     }
 
-    // The receipt of a pixel mapping packet allows state to progress to event processing
+    // The receipt of a pixel mapping packet allows state to progress
+    // to event processing
     m_processing_state = PROCESSING_EVENTS;
 
     return false;
@@ -448,7 +504,7 @@ StreamParser::rxPacket
 /*! \brief This method processes Banked Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by ths method with the
+ * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by this method with the
  * pulse data attached to the received Banked Event packet. The payload of the Banked Event packet is parsed for neutron
  * events which are then handled by the processBankEvents() method.
  */
@@ -535,17 +591,20 @@ StreamParser::rxOversizePkt
     if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
-            "[%i] %s %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+        "[%i] %s %u.%09u type=0x%x payload_len=%u max=%u offset=%u len=%u",
             g_pid, "OversizePkt:",
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
-            hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
+            hdr->type(), hdr->payload_length(), ADARA_IN_BUF_SIZE,
+            chunk_offset, chunk_len);
 
         // Handle pulse sequence flag for this Oversized Packet
         // (so we don't get "out of sync" when we throw it away... :-)
 
         if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+            || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1
+            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
         {
             // Pulse flag should be 0 (no data processed yet) or 2 (monitor
             // data processed) any other value indicates an error with
@@ -556,31 +615,41 @@ StreamParser::rxOversizePkt
                 // First packet of new pulse - count it and set flag
                 // indicating it was counted
                 ++m_pulse_count;
-                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                    || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
                 {
                     m_pulse_flag |= 1;
                 }
                 else if ( hdr->type() ==
-                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                    || hdr->type() ==
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
                 {
                     m_pulse_flag |= 2;
                 }
             }
-            else if ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+            else if ( ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                            || hdr->type() ==
+                                ADARA::PacketType::BANKED_EVENT_V1 )
                         && m_pulse_flag == 2 )
-                    || ( hdr->type() ==
-                            ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                    || ( ( hdr->type() ==
+                                ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                            || hdr->type() ==
+                                ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
                         && m_pulse_flag == 1 ) )
             {
                 m_pulse_flag = 0;
             }
-            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0 )
+            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
+                || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid banked event packet sequence received" )
             }
             else if ( hdr->type() ==
-                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0 )
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0
+                || hdr->type() ==
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid beam monitor packet sequence received" )
@@ -592,8 +661,8 @@ StreamParser::rxOversizePkt
     else
     {
         syslog( LOG_WARNING,
-            "[%i] OversizePkt: next chunk offset=%u len=%u",
-            g_pid, chunk_offset, chunk_len);
+            "[%i] OversizePkt: next chunk max=%u offset=%u len=%u",
+            g_pid, ADARA_IN_BUF_SIZE, chunk_offset, chunk_len);
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -671,10 +740,13 @@ StreamParser::processPulseInfo
 
 /*! \brief This method processes the neutron events for a specific detector bank.
  *
- * This method processes incoming neutron events for a specified detector bank. The events are read from the packet
- * and placed into internal event buffers (units are converted for event time of flight). When the event buffers are
- * full, they are flushed to a subclassed stream adapter via the bankBuffersReady() virtual method. This method also
- * detects pulse gaps and corrects the event index as required (see handleBankPulseGap() method for more details).
+ * This method processes incoming neutron events for a specified detector
+ * bank. The events are read from the packet and placed into internal event
+ * buffers (units are converted for event time of flight). When the event
+ * buffers are full, they are flushed to a subclassed stream adapter via
+ * the bankBuffersReady() virtual method. This method also detects pulse
+ * gaps and corrects the event index as required (see handleBankPulseGap()
+ * method for more details).
  */
 void
 StreamParser::processBankEvents
@@ -684,60 +756,203 @@ StreamParser::processBankEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
+    // Valid Detector Bank ID...
     if ( a_bank_id < m_banks.size() )
     {
         BankInfo *bi = m_banks[a_bank_id];
 
-        // Detect gaps in event data and fill event index if present
-        if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
-            handleBankPulseGap( *bi, ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank( false );
 
-        size_t sz = bi->m_tof_buffer.size();
-
-        bi->m_tof_buffer.resize( sz + a_event_count );
-        bi->m_pid_buffer.resize( sz + a_event_count );
-
-        float           *tof_ptr = &bi->m_tof_buffer[sz];
-        uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
-        const uint32_t  *epos = a_rpos + (a_event_count<<1);
-
-        while ( a_rpos != epos )
+        // Event-based Data Processing
+        if ( bi->m_has_event )
         {
-            // ADARA TOF values are in units of 100 ns - convert to microseconds
-            *tof_ptr++ = *a_rpos++ / 10.0;
-            *pid_ptr++ = *a_rpos++;
+            // Detect gaps in event data and fill event index if present
+            if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
+            {
+                handleBankPulseGap( *bi,
+                    ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
+            }
+
+            size_t sz = bi->m_tof_buffer.size();
+
+            bi->m_tof_buffer.resize( sz + a_event_count );
+            bi->m_pid_buffer.resize( sz + a_event_count );
+
+            float           *tof_ptr = &bi->m_tof_buffer[sz];
+            uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
+            const uint32_t  *rpos = a_rpos;
+            const uint32_t  *epos = a_rpos + (a_event_count<<1);
+
+            while ( rpos != epos )
+            {
+                // ADARA TOF values are in units of 100 ns
+                // - convert to microseconds
+                *tof_ptr++ = *rpos++ / 10.0;
+                *pid_ptr++ = *rpos++;
+            }
+
+            // Cache event index until large enough to write
+            bi->m_index_buffer.push_back( bi->m_event_count );
+            bi->m_event_count += a_event_count;
+
+            bi->m_last_pulse_with_data = m_pulse_count;
+
+            // Check to see if buffers are ready to write
+            if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh
+                   || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            {
+                bankBuffersReady( *bi );
+
+                bi->m_tof_buffer.clear();
+                bi->m_pid_buffer.clear();
+                bi->m_index_buffer.clear();
+            }
+
+            m_run_metrics.events_counted += a_event_count;
         }
 
-        // Cache event index until large enough to write
-        bi->m_index_buffer.push_back( bi->m_event_count );
-        bi->m_event_count += a_event_count;
-
-        bi->m_last_pulse_with_data = m_pulse_count;
-
-        // Check to see if buffers are ready to write
-        if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        // Histogram-based Data Processing
+        if ( bi->m_has_histo )
         {
-            bankBuffersReady( *bi );
+            const uint32_t  *rpos = a_rpos;
+            const uint32_t  *epos = a_rpos + (a_event_count<<1);
 
-            bi->m_tof_buffer.clear();
-            bi->m_pid_buffer.clear();
-            bi->m_index_buffer.clear();
-        }
+            // Find Detector Bank Set We're Using for Histogram
+            // (Only *One* Histogram per Detector Bank (for now)...)
+            for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+                        bi->m_bank_sets.begin();
+                    dbs != bi->m_bank_sets.end() ; ++dbs )
+            {
+                if ( !*dbs )
+                    continue;
 
-        m_run_metrics.events_counted += a_event_count;
-    }
+                // Histo-based Detector Bank
+                if ( (*dbs)->flags
+                        & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+                {
+                    uint32_t tofbin;
+                    uint32_t index;
+                    uint32_t tof;
+                    uint32_t pid;
+
+                    while ( rpos != epos )
+                    {
+                        // ADARA TOF values are in units of 100 ns,
+                        //    convert to microseconds
+                        tof = *rpos++ / 10;
+                        pid = *rpos++;
+
+                        // Ignore TOF Less than Minimum Offset
+                        //    and Greater than or Equal to Maximum TOF...
+                        //    (Non-Inclusive Max...! ;-D)
+                        if ( tof >= (*dbs)->tofOffset
+                                && tof < (*dbs)->tofMax
+                                && bi->m_histo_pid_offset[
+                                    pid - bi->m_base_pid ] >= 0 )
+                        {
+                            // Calculate index into Histogram based on TOF
+                            tofbin = ( tof - (*dbs)->tofOffset )
+                                / bi->m_tof_bin_size;
+
+                            // TOF Sanity Test, Just to Be Sure... ;-b
+                            // (This should never happen,
+                            //    but the logic is confusing.)
+                            if ( tofbin >= bi->m_num_tof_bins - 1 )
+                            {
+                                syslog( LOG_ERR,
+                                "[%i] %s %s %u %s tof=%u tofbin=%u >= %u",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Error",
+                                    tof, tofbin, bi->m_num_tof_bins - 1 );
+                                // Count Uncounted Detector Histo Events...
+                                (bi->m_histo_event_uncounted)++;
+                                continue;
+                            }
+
+                            // Calculate Overall Histogram Index
+                            index = bi->m_histo_pid_offset[
+                                        pid - bi->m_base_pid ]
+                                    + tofbin;
+
+                            // Index Sanity Test, Just to Be Sure... ;-b
+                            // (This should never happen...)
+                            if ( index >= ( bi->m_logical_pixelids.size()
+                                    * ( bi->m_num_tof_bins - 1 ) ) )
+                            {
+                                syslog( LOG_ERR,
+                             "[%i] %s %s %u %s pid=%u tofbin=%u %u >= %lu",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Index Overflow",
+                                    pid, tofbin, index,
+                                    bi->m_logical_pixelids.size()
+                                        * ( bi->m_num_tof_bins - 1 )
+                                    );
+                                // Count Uncounted Detector Histo Events...
+                                (bi->m_histo_event_uncounted)++;
+                                continue;
+                            }
+
+                            // Increment Histogram Time Slot...
+                            (bi->m_data_buffer[ index ])++;
+
+                            // Count Detector Events for Histogram Mode Too
+                            (bi->m_histo_event_count)++;
+                        }
+
+                        // Count Uncounted Detector Events for Histogram...
+                        else
+                        {
+                            // Log Any Bogus PixelId Offsets...?
+                            // (TODO definitely need to be rate-limited ;-)
+                            if ( bi->m_histo_pid_offset[
+                                    pid - bi->m_base_pid ] < 0 )
+                            {
+                                syslog( LOG_ERR,
+                           "[%i] %s %s %u %s pid=%u base=%u offset=%u < 0",
+                                    g_pid, "STS Error:",
+                                    "Detector Bank", bi->m_id,
+                                    "Histogram Offset Error",
+                                    pid, bi->m_base_pid,
+                                    bi->m_histo_pid_offset[
+                                        pid - bi->m_base_pid ] );
+                            }
+
+                            (bi->m_histo_event_uncounted)++;
+                        }
+
+                    }   // event processing loop...
+
+                    // Only *One* Histogram per Detector Bank (for now)...
+                    break;
+
+                }   // histo-based detector bank...
+
+            }   // m_bank_sets loop...
+
+        }   // m_has_histo
+
+    }   // Valid Detector Bank ID...
+
+    // Not a Valid Detector Bank ID...
     else
         m_run_metrics.events_uncounted += a_event_count;
 }
 
 /*! \brief This method handles pulse gaps for a specified detector bank
  *
- * This method handles pulse gaps in the event stream for the specified detectpr bank. When a gap is detected, the event
- * index for the bank must be corrected for the missing pulses to keep in synchronized with the event stream. If a small
- * gap is detected, values are inserted directly into the internal index buffer; otherwise, gap processing is deferred
- * to the stream adatapter subclass via the bankPulseGap() virtual method. (It is expected that the virtual method
- * should write index values directly into the destination format to prevent excessive memory consumption that would
- * be caused by buffering the corrected index.)
+ * This method handles pulse gaps in the event stream for the specified
+ * detectpr bank. When a gap is detected, the event index for the bank
+ * must be corrected for the missing pulses to keep in synchronized with
+ * the event stream. If a small gap is detected, values are inserted
+ * directly into the internal index buffer; otherwise, gap processing is
+ * deferred to the stream adatapter subclass via the bankPulseGap() virtual
+ * method. (It is expected that the virtual method should write index
+ * values directly into the destination format to prevent excessive memory
+ * consumption that would be caused by buffering the corrected index.)
  */
 void
 StreamParser::handleBankPulseGap
@@ -746,16 +961,22 @@ StreamParser::handleBankPulseGap
     uint64_t a_count    ///< [in] The size of the pulse gap
 )
 {
+    // Make Sure Data has been (Late) Initialized...
+    if ( !(a_bi.m_initialized) )
+        a_bi.initializeBank( false );
+
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
     if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
     {
-        a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count, a_bi.m_event_count );
+        a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count,
+            a_bi.m_event_count );
     }
     else
     {
         // Otherwise, if the gap is too large - flush buffers & fill gap
-        // Note: it is acceptable to call bankBuffersReady even if they are empty.
+        // Note: it is acceptable to call bankBuffersReady
+        // even if they are empty.
         bankBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
 
@@ -769,16 +990,17 @@ StreamParser::handleBankPulseGap
 // ADARA Beam Monitor packet processing
 //---------------------------------------------------------------------------------------------------------------------
 
-/*! \brief This method processes Monitor Event ADARA packets
+/*! \brief This method processes Beam Monitor Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Monitor Event packets. The payload of the Monitor Event packet is parsed for neutron
- * events which are then handled by the processMonitorEvents() method.
+ * This method processes ADARA Beam Monitor Event packets. The payload
+ * of the Monitor Event packet is parsed for neutron events which are
+ * then handled by the processMonitorEvents() method.
  */
 bool
 StreamParser::rxPacket
 (
-    const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BankedEventPkt object to process
+    const ADARA::BeamMonitorPkt &a_pkt  ///< [in] ADARA BeamMonitorPkt object to process
 )
 {
     // Ignore duplicate pulses
@@ -1166,14 +1388,21 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    m_run_info.instr_id =  a_pkt.id();
-    m_run_info.instr_shortname =  a_pkt.shortName();
-    m_run_info.instr_longname =  a_pkt.longName();
+    m_run_info.target_number = a_pkt.targetNumber();
+
+    m_run_info.instr_id = a_pkt.id();
+    m_run_info.instr_shortname = a_pkt.shortName();
+    m_run_info.instr_longname = a_pkt.longName();
 
     receivedInfo( INSTR_INFO_BIT );
 
     return false;
 }
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Beam Monitor Config packet processing
+//---------------------------------------------------------------------------------------------------------------------
 
 
 /*! \brief This method processes Beam Monitor Config ADARA packets
@@ -1186,7 +1415,7 @@ StreamParser::rxPacket
 bool
 StreamParser::rxPacket
 (
-    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
+    const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beam Monitor Config Packet to process
 )
 {
     syslog( LOG_INFO,
@@ -1288,6 +1517,194 @@ StreamParser::getBeamMonitorConfig
     }
 
     return(config);
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Detector Bank Sets packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes Detector Bank Sets ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Detector Bank Sets packets,
+ * to optionally define Histogramming & Rate-Throttled Event parameters
+ * for processing/accumulating special subsets of Neutron Detector Banks.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::DetectorBankSetsPkt &a_pkt     ///< [in] The ADARA Detector Bank Sets Packet to process
+)
+{
+    syslog( LOG_INFO,
+        "[%i] Detector Bank Sets Packet Received: %u Detector Bank Sets",
+        g_pid, a_pkt.detBankSetCount() );
+
+    std::vector<uint32_t> banklist;
+
+    for (uint32_t i=0 ; i < a_pkt.detBankSetCount() ; i++) {
+
+        banklist.clear();
+
+        const uint32_t *rawBanklist = a_pkt.banklist(i);
+        std::stringstream ss;
+        bool first = true;
+        ss << "[";
+        for (uint32_t b=0 ; b < a_pkt.bankCount(i) ; b++) {
+            if ( first ) first = false;
+            else ss << ",";
+            ss << rawBanklist[b];
+            banklist.push_back( rawBanklist[b] );
+        }
+        ss << "]";
+
+        STS::DetectorBankSet *set = new STS::DetectorBankSet;
+
+        set->name = a_pkt.name(i);
+        set->banklist = banklist;
+        set->flags = a_pkt.flags(i);
+        set->tofOffset = a_pkt.tofOffset(i);
+        set->tofMax = a_pkt.tofMax(i);
+        set->tofBin = a_pkt.tofBin(i);
+        set->throttle = a_pkt.throttle(i);
+        set->suffix = a_pkt.suffix(i);
+
+        std::string format;
+        if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+                && set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            format = "both";
+        else if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            format = "event";
+        else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            format = "histo";
+        else
+            format = "[Unknown!]";
+
+        syslog( LOG_INFO,
+        "[%i] %s %s (%u=%s): %s=%u (%s) %s=(%u to %u by %u) %s=%lf (%s).",
+            g_pid, "Detector Bank Set", set->name.c_str(),
+            a_pkt.bankCount(i), ss.str().c_str(),
+            "flags", set->flags, format.c_str(),
+            "histo", set->tofOffset, set->tofMax, set->tofBin,
+            "throttle", set->throttle, set->suffix.c_str() );
+
+        // Basic Sanity Check...
+        if ( set->tofOffset >= set->tofMax )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s Config Error: Offset %u >= Max %u",
+                g_pid, "STS Error:", "Detector Bank Set",
+                set->name.c_str(), set->tofOffset, set->tofMax );
+            syslog( LOG_ERR,
+                "[%i] %s Restricting Detector Bank Set to Event Mode!",
+                g_pid, "STS Error:" );
+            set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
+        }
+
+        // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
+        if ( set->tofBin < 1 )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
+                g_pid, "STS Error:", "Detector Bank Set",
+                set->name.c_str(), set->tofBin );
+            set->tofBin = 1;
+        }
+
+        // Associate This Detector Bank Set with Any Existing BankInfo...
+        associateDetectorBankSet( set );
+
+        // Save for Posterity
+        m_bank_sets.push_back(set);
+    }
+
+    return false;
+}
+
+
+/*! \brief This method looks up any Bank Sets for a Neutron Detector
+ *  \return Vector of pointers to elements of the DetectorBankSets vector
+ *
+ * This method looks for a Detector Bank Set amongst
+ * any optionally received prologue information, to define proper
+ * Histogramming parameters for processing/accumulating Neutron Detector
+ * data.
+ */
+vector<STS::DetectorBankSet *>
+StreamParser::getDetectorBankSets
+(
+    uint32_t a_bank_id    ///< [in] Detector Bank Id (uint32_t)
+)
+{
+    vector<STS::DetectorBankSet *> bank_sets;
+
+    // Any Detector Bank Sets...? (If not, we're done.)
+    if (m_bank_sets.size() == 0)
+        return(bank_sets); // empty...
+
+    // Look for Detector Bank Sets with matching Detector Bank Ids...
+    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+                m_bank_sets.begin();
+            dbs != m_bank_sets.end() ; ++dbs )
+    {
+        if ( !*dbs )
+            continue;
+
+        for ( vector<uint32_t>::iterator b = (*dbs)->banklist.begin();
+                b != (*dbs)->banklist.end(); ++b )
+        {
+            if ((*b) == a_bank_id)
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Bank Id %d Found in \"%s\" Bank Set.",
+                    g_pid, "StreamParser::getDetectorBankSets()",
+                    a_bank_id, (*dbs)->name.c_str() );
+
+                bank_sets.push_back(*dbs);
+            }
+        }
+    }
+
+    return(bank_sets);
+}
+
+
+/*! \brief This method associates Detector Bank Set with Any Included Banks
+ *
+ * This method looks for BankInfo instances which match a Bank Id in the
+ * given Detector Bank Set, and append the Set to the vector for the Bank.
+ */
+void
+StreamParser::associateDetectorBankSet
+(
+    STS::DetectorBankSet *a_bank_set  ///< [in] Detector Bank Set (ptr)
+)
+{
+    // Look for Detector Banks that are Listed in This Set...
+    //    - append to given BankInfo Bank Sets vector
+
+    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+            ibi != m_banks.end(); ++ibi )
+    {
+        if ( !*ibi )
+            continue;
+
+        for ( vector<uint32_t>::iterator b = a_bank_set->banklist.begin();
+                b != a_bank_set->banklist.end(); ++b )
+        {
+            if ((*b) == (*ibi)->m_id)
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
+                    g_pid, "StreamParser::associateDetectorBankSet()",
+                    a_bank_set->name.c_str(), (*ibi)->m_id );
+
+                (*ibi)->m_bank_sets.push_back(a_bank_set);
+            }
+        }
+    }
 }
 
 
@@ -1738,18 +2155,24 @@ StreamParser::receivedInfo( InfoBit a_bit )
         processRunInfo( m_run_info );
         m_info_rcvd |= INFO_SENT;
 
-        syslog( LOG_INFO, "[%i] beam: %s:%s, prop: %s, run: %lu", g_pid,
-            m_run_info.facility_name.c_str(), m_run_info.instr_shortname.c_str(),
-            m_run_info.proposal_id.c_str(), m_run_info.run_number );
+        syslog( LOG_INFO,
+            "[%i] target: %u, beam: %s:%s, prop: %s, run: %lu", g_pid,
+            m_run_info.target_number,
+            m_run_info.facility_name.c_str(),
+            m_run_info.instr_shortname.c_str(),
+            m_run_info.proposal_id.c_str(),
+            m_run_info.run_number );
     }
 }
 
 
 /*! \brief This method performs final stream processing.
  *
- * This method is called after the internal processing state progreses to "DONE_PROCESSING" and permits a variety of
- * final processing tasks to be performed (primarily flushing data buffers). This method also calls the virtual
- * finalize() method to allow the stream adapter to also perform final output operations.
+ * This method is called after the internal processing state progreses
+ * to "DONE_PROCESSING" and permits a variety of final processing tasks
+ * to be performed (primarily flushing data buffers). This method also
+ * calls the virtual finalize() method to allow the stream adapter to
+ * also perform final output operations.
  */
 void
 StreamParser::finalizeStreamProcessing()
@@ -1769,6 +2192,10 @@ StreamParser::finalizeStreamProcessing()
     {
         if ( !*ibi )
             continue;
+
+        // Make Sure Data has been (Late) Initialized...
+        if ( !((*ibi)->m_initialized) )
+            (*ibi)->initializeBank( true );
 
         // Detect gaps in bank data and fill event index if present
         if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
@@ -1851,9 +2278,13 @@ StreamParser::getPktName(
     case ADARA::PacketType::SOURCE_LIST_V0:
         return "Src List";
     case ADARA::PacketType::BANKED_EVENT_V0:
-        return "Bank Event";
+        return "Banked Event V0";
+    case ADARA::PacketType::BANKED_EVENT_V1:
+        return "Banked Event V1";
     case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return "Beam Mon";
+        return "Beam Monitor Event V0";
+    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
+        return "Beam Monitor Event V1";
     case ADARA::PacketType::PIXEL_MAPPING_V0:
         return "Pix Map";
     case ADARA::PacketType::RUN_STATUS_V0:
@@ -1873,7 +2304,13 @@ StreamParser::getPktName(
     case ADARA::PacketType::GEOMETRY_V0:
         return "Geom Info";
     case ADARA::PacketType::BEAMLINE_INFO_V0:
-        return "Beam Info";
+        return "Beamline Info V0";
+    case ADARA::PacketType::BEAMLINE_INFO_V1:
+        return "Beamline Info V1";
+    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
+        return "Beam Monitor Config";
+    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
+        return "Detector Bank Sets";
     case ADARA::PacketType::DATA_DONE_V0:
         return "Data Done";
     case ADARA::PacketType::DEVICE_DESC_V0:

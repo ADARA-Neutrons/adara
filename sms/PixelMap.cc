@@ -1,7 +1,9 @@
 #include <boost/bind.hpp>
 #include <boost/lexical_cast.hpp>
 #include <fstream>
+#include <utility>
 #include <stdexcept>
+#include <string>
 #include <queue>
 #include <map>
 #include <set>

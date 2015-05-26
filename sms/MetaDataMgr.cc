@@ -1,5 +1,13 @@
 #include <boost/bind.hpp>
 
+#include <string>
+#include <sstream>
+#include <map>
+
+#include <stdint.h>
+
+#include "ADARA.h"
+#include "ADARAPackets.h"
 #include "ADARAUtils.h"
 #include "MetaDataMgr.h"
 #include "StorageManager.h"

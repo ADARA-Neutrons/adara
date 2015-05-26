@@ -1,5 +1,6 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "StorageManager.h"
@@ -9,15 +10,22 @@
 #include "PixelMap.h"
 #include "BeamlineInfo.h"
 #include "BeamMonitorConfig.h"
+#include "DetectorBankSet.h"
 #include "MetaDataMgr.h"
 #include "FastMeta.h"
 #include "Markers.h"
 #include "Logging.h"
 #include "utils.h"
 
+#include "snsTiming.h"
+
+#include <string>
+#include <sstream>
+#include <map>
 #include <time.h>
 #include <math.h>
 #include <boost/lexical_cast.hpp>
+#include <stdint.h>
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
@@ -28,7 +36,10 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_SET_SOURCES_READ_DELAY       3
-#define RLL_NO_RTDL_FOR_PULSE            4
+#define RLL_RTDL_NO_DATA                 4
+#define RLL_NO_RTDL_FOR_PULSE            5
+
+uint32_t SMSControl::m_targetNumber;
 
 std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
@@ -97,6 +108,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	if (!m_pixelMapPath.length())
 		m_pixelMapPath = base + "/pixelmap";
 
+	m_targetNumber = conf.get<uint32_t>("sms.target", 1);
+	INFO("Operating on Neutron Facility Target " << m_targetNumber << ".");
+
 	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
 	m_beamlineShortName =
 			conf.get<std::string>("sms.beamline_shortname", "");
@@ -137,6 +151,8 @@ void SMSControl::late_config(const boost::property_tree::ptree &conf)
 
 	sms->m_bmonConfig.reset(new BeamMonitorConfig(conf));
 
+	sms->m_detBankSets.reset(new DetectorBankSet(conf));
+
 	sms->addSources(conf);
 	sms->m_fastmeta->addDevices(conf);
 }
@@ -152,19 +168,31 @@ void SMSControl::addSources(const boost::property_tree::ptree &conf)
 			continue;
 
 		b = it->first.find_first_of('\"', plen);
-		if (b != std::string::npos)
-			e = it->first.find_first_of('\"', b + 1);
-		else
-			e = std::string::npos;
-
-		if (b == std::string::npos || e == std::string::npos) {
-			std::string msg("Invalid source section name '");
-			msg += it->first;
-			msg += "'";
-			throw std::runtime_error(msg);
+		// Starting Quote Found...
+		if (b != std::string::npos) {
+			e = it->first.find_first_of('\"', ++b); // strip off quote...
+			// No Ending Quote Found... (Just use string length...)
+			if (e == std::string::npos) {
+				e = it->first.length();
+			}
+			else e--; // strip off quote...
+		}
+		// No Starting Quote (Malformed, but try to wing it...)
+		else {
+			b = plen;
+			e = it->first.length();
 		}
 
-		name = it->first.substr(b + 1, e - b - 1);
+		// Handle Empty or Missing Name...
+		// (Apparently this never happens, as ptree eats the trailing space
+		//    and we fail to match the prefix, so the section is ignored.)
+		if ( b == e ) {
+			name = "NoName";
+		}
+		// Extract Name String from (Any) Quotes...
+		else {
+			name = it->first.substr(b, e - b + 1);
+		}
 
 		bool enabled = !(it->second.count("disabled"));
 
@@ -183,6 +211,7 @@ void SMSControl::addSource(const std::string &name,
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	uint32_t rtdlNoDataThresh;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
@@ -207,6 +236,7 @@ void SMSControl::addSource(const std::string &name,
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
@@ -223,7 +253,8 @@ void SMSControl::addSource(const std::string &name,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
-							 chunk_size));
+							 chunk_size,
+							 rtdlNoDataThresh));
 	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
@@ -303,8 +334,8 @@ SMSControl::SMSControl() :
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(m_beamlineId,
-			m_beamlineShortName, m_beamlineLongName));
+	m_beamlineInfo.reset(new BeamlineInfo(m_targetNumber,
+			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
@@ -369,7 +400,7 @@ bool SMSControl::setRecording(bool v)
 	 * It is not an error for a caller to try to stop recording if
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
-	 * false for that case.  
+	 * false for that case.
 	 */
 
 	if (v == m_recording) {
@@ -687,12 +718,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		if (id < min_id) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_GLOBAL_SAWTOOTH_PULSE, ss.str(),
+					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Global SAWTOOTH Pulse(0x"
@@ -704,12 +731,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		else if (id >= min_id && id < max_id) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, ss.str(),
+					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
@@ -724,12 +747,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		if ( id < m_lastPulseId ) {
 			/* Rate-limited logging of global sawtooth pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << id;
-			ss << "/";
-			ss << dup;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_GLOBAL_SAWTOOTH_LAST, ss.str(),
+					RLL_GLOBAL_SAWTOOTH_LAST, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "getPulse(): Global SAWTOOTH Pulse(0x"
@@ -1038,10 +1057,11 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		/* Hmm, no RTDL; save the raw packet's concept of values
 		 * we'll need for the banked event packets.
 		 */
+		pulse->m_vetoFlags = pkt.vetoFlags();
 		pulse->m_cycle = pkt.cycle();
 		pulse->m_ringPeriod = m_lastRingPeriod;
 
-		/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
+		/* Note: pkt.badCycle() and pkt.badVeto() are Deprecated. */
 	}
 
 	/* Find this source in the current pulse; if it doesn't exist
@@ -1058,9 +1078,17 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		src = pulse->m_pulseSources.insert(val).first;
 	}
 
-	/* We'll save this time and time again, but we can't use the one
+	/* We'll say this time and time again, but we can't use the one
 	 * from the RTDL packet -- that was for the previous pulse.
 	 * XXX validate that assertion when we have beam again
+	 * Note: Nope, the charge in the RawDataPkt/MappedDataPkt is
+	 * "Off By One" too, for Previous Pulse, just like the RTDL...
+	 * FIXME -Jeeeem
+	 * Also Note: By capturing the charge from RawDataPkt/MappedDataPkt,
+	 * there is a subtle side benefit, which is that any Pulses with
+	 * No Events will go thru _Without_ any Proton Charge (set to 0.0),
+	 * which is Very Convenient for Sub-60Hz Operation, where we don't
+	 * _Want_ any Proton Charge for those Pulses... ;-D  "Lucky."
 	 */
 	pulse->m_charge = pkt.pulseCharge();
 
@@ -1166,20 +1194,33 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 	/* Save off information about this pulse for the incoming pulse.
 	 * We don't save the pulse charge here, as that is for the
-	 * previous pulse.
+	 * previous pulse. (Same is true for RawDataPkt/MappedDataPkt tho,
+	 * however doing it this way is "Better"... Please see comment
+	 * in pulseEvents() above... ;-)
 	 */
+	pulse->m_vetoFlags = pkt.vetoFlags();
 	pulse->m_cycle = pkt.cycle();
 	pulse->m_ringPeriod = pkt.ringPeriod();
 
 	m_lastRingPeriod = pkt.ringPeriod();
 
-	/* TODO handle pkt.badCycle() and pkt.badVeto(), etc. ?? */
+	/* Note: pkt.badCycle() and pkt.badVeto() are Deprecated. */
 
 	pulse->m_rtdl.reset(new ADARA::RTDLPkt(pkt));
 
 	// Is pulse pending from any data sources...?
 	if (!pulse->m_pending.any()) {
-		// DEBUG("pulseRTDL(): Pulse with No Registered Event Sources!");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+				RLL_RTDL_NO_DATA, "none",
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< "pulseRTDL(): Pulse with No Registered Event Sources!"
+				<< " Marking Partial...");
+		}
+		// Mark Pulse "Partial" Because there's No Event Data,
+		// but then go ahead and mark it "Complete" to record it, lol...!
+		pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 		markComplete(pkt.pulseId(), dup, -1);
 	}
 }
@@ -1293,17 +1334,13 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			 * event packet with the RTDL packet.
 			 */
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
-						  pulse->m_rtdl->packet_length(),
-						  false);
+						pulse->m_rtdl->packet_length(),
+						false);
 		} else {
 			/* Rate-limited logging of no RTDL for pulse */
 			std::string log_info;
-			std::stringstream ss;
-			ss << pulse->m_id.first;
-			ss << "/";
-			ss << pulse->m_id.second;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_NO_RTDL_FOR_PULSE, ss.str(),
+					RLL_NO_RTDL_FOR_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< "recordPulse(): NO RTDL for Pulse"
@@ -1313,6 +1350,25 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 		}
 
+		// Properly Set Veto Bit in Flags, Based on Timing Master Header
+		// (Don't Worry, This Just Sets an "Aggregation" Veto Bit;
+		//    the Full Veto Flags are _Also_ Included Now...! ;-D)
+		bool is_veto = false;
+		if ( m_targetNumber == 1 ) {
+			if ( pulse->m_vetoFlags & TARGET_1_VETO_MASK ) {
+				is_veto = true;
+			}
+		}
+		else if ( m_targetNumber == 2 ) {
+			if ( pulse->m_vetoFlags & TARGET_2_VETO_MASK ) {
+				is_veto = true;
+			}
+		}
+		if ( is_veto ) {
+			pulse->m_flags |= ADARA::BankedEventPkt::PULSE_VETO;
+		}
+
+		// Build Various Packets for Pulse...
 		buildMonitorPacket(pulse);
 		buildBankedPacket(pulse);
 		buildChopperPackets(pulse);
@@ -1353,7 +1409,7 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	size *= sizeof(uint32_t);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V0);
+	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V1);
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1361,7 +1417,10 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_charge);
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
-	m_hdrs.push_back(pulse->m_flags);
+
+	uint32_t flags = ( pulse->m_flags & 0xfffff )
+		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
+	m_hdrs.push_back(flags);
 
 	struct iovec iov;
 	iov.iov_base = &m_hdrs.front();
@@ -1417,7 +1476,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	size += pulse->m_numEvents * sizeof(ADARA::Event);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V0);
+	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V1);
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1425,7 +1484,10 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_charge);
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
-	m_hdrs.push_back(pulse->m_flags);
+
+	uint32_t flags = ( pulse->m_flags & 0xfffff )
+		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
+	m_hdrs.push_back(flags);
 
 	struct iovec iov;
 	iov.iov_base = &m_hdrs.front();
@@ -1532,7 +1594,7 @@ void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
-				  uint32_t sourceId)
+			uint32_t sourceId)
 {
 	m_meta->updateDescriptor(pkt, sourceId);
 }

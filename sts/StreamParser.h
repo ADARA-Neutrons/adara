@@ -5,13 +5,13 @@
 #include <fstream>
 #include <map>
 #include <string>
-#include <string.h>
 #include <vector>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 #include <libxml/tree.h>
 #include "POSIXParser.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 #include "stsdefs.h"
 #include "TraceException.h"
 
@@ -84,6 +84,7 @@ private:
     bool        rxPacket( const ADARA::GeometryPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorConfigPkt &a_pkt );
+    bool        rxPacket( const ADARA::DetectorBankSetsPkt &a_pkt );
     bool        rxPacket( const ADARA::DataDonePkt &a_pkt );
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
@@ -107,6 +108,10 @@ private:
     STS::BeamMonitorConfig *
                 getBeamMonitorConfig( Identifier a_monitor_id,
                     bool & known_monitor );
+    std::vector<STS::DetectorBankSet *>
+                getDetectorBankSets( Identifier a_bank_id );
+    void        associateDetectorBankSet(
+                    STS::DetectorBankSet *a_bank_set );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
                     T a_value, const timespec &a_timestamp );
@@ -126,6 +131,7 @@ private:
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
+    std::vector<STS::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
     std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
     std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information

@@ -2,6 +2,9 @@
 #define __ADARA_PACKETS_H
 
 #include <stdint.h>
+#include <string>
+#include <sstream>
+#include <string.h>
 
 #include "ADARA.h"
 
@@ -79,12 +82,12 @@ public:
 						((m_fields[2] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[2] & 0x00ffffff; }
-	bool badVeto(void) const { return !!(m_fields[3] & 0x8000000); }
+	bool badVeto(void) const { return !!(m_fields[3] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[3] & 0x40000000); }
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[3] >> 22);
 	}
-	uint16_t veto(void) const { return (m_fields[3] >> 10) & 0xfff; }
+	uint16_t vetoFlags(void) const { return (m_fields[3] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[3] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[4]; }
 	bool tofCorrected(void) const { return !!(m_fields[5] & 0x80000000); }
@@ -123,19 +126,37 @@ public:
 						((m_fields[0] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
-	bool badVeto(void) const { return !!(m_fields[1] & 0x8000000); }
+	bool badVeto(void) const { return !!(m_fields[1] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[1] & 0x40000000); }
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[1] >> 22);
 	}
-	uint16_t veto(void) const { return (m_fields[1] >> 10) & 0xfff; }
+	uint16_t vetoFlags(void) const { return (m_fields[1] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[1] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
 	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[3] & 0x7fffffff; }
 	uint32_t ringPeriod(void) const { return m_fields[4] & 0xffffff; }
 
-	// TODO implement accessor for optional fields
+	// accessor methods for optional FNA/Frame Data fields
+
+	uint32_t FNA(uint32_t index) const
+	{
+		// If out of bounds, just return "0" for "Unused Frame"... ;-D
+		if ( index > 24 )
+			return( 0 );
+		else
+			return ( m_fields[ 5 + index ] >> 24 ) & 0xff;
+	}
+
+	uint32_t frameData(uint32_t index) const
+	{
+		// Out of bounds, return "-1" (0xffffff) for Bogus "Frame Data" ;-b
+		if ( index > 24 )
+			return( -1 );
+		else
+			return m_fields[ 5 + index ] & 0xffffff;
+	}
 
 private:
 	const uint32_t *m_fields;
@@ -176,7 +197,8 @@ public:
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
 	uint32_t cycle(void) const { return m_fields[2]; }
-	uint32_t flags(void) const { return m_fields[3]; }
+	uint32_t vetoFlags(void) const { return (m_fields[3] >> 20) & 0xfff; }
+	uint32_t flags(void) const { return m_fields[3] & 0xfffff; }
 
 	// TODO implment bank/event accessors
 
@@ -195,7 +217,8 @@ public:
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
 	uint32_t cycle(void) const { return m_fields[2]; }
-	uint32_t flags(void) const { return m_fields[3]; }
+	uint32_t vetoFlags(void) const { return (m_fields[3] >> 20) & 0xfff; }
+	uint32_t flags(void) const { return m_fields[3] & 0xfffff; }
 
 	// TODO implment monitor/event accessors
 
@@ -348,11 +371,15 @@ class BeamlineInfoPkt : public Packet {
 public:
 	BeamlineInfoPkt(const BeamlineInfoPkt &pkt);
 
+	const uint32_t &targetNumber(void) const { return m_targetNumber; }
+
 	const std::string &id(void) const { return m_id; }
 	const std::string &shortName(void) const { return m_shortName; }
 	const std::string &longName(void) const { return m_longName; }
 
 private:
+	uint32_t m_targetNumber;
+
 	std::string m_id;
 	std::string m_shortName;
 	std::string m_longName;
@@ -369,21 +396,184 @@ public:
 	uint32_t beamMonCount(void) const { return m_fields[0]; }
 
 	uint32_t bmonId(uint32_t index) const
-		{ return m_fields[(index * 6) + 1]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 1];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofOffset(uint32_t index) const
-		{ return m_fields[(index * 6) + 2]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 2];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofMax(uint32_t index) const
-		{ return m_fields[(index * 6) + 3]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 3];
+		else
+			return( 0 );
+	}
+
 	uint32_t tofBin(uint32_t index) const
-		{ return m_fields[(index * 6) + 4]; }
+	{
+		if ( index < beamMonCount() )
+			return m_fields[(index * 6) + 4];
+		else
+			return( 0 );
+	}
 
 	double distance(uint32_t index) const
-		{ return *(const double *) &m_fields[(index * 6) + 5]; }
+	{
+		if ( index < beamMonCount() )
+			return *(const double *) &m_fields[(index * 6) + 5];
+		else
+			return( 0.0 );
+	}
 
 private:
 	const uint32_t *m_fields;
 
 	BeamMonitorConfigPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
+class DetectorBankSetsPkt : public Packet {
+public:
+	DetectorBankSetsPkt(const DetectorBankSetsPkt &pkt);
+
+	// Detector Bank Set Name, alphanumeric characters...
+	static const size_t SET_NAME_SIZE = 16;
+
+	// Throttle Suffix, alphanumeric, no spaces/punctuation...
+	static const size_t THROTTLE_SUFFIX_SIZE = 16;
+
+	enum Flags {
+		EVENT_FORMAT    = 0x0001,
+		HISTO_FORMAT    = 0x0002,
+	};
+
+	uint32_t detBankSetCount(void) const { return m_fields[0]; }
+
+	uint32_t sectionOffset(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return( m_sectionOffsets[index] );
+		else
+			return( 0 );   // Minimum Valid offset is always past Header...
+	}
+
+	std::string name(uint32_t index) const
+	{
+		if ( index < detBankSetCount() ) {
+			char name_c[SET_NAME_SIZE + 1];   // give them an inch...
+			memset( (void *) name_c, '\0', SET_NAME_SIZE + 1 );
+			strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
+				SET_NAME_SIZE);
+			return( std::string(name_c) );
+		} else {
+			return( "<Out Of Range!>" );
+		}
+	}
+
+	uint32_t flags(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_sectionOffsets[index] + m_name_offset ];
+		else
+			return( 0 );
+	}
+
+	uint32_t bankCount(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_sectionOffsets[index] + m_name_offset + 1 ];
+		else
+			return( 0 );
+	}
+
+	const uint32_t *banklist(uint32_t index) const
+	{
+		if ( index < detBankSetCount() ) {
+			return (const uint32_t *) &m_fields[ m_sectionOffsets[index]
+				+ m_name_offset + 2 ];
+		}
+		else {
+			// Shouldn't be asking for this if bankCount() returned 0...!
+			return( (const uint32_t *) NULL );
+		}
+	}
+
+	uint32_t tofOffset(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] ];
+		else
+			return( 0 );
+	}
+
+	uint32_t tofMax(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] + 1 ];
+		else
+			return( 0 );
+	}
+
+	uint32_t tofBin(uint32_t index) const
+	{
+		if ( index < detBankSetCount() )
+			return m_fields[ m_after_banks_offset[index] + 2 ];
+		else
+			return( 0 );
+	}
+
+	double throttle(uint32_t index) const
+	{
+		if ( index < detBankSetCount() ) {
+			return *(const double *) &m_fields[
+				m_after_banks_offset[index] + 3 ];
+		}
+		else
+			return( 0.0 );
+	}
+
+	std::string suffix(uint32_t index) const
+	{
+		if ( index < detBankSetCount() ) {
+			char suffix_c[THROTTLE_SUFFIX_SIZE + 1];   // give them an inch
+			memset( (void *) suffix_c, '\0', THROTTLE_SUFFIX_SIZE + 1 );
+			strncpy(suffix_c,
+				(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
+				THROTTLE_SUFFIX_SIZE);
+			return( std::string(suffix_c) );
+		} else {
+			std::stringstream ss;
+			ss << "out-of-range-";
+			ss << index;
+			return( ss.str() );
+		}
+	}
+
+private:
+	const uint32_t *m_fields;
+
+	static const uint32_t m_name_offset =
+		SET_NAME_SIZE / sizeof(uint32_t);
+
+	static const uint32_t m_suffix_offset =
+		THROTTLE_SUFFIX_SIZE / sizeof(uint32_t);
+
+	uint32_t *m_sectionOffsets;
+
+	uint32_t *m_after_banks_offset;
+
+	DetectorBankSetsPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };

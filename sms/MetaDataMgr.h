@@ -4,6 +4,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>
 #include <boost/smart_ptr.hpp>
+#include <string>
 #include <map>
 #include <set>
 

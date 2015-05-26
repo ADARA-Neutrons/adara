@@ -2,13 +2,14 @@
 #define __DATA_SOURCE_H
 
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
 #include <map>
+#include <string>
 
+#include "ADARAPackets.h"
 #include "POSIXParser.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 
 extern "C" {
 struct addrinfo;
@@ -20,13 +21,15 @@ class smsEnabledPV;
 class smsConnectedPV;
 class smsFloat64PV;
 class smsBooleanPV;
+class smsUint32PV;
 
 class DataSource : public ADARA::POSIXParser {
 public:
 	DataSource(const std::string &name, bool enabled,
 		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
-		bool ignore_eop, unsigned int read_chunk);
+		bool ignore_eop, unsigned int read_chunk,
+		uint32_t rtdlNoDataThresh);
 	~DataSource();
 
 	bool m_readDelay;
@@ -58,6 +61,7 @@ private:
 	double m_data_timeout;
 	bool m_ignore_eop;
 	unsigned int m_max_read_chunk;
+	uint32_t m_rtdlNoDataThresh;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
 	boost::shared_ptr<smsStringPV> m_pvDataURI;
@@ -68,6 +72,7 @@ private:
 	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;
+	boost::shared_ptr<smsUint32PV> m_pvRTDLNoDataThresh;
 
 	uint64_t m_lastRTDLPulseId;
 	uint16_t m_lastRTDLCycle;

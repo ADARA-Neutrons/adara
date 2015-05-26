@@ -40,12 +40,18 @@ public:
     void clear()
     {
         m_facility.clear();
+
+        m_target_number = 1;
+
         m_beam_id.clear();
         m_beam_sname.clear();
         m_beam_lname.clear();
     }
 
     std::string             m_facility;
+
+    uint32_t                m_target_number;
+
     std::string             m_beam_id;
     std::string             m_beam_sname;
     std::string             m_beam_lname;

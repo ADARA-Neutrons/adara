@@ -3,11 +3,13 @@
 
 #include <unistd.h>
 #include <vector>
+#include <string>
 #include <syslog.h>
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.2.2"
+#define STS_VERSION "1.3.0"
 extern pid_t g_pid;
 
 namespace STS {
@@ -32,6 +34,20 @@ struct PulseInfo
 };
 
 
+/// Detector Bank Set information (used in BankInfo)
+struct DetectorBankSet
+{
+    std::string             name;
+    std::vector<uint32_t>   banklist;
+    uint32_t                flags;
+    uint32_t                tofOffset;
+    uint32_t                tofMax;
+    uint32_t                tofBin;
+    double                  throttle;
+    std::string             suffix;
+};
+
+
 /// Base class for detector bank info
 class BankInfo
 {
@@ -40,32 +56,309 @@ public:
     BankInfo
     (
         uint16_t a_id,              ///< [in] ID of detector bank
-        uint16_t a_pixel_count,     ///< [in] Pixel count of bank
         uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
         uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
     )
     :
         m_id(a_id),
-        m_pixel_count(a_pixel_count),
+        m_buf_reserve(a_buf_reserve),
+        m_idx_buf_reserve(a_idx_buf_reserve),
+        m_initialized(false),
         m_event_count(0),
-        m_last_pulse_with_data(0)
+        m_histo_event_count(0),
+        m_histo_event_uncounted(0),
+        m_last_pulse_with_data(0),
+        m_has_event(false),
+        m_has_histo(false)
     {
-        m_index_buffer.reserve(a_idx_buf_reserve);
-        m_tof_buffer.reserve(a_buf_reserve);
-        m_pid_buffer.reserve(a_buf_reserve);
+        // Save Initialization for initializeBank() method...
     }
 
     /// BankInfo destructor
     virtual ~BankInfo()
     {}
 
+    void initializeBank( bool a_end_of_run )
+    {
+        // Already Initialized...
+        if ( m_initialized )
+            return;
+
+        // Iterate Thru All Detector Bank Sets & Set Up Appropriate Data
+        for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+                m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs )
+        {
+            if ( !*dbs )
+                continue;
+
+            // Histo-based Detector Bank
+            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            {
+                // Only Room for *One* Histogram per Detector Bank (for now)
+                if ( m_has_histo )
+                {
+                    syslog( LOG_ERR,
+                    "[%i] %s %s %u %s! Ignoring %s %s (%u to %u by %u).",
+                        g_pid, "STS Error:", "Detector Bank", m_id,
+                        "Duplicate Histogram Request",
+                        (*dbs)->name.c_str(), "Bank Set",
+                        (*dbs)->tofOffset, (*dbs)->tofMax, (*dbs)->tofBin );
+                }
+
+                else
+                {
+                    // Determine Total Number of Logical PixelIds in Bank
+                    uint32_t num_pids = m_logical_pixelids.size();
+
+                    // If there aren't any PixelIds, we won't get any data!
+                    if ( num_pids == 0 )
+                    {
+                        // Better Alert Someone... (this shouldn't happen)
+                        syslog( LOG_ERR,
+                       "[%i] %s %s %u %s! Ignoring %s %s (%u to %u by %u).",
+                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            "No PixelIds for Histogram",
+                            (*dbs)->name.c_str(), "Bank Set",
+                            (*dbs)->tofOffset, (*dbs)->tofMax,
+                            (*dbs)->tofBin );
+
+                        // Don't set "m_has_histo", just fall thru...
+                        // (all subsequent Histo attempts will also fail)
+                        continue;
+                    }
+
+                    // Did we reach End of Run with No Data for this Bank?
+                    if ( a_end_of_run )
+                    {
+                        // Fake a Tiny Histogram to Save Space,
+                        // Yet Remain Compatible... ;-D
+
+                        m_num_tof_bins = 3;
+
+                        // Divide the TOF Range "Evenly"...
+                        m_tof_bin_size = (*dbs)->tofMax / 2;
+
+                        syslog( LOG_ERR,
+                            "[%i] %s %u %s: Setting %s to %u, %s to %u",
+                            g_pid, "Detector Bank", m_id, "Empty Histogram",
+                            "num_tof_bins", m_num_tof_bins,
+                            "tof_bin_size", m_tof_bin_size);
+                    }
+
+                    else
+                    {
+                        // Number of Time Bin Values Needed...
+                        m_num_tof_bins =
+                            ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                                / (*dbs)->tofBin ) + 1;
+
+                        // If Max TOF doesn't divide evenly into TOF Bin
+                        // then need "One Extra" Bin Value...
+                        if ( ( (*dbs)->tofMax - (*dbs)->tofOffset )
+                                % (*dbs)->tofBin )
+                        {
+                            m_num_tof_bins++;
+                        }
+
+                        // Fail Safe: Make Sure We Get At Least One
+                        // Actual TOF Bin!
+                        if ( m_num_tof_bins < 2 )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s %u %s: num_tof_bins=%u < 2!",
+                                g_pid, "STS Error:", "Detector Bank", m_id,
+                                "Histogram Warning", m_num_tof_bins);
+                            m_num_tof_bins = 2;
+                        }
+
+                        // Use the TOF Bin Size from the Detector Bank Set
+                        m_tof_bin_size = (*dbs)->tofBin;
+                    }
+
+                    syslog( LOG_ERR,
+                        "[%i] %s %u Histogram: %s=%u %s=%u %s=%u (%u)",
+                        g_pid, "Detector Bank", m_id,
+                        "num_tof_bins", m_num_tof_bins,
+                        "tof_bin_size", m_tof_bin_size,
+                        "num_pids", num_pids,
+                        num_pids * ( m_num_tof_bins - 1 ) );
+
+                    // Actual Histogram Storage, Non-Inclusive Max TOF Bin
+                    m_data_buffer.reserve( num_pids
+                        * ( m_num_tof_bins - 1 ) );
+
+                    // TOF Bin Values...
+                    m_tofbin_buffer.reserve(m_num_tof_bins);
+
+                    syslog( LOG_INFO,
+                    "[%i] %s %u Histogram: %u Time Bin Values, %u to %u.",
+                        g_pid, "Detector Bank", m_id, m_num_tof_bins,
+                        (*dbs)->tofOffset, (*dbs)->tofMax );
+
+                    uint32_t tofbin = (*dbs)->tofOffset;
+                    for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
+                    {
+                        // Inverted Indexing, but it's the right count...!
+                        for (uint32_t p=0 ; p < num_pids ; p++)
+                            m_data_buffer.push_back(0);
+
+                        m_tofbin_buffer.push_back((float)tofbin);
+                        tofbin += m_tof_bin_size;
+                    }
+
+                    // Max TOF Bin Value...
+                    m_tofbin_buffer.push_back((float)((*dbs)->tofMax));
+
+                    // Verify Histogram Data Size
+                    if ( m_data_buffer.size() !=
+                            num_pids * ( m_num_tof_bins - 1 ) )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s %s %u %s: %s %s.size()=%lu vs. %s %u",
+                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            "Histogram", "Verifying",
+                            "m_data_buffer", m_data_buffer.size(),
+                            "expected", num_pids * ( m_num_tof_bins - 1 ) );
+                    }
+
+                    // Calculate Per-PixelId Offset Index
+                    //    into Histogram Data Buffer...
+                    // (saves time, and we sorta _Have_ to do this
+                    //    to account for non-contiguous PixelId spaces!)
+
+                    // Determine Min & Max PixelIds for This Bank...
+                    uint32_t minPid, maxPid;
+                    minPid = maxPid = m_logical_pixelids[0];
+                    for (uint32_t p=1 ; p < num_pids ; p++)
+                    {
+                        if ( m_logical_pixelids[p] < minPid )
+                            minPid = m_logical_pixelids[p];
+                        if ( m_logical_pixelids[p] > maxPid )
+                            maxPid = m_logical_pixelids[p];
+                    }
+
+                    // Save Minimum PixelId as Offset into Offset Index!
+                    m_base_pid = minPid;
+
+                    // Determine Required Offset Index Size...
+                    size_t offset_size = maxPid - minPid + 1;
+
+                    syslog( LOG_ERR,
+                "[%i] %s %u Histogram: minPid=%u maxPid=%u offset_size=%lu",
+                        g_pid, "Detector Bank", m_id, minPid, maxPid,
+                        offset_size );
+
+                    // Reserve Required Index Size & Initialize Vector...
+                    // (I hope there aren't huge gaps in the PixelIds...!)
+                    m_histo_pid_offset.reserve( offset_size );
+                    for (size_t i=0 ; i < offset_size ; i++)
+                        m_histo_pid_offset.push_back( -1 );
+
+                    syslog( LOG_ERR,
+                        "[%i] %s %u Histogram: Filling in Offsets...",
+                        g_pid, "Detector Bank", m_id );
+
+                    // Fill In Offsets per PixelId...
+                    size_t offset = 0;
+                    size_t index;
+                    for (uint32_t p=0 ; p < num_pids ; p++)
+                    {
+                        // Index is Logical PixelId...
+                        index = m_logical_pixelids[p] - m_base_pid;
+
+                        // New PixelId Offset...
+                        if ( m_histo_pid_offset[ index ] < 0 )
+                        {
+                            m_histo_pid_offset[ index ] = 
+                                offset++ * ( m_num_tof_bins - 1 );
+
+                            // syslog( LOG_ERR,
+                            // "[%i] %s %u Histogram: p=%u offset[%lu]=%d",
+                                // g_pid, "Detector Bank", m_id,
+                                // p, index, m_histo_pid_offset[ index ] );
+                            // give sleep a chance...
+                            // usleep(10000);
+                        }
+
+                        // Duplicate PixelId!  (shouldn't happen...)
+                        else
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s: %s %u has %s %lu - Ignoring!",
+                                g_pid, "STS Error", "Detector Bank", m_id,
+                                "Duplicate PixelId in Histo Offset Map",
+                                index );
+
+                            // Still need to increment offset past PixelId!
+                            offset++;
+                        }
+                    }
+
+                    syslog( LOG_ERR,
+                        "[%i] %s %u Done with Histogram Init.",
+                        g_pid, "Detector Bank", m_id );
+
+                    // Got One, That's All We'll Ever Need... ;-D
+                    m_has_histo = true;
+                }
+            }
+
+            // Event-based Detector Bank
+            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            {
+                // Only Allocate Event Storage *Once*...
+                if ( !m_has_event )
+                {
+                    m_index_buffer.reserve(m_idx_buf_reserve);
+                    m_tof_buffer.reserve(m_buf_reserve);
+                    m_pid_buffer.reserve(m_buf_reserve);
+
+                    // Got One, That's All We'll Ever Need... ;-D
+                    m_has_event = true;
+                }
+            }
+        }
+
+        // Handle *Default* Case, No Detector Bank Sets at All...! ;-D
+        // (We _Always_ Save Events, Unless Specifically Directed Not To!)
+        if ( m_bank_sets.size() == 0 )
+        {
+            m_index_buffer.reserve(m_idx_buf_reserve);
+            m_tof_buffer.reserve(m_buf_reserve);
+            m_pid_buffer.reserve(m_buf_reserve);
+
+            m_has_event = true;
+        }
+
+        // Done Initializing
+        m_initialized = true;
+    }
+
     uint32_t                m_id;                   ///< ID of detector bank
-    uint16_t                m_pixel_count;          ///< Number of pixels in bank
+    std::vector<uint32_t>   m_logical_pixelids;     ///< Logical PixelIds in detector bank
+    uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
+    uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
+    bool                    m_initialized;          ///< Has detector bank been initialized yet?
+
     uint64_t                m_event_count;          ///< Running event count
+    uint64_t                m_histo_event_count;    ///< Running Histogram event count
+    uint64_t                m_histo_event_uncounted;///< Running Histogram uncounted events
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this bank
+
+    bool                    m_has_event;            ///< Has an Event output already been defined?
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
     std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
+
+    bool                    m_has_histo;            ///< Has a Histogram output already been defined?
+    uint32_t                m_num_tof_bins;         ///< Histo Number of TOF Bins
+    uint32_t                m_tof_bin_size;         ///< Histo Actual TOF Bin Size (differs for "empty")
+    uint32_t                m_base_pid;             ///< Base PixelId Offset into Histo Offset Index
+    std::vector<int32_t>    m_histo_pid_offset;     ///< Histo PixelId Offsets into data buffer
+    std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
+    std::vector<float>      m_tofbin_buffer;        ///< Histo TOF Bin buffer
+
+    std::vector<DetectorBankSet *>  m_bank_sets;    ///< Any Detector Bank Set info for this detector bank
 };
 
 
@@ -78,6 +371,7 @@ struct BeamMonitorConfig
     uint32_t                tofBin;
     double                  distance;
 };
+
 
 /// Base class for monitor info
 class MonitorInfo
@@ -182,12 +476,14 @@ struct UserInfo
     std::string             role;
 };
 
+
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : run_number(0)
+    RunInfo() : target_number(1), run_number(0)
     {}
 
+    uint32_t                target_number;
     std::string             instr_id;
     std::string             instr_shortname;
     std::string             instr_longname;
@@ -219,6 +515,7 @@ struct RunMetrics
     Statistics              charge_stats;       ///< Pulse charge statistics
     Statistics              freq_stats;         ///< Pulse frequency statistics
 };
+
 
 // ============================================================================
 // Process Variable Classes and Types
@@ -352,7 +649,6 @@ public:
                                 Identifier a_pv_id, PVType a_type,
                                 const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
-                                uint16_t a_pixel_count,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve ) = 0;
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
@@ -391,10 +687,10 @@ public:
                                 const std::string &a_comment ) = 0;
 };
 
+
 // ============================================================================
 // Error Codes for TraceExceptions
 // ============================================================================
-
 
 enum ErrorCodes
 {

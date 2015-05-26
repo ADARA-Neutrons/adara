@@ -3,12 +3,15 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>
+#include <stdint.h>
 #include <string>
 
 class BeamlineInfo : boost::noncopyable {
 public:
-	BeamlineInfo(const std::string &id, const std::string &shortname,
-		     const std::string &longname);
+	BeamlineInfo(uint32_t targetNumber,
+			const std::string &id,
+			const std::string &shortName,
+			const std::string &longName);
 	~BeamlineInfo();
 
 private:

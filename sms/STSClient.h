@@ -3,12 +3,12 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
 #include <memory>
 
 #include "ADARAPackets.h"
 #include "POSIXParser.h"
 #include "STSClientMgr.h"
-#include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "TimerAdapter.h"

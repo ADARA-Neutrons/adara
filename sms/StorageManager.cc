@@ -5,6 +5,7 @@
 #include <sys/vfs.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <stdint.h>
 
 #include <string>
 #include <stdexcept>
@@ -14,12 +15,12 @@
 
 #include <time.h>
 
+#include "ADARA.h"
 #include "StorageManager.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-#include "ADARA.h"
 #include "ADARAUtils.h"
 #include "EventFd.h"
 #include "STSClientMgr.h"
@@ -102,8 +103,8 @@ private:
 		uint64_t maxSize;
 
 		/* If the user doesn't specify a size, we'll use a percentage
-	 	 * of the total space, 80% by default.
-	 	 */
+		 * of the total space, 80% by default.
+		 */
 		struct statfs fsstats;
 		if (statfs(m_baseDir.c_str(), &fsstats)) {
 			int err = errno;
@@ -190,6 +191,7 @@ std::string StorageManager::m_domain;
 std::string StorageManager::m_broker_uri;
 std::string StorageManager::m_broker_user;
 std::string StorageManager::m_broker_pass;
+
 ComBusSMSMon *StorageManager::m_combus;
 
 /* These get passed through an eventfd(), and need to be above the
@@ -296,10 +298,10 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
-        m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
-        m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
-        m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
-        m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
+	m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
+	m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
+	m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
+	m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
 
 	StorageFile::config(conf);
 }
@@ -398,8 +400,7 @@ void StorageManager::init(void)
 	 */
 	if (faccessat(m_base_fd, m_stateDirPrefix.c_str(), 0, 0) == 0) {
 		if (retireIndexDir(false)) {
-			throw std::runtime_error("Unable to retire stale "
-						 "index");
+			throw std::runtime_error("Unable to retire stale index");
 		}
 	}
 }
@@ -455,11 +456,11 @@ void StorageManager::lateInit(void)
 	 */
 	m_pulseTime = m_nextIndexTime = 1;
 
-        /* start the monitor thread so that it will be available from 
-         * backgroundIo thread
-         */
-        m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
-        m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass );
+	/* start the monitor thread so that it will be available from
+	 * backgroundIo thread
+	 */
+	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
+	m_combus->start(m_domain, m_broker_uri, m_broker_user, m_broker_pass);
 
 	boost::thread io(backgroundIo);
 	m_ioThread.swap(io);
@@ -712,8 +713,8 @@ void StorageManager::startContainer(uint32_t run)
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run);
 
-        if (run)
-           m_combus->sendOriginal(run, std::string("SMS run started"), now);
+	if (run)
+		m_combus->sendOriginal(run, std::string("SMS run started"), now);
 
 	m_contChange(m_cur_container, true);
 
@@ -786,7 +787,7 @@ void StorageManager::startRecording(uint32_t run)
 void StorageManager::stopRecording(void)
 {
 	m_combus->sendUpdate(m_cur_container->runNumber(),
-                                std::string("SMS run stopped"));
+		std::string("SMS run stopped"));
 	endCurrentContainer();
 	startContainer();
 }
@@ -878,8 +879,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		 */
 		break;
 	case ADARA::PacketType::RTDL_V0:
-	case ADARA::PacketType::BANKED_EVENT_V0:
-	case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
+	case ADARA::PacketType::BANKED_EVENT_V1:
+	case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
 		m_pulseTime = hdr->ts_sec;
 		break;
 	}
@@ -928,7 +929,7 @@ void StorageManager::addPrologue(IoVector &iovec)
 	 */
 	if (!m_prologueFile) {
 		throw std::logic_error("Invalid use of "
-					 "StorageManager::addPrologue");
+					"StorageManager::addPrologue");
 	}
 
 	uint32_t len = validatePacket(iovec);
@@ -973,26 +974,26 @@ void StorageManager::scanDaily(const std::string &dir)
 		if (c) {
 			m_scannedBlocks += c->blocks();
 
-                        if (c->runNumber()) {
-                           if (c->isTranslated()) {
-                               /* send sts succeeded message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("STS send succeeded"),
-                                                       c->startTime());
-                           } else if (c->isManual()) {
-                               /* send sts failed message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("Needs Manual Translation"),
-                                                       c->startTime());
-                           } else {
-                                /* note pending for later translation */
-                               m_pendingRuns.push_back(c);
-                               /* send run stopped message */
-                               m_combus->sendOriginal(c->runNumber(),
-                                       std::string("STS send pending"),
-                                                       c->startTime());
-                           }
-                        }
+			if (c->runNumber()) {
+				if (c->isTranslated()) {
+					/* send sts succeeded message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("STS send succeeded"),
+							c->startTime());
+				} else if (c->isManual()) {
+					/* send sts failed message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("Needs Manual Translation"),
+							c->startTime());
+				} else {
+					/* note pending for later translation */
+					m_pendingRuns.push_back(c);
+					/* send run stopped message */
+					m_combus->sendOriginal(c->runNumber(),
+							std::string("STS send pending"),
+							c->startTime());
+				}
+			}
 
 		}
 	}
@@ -1188,7 +1189,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
 	 * reasonably small, so go for the simple code for now. We
-	 * can revist if CPU usage is too high.
+	 * can revisit if CPU usage is too high.
 	 */
 	std::list<fs::path> containers;
 	fs::directory_iterator end, it(dir);
@@ -1206,28 +1207,71 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	 */
 	containers.sort();
 
-	uint64_t purged = 0;
+	uint64_t total_purged = 0;
+	uint64_t purged;
 	std::list<fs::path>::iterator cit, cend = containers.end();
-	for (cit = containers.begin(); purged < goal && cit != cend; ) {
+	for (cit = containers.begin(); total_purged < goal && cit != cend; ) {
 		fs::path &cpath = *cit;
+
+		uint32_t date=-1, secs=-1, nanosecs=-1;
+		uint32_t run;
+		int numParsed = -1;
+		if ( (numParsed = sscanf((*cit).filename().c_str(),
+				"%8u-%6u.%9u-run-%u",
+				&date, &secs, &nanosecs, &run)) == 4 ) {
+			INFO("purgeDaily(): Parsed Run Number of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " as " << run
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+		}
+		else if ( numParsed < 3 ) {
+			ERROR("purgeDaily():"
+				<< " Failed to Parse Run Number (or Date/Time) of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+		}
+		else {
+			INFO("purgeDaily(): Parsed In-Between-Run Date/Time of"
+				<< " [" << (*cit).filename() << "]"
+				<< " from [" << cpath.string() << "]"
+				<< " in [" << dir << "]"
+				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+		}
 
 		/* We do the iterator increment in the loop, as we don't
 		 * want the container purge to delete the container when
 		 * it is the last one in the last daily directory -- ie,
 		 * if it could be the current container.
 		 */
-                uint32_t run;
-                if (1 == sscanf((*cit).root_name().c_str(),
-                                  "%*8c-%*6c.%d", &run)) {
-                    m_combus->sendUpdate(run, std::string("SMS run purged"));
-                } else {
-                    WARN("sscanf of " << (*cit).root_name() << " failed");
-                }
-
 		++cit;
-		purged += StorageContainer::purge(cpath.string(),
-							goal - purged,
-							last && cit == cend);
+
+		// Try to Purge this Container...
+		bool path_deleted = false;
+		purged = StorageContainer::purge(cpath.string(),
+							goal - total_purged,
+							last && cit == cend,
+							path_deleted);
+
+		// Send ComBus Message if Purged and Run Number Known...
+		if ( purged > 0 && numParsed == 4 ) {
+			std::string purgeMsg;
+			if ( path_deleted )
+				purgeMsg = "SMS run backup purged.";
+			else
+				purgeMsg = "SMS run backup purging...";
+			// Better Send Original ComBus Message Here...
+			// - who knows whether we've touched this run before...
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			m_combus->sendOriginal(run, purgeMsg, now);
+		}
+
+		// Accumulate Total Blocks Purged
+		total_purged += purged;
 	}
 
 	/* Try to remove the directory, but expect to fail. */
@@ -1236,7 +1280,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	} catch (fs::filesystem_error e) {
 	}
 
-	return purged;
+	return total_purged;
 }
 
 uint64_t StorageManager::purgeData(uint64_t purgeRequested)
@@ -1388,11 +1432,12 @@ bool StorageManager::cleanupIndexes(void)
 }
 
 void StorageManager::sendComBus(uint32_t a_run_num,
-                     std::string a_run_state,
-                     const struct timespec &a_start_time) 
+		std::string a_run_state,
+		const struct timespec & a_start_time)
 {
-   if (0 == a_start_time.tv_sec && 0 == a_start_time.tv_nsec) 
-      m_combus->sendUpdate(a_run_num, a_run_state);
-   else
-      m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
+	if ( a_start_time.tv_sec == 0 && a_start_time.tv_nsec == 0 )
+		m_combus->sendUpdate(a_run_num, a_run_state);
+	else
+		m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
 }
+

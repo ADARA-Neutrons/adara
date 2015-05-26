@@ -2,6 +2,7 @@
 #define TRACEEXCEPTION_H
 
 #include <list>
+#include <sstream>
 
 /*! \class TraceException
  *  \brief Exception class provideing stack-trace-like context capturing

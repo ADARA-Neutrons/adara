@@ -12,7 +12,11 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/classification.hpp>
+
 #include <fstream>
+#include <string>
+#include <sstream>
+#include <stdint.h>
 
 using namespace boost::property_tree;
 

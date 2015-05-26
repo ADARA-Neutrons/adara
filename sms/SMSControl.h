@@ -3,6 +3,7 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+#include <stdint.h>
 #include <string>
 #include <map>
 #include <vector>
@@ -28,6 +29,7 @@ class DataSource;
 class PixelMap;
 class BeamlineInfo;
 class BeamMonitorConfig;
+class DetectorBankSet;
 class MetaDataMgr;
 class FastMeta;
 class Markers;
@@ -44,6 +46,8 @@ public:
 	void addPV(PVSharedPtr pv);
 
 	static SMSControl *getInstance(void) { return m_singleton; }
+
+	uint32_t getTargetNumber(void) { return m_targetNumber; }
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
@@ -132,10 +136,10 @@ private:
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
 				m_id(id), m_pending(srcs), m_numEvents(0),
 				m_numBanks(0), m_numMonEvents(0), m_charge(0),
-				m_cycle(0), m_ringPeriod(0), m_flags(0)
+				m_vetoFlags(0), m_cycle(0), m_ringPeriod(0), m_flags(0)
 		{ }
 
-		PulseIdentifier				m_id;
+		PulseIdentifier			m_id;
 		SourceSet				m_pending;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
 		SourceMap				m_pulseSources;
@@ -146,6 +150,7 @@ private:
 		uint32_t				m_numBanks;
 		uint32_t				m_numMonEvents;
 		uint32_t				m_charge;
+		uint32_t				m_vetoFlags;
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
 		uint32_t				m_flags;
@@ -184,6 +189,7 @@ private:
 	boost::shared_ptr<PixelMap> m_pixelMap;
 	boost::shared_ptr<BeamlineInfo> m_beamlineInfo;
 	boost::shared_ptr<BeamMonitorConfig> m_bmonConfig;
+	boost::shared_ptr<DetectorBankSet> m_detBankSets;
 	boost::shared_ptr<MetaDataMgr> m_meta;
 	boost::shared_ptr<FastMeta> m_fastmeta;
 	boost::shared_ptr<Markers> m_markers;
@@ -192,6 +198,8 @@ private:
 	uint32_t m_maxBanks;
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
+
+	static uint32_t m_targetNumber;
 
 	static std::string m_version;
 	static std::string m_beamlineId;

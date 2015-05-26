@@ -5,6 +5,7 @@
 #include "NxGen.h"
 #include "TraceException.h"
 #include "ADARAUtils.h"
+#include "ADARAPackets.h"
 
 using namespace std;
 
@@ -42,6 +43,9 @@ NxGen::NxGen
     m_tof_name(string("event_time_offset")),
     m_index_name(string("event_index")),
     m_pulse_time_name(string("event_time_zero")),
+    m_data_name(string("data")),
+    m_histo_pid_name(string("pixel_id")),
+    m_tofbin_name(string("time_of_flight")),
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
     m_pulse_info_slab_size(0),
@@ -133,47 +137,115 @@ STS::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
-    uint16_t a_pixel_count,     ///< [in] Pixel count of bank
     uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
     try
     {
-        NxBankInfo* bi = new NxBankInfo( a_id, a_pixel_count,
+        NxBankInfo* bi = new NxBankInfo( a_id,
             a_buf_reserve, a_idx_buf_reserve, *this );
 
-        if ( m_gen_nexus)
-        {
-            // Instrument bank group
-            makeGroup( bi->m_instr_path, "NXdetector" );
-            makeDataset( bi->m_instr_path, m_tof_name,
-                NeXus::FLOAT32, TIME_USEC_UNITS );
-            makeDataset( bi->m_instr_path, m_pid_name, NeXus::UINT32 );
-            makeDataset( bi->m_instr_path, m_index_name,
-                NeXus::UINT64 );
-
-            // Event data group
-            makeGroup( bi->m_event_path, "NXevent_data" );
-            makeLink( bi->m_tof_slab_path,
-                bi->m_event_path + "/" + m_tof_name );
-            makeLink( bi->m_pid_slab_path,
-                bi->m_event_path + "/" + m_pid_name );
-            makeLink( bi->m_index_slab_path,
-                bi->m_event_path + "/" + m_index_name );
-
-            // Link pulse time to bank event times
-            makeLink( bi->m_time_path,
-                bi->m_instr_path + "/" + m_pulse_time_name );
-            makeLink( bi->m_time_path,
-                bi->m_event_path + "/" + m_pulse_time_name );
-        }
+        // "Late" Initialization Now via NxGen::initializeNxBank()...
+        // (after All BankInfos & Any Detector Bank Sets have been defined)
 
         return bi;
     }
     catch ( TraceException &e )
     {
-        RETHROW_TRACE( e, "makeBankInfo (bank: " << a_id << ") failed." )
+        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id << " ) failed." )
+    }
+}
+
+
+/*! \brief Initialization method for BankInfo NeXus file groups & datasets
+ *
+ * Late Initialization of NeXus Groups and Datasets, specific to whether
+ * Events or Histograms (or Both) are to be Output.  Called after both the
+ * BankInfo instances have all been created (PixelMapPkt) and any
+ * Detector Bank Sets have been defined (DetectorBankSetsPkt).
+ */
+void
+NxGen::initializeNxBank
+(
+    NxBankInfo* a_bi,           ///< [in] Ptr to NeXus detector bank info
+    bool a_end_of_run           ///< [in] Is there more data yet to come?
+)
+{
+    // Make Sure BankInfo has been (Late) Initialized...
+    // (to know whether Events, Histo or Both...?)
+    if ( !(a_bi->m_initialized) )
+        a_bi->initializeBank( a_end_of_run );
+
+    try
+    {
+        if ( m_gen_nexus)
+        {
+            // Instrument bank group (contains *Both* Event and Histo data)
+            makeGroup( a_bi->m_instr_path, "NXdetector" );
+
+            // NeXus Event-based Structures
+            if ( a_bi->m_has_event )
+            {
+                // Event data
+                makeDataset( a_bi->m_instr_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                makeDataset( a_bi->m_instr_path, m_pid_name,
+                    NeXus::UINT32 );
+                makeDataset( a_bi->m_instr_path, m_index_name,
+                    NeXus::UINT64 );
+
+                // Top-level Event data group
+                makeGroup( a_bi->m_event_path, "NXevent_data" );
+                makeLink( a_bi->m_tof_slab_path,
+                    a_bi->m_event_path + "/" + m_tof_name );
+                makeLink( a_bi->m_pid_slab_path,
+                    a_bi->m_event_path + "/" + m_pid_name );
+                makeLink( a_bi->m_index_slab_path,
+                    a_bi->m_event_path + "/" + m_index_name );
+
+                // Link pulse time to bank event times
+                makeLink( a_bi->m_time_path,
+                    a_bi->m_instr_path + "/" + m_pulse_time_name );
+                makeLink( a_bi->m_time_path,
+                    a_bi->m_event_path + "/" + m_pulse_time_name );
+            }
+
+            // NeXus Histogram-based Structures
+            if ( a_bi->m_has_histo )
+            {
+                // Histo data
+
+                // (defer creation/writing of actual histogram data
+                //     to bankFinalize(), create & write in one shot...)
+
+                makeDataset( a_bi->m_instr_path, m_histo_pid_name,
+                    NeXus::UINT32 );
+                makeDataset( a_bi->m_instr_path, m_tofbin_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS );
+
+                // Top-level Histo data group
+
+                makeGroup( a_bi->m_histo_path, "NXdata" );
+
+                // (defer linking of histogram data, which won't exist
+                //     until later in bankFinalize()... :-)
+
+                makeLink( a_bi->m_histo_pid_slab_path,
+                    a_bi->m_histo_path + "/" + m_histo_pid_name );
+                makeLink( a_bi->m_tofbin_slab_path,
+                    a_bi->m_histo_path + "/" + m_tofbin_name );
+            }
+
+            // NeXus Structures are Now Initialized
+            a_bi->m_nexus_init = true;
+        }
+    }
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "initializeNxBank( bank: " << a_bi->m_id
+            << ", end_of_run=" << a_end_of_run
+            << " ) initialization failed." )
     }
 }
 
@@ -183,8 +255,8 @@ NxGen::makeBankInfo
  *
  * This method constructs Nexus-specific MonitorInfo objects.
  * The Nexus-specific NxMonitorInfo class extends the
- * BankInfo class to include a number of attributes needed
- * for writing monito event data efficiently to a Nexus file.
+ * MonitorInfo class to include a number of attributes needed
+ * for writing monitor event data efficiently to a Nexus file.
  */
 STS::MonitorInfo*
 NxGen::makeMonitorInfo
@@ -209,9 +281,9 @@ NxGen::makeMonitorInfo
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( mi->m_path, mi->m_data_name,
+                makeDataset( mi->m_path, m_data_name,
                     NeXus::UINT32, "" );
-                makeDataset( mi->m_path, mi->m_tofbin_name,
+                makeDataset( mi->m_path, m_tofbin_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
 
                 writeScalar( mi->m_path, "distance",
@@ -498,11 +570,15 @@ NxGen::processRunInfo
 
     try
     {
+        writeScalar( m_instrument_path, "target_number",
+            a_run_info.target_number, "" );
+
         writeString( m_instrument_path, "beamline", a_run_info.instr_id );
 
         if ( a_run_info.instr_longname.size())
         {
-            writeString( m_instrument_path, "name", a_run_info.instr_longname );
+            writeString( m_instrument_path, "name",
+                a_run_info.instr_longname );
 
             if ( a_run_info.instr_shortname.size())
             {
@@ -531,7 +607,9 @@ NxGen::processRunInfo
 
         size_t user_count = 0;
         string path;
-        for ( vector<STS::UserInfo>::const_iterator u = a_run_info.users.begin(); u != a_run_info.users.end(); ++u )
+        for ( vector<STS::UserInfo>::const_iterator u =
+                a_run_info.users.begin();
+                u != a_run_info.users.end(); ++u )
         {
             path = m_entry_path + "/user"
                 + boost::lexical_cast<string>(++user_count);
@@ -580,7 +658,8 @@ NxGen::processGeometry
 
 /*! \brief Writes pulse buffers to Nexus file
  *
- * This method writes time, frequency, and charge data in pulse buffers to the Nexus file.
+ * This method writes time, frequency, and charge data in pulse buffers
+ * to the Nexus file.
  */
 void
 NxGen::pulseBuffersReady
@@ -604,13 +683,18 @@ NxGen::pulseBuffersReady
 
         // Must process pulse flags linearly
         vector<double>::iterator t = a_pulse_info.times.begin();
-        for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin(); f != a_pulse_info.flags.end(); ++f, ++t )
+        for ( vector<uint32_t>::iterator f = a_pulse_info.flags.begin();
+                f != a_pulse_info.flags.end(); ++f, ++t )
         {
-            // If any pulse flags are set (except veto), write them to pulse_flags DASLog
-            if ( *f & ~ADARA::BankedEventPkt::PULSE_VETO )
+            // If any pulse flags are set (except veto),
+            // write them to pulse_flags DASLog
+            // (For Forward-/Backwards-Compatibility, Strip Off Veto Flags
+            //  in top 12 bits of flags...)
+            if ( (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO )
             {
                 m_pulse_flags_time.push_back( *t );
-                m_pulse_flags_value.push_back( *f & ~ADARA::BankedEventPkt::PULSE_VETO );
+                m_pulse_flags_value.push_back(
+                    (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
             }
 
             // Write pulse vetoes to dedicated DASlog area
@@ -661,20 +745,42 @@ NxGen::bankBuffersReady
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankBuffers()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankBuffersReady()" )
+        }
 
-        writeSlab( bi->m_tof_slab_path, a_bank.m_tof_buffer, bi->m_event_slab_size );
-        writeSlab( bi->m_pid_slab_path, a_bank.m_pid_buffer, bi->m_event_slab_size );
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank( false );
 
-        bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi, false );
 
-        writeSlab( bi->m_index_slab_path, a_bank.m_index_buffer, bi->m_index_slab_size );
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            writeSlab( bi->m_tof_slab_path,
+                a_bank.m_tof_buffer, bi->m_event_slab_size );
+            writeSlab( bi->m_pid_slab_path,
+                a_bank.m_pid_buffer, bi->m_event_slab_size );
 
-        bi->m_index_slab_size += a_bank.m_index_buffer.size();
+            bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+
+            writeSlab( bi->m_index_slab_path,
+                a_bank.m_index_buffer, bi->m_index_slab_size );
+
+            bi->m_index_slab_size += a_bank.m_index_buffer.size();
+        }
+
+        // No NeXus Histogram-based Handling Needed Here...
+
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: " << a_bank.m_id )
+        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: "
+            << a_bank.m_id )
     }
 }
 
@@ -697,14 +803,30 @@ NxGen::bankPulseGap
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankPulseGap()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankPulseGap()" )
+        }
 
-        fillSlab( bi->m_index_slab_path, bi->m_event_count, a_count, bi->m_index_slab_size );
-        bi->m_index_slab_size += a_count;
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi, false );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            fillSlab( bi->m_index_slab_path,
+                bi->m_event_count, a_count, bi->m_index_slab_size );
+            bi->m_index_slab_size += a_count;
+        }
+
+        // No NeXus Histogram-based Handling Needed Here...
+
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankPulseGap() failed for bank id: " << a_bank.m_id << ", gap count: " << a_count )
+        RETHROW_TRACE( e, "bankPulseGap() failed for bank id: "
+            << a_bank.m_id << ", gap count: " << a_count )
     }
 }
 
@@ -726,16 +848,73 @@ NxGen::bankFinalize
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
-            THROW_TRACE( STS::ERR_CAST_FAILED, "Invalid bank object passed to bankFinalize()" )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankFinalize()" )
+        }
 
-        string total_path = m_instrument_path + "/" + bi->m_name;
-        writeScalar( total_path, "total_counts", bi->m_event_count, "" );
-        makeLink( total_path + "/total_counts",
-            m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi, true );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            string total_path = m_instrument_path + "/" + bi->m_name;
+            writeScalar( total_path, "total_counts",
+                bi->m_event_count, "" );
+            makeLink( total_path + "/total_counts",
+                m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+        }
+
+        // NeXus Histogram-based Data...
+        if ( bi->m_has_histo )
+        {
+            // Create & Write Histogram Multi-dimensional Data...
+            std::vector<hsize_t> dims;
+            dims.push_back( bi->m_logical_pixelids.size() );
+            dims.push_back( bi->m_num_tof_bins - 1 );
+            writeMultidimDataset( bi->m_instr_path, m_data_name,
+                bi->m_data_buffer, dims );
+
+            // Add "Axes" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
+                "axes", m_histo_pid_name + "," + m_tofbin_name );
+
+            // Add "Signal" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
+                "signal", "1" );
+
+            // Link Multi-dimensional Data into NXdata Histo group...
+            makeLink( bi->m_data_slab_path,
+                bi->m_histo_path + "/" + m_data_name );
+
+            // Write out Bank PixelIds...
+            writeSlab( bi->m_histo_pid_slab_path,
+                bi->m_logical_pixelids, 0 );
+
+            // Add "Axis" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute(
+                bi->m_instr_path + "/" + m_histo_pid_name, "axis", "1" );
+
+            // Write out TOF Bins...
+            writeSlab( bi->m_tofbin_slab_path, bi->m_tofbin_buffer, 0 );
+
+            // Add "Axis" Attribute for NeXus NXdata Standards Compat
+            writeStringAttribute(
+                bi->m_instr_path + "/" + m_tofbin_name, "axis", "2" );
+
+            // Write Out Total Counts for Histograms, too... ;-D
+            writeScalar( bi->m_histo_path, "total_counts",
+                bi->m_histo_event_count, "" );
+            writeScalar( bi->m_histo_path, "total_uncounted_counts",
+                bi->m_histo_event_uncounted, "" );
+        }
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankFinalize() failed for bank id: " << a_bank.m_id )
+        RETHROW_TRACE( e, "bankFinalize() failed for bank id: "
+            << a_bank.m_id )
     }
 }
 
@@ -1168,9 +1347,10 @@ NxGen::makeGroup
 }
 
 
-/*! \brief Creates a Nexus dataset
+/*! \brief Creates a Nexus Dataset
  *
- * This method creates a Nexus dataset with the specified type and (optional) units in the output Nexus file.
+ * This method creates a Nexus Dataset with the specified type and
+ * (optional) units in the output Nexus file.
  */
 void
 NxGen::makeDataset
@@ -1181,18 +1361,62 @@ NxGen::makeDataset
     const string        a_units     ///< [in] Optional units of new dataset
 )
 {
-    if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type, m_chunk_size ) != SUCCEED )
+    if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type,
+            m_chunk_size ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcreate_dataset_extend() failed for path: " << a_path << ", name: "
-                     << a_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXcreate_dataset_extend() failed for path: " << a_path
+                << ", name: " << a_name )
     }
 
     if ( a_units.size() )
     {
-        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
+        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
+                "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
-                         << ", name: " << a_name )
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                "H5NXmake_attribute_string() failed for path: " << a_path
+                     << ", name: " << a_name )
+        }
+    }
+}
+
+
+/*! \brief Creates and Writes a Nexus Multi-dimensional Dataset
+ *
+ * This method Creates and Writes a Nexus Multi-dimensional Dataset
+ * with the specified type and (optional) units in the output Nexus file.
+ *
+ * Note: We just need this for Histogram data, which is "UINT32",
+ * so no need to template-ize this method "yet"... ;-D
+ */
+void
+NxGen::writeMultidimDataset
+(
+    const std::string       &a_path,    ///< [in] Nexus path of new dataset
+    const std::string       &a_name,    ///< [in] Name of new dataset
+    std::vector<uint32_t>   &a_data,    ///< [in] Multi-dim Data Array
+    std::vector<hsize_t>    &a_dims,    ///< [in] Dimensions of Data
+    const string            a_units     ///< [in] Optional units of dataset
+)
+{
+    int cc;
+    if ( (cc = m_h5nx.H5NXmake_dataset_vector( a_path, a_name, a_data,
+            a_dims.size(), a_dims )) != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_dataset_vector() failed for path: " << a_path
+                << ", name: " << a_name )
+    }
+
+    if ( a_units.size() )
+    {
+        if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
+                "units", a_units ) != SUCCEED )
+        {
+            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                "H5NXmake_attribute_string() failed for path: " << a_path
+                     << ", name: " << a_name )
         }
     }
 }

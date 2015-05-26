@@ -240,7 +240,8 @@ int main( int argc, char** argv )
             if ( !interact )
             {
                 monitor = new ComBusTransMon();
-                monitor->start( *nxgen, broker_uri, broker_user, broker_pass, domain );
+                monitor->start( *nxgen,
+                    broker_uri, broker_user, broker_pass, domain );
             }
 
             // Begin ADARA stream processing - does not return until recording ends

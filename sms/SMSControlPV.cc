@@ -4,6 +4,8 @@
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
 
+#include <stdint.h>
+
 #include <gddApps.h>
 
 #include "Logging.h"

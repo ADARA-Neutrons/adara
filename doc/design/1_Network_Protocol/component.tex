@@ -149,10 +149,14 @@ system.
 		\ref{section:protocol_rtdl_packet} \\
 	0x0002.0 & Event Source List &
 		\ref{section:protocol_source_list_packet} \\
-	0x4000.0 & Banked Event Data &
-		\ref{section:protocol_banked_events} \\
-	0x4001.0 & Beam Monitor Event Data &
-		\ref{section:protocol_beam_monitor_events} \\
+	0x4000.0 & Banked Event Data V0 &
+		\ref{section:protocol_banked_events_v0} \\
+	0x4000.1 & Banked Event Data V1 &
+		\ref{section:protocol_banked_events_v1} \\
+	0x4001.0 & Beam Monitor Event Data V0 &
+		\ref{section:protocol_beam_monitor_events_v0} \\
+	0x4001.1 & Beam Monitor Event Data V1 &
+		\ref{section:protocol_beam_monitor_events_v1} \\
 	0x4002.0 & Pixel Mapping Table &
 		\ref{section:protocol_pixel_mapping_table} \\
 	0x4003.0 & Run Status &
@@ -171,10 +175,14 @@ system.
 		\ref{section:protocol_heartbeat} \\
 	0x400A.0 & Geometry &
 		\ref{section:protocol_geometry} \\
-	0x400B.0 & Beamline Info &
-		\ref{section:protocol_beamline_info} \\
-	0x4001.0 & Beam Monitor Config &
+	0x400B.0 & Beamline Info V0 &
+		\ref{section:protocol_beamline_info_v0} \\
+	0x400B.1 & Beamline Info V1 &
+		\ref{section:protocol_beamline_info_v1} \\
+	0x400D.0 & Beam Monitor Config &
 		\ref{section:protocol_beam_monitor_config} \\
+	0x400E.0 & Detector Bank Sets &
+		\ref{section:protocol_detector_bank_sets} \\
 	0x400C.0 & Data Done &
 		\ref{section:protocol_data_done} \\
 	0x8000.0 & Device Descriptor &
@@ -221,7 +229,7 @@ currently have the knowledge required to define them. The detector system
 developers will fill them in at a later date.}
 
 \newpage
-\subsubsection{Detector System: Raw event data}
+\subsubsection{Detector System: Raw Event Data}
 \label{section:protocol_raw_event_packet}
 
 \begin{figure}[h]
@@ -243,7 +251,7 @@ developers will fill them in at a later date.}
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -281,14 +289,30 @@ the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a ``bad'' or veto (previous pulse) frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was just received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information for this frame as defined
-in the SNS Timing Master Functional Description. A non-zero value indicates
-a veto.
+\item{\bf Veto Flags} contains the veto information
+for the {\it previous pulse} frame,
+as defined in the SNS Timing Master Functional Description,
+see Table~\ref{table:sns_timing_master_veto_bits}.
+The value of the corresponding Veto bits indicates whether the
+{\it previous pulse} was valid or not,
+i.e. for a beamline on Target Station 1,
+a non-zero value {\it other than } {\tt VETO\_NOT\_TARGET\_2}
+indicates a veto for the previous pulse. \\
+(Note that the VETO\_RF\_ONLY\_NO\_BEAM bit is ignored,
+encompassed by VETO\_NO\_BEAM for our purposes;
+only the first 12 Veto bits are used.)
 \item{\bf Cycle} identifies the Accelerator cycle number for the most
 recent pulse. This may not be the originating pulse for the events in this
 packet due to frame skew.
@@ -304,6 +328,42 @@ neutron(s), in a format given by Figure~\ref{fig:protocol_packet_event_data}.
 Pixel ID is the physical pixel associated with this neutron event.
 \end{itemize}
 
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | c | l}
+	Bit Value & Constant & Description \\
+	\hline
+	0x000001 & VETO\_NO\_BEAM & No beam delivered ``this'' (last) pulse \\
+	0x000002 & VETO\_NOT\_TARGET\_1 & Beam was not for target 1 \\
+	0x000004 & VETO\_NOT\_TARGET\_2 & Beam was not for target 2 \\
+	0x000008 & VETO\_DIAGNOSTIC\_PULSE & Limited-Duty diagnostic beam \\
+	0x000010 & VETO\_PHYSICS\_PULSE\_1 & Special physics pulse \\
+	0x000020 & VETO\_PHYSICS\_PULSE\_2 & Special physics pulse \\
+	0x000040 & VETO\_MPS\_AUTO\_RESET & MPS Auto-Reset fault asserted during (last) pulse \\
+	0x000080 & VETO\_MPS\_FAULT & MPS Latched fault asserted during (last) pulse \\
+	0x000100 & VETO\_EVENT\_LINK\_ERROR & Event Link corruption detected \\
+	0x000200 & VETO\_RING\_RF\_SYNCH & Lost synch with Ring RF \\
+	0x000400 & VETO\_RING\_RF\_FREQ & Ring RF frequency out of tolerance \\
+	0x000800 & VETO\_60\_HZ\_ERROR & 60 Hz Line phase error out of tolerance \\
+	(0x001000) & (VETO\_RF\_ONLY\_NO\_BEAM) & (Ignored: Master rep-rate
+	but no beam. \\ & & ...use for BLM background) \\
+    \end{tabular}
+  \end{center}
+  \caption {SNS Timing Master Veto Flag Bits}
+  \label{table:sns_timing_master_veto_bits}
+\end{table}
+
+\begin{figure}
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Time-of-flight (units of 100ns, u32)} \\
+    \wordbox{1}{Pixel ID (u32)}
+  \end{bytefield}
+  \caption{Event Data Format}
+  \label{fig:protocol_packet_event_data}
+\end{figure}
+
 When run over a network transport that does not provide reliable service, such
 as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
 and {\bf EOP} field to detect the loss of packets describing the events for a
@@ -316,18 +376,6 @@ this will be detected when the sources sends the first packet with a new {\bf
 Pulse ID}. This loss-detection protocol assumes that the transport does not
 reorder packets; additional measures must be taken in the receiver
 to deal with reordering should it be necessary.
-
-
-\begin{figure}
-  \centering
-  \begin{bytefield}{32}
-    \bitheader{31,0} \\
-    \wordbox{1}{Time-of-flight (units of 100ns, u32)} \\
-    \wordbox{1}{Pixel ID (u32)}
-  \end{bytefield}
-  \caption{Event Data Format}
-  \label{fig:protocol_packet_event_data}
-\end{figure}
 
 \newpage
 {\large \bf Pixel ID Semantics for Raw Event Packets}
@@ -492,7 +540,7 @@ fast metadata pixel ID formats.}
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -519,12 +567,12 @@ but instead has {\it already} ``mapped'' the Raw pixel IDs
 for the neutron events into ``Logical'' pixel IDs,
 as will be recognized and used directly by the data analysis system.
 
-As discussed in Section \ref{section:protocol_banked_events}
+As discussed in Section \ref{section:protocol_banked_events_v1}
 on the ``Banked Event Data'' packet,
 the physical layout of Pixel IDs in the detector systems for an instrument
 does not always match up with the layout that the scientists wish to use
 for analysis.
-So normally the Stream Management Service must transform the pixel ID
+So normally the Stream Management Service (SMS) must transform the pixel ID
 for every neutron event
 from the Raw or ``Physical'' mapping associated with the detector hardware
 into a Logical pixel ID that better represents the scientific semantics
@@ -579,14 +627,30 @@ the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the most recent pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs. This
 value may not be the charge for the events in this packet due to frame skew.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a ``bad'' or veto (previous pulse) frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was just received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information for this frame as defined
-in the SNS Timing Master Functional Description. A non-zero value indicates
-a veto.
+\item{\bf Veto Flags} contains the veto information
+for the {\it previous pulse} frame,
+as defined in the SNS Timing Master Functional Description,
+see Table~\ref{table:sns_timing_master_veto_bits}.
+The value of the corresponding Veto bits indicates whether the
+{\it previous pulse} was valid or not,
+i.e. for a beamline on Target Station 1,
+a non-zero value {\it other than } {\tt VETO\_NOT\_TARGET\_2}
+indicates a veto for the previous pulse. \\
+(Note that the VETO\_RF\_ONLY\_NO\_BEAM bit is ignored,
+encompassed by VETO\_NO\_BEAM for our purposes;
+only the first 12 Veto bits are used.)
 \item{\bf Cycle} identifies the Accelerator cycle number for the most
 recent pulse. This may not be the originating pulse for the events in this
 packet due to frame skew.
@@ -634,7 +698,7 @@ to deal with reordering should it be necessary.
     \bitbox{1}{\tiny B \\ V \\ T } &
     \bitbox{1}{\tiny B \\ C \\ Y } &
     \bitbox{8}{TSTAT} &
-    \bitbox{12}{Veto} &
+    \bitbox{12}{Veto Flags} &
     \bitbox{10}{Cycle} \\
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
@@ -663,14 +727,30 @@ accelerator.
 the SNS Timing Master Functional Description.
 \item{\bf Pulse Charge} indicates the charge of the previous pulse. This
 unsigned number must be multiplied by 10 to get the charge in picoColumbs.
-\item{\bf BVT} indicates that a bad veto frame (frame 24) was received over the
-Real Time Data Link.
-\item{\bf BCY} indicates that a bad cycle frame (frame 5) was received over the Real Time Data Link.
-\item{\bf TSTAT} contains the timing status as defined in the SNS Timing Master
+\item{\bf BVT} indicates that a ``bad'' or veto (previous pulse) frame
+(RTDL\_LAST\_CYCLE\_VETO\_FRAME, frame 24) was just received over the
+Real Time Data Link [Deprecated: effectively unnecessary and never used,
+this single bit aggregates the specific bits in the ``Veto'' field].
+\item{\bf BCY} indicates that a bad cycle frame
+(RTDL\_MODE\_FRAME/MPS Mode, frame 5) was received over the
+Real Time Data Link
+[Deprecated: unnecessary and never used, essentially a subset of the
+specific bits in the ``Veto'' field].
+\item{\bf TSTAT} contains the timing status
+(e.g. RTDL\_STATUS\_*) as defined in the SNS Timing Master
 Functional Description.
-\item{\bf Veto} contains the veto information for the previous frame as defined
-in the SNS Timing Master Functional Description. A non-zero value indicates
-a veto.
+\item{\bf Veto Flags} contains the veto information
+for the {\it previous pulse} frame,
+as defined in the SNS Timing Master Functional Description,
+see Table~\ref{table:sns_timing_master_veto_bits}.
+The value of the corresponding Veto bits indicates whether the
+{\it previous pulse} was valid or not,
+i.e. for a beamline on Target Station 1,
+a non-zero value {\it other than } {\tt VETO\_NOT\_TARGET\_2}
+indicates a veto for the previous pulse. \\
+(Note that the VETO\_RF\_ONLY\_NO\_BEAM bit is ignored,
+encompassed by VETO\_NO\_BEAM for our purposes;
+only the first 12 Veto bits are used.)
 \item{\bf Cycle} identifies the Accelerator cycle number for the most
 recent pulse.
 \item{\bf Intra-pulse time} contains the intra-pulse time in units of 100 ns.
@@ -732,7 +812,7 @@ should send this packet without any source IDs and a payload length of 0.
 
 
 \newpage
-\subsection{Stream Management Service generated events}
+\subsection{Stream Management Service (SMS) generated events}
 
 The following packet types are generally generated by, or used when
 communicating with the Stream Management Service (SMS). These packets generally
@@ -740,7 +820,7 @@ use the current time-of-day clock for their {\bf Timestamp} fields, though the
 Banked Event Data and Beam Monitor Event Data packets will use the Pulse ID
 from the associated Raw Event Data.  While all of the defined packet types may
 be seen over a network transport, several have meaning only when seen on
-permament storage and should be ignored when seen on the network.
+permanent storage and should be ignored when seen on the network.
 
 {\large \bf Communication with the Translation Service}
 
@@ -752,23 +832,24 @@ for the run, the SMS will send the following prologue:
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Run Information (Section~\ref{section:protocol_run_information})
 \item Geometry (Section~\ref{section:protocol_geometry})
-\item Beamline Info (Section~\ref{section:protocol_beamline_info})
-\item Beam Monitor Config (Section~\ref{section:protocol_beam_monitor_config})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
+\item Beam Monitor Config (Optional, Section~\ref{section:protocol_beam_monitor_config})
+\item Detector Bank Sets (Optional, Section~\ref{section:protocol_detector_bank_sets})
 \item one or more Device Descriptors and Variable Value packets
 (Section~\ref{section:protocol_meta_data_packets})
 \end{itemize}
 While Variable Value packets will not proceed the Device Descriptor that
 defines their meaning, there is no guaranteed ordering among prologue
 packets other than that they will be sent prior to event data
-(Sections~\ref{section:protocol_banked_events} and
-\ref{section:protocol_beam_monitor_events}).
+(Sections~\ref{section:protocol_banked_events_v1} and
+\ref{section:protocol_beam_monitor_events_v1}).
 
 The Translation Service
 may also receive Synchronization Packets (Section~\ref{section:protocol_sync})
 and Heartbeat Packets (Section~\ref{section:protocol_heartbeat}), both of
 which it should discard. These may appear prior to the prologue.
 
-The Translation Service may recieve a Stream Annotation packet
+The Translation Service may receive a Stream Annotation packet
 (Section~\ref{section:protocol_stream_annotation}) at any time. It is
 recommended that these packets be logged at minimum, though the Translation
 Service is free to handle to these packets as it deems appropriate.
@@ -793,16 +874,17 @@ Hello, it will send the following prologue:
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table})
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Geometry (Section~\ref{section:protocol_geometry})
-\item Beamline Info (Section~\ref{section:protocol_beamline_info})
-\item Beam Monitor Config (Section~\ref{section:protocol_beam_monitor_config})
+\item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
+\item Beam Monitor Config (Optional, Section~\ref{section:protocol_beam_monitor_config})
+\item Detector Bank Sets (Optional, Section~\ref{section:protocol_detector_bank_sets})
 \item one or more Device Descriptors and Variable Value packets
 (Section~\ref{section:protocol_meta_data_packets})
 \end{itemize}
 While Variable Value packets will not proceed the Device Descriptor that
 defines their meaning, there is no guaranteed ordering among prologue
 packets other than that they will be sent prior to event data
-(Sections~\ref{section:protocol_banked_events} and
-\ref{section:protocol_beam_monitor_events}).
+(Sections~\ref{section:protocol_banked_events_v1} and
+\ref{section:protocol_beam_monitor_events_v1}).
 
 If the client's requested starting timestamp is inside an experimental
 run, it will also receive a Run Information Packet
@@ -828,8 +910,8 @@ annotation received.
 
 
 \newpage
-\subsubsection{Banked Event Data}
-\label{section:protocol_banked_events}
+\subsubsection{Banked Event Data - Version 0 (Original)}
+\label{section:protocol_banked_events_v0}
 
 \begin{figure}[h]
   \centering
@@ -849,8 +931,8 @@ annotation received.
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Source Section $N$} \\
   \end{bytefield}
-  \caption{Packet Type 0x4000.0: Banked Event Data}
-  \label{fig:protocol_packet_banked_event_data}
+  \caption{Packet Type 0x4000.0: Banked Event Data V0}
+  \label{fig:protocol_packet_banked_event_data_v0}
 \end{figure}
 
 \begin{table}[h]
@@ -870,9 +952,9 @@ annotation received.
   \label{table:protocol_packet_banked_event_flags}
 \end{table}
 
-The ``Banked Event Data'' packet described in
-Figure~\ref{fig:protocol_packet_banked_event_data} is generated by the
-Stream Management Service and is used to convey time-of-flight and logical
+The ``Banked Event Data'' (Version 0) packet described in
+Figure~\ref{fig:protocol_packet_banked_event_data_v0} is generated by the
+Stream Management Service (SMS) and is used to convey time-of-flight and logical
 location information for detected neutrons. It contains the following fields:
 \begin{itemize}
 \item{\bf Length} is defined by the number of events in the packet. There
@@ -911,8 +993,8 @@ events for a pulse.
 
 The physical layout of pixel IDs in the detector systems for an instrument
 do not always match up with the layout that the scientists wish to use for
-analysis. The Stream Management Service will transform the pixel IDs from
-physical in the Raw packets to logical in the Banked packets using a
+analysis. The Stream Management Service (SMS) will transform the pixel IDs
+from physical in the Raw packets to logical in the Banked packets using a
 one-to-one mapping (communicated in the stream via ``Pixel Mapping Table''
 packets defined in Section~\ref{section:protocol_pixel_mapping_table}).
 These logical pixels are then communicated in the ``Banked Event Data''
@@ -928,7 +1010,7 @@ a single ``Banked Event Data'' packet will be sent by the SMS for each pulse.
     \wordbox{1}{Intra-pulse time (units of 100 ns, u32)} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
     \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
-    \wordbox{1}{Bank Count (u32)} \\
+    \wordbox{1}{Bank Count (``$N$'', u32)} \\
     \wordbox{2}{Banked Section 1} \\
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Banked Section $N$} \\
@@ -941,7 +1023,7 @@ Instruments may have multiple hardware sources for their event data, due to the
 placement of detectors, simplification of routing, or due to different frame
 skew offsets depending upon instrument geometry and neutron wavelength. As each
 of these sources has its own, independent free-running clock to generate a
-relative time-of-flight, the obvserved length of the pulse may vary slightly
+relative time-of-flight, the observed length of the pulse may vary slightly
 from source to source. These small variations, as well as the time offsets used
 to center events in the temporal detection window and correct for frame skew,
 must be recorded per-source for full experiment fidelity. Each ``Banked Event
@@ -973,7 +1055,7 @@ Figure~\ref{fig:protocol_banked_event_section}.
   \begin{bytefield}{32}
     \bitheader{31,0} \\
     \wordbox{1}{Bank ID (u32)} \\
-    \wordbox{1}{Event Count (u32)} \\
+    \wordbox{1}{Event Count (``$N$'', u32)} \\
     \wordbox{2}{Banked Event 1} \\
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Banked Event $N$} \\
@@ -1000,8 +1082,98 @@ detector.
 \end{itemize}
 
 \newpage
-\subsubsection{Beam Monitor Event Data}
-\label{section:protocol_beam_monitor_events}
+\subsubsection{Banked Event Data - Version 1}
+\label{section:protocol_banked_events_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Length 16 + Section Lengths} \\
+    \wordbox{1}{0x00400001} \\
+    \wordbox{1}{Pulse ID (seconds)} \\
+    \wordbox{1}{Pulse ID (nanoseconds)} \\
+
+    \bitheader{31,20,19,0} \\
+    \wordbox{1}{Pulse Charge (units of 10 pC, u32)} \\
+    \wordbox{1}{Pulse Energy (eV, u32)} \\
+    \wordbox{1}{Accelerator Cycle} \\
+    \bitbox{12}{Veto Flags} &
+    \bitbox{20}{Flags} \\
+    \wordbox{2}{Source Section 1} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{2}{Source Section $N$} \\
+  \end{bytefield}
+  \caption{Packet Type 0x4000.1: Banked Event Data V1}
+  \label{fig:protocol_packet_banked_event_data_v1}
+\end{figure}
+
+The ``Banked Event Data'' (Version 1) packet described in
+Figure~\ref{fig:protocol_packet_banked_event_data_v1}
+is a backwards-compatible and nearly identical extension
+to the ``Version 0'' definition of the same packet type,
+as described in the previous
+Section~\ref{section:protocol_banked_events_v0}.
+The only difference here is a subdividing of the ``Flags'' field
+to additionally include the full 12-bits of ``Veto Flags''
+(see Table~\ref{table:sns_timing_master_veto_bits}),
+e.g. as are provided in the RTDL
+(Section~\ref{section:protocol_rtdl_packet})
+and Raw Event Data (Section~\ref{section:protocol_raw_event_packet})
+packet types.
+The remaining structure and sub-structures
+of the Banked Event Data V1 packet type are the same as the V0 packet,
+and are therefore accurately described by the original
+Banked Event Data V0 packet documentation in
+Section~\ref{section:protocol_banked_events_v0}.
+Please see this section for the remainder of this packet type's details.
+
+This packet is generated by the
+Stream Management Service (SMS) and is used to convey time-of-flight and
+logical location information for detected neutrons.
+It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is defined by the number of events in the packet. There
+are 16 bytes of pulse and packet information followed by sections for each
+hardware event source.
+\item{\bf Pulse ID} identifies the most recent pulse generated by the
+accelerator. This ID may not be originating pulse for the events in this packet
+due to frame skew.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+resent pulse. If this value is unknown (due to an error such as a lost RTDL
+packet), this field will be set to all ones. This may not be the originating
+pulse for the events in this packet due to frame skew.
+\item{\bf Pulse Charge} indicates the charge of the most recent pulse in units
+of 10 picoColumbs. This value may not be the charge for the events in this
+packet due to frame skew.
+\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
+given in electron volts. This value is calculated from the Ring Period
+field of the RTDL packet and depends on the accumulator ring geometry. This
+value may not be the voltage for the events in this packet due to frame skew.
+\item{\bf Veto Flags} contains the veto information
+for the {\it previous pulse} frame,
+as defined in the SNS Timing Master Functional Description,
+see Table~\ref{table:sns_timing_master_veto_bits}.
+The value of the corresponding Veto bits indicates whether the
+{\it previous pulse} was valid or not,
+i.e. for a beamline on Target Station 1,
+a non-zero value {\it other than } {\tt VETO\_NOT\_TARGET\_2}
+indicates a veto for the previous pulse. \\
+(Note that the VETO\_RF\_ONLY\_NO\_BEAM bit is ignored,
+encompassed by VETO\_NO\_BEAM for our purposes;
+only the first 12 Veto bits are used.)
+\item{\bf Flags} is a bit-field indicating pulse properties, such as errors or
+missing event data as defined in
+Table~\ref{table:protocol_packet_banked_event_flags}.
+\item{\bf Source Section(s)} contains information from each source of event
+data. There will be one section for each source, which will contain timing
+information and one or more {\bf Banked Event Section(s)}. The format of the
+Source Section is given in Figure~\ref{fig:protocol_source_section}.
+\end{itemize}
+
+\newpage
+\subsubsection{Beam Monitor Event Data - Version 0 (Original)}
+\label{section:protocol_beam_monitor_events_v0}
 
 \begin{figure}[h]
   \centering
@@ -1021,8 +1193,8 @@ detector.
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Beam Monitor Section $N$} \\
   \end{bytefield}
-  \caption{Packet Type 0x4001.0: Beam Monitor Event Data}
-  \label{fig:protocol_packet_monitor_event_data}
+  \caption{Packet Type 0x4001.0: Beam Monitor Event Data V0}
+  \label{fig:protocol_packet_monitor_event_data_v0}
 \end{figure}
 
 \begin{figure}[h]
@@ -1030,7 +1202,7 @@ detector.
   \begin{bytefield}{32}
     \bitheader{31,30,22,21,0} \\
     \bitbox{10}{Monitor ID} &
-    \bitbox{22}{Event Count} \\
+    \bitbox{22}{Event Count (``$N$'')} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny C \\ O \\ R} &
     \bitbox{31}{TOF Offset (units of 100 ns, u32)} \\
@@ -1054,9 +1226,9 @@ detector.
   \label{fig:protocol_monitor_event_fields}
 \end{figure}
 
-The ``Beam Monitor Event Data'' packet described in
-Figure~\ref{fig:protocol_packet_monitor_event_data} is generated by the
-Stream Management Service and is used to convey neutron time-of-flight
+The ``Beam Monitor Event Data'' (Version 0) packet described in
+Figure~\ref{fig:protocol_packet_monitor_event_data_v0} is generated by the
+Stream Management Service (SMS) and is used to convey neutron time-of-flight
 information originating from beam monitors. It contains the following fields:
 \begin{itemize}
 \item{\bf Length} is defined by the number of events in the packet. There
@@ -1126,6 +1298,96 @@ It is expected that a single ``Beam Monitor Event Data'' packet will be sent
 by the SMS for each pulse.
 
 \newpage
+\subsubsection{Beam Monitor Event Data - Version 1}
+\label{section:protocol_beam_monitor_events_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Length 16 + Section Lengths} \\
+    \wordbox{1}{0x00400101} \\
+    \wordbox{1}{Pulse ID (seconds)} \\
+    \wordbox{1}{Pulse ID (nanoseconds)} \\
+
+    \bitheader{31,20,19,0} \\
+    \wordbox{1}{Pulse Charge (units of 10 pC, u32)} \\
+    \wordbox{1}{Pulse Energy (eV, u32)} \\
+    \wordbox{1}{Accelerator Cycle} \\
+	\bitbox{12}{Veto Flags} &
+    \bitbox{20}{Flags} \\
+    \wordbox{2}{Beam Monitor Section 1} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{2}{Beam Monitor Section $N$} \\
+  \end{bytefield}
+  \caption{Packet Type 0x4001.1: Beam Monitor Event Data V1}
+  \label{fig:protocol_packet_monitor_event_data_v1}
+\end{figure}
+
+The ``Beam Monitor Event Data'' (Version 1) packet described in
+Figure~\ref{fig:protocol_packet_monitor_event_data_v1}
+is a backwards-compatible and nearly identical extension
+to the ``Version 0'' definition of the same packet type,
+as described in the previous
+Section~\ref{section:protocol_beam_monitor_events_v0}.
+The only difference here is a subdividing of the ``Flags'' field
+to additionally include the full 12-bits of ``Veto Flags''
+(see Table~\ref{table:sns_timing_master_veto_bits}),
+e.g. as are provided in the RTDL
+(Section~\ref{section:protocol_rtdl_packet})
+and Raw Event Data (Section~\ref{section:protocol_raw_event_packet})
+packet types.
+The remaining structure and sub-structures
+of the Beam Monitor Event Data V1 packet type
+are the same as the V0 packet,
+and are therefore accurately described by the original
+Beam Monitor Event Data V0 packet documentation in
+Section~\ref{section:protocol_beam_monitor_events_v0}.
+Please see this section for the remainder of this packet type's details.
+
+This packet is generated by the
+Stream Management Service (SMS) and is used to convey neutron time-of-flight
+information originating from beam monitors. It contains the following fields:
+\begin{itemize}
+\item{\bf Length} is defined by the number of events in the packet. There
+are 16 bytes of pulse and packet information followed by 4 bytes of data
+for each event.
+\item{\bf Pulse ID} identifies the most recent pulse generated by the
+accelerator. This ID may not be originating pulse for the events in this
+packet due to frame skew.
+\item{\bf Cycle} identifies the Accelerator cycle number for the most
+recent pulse. If this value is unknown (due to an error such as a lost RTDL
+packet), this field will be set to all ones. This may not be the originating
+pulse for the events in this packet due to frame skew.
+\item{\bf Pulse Charge} indicates the charge of the most recent pulse in units
+of 10 picoColumbs. This value may not be the charge for the events in this
+packet due to frame skew.
+\item{\bf Pulse Energy} indicates the voltage of the most recent pulse,
+given in electron volts. This value is calculated from the Ring Period
+field of the RTDL packet and depends on the accumulator ring geometry. This
+value may not be the voltage for the events in this packet due to frame skew.
+\item{\bf Veto Flags} contains the veto information
+for the {\it previous pulse} frame,
+as defined in the SNS Timing Master Functional Description,
+see Table~\ref{table:sns_timing_master_veto_bits}.
+The value of the corresponding Veto bits indicates whether the
+{\it previous pulse} was valid or not,
+i.e. for a beamline on Target Station 1,
+a non-zero value {\it other than } {\tt VETO\_NOT\_TARGET\_2}
+indicates a veto for the previous pulse. \\
+(Note that the VETO\_RF\_ONLY\_NO\_BEAM bit is ignored,
+encompassed by VETO\_NO\_BEAM for our purposes;
+only the first 12 Veto bits are used.)
+\item{\bf Flags} is a bit-field indicating pulse properties, such as errors or
+missing event data as defined in
+Table~\ref{table:protocol_packet_banked_event_flags}.
+\item{\bf Beam Monitor Section(s)} contain the Beam Monitor ID and events
+for each Beam Monitor. There will be one section for each beam monitor
+on this beam line that has events for this pulse. The format of the section
+is given in Figure~\ref{fig:protocol_monitor_event_section}.
+\end{itemize}
+
+\newpage
 \subsubsection{Pixel Mapping Table Packet}
 \label{section:protocol_pixel_mapping_table}
 
@@ -1160,7 +1422,7 @@ for the same experiment recording.
     \bitheader{31,16,15,0} \\
     \bitbox{32}{Base Logical ID (u32)} \\
     \bitbox{16}{Bank ID (u16)} & 
-    \bitbox{16}{Count (u16)} \\
+    \bitbox{16}{Count (``$N$'', u16)} \\
     %\wordbox{1}{Map Entry 0} \\
     \wordbox{1}{Physical ID 0 (u32)} \\
     \wordbox[lrt]{1}{Physical ID 1 (u32)} \\
@@ -1218,7 +1480,7 @@ ID space is not contiguous.
     \wordbox{1}{Timestamp (nanoseconds)} \\
 
     \bitheader{31,24,23,0} \\
-    \wordbox{1}{Run Number(u32)} \\
+    \wordbox{1}{Run Number (u32)} \\
     \wordbox{1}{Run Start (seconds, u32)} \\
     \bitbox{8}{Status} &
     \bitbox{24}{File Number} \\
@@ -1262,7 +1524,7 @@ data. This field is relative to the EPICS epoch.
 field is undefined if we are not currently recording an experimental run.
 \end{itemize}
 
-The Stream Management Service breaks experimental recordings into multiple
+The Stream Management Service (SMS) breaks experimental recordings into multiple
 chunks to allow a gradual reclaimation of storage space once the recording
 has been translated to a NeXus file. This process increases the window in
 which at least partial data from a experiment can be retrieved from the SMS
@@ -1287,7 +1549,7 @@ of time and approximate data missing by using the {\bf Run Start} and
     \wordbox{1}{Timestamp (nanoseconds)} \\
 
     \bitheader{31,0} \\
-    \wordbox{1}{XML Length (u32)} \\
+    \wordbox{1}{XML Length (``$N$'', u32)} \\
     \wordbox{4}{XML Run Information ($N$ byte string data)} \\
   \end{bytefield}
   \caption{Packet Type 0x4004.0: Run Information Packet}
@@ -1316,7 +1578,7 @@ metadata value packets.}
 
     \bitheader{31,16,15,0} \\
     \bitbox{16}{Status (u16)} &
-    \bitbox{16}{Reason Length (u16)} \\
+    \bitbox{16}{Reason Length (``$N$'', u16)} \\
     \wordbox{2}{Reason ($N$ byte string, optional)} \\
   \end{bytefield}
   \caption{Packet Type 0x4005.0: Translation Complete Packet}
@@ -1338,7 +1600,7 @@ metadata value packets.}
 \end{table}
 
 The ``Translation Complete'' Packet allows the Translation Service to signal
-the Stream Management Service that is has completed processing the data sent
+the Stream Management Service (SMS) that is has completed processing the data sent
 for this experimental run.
 
 \begin{itemize}
@@ -1388,7 +1650,7 @@ experiment.
   \label{fig:protocol_client_hello}
 \end{figure}
 
-After first connecting to the Stream Management Service, a client will send
+After first connecting to the Stream Management Service (SMS), a client will send
 a ``Client Hello'' packet to indicate from where in the stream it would like
 begin receiving event data. No data will be sent to the client prior to
 receiving this packet.
@@ -1439,7 +1701,7 @@ be set to ``1'' to indicate the oldest possible timestamp greater than 0.
     \bitheader{31,30,16,15,0} \\
     \bitbox{1}{\tiny R \\ S \\ T } &
     \bitbox{15}{Type (u11)} &
-    \bitbox{16}{Comment Length (u16)} \\
+    \bitbox{16}{Comment Length (``$N$'', u16)} \\
     \wordbox{1}{Scan Index (u32)} \\
     \wordbox{2}{Comment ($N$ byte string, optional)} \\
   \end{bytefield}
@@ -1534,7 +1796,7 @@ clients may use this to populate the appropriate field in their output file.
     \bitheader{31,0} \\
     \wordbox{4}{Signature (16 bytes)} \\
     \wordbox{2}{File Offset (u64)} \\
-    \wordbox{1}{Comment Length (u32)} \\
+    \wordbox{1}{Comment Length (``$N$'', u32)} \\
     \wordbox{2}{Comment ($N$ byte string, optional)} \\
   \end{bytefield}
   \caption{Packet Type 0x4008.0: Synchronization Packet}
@@ -1623,7 +1885,7 @@ expected to use an unreliable transport.
     \wordbox{1}{Timestamp (nanoseconds)} \\
 
     \bitheader{31,0} \\
-    \wordbox{1}{XML Length (u32)} \\
+    \wordbox{1}{XML Length (``$N$'', u32)} \\
     \wordbox{4}{XML Geometry Information ($N$ byte string data)} \\
   \end{bytefield}
   \caption{Packet Type 0x400A.0: Geometry Packet}
@@ -1647,8 +1909,8 @@ this field must be padded to a multple of 4 bytes.
 
 
 \newpage
-\subsubsection{Beamline Info Packet}
-\label{section:protocol_beamline_info}
+\subsubsection{Beamline Info Packet - Version 0 (Original)}
+\label{section:protocol_beamline_info_v0}
 
 \begin{figure}[h]
   \centering
@@ -1666,18 +1928,81 @@ this field must be padded to a multple of 4 bytes.
     \bitbox{8}{Long Len} \\
     \wordbox{2}{Beamline Data ($N$ byte string data)}
   \end{bytefield}
-  \caption{Packet Type 0x400B.0: Beamline Info Packet}
-  \label{fig:protocol_packet_beamline_info}
+  \caption{Packet Type 0x400B.0: Beamline Info Packet V0}
+  \label{fig:protocol_packet_beamline_info_v0}
 \end{figure}
 
-The ``Beamline Info'' packet contains information to identify the beamline that
-created the event data in this stream.
+The ``Beamline Info'' (Version 0) packet contains information
+to identify the beamline that created the event data in this stream.
 
 \begin{itemize}
 \item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
 \item{\bf Timestamp} does not carry significant information and may be the
 startup time of the SMS, or the time the packet was send, if not another value
 altogether.
+\item{\bf Id Len} gives the length of the numeric beamline identifier in the
+{\bf Beamline Data} field.
+\item{\bf Short Len} gives the length of the short name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Long Len} gives the length of the long name for the beamline in the
+{\bf Beamline Data} field.
+\item{\bf Beamline Data} contains the numeric identifier, short name, and long
+name for the beamline. These strings are concatenated together without
+intervening NULLs. This field must be padded to a multiple of 4 bytes.
+\end{itemize}
+
+
+\newpage
+\subsubsection{Beamline Info Packet - Version 1}
+\label{section:protocol_beamline_info_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{4 + roundup($N$, 4)} \\
+    \wordbox{1}{0x00400B01} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,24,23,16,15,8,7,0} \\
+    \bitbox{8}{Target Number} &
+    \bitbox{8}{Id Len} &
+    \bitbox{8}{Short Len} &
+    \bitbox{8}{Long Len} \\
+    \wordbox{2}{Beamline Data ($N$ byte string data)}
+  \end{bytefield}
+  \caption{Packet Type 0x400B.1: Beamline Info Packet V1}
+  \label{fig:protocol_packet_beamline_info_v1}
+\end{figure}
+
+The ``Beamline Info'' (Version 1) packet contains information
+to identify the beamline that created the event data in this stream.
+Note that this version of the Beamline Info packet is wire-compatible
+with the original ``Version 0'' packet type
+(Section~\ref{section:protocol_beamline_info_v0}),
+as the ``Unused'' field is simply replaced with ``real information,''
+namely the ``Target Number'' (see below).
+It shall be that any ADARA components supporting the new Version 1
+structure of the Beamline Info packet are made
+backwards compatible to components that might
+deliver the Version 0 packet structure,
+by ensuring that the Target Number simply defaults to ``1''
+if not specified (i.e. left as ``0'' in the ``Unused'' field).
+
+\begin{itemize}
+\item{\bf Length} is 4 bytes plus the length of the {\bf Beamline Data}.
+\item{\bf Timestamp} does not carry significant information and may be the
+startup time of the SMS, or the time the packet was send, if not another value
+altogether.
+\item{\bf Target Number} specifies the Neutron Target Station Number
+for the given Neutron Facility,
+e.g. in the case of the Spallation Neutron Source (SNS) there are
+two potential Target Stations, Target Station 1 and Target Station 2;
+this distinction is already relevant based on Timing information
+that distinguishes between the two Target Stations in the RTDL
+(Real Time Data Link, Section~\ref{section:protocol_rtdl_packet})
+packet bits.
 \item{\bf Id Len} gives the length of the numeric beamline identifier in the
 {\bf Beamline Data} field.
 \item{\bf Short Len} gives the length of the short name for the beamline in the
@@ -1704,7 +2029,7 @@ intervening NULLs. This field must be padded to a multiple of 4 bytes.
     \wordbox{1}{Timestamp (nanoseconds)} \\
 
     \bitheader{31,0} \\
-    \wordbox{1}{Beam Monitor Count (u32)} \\
+    \wordbox{1}{Beam Monitor Count (``$N$'', u32)} \\
     \wordbox{2}{Beam Monitor Config Section 1} \\
     \wordbox{1}{$\cdots$} \\
     \wordbox{2}{Beam Monitor Config Section $N$} \\
@@ -1729,7 +2054,7 @@ intervening NULLs. This field must be padded to a multiple of 4 bytes.
 
 The ``Beam Monitor Config'' packet described in
 Figure~\ref{fig:protocol_packet_monitor_config} is generated by the
-Stream Management Service and is used to convey optionally requested
+Stream Management Service (SMS) and is used to convey optionally requested
 Histogramming parameters for processing and storing the neutron
 time-of-flight information originating from the given beam monitor.
 Each single Beam Monitor Config packet consists of 1 or more
@@ -1767,6 +2092,227 @@ histogram bin.
 value for the ``distance'' from the sample of the given beam monitor in
 the associated physical beamline configuration.
 \end{itemize}
+
+
+\newpage
+\subsubsection{Detector Bank Sets}
+\label{section:protocol_detector_bank_sets}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Length $((15 + M)4N) + 4$ (N Sections, 60 + 4M bytes each)} \\
+    \wordbox{1}{0x00400E00} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Detector Bank Set Count (``$N$'', u32)} \\
+    \wordbox{2}{Detector Bank Set Section 1} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{2}{Detector Bank Set Section $N$} \\
+  \end{bytefield}
+  \caption{Packet Type 0x400E.0: Detector Bank Sets}
+  \label{fig:protocol_packet_detector_bank_sets}
+\end{figure}
+
+The ``Detector Bank Sets'' packet described in
+Figure~\ref{fig:protocol_packet_detector_bank_sets} is generated by the
+Stream Management Service (SMS) and is used to convey optionally requested
+configuration parameters for ``subsets'' of the neutron detectors
+on a given beamline.
+Normally in ADARA, individual neutron events are stored explicitly,
+per detector bank, in NeXus data files,
+to enable flexible time-series analysis of a run.
+However, with the information provided in this optional prologue packet,
+an alternate Histogram-based data format can be requested
+for certain subsets of the neutron detectors at a beamline,
+on a run-by-run basis.
+The Detector Bank Sets packet identifies one or more subsets of detectors,
+and includes basic histogramming parameters
+for the processing and storing of accumulated neutron time-of-flight data,
+using all events originating from the given set(s) of neutron detectors.
+
+The intent of this functionality is to reduce the amount
+of neutron event data saved for {\it some of the detectors},
+for runs where keeping the full event stream is unnecessary
+for proper normalization or other scientific comparisons.
+For some beamlines,
+the type, sensitivity and/or arrangement of neutron detectors can lead
+to large discrepancies in the relative event rates
+of different detector subsets.
+This can produce pathological situations for a given run,
+where massive amounts of data must be collected
+for one or more ``secondary'' neutron detector sets,
+just to be able to collect a sufficient amount of the more crucial data
+from a lower event rate yet ``primary'' detector set.
+The length of time for a given run,
+in conjunction with any differences in the relative event rates
+of the distinct detector sets,
+exacerbates this issue.
+A detailed, high fidelity histogram of the events' time-of-flight data
+for some of the detector banks,
+using {\it all} of their neutron events,
+can be sufficient and prudent for fulfilling a scientific analysis,
+and is also efficient in terms of post-processing/analysis time
+and archival data storage cost.
+
+However, in the case where a transient electronics system condition
+might corrupt the neutron event data briefly in the middle of a long run,
+any accumulated histograms for those detector banks would
+likewise be corrupted, requiring a ``fallback'' option.
+Normally, with event-based analysis, any bad sections of the data
+can be removed using a time-series filter,
+and a ``clean'' histogram can be generated.
+Here, by additionally saving a {\it small subset} of the
+original raw neutron event data,
+it is possible during post-mortem analysis to step around the bad data
+and produce a new time-series filtered histogram
+using only valid neutron events.
+This ``best-effort'' histogram will of course lack the high fidelity
+achieved by using the entire neutron event stream for those detector banks,
+yet the result should allow the given run to still be useful for science.
+
+Two extra parameters in each Detector Bank Set Section are for
+optionally requesting that such a ``Throttled'' (reduced sampling rate)
+subset of neutron events be stored {\it alongside} the histogrammed data,
+in support of any reduced-fidelity time-series analysis as needed
+(see below in Figure~\ref{fig:protocol_packet_detector_bank_set_section}).
+The first ``Throttle Rate'' parameter dictates how frequently
+the pulses/events will be captured for the saved subset.
+Note that the Pulse Time series for this data will be {\it different}
+than the overall times for the full run data
+(in the main ``/entry'' {\tt NXentry}).
+Likewise, the Throttled {\tt NXentry} groups will have their
+own Proton Charge sums,
+corresponding to the specific set of pulses included.
+The second ``Throttle Suffix'' parameter indicates the distinct name
+of the top-level {\tt NXentry} group for storing the data,
+e.g. ``/entry-[suffix]''.
+
+The main Detector Bank Sets packet structure contains the following fields:
+\begin{itemize}
+\item{\bf Length} of payload is 4 bytes for the Detector Bank Set Count,
+plus an additional 60 byte fixed count for each Detector Bank Set Section,
+plus an additional $4M$ bytes for each array of Detector Bank Numbers
+for the given set; note that $M$ is expected to be {\it unique per set},
+and so the overall payload size must be accumulated by summing
+{\it All} individual values of $M$
+(multiplied by 4 bytes, the size of a single bank number).
+\item{\bf Timestamp} indicates when the SMS introduced this latest
+configuration information into the data stream (not expected to
+change frequently, or mid-run).
+\item{\bf Detector Bank Set Count (``$N$'')} is the number of Detector Bank Sets
+defined for this beamline/run,
+including histogramming and event rate-throttling configurations,
+and is greater than or equal to 1.
+\end{itemize}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{4}{Detector Bank Set Name ($16$ byte string data)} \\
+    \wordbox{1}{Detector Bank Set Format/Flags (u32)} \\
+    \wordbox{1}{Detector Bank Id Count (``$M$'', u32)} \\
+    \wordbox{1}{Detector Bank Id Number 1 (u32)} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{1}{Detector Bank Id Number $M$ (u32)} \\
+    \wordbox{1}{TOF Offset (microseconds, u32)} \\
+    \wordbox{1}{Maximum TOF (microseconds, u32)} \\
+    \wordbox{1}{Histogram Bin Size (microseconds, u32)} \\
+    \wordbox{2}{Throttle Rate (Hz, IEEE 754 double)} \\
+    \wordbox{4}{Throttled NeXus Data {\tt NXentry} Suffix ($16$ byte string data)} \\
+  \end{bytefield}
+  \caption{Detector Bank Set Section}
+  \label{fig:protocol_packet_detector_bank_set_section}
+\end{figure}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0x0001 & Event-based Output Format \\
+	0x0002 & Histogram-based Output Format \\
+    \end{tabular}
+  \end{center}
+  \caption {Detector Bank Set ``Flags'' Bit-Mask Values}
+  \label{table:protocol_detector_bank_set_flags}
+\end{table}
+
+Each single Detector Bank Sets packet consists of 1 or more
+``Detector Bank Set Sections'' to define the appropriate handling
+and optional data saving for each detector bank subset,
+as described in Figure~\ref{fig:protocol_packet_detector_bank_set_section}.
+
+Each individual Detector Bank Set Section then includes the
+following fields:
+\begin{itemize}
+\item{\bf Detector Bank Set Name} provides up to 15 alphanumeric characters
+(followed by one or more `\textbackslash0' end-of-string characters
+in the remaining space)
+that describe the nature of this particular Detector Bank Set;
+this could be a logical ``name'' for the set of Neutron Detectors,
+e.g. ``IED Detectors'' for inelastic detectors
+or ``BSD Detectors'' for backscattering,
+or some other descriptive information such as ``North Banks''.
+\item{\bf Detector Bank Set Format/Flags} is a 32-bit unsigned integer
+``bit mask'' that defines various aspects of the special handling
+for the given detector bank set,
+including the requested ``Output Format(s)'';
+as shown in Table~\ref{table:protocol_detector_bank_set_flags},
+the generation of Event-based and Histogram-based data products,
+for a given detector bank set in the NeXus output file,
+can be independently controlled by OR-ing the desired bit values,
+to produce Events, Histograms or Both (0x0001 | 0x0002 = 0x0003).
+\item{\bf Detector Bank Id Count (``$M$'')} is the count of specific
+detector bank id numbers in this particular set.
+\item{\bf Detector Bank Id Numbers ($1..M$)} is the actual list of specific
+detector bank id numbers.
+\item{\bf TOF Offset} is any minimum TOF offset value (in microseconds)
+required for inclusion in the histogrammed data for this neutron
+detector set;
+any TOF less than this will be discarded during histogram accumulation.
+\item{\bf Maximum TOF} indicates the maximum TOF value (in microseconds)
+for defining the set of histogram bins for this neutron detector set;
+any TOF values greater than this will be discarded during histogram
+accumulation.
+\item{\bf Histogram Bin Size} is the linear ``bin size'' (in microseconds)
+for histogramming the neutron detector set's TOF data values,
+e.g. the number of distinct TOF values to be summed together in a single
+histogram bin.
+\item{\bf Throttle Rate} is an IEEE 754 double floating point value that
+indicates the (optional) ``Throttle Rate'', for additionally sampling
+and including individual neutron event subsets from the given detector set
+(despite the main data for these detector banks being {\it histogrammed}),
+and storing them in a distinct toplevel {\tt NXentry} group
+(see the ``Throttle Suffix'' below)
+in the resulting NeXus data file.
+Setting the Throttle Rate to $0.0$ is interpreted as ``Do Not Throttle'',
+or in other words do not additionally save any raw neutron events
+for this detector set.
+Otherwise, the Throttle Rate is a floating point value in Hz that
+specifies how frequently a given neutron pulse and its associated events
+should be captured;
+values greater than $1.0$ indicate collecting several pulses per second,
+whereas values between $0.0 < T < 1.0$ indicate a ``Sub-Hz'' operation,
+only saving events for pulses every few seconds or minutes or hours, etc.
+\item{\bf Throttled NeXus Data {\tt NXentry} Suffix} is an
+alphanumeric string of up to 15 characters
+(followed by one or more `\textbackslash0' end-of-string characters
+in the remaining space)
+that is to be appended to the usual toplevel ``/entry'' {\tt NXentry}
+group in the NeXus data file for any ``Throttled'' neutron event data
+for the given detector set
+(despite the {\it main} data for these detector banks being
+{\it histogrammed});
+for example, ``bsd'' for ``/entry-bsd'' or ``north'' for ''/entry-north''.
+Note that there should be {\it No Spaces} or other punctuation in the
+Throttle Suffix, as it will interfere with the NeXus data file format.
+\end{itemize}
+
 
 \newpage
 \subsubsection{Data Done Packet}
@@ -1819,7 +2365,7 @@ The SMS will continue to ``retry'' the said run repeatedly, forever.
 This problem does not occur with comparable system setups,
 e.g. with the SMS and STS together on a local workstation,
 so the issue is not likely related to XInetd service management.
-Indeed, the "keepalive" setting has been activated for the STS service
+Indeed, the ``keepalive'' setting has been activated for the STS service
 configuration to no avail.
 
 
@@ -1863,8 +2409,8 @@ choppers.
 \subsubsection{Variable Status and Severity}
 
 Each variable carries with it an associated alarm status and severity.  Except
-for "not reported", these values are derived from the EPICS Record Reference
-Manual. "Not reported" is used to interface with pre-EPICS controls that
+for ``not reported'', these values are derived from the EPICS Record Reference
+Manual. ``Not reported'' is used to interface with pre-EPICS controls that
 do not have a reporting mechanism for variable status and severity.
 
 \begin{table}[h]

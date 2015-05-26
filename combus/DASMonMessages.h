@@ -490,6 +490,9 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_facility = a_prop_tree.get( "facility", "" );
+
+        m_target_number = a_prop_tree.get( "target_number", 1 );
+
         m_beam_id = a_prop_tree.get( "beam_id", "" );
         m_beam_sname = a_prop_tree.get( "beam_sname", "" );
         m_beam_lname = a_prop_tree.get( "beam_lname", "" );
@@ -500,6 +503,9 @@ protected:
         MessageBase::write( a_prop_tree );
 
         a_prop_tree.put( "facility", m_facility );
+
+        a_prop_tree.put( "target_number", m_target_number );
+
         a_prop_tree.put( "beam_id", m_beam_id );
         a_prop_tree.put( "beam_sname", m_beam_sname );
         a_prop_tree.put( "beam_lname", m_beam_lname );

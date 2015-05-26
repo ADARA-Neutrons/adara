@@ -7,7 +7,6 @@
 #include <boost/signals2.hpp>
 #include <boost/thread.hpp>
 #include <stdint.h>
-#include <sys/uio.h>
 #include <string>
 #include <vector>
 
@@ -29,7 +28,7 @@ class MaxBlocksPV;
 class StorageManager {
 public:
 	typedef boost::signals2::signal<void (StorageContainer::SharedPtr &,
-					      bool)> ContainerSignal;
+					bool)> ContainerSignal;
 	typedef boost::signals2::signal<void (void)> PrologueSignal;
 	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
 								FileOffSetFunc;
@@ -44,8 +43,8 @@ public:
 	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
 	static void addPacket(IoVector &iovec, bool notify = true);
-	static void addPacket(const void *pkt, uint32_t len,
-			      bool notify = true) {
+	static void addPacket(const void *pkt, uint32_t len, bool notify = true)
+	{
 		IoVector iovec(1);
 		iovec[0].iov_base = (void *) pkt;
 		iovec[0].iov_len = len;
@@ -95,11 +94,9 @@ public:
 
 	static void update_max_blocks_allowed_pv(void);
 
-
-        static void sendComBus ( uint32_t a_run_num,
-                     std::string a_run_state,
-                     const struct timespec &a_start_time = 
-                                            combuszerotime);
+	static void sendComBus(uint32_t a_run_num,
+		std::string a_run_state,
+		const struct timespec & a_start_time = combuszerotime);
 
 private:
 	typedef boost::signals2::connection connection;
@@ -111,9 +108,9 @@ private:
 		off_t			m_resumeOffset;
 
 		IndexEntry(uint32_t s, StorageFile::SharedPtr &f,
-			   StorageFile::SharedPtr &d, off_t r) :
-				m_stateFile(f), m_dataFile(d), m_key(s),
-				m_resumeOffset(r) {}
+				StorageFile::SharedPtr &d, off_t r) :
+			m_stateFile(f), m_dataFile(d), m_key(s),
+			m_resumeOffset(r) {}
 
 		bool isDataOnly(void) const { return !m_resumeOffset; }
 	};
@@ -161,11 +158,12 @@ private:
 	static bool m_dailyExhausted;
 	static std::list<std::string> m_dailyCache;
 
-        static std::string m_domain;
-        static std::string m_broker_uri;
-        static std::string m_broker_user;
-        static std::string m_broker_pass;
-        static ComBusSMSMon *m_combus;
+	static std::string m_domain;
+	static std::string m_broker_uri;
+	static std::string m_broker_user;
+	static std::string m_broker_pass;
+
+	static ComBusSMSMon *m_combus;
 
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
@@ -174,7 +172,7 @@ private:
 	static bool retireIndexDir(bool remove = true);
 	static bool cleanupIndexes(void);
 	static void indexState(StorageFile::SharedPtr &state,
-			       StorageFile::SharedPtr &data, off_t dataOffset);
+				StorageFile::SharedPtr &data, off_t dataOffset);
 
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
@@ -185,7 +183,7 @@ private:
 	static void requestPurge(uint64_t goal);
 	static uint64_t purgeData(uint64_t goal);
 	static uint64_t purgeDaily(const std::string &dir, uint64_t goal,
-				   bool last);
+				bool last);
 	static void populateDailyCache(void);
 
 	static void addBaseStorage(off_t size);

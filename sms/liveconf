@@ -35,6 +35,9 @@ idName["ctrl"]="Control"
 is_indexed["monitor"]=1
 idName["monitor"]="BeamMonitor"
 
+is_indexed["bankset"]=1
+idName["bankset"]="DetectorBankSet"
+
 is_indexed["storage"]=0
 idName["storage"]="Storage"
 
@@ -97,6 +100,13 @@ option_value_type[$num_options]="UINT32_VALUE+[M|K](bytes)"
 option_label[$num_options]="[Max Read Chunk]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="source"
+option_name[$num_options]="rtdl_no_data_thresh"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:RTDLNoDataThresh"
+option_value_type[$num_options]="UINT32_VALUE(packets)"
+option_label[$num_options]="[RTDL No Data Threshold]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_eop_pulse_buffer_size"
 option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
@@ -130,14 +140,14 @@ option_id_type[$num_options]="monitor"
 option_name[$num_options]="offset"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofOffset"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
-option_label[$num_options]="[TOF Offset for Histogramming Beam Monitor]"
+option_label[$num_options]="[TOF Offset for Beam Monitor Histogram]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="max"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:MaxTof"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
-option_label[$num_options]="[Max TOF Beam Monitor Histogram]"
+option_label[$num_options]="[Max TOF for Beam Monitor Histogram]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
@@ -152,6 +162,65 @@ option_name[$num_options]="distance"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Distance"
 option_value_type[$num_options]="FLOAT64_VALUE(meters)"
 option_label[$num_options]="[Beam Monitor Distance from Sample]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="name"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Name"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(human-readable description)"
+option_label[$num_options]="[Name of Given Detector Bank Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="banklist"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Banklist"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="[UINT32_VALUE, ...](detector bank ids)"
+option_label[$num_options]="[List of Detector Bank Ids in the Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="format"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Format"
+option_value_type[$num_options]="ENUM_VALUE(event/histo/both)"
+option_label[$num_options]="[Set Detector Bank Set Output Formatting]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="offset"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofOffset"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[TOF Offset for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="max"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:MaxTof"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Max TOF for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="bin"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofBin"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_label[$num_options]="[Linear TOF Bin Size for Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="throttle"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Throttle"
+option_value_type[$num_options]="FLOAT64_VALUE(Hz)"
+option_label[$num_options]="[Detector Set Throttled Event Sampling Rate]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="suffix"
+option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Suffix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
+option_label[$num_options]="[NeXus File NXentry Suffix for Detector Set]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
@@ -231,8 +300,8 @@ USAGE()
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
-	echo "            [status] [run_status] [data_status] \\"
-	echo "            [sys_status] [live_status] [bmon_status] \\"
+	echo "            [status] [run_status] [data_status] [sys_status] \\"
+	echo "            [bmon_status] [detset_status] [live_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -255,13 +324,23 @@ USAGE()
 	echo "   data_status           = display SMS data source status"
 	echo "   sys_status            = display SMS internal system status"
 	echo "   bmon_status           = display SMS BeamMonitorConfig status"
+	echo "   detset_status         = display SMS DetectorBankSet status"
 	echo "   live_status           = display SMS live client status"
 	echo
 
 	echo "Available Options:"
-	echo
 
+	last_option_id_type=""
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+		if [[ $last_option_id_type != ${option_id_type[$i]} ]]; then
+			echo
+			echo -n "   [${option_id_type[$i]}"
+			if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
+				echo -n "<N>"
+			fi
+			echo "]"
+		fi
+		last_option_id_type="${option_id_type[$i]}"
 		echo -n "   --option=\"${option_id_type[$i]}"
 		if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
 			echo -n "<N>"
@@ -292,7 +371,7 @@ fi
 skiplive=0
 testonly=0
 PRE="[NotSet]"
-for arg in $* ; do
+for arg in "$@" ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
 	value=`echo "$arg" | awk -F = '{print $2}'`
@@ -310,7 +389,7 @@ for arg in $* ; do
 	elif [ "#$key#" == '#--option#' ]; then
 		command="option"
 		opt_arg="$value"
-		echo -e "Setting Command to: $command $opt_arg\n"
+		echo -e "Setting Command to:\n   $command $opt_arg\n"
 	elif [ "#$key#" == '#--skiplive#' ]; then
 		skiplive=1
 		echo -e "*** Skipping Live Config - Update Config File Only!\n"
@@ -322,7 +401,7 @@ for arg in $* ; do
 		exit -1
 	else
 		command="$key"
-		echo -e "Setting Command to: $command\n"
+		echo -e "Setting Command to:\n   $command\n"
 	fi
 done
 
@@ -396,12 +475,21 @@ echo -e "Git Config Repository: [${CONFIG_REPO}].\n"
 
 echo -e "Git Config Repository Branch: [${config_branch}].\n"
 
+awkLineBreak=" \
+	{ \
+		printf(\"%s\n   \", \$1); \
+		for (i=2; i<NF; i++) \
+			printf(\"%s \", \$(i)); \
+		printf(\"%s\n\", \$NF); \
+	}"
+
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
 		|| "$command" == "data_status" \
 		|| "$command" == "sys_status" \
 		|| "$command" == "bmon_status" \
+		|| "$command" == "detset_status" \
 		|| "$command" == "live_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
@@ -416,7 +504,7 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
-		caget -S $WAIT ${PRE}:SMS:Version
+		caget -S $WAIT ${PRE}:SMS:Version | sed "s/ (/\n   (/"
 
 		echo
 
@@ -474,6 +562,7 @@ if [[ "$command" == "status" \
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:RTDLNoDataThresh
 				echo
 			done
 		fi
@@ -530,6 +619,32 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
+			|| "$command" == "detset_status" ]]; then
+
+		ndbsvar="${PRE}:SMS:Control:NumDetBankSets"
+		caget $WAIT $ndbsvar
+		if [ $? == 0 ]; then
+			echo
+			numDetBankSets=`caget $WAIT $ndbsvar | grep $ndbsvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( dbs=1 ; dbs <= numDetBankSets ; dbs++ )); do
+				echo "Detector Bank Set index=${dbs}:"
+				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Name
+				bl="${PRE}:SMS:DetectorBankSet:${dbs}:Banklist"
+				caget $WAIT -S $bl | grep $bl | awk "$awkLineBreak"
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Format
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofOffset
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:MaxTof
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofBin
+				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Throttle
+				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Suffix
+				echo
+			done
+		fi
+	fi
+
+	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
 
 		nlcvar="${PRE}:SMS:Control:NumLiveClients"
@@ -543,8 +658,7 @@ if [[ "$command" == "status" \
 				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
 				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
 				cfp="${PRE}:SMS:LiveClient:${lc}:CurrentFilePath"
-				caget $WAIT -S $cfp | grep $cfp \
-					| awk '{ printf("%s\n   ", $1); for (i=2; i<NF; i++) printf("%s ", $(i)); printf("%s\n", $NF); }'
+				caget $WAIT -S $cfp | grep $cfp | awk "$awkLineBreak"
 				caget $WAIT -a ${PRE}:SMS:LiveClient:${lc}:Status
 				echo
 			done
@@ -750,6 +864,7 @@ GET_OPTION_INFO()
 				/bin/cat $LOG
 				exit -3
 			fi
+			echo
 			# Continue, But Skip Live Option Setting...
 			do_live=0
 		else
@@ -779,6 +894,9 @@ GET_OPTION_INFO()
 #    $opt_str
 #    $config_end_of_section $config_use_comment
 #
+
+opt_id_name=""
+id_name_indent=""
 
 GET_CONFIG_SETTING()
 {
@@ -813,7 +931,10 @@ GET_CONFIG_SETTING()
 
 	local _monitor_cnt=0
 
+	local _bankset_cnt=0
+
 	opt_id_name=""
+	id_name_indent=""
 
 	local _id_type=""
 	local _id_num=0
@@ -827,11 +948,12 @@ GET_CONFIG_SETTING()
 		local _line=""
 		local _line_num=""
 		local _line_rest=""
+		local _line_type=""
 		local _line_id=""
 
-		local _is_comment=""
-		local _is_blank=""
-		local _nbytes=""
+		local _is_comment=0
+		local _is_blank=0
+		local _nbytes=0
 
 		# Note: Just strip off _First_ ':' from Line Number -> '|'...
 		# (This preserves the ':' in URI values: "ip_addr:port".)
@@ -841,14 +963,35 @@ GET_CONFIG_SETTING()
 		_line_num=`echo "${_line}" | awk -F '|' '{print $1}'`
 		# echo "line_num=${_line_num}"
 
-		_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
+		# Make Sure We Don't Interpret Any _Subsequent '|'s in Line...!
+		#_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
+		_line_rest="${_line:$(expr index "${_line}" "|")}"
 		# echo "line_rest=${_line_rest}"
 
-		_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
-		# echo "line_id=${_line_id}"
+		# Authoritatively Determine "Line Type" Prior to
+		# Deducing Other Schtuff, like:
+		#    - "${_line_id}" which is only for Section Headings
+		#    - "${_is_comment}" which should only be for _Leading_ ';'s
+		_line_type=`echo "${_line_rest}" | sed "s/^[ \t]//"`
 
-		_is_comment=`echo "${_line_rest}" | grep ';' | wc \
-			| awk '{print $1}'`
+		# Section Heading...
+		if [ "${_line_type:0:1}" == "[" ]; then
+			# echo "SECTION"
+			_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
+			# echo "line_id=${_line_id}"
+			_is_comment=0
+		# Comment...
+		elif [ "${_line_type:0:1}" == ";" ]; then
+			# echo "COMMENT"
+			_line_id=""
+			_is_comment=`echo "${_line_rest}" | grep ';' | wc \
+				| awk '{print $1}'`
+		# Config or Blank Line... (i.e. Everything Else... :-)
+		else
+			# echo "CONFIG or BLANK"
+			_line_id=""
+			_is_comment=0
+		fi
 
 		_nbytes=`echo "${_line_rest}" | awk '{print $1}' | wc \
 			| awk '{print $2}'`
@@ -862,6 +1005,7 @@ GET_CONFIG_SETTING()
 		if [ "${_line_id}" == "" ]; then
 
 			# echo "Config Option Line..."
+			# echo "   id_type=${_id_type} id_num=${_id_num}"
 
 			if [ "#${_is_blank}#" == '#1#' ]; then
 				# echo "Blank Line at line ${_line_num} [${_line_rest}]"
@@ -889,7 +1033,11 @@ GET_CONFIG_SETTING()
 
 				config_value=`echo "${_line_rest}" \
 					| awk -F '=' '{print $2}'`
-				config_value=`echo "$config_value" | sed "s/ //g"`
+
+				# Strip Only _Preceding_ White Space from Value...!
+				# (some options could be Character Strings now...! ;-D)
+				config_value=`echo "$config_value" | sed "s/^[ ]*//"`
+
 				# echo -n "Config File Option "
 				# echo "${_optId}:${_opt_label} = ${config_value}."
 
@@ -922,7 +1070,8 @@ GET_CONFIG_SETTING()
 				_id_num="$_source_cnt"
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name=" (${_source_name})"
+					opt_id_name="(${_source_name})"
+					id_name_indent="   "
 				fi
 				# echo "Source #${_source_cnt}: ${_source_name} Section."
 			elif [ "${_id_type}" == "monitor" ]; then
@@ -932,9 +1081,10 @@ GET_CONFIG_SETTING()
 				_id_num="$_monitor_cnt"
 				if [[ "${_id_type}" == "$opt_id_type" \
 						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name=" (Monitor${_monitor_id})"
+					opt_id_name="(Monitor${_monitor_id})"
+					id_name_indent="   "
 				fi
-				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect."
+				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect"
 				# Special Case: Monitor Id Stored in Section Id...!
 				if [[ "${_option}" == "id"
 						&& "${_id_num}" == "$opt_id_num" ]]; then
@@ -945,6 +1095,31 @@ GET_CONFIG_SETTING()
 					config_line_num="${_line_num}"
 					# echo "Config File Line Number = ${config_line_num}."
 					config_value="${_monitor_id}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "bankset" ]; then
+				local _bankset_name=`echo "${_line_id}" \
+					| sed "s/^bankset //"`
+				_bankset_cnt=$(( _bankset_cnt + 1 ))
+				_id_num="$_bankset_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(BankSet ${_bankset_name})"
+					id_name_indent="   "
+				fi
+				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_name}"
+				# Special Case: BankSet Name Stored in Section Id...!
+				if [[ "${_option}" == "name"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: BankSet Name in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_bankset_name}"
 					# echo -n "Config File Option "
 					# echo "${_optId}:${_opt_label} = ${config_value}."
 					_found=$(( _found + 1 ))
@@ -968,7 +1143,7 @@ GET_CONFIG_SETTING()
 
 	done
 
-	opt_str="${_optId}:${_opt_label}${opt_id_name}"
+	opt_str="${_optId}:${_opt_label}"
 
 	config_end_of_section=0
 	config_use_comment=0
@@ -995,7 +1170,10 @@ GET_CONFIG_SETTING()
 		else
 			echo "Cannot Automatically Update Configuration File... ;-Q"
 			echo "   ${opt_str}"
-			echo "      to ${_opt_config_str}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${_opt_config_str}"
 			do_config=0
 			do_git_config=0
 		fi
@@ -1004,15 +1182,21 @@ GET_CONFIG_SETTING()
 		echo "\"${_option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
 		echo "   ${opt_str}"
-		echo "      to ${_opt_config_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${_opt_config_str}"
 		do_config=0
 		do_git_config=0
 	fi
 
 	if [ "$do_config" == 1 ]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
-		echo "   ${_optId}:${_opt_label}${opt_id_name}"
-		echo "   ${_option} = ${config_value}."
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "   ${_option} = ${config_value}"
 	fi
 }
 
@@ -1037,14 +1221,20 @@ GET_CONFIG_SETTING()
 		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
 	elif [ "$opt_value" == "$live_value" ]; then
 		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${opt_id_name}"
-		echo "      = ${opt_value}"
+		echo "   ${optId}:${opt_label}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Live Option:"
 		echo "   ${opt_str}"
-		echo -n "      to ${opt_value} (yes/No)? "
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_value} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -1054,17 +1244,26 @@ GET_CONFIG_SETTING()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		echo "Setting Live SMS Daemon Option:"
 		echo "   ${opt_str}"
-		echo "      to ${opt_value}."
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_value}."
 		if [ $testonly == 1 ]; then
 			echo "[TESTONLY] caput $opt_pv_opt ${PRE}:${PV} $opt_value"
 		else
 			caput $opt_pv_opt ${PRE}:${PV} "$opt_value"
 		fi
 		if [ $? != 0 ]; then
-			echo "Error Setting ${optId}:${opt_label}${opt_id_name}...!"
+			echo "Error Setting Live SMS Daemon Option:"
+			echo "   ${optId}:${opt_label}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${opt_value}...!"
 			echo "Bailing..."
 			/bin/ls -l $LOG
 			/bin/cat $LOG
@@ -1074,6 +1273,28 @@ GET_CONFIG_SETTING()
 		any_change=$(( any_change + 1 ))
 
 	fi
+
+#
+# Sanitize Original Config File Value String (for Sed)
+#
+
+SANITIZE_ORIGINAL_CONFIG_VALUE()
+{
+	local _orig_config_value="$1"
+
+	echo "${_orig_config_value}" | sed -e 's/[]\/$*.^|[]/\\&/g'
+}
+
+#
+# Sanitize New Config File Value String (for Sed)
+#
+
+SANITIZE_NEW_CONFIG_VALUE()
+{
+	local _new_config_value="$1"
+
+	echo "${_new_config_value}" | sed -e 's/[\/&]/\\&/g'
+}
 
 #
 # Update Current SMS Daemon Config File Setting
@@ -1103,9 +1324,13 @@ UPDATE_CONFIG_FILE()
 			echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
 			_no_change=1
 		else
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
-			sed ${last_comment_line_num}a"|$option = $opt_config_value" \
-				${_src_config} | tr '|' '\t' > ${_dst_config}
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+			# Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D
+			sed ${last_comment_line_num}a"\	$option = ${_config_value}" \
+				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
 
@@ -1116,17 +1341,25 @@ UPDATE_CONFIG_FILE()
 			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
 			_no_change=1
 		else
-			# Construct New Comment and Option Setting...
-			local _new_opt=""
-			_new_opt="|; Option Auto-Added by LiveConf!\n"
-			_new_opt="${_new_opt}|; ${optId}:${opt_label}${opt_id_name}\n"
-			_new_opt="${_new_opt}|;\n"
-			_new_opt="${_new_opt}|; $option = $opt_config_value\n"
-			_new_opt="${_new_opt}|$option = $opt_config_value\n"
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
 
-			# Goofy Incantation to get Sed to insert a Tab... ;-b
+			# Construct New Comment and Option Setting...
+			# (Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D)
+			local _new_opt=""
+			_new_opt="\	; Option Auto-Added by LiveConf!\n"
+			_new_opt="${_new_opt}	; ${optId}:${opt_label}\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				_new_opt="${_new_opt}	;    ${opt_id_name}\n"
+			fi
+			_new_opt="${_new_opt}	;\n"
+			_new_opt="${_new_opt}	; $option = ${_config_value}\n"
+			_new_opt="${_new_opt}	$option = ${_config_value}\n"
+
 			sed ${end_of_section_line_num}a"${_new_opt}" \
-				${_src_config} | tr '|' '\t' > ${_dst_config}
+				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 		fi
 
@@ -1142,11 +1375,29 @@ UPDATE_CONFIG_FILE()
 
 		else
 
-			local _new_config_line=`echo "$config_current_line" \
-				| sed "s/$config_value/$opt_config_value/"`
+			# Sanitize Any Special Characters in Original Config Value
+			local _old_config_value=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_value")
 
+			# Sanitize Any Special Characters in New Config Value
+			local _new_config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+
+			# Construct New Config File Line...
+			local _new_config_line=`echo "$config_current_line" \
+				| sed "s/${_old_config_value}/${_new_config_value}/"`
+
+			# Sanitize Any Special Characters in Original Config Line
+			local _old_config_line=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_current_line")
+
+			# Sanitize Any Special Characters in New Config Line
+			_new_config_line=$(SANITIZE_NEW_CONFIG_VALUE \
+				"${_new_config_line}")
+
+			# Replace the Original Config Line with New one...
 			sed \
-		"${config_line_num}s/^$config_current_line/${_new_config_line}/" \
+		"${config_line_num}s/^${_old_config_line}/${_new_config_line}/" \
 				${_src_config} > ${_dst_config}
 			changed=$(( changed + 1 ))
 
@@ -1177,14 +1428,20 @@ UPDATE_CONFIG_FILE()
 		echo "Skipping Config File Option Set."
 	elif [ "$opt_config_value" == "$config_value" ]; then
 		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
-		echo "   ${optId}:${opt_label}${opt_id_name}"
-		echo "      = ${opt_config_value}"
+		echo "   ${optId}:${opt_label}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_config_value}"
 		echo -e "\nDone."
 	else
 
 		echo "Proceed to Set Config File Option:"
 		echo "   ${opt_str}"
-		echo -n "      to ${opt_config_str} (yes/No)? "
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_config_str} (yes/No)? "
 		read ckset
 		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckset" == "" \
@@ -1194,11 +1451,14 @@ UPDATE_CONFIG_FILE()
 			/bin/cat $LOG
 			exit -3
 		fi
-
 		echo
+
 		echo "Setting SMS Daemon Config File Option:"
 		echo "   ${opt_str}"
-		echo "      to ${opt_config_str}."
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_config_str}."
 
 		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
 
@@ -1210,7 +1470,11 @@ UPDATE_CONFIG_FILE()
 		# (with _Original_ option name/value, before we muck with them...!)
 		commit_str="Set SMS Live/Config Option:\n"
 		commit_str="$commit_str   ${opt_str}\n"
-		commit_str="$commit_str      to ${opt_config_str}\n"
+		if [[ ${opt_id_name} != "" ]]; then
+			commit_str="$commit_str      ${opt_id_name}\n"
+		fi
+		commit_str="$commit_str      ${id_name_indent}to"
+		commit_str="$commit_str ${opt_config_str}\n"
 		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
 
 		# Handle Any Higher Precedence Config File Options...!
@@ -1243,7 +1507,11 @@ UPDATE_CONFIG_FILE()
 			temp="Also Disabled Superceding Config File Option"
 			commit_str="${commit_str}${temp}:\n"
 			commit_str="$commit_str   ${opt_str}\n"
-			commit_str="$commit_str      set to ${opt_config_str}\n\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_config_str}\n\n"
 
 			# Switch to New Temp Config...
 
@@ -1379,6 +1647,7 @@ OPEN_CONFIG_REPO()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		# Update the SMS Daemon Config File in the Git Config Repo...
 		if [ $testonly == 1 ]; then
@@ -1412,6 +1681,7 @@ OPEN_CONFIG_REPO()
 			/bin/cat $LOG
 			exit -3
 		fi
+		echo
 
 		# Finally Append Required User Log Description...
 		commit_str="$commit_str$log_desc\n"
@@ -1522,7 +1792,11 @@ OPEN_CONFIG_REPO()
 		if [ -z $commit_str ]; then
 			commit_str="Set SMS Live/Config Option:\n"
 			commit_str="$commit_str   Live PV ${opt_str}\n"
-			commit_str="$commit_str      set to ${opt_value})\n\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_value})\n\n"
 		fi
 
 		# Finally Append Required User Log Description...

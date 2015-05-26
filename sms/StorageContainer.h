@@ -38,7 +38,7 @@ public:
 	static SharedPtr create(const struct timespec &start, uint32_t run);
 	static SharedPtr scan(const std::string &path);
 	static uint64_t purge(const std::string &path, uint64_t goal,
-				bool rmdir);
+				bool keep, bool &path_deleted);
 
 	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);

@@ -1,6 +1,7 @@
 #ifndef __SMS_CONTROL_PV_H
 #define __SMS_CONTROL_PV_H
 
+#include <stdint.h>
 #include <time.h>
 #include <string>
 

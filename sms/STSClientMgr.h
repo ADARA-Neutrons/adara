@@ -4,8 +4,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include <string>
 #include <map>
+#include <stdint.h>
 
-#include "StorageManager.h"
 #include "StorageContainer.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"

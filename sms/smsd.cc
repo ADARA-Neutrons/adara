@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/eventfd.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include <grp.h>
 #include <pwd.h>
 
@@ -28,7 +29,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.2.11";
+const std::string SMSD_VERSION = "1.3.0";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;

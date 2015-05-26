@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <stdint.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -6,9 +7,12 @@
 #include <time.h>
 
 #include <boost/bind.hpp>
+#include <string>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
+#include "StorageManager.h"
+#include "StorageContainer.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "STSClientMgr.h"
@@ -71,7 +75,7 @@ STSClientMgr::STSClientMgr() :
 {
 	m_sigevent.sigev_notify = SIGEV_SIGNAL;
 	m_sigevent.sigev_signo = SignalEvents::allocateRTsig(
-			boost::bind(&STSClientMgr::lookupComplete, this, _1));
+		boost::bind(&STSClientMgr::lookupComplete, this, _1));
 
 	memset(&m_gai_hints, 0, sizeof(m_gai_hints));
 	m_gai_hints.ai_family = AF_INET6;
@@ -80,8 +84,7 @@ STSClientMgr::STSClientMgr() :
 	m_gai_hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
 
 	m_mgrConnection = StorageManager::onContainerChange(
-				boost::bind(&STSClientMgr::containerChange,
-					    this, _1, _2));
+		boost::bind(&STSClientMgr::containerChange, this, _1, _2));
 
 	// Create Run-Time Configuration PVs for STS Client...
 
@@ -142,14 +145,14 @@ STSClientMgr::~STSClientMgr()
 }
 
 void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
-				   bool starting)
+		bool starting)
 {
 	if (!c->runNumber())
 		return;
 
 	if (starting) {
-                StorageManager::sendComBus(c->runNumber(), 
-					std::string("SMS start run sent to STS"));
+		StorageManager::sendComBus(c->runNumber(),
+			std::string("SMS start run sent to STS"));
 		queueRun(c);
 		startConnect();
 	} else
@@ -317,8 +320,10 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	}
 
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
-	if (m_fd < 0)
+	if (m_fd < 0) {
+		m_fd = -1;   // just to be sure... ;-b
 		goto error;
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0)
@@ -474,7 +479,7 @@ bool STSClientMgr::transientTimeout(void)
 }
 
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
-				  Disposition disp)
+		Disposition disp)
 {
 	// clean up...
 	dequeueRun(c);
@@ -484,8 +489,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* STSClient already logged our success, we just need to
 		 * note that we've completed translation.
 		 */
-                StorageManager::sendComBus(c->runNumber(),
-                     std::string("Translation succeeded"));
+		StorageManager::sendComBus(c->runNumber(),
+			std::string("Translation succeeded"));
 		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
@@ -499,8 +504,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
-                StorageManager::sendComBus(c->runNumber(),
-                     std::string("STS Connection Error"));
+		StorageManager::sendComBus(c->runNumber(),
+			std::string("STS Connection Error"));
 		queueRun(c); // re-queue run...
 		break;
 	case TRANSIENT_FAIL:
@@ -518,18 +523,18 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			ERROR("Maximum Re-Queue Count Reached!"
 				<< " Marking Run " << c->runNumber()
 				<< " for Manual Translation");
-                        StorageManager::sendComBus(c->runNumber(),
-                                   std::string("Needs Manual Translation"));
+			StorageManager::sendComBus(c->runNumber(),
+				std::string("Needs Manual Translation"));
 			c->markManual();
-		}  
+		}
 		// Re-Queue Run to Try Again...
 		else {
 			// Increment Re-Queue Count
 			c->incrRequeueCount();
 			ERROR("Requeueing Run " << c->runNumber()
 				<< ", Re-Queue #" << c->getRequeueCount());
-                        StorageManager::sendComBus(c->runNumber(),
-                                   std::string("STS transient Error"));
+			StorageManager::sendComBus(c->runNumber(),
+				std::string("STS transient Error"));
 			/* We shouldn't pound on the STS if we keep hitting problems,
 			 * back off and give it time to breathe.
 			 */
@@ -546,8 +551,8 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* STSClient already logged the failure, we just need to
 		 * mark it for manual processing.
 		 */
-                StorageManager::sendComBus(c->runNumber(),
-                       std::string("Needs Manual Translation"));
+		StorageManager::sendComBus(c->runNumber(),
+			std::string("Needs Manual Translation"));
 		c->markManual();
 		break;
 	}
