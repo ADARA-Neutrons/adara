@@ -99,7 +99,7 @@ ComBusSMSMon::start(void)
 	       		"uninitialized restart fd ComBusSMSMon!");
 		}
 		m_pvRestartCombus = boost::shared_ptr<smsMTBoolPV>(new 
-			smsMTBoolPV( prefix + ":RestartCombus", newfd));
+			smsMTBoolPV( prefix + ":Restart", newfd));
 		m_pvDomain = boost::shared_ptr<smsMTStrPV>( new
 			smsMTStrPV(prefix + ":Domain"));
 		m_pvBrokerUri = boost::shared_ptr<smsMTStrPV>( new
@@ -117,6 +117,8 @@ ComBusSMSMon::start(void)
 
  		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
+
+		m_pvRestartCombus->update(0, &now);
   		m_pvDomain->update(m_domain, &now);
 		m_pvBrokerUri->update(m_broker_uri, &now);
 		m_pvBrokerUser->update(m_broker_user, &now);
