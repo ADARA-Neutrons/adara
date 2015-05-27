@@ -187,7 +187,7 @@ protected:
 	epicsMutex *m_updateLock;
 	epicsEvent *m_doneEvent;
  
-	struct timespec *m_update_ts;
+	struct timespec m_update_ts;
 
 private: 
 

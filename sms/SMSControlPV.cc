@@ -929,7 +929,7 @@ void smsMTBoolPV::mtUpdate(bool val, struct timespec *ts)
 
         m_updateLock->lock();	
 
- 	m_update_ts = ts;
+ 	m_update_ts = *ts;
         ::write(m_updatefd, &uval, sizeof(uint64_t));
         m_doneEvent->wait();		// for remoteUpdate to be done
         m_updateLock->unlock();	
@@ -950,19 +950,13 @@ void smsMTBoolPV::callBack() {
 		return;
  	}
 
-	m_readLock->lock();
 
-	// this tests if we really sent the callback
-   	if (m_update_ts == 0) {
-		m_readLock->unlock();
-		return;
-	}
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put((uint16_t)val);
-	nval->setTimeStamp(m_update_ts);
-	m_update_ts = 0;
-	m_value = nval;
+	nval->setTimeStamp(&m_update_ts);
 
+	m_readLock->lock();
+	m_value = nval;
 	m_readLock->unlock();
 
 	notify();
