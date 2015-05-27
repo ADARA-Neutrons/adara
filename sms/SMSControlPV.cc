@@ -885,6 +885,7 @@ smsMTBoolPV::smsMTBoolPV(const std::string &name, const SOCKET fdIn) :
 			smsBooleanPV(name),
 			fdReg(fdIn, fdrRead),
  			m_readLock(new epicsMutex()),
+ 			m_updateLock(new epicsMutex()),
 			m_doneEvent(new epicsEvent()),
 			m_updatefd(fdIn)
 {
@@ -942,7 +943,7 @@ void smsMTBoolPV::callBack() {
 	gdd *nval;
 
         ::read(m_updatefd, &val, sizeof(uint64_t));
-	val = val - 5;
+	val = val - 1;
 
 	m_value->get(v);
 	if (v == val) {
