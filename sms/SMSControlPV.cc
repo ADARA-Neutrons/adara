@@ -950,12 +950,19 @@ void smsMTBoolPV::callBack() {
 		return;
  	}
 
+	m_readLock->lock();
+
+	// this tests if we really sent the callback
+   	if (m_update_ts == 0) {
+		m_readLock->unlock();
+		return;
+	}
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put((uint16_t)val);
 	nval->setTimeStamp(m_update_ts);
-
-	m_readLock->lock();
+	m_update_ts = 0;
 	m_value = nval;
+
 	m_readLock->unlock();
 
 	notify();
