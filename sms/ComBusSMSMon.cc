@@ -4,7 +4,7 @@
 #include "Logging.h"
 #include "ComBusSMSMon.h"
 
-static LoggerPtr logger( Logger::getLogger("SMS.ComBus") );
+static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
 
 SMSRunStatus::SMSRunStatus( unsigned long a_run_num, std::string &a_reason,
 		struct timespec a_start_time ) :
@@ -15,7 +15,10 @@ SMSRunStatus::SMSRunStatus( unsigned long a_run_num, std::string &a_reason,
 SMSRunStatus::SMSRunStatus( unsigned long a_run_num,
 		std::string &a_reason ) :
 	m_run_num(a_run_num), m_reason(a_reason)
-{}
+{
+	m_start_time.tv_sec = 0;
+	m_start_time.tv_nsec = 0;
+}
 
 bool SMSRunStatus::hasTime()
 {
