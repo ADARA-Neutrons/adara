@@ -178,6 +178,7 @@ void ComBusSMSMon::commThread()
 	int bytesrec = 0;
 	struct timespec now;
 	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
+	char inbuf[smsStringPV::MAX_LENGTH];
 
 	INFO( "SMS ComBus thread started" );
 
@@ -204,28 +205,32 @@ void ComBusSMSMon::commThread()
 		SEVCHK(ca_get(DBR_SHORT, restart_chid, &m_restart_combus),
 			"get combus restart PV");
        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
-	        INFO( "combus restart tested" );
  		if (m_restart_combus) {
 	                INFO( "combus restart true" );
-			SEVCHK(ca_get(DBR_STRING, domain_chid, &m_domain),
+			SEVCHK(ca_array_get(DBR_CHAR, 0, domain_chid, inbuf),
 					"get combus domain");
-			SEVCHK(ca_get(DBR_STRING, uri_chid, &m_broker_uri),
+        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+                        m_domain = inbuf;
+			SEVCHK(ca_array_get(DBR_CHAR, 0, uri_chid, inbuf),
 					"get combus broker uri");
-			SEVCHK(ca_get(DBR_STRING, user_chid, &m_broker_user),
+        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+			m_broker_uri = inbuf;
+			SEVCHK(ca_array_get(DBR_CHAR, 0, user_chid, inbuf),
 					"get combus broker user");
-			SEVCHK(ca_get(DBR_STRING, pass_chid, &m_broker_pass),
+        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+			m_broker_user = inbuf;
+			SEVCHK(ca_array_get(DBR_CHAR, 0, pass_chid, inbuf),
 					"get combus broker passwd");
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+			m_broker_pass = inbuf;
  			reOpenComm();
 			clock_gettime(CLOCK_REALTIME, &now);
 			m_restart_combus = 0;
-			SEVCHK(ca_put_callback(DBR_SHORT, restart_chid, 
-				&m_restart_combus , restartCB, this),
+ 			SEVCHK(ca_put(DBR_SHORT, restart_chid,
+				&m_restart_combus), 
 				"reset of combus restart PV");
 			// test if next line necessary
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
-                        m_restartEvent->wait();
-	                INFO( "got past the wait..." );
 			continue;
 		}
 		bytesrec = m_inqueue->receive( &inpu, sizeof(SMSRunStatus *), 
