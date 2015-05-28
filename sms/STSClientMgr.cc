@@ -209,9 +209,12 @@ StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 		}
 	}
 
-	m_sendingRuns[run->first] = run->second;
+	// Save Run Number for Return Indexing, as it will be Freed...! ;-D
+	// (Thanks Valgrind! ;-D)
+	uint32_t runNumber = run->first;
+	m_sendingRuns[runNumber] = run->second;
 	m_pendingRuns.erase(run);
-	return m_sendingRuns[run->first];
+	return m_sendingRuns[runNumber];
 }
 
 void STSClientMgr::startConnect(void)
