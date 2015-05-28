@@ -1005,7 +1005,7 @@ bool StorageManager::isValidDaily(const std::string &dir)
 	 * for a daily directory. strptime() allows leading zeros
 	 * to be omitted, so we convert back to a string to verify.
 	 */
-	struct tm tm;
+	struct tm tm = { 0 };
 	char *p = strptime(dir.c_str(), "%Y%m%d", &tm);
 	if (p && !*p) {
 		char tmp[9];
