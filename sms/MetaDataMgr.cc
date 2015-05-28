@@ -53,7 +53,7 @@ void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
 
 		len = orig->packet_length();
 		if (len > pktSize) {
-			delete pkt;
+			delete[] pkt;
 			pktSize = len;
 			pkt = new uint8_t[pktSize];
 			fields = (uint32_t *) (pkt +
@@ -75,7 +75,7 @@ void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
 		StorageManager::addPacket(pkt, len, false);
 	}
 
-	delete pkt;
+	delete[] pkt;
 }
 
 void MetaDataMgr::dropTag(uint32_t tag)
