@@ -197,7 +197,8 @@ public:
 class MessageBase
 {
 public:
-    MessageBase() : m_timestamp(0)
+    MessageBase() :
+		m_src_id(""), m_dest_id(""), m_correlation_id(""), m_timestamp(0)
     { }
 
     virtual ~MessageBase()
