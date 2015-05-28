@@ -207,20 +207,25 @@ void ComBusSMSMon::commThread()
        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
  		if (m_restart_combus) {
 	                INFO( "combus restart true" );
-			SEVCHK(ca_array_get(DBR_CHAR, 0, domain_chid, inbuf),
-					"get combus domain");
+			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH, 
+				domain_chid, inbuf),
+				"get combus domain");
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
                         m_domain = inbuf;
-			SEVCHK(ca_array_get(DBR_CHAR, 0, uri_chid, inbuf),
-					"get combus broker uri");
+			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH, 
+				uri_chid, inbuf),
+				"get combus broker uri");
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_uri = inbuf;
-			SEVCHK(ca_array_get(DBR_CHAR, 0, user_chid, inbuf),
-					"get combus broker user");
+			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH, 
+				user_chid, inbuf),
+				"get combus broker user");
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+ 			printf("broker user is %s\n", inbuf);
 			m_broker_user = inbuf;
-			SEVCHK(ca_array_get(DBR_CHAR, 0, pass_chid, inbuf),
-					"get combus broker passwd");
+			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH, 
+				pass_chid, inbuf),
+				"get combus broker passwd");
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_pass = inbuf;
  			reOpenComm();
