@@ -2,16 +2,15 @@
 #include <stdint.h>
 #include <sys/eventfd.h>
 #include <string>
+#include <boost/bind.hpp>
+
+#include <cadef.h>
+
 #include "Logging.h"
 #include "ComBusSMSMon.h"
 #include "SMSControl.h"
 
 static LoggerPtr logger( Logger::getLogger("SMS.ComBus") );
-
-std::string ComBusSMSMon::m_domain;
-std::string ComBusSMSMon::m_broker_uri;
-std::string ComBusSMSMon::m_broker_user;
-std::string ComBusSMSMon::m_broker_pass;
 
 SMSRunStatus::SMSRunStatus( unsigned long a_run_num, std::string &a_reason,
 		struct timespec a_start_time ) :
@@ -34,6 +33,7 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_combus(0),
 	m_beam_sname(a_beam_sname),
 	m_facility(a_facility),
+	m_restartEvent(new epicsEvent()),
 	m_comm_thread(0),
 	m_stop(false),
 	m_inqueue( new epicsMessageQueue( 100, sizeof(SMSRunStatus *) ) )
@@ -49,12 +49,17 @@ ComBusSMSMon::~ComBusSMSMon()
 	}
 }
 
+std::string              ComBusSMSMon::m_domain;
+std::string              ComBusSMSMon::m_broker_uri;
+std::string              ComBusSMSMon::m_broker_user;
+std::string              ComBusSMSMon::m_broker_pass;
+
 void ComBusSMSMon::config(const boost::property_tree::ptree &conf) {
 
-	m_domain = conf.get<std::string>("storage.domain", "SNS.TEST");
-	m_broker_uri = conf.get<std::string>("storage.broker_uri", "localhost");
-	m_broker_user = conf.get<std::string>("storage.broker_user", "DAS");
-	m_broker_pass = conf.get<std::string>("storage.broker_pass", "fish");
+	m_domain = conf.get<std::string>("combus.domain", "SNS.TEST");
+	m_broker_uri = conf.get<std::string>("combus.broker_uri", "localhost");
+	m_broker_user = conf.get<std::string>("combus.broker_user", "DAS");
+	m_broker_pass = conf.get<std::string>("combus.broker_pass", "fish");
 }
 
 
@@ -93,21 +98,16 @@ ComBusSMSMon::start(void)
 		prefix += ":SMS";
 		prefix += ":Combus";
 
-		SOCKET newfd = eventfd(1, EFD_NONBLOCK);
-		if (newfd <= 0) { 
-			throw std::logic_error(
-	       		"uninitialized restart fd ComBusSMSMon!");
-		}
-		m_pvRestartCombus = boost::shared_ptr<smsMTBoolPV>(new 
-			smsMTBoolPV( prefix + ":Restart", newfd));
-		m_pvDomain = boost::shared_ptr<smsMTStrPV>( new
-			smsMTStrPV(prefix + ":Domain"));
-		m_pvBrokerUri = boost::shared_ptr<smsMTStrPV>( new
-			smsMTStrPV(prefix + ":BrokerUri"));
-		m_pvBrokerUser = boost::shared_ptr<smsMTStrPV>( new
-			smsMTStrPV(prefix + ":BrokerUser"));
-		m_pvBrokerPass = boost::shared_ptr<smsMTStrPV>( new
-			smsMTStrPV(prefix + ":BrokerPass"));
+		m_pvRestartCombus = boost::shared_ptr<smsBooleanPV>(new 
+			smsBooleanPV( prefix + ":Restart"));
+		m_pvDomain = boost::shared_ptr<smsStringPV>( new
+			smsStringPV(prefix + ":Domain"));
+		m_pvBrokerUri = boost::shared_ptr<smsStringPV>( new
+			smsStringPV(prefix + ":BrokerUri"));
+		m_pvBrokerUser = boost::shared_ptr<smsStringPV>( new
+			smsStringPV(prefix + ":BrokerUser"));
+		m_pvBrokerPass = boost::shared_ptr<smsStringPV>( new
+			smsStringPV(prefix + ":BrokerPass"));
 
 		ctrl->addPV(m_pvRestartCombus);
 		ctrl->addPV(m_pvDomain);
@@ -166,34 +166,66 @@ void ComBusSMSMon::reOpenComm()
 	}
 }
 
+void ComBusSMSMon::restartCB(struct event_handler_args args) {
+	ComBusSMSMon *that = (ComBusSMSMon *)ca_puser(args.chid);
+	if (that) that->m_restartEvent->signal();
+}
+
 void ComBusSMSMon::commThread()
 {
 	unsigned long hb = 0;
 	SMSRunStatus *inpu, *lookup;
 	int bytesrec = 0;
 	struct timespec now;
+	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
 
 	INFO( "SMS ComBus thread started" );
 
+	SEVCHK(ca_create_channel(m_pvDomain->getName(), 0, 0, 0, &domain_chid),
+		"create domain channel");
+	SEVCHK(ca_create_channel(m_pvBrokerUri->getName(), 0, 0, 0, &uri_chid),
+		"create broker uri channel");
+	SEVCHK(ca_create_channel(m_pvBrokerUser->getName(), 0, 0, 0, &user_chid),
+		"create broker user channel");
+	SEVCHK(ca_create_channel(m_pvBrokerPass->getName(), 0, 0, 0, &pass_chid),
+		"create broker passwd channel");
+	SEVCHK(ca_create_channel(m_pvRestartCombus->getName(), 0, 0, 0, 
+		&restart_chid), "create combus restart channel");
+
+        SEVCHK(ca_pend_io(1.0), "Combus thread CA connection");
+
+
 	while (!m_stop) {
 		if (!m_combus) {
-			m_domain = m_pvDomain->value();
-			m_broker_uri = m_pvBrokerUri->value();
-  			m_broker_user = m_pvBrokerUser->value();
-			m_broker_pass = m_pvBrokerPass->value();
+			// only happens at beginning. Take values from config
 			openComm();
 			continue; 
 		}
-		m_restart_combus = m_pvRestartCombus->value();
+		SEVCHK(ca_get(DBR_SHORT, restart_chid, &m_restart_combus),
+			"get combus restart PV");
+       		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+	        INFO( "combus restart tested" );
  		if (m_restart_combus) {
-			m_domain = m_pvDomain->value();
-			m_broker_uri = m_pvBrokerUri->value();
-  			m_broker_user = m_pvBrokerUser->value();
-			m_broker_pass = m_pvBrokerPass->value();
+	                INFO( "combus restart true" );
+			SEVCHK(ca_get(DBR_STRING, domain_chid, &m_domain),
+					"get combus domain");
+			SEVCHK(ca_get(DBR_STRING, uri_chid, &m_broker_uri),
+					"get combus broker uri");
+			SEVCHK(ca_get(DBR_STRING, user_chid, &m_broker_user),
+					"get combus broker user");
+			SEVCHK(ca_get(DBR_STRING, pass_chid, &m_broker_pass),
+					"get combus broker passwd");
+        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
  			reOpenComm();
 			clock_gettime(CLOCK_REALTIME, &now);
-			m_pvRestartCombus->mtUpdate(0, &now);
 			m_restart_combus = 0;
+			SEVCHK(ca_put_callback(DBR_SHORT, restart_chid, 
+				&m_restart_combus , restartCB, this),
+				"reset of combus restart PV");
+			// test if next line necessary
+        		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
+                        m_restartEvent->wait();
+	                INFO( "got past the wait..." );
 			continue;
 		}
 		bytesrec = m_inqueue->receive( &inpu, sizeof(SMSRunStatus *), 

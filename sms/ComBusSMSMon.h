@@ -7,6 +7,8 @@
 #include <time.h>
 #include <map>
 #include <epicsMessageQueue.h>
+#include <cadef.h>
+#include <epicsEvent.h>
 #include "combus/ComBus.h"
 #include "combus/SMSMessages.h"
 #include "SMSControlPV.h"
@@ -50,6 +52,8 @@ public:
 	// Must be preceded by a sendOriginal for a given run.
 	void sendUpdate( uint32_t a_run_num, std::string a_run_state );
 
+	static void restartCB( event_handler_args);
+
 private:
 	void openComm();
 	void reOpenComm();
@@ -65,13 +69,15 @@ private:
 	static std::string		m_broker_uri;
 	static std::string		m_broker_user;
 	static std::string		m_broker_pass;
-	bool 			m_restart_combus;
+	uint16_t 			m_restart_combus;
 
-        boost::shared_ptr<smsMTBoolPV> m_pvRestartCombus;
-        boost::shared_ptr<smsMTStrPV> m_pvDomain;
-        boost::shared_ptr<smsMTStrPV> m_pvBrokerUri;
-        boost::shared_ptr<smsMTStrPV> m_pvBrokerUser;
-        boost::shared_ptr<smsMTStrPV> m_pvBrokerPass;
+	epicsEvent *m_restartEvent;
+
+        boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
+        boost::shared_ptr<smsStringPV> m_pvDomain;
+        boost::shared_ptr<smsStringPV> m_pvBrokerUri;
+        boost::shared_ptr<smsStringPV> m_pvBrokerUser;
+        boost::shared_ptr<smsStringPV> m_pvBrokerPass;
 
 	boost::thread	*m_comm_thread;
 
