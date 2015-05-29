@@ -149,6 +149,26 @@ void ComBusSMSMon::openComm()
 
 void ComBusSMSMon::reOpenComm()
 {
+	
+	// Apply default protocol & port if not set
+	if ( m_broker_uri.find("://") == std::string::npos )
+    		m_broker_uri = std::string("tcp://") + m_broker_uri;
+	
+	// Will always return a valid pos b/c of code above
+	size_t pos = m_broker_uri.find_last_of(":"); 
+	try
+	{
+    		boost::lexical_cast<uint32_t>( m_broker_uri.substr( pos + 1 ));
+	}
+	catch ( boost::bad_lexical_cast &e )
+	{
+    		m_broker_uri += std::string( ":61616" );
+	}
+
+	// If base path is specified, ensure it ends with a '.' character
+	if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
+    		m_domain += ".";
+
 	m_combus->setConnection(m_domain, m_broker_uri, m_broker_user, 
 				m_broker_pass);
 
