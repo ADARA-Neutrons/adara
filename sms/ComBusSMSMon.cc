@@ -196,12 +196,14 @@ void ComBusSMSMon::commThread()
 	unsigned long hb = 0;
 	SMSRunStatus *inpu, *lookup;
 	int bytesrec = 0;
-	struct timespec now;
 	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
 	char inbuf[smsStringPV::MAX_LENGTH];
 
 	INFO( "SMS ComBus thread started" );
 
+	// explicitly specify single threaded context. CA being used as ipc.
+	SEVCHK(ca_context_create(ca_disable_preemptive_callback),
+		"create ca context");
 	SEVCHK(ca_create_channel(m_pvDomain->getName(), 0, 0, 0, &domain_chid),
 		"create domain channel");
 	SEVCHK(ca_create_channel(m_pvBrokerUri->getName(), 0, 0, 0, &uri_chid),
@@ -249,7 +251,6 @@ void ComBusSMSMon::commThread()
         		SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_pass = inbuf;
  			reOpenComm();
-			clock_gettime(CLOCK_REALTIME, &now);
 			m_restart_combus = 0;
  			SEVCHK(ca_put(DBR_SHORT, restart_chid,
 				&m_restart_combus), 
