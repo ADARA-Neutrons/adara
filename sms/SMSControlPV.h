@@ -62,6 +62,8 @@ protected:
 	virtual gddAppFuncTableStatus getEnums(gdd &value);
 	gddAppFuncTableStatus defaultNumber(gdd &in);
 	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
 	gddAppFuncTableStatus unusedType(gdd &in);
 
 	void initReadTable(void);
@@ -201,9 +203,20 @@ public:
 
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+protected:
+	gddAppFuncTable<smsUint32PV>	m_read_table;
+
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
+
+	void initReadTable(void);
 };
 
 class smsInt32PV : public smsPV {
