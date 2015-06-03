@@ -291,7 +291,9 @@ public:
 
 class smsFloat64PV : public smsPV {
 public:
-	smsFloat64PV(const std::string &name);
+	smsFloat64PV(const std::string &name,
+		double min = -1.7976931348623157E308,
+		double max = 1.7976931348623157E308);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -304,9 +306,22 @@ public:
 
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	double m_min, m_max;
+
+protected:
+	gddAppFuncTable<smsFloat64PV>    m_read_table;
+
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
+
+	void initReadTable(void);
 };
 
 #endif /* __SMS_CONTROL_PV_H */

@@ -1413,8 +1413,15 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 /* ----------------------------------------------------------------------- */
 
-smsFloat64PV::smsFloat64PV(const std::string &name) : smsPV(name)
+smsFloat64PV::smsFloat64PV(const std::string &name,
+		double min, double max) : smsPV(name)
 {
+	// Apply Min and Max Limits
+	m_min = min;
+	m_max = max;
+
+	initReadTable();
+
 	struct timespec ts;
 
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -1436,6 +1443,72 @@ gddAppFuncTableStatus smsFloat64PV::getValue(gdd &in)
 	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
 		return S_cas_noConvert;
 
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::getEnums(gdd &)
+{
+	return S_gddAppFuncTable_badType;
+}
+
+void smsFloat64PV::initReadTable(void)
+{
+	m_read_table.installReadFunc("value", &smsFloat64PV::getValue);
+	m_read_table.installReadFunc("enums", &smsFloat64PV::getEnums);
+
+	/* These are not currently used by any child classes */
+	/* However, we are applying defaults so that clients requesting
+	 * DBR_CTRL types won't complain so much.
+	 */
+	m_read_table.installReadFunc("alarmHigh",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLow",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmHighWarning",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLowWarning",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh",
+		&smsFloat64PV::maximumNumber);
+	m_read_table.installReadFunc("controlLow",
+		&smsFloat64PV::minimumNumber);
+	m_read_table.installReadFunc("graphicHigh",
+		&smsFloat64PV::maximumNumber);
+	m_read_table.installReadFunc("graphicLow",
+		&smsFloat64PV::minimumNumber);
+	m_read_table.installReadFunc("precision",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("units",
+		&smsFloat64PV::defaultString);
+}
+
+gddAppFuncTableStatus smsFloat64PV::defaultNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(0.0);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::defaultString(gdd &in)
+{
+	in.put("");
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::minimumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(m_min);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::maximumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(m_max);
+	in.put(val);
 	return S_cas_success;
 }
 
