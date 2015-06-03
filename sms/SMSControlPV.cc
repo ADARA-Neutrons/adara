@@ -1042,8 +1042,13 @@ void smsConnectedPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
-smsUint32PV::smsUint32PV(const std::string &name) : smsPV(name)
+smsUint32PV::smsUint32PV(const std::string &name,
+		uint32_t min, uint32_t max) : smsPV(name)
 {
+	// Apply Min and Max Limits
+	m_min = min;
+	m_max = max;
+
 	initReadTable();
 
 	struct timespec ts;
@@ -1123,7 +1128,7 @@ gddAppFuncTableStatus smsUint32PV::defaultString(gdd &in)
 gddAppFuncTableStatus smsUint32PV::minimumNumber(gdd &in)
 {
 	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
-	val->put(0);
+	val->put(m_min);
 	in.put(val);
 	return S_cas_success;
 }
@@ -1131,7 +1136,7 @@ gddAppFuncTableStatus smsUint32PV::minimumNumber(gdd &in)
 gddAppFuncTableStatus smsUint32PV::maximumNumber(gdd &in)
 {
 	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
-	val->put(INT32_MAX);  // Uint32's in EPICS are Really Int32's...
+	val->put(m_max);
 	in.put(val);
 	return S_cas_success;
 }

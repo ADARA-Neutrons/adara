@@ -1,7 +1,9 @@
 #ifndef __SMS_CONTROL_PV_H
 #define __SMS_CONTROL_PV_H
 
+#define __STDC_LIMIT_MACROS
 #include <stdint.h>
+
 #include <time.h>
 #include <string>
 
@@ -190,7 +192,9 @@ public:
 
 class smsUint32PV : public smsPV {
 public:
-	smsUint32PV(const std::string &name);
+	smsUint32PV(const std::string &name,
+		uint32_t min = 0, uint32_t max = INT32_MAX);
+		// Uint32's in EPICS are Really Int32's...
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -207,6 +211,8 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	uint32_t m_min, m_max;
 
 protected:
 	gddAppFuncTable<smsUint32PV>	m_read_table;
