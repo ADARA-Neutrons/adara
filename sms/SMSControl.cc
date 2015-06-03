@@ -1,3 +1,7 @@
+
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -25,7 +29,6 @@
 #include <time.h>
 #include <math.h>
 #include <boost/lexical_cast.hpp>
-#include <stdint.h>
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 

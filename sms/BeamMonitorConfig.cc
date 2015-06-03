@@ -1,8 +1,10 @@
 
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <boost/bind.hpp>
 #include <sstream>
 #include <string>
-#include <stdint.h>
 #include <time.h>
 
 #include "ADARA.h"
