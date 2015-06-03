@@ -1131,7 +1131,7 @@ gddAppFuncTableStatus smsUint32PV::minimumNumber(gdd &in)
 gddAppFuncTableStatus smsUint32PV::maximumNumber(gdd &in)
 {
 	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
-	val->put(UINT32_MAX);
+	val->put(INT32_MAX);  // Uint32's in EPICS are Really Int32's...
 	in.put(val);
 	return S_cas_success;
 }
