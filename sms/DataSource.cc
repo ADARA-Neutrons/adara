@@ -339,13 +339,13 @@ DataSource::DataSource(const std::string &name, bool enabled,
 		smsConnectedPV(prefix + ":Connected"));
 
 	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry"));
+		smsFloat64PV(prefix + ":ConnectRetry", 0.0));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout"));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":DataTimeout"));
+		smsFloat64PV(prefix + ":DataTimeout", 0.0));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));

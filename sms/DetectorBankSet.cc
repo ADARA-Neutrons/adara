@@ -283,7 +283,7 @@ public:
 	public:
 		DetBankSetThrottlePV(const std::string &name,
 				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsFloat64PV(name), m_config(config), m_info(info) {}
+			smsFloat64PV(name, 0.0), m_config(config), m_info(info) {}
 
 		void changed(void)
 		{
