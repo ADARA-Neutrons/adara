@@ -591,11 +591,12 @@ StreamParser::rxOversizePkt
     if ( hdr != NULL )
     {
         syslog( LOG_WARNING,
-            "[%i] %s %u.%09u type=0x%x payload_len=%u offset=%u len=%u",
+        "[%i] %s %u.%09u type=0x%x payload_len=%u max=%u offset=%u len=%u",
             g_pid, "OversizePkt:",
             (uint32_t) hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET,
             (uint32_t) hdr->timestamp().tv_nsec,
-            hdr->type(), hdr->payload_length(), chunk_offset, chunk_len);
+            hdr->type(), hdr->payload_length(), ADARA_IN_BUF_SIZE,
+            chunk_offset, chunk_len);
 
         // Handle pulse sequence flag for this Oversized Packet
         // (so we don't get "out of sync" when we throw it away... :-)
@@ -660,8 +661,8 @@ StreamParser::rxOversizePkt
     else
     {
         syslog( LOG_WARNING,
-            "[%i] OversizePkt: next chunk offset=%u len=%u",
-            g_pid, chunk_offset, chunk_len);
+            "[%i] OversizePkt: next chunk max=%u offset=%u len=%u",
+            g_pid, ADARA_IN_BUF_SIZE, chunk_offset, chunk_len);
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -853,7 +854,7 @@ StreamParser::processBankEvents
                         {
                             // Calculate index into Histogram based on TOF
                             tofbin = ( tof - (*dbs)->tofOffset )
-                                / (*dbs)->tofBin;
+                                / bi->m_tof_bin_size;
 
                             // TOF Sanity Test, Just to Be Sure... ;-b
                             // (This should never happen,
@@ -1579,7 +1580,7 @@ StreamParser::rxPacket
         else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
             format = "histo";
         else
-            format = "[Unknown!]";
+            format = "[None/Unknown!]";  // "None"... (implies *NO DATA*!)
 
         syslog( LOG_INFO,
         "[%i] %s %s (%u=%s): %s=%u (%s) %s=(%u to %u by %u) %s=%lf (%s).",

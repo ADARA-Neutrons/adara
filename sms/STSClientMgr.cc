@@ -1,5 +1,8 @@
-#include <unistd.h>
+
+#define __STDC_LIMIT_MACROS
 #include <stdint.h>
+
+#include <unistd.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -99,13 +102,13 @@ STSClientMgr::STSClientMgr() :
 	prefix += ":STSClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout"));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
 
 	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry"));
+		smsFloat64PV(prefix + ":ConnectRetry", 0.0));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":TransientTimeout"));
+		smsFloat64PV(prefix + ":TransientTimeout", 0.0));
 
 	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
 		MaxConnectionsPV(prefix + ":MaxConnections", this));
@@ -209,9 +212,12 @@ StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 		}
 	}
 
-	m_sendingRuns[run->first] = run->second;
+	// Save Run Number for Return Indexing, as it will be Freed...! ;-D
+	// (Thanks Valgrind! ;-D)
+	uint32_t runNumber = run->first;
+	m_sendingRuns[runNumber] = run->second;
 	m_pendingRuns.erase(run);
-	return m_sendingRuns[run->first];
+	return m_sendingRuns[runNumber];
 }
 
 void STSClientMgr::startConnect(void)

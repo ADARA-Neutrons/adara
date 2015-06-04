@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.2.2"
+#define STS_VERSION "1.3.0"
 extern pid_t g_pid;
 
 namespace STS {
@@ -130,11 +130,19 @@ public:
                     // Did we reach End of Run with No Data for this Bank?
                     if ( a_end_of_run )
                     {
-                        m_num_tof_bins = 2;
+                        // Fake a Tiny Histogram to Save Space,
+                        // Yet Remain Compatible... ;-D
+
+                        m_num_tof_bins = 3;
+
+                        // Divide the TOF Range "Evenly"...
+                        m_tof_bin_size = (*dbs)->tofMax / 2;
+
                         syslog( LOG_ERR,
-                            "[%i] %s %u %s: Setting num_tof_bins to %u",
-                            g_pid, "Detector Bank", m_id,
-                            "Empty Histogram", m_num_tof_bins);
+                            "[%i] %s %u %s: Setting %s to %u, %s to %u",
+                            g_pid, "Detector Bank", m_id, "Empty Histogram",
+                            "num_tof_bins", m_num_tof_bins,
+                            "tof_bin_size", m_tof_bin_size);
                     }
 
                     else
@@ -162,12 +170,18 @@ public:
                                 "Histogram Warning", m_num_tof_bins);
                             m_num_tof_bins = 2;
                         }
+
+                        // Use the TOF Bin Size from the Detector Bank Set
+                        m_tof_bin_size = (*dbs)->tofBin;
                     }
 
                     syslog( LOG_ERR,
-                   "[%i] %s %u Histogram: num_tof_bins=%u num_pids=%u (%u)",
-                        g_pid, "Detector Bank", m_id, m_num_tof_bins,
-                        num_pids, num_pids * ( m_num_tof_bins - 1 ) );
+                        "[%i] %s %u Histogram: %s=%u %s=%u %s=%u (%u)",
+                        g_pid, "Detector Bank", m_id,
+                        "num_tof_bins", m_num_tof_bins,
+                        "tof_bin_size", m_tof_bin_size,
+                        "num_pids", num_pids,
+                        num_pids * ( m_num_tof_bins - 1 ) );
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -189,7 +203,7 @@ public:
                             m_data_buffer.push_back(0);
 
                         m_tofbin_buffer.push_back((float)tofbin);
-                        tofbin += (*dbs)->tofBin;
+                        tofbin += m_tof_bin_size;
                     }
 
                     // Max TOF Bin Value...
@@ -338,6 +352,7 @@ public:
 
     bool                    m_has_histo;            ///< Has a Histogram output already been defined?
     uint32_t                m_num_tof_bins;         ///< Histo Number of TOF Bins
+    uint32_t                m_tof_bin_size;         ///< Histo Actual TOF Bin Size (differs for "empty")
     uint32_t                m_base_pid;             ///< Base PixelId Offset into Histo Offset Index
     std::vector<int32_t>    m_histo_pid_offset;     ///< Histo PixelId Offsets into data buffer
     std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer

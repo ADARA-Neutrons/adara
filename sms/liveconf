@@ -100,6 +100,13 @@ option_value_type[$num_options]="UINT32_VALUE+[M|K](bytes)"
 option_label[$num_options]="[Max Read Chunk]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="source"
+option_name[$num_options]="rtdl_no_data_thresh"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:RTDLNoDataThresh"
+option_value_type[$num_options]="UINT32_VALUE(packets)"
+option_label[$num_options]="[RTDL No Data Threshold]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_eop_pulse_buffer_size"
 option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
@@ -555,6 +562,7 @@ if [[ "$command" == "status" \
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:RTDLNoDataThresh
 				echo
 			done
 		fi

@@ -1,6 +1,9 @@
+
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <stdint.h>
 #include <string>
 #include <sstream>
 #include <netdb.h>
@@ -58,7 +61,10 @@ public:
 		m_name(name), m_hwId(hwId), m_smsId(smsId), m_activePulse(0),
 		m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
-	{ }
+	{
+		// Initialize "RTDL Packets with No Data Packets" Count...
+		m_rtdlNoDataCount = 0;
+	}
 
 	uint64_t pulse(void) const { return m_activePulse; }
 	uint64_t lastPulse(void) const { return m_lastPulse; }
@@ -261,6 +267,8 @@ public:
 		return !ok;
 	}
 
+	uint32_t	m_rtdlNoDataCount;
+
 private:
 	const std::string &m_name;
 
@@ -290,13 +298,13 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
-			unsigned int read_chunk) :
+			unsigned int read_chunk, uint32_t rtdlNoDataThresh) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
-	m_max_read_chunk(read_chunk)
+	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh)
 {
 	m_name += " (";
 	m_name += m_basename;
@@ -331,19 +339,22 @@ DataSource::DataSource(const std::string &name, bool enabled,
 		smsConnectedPV(prefix + ":Connected"));
 
 	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry"));
+		smsFloat64PV(prefix + ":ConnectRetry", 0.0));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout"));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":DataTimeout"));
+		smsFloat64PV(prefix + ":DataTimeout", 0.0));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk"));
+
+	m_pvRTDLNoDataThresh = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":RTDLNoDataThresh"));
 
 	ctrl->addPV(m_pvName);
 	ctrl->addPV(m_pvDataURI);
@@ -354,6 +365,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
 	ctrl->addPV(m_pvMaxReadChunk);
+	ctrl->addPV(m_pvRTDLNoDataThresh);
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
@@ -366,6 +378,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 
 	// Initialize Max Read Chunk PV (construct string)...
 	std::stringstream ssMRC;
@@ -984,7 +997,7 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr, 
 			       const uint8_t *UNUSED(chunk),
 				   unsigned int UNUSED(chunk_offset),
-			       unsigned int UNUSED(chunk_len))
+			       unsigned int chunk_len)
 {
 	/* Rate-limited logging of oversized packets */
 	std::string log_info;
@@ -992,10 +1005,16 @@ bool DataSource::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
-			ERROR(log_info << "Oversized packet of type " << hdr->type()
+			ERROR(log_info << "Oversized packet"
+				<< " at " << hdr->timestamp().tv_sec
+				<< "." << hdr->timestamp().tv_nsec
+				<< " of type 0x" << std::hex << hdr->type() << std::dec
+				<< " payload_length=" << hdr->payload_length()
 				<< " from " << m_name);
 		} else {
-			ERROR(log_info << "Oversized packet from " << m_name);
+			ERROR(log_info << "Oversized packet"
+				<< " chunk_len=" << chunk_len
+				<< " from " << m_name);
 		}
 	}
 	return true;
@@ -1043,6 +1062,9 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		bool is_mapped)
 {
 	HWSource &hw_src = getHWSource(pkt->sourceID());
+
+	// Reset "RTDL Packets with No Data Packets" Count...
+	hw_src.m_rtdlNoDataCount = 0;
 
 	/* Check that the fields are consistent with the pulse we are
 	 * currently processing. If not, then we've started a new pulse.
@@ -1123,11 +1145,13 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// strip off pulse nanoseconds...
 	time_t sec = pkt.pulseId() >> 32;
+
 	// check for "totally bogus" pulse times, in distant past/future... ;-b
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	time_t future = 
 		now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
+
 	// before SNS time began... ;-D
 	if ( sec < FACILITY_START_TIME )
 	{
@@ -1145,6 +1169,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		}
 		drop_pulse = true;
 	}
+
 	// more than a week into the future...! :-o
 	else if ( sec > future )
 	{
@@ -1188,6 +1213,34 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	m_rtdl_pkt_counts++;
 
+	// Check for Run-Away Data Sources...
+	// (Lots of RTDLs filling up our internal Pulse Buffer,
+	// with No RawDataPkts to release them... ;-b)
+
+	// Update RTDL "No Data" Threshold from PV...
+	m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	HWSrcMap::iterator it = m_hwSources.begin();
+
+	while ( it != m_hwSources.end() ) {
+		if ( ++(it->second->m_rtdlNoDataCount) > m_rtdlNoDataThresh ) {
+			ERROR("Run-Away Data Source " << m_name
+				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
+				<< ", " << it->second->m_rtdlNoDataCount
+				<< " (> " << m_rtdlNoDataThresh << ")"
+				<< " RTDL Pulses without a Corresponding RawDataPkt!"
+				<< " Unregistering Event Source " << it->second->smsId());
+			ctrl->unregisterEventSource(it->second->smsId());
+			// Remove Hardware Source from Map...
+			// (Note: iterator increments to next element,
+			// but returns current element for deletion... :-)
+			m_hwSources.erase(it++);
+		}
+		else {
+			++it;
+		}
+	}
 	return false;
 }
 

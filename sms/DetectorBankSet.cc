@@ -1,9 +1,11 @@
 
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <boost/bind.hpp>
 #include <string>
 #include <sstream>
 #include <string.h>
-#include <stdint.h>
 #include <time.h>
 
 #include "ADARA.h"
@@ -97,10 +99,29 @@ public:
 			delete [] str;
 			return S_casApp_noMemory;
 		}
-		strncpy(str[0].fixed_string, "none", sizeof(str[0].fixed_string));
-		strncpy(str[1].fixed_string, "event", sizeof(str[1].fixed_string));
-		strncpy(str[2].fixed_string, "histo", sizeof(str[2].fixed_string));
-		strncpy(str[3].fixed_string, "both", sizeof(str[3].fixed_string));
+
+		uint32_t flag;
+
+		// None
+		flag = 0;
+		strncpy( str[flag].fixed_string, "none",
+			sizeof(str[flag].fixed_string));
+
+		// Event
+		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
+		strncpy(str[flag].fixed_string, "event",
+			sizeof(str[flag].fixed_string));
+
+		// Histo
+		flag = ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		strncpy(str[flag].fixed_string, "histo",
+			sizeof(str[flag].fixed_string));
+
+		// Histo
+		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+			| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		strncpy(str[flag].fixed_string, "both",
+			sizeof(str[flag].fixed_string));
 
 		in.setDimension(1);
 		in.setBound(0, 0, 4);
@@ -132,24 +153,30 @@ public:
 			std::string oldFormat;
 			if ( oldFlags == 0 )
 				oldFormat = "none";
-			else if ( oldFlags == 1 )
+			else if ( oldFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
 				oldFormat = "event";
-			else if ( oldFlags == 2 )
+			else if ( oldFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
 				oldFormat = "histo";
-			else if ( oldFlags == 3 )
+			else if ( oldFlags ==
+					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
 				oldFormat = "both";
+			}
 
 			uint32_t newFlags = value();
 
 			std::string newFormat;
 			if ( newFlags == 0 )
 				newFormat = "none";
-			else if ( newFlags == 1 )
+			else if ( newFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
 				newFormat = "event";
-			else if ( newFlags == 2 )
+			else if ( newFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
 				newFormat = "histo";
-			else if ( newFlags == 3 )
+			else if ( newFlags ==
+					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
 				newFormat = "both";
+			}
 
 			INFO("DetBankSetFormatPV: Changing Detector Bank Set "
 				<< m_info->getName() << " Output Format for "
@@ -256,7 +283,7 @@ public:
 	public:
 		DetBankSetThrottlePV(const std::string &name,
 				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsFloat64PV(name), m_config(config), m_info(info) {}
+			smsFloat64PV(name, 0.0), m_config(config), m_info(info) {}
 
 		void changed(void)
 		{
@@ -665,11 +692,13 @@ DetectorBankSet::DetectorBankSet(
 		// Set Format Flags...
 		flags = 0;
 		if ( !format.compare("histo") )
-			flags |= 2;
-		else if ( !format.compare("both") )
-			flags |= 1 + 2;
+			flags |= ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		else if ( !format.compare("both") ) {
+			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+				| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		}
 		else // if ( !format.compare("event") )
-			flags |= 1;
+			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
 
 		std::string banklistStr =
 			it->second.get<std::string>("banklist", "none");

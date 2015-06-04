@@ -1,6 +1,9 @@
+
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
-#include <stdint.h>
 #include <string>
 #include <sstream>
 

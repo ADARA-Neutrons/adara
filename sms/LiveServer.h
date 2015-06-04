@@ -17,6 +17,8 @@ private:
 	int m_fd;
 
 	static std::string m_service;
+	static std::string m_host;
+	static char *m_node;
 	static LiveServer *m_singleton;
 
 	void newConnection(void);

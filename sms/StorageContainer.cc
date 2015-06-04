@@ -401,7 +401,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 }
 
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
-				 bool keep)
+				 bool keep, bool &path_deleted )
 {
 	std::string cpath;
 	struct timespec ts;
@@ -492,6 +492,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		fs::path base(path), completed(path);
 		completed /= m_completed_marker;
 
+		path_deleted = true;
 		try {
 			if (run)
 				remove(completed);
@@ -500,7 +501,12 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			DEBUG("Removed container " << base);
 		} catch(fs::filesystem_error err) {
 			WARN("Error removing container: " << err.what());
+			path_deleted = false;
 		}
+	}
+	// Not Done Yet with This Container Path...
+	else {
+		path_deleted = false;
 	}
 
 	return purged;

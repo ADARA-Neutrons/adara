@@ -229,7 +229,7 @@ bool Parser::rxUnknownPkt(const ADARA::Packet &pkt)
 bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 				const uint8_t *UNUSED(chunk),
 				unsigned int UNUSED(chunk_offset),
-				unsigned int UNUSED(chunk_len))
+				unsigned int chunk_len)
 {
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	if (hdr) {
@@ -237,6 +237,10 @@ bool Parser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			(uint32_t) (hdr->pulseId() >> 32),
 			(uint32_t) hdr->pulseId());
 		printf("    type %08x len %u\n", hdr->type(), hdr->packet_length());
+	}
+	else {
+		printf("[No Header, Continuation...] Oversize Packet\n");
+		printf("    chunk_len %u\n", chunk_len);
 	}
 
 	return false;

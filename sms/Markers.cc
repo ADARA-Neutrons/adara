@@ -1,5 +1,8 @@
-#include <boost/function.hpp>
+
+#define __STDC_LIMIT_MACROS
 #include <stdint.h>
+
+#include <boost/function.hpp>
 #include <string>
 
 #include "Markers.h"
@@ -37,7 +40,8 @@ private:
 	void triggered(void) { m_cb(); }
 };
 
-Markers::Markers(SMSControl *sms)
+Markers::Markers(SMSControl *sms) :
+	m_scanIndex(0)
 {
 	std::string prefix(sms->getBeamlineId());
 	prefix += ":SMS:";
