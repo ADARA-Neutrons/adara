@@ -1,3 +1,4 @@
+
 #include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -5,8 +6,6 @@
 #include <sys/vfs.h>
 #include <fcntl.h>
 #include <ctype.h>
-
-#define __STDC_LIMIT_MACROS
 #include <stdint.h>
 
 #include <string>

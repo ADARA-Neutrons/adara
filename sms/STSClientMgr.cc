@@ -1,8 +1,6 @@
 
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-
 #include <unistd.h>
+#include <stdint.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>

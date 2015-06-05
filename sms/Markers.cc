@@ -1,8 +1,6 @@
 
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-
 #include <boost/function.hpp>
+#include <stdint.h>
 #include <string>
 
 #include "Markers.h"

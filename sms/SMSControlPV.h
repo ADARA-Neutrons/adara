@@ -1,11 +1,13 @@
 #ifndef __SMS_CONTROL_PV_H
 #define __SMS_CONTROL_PV_H
 
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-
 #include <time.h>
 #include <string>
+#include <stdint.h>
+
+#ifndef INT32_MAX
+#define INT32_MAX (2147483647)
+#endif
 
 #include <gddAppFuncTable.h>
 #include <smartGDDPointer.h>

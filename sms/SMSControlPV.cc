@@ -1,7 +1,4 @@
 
-#define __STDC_LIMIT_MACROS
-#include <stdint.h>
-
 #include "EPICS.h"
 #include "DataSource.h"
 #include "SMSControl.h"
@@ -9,6 +6,8 @@
 #include "ADARAUtils.h"
 
 #include <gddApps.h>
+
+#include <stdint.h>
 
 #include "Logging.h"
 

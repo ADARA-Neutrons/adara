@@ -1,10 +1,9 @@
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
-#include <string>
-
-#define __STDC_LIMIT_MACROS
 #include <stdint.h>
+#include <string>
 
 #include <boost/bind.hpp>
 
