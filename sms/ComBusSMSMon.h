@@ -77,7 +77,7 @@ private:
 
 	boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
 	boost::shared_ptr<smsStringPV> m_pvDomain;
-	boost::shared_ptr<smsStringPV> m_pvBrokerUri;
+	boost::shared_ptr<smsStringPV> m_pvBrokerURI;
 	boost::shared_ptr<smsStringPV> m_pvBrokerUser;
 	boost::shared_ptr<smsStringPV> m_pvBrokerPass;
 

@@ -110,8 +110,8 @@ ComBusSMSMon::start(void)
 			smsBooleanPV( prefix + ":Restart"));
 		m_pvDomain = boost::shared_ptr<smsStringPV>(new
 			smsStringPV(prefix + ":Domain"));
-		m_pvBrokerUri = boost::shared_ptr<smsStringPV>(new
-			smsStringPV(prefix + ":BrokerUri"));
+		m_pvBrokerURI = boost::shared_ptr<smsStringPV>(new
+			smsStringPV(prefix + ":BrokerURI"));
 		m_pvBrokerUser = boost::shared_ptr<smsStringPV>(new
 			smsStringPV(prefix + ":BrokerUser"));
 		m_pvBrokerPass = boost::shared_ptr<smsStringPV>(new
@@ -119,7 +119,7 @@ ComBusSMSMon::start(void)
 
 		ctrl->addPV(m_pvRestartCombus);
 		ctrl->addPV(m_pvDomain);
-		ctrl->addPV(m_pvBrokerUri);
+		ctrl->addPV(m_pvBrokerURI);
 		ctrl->addPV(m_pvBrokerUser);
 		ctrl->addPV(m_pvBrokerPass);
 
@@ -127,7 +127,7 @@ ComBusSMSMon::start(void)
 		clock_gettime(CLOCK_REALTIME, &now);
 
 		m_pvDomain->update(m_domain, &now);
-		m_pvBrokerUri->update(m_broker_uri, &now);
+		m_pvBrokerURI->update(m_broker_uri, &now);
 		m_pvBrokerUser->update(m_broker_user, &now);
 		m_pvBrokerPass->update(m_broker_pass, &now);
 
@@ -199,7 +199,7 @@ void ComBusSMSMon::commThread()
 	SEVCHK(ca_create_channel(m_pvDomain->getName(), 0, 0, 0,
 			&domain_chid),
 		"create domain channel");
-	SEVCHK(ca_create_channel(m_pvBrokerUri->getName(), 0, 0, 0,
+	SEVCHK(ca_create_channel(m_pvBrokerURI->getName(), 0, 0, 0,
 			&uri_chid),
 		"create broker uri channel");
 	SEVCHK(ca_create_channel(m_pvBrokerUser->getName(), 0, 0, 0,
