@@ -244,23 +244,10 @@ Connection::Connection( const std::string &a_domain,
     }
 
     // Apply default protocol & port if not set
-    if ( m_broker_uri.find("://") == string::npos )
-        m_broker_uri = string("tcp://") + m_broker_uri;
-
-    // Will always return a valid pos b/c of code above
-    size_t pos = m_broker_uri.find_last_of(":");
-    try
-    {
-        boost::lexical_cast<uint32_t>( m_broker_uri.substr( pos + 1 ) );
-    }
-    catch ( boost::bad_lexical_cast &e )
-    {
-        m_broker_uri += string( ":61616" );
-    }
+	m_broker_uri = checkBrokerURI( m_broker_uri );
 
     // If base path is specified, ensure it ends with a '.' character
-    if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
-        m_domain += ".";
+	m_domain = checkDomain( m_domain );
 
     m_proc_id += m_proc_name + "_"
         + boost::lexical_cast<string>(m_proc_inst);
@@ -314,9 +301,59 @@ Connection&
 Connection::getInst()
 {
     if ( !g_inst )
-        throw std::runtime_error("No ComBus::Connection instance present.");
+    {
+        throw std::runtime_error(
+            "No ComBus::Connection instance present.");
+    }
 
     return *g_inst;
+}
+
+
+/** \brief Checks/fixes Broker URI (protocol and port) for Connection.
+  * \return Possibly-enhanced/corrected Broker URI string.
+  *
+  * This (static) method check the Broker URI string for the Connection,
+  * ensures it has the proper protocol ("tcp://"), and if omitted,
+  * supplies the default ComBus port (":61616").
+  */
+std::string&
+Connection::checkBrokerURI( std::string &a_broker_uri )
+{
+    // Apply default protocol if not set
+    if ( a_broker_uri.find("://") == string::npos )
+        a_broker_uri = string("tcp://") + a_broker_uri;
+
+    // Will always return a valid pos b/c of code above
+    size_t pos = a_broker_uri.find_last_of(":");
+    try
+    {
+        boost::lexical_cast<uint32_t>( a_broker_uri.substr( pos + 1 ) );
+    }
+    catch ( boost::bad_lexical_cast &e )
+    {
+		// Apply default port if not set
+        a_broker_uri += string( ":61616" );
+    }
+
+    return a_broker_uri;
+}
+
+
+/** \brief Checks/fixes Domain for Connection.
+  * \return Possibly-enhanced/corrected Domain string.
+  *
+  * This (static) method check the Domain string for the Connection,
+  * and ensures it has the proper trailing '.' character.
+  */
+std::string&
+Connection::checkDomain( std::string &a_domain )
+{
+    // If base path is specified, ensure it ends with a '.' character
+    if ( !a_domain.empty() && *a_domain.rbegin() != '.' )
+        a_domain += ".";
+
+    return a_domain;
 }
 
 
@@ -328,10 +365,10 @@ Connection::getInst()
   *
   * This method allows the AMQP connection parameters to be changed. If a
   * connection is active, it is disconnected and all topics are detached;
-  * however, status and control listeners are not detached. A new connection
-  * is started asynchronously before this method returns. All status
-  * listeners will be notified about the disconnect and subsequent
-  * connection events.
+  * however, status and control listeners are not detached. A new
+  * connection is started asynchronously before this method returns.
+  * All status listeners will be notified about the disconnect and
+  * subsequent connection events.
   */
 void
 Connection::setConnection( const std::string &a_domain,
@@ -350,6 +387,12 @@ Connection::setConnection( const std::string &a_domain,
     m_broker_uri = a_broker_uri;
     m_broker_user = a_user;
     m_broker_pass = a_pass;
+
+    // Apply default protocol & port if not set
+	m_broker_uri = checkBrokerURI( m_broker_uri );
+
+    // If base path is specified, ensure it ends with a '.' character
+	m_domain = checkDomain( m_domain );
 
     lock.unlock();
 
@@ -1014,6 +1057,6 @@ Connection::createTopicConsumer( const string &a_topic_name,
 }
 
 
-} // namespace ComBus
-} // namespace ADARA
+} // End ComBus namespace
+} // End ADARA namespace
 
