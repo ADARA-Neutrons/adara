@@ -244,10 +244,10 @@ Connection::Connection( const std::string &a_domain,
     }
 
     // Apply default protocol & port if not set
-	m_broker_uri = checkBrokerURI( m_broker_uri );
+    m_broker_uri = checkBrokerURI( m_broker_uri );
 
     // If base path is specified, ensure it ends with a '.' character
-	m_domain = checkDomain( m_domain );
+    m_domain = checkDomain( m_domain );
 
     m_proc_id += m_proc_name + "_"
         + boost::lexical_cast<string>(m_proc_inst);
@@ -332,7 +332,7 @@ Connection::checkBrokerURI( std::string &a_broker_uri )
     }
     catch ( boost::bad_lexical_cast &e )
     {
-		// Apply default port if not set
+        // Apply default port if not set
         a_broker_uri += string( ":61616" );
     }
 
@@ -389,10 +389,10 @@ Connection::setConnection( const std::string &a_domain,
     m_broker_pass = a_pass;
 
     // Apply default protocol & port if not set
-	m_broker_uri = checkBrokerURI( m_broker_uri );
+    m_broker_uri = checkBrokerURI( m_broker_uri );
 
     // If base path is specified, ensure it ends with a '.' character
-	m_domain = checkDomain( m_domain );
+    m_domain = checkDomain( m_domain );
 
     lock.unlock();
 

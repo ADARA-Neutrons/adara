@@ -87,8 +87,8 @@ public:
 
     static Connection&  getInst();
 
-	static std::string& checkBrokerURI( std::string &a_broker_uri );
-	static std::string& checkDomain( std::string &a_domain );
+    static std::string& checkBrokerURI( std::string &a_broker_uri );
+    static std::string& checkDomain( std::string &a_domain );
 
     void                setConnection( const std::string &a_domain,
                             const std::string &a_broker_uri,
