@@ -63,6 +63,13 @@ void ComBusSMSMon::config(const boost::property_tree::ptree &conf)
 	m_broker_uri = conf.get<std::string>("combus.broker_uri", "localhost");
 	m_broker_user = conf.get<std::string>("combus.broker_user", "DAS");
 	m_broker_pass = conf.get<std::string>("combus.broker_pass", "fish");
+
+	// Apply default protocol & port if not set
+	m_broker_uri = ADARA::ComBus::Connection::checkBrokerURI(
+		m_broker_uri );
+
+	// If base path is specified, ensure it ends with a '.' character
+	m_domain = ADARA::ComBus::Connection::checkDomain( m_domain );
 }
 
 void ComBusSMSMon::sendOriginal( uint32_t a_run_num,
@@ -137,12 +144,14 @@ void ComBusSMSMon::openComm()
 	if ( !m_combus->waitForConnect( 5 ) )
 	{
 		ERROR("SMS ComBus Connection Timeout"
+			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
 	}
 	else
 	{
 		INFO("SMS ComBus Connection Succeeded"
+			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
 	}
@@ -150,37 +159,20 @@ void ComBusSMSMon::openComm()
 
 void ComBusSMSMon::reOpenComm()
 {
-	// Apply default protocol & port if not set
-	if ( m_broker_uri.find("://") == std::string::npos )
-		m_broker_uri = std::string("tcp://") + m_broker_uri;
-
-	// Will always return a valid pos b/c of code above
-	size_t pos = m_broker_uri.find_last_of(":");
-	try
-	{
-		boost::lexical_cast<uint32_t>( m_broker_uri.substr( pos + 1 ));
-	}
-	catch ( boost::bad_lexical_cast &e )
-	{
-		m_broker_uri += std::string( ":61616" );
-	}
-
-	// If base path is specified, ensure it ends with a '.' character
-	if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
-		m_domain += ".";
-
 	m_combus->setConnection(m_domain, m_broker_uri, m_broker_user,
 				m_broker_pass);
 
 	if ( !m_combus->waitForConnect( 5 ) )
 	{
 		ERROR("SMS ComBus Reconnection Timeout"
+			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
 	}
 	else
 	{
 		INFO("SMS ComBus Reconnection Succeeded"
+			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
 	}
@@ -249,12 +241,21 @@ void ComBusSMSMon::commThread()
 			m_domain = inbuf;
 			INFO("Combus Domain = " << m_domain);
 
+			// If base path is specified ensure it ends with a '.' character
+			m_domain = ADARA::ComBus::Connection::checkDomain( m_domain );
+			INFO("Combus Domain (Checked) = " << m_domain);
+
 			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
 				uri_chid, inbuf),
 				"get combus broker uri");
 			SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_uri = inbuf;
 			INFO("Combus Broker URI =" << m_broker_uri);
+
+			// Apply default protocol & port if not set
+			m_broker_uri = ADARA::ComBus::Connection::checkBrokerURI(
+				m_broker_uri );
+			INFO("Combus Broker URI (Checked) =" << m_broker_uri);
 
 			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
 				user_chid, inbuf),
@@ -317,6 +318,7 @@ void ComBusSMSMon::commThread()
 			WARN("SMS ComBus run " << lookup->m_run_num
 				<< " status <" << lookup->m_reason
 				<< "> send failed"
+				<< " for Domain " << m_domain
 				<< " to URI " << m_broker_uri
 				<< " as User " << m_broker_user);
 		}
@@ -324,6 +326,7 @@ void ComBusSMSMon::commThread()
 		{
 			INFO("SMS ComBus run " << lookup->m_run_num
 				<< " status <" << lookup->m_reason << "> sent"
+				<< " for Domain " << m_domain
 				<< " to URI " << m_broker_uri
 				<< " as User " << m_broker_user);
 		}
