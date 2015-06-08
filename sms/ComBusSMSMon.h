@@ -65,19 +65,21 @@ private:
 
 	std::string		m_beam_sname;
 	std::string		m_facility;
+
 	static std::string		m_domain;
 	static std::string		m_broker_uri;
 	static std::string		m_broker_user;
 	static std::string		m_broker_pass;
-	uint16_t 			m_restart_combus;
+
+	uint16_t		m_restart_combus;
 
 	epicsEvent *m_restartEvent;
 
-        boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
-        boost::shared_ptr<smsStringPV> m_pvDomain;
-        boost::shared_ptr<smsStringPV> m_pvBrokerUri;
-        boost::shared_ptr<smsStringPV> m_pvBrokerUser;
-        boost::shared_ptr<smsStringPV> m_pvBrokerPass;
+	boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
+	boost::shared_ptr<smsStringPV> m_pvDomain;
+	boost::shared_ptr<smsStringPV> m_pvBrokerUri;
+	boost::shared_ptr<smsStringPV> m_pvBrokerUser;
+	boost::shared_ptr<smsStringPV> m_pvBrokerPass;
 
 	boost::thread	*m_comm_thread;
 
