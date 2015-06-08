@@ -193,9 +193,6 @@ void ComBusSMSMon::commThread()
 
 	INFO("SMS ComBus thread started");
 
-	setenv("EPICS_CA_ADDR_LIST","127.255.255.255", 1);
-	setenv("EPICS_CA_AUTO_ADDR_LIST","NO", 1);
-
 	// explicitly specify single threaded context. CA being used as ipc.
 	SEVCHK(ca_context_create(ca_disable_preemptive_callback),
 		"create ca context");
