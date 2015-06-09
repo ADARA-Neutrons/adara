@@ -260,19 +260,19 @@ void ComBusSMSMon::commThread()
 				"get combus broker uri");
 			SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_uri = inbuf;
-			INFO("Combus Broker URI =" << m_broker_uri);
+			INFO("Combus Broker URI = " << m_broker_uri);
 
 			// Apply default protocol & port if not set
 			m_broker_uri = ADARA::ComBus::Connection::checkBrokerURI(
 				m_broker_uri );
-			INFO("Combus Broker URI (Checked) =" << m_broker_uri);
+			INFO("Combus Broker URI (Checked) = " << m_broker_uri);
 
 			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
 				user_chid, inbuf),
 				"get combus broker user");
 			SEVCHK(ca_pend_io(1.0), "reset of combus restart PV");
 			m_broker_user = inbuf;
-			INFO("Combus Broker User =" << m_broker_user);
+			INFO("Combus Broker User = " << m_broker_user);
 
 			SEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
 				pass_chid, inbuf),
