@@ -193,6 +193,19 @@ void ComBusSMSMon::commThread()
 
 	INFO("SMS ComBus thread started");
 
+	// The CA_ADDR_LIST is set to the local host "broadcast address",
+	// although local host would work. The broadcast address can be more
+	// robust if there are multiple iocs on the same host. ALL the PVs I
+	// am looking at are there, always.  Never changes. (CA used as IPC.)
+	// The AUTO_ADDR_LIST one tells the client not to bother checking
+	// the real Ethernet ports.  It'll find what it wants without that.
+	// Its a minor optimization; I figured if I'm messing around with
+	// the environment variables anyway I might as well do it to some
+	// level of completeness. - Carl A. Lionberger, Tue, 9 Jun 2015
+	// (Note to Jeeem: *Don't Delete These!* Lol, Oops... ;-b)
+	setenv("EPICS_CA_ADDR_LIST","127.255.255.255", 1);
+	setenv("EPICS_CA_AUTO_ADDR_LIST","NO", 1);
+
 	// explicitly specify single threaded context. CA being used as ipc.
 	SEVCHK(ca_context_create(ca_disable_preemptive_callback),
 		"create ca context");
