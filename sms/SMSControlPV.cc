@@ -21,6 +21,8 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
 #define RLL_CONNPV_FAILED             2
 #define RLL_CONNPV_TRYING             3
 #define RLL_CONNPV_WAITING            4
+#define RLL_PV_READ                   5
+#define RLL_PV_WRITE                  6
 
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
@@ -319,8 +321,14 @@ caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRunNumberPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsRunNumberPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -384,8 +392,14 @@ caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRecordingPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsRecordingPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -400,8 +414,14 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsRecordingPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsRecordingPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -468,8 +488,12 @@ gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
 
 caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
-	DEBUG("smsStringPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << m_value.get());
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << m_value.get());
+	}
 	return m_read_table.read(*this, prototype);
 }
 
@@ -481,8 +505,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	 * as an unset request.
 	 */
 	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Null String, Unset Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Null String, Unset Value.");
+		}
 		unset();
 		return S_cas_success;
 	}
@@ -509,8 +538,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	/* Writing no elements will be considered an unset request.
 	 */
 	if (!nelem) {
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Writing No Elements, Unset Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Writing No Elements, Unset Value.");
+		}
 		unset();
 		return S_cas_success;
 	}
@@ -520,8 +554,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		 * send a notification to any watchers, and just return
 		 * success.
 		 */
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Updates Not Allowed, Ignore Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Updates Not Allowed, Ignore Value.");
+		}
 		notify();
 		return S_casApp_success;
 	}
@@ -533,8 +572,12 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
 
-	DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << new_str);
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << new_str);
+	}
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
@@ -659,8 +702,14 @@ caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsBooleanPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsBooleanPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -677,8 +726,14 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsBooleanPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsBooleanPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -875,8 +930,14 @@ caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsConnectedPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -893,8 +954,14 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsConnectedPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -1144,7 +1211,14 @@ caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsUint32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsUint32PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1161,8 +1235,14 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsUint32PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -1249,7 +1329,14 @@ caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitInt32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsInt32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsInt32PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1266,8 +1353,14 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsInt32PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsInt32PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -1360,8 +1453,14 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsTriggerPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsTriggerPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1376,8 +1475,14 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsTriggerPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsTriggerPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -1515,7 +1620,14 @@ caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitFloat64 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsFloat64PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+		DEBUG(log_info << "smsFloat64PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1532,8 +1644,14 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsFloat64PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
