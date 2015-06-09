@@ -324,7 +324,7 @@ caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsRunNumberPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -395,7 +395,7 @@ caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsRecordingPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -490,7 +490,7 @@ caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << m_value.get());
 	}
@@ -705,7 +705,7 @@ caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsBooleanPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -933,7 +933,7 @@ caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsConnectedPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -1214,7 +1214,7 @@ caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsUint32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -1332,7 +1332,7 @@ caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsInt32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -1456,7 +1456,7 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsTriggerPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
@@ -1623,7 +1623,7 @@ caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
-			RLL_PV_READ, m_pv_name, 60, 3, 60, log_info ) ) {
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		DEBUG(log_info << "smsFloat64PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v);
 	}
