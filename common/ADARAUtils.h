@@ -256,7 +256,10 @@ public:
 			ss << old;
 			ss << " Timestamps Marked Old out of ";
 			ss << lh->second.size();
-			ss << " Total Saved, Now Under Threshold of ";
+			ss << " Total Saved";
+			if ( lh->second.size() == old + 1 )
+				ss << " [ALL OLD]";
+			ss << ", Now Under Threshold of ";
 			ss << threshold;
 			ss << ".] ";
 			log_info.append(ss.str());
