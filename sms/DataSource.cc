@@ -33,21 +33,22 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_RAWDATA_PULSE_IN_PAST     3
 #define RLL_RAWDATA_PULSE_IN_FUTURE   4
 #define RLL_LOCAL_PACKET_SEQUENCE     5
-#define RLL_TRYING_CONN               6
-#define RLL_CONN_REFUSED              7
-#define RLL_CONN_REQUEST_ERROR        8
-#define RLL_CONN_FAILED               9
-#define RLL_READ_EXCEPTION           10
-#define RLL_READ_DELAY               11
-#define RLL_PULSEID_ZERO             12
-#define RLL_UNKNOWN_PACKET           13
-#define RLL_OVERSIZE_PACKET          14
-#define RLL_LOCAL_DUPLICATE_RTDL     15
-#define RLL_LOCAL_SAWTOOTH_RTDL      16
-#define RLL_LOCAL_RTDL_SEQUENCE      17
-#define RLL_RTDL_PULSE_IN_PAST       18
-#define RLL_RTDL_PULSE_IN_FUTURE     19
-#define RLL_HEARTBEAT                20
+#define RLL_WONT_CONN                 6
+#define RLL_TRYING_CONN               7
+#define RLL_CONN_REFUSED              8
+#define RLL_CONN_REQUEST_ERROR        9
+#define RLL_CONN_FAILED              10
+#define RLL_READ_EXCEPTION           11
+#define RLL_READ_DELAY               12
+#define RLL_PULSEID_ZERO             13
+#define RLL_UNKNOWN_PACKET           14
+#define RLL_OVERSIZE_PACKET          15
+#define RLL_LOCAL_DUPLICATE_RTDL     16
+#define RLL_LOCAL_SAWTOOTH_RTDL      17
+#define RLL_LOCAL_RTDL_SEQUENCE      18
+#define RLL_RTDL_PULSE_IN_PAST       19
+#define RLL_RTDL_PULSE_IN_FUTURE     20
+#define RLL_HEARTBEAT                21
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -386,9 +387,28 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	// Set Up Data Source Connection Timer...
 	try {
 		m_timer = new TimerAdapter<DataSource>(this);
-	} catch(...) {
-		freeaddrinfo(m_addrinfo);
-		throw;
+	}
+	catch (std::exception &e) {
+		if ( m_addrinfo != NULL ) {
+			freeaddrinfo(m_addrinfo);
+			m_addrinfo = NULL;
+		}
+		std::string msg("Unable to Create TimerAdapter for Data Source ");
+		msg += m_name;
+		msg += ": Bailing! ";
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
+	catch (...) {
+		if ( m_addrinfo != NULL ) {
+			freeaddrinfo(m_addrinfo);
+			m_addrinfo = NULL;
+		}
+		std::string msg("Unable to Create TimerAdapter for Data Source ");
+		msg += m_name;
+		msg += ": Bailing! ";
+		msg += "Unknown Exception.";
+		throw std::runtime_error(msg);
 	}
 
 	m_lastRTDLPulseId = 0;
@@ -411,7 +431,10 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 DataSource::~DataSource()
 {
-	freeaddrinfo(m_addrinfo);
+	if ( m_addrinfo != NULL ) {
+		freeaddrinfo(m_addrinfo);
+		m_addrinfo = NULL;
+	}
 	delete m_timer;
 	if (m_fdreg)
 		delete m_fdreg;
@@ -427,6 +450,8 @@ void DataSource::parseURI(std::string uri)
 	size_t pos = uri.find_first_of(':');
 	int rc;
 
+	// Extract Desired Service, if found...
+	// Set Node to Any Remainder.
 	if (pos != std::string::npos) {
 		node = uri.substr(0, pos);
 		if (pos != uri.length())
@@ -440,13 +465,24 @@ void DataSource::parseURI(std::string uri)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_CANONNAME | AI_V4MAPPED;
 
+	// Free Any Previous Address Info...
+	if ( m_addrinfo != NULL ) {
+		freeaddrinfo(m_addrinfo);
+		m_addrinfo = NULL;
+	}
+
 	rc = getaddrinfo(node.c_str(), service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
+		// *Don't* Throw Exception Here, Just Log Loudly & Thwart Connect!
 		std::string msg("Unable to lookup data source ");
 		msg += m_name;
 		msg += ": ";
 		msg += gai_strerror(rc);
-		throw std::runtime_error(msg);
+		ERROR("parseURI(): " << msg << " - *** Won't Attempt Connect!");
+		if ( m_addrinfo != NULL ) {
+			freeaddrinfo(m_addrinfo);
+			m_addrinfo = NULL;
+		}
 	}
 }
 
@@ -665,6 +701,18 @@ void DataSource::startConnect(void)
 		m_pvName->update(m_name, &now);
 	}
 
+	// Did the Address Lookup Succeed...?
+	if ( m_addrinfo == NULL ) {
+		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+				RLL_WONT_CONN, m_name,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "startConnect():"
+				<< " Invalid Address Info/Lookup for Data Source "
+				<< m_name << " - *** Won't Attempt to Connect...!");
+		}
+		goto error;
+	}
+
 	// Ready to Connect...
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_TRYING_CONN, m_name,
@@ -831,7 +879,9 @@ void DataSource::dataReady(void)
 		msg += m_name;
 		msg += "': ";
 		msg += e.what();
-		// *Don't* throw std::runtime_error(msg);
+		// *Don't* Throw std::runtime_error(msg), Just Log Instead...
+		ERROR("dataReady(): " << msg << " - Revert to Original"
+			<< " m_max_read_chunk=" << m_max_read_chunk);
 		// String parse failed, revert to original value...
 		tmp_max_read_chunk = m_max_read_chunk;
 	}
