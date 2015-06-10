@@ -1,13 +1,17 @@
 #ifndef COMBUSSMSMON_H
 #define COMBUSSMSMON_H
 
+#include <boost/property_tree/ptree.hpp>
 #include <stdint.h>
 #include <string>
 #include <time.h>
 #include <map>
 #include <epicsMessageQueue.h>
+#include <cadef.h>
+#include <epicsEvent.h>
 #include "combus/ComBus.h"
 #include "combus/SMSMessages.h"
+#include "SMSControlPV.h"
 
 class SMSRunStatus
 {
@@ -34,10 +38,9 @@ public:
 	ComBusSMSMon( std::string a_beam_sname, std::string a_facility );
 	~ComBusSMSMon();
 
-	void start( const std::string & a_domain,
-		const std::string & a_broker_uri,
-		const std::string & a_broker_user,
-		const std::string & a_broker_pass );
+	static void config(const boost::property_tree::ptree &conf);
+
+	void start(void);
 
 	// sendOriginal() is called at startup scan time,
 	// or when a new run is started.
@@ -49,8 +52,11 @@ public:
 	// Must be preceded by a sendOriginal for a given run.
 	void sendUpdate( uint32_t a_run_num, std::string a_run_state );
 
+	static void restartCB( event_handler_args);
+
 private:
 	void openComm();
+	void reOpenComm();
 	void commThread();
 
 	std::map<uint32_t, SMSRunStatus *> m_run_dict;
@@ -59,10 +65,21 @@ private:
 
 	std::string		m_beam_sname;
 	std::string		m_facility;
-	std::string		m_domain;
-	std::string		m_broker_uri;
-	std::string		m_broker_user;
-	std::string		m_broker_pass;
+
+	static std::string		m_domain;
+	static std::string		m_broker_uri;
+	static std::string		m_broker_user;
+	static std::string		m_broker_pass;
+
+	uint16_t		m_restart_combus;
+
+	epicsEvent *m_restartEvent;
+
+	boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
+	boost::shared_ptr<smsStringPV> m_pvDomain;
+	boost::shared_ptr<smsStringPV> m_pvBrokerURI;
+	boost::shared_ptr<smsStringPV> m_pvBrokerUser;
+	boost::shared_ptr<smsStringPV> m_pvBrokerPass;
 
 	boost::thread	*m_comm_thread;
 

@@ -1,3 +1,4 @@
+
 #include <fstream>
 #include <activemq/commands/Command.h>
 #include <decaf/io/EOFException.h>
@@ -14,8 +15,8 @@ namespace ADARA {
 namespace ComBus {
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//================= Translator Class ==================================================================================
+///////////////////////////////////////////////////////////////////////////
+//================= Translator Class ======================================
 
 
 /** \brief Translator constructor for Topic mode.
@@ -34,9 +35,9 @@ Connection::Translator::Translator( ITopicListener &a_listener )
 /** \brief Translator constructor for Command mode.
   * \param a_handler - IInputListener instance
   *
-  * This constructor builds a Translator for command mode (i.e. for instances
-  * that wish to subscribe to the command-input topic for the process). There
-  * can be only one command handler for a process.
+  * This constructor builds a Translator for command mode (i.e. for
+  * instances that wish to subscribe to the command-input topic for
+  * the process). There can be only one command handler for a process.
   */
 Connection::Translator::Translator( IInputListener &a_handler )
     : m_listener(0), m_handler(&a_handler)
@@ -47,8 +48,8 @@ Connection::Translator::Translator( IInputListener &a_handler )
 
 /** \brief Translator destructor.
   *
-  * This destructor disconnects from all topics before destroying the Translator
-  * instance.
+  * This destructor disconnects from all topics before destroying the
+  * Translator instance.
   */
 Connection::Translator::~Translator() throw()
 {
@@ -65,8 +66,8 @@ Connection::Translator::~Translator() throw()
 void
 Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 {
-    const cms::TextMessage *txtmsg = dynamic_cast<const cms::TextMessage*>(a_msg);
-
+    const cms::TextMessage *txtmsg =
+        dynamic_cast<const cms::TextMessage*>(a_msg);
 
     // ALL ComBus messages are TextMessages - ignore if not
     if ( !txtmsg )
@@ -76,32 +77,37 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
     {
         MessageBase *msg = Connection::makeMessage( *txtmsg );
 
-        // Generic ComBus messages are always broadcast, so are never directed
-        // at a particular process. If filtering is desired, it must be
-        // performed by the receiving process (in the comBusMessage callback).
-        // Input messages are always directed at a particular process, so no
-        // filtering is required.
-
+        // Generic ComBus messages are always broadcast, so are never
+        // directed at a particular process. If filtering is desired,
+        // it must be performed by the receiving process (in the
+        // comBusMessage callback).
+        // Input messages are always directed at a particular process,
+        // so no filtering is required.
         if ( m_listener )
             m_listener->comBusMessage( *msg );
-        else if ( msg->getMessageCategory() == CAT_INPUT && msg->getDestID() == m_proc_id )
+        else if ( msg->getMessageCategory()
+                == CAT_INPUT && msg->getDestID() == m_proc_id )
+        {
             m_handler->comBusInputMessage( *msg );
+        }
 
         delete msg;
     }
     catch(...)
     {
-    } // TODO - Should probably report exceptions somewhere
+        // TODO - Should probably report exceptions somewhere
+    }
 }
 
 
 /** \brief Attach translator to a topic
   * \param a_topic - Topic to attach to
   *
-  * This method attaches the Translator to the specified topic which will result
-  * in messages received from this topic being routed to the listener/handler.
-  * For command-mode, only the input topic ([domain].INPUT.[proc_name] should
-  * be attached.
+  * This method attaches the Translator to the specified topic which will
+  * result in messages received from this topic being routed to the
+  * listener/handler.
+  * For command-mode, only the input topic ([domain].INPUT.[proc_name]
+  * should be attached.
   */
 void
 Connection::Translator::attach( const std::string &a_topic )
@@ -129,7 +135,8 @@ Connection::Translator::attach( const std::string &a_topic )
 void
 Connection::Translator::detach( const std::string &a_topic )
 {
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop = m_topics.find( a_topic );
+    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
+        m_topics.find( a_topic );
     if ( itop != m_topics.end())
     {
         delete itop->second.second;
@@ -149,10 +156,12 @@ void
 Connection::Translator::connect_all()
 {
     Connection &conn = ComBus::Connection::getInst();
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop = m_topics.begin();
+    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
+        m_topics.begin();
     for ( ; itop != m_topics.end(); ++itop )
     {
-        // If called when still connected, clean-up current connections before proceeding
+        // If called when still connected, clean-up current connections
+        // before proceeding
         if ( itop->second.first )
         {
             delete itop->second.first;
@@ -164,7 +173,8 @@ Connection::Translator::connect_all()
             itop->second.second = 0;
         }
 
-        conn.createTopicConsumer( itop->first, &itop->second.first, &itop->second.second );
+        conn.createTopicConsumer( itop->first,
+            &itop->second.first, &itop->second.second );
         if ( itop->second.second )
             itop->second.second->setMessageListener( this );
     }
@@ -173,14 +183,16 @@ Connection::Translator::connect_all()
 
 /** \brief Disconnects all topics
   *
-  * This method disconnects all topics associated with the Translator. This
-  * method is used when exceptions are encountered while sending or receiving
-  * messages and allows recovery by the connection maintenance thread.
+  * This method disconnects all topics associated with the Translator.
+  * This method is used when exceptions are encountered while sending or
+  * receiving messages and allows recovery by the connection maintenance
+  * thread.
   */
 void
 Connection::Translator::disconnect_all()
 {
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop = m_topics.begin();
+    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
+        m_topics.begin();
     for ( ; itop != m_topics.end(); ++itop )
     {
         delete itop->second.second;
@@ -191,9 +203,8 @@ Connection::Translator::disconnect_all()
 }
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//================= Connection Class ==================================================================================
+///////////////////////////////////////////////////////////////////////////
+//================= Connection Class ======================================
 
 
 /// Initializes global Connection instance
@@ -210,46 +221,43 @@ Connection * Connection::g_inst = 0;
   * \param a_log_dir - Directory for back-up log output
   *
   * This constructor builds a(the) Connection instance from the provided
-  * parameters. If a Connection instance already exists, the constructor will
-  * throw an exception. The domain, broker uri, user name, and password may be
-  * changed later using the setConnection() method.
+  * parameters. If a Connection instance already exists, the constructor
+  * will throw an exception. The domain, broker uri, user name, and
+  * password may be changed later using the setConnection() method.
   */
-Connection::Connection(  const std::string &a_domain, const std::string &a_proc_name, uint32_t a_proc_inst,
-                         const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
-                         const std::string &a_log_dir )
-  : m_running(true), m_connected(false), m_domain(a_domain), m_proc_name(a_proc_name), m_proc_inst(a_proc_inst),
+Connection::Connection( const std::string &a_domain,
+        const std::string &a_proc_name, uint32_t a_proc_inst,
+        const std::string &a_broker_uri, const std::string &a_user,
+        const std::string &a_pass, const std::string &a_log_dir )
+    : m_running(true), m_connected(false), m_domain(a_domain),
+    m_proc_name(a_proc_name), m_proc_inst(a_proc_inst),
     m_input_listener(0), m_input_translator(0),
-    m_broker_uri(a_broker_uri), m_broker_user(a_user), m_broker_pass(a_pass),
-    m_connection(0), m_session(0), m_reconnect_thread(0), m_status_thread(0)
+    m_broker_uri(a_broker_uri), m_broker_user(a_user),
+    m_broker_pass(a_pass),
+    m_connection(0), m_session(0),
+    m_reconnect_thread(0), m_status_thread(0)
 {
     if ( g_inst )
-        throw std::runtime_error( "Only one instance of Connection class allowed." );
+    {
+        throw std::runtime_error(
+            "Only one instance of Connection class allowed." );
+    }
 
     // Apply default protocol & port if not set
-    if ( m_broker_uri.find("://") == string::npos )
-        m_broker_uri = string("tcp://") + m_broker_uri;
-
-    size_t pos = m_broker_uri.find_last_of(":"); // Will always return a valid pos b/c of code above
-    try
-    {
-        boost::lexical_cast<uint32_t>( m_broker_uri.substr( pos + 1 ));
-    }
-    catch ( boost::bad_lexical_cast &e )
-    {
-        m_broker_uri += string( ":61616" );
-    }
+    m_broker_uri = checkBrokerURI( m_broker_uri );
 
     // If base path is specified, ensure it ends with a '.' character
-    if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
-        m_domain += ".";
+    m_domain = checkDomain( m_domain );
 
-    m_proc_id += m_proc_name + "_" + boost::lexical_cast<string>(m_proc_inst);
+    m_proc_id += m_proc_name + "_"
+        + boost::lexical_cast<string>(m_proc_inst);
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_id + ".txt";
 
     activemq::library::ActiveMQCPP::initializeLibrary();
 
-    m_status_thread = new boost::thread( boost::bind( &Connection::connectionStatusNotifyThread, this ));
+    m_status_thread = new boost::thread( boost::bind(
+        &Connection::connectionStatusNotifyThread, this ));
 
     g_inst = this;
 }
@@ -257,9 +265,9 @@ Connection::Connection(  const std::string &a_domain, const std::string &a_proc_
 
 /** \brief Destructor for Connection class.
   *
-  * Since Connection is a singleton, calling this destructor will re-init the
-  * global Connection instance to NULL, and will allow another Connection
-  * instance to be subsequently created if desired.
+  * Since Connection is a singleton, calling this destructor will re-init
+  * the global Connection instance to NULL, and will allow another
+  * Connection instance to be subsequently created if desired.
   */
 Connection::~Connection() throw()
 {
@@ -286,16 +294,66 @@ Connection::~Connection() throw()
 /** \brief Gets the global Connection instance.
   * \return Connection instance pointer
   *
-  * This method returns the global Connection instance pointer. If no Connection
-  * instance has been created yet, an exception is thrown.
+  * This method returns the global Connection instance pointer.
+  * If no Connection instance has been created yet, an exception is thrown.
   */
 Connection&
 Connection::getInst()
 {
     if ( !g_inst )
-        throw std::runtime_error("No ComBus::Connection instance present.");
+    {
+        throw std::runtime_error(
+            "No ComBus::Connection instance present.");
+    }
 
     return *g_inst;
+}
+
+
+/** \brief Checks/fixes Broker URI (protocol and port) for Connection.
+  * \return Possibly-enhanced/corrected Broker URI string.
+  *
+  * This (static) method check the Broker URI string for the Connection,
+  * ensures it has the proper protocol ("tcp://"), and if omitted,
+  * supplies the default ComBus port (":61616").
+  */
+std::string&
+Connection::checkBrokerURI( std::string &a_broker_uri )
+{
+    // Apply default protocol if not set
+    if ( a_broker_uri.find("://") == string::npos )
+        a_broker_uri = string("tcp://") + a_broker_uri;
+
+    // Will always return a valid pos b/c of code above
+    size_t pos = a_broker_uri.find_last_of(":");
+    try
+    {
+        boost::lexical_cast<uint32_t>( a_broker_uri.substr( pos + 1 ) );
+    }
+    catch ( boost::bad_lexical_cast &e )
+    {
+        // Apply default port if not set
+        a_broker_uri += string( ":61616" );
+    }
+
+    return a_broker_uri;
+}
+
+
+/** \brief Checks/fixes Domain for Connection.
+  * \return Possibly-enhanced/corrected Domain string.
+  *
+  * This (static) method check the Domain string for the Connection,
+  * and ensures it has the proper trailing '.' character.
+  */
+std::string&
+Connection::checkDomain( std::string &a_domain )
+{
+    // If base path is specified, ensure it ends with a '.' character
+    if ( !a_domain.empty() && *a_domain.rbegin() != '.' )
+        a_domain += ".";
+
+    return a_domain;
 }
 
 
@@ -307,13 +365,15 @@ Connection::getInst()
   *
   * This method allows the AMQP connection parameters to be changed. If a
   * connection is active, it is disconnected and all topics are detached;
-  * however, status and control listeners are not detached. A new connection is
-  * started asynchronously before this method returns. All status listeners
-  * will be notified about the disconnect and subsequent connection events.
+  * however, status and control listeners are not detached. A new
+  * connection is started asynchronously before this method returns.
+  * All status listeners will be notified about the disconnect and
+  * subsequent connection events.
   */
 void
-Connection::setConnection( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_user,
-                           const std::string &a_pass )
+Connection::setConnection( const std::string &a_domain,
+        const std::string &a_broker_uri, const std::string &a_user,
+        const std::string &a_pass )
 {
     boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
@@ -328,6 +388,12 @@ Connection::setConnection( const std::string &a_domain, const std::string &a_bro
     m_broker_user = a_user;
     m_broker_pass = a_pass;
 
+    // Apply default protocol & port if not set
+    m_broker_uri = checkBrokerURI( m_broker_uri );
+
+    // If base path is specified, ensure it ends with a '.' character
+    m_domain = checkDomain( m_domain );
+
     lock.unlock();
 
     disconnect();
@@ -339,11 +405,11 @@ Connection::setConnection( const std::string &a_domain, const std::string &a_bro
 
 
 /** \brief Sets the input handler for the process
-  * \param a_input_listener - The new IInputListener instance for the process
+  * \param a_input_listener - New IInputListener instance for the process
   *
-  * This method sets the input (command) listener for the owning process. There
-  * can be only one input listener for a process, but it may be changed using
-  * this method if needed.
+  * This method sets the input (command) listener for the owning process.
+  * There can be only one input listener for a process, but it may be
+  * changed using this method if needed.
   */
 void
 Connection::setInputListener( IInputListener &a_input_listener )
@@ -365,8 +431,8 @@ Connection::setInputListener( IInputListener &a_input_listener )
   * \param a_timeout - Time to wait in seconds
   * \return True if connection was established; false otherwise
   *
-  * This method waits and blocks the caller up to the specified timeout (in
-  * seconds) for the AMQP connection to be established.
+  * This method waits and blocks the caller up to the specified timeout
+  * (in seconds) for the AMQP connection to be established.
   */
 bool
 Connection::waitForConnect( unsigned short a_timeout ) const
@@ -389,18 +455,22 @@ Connection::waitForConnect( unsigned short a_timeout ) const
 /** \brief AMQP connection thread.
   *
   * This method is a (re)connection thread that attempts to establish a new
-  * connection to the AMQP broker at a varying period. Initial retry period is
-  * 2 seconds, but after each failed attempt, the retry period is increased to
-  * a max of 10 seconds. Once a connection is established, this threas exits.
+  * connection to the AMQP broker at a varying period. Initial retry period
+  * is 2 seconds, but after each failed attempt, the retry period is
+  * increased to a max of 10 seconds. Once a connection is established,
+  * this thread exits.
+  *
   * This thread is started on-demand by the connectionStatusNotifyThread()
-  * thread. A condition var (m_status_cond) and m_status_mutex is used by this
-  * thread to notify the monitoring thread when the connection is established.
+  * thread. A condition var (m_status_cond) and m_status_mutex is used
+  * by this thread to notify the monitoring thread when the connection
+  * is established.
   */
 void
 Connection::reconnectThread()
 {
     unsigned short retry_period = 2;
-    boost::unique_lock<boost::mutex> lock( m_status_mutex, boost::defer_lock );
+    boost::unique_lock<boost::mutex> lock( m_status_mutex,
+        boost::defer_lock );
 
     while( 1 )
     {
@@ -414,18 +484,28 @@ Connection::reconnectThread()
 
         try
         {
-            m_connection = dynamic_cast<activemq::core::ActiveMQConnection*>( factory.createConnection( m_broker_user, m_broker_pass ) );
+            m_connection =
+                dynamic_cast<activemq::core::ActiveMQConnection*>(
+                    factory.createConnection(
+                        m_broker_user, m_broker_pass ) );
             if ( !m_connection )
-                throw std::runtime_error( "Failed to create ActiveMQConnection" );
+            {
+                throw std::runtime_error(
+                    "Failed to create ActiveMQConnection" );
+            }
 
             m_connection->start();
-            m_session = m_connection->createSession( cms::Session::AUTO_ACKNOWLEDGE );
+
+            m_session = m_connection->createSession(
+                cms::Session::AUTO_ACKNOWLEDGE );
 
             m_connected = true;
+
             lock.unlock();
 
             // Reconnect all message consumers
-            for ( map<ITopicListener*,Translator*>::iterator il = m_listeners.begin(); il != m_listeners.end(); ++il )
+            for ( map<ITopicListener*,Translator*>::iterator il =
+                    m_listeners.begin(); il != m_listeners.end(); ++il )
             {
                 il->second->connect_all();
             }
@@ -442,6 +522,8 @@ Connection::reconnectThread()
         }
         catch(...)
         {
+            // TODO - Should probably report exceptions somewhere
+
             delete m_session;
             m_session = 0;
             delete m_connection;
@@ -454,7 +536,8 @@ Connection::reconnectThread()
 
         lock.unlock();
 
-        // TODO Replace with a timed cond var wait so destructor can interrupt this thread
+        // TODO Replace with a timed cond var wait so destructor
+        // can interrupt this thread
         sleep( retry_period );
     }
 
@@ -468,10 +551,10 @@ Connection::reconnectThread()
 
 /** \brief AMQP connection montioring thread.
   *
-  * This thread monitors the AMQP connection, notifies listeners on connection
-  * state changes, and initiates the reconnectThread when the connection is
-  * lost. A condition var (m_status_cond) and m_status_mutex are used by this
-  * thread to sleep until the connection is established.
+  * This thread monitors the AMQP connection, notifies listeners on
+  * connection state changes, and initiates the reconnectThread when the
+  * connection is lost. A condition var (m_status_cond) and m_status_mutex
+  * are used by this thread to sleep until the connection is established.
   */
 void
 Connection::connectionStatusNotifyThread()
@@ -490,16 +573,22 @@ Connection::connectionStatusNotifyThread()
         if ( last_connection_state != m_connected )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
-            for ( vector<IConnectionListener*>::iterator l = m_status_listeners.begin(); l != m_status_listeners.end(); ++l )
+            for ( vector<IConnectionListener*>::iterator l =
+                        m_status_listeners.begin();
+                    l != m_status_listeners.end(); ++l )
+            {
                 (*l)->comBusConnectionStatus( m_connected );
+            }
 
             last_connection_state = m_connected;
         }
 
-        // If not connected, and reconnect thread is not running, start reconnect thread
+        // If not connected, and reconnect thread is not running,
+        // start reconnect thread
         if ( !m_connected && !m_reconnect_thread )
         {
-            m_reconnect_thread = new boost::thread( boost::bind( &Connection::reconnectThread, this ));
+            m_reconnect_thread = new boost::thread( boost::bind(
+                &Connection::reconnectThread, this ));
         }
 
         // Wait for status condition var to be signalled
@@ -522,7 +611,8 @@ Connection::disconnect()
         m_connected = false;
 
         // Disconnect all message producers
-        map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator ip = m_producer_topics.begin();
+        map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator ip =
+            m_producer_topics.begin();
         for ( ; ip != m_producer_topics.end(); ++ip )
         {
             delete ip->second.second;
@@ -531,7 +621,8 @@ Connection::disconnect()
         m_producer_topics.clear();
 
         // Disconnect all message consumers
-        for ( map<ITopicListener*,Translator*>::iterator il = m_listeners.begin(); il != m_listeners.end(); ++il )
+        for ( map<ITopicListener*,Translator*>::iterator il =
+                m_listeners.begin(); il != m_listeners.end(); ++il )
         {
             il->second->disconnect_all();
         }
@@ -554,7 +645,8 @@ Connection::disconnect()
 /** \brief Broadcasts status of process
   * \param a_status - Status to broadcast
   *
-  * This method may be used by clients to broadcast status from a watchdog thread.
+  * This method may be used by clients to broadcast status from a
+  * watchdog thread.
   */
 bool
 Connection::status( StatusCode a_status )
@@ -566,7 +658,8 @@ Connection::status( StatusCode a_status )
 
 /// The log API is not currently used...
 bool
-Connection::log( const std::string &a_msg, Level a_level, const char *a_file, uint32_t a_line, uint32_t a_tid )
+Connection::log( const std::string &a_msg, Level a_level,
+        const char *a_file, uint32_t a_line, uint32_t a_tid )
 {
     bool res = false;
 
@@ -582,7 +675,9 @@ Connection::log( const std::string &a_msg, Level a_level, const char *a_file, ui
         ofstream outf( m_log_file.c_str(), ios_base::out | ios_base::app );
         if ( outf.is_open() )
         {
-            outf << time(0) << "," << a_level << ",\"" << a_msg << "\"," << (a_file?a_file:"") << "," << a_line << "," << a_tid << endl;
+            outf << time(0) << "," << a_level << ",\"" << a_msg << "\","
+                 << (a_file?a_file:"") << "," << a_line << "," << a_tid
+                 << endl;
             outf.close();
         }
     }
@@ -595,8 +690,8 @@ Connection::log( const std::string &a_msg, Level a_level, const char *a_file, ui
   * \param a_msg - Message to broadcast
   * \return True if message is sent; false otherwise
   *
-  * This method broadcasts the provided message on the appropriate topic given
-  * the message category.
+  * This method broadcasts the provided message on the appropriate topic
+  * given the message category.
   */
 bool
 Connection::broadcast( MessageBase &a_msg )
@@ -615,12 +710,15 @@ Connection::broadcast( MessageBase &a_msg )
             a_msg.serialize( *cmsmsg );
 
             string topic = a_msg.getTopic();
-            map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( topic );
+            map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator
+                itop = m_producer_topics.find( topic );
             if ( itop == m_producer_topics.end())
             {
-                // First message sent on this topic, create producer and put in "cache"
+                // First message sent on this topic,
+                // create producer and put in "cache"
                 pair<cms::Topic*,cms::MessageProducer*> p;
-                p.first = m_session->createTopic( m_domain + topic + "." + m_proc_name );
+                p.first = m_session->createTopic(
+                    m_domain + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
                 m_producer_topics[topic] = p;
                 p.second->send( cmsmsg );
@@ -635,6 +733,8 @@ Connection::broadcast( MessageBase &a_msg )
         }
         catch(...)
         {
+            // TODO - Should probably report exceptions somewhere
+
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
@@ -651,18 +751,21 @@ Connection::broadcast( MessageBase &a_msg )
   * \param a_correlation_id - Correlation ID to use (optional)
   * \return True if message is sent; false otherwise
   *
-  * This method sends a mesage to the INPUT topic associated with the specified
-  * recipient. If the message sent is the first of a "conversation", then the
-  * correlation ID should be left empty (null) as it will be filled-in on the
-  * message itself when the message is successfully sent. If the message is a
-  * continuation of an ongoing conversation, then the correlation ID of that
-  * conversation should be passed-in (if not, the recipient will assume this is
-  * a new conversation). The life cycle of conversations is application-
-  * specific and both parties must implement the same life cycle (i.e. how long
-  * correlation IDs and associated state information is maintained).
+  * This method sends a mesage to the INPUT topic associated with the
+  * specified recipient. If the message sent is the first of a
+  * "conversation", then the correlation ID should be left empty (null)
+  * as it will be filled-in on the message itself when the message is
+  * successfully sent. If the message is a continuation of an ongoing
+  * conversation, then the correlation ID of that conversation should
+  * be passed-in (if not, the recipient will assume this is a new
+  * conversation). The life cycle of conversations is application-
+  * specific and both parties must implement the same life cycle
+  * (i.e. how long correlation IDs and associated state information
+  * is maintained).
   */
 bool
-Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const std::string *a_correlation_id )
+Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id,
+        const std::string *a_correlation_id )
 {
     bool res = false;
 
@@ -675,19 +778,24 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const s
         {
             try
             {
-                a_msg.setRoutingInfo( m_proc_id, a_dest_proc_id, time(0), a_correlation_id );
+                a_msg.setRoutingInfo( m_proc_id, a_dest_proc_id, time(0),
+                    a_correlation_id );
 
                 cmsmsg = m_session->createTextMessage();
                 a_msg.serialize( *cmsmsg );
 
                 string dest_proc_name( a_dest_proc_id.substr( 0, pos ));
 
-                map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator itop = m_producer_topics.find( dest_proc_name );
+                map<string, pair<cms::Topic*, cms::MessageProducer*> >
+                    ::iterator itop =
+                        m_producer_topics.find( dest_proc_name );
                 if ( itop == m_producer_topics.end())
                 {
-                    // First message sent on this topic, create producer and put in "cache"
+                    // First message sent on this topic,
+                    // create producer and put in "cache"
                     pair<cms::Topic*,cms::MessageProducer*> pr;
-                    pr.first = m_session->createTopic( m_domain + "INPUT." + dest_proc_name );
+                    pr.first = m_session->createTopic(
+                        m_domain + "INPUT." + dest_proc_name );
                     pr.second = m_session->createProducer( pr.first );
                     m_producer_topics[dest_proc_name] = pr;
 
@@ -698,7 +806,8 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const s
                     itop->second.second->send( cmsmsg );
                 }
 
-                // If the correl ID is requested (not set or empty), use the current message ID (receiver will use same)
+                // If the correl ID is requested (not set or empty),
+                // use the current message ID (receiver will use same)
                 if ( !a_correlation_id || a_correlation_id->empty() )
                     a_msg.setCorrelationID( cmsmsg->getCMSMessageID() );
 
@@ -707,6 +816,8 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id, const s
             }
             catch(...)
             {
+                // TODO - Should probably report exceptions somewhere
+
                 // An exception indicates a loss of connection
                 delete cmsmsg;
                 disconnect();
@@ -736,8 +847,11 @@ Connection::postWorkflow( MessageBase &a_msg )
 
         try
         {
-            auto_ptr<cms::Queue>                q( m_session->createQueue( "POSTPROCESS.DATA_READY" ));
-            auto_ptr<cms::MessageProducer>      producer( m_session->createProducer( q.get()) );
+            auto_ptr<cms::Queue> q( m_session->createQueue(
+                "POSTPROCESS.DATA_READY" ));
+
+            auto_ptr<cms::MessageProducer> producer(
+                m_session->createProducer( q.get()) );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
@@ -748,6 +862,8 @@ Connection::postWorkflow( MessageBase &a_msg )
         }
         catch(...)
         {
+            // TODO - Should probably report exceptions somewhere
+
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
@@ -761,17 +877,18 @@ Connection::postWorkflow( MessageBase &a_msg )
   * \param a_msg - A received AMQP text message.
   * \return A new ComBus message as a MessageBase pointer
   *
-  * This method examines the provided AMQP TextMessage and based on the expected
-  * JSON payload, constructs a corresponding ComBus message and unserializes the
-  * received payload into the new message. An exception will be thrown if the
-  * message payload is not structured correctly.
+  * This method examines the provided AMQP TextMessage and based on the
+  * expected JSON payload, constructs a corresponding ComBus message and
+  * unserializes the received payload into the new message. An exception
+  * will be thrown if the message payload is not structured correctly.
   */
 MessageBase*
 Connection::makeMessage( const cms::TextMessage &a_msg )
 {
-    // Due to constraints imposed by the RESTful interface, the message type
-    // must be supplied in the message body. This means that the body must be
-    // parsed here first to extract the message type (for object creation).
+    // Due to constraints imposed by the RESTful interface, the message
+    // type must be supplied in the message body. This means that the
+    // body must be parsed here first to extract the message type
+    // (for object creation).
 
     boost::property_tree::ptree prop_tree;
     std::stringstream sstr( a_msg.getText() );
@@ -797,7 +914,9 @@ void
 Connection::attach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IConnectionListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
+    vector<IConnectionListener*>::iterator l =
+        find( m_status_listeners.begin(), m_status_listeners.end(),
+            &a_subscriber );
     if ( l == m_status_listeners.end() )
     {
         m_status_listeners.push_back( &a_subscriber );
@@ -813,7 +932,9 @@ void
 Connection::detach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IConnectionListener*>::iterator l = find( m_status_listeners.begin(), m_status_listeners.end(), &a_subscriber );
+    vector<IConnectionListener*>::iterator l =
+        find( m_status_listeners.begin(), m_status_listeners.end(),
+            &a_subscriber );
     if ( l != m_status_listeners.end() )
     {
         m_status_listeners.erase( l );
@@ -825,16 +946,18 @@ Connection::detach( IConnectionListener  &a_subscriber )
   * \param a_listener - Listener to attach topic to
   * \param a_topic - New topic to listen to
   *
-  * This method attaches the specified topic to the specified listener. Once
-  * connected, all messages received on this topic will be routed to the
-  * listener via the comBusMessage() callback.
+  * This method attaches the specified topic to the specified listener.
+  * Once connected, all messages received on this topic will be routed
+  * to the listener via the comBusMessage() callback.
   */
 void
-Connection::attach( ITopicListener &a_listener, const std::string &a_topic )
+Connection::attach( ITopicListener &a_listener,
+        const std::string &a_topic )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l = m_listeners.find(&a_listener);
+    map<ITopicListener*,Translator*>::iterator l =
+        m_listeners.find(&a_listener);
     if ( l == m_listeners.end())
     {
         Translator *trans = new Translator(a_listener);
@@ -855,15 +978,17 @@ Connection::attach( ITopicListener &a_listener, const std::string &a_topic )
   * This method detaches the specified topic from the specified listener.
   */
 void
-Connection::detach( ITopicListener &a_listener, const std::string &a_topic )
+Connection::detach( ITopicListener &a_listener,
+        const std::string &a_topic )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l = m_listeners.find( &a_listener );
+    map<ITopicListener*,Translator*>::iterator l =
+        m_listeners.find( &a_listener );
     if ( l != m_listeners.end())
     {
-        // If the listener is attached to topic, ask associated translator to
-        // detach from topic.
+        // If the listener is attached to topic, ask associated translator
+        // to detach from topic.
 
         l->second->detach( m_domain + a_topic );
         if ( !l->second->haveTopics() )
@@ -887,7 +1012,8 @@ Connection::detach( ITopicListener &a_listener )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l = m_listeners.find( &a_listener );
+    map<ITopicListener*,Translator*>::iterator l =
+        m_listeners.find( &a_listener );
     if ( l != m_listeners.end())
     {
         delete l->second;
@@ -901,12 +1027,14 @@ Connection::detach( ITopicListener &a_listener )
   * \param a_topic - Outputs new cms::Topic pointer
   * \param a_consumer - Outputs new cms::MessageConsumer pointer
   *
-  * This is a helper method that tries to create the AMQP topic and consumer
-  * objects needed for connecting to a topic. If not connected, no seesion
-  * is established, or an error occurs, the outputs will be null pointers.
+  * This is a helper method that tries to create the AMQP topic and
+  * consumer objects needed for connecting to a topic. If not connected,
+  * no session is established, or an error occurs, the outputs will be
+  * null pointers.
   */
 void
-Connection::createTopicConsumer( const string &a_topic_name, cms::Topic **a_topic, cms::MessageConsumer **a_consumer )
+Connection::createTopicConsumer( const string &a_topic_name,
+       cms::Topic **a_topic, cms::MessageConsumer **a_consumer )
 {
     if ( m_connected )
     {
@@ -920,6 +1048,8 @@ Connection::createTopicConsumer( const string &a_topic_name, cms::Topic **a_topi
         }
         catch(...)
         {
+            // TODO - Should probably report exceptions somewhere
+
             *a_topic = 0;
             *a_consumer = 0;
         }
@@ -927,4 +1057,6 @@ Connection::createTopicConsumer( const string &a_topic_name, cms::Topic **a_topi
 }
 
 
-}}
+} // End ComBus namespace
+} // End ADARA namespace
+

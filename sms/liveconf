@@ -38,6 +38,9 @@ idName["monitor"]="BeamMonitor"
 is_indexed["bankset"]=1
 idName["bankset"]="DetectorBankSet"
 
+is_indexed["combus"]=0
+idName["combus"]="ComBus"
+
 is_indexed["storage"]=0
 idName["storage"]="Storage"
 
@@ -223,6 +226,46 @@ option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
 option_label[$num_options]="[NeXus File NXentry Suffix for Detector Set]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="combus"
+option_name[$num_options]="restart"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:Combus:Restart"
+option_value_type[$num_options]="BOOL_VALUE(Trigger ComBus Restart)"
+option_label[$num_options]="[Trigger ComBus Restart & Reconnect]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="domain"
+option_pv[$num_options]="SMS:Combus:Domain"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Domain Name.)"
+option_label[$num_options]="[ComBus Domain]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_uri"
+option_pv[$num_options]="SMS:Combus:BrokerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker URI tcp://host:port)"
+option_label[$num_options]="[ComBus Broker URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_user"
+option_pv[$num_options]="SMS:Combus:BrokerUser"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker User)"
+option_label[$num_options]="[ComBus Broker User]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_pass"
+option_pv[$num_options]="SMS:Combus:BrokerPass"
+option_value_type[$num_options]="STRING(ComBus Broker Password)"
+option_pv_opt[$num_options]="-S"
+option_label[$num_options]="[ComBus Broker Password]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
@@ -301,7 +344,8 @@ USAGE()
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
-	echo "            [bmon_status] [detset_status] [live_status] \\"
+	echo "            [bmon_status] [detset_status] [combus_status] \\"
+	echo "            [live_status] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -325,6 +369,7 @@ USAGE()
 	echo "   sys_status            = display SMS internal system status"
 	echo "   bmon_status           = display SMS BeamMonitorConfig status"
 	echo "   detset_status         = display SMS DetectorBankSet status"
+	echo "   combus_status         = display SMS ComBus status"
 	echo "   live_status           = display SMS live client status"
 	echo
 
@@ -490,6 +535,7 @@ if [[ "$command" == "status" \
 		|| "$command" == "sys_status" \
 		|| "$command" == "bmon_status" \
 		|| "$command" == "detset_status" \
+		|| "$command" == "combus_status" \
 		|| "$command" == "live_status" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
@@ -593,6 +639,7 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
+
 	fi
 
 	if [[ "$command" == "status" \
@@ -642,6 +689,22 @@ if [[ "$command" == "status" \
 				echo
 			done
 		fi
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "combus_status" ]]; then
+
+		caget $WAIT -S ${PRE}:SMS:Combus:Restart
+
+		echo
+
+		caget $WAIT -S ${PRE}:SMS:Combus:Domain
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerURI
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerUser
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerPass
+
+		echo
+
 	fi
 
 	if [[ "$command" == "status" \

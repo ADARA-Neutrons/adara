@@ -1,12 +1,13 @@
+
 #include "EPICS.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
 
-#include <stdint.h>
-
 #include <gddApps.h>
+
+#include <stdint.h>
 
 #include "Logging.h"
 
@@ -20,6 +21,8 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
 #define RLL_CONNPV_FAILED             2
 #define RLL_CONNPV_TRYING             3
 #define RLL_CONNPV_WAITING            4
+#define RLL_PV_READ                   5
+#define RLL_PV_WRITE                  6
 
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
@@ -168,10 +171,10 @@ void smsPV::initReadTable(void)
 	m_read_table.installReadFunc("alarmLow", &smsPV::defaultNumber);
 	m_read_table.installReadFunc("alarmHighWarning", &smsPV::defaultNumber);
 	m_read_table.installReadFunc("alarmLowWarning", &smsPV::defaultNumber);
-	m_read_table.installReadFunc("controlHigh", &smsPV::defaultNumber);
-	m_read_table.installReadFunc("controlLow", &smsPV::defaultNumber);
-	m_read_table.installReadFunc("graphicHigh", &smsPV::defaultNumber);
-	m_read_table.installReadFunc("graphicLow", &smsPV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh", &smsPV::maximumNumber);
+	m_read_table.installReadFunc("controlLow", &smsPV::minimumNumber);
+	m_read_table.installReadFunc("graphicHigh", &smsPV::maximumNumber);
+	m_read_table.installReadFunc("graphicLow", &smsPV::minimumNumber);
 	m_read_table.installReadFunc("precision", &smsPV::defaultNumber);
 	m_read_table.installReadFunc("units", &smsPV::defaultString);
 }
@@ -255,6 +258,18 @@ gddAppFuncTableStatus smsPV::defaultString(gdd &in)
 	return S_cas_success;
 }
 
+gddAppFuncTableStatus smsPV::minimumNumber(gdd &in)
+{
+	in.put(-1.7976931348623157E308);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsPV::maximumNumber(gdd &in)
+{
+	in.put(1.7976931348623157E308);
+	return S_cas_success;
+}
+
 /* ----------------------------------------------------------------------- */
 
 smsReadOnlyChannel::smsReadOnlyChannel(const casCtx &cas) : casChannel(cas)
@@ -306,8 +321,14 @@ caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRunNumberPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsRunNumberPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -371,8 +392,14 @@ caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsRecordingPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsRecordingPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -387,8 +414,14 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsRecordingPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsRecordingPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -455,8 +488,12 @@ gddAppFuncTableStatus smsStringPV::getValue(gdd &in)
 
 caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
-	DEBUG("smsStringPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << m_value.get());
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << m_value.get());
+	}
 	return m_read_table.read(*this, prototype);
 }
 
@@ -468,8 +505,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	 * as an unset request.
 	 */
 	if (val.isScalar() && val.primitiveType() == aitEnumUint8) {
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Null String, Unset Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Null String, Unset Value.");
+		}
 		unset();
 		return S_cas_success;
 	}
@@ -496,8 +538,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	/* Writing no elements will be considered an unset request.
 	 */
 	if (!nelem) {
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Writing No Elements, Unset Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Writing No Elements, Unset Value.");
+		}
 		unset();
 		return S_cas_success;
 	}
@@ -507,8 +554,13 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		 * send a notification to any watchers, and just return
 		 * success.
 		 */
-		DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " Updates Not Allowed, Ignore Value.");
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " Updates Not Allowed, Ignore Value.");
+		}
 		notify();
 		return S_casApp_success;
 	}
@@ -520,8 +572,12 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
 
-	DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << new_str);
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsStringPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << new_str);
+	}
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
@@ -646,8 +702,14 @@ caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsBooleanPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsBooleanPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -664,8 +726,14 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsBooleanPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsBooleanPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -862,8 +930,14 @@ caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsConnectedPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -880,8 +954,14 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsConnectedPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsConnectedPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -1028,8 +1108,15 @@ void smsConnectedPV::changed(void)
 
 /* ----------------------------------------------------------------------- */
 
-smsUint32PV::smsUint32PV(const std::string &name) : smsPV(name)
+smsUint32PV::smsUint32PV(const std::string &name,
+		uint32_t min, uint32_t max) : smsPV(name)
 {
+	// Apply Min and Max Limits
+	m_min = min;
+	m_max = max;
+
+	initReadTable();
+
 	struct timespec ts;
 
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -1054,11 +1141,84 @@ gddAppFuncTableStatus smsUint32PV::getValue(gdd &in)
 	return S_cas_success;
 }
 
+gddAppFuncTableStatus smsUint32PV::getEnums(gdd &)
+{
+	return S_gddAppFuncTable_badType;
+}
+
+void smsUint32PV::initReadTable(void)
+{
+	m_read_table.installReadFunc("value", &smsUint32PV::getValue);
+	m_read_table.installReadFunc("enums", &smsUint32PV::getEnums);
+
+	/* These are not currently used by any child classes */
+	/* However, we are applying defaults so that clients requesting
+	 * DBR_CTRL types won't complain so much.
+	 */
+	m_read_table.installReadFunc("alarmHigh",
+		&smsUint32PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLow",
+		&smsUint32PV::defaultNumber);
+	m_read_table.installReadFunc("alarmHighWarning",
+		&smsUint32PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLowWarning",
+		&smsUint32PV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh",
+		&smsUint32PV::maximumNumber);
+	m_read_table.installReadFunc("controlLow",
+		&smsUint32PV::minimumNumber);
+	m_read_table.installReadFunc("graphicHigh",
+		&smsUint32PV::maximumNumber);
+	m_read_table.installReadFunc("graphicLow",
+		&smsUint32PV::minimumNumber);
+	m_read_table.installReadFunc("precision",
+		&smsUint32PV::defaultNumber);
+	m_read_table.installReadFunc("units",
+		&smsUint32PV::defaultString);
+}
+
+gddAppFuncTableStatus smsUint32PV::defaultNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
+	val->put(0);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsUint32PV::defaultString(gdd &in)
+{
+	in.put("");
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsUint32PV::minimumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
+	val->put(m_min);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsUint32PV::maximumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumUint32);
+	val->put(m_max);
+	in.put(val);
+	return S_cas_success;
+}
+
 caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsUint32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsUint32PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1075,8 +1235,14 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsUint32PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -1163,7 +1329,14 @@ caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitInt32 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsInt32PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsInt32PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1180,8 +1353,14 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsInt32PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsInt32PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;
@@ -1274,8 +1453,14 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitUint16 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsTriggerPV::read() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsTriggerPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1290,8 +1475,14 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsTriggerPV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsTriggerPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	if (v > 1)
 		return S_casApp_noSupport;
 
@@ -1326,8 +1517,15 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 /* ----------------------------------------------------------------------- */
 
-smsFloat64PV::smsFloat64PV(const std::string &name) : smsPV(name)
+smsFloat64PV::smsFloat64PV(const std::string &name,
+		double min, double max) : smsPV(name)
 {
+	// Apply Min and Max Limits
+	m_min = min;
+	m_max = max;
+
+	initReadTable();
+
 	struct timespec ts;
 
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -1352,11 +1550,84 @@ gddAppFuncTableStatus smsFloat64PV::getValue(gdd &in)
 	return S_cas_success;
 }
 
+gddAppFuncTableStatus smsFloat64PV::getEnums(gdd &)
+{
+	return S_gddAppFuncTable_badType;
+}
+
+void smsFloat64PV::initReadTable(void)
+{
+	m_read_table.installReadFunc("value", &smsFloat64PV::getValue);
+	m_read_table.installReadFunc("enums", &smsFloat64PV::getEnums);
+
+	/* These are not currently used by any child classes */
+	/* However, we are applying defaults so that clients requesting
+	 * DBR_CTRL types won't complain so much.
+	 */
+	m_read_table.installReadFunc("alarmHigh",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLow",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmHighWarning",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("alarmLowWarning",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("controlHigh",
+		&smsFloat64PV::maximumNumber);
+	m_read_table.installReadFunc("controlLow",
+		&smsFloat64PV::minimumNumber);
+	m_read_table.installReadFunc("graphicHigh",
+		&smsFloat64PV::maximumNumber);
+	m_read_table.installReadFunc("graphicLow",
+		&smsFloat64PV::minimumNumber);
+	m_read_table.installReadFunc("precision",
+		&smsFloat64PV::defaultNumber);
+	m_read_table.installReadFunc("units",
+		&smsFloat64PV::defaultString);
+}
+
+gddAppFuncTableStatus smsFloat64PV::defaultNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(0.0);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::defaultString(gdd &in)
+{
+	in.put("");
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::minimumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(m_min);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::maximumNumber(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(m_max);
+	in.put(val);
+	return S_cas_success;
+}
+
 caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 {
 	aitFloat64 uninitialized_var(v);
 	m_value->get(v);
-	DEBUG("smsFloat64PV::read() m_pv_name=" << m_pv_name << " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsFloat64PV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	return m_read_table.read(*this, prototype);
 }
 
@@ -1373,8 +1644,14 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	val.get(v);
-	DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
-		<< " value=" << v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsFloat64PV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
 	m_value->get(cur);
 	if (v == cur)
 		return S_casApp_success;

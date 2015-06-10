@@ -158,11 +158,6 @@ private:
 	static bool m_dailyExhausted;
 	static std::list<std::string> m_dailyCache;
 
-	static std::string m_domain;
-	static std::string m_broker_uri;
-	static std::string m_broker_user;
-	static std::string m_broker_pass;
-
 	static ComBusSMSMon *m_combus;
 
 	static uint32_t readRunFile(const char *path, bool notify);
