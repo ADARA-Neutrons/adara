@@ -1,7 +1,7 @@
 #include <iostream>
+#include <string>
 #include <syslog.h>
 #include <alarm.h>
-#include <time.h>
 
 #include "CoreDefs.h"
 #include "TraceException.h"
@@ -16,6 +16,8 @@ using namespace std;
 
 namespace PVS {
 namespace EPICS {
+
+#define DEVICE_START_TIMEOUT 30
 
 //-------------------------------------------------------------------------------------------------
 // PUBLIC DeviceAgent Methods
@@ -32,8 +34,9 @@ namespace EPICS {
  */
 DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context )
     : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true),
-      m_epics_context(a_epics_context), m_tid(0)
+      m_epics_context(a_epics_context)
 {
+    m_monitor_thread = new boost::thread( boost::bind( &DeviceAgent::monitorThread, this ));
     m_ctrl_thread = new boost::thread( boost::bind( &DeviceAgent::controlThread, this ));
 
     update(a_device);
@@ -56,11 +59,21 @@ DeviceAgent::~DeviceAgent()
     // Wake up ctrl thread and wait for it to exit
     m_state_cond.notify_one();
     m_ctrl_thread->join();
+    m_monitor_thread->join();
+
+    // Get mutex in case timer callback is currently active
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+    if ( m_dev_desc )
+    {
+        delete m_dev_desc;
+        m_dev_desc = 0;
+    }
+    lock.unlock();
 }
 
 
 /**
- * @brief Handles new or updated to device descriptors
+ * @brief Handles new or updated device descriptors
  * @param a_device - DeviceDescriptor for new/updated device
  *
  * This method is used to establish or update EPICS connections when a new device is defined or the
@@ -450,6 +463,136 @@ DeviceAgent::controlThread()
     }
 }
 
+/**
+ * @brief Monitors device start-up and generates alarm if needed
+ *
+ * A device descriptor packet is only injected into the output stream when a
+ * device becomes fully active. For EPICS, this means all configured process
+ * variables are connected and any required metadata has been receieved;
+ * however, PV error codes do not impact the "readiness" of a device. If a
+ * device does not become ready within a configured timeout, this thread
+ * will generate a ComBus signal alerting any monitoring processes that the
+ * device is in a hung state. This signal will persist until the device
+ * becomes ready, or the DeviceAgent instance is destroyed (i.e. pvsd is
+ * reconfigured or shutdown).
+ */
+void
+DeviceAgent::monitorThread()
+{
+    enum DeviceStartupState
+    {
+        DSS_INITIALIZING,
+        DSS_FAULT,
+        DSS_READY
+    };
+
+    timer_t             tid;
+    struct sigevent     timer_cfg;
+    struct itimerspec   timeout;
+    string              sid;
+    string              dev_name;
+    string              message;
+    DeviceStartupState  state = DSS_READY;
+
+    // Create but don't start timer
+    memset( &timer_cfg, 0, sizeof(struct sigevent));
+    timer_cfg.sigev_notify = SIGEV_NONE;
+    timer_create( CLOCK_REALTIME, &timer_cfg, &tid );
+
+    /* Note: it is possible for devices to change state quickly without this
+     * monitor loop from ever noticing. This is fine since the only purpose of
+     * the loop is to detect slow/hung devices. It's also possible for an
+     * initializing device to be reconfigured before is becomes "ready" which
+     * is also OK - but if the total initialization time takes too long it
+     * could cause a signal to be asserted briefly (this is unlikely). If a
+     * hung device is reconfigured (which is likely), then the asserted signal
+     * will be properly retracted when it is finally ready.
+     */
+
+    // Run until DeviceAgent is shutdown/destroyed
+    while( m_active )
+    {
+        sleep(1);
+
+        boost::unique_lock<boost::mutex> lock(m_mutex);
+
+        switch( state )
+        {
+            case DSS_INITIALIZING: // Timer running - device not ready yet
+                // Is device ready? If so, stop timer and go to READY
+                if ( m_defined )
+                {
+                    // Change state
+                    state = DSS_READY;
+                }
+                else
+                {
+                    // Else did timer expire? If so, assert signal and go to FAULT state
+                    timer_gettime( tid, &timeout );
+                    if ( timeout.it_value.tv_sec == 0 && timeout.it_value.tv_nsec == 0 )
+                    {
+                        dev_name = m_dev_desc->m_name;
+                        sid = string("SID_EPICS_DEV_") + dev_name;
+                        message = string("Device (") + dev_name + ") has hung while initializing";
+                        ADARA::ComBus::SignalAssertMessage sigmsg( sid, "EPICS", message, ADARA::ERROR );
+                        ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
+
+                        // Also log the error
+                        syslog( LOG_ERR, message.c_str() );
+
+                        if ( m_dev_record.get() )
+                        {
+                            m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+                            m_dev_record.reset();
+                        }
+
+                        // Change state
+                        state = DSS_FAULT;
+                    }
+                }
+                break;
+            case DSS_FAULT: // Timer stopped - device not ready
+                // Is device ready? If so, retract signal and go to state READY
+                if ( m_defined )
+                {
+                    // Retract signal
+                    ADARA::ComBus::SignalRetractMessage sigmsg( sid );
+                    ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
+
+                    // Log the recovery
+                    string message = string("Device (") + dev_name + ") has recovered from hung state.";
+                    syslog( LOG_ERR, message.c_str() );
+
+                    // Change state
+                    state = DSS_READY;
+                }
+                break;
+            case DSS_READY: // Timer stopped - device ready
+                // Did device get updated
+                if ( !m_defined )
+                {
+                    // Start timer
+                    memset( &timeout, 0, sizeof(struct itimerspec));
+                    timeout.it_value.tv_sec = DEVICE_START_TIMEOUT;
+                    timer_settime( tid, 0, &timeout, 0 );
+
+                    // Change state to INIT
+                    state = DSS_INITIALIZING;
+                }
+                break;
+        }
+    }
+
+    // Exited while in fault state - retract signal
+    if ( state == DSS_FAULT )
+    {
+        ADARA::ComBus::SignalRetractMessage msg( sid );
+        ADARA::ComBus::Connection::getInst().broadcast( msg );
+    }
+
+    // Clean-up timer
+    timer_delete( tid );
+}
 
 /**
  * @brief Handles EPICS connection status callbacks
