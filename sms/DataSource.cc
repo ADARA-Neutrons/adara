@@ -397,6 +397,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 		msg += m_name;
 		msg += ": Bailing! ";
 		msg += e.what();
+		ERROR("DataSource(): " << msg);
 		throw std::runtime_error(msg);
 	}
 	catch (...) {
@@ -408,6 +409,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 		msg += m_name;
 		msg += ": Bailing! ";
 		msg += "Unknown Exception.";
+		ERROR("DataSource(): " << msg);
 		throw std::runtime_error(msg);
 	}
 
@@ -663,6 +665,7 @@ void DataSource::fdReady(void)
 				<< m_name);
 			break;
 		case IDLE:
+			ERROR("fdReady(): Invalid Idle State! Bailing...");
 			throw std::logic_error("Invalid state");
 		case CONNECTING:
 			connectComplete();
