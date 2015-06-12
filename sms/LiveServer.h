@@ -5,21 +5,30 @@
 #include <string>
 #include "ReadyAdapter.h"
 
+extern "C" {
+struct addrinfo;
+}
+
 class LiveServer {
 public:
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 
-private:
 	LiveServer();
+	~LiveServer();
 
-	ReadyAdapter *m_fdreg;
-	int m_fd;
+	void setupListener(void);
+
+private:
+	static LiveServer *m_singleton;
 
 	static std::string m_service;
 	static std::string m_host;
 	static char *m_node;
-	static LiveServer *m_singleton;
+
+	ReadyAdapter *m_fdreg;
+	struct addrinfo *m_addrinfo;
+	int m_fd;
 
 	void newConnection(void);
 };

@@ -13,11 +13,11 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
+LiveServer *LiveServer::m_singleton;
+
 std::string LiveServer::m_service;
 std::string LiveServer::m_host;
 char *LiveServer::m_node;
-
-LiveServer *LiveServer::m_singleton;
 
 void LiveServer::config(const boost::property_tree::ptree &conf)
 {
@@ -35,11 +35,52 @@ void LiveServer::init()
 	m_singleton = new LiveServer();
 }
 
-LiveServer::LiveServer()
+LiveServer::LiveServer() :
+		m_fdreg(NULL), m_addrinfo(NULL), m_fd(-1)
 {
-	struct addrinfo hints, *ai;
-	std::string msg;
+	setupListener();
+}
+
+LiveServer::~LiveServer()
+{
+	if ( m_addrinfo != NULL ) {
+		freeaddrinfo( m_addrinfo );
+		m_addrinfo = NULL;
+	}
+	if ( m_fdreg ) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+	if ( m_fd >= 0 ) {
+		close( m_fd );
+		m_fd = -1;
+	}
+}
+
+void LiveServer::setupListener(void)
+{
+	// Free Any Previous Listener Connection
+
+	if ( m_addrinfo != NULL ) {
+		freeaddrinfo( m_addrinfo );
+		m_addrinfo = NULL;
+	}
+
+	if ( m_fdreg ) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+
+	if ( m_fd >= 0 ) {
+		close( m_fd );
+		m_fd = -1;
+	}
+
+	// Set Up New Listener Connection
+
+	struct addrinfo hints;
 	int val, rc, flags;
+	std::string msg;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -47,7 +88,7 @@ LiveServer::LiveServer()
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(m_node, m_service.c_str(), &hints, &ai);
+	rc = getaddrinfo(m_node, m_service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
 		msg = "Unable to convert host/service '";
 		msg += m_host;
@@ -55,10 +96,10 @@ LiveServer::LiveServer()
 		msg += m_service;
 		msg += "' to a port: ";
 		msg += gai_strerror(rc);
-		throw std::runtime_error(msg);
+		goto error;
 	}
 
-	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
+	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
 		msg = "Unable to create socket: ";
 		msg += strerror(errno);
@@ -79,7 +120,7 @@ LiveServer::LiveServer()
 		goto error_fd;
 	}
 
-	if (bind(m_fd, ai->ai_addr, ai->ai_addrlen)) {
+	if (bind(m_fd, m_addrinfo->ai_addr, m_addrinfo->ai_addrlen)) {
 		msg = "Unable to bind to port ";
 		msg += m_host;
 		msg += ":";
@@ -95,68 +136,107 @@ LiveServer::LiveServer()
 		goto error_fd;
 	}
 
-	INFO("LiveServer() listening for connections at "
+	INFO("setupListener(): Listening for Connections at "
 		<< m_host << ":" << m_service << "...");
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-					boost::bind(&LiveServer::newConnection,
-						    this));
-	} catch(...) {
-		ERROR("Unknown LiveServer() Exception in Ready Adapter");
-		close(m_fd);
-		freeaddrinfo(ai);
-		throw;
+			boost::bind(&LiveServer::newConnection,
+				this));
+	}
+	catch (std::exception &e) {
+		ERROR("setupListener(): Exception in Ready Adapter - " << e.what());
+		goto error_fdreg;
+	}
+	catch (...) {
+		ERROR("setupListener(): Unknown Exception in Ready Adapter!");
+		goto error_fdreg;
 	}
 
-	INFO("LiveServer() adapter ready for connections");
+	INFO("setupListener(): Adapter Ready for Connections");
 
 	return;
 
+error_fdreg:
+
+	if ( m_fdreg ) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+
 error_fd:
-	close(m_fd);
+
+	if ( m_fd >= 0 ) {
+		close(m_fd);
+		m_fd = -1;
+	}
 
 error:
-	freeaddrinfo(ai);
-	throw std::runtime_error(msg);
+
+	if ( m_addrinfo != NULL ) {
+		freeaddrinfo(m_addrinfo);
+		m_addrinfo = NULL;
+	}
+
+	// *Don't* Throw Exception, Just Fly Without LiveServer
+	// Until We Timeout (TODO) or Change the Connection Parameters (TODO)
+	// Just Log Whatever Error and Return to the Abyss...! ;-D
+	ERROR("setupListener(): " << msg);
+	return;
 }
 
 void LiveServer::newConnection(void)
 {
 	DEBUG("newConnection() entry");
 
-	int rc;
+	// Verify We Actually (Still) Have a Listener Socket Here... ;-D
+	if ( m_fd < 0 ) {
+		/* TODO Rate-Limited Logging... */
+		ERROR("newConnection(): Invalid Listener Socket, Cannot Accept!");
+		return;
+	}
 
+	int rc;
 	rc = accept4(m_fd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);
 	if (rc < 0) {
-		int e = errno;
+		int err = errno;
 
-		if (e == EINTR || e == EAGAIN || e == EWOULDBLOCK ||
-							e == ECONNABORTED) {
-			DEBUG("newConnection() not-really-an-error exit");
-			/* Not really an error */
+		/* Not really an error :-D */
+		if (err == EINTR || err == EAGAIN || err == EWOULDBLOCK
+				|| err == ECONNABORTED) {
+			WARN("newConnection() Not-Really-An-Error"
+				<< " (" << strerror(err) << ")");
 			return;
 		}
 
-		if (e == ENOBUFS || e == ENOMEM || e == EMFILE || e == ENFILE) {
-			/* TODO log no descriptors */
-			DEBUG("newConnection() no-descriptors exit");
+		/* No Descriptors/Resources... */
+		if (err == ENOBUFS || err == ENOMEM || err == EMFILE
+				|| err == ENFILE) {
+			ERROR("newConnection() No Descriptors/Resources!"
+				<< " (" << strerror(err) << ")");
 			return;
 		}
 
-		std::string msg("LiveServer::newConnection() accept error: ");
-		msg += strerror(e);
-		throw std::runtime_error(msg);
+		/* Some Other Accept Error... */
+		ERROR("newConnection() Accept Error: " << strerror(err));
+		return;
 	}
 
 	try {
-		new LiveClient(rc);
-	} catch (...) {
-		ERROR("Unknown LiveClient() Exception in newConnection()");
-		close(rc);
+		// TODO may want to put LiveClient on list
+		// to cleanup during shutdown
+		new LiveClient( rc );
 	}
-
-	/* TODO may want to put on list to cleanup during shutdown */
+	catch (std::exception &e) {
+		ERROR("newConnection(): LiveClient() Exception - " << e.what());
+		close( rc );
+		return;
+	}
+	catch (...) {
+		ERROR("newConnection(): Unknown LiveClient() Exception!");
+		close( rc );
+		return;
+	}
 
 	DEBUG("newConnection() exit");
 }
