@@ -7,26 +7,47 @@
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
+class ListenStringPV : public smsStringPV {
+public:
+	ListenStringPV(const std::string &name, LiveServer *liveServer) :
+		smsStringPV(name), m_liveServer(liveServer) {}
+
+private:
+	LiveServer *m_liveServer;
+
+	void changed(void)
+	{
+		// On Any Change to the LiveServer Listener URI/Service PVs,
+		// Reset the Listener Setup... :-D
+		DEBUG("ListenStringPV: " << m_pv_name
+			<< " PV value changed, Reset Listener Setup...");
+		m_liveServer->setupListener();
+	}
+};
+
 LiveServer *LiveServer::m_singleton;
 
 std::string LiveServer::m_service;
 std::string LiveServer::m_host;
-char *LiveServer::m_node;
+
+double LiveServer::m_listen_retry;
 
 void LiveServer::config(const boost::property_tree::ptree &conf)
 {
 	m_service = conf.get<std::string>("livestream.service", "31415");
+
 	m_host = conf.get<std::string>("livestream.uri", "ANY");
-	if ( !m_host.compare("ANY") )
-		m_node = (char *) NULL;
-	else
-		m_node = (char *) m_host.c_str();
+
+	m_listen_retry = conf.get<double>("livestream.listen_retry", 5.0);
+
 	LiveClient::config(conf);
 }
 
@@ -36,8 +57,46 @@ void LiveServer::init()
 }
 
 LiveServer::LiveServer() :
+		m_listen_timer(new TimerAdapter<LiveServer>(this,
+			&LiveServer::listenRetry)),
 		m_fdreg(NULL), m_addrinfo(NULL), m_fd(-1)
 {
+	// Create Run-Time Configuration PVs for Listener Params/Status
+
+	SMSControl *ctrl = SMSControl::getInstance();
+	if (!ctrl) {
+		throw std::logic_error(
+			"uninitialized SMSControl obj for LiveServer!");
+	}
+
+	std::string prefix(ctrl->getBeamlineId());
+	prefix += ":SMS";
+	prefix += ":LiveServer";
+
+	m_pvListenRetry = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ListenRetry", 0.0));
+
+	m_pvListenerURI = boost::shared_ptr<ListenStringPV>(new
+		ListenStringPV(prefix + ":ListenerURI", this));
+	m_pvListenerService = boost::shared_ptr<ListenStringPV>(new
+		ListenStringPV(prefix + ":ListenerService", this));
+
+	ctrl->addPV(m_pvListenRetry);
+	ctrl->addPV(m_pvListenerURI);
+	ctrl->addPV(m_pvListenerService);
+
+	// Initialize LiveServer PVs...
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	m_pvListenRetry->update(m_listen_retry, &now);
+
+	m_pvListenerURI->update(m_host, &now);
+	m_pvListenerService->update(m_service, &now);
+
+	// Initialize Listener...
+
 	setupListener();
 }
 
@@ -59,6 +118,10 @@ LiveServer::~LiveServer()
 
 void LiveServer::setupListener(void)
 {
+	// Cancel Any Pending Listen Retry Timer...
+
+	m_listen_timer->cancel();
+
 	// Free Any Previous Listener Connection
 
 	if ( m_addrinfo != NULL ) {
@@ -80,6 +143,8 @@ void LiveServer::setupListener(void)
 
 	struct addrinfo hints;
 	int val, rc, flags;
+	char *node;
+
 	std::string msg;
 
 	memset(&hints, 0, sizeof(hints));
@@ -88,7 +153,17 @@ void LiveServer::setupListener(void)
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(m_node, m_service.c_str(), &hints, &m_addrinfo);
+	// Update Listener URI from PV...
+	m_host = m_pvListenerURI->value();
+	if ( !m_host.compare("ANY") )
+		node = (char *) NULL;
+	else
+		node = (char *) m_host.c_str();
+
+	// Update Listener Service from PV...
+	m_service = m_pvListenerService->value();
+
+	rc = getaddrinfo(node, m_service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
 		msg = "Unable to convert host/service '";
 		msg += m_host;
@@ -181,7 +256,13 @@ error:
 	// *Don't* Throw Exception, Just Fly Without LiveServer
 	// Until We Timeout (TODO) or Change the Connection Parameters (TODO)
 	// Just Log Whatever Error and Return to the Abyss...! ;-D
+
 	ERROR("setupListener(): " << msg);
+
+	// Update Listen Retry Timeout from PV...
+	m_listen_retry = m_pvListenRetry->value();
+	m_listen_timer->start(m_listen_retry);
+
 	return;
 }
 
@@ -239,5 +320,11 @@ void LiveServer::newConnection(void)
 	}
 
 	DEBUG("newConnection() exit");
+}
+
+bool LiveServer::listenRetry(void)
+{
+	setupListener();
+	return false;
 }
 
