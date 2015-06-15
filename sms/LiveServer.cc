@@ -73,6 +73,9 @@ LiveServer::LiveServer() :
 	prefix += ":SMS";
 	prefix += ":LiveServer";
 
+	m_pvListenStatus = boost::shared_ptr<smsErrorPV>(new
+		smsErrorPV(prefix + ":ListenStatus"));
+
 	m_pvListenRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ListenRetryTimeout", 0.0));
 
@@ -81,6 +84,7 @@ LiveServer::LiveServer() :
 	m_pvListenerService = boost::shared_ptr<ListenStringPV>(new
 		ListenStringPV(prefix + ":ListenerService", this));
 
+	ctrl->addPV(m_pvListenStatus);
 	ctrl->addPV(m_pvListenRetryTimeout);
 	ctrl->addPV(m_pvListenerURI);
 	ctrl->addPV(m_pvListenerService);
@@ -144,6 +148,8 @@ void LiveServer::setupListener(void)
 	struct addrinfo hints;
 	int val, rc, flags;
 	char *node;
+
+	struct timespec now;
 
 	std::string msg;
 
@@ -230,6 +236,10 @@ void LiveServer::setupListener(void)
 
 	INFO("setupListener(): Adapter Ready for Connections");
 
+	// Update LiveServer Listen Status PV, All OK.
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvListenStatus->update(0, &now);
+
 	return;
 
 error_fdreg:
@@ -258,6 +268,10 @@ error:
 	// Just Log Whatever Error and Return to the Abyss...! ;-D
 
 	ERROR("setupListener(): " << msg);
+
+	// Update LiveServer Listen Status PV, Setup Failed!
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_pvListenStatus->update(1, &now);
 
 	// Update Listen Retry Timeout from PV...
 	m_listen_retry = m_pvListenRetryTimeout->value();

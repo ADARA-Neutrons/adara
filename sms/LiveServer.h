@@ -10,6 +10,7 @@ extern "C" {
 struct addrinfo;
 }
 
+class smsErrorPV;
 class smsFloat64PV;
 class ListenStringPV;
 
@@ -40,6 +41,8 @@ private:
 	void newConnection(void);
 
 	bool listenRetry(void);
+
+	boost::shared_ptr<smsErrorPV> m_pvListenStatus;
 
 	boost::shared_ptr<smsFloat64PV> m_pvListenRetryTimeout;
 
