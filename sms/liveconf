@@ -47,6 +47,9 @@ idName["storage"]="Storage"
 is_indexed["sts"]=0
 idName["sts"]="STS"
 
+is_indexed["livestream"]=0
+idName["livestream"]="LiveServer"
+
 
 # Options...
 
@@ -331,6 +334,29 @@ option_pv[$num_options]="SMS:STSClient:ServiceURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_label[$num_options]="[STS Client Service URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="listen_retry"
+option_pv[$num_options]="SMS:LiveServer:ListenRetryTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[Live Server Listener Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="uri"
+option_pv[$num_options]="SMS:LiveServer:ListenerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR(ip_addr or ANY)"
+option_label[$num_options]="[Live Server Listener Service IP Address]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="service"
+option_pv[$num_options]="SMS:LiveServer:ListenerService"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_PORT(service)"
+option_label[$num_options]="[Live Server Listener Service Port]"
 num_options=$(( num_options + 1 ))
 
 #
@@ -709,6 +735,13 @@ if [[ "$command" == "status" \
 
 	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
+
+		caget $WAIT -a ${PRE}:SMS:LiveServer:ListenStatus
+		caget $WAIT ${PRE}:SMS:LiveServer:ListenRetryTimeout
+		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerURI
+		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerService
+
+		echo
 
 		nlcvar="${PRE}:SMS:Control:NumLiveClients"
 		caget $WAIT -S $nlcvar
