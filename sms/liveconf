@@ -76,7 +76,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetry"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_label[$num_options]="[Data Source Disconnect Retry Timeout]"
 num_options=$(( num_options + 1 ))
@@ -299,9 +299,9 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:STSClient:ConnectRetry"
+option_pv[$num_options]="SMS:STSClient:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
-option_label[$num_options]="[STS Client Time Before Re-Connection Attempt]"
+option_label[$num_options]="[STS Client Timeout for Re-Connection Attempt]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
@@ -604,7 +604,7 @@ if [[ "$command" == "status" \
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
 				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
+				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetryTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
 				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
 				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
@@ -632,7 +632,7 @@ if [[ "$command" == "status" \
 		echo
 
 		caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
-		caget $WAIT ${PRE}:SMS:STSClient:ConnectRetry
+		caget $WAIT ${PRE}:SMS:STSClient:ConnectRetryTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
 		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
