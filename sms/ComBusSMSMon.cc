@@ -178,13 +178,6 @@ void ComBusSMSMon::reOpenComm()
 	}
 }
 
-/*
-void ComBusSMSMon::restartCB(struct event_handler_args args) {
-	ComBusSMSMon *that = (ComBusSMSMon *)ca_puser(args.chid);
-	if (that) that->m_restartEvent->signal();
-}
-*/
-
 void ComBusSMSMon::restartCallback(struct event_handler_args args) {
 	if (args.status != ECA_NORMAL) {
 		WARN("Restart Callback status: " << ca_message(args.status));
