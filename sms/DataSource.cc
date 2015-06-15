@@ -337,8 +337,8 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
 
-	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry", 0.0));
+	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
@@ -359,7 +359,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvDataURI);
 	ctrl->addPV(m_pvEnabled);
 	ctrl->addPV(m_pvConnected);
-	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvConnectRetryTimeout);
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
@@ -373,7 +373,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvName->update(m_name, &now);
 	m_pvDataURI->update(uri, &now);
 	m_pvConnected->disconnected();
-	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
@@ -580,8 +580,8 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 	m_lastRTDLCycle = 0;
 
 	if (m_state != DISABLED) {
-		// Update Connect Retry Time from PV...
-		m_connect_retry = m_pvConnectRetry->value();
+		// Update Connect Retry Timeout from PV...
+		m_connect_retry = m_pvConnectRetryTimeout->value();
 		m_timer->start(m_connect_retry);
 	}
 }
@@ -605,8 +605,8 @@ bool DataSource::timerExpired(void)
 			if ( m_readDelay ) {
 				WARN("Ignoring Connect Retry Timeout (Read Delayed)"
 					<< " for " << m_name << ", Resetting Timer.");
-				// Update Connect Retry Time from PV...
-				m_connect_retry = m_pvConnectRetry->value();
+				// Update Connect Retry Timeout from PV...
+				m_connect_retry = m_pvConnectRetryTimeout->value();
 				m_timer->start(m_connect_retry);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {

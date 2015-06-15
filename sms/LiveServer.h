@@ -41,7 +41,7 @@ private:
 
 	bool listenRetry(void);
 
-	boost::shared_ptr<smsFloat64PV> m_pvListenRetry;
+	boost::shared_ptr<smsFloat64PV> m_pvListenRetryTimeout;
 
 	boost::shared_ptr<ListenStringPV> m_pvListenerURI;
 	boost::shared_ptr<ListenStringPV> m_pvListenerService;

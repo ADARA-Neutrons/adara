@@ -103,8 +103,8 @@ STSClientMgr::STSClientMgr() :
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
 
-	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry", 0.0));
+	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":TransientTimeout", 0.0));
@@ -119,7 +119,7 @@ STSClientMgr::STSClientMgr() :
 		smsStringPV(prefix + ":ServiceURI"));
 
 	ctrl->addPV(m_pvConnectTimeout);
-	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvConnectRetryTimeout);
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
 	ctrl->addPV(m_pvMaxRequeueCount);
@@ -129,7 +129,7 @@ STSClientMgr::STSClientMgr() :
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
-	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
@@ -501,7 +501,7 @@ void STSClientMgr::connectFailed(void)
 	m_fdreg.reset();
 	m_connect_timer->cancel();
 	// Update Connect Retry Timeout from PV...
-	m_connect_retry = m_pvConnectRetry->value();
+	m_connect_retry = m_pvConnectRetryTimeout->value();
 	m_reconnect_timer->start(m_connect_retry);
 }
 

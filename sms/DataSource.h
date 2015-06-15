@@ -67,7 +67,7 @@ private:
 	boost::shared_ptr<smsStringPV> m_pvDataURI;
 	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
-	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetryTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;

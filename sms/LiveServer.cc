@@ -73,15 +73,15 @@ LiveServer::LiveServer() :
 	prefix += ":SMS";
 	prefix += ":LiveServer";
 
-	m_pvListenRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ListenRetry", 0.0));
+	m_pvListenRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ListenRetryTimeout", 0.0));
 
 	m_pvListenerURI = boost::shared_ptr<ListenStringPV>(new
 		ListenStringPV(prefix + ":ListenerURI", this));
 	m_pvListenerService = boost::shared_ptr<ListenStringPV>(new
 		ListenStringPV(prefix + ":ListenerService", this));
 
-	ctrl->addPV(m_pvListenRetry);
+	ctrl->addPV(m_pvListenRetryTimeout);
 	ctrl->addPV(m_pvListenerURI);
 	ctrl->addPV(m_pvListenerService);
 
@@ -90,7 +90,7 @@ LiveServer::LiveServer() :
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	m_pvListenRetry->update(m_listen_retry, &now);
+	m_pvListenRetryTimeout->update(m_listen_retry, &now);
 
 	m_pvListenerURI->update(m_host, &now);
 	m_pvListenerService->update(m_service, &now);
@@ -260,7 +260,7 @@ error:
 	ERROR("setupListener(): " << msg);
 
 	// Update Listen Retry Timeout from PV...
-	m_listen_retry = m_pvListenRetry->value();
+	m_listen_retry = m_pvListenRetryTimeout->value();
 	m_listen_timer->start(m_listen_retry);
 
 	return;
