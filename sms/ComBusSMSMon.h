@@ -73,7 +73,7 @@ private:
 	void openComm();
 	void reOpenComm();
 	void commThread();
-	//void restartCallback(struct event_handler_args);
+	static void restartCallback(struct event_handler_args);
 
 	std::map<uint32_t, SMSRunStatus *> m_run_dict;
 
