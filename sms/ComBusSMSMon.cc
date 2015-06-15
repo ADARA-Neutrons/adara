@@ -36,7 +36,6 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_combus(0),
 	m_beam_sname(a_beam_sname),
 	m_facility(a_facility),
-	m_restartEvent(new epicsEvent()),
 	m_comm_thread(0),
 	m_stop(false),
 	m_inqueue(new epicsMessageQueue(100, sizeof(SMSRunStatus *)))
@@ -179,19 +178,23 @@ void ComBusSMSMon::reOpenComm()
 	}
 }
 
+/*
 void ComBusSMSMon::restartCB(struct event_handler_args args) {
 	ComBusSMSMon *that = (ComBusSMSMon *)ca_puser(args.chid);
 	if (that) that->m_restartEvent->signal();
 }
+*/
 
-void restartCallback(struct event_handler_args args) {
+extern "C" {
+static void restartCallback(struct event_handler_args args) {
 	if (args.status != ECA_NORMAL) {
 		WARN("Restart Callback status: " << ca_message(args.status));
 		return;
 	}
 	if (args.type == DBR_SHORT && *((uint16_t *)args.dbr)) {
-		ComBusSMSMon::m_restart_combus = 1;
+		*((uint16_t *)args.usr) = 1;
 	}
+}
 }
 
 void ComBusSMSMon::commThread()
@@ -232,14 +235,13 @@ void ComBusSMSMon::commThread()
 	SMSSEVCHK(ca_create_channel(m_pvBrokerPass->getName(), 0, 0, 0,
 			&pass_chid),
 		"create broker passwd channel");
-	SMSSEVCHK(ca_create_channel(m_pvRestartCombus->getName(), 0, 0, 0,
+	SMSSEVCHK(ca_create_channel(m_pvRestartCombus->getName(), 0, 0, 0, 
 			&restart_chid),
 		"create combus restart channel");
 
-	SMSSEVCHK(ca_pend_io(1.0), "Combus thread CA connection");
-
 	SMSSEVCHK(ca_create_subscription(DBR_SHORT, 1, restart_chid, DBE_VALUE,
-			restartCallback, 0, 0), "monitor combus restart");
+			restartCallback, &m_restart_combus, 0), 
+			"monitor combus restart");
 
 	SMSSEVCHK(ca_pend_io(1.0), "Combus thread monitor");
 
@@ -252,7 +254,7 @@ void ComBusSMSMon::commThread()
 			continue;
 		}
 
-		SMSSEVCHK(ca_pend_io(1.0), "Main loop pend");
+		ca_poll();	// Where restartCallback() gets called
 
 		if (m_restart_combus) {
 

@@ -67,7 +67,6 @@ public:
 	// Must be preceded by a sendOriginal for a given run.
 	void sendUpdate( uint32_t a_run_num, std::string a_run_state );
 
-	static void restartCB( event_handler_args);
 	static uint16_t		m_restart_combus;
 
 private:
@@ -87,9 +86,6 @@ private:
 	static std::string		m_broker_uri;
 	static std::string		m_broker_user;
 	static std::string		m_broker_pass;
-
-
-	epicsEvent *m_restartEvent;
 
 	boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
 	boost::shared_ptr<smsStringPV> m_pvDomain;
