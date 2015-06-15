@@ -185,7 +185,6 @@ void ComBusSMSMon::restartCB(struct event_handler_args args) {
 }
 */
 
-extern "C" {
 static void restartCallback(struct event_handler_args args) {
 	if (args.status != ECA_NORMAL) {
 		WARN("Restart Callback status: " << ca_message(args.status));
@@ -194,7 +193,6 @@ static void restartCallback(struct event_handler_args args) {
 	if (args.type == DBR_SHORT && *((uint16_t *)args.dbr)) {
 		*((uint16_t *)args.usr) = 1;
 	}
-}
 }
 
 void ComBusSMSMon::commThread()
