@@ -27,8 +27,6 @@ public:
 	bool truncateString( std::string & str, size_t sz,
 		std::string caller, std::string desc, bool is_error );
 
-	bool sanitizeSuffix( std::string & suffix );
-
 	void resetPacketTime(void);
 
 private:

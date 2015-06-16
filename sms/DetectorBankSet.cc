@@ -8,6 +8,7 @@
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
+#include "ADARAUtils.h"
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -462,7 +463,7 @@ public:
 	void setSuffix(std::string suffix)
 	{
 		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( m_config->sanitizeSuffix( suffix ) ) {
+		if ( Utils::sanitizeString( suffix, false ) ) {
 			ERROR("setSuffix(): Sanitized"
 				<< " Throttle NXentry Suffix for Detector Bank Set "
 				<< m_suffix << " to " << suffix);
@@ -721,7 +722,7 @@ DetectorBankSet::DetectorBankSet(
 		suffix = it->second.get<std::string>("suffix", "throttled");
 
 		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( sanitizeSuffix( suffix ) ) {
+		if ( Utils::sanitizeString( suffix, false ) ) {
 			WARN("DetectorBankSet: Sanitized"
 				<< " Throttle NXentry Suffix for Detector Bank Set "
 				<< detBankSetName
@@ -882,33 +883,6 @@ bool DetectorBankSet::truncateString( std::string & str, size_t sz,
 			ss << "will be truncated to: " << str.substr( 0, sz );
 			WARN( ss.str() );
 		}
-	}
-
-	return( changed );
-}
-
-bool DetectorBankSet::sanitizeSuffix( std::string & suffix )
-{
-	std::string bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
-
-	size_t next, last;
-
-	bool changed = false;
-
-	last = 0;
-
-	while ( (next = suffix.find_first_of( bad, last ))
-			!= std::string::npos )
-	{
-		if ( next != last + 1 || last == 0 )
-			suffix.replace( next, 1, "-" );   // replace space with '-'...
-		else {
-			suffix.replace( next, 1, "" );   // just remove double-spaces...
-		}
-
-		changed = true;
-
-		last = next;
 	}
 
 	return( changed );
