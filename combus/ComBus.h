@@ -77,9 +77,9 @@ public:
 class Connection
 {
 public:
-    Connection( const std::string &a_base_path,
+    Connection( std::string &a_domain,
         const std::string &a_proc_name, uint32_t a_inst_num,
-        const std::string &a_broker_uri, const std::string &a_user,
+        std::string &a_broker_uri, const std::string &a_user,
         const std::string &a_pass,
         const std::string &a_log_dir = "/tmp" );
 
@@ -90,8 +90,8 @@ public:
     static std::string& checkBrokerURI( std::string &a_broker_uri );
     static std::string& checkDomain( std::string &a_domain );
 
-    void                setConnection( const std::string &a_domain,
-                            const std::string &a_broker_uri,
+    void                setConnection( std::string &a_domain,
+                            std::string &a_broker_uri,
                             const std::string &a_user,
                             const std::string &a_pass );
 

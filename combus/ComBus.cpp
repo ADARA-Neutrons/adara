@@ -226,9 +226,9 @@ Connection * Connection::g_inst = 0;
   * will throw an exception. The domain, broker uri, user name, and
   * password may be changed later using the setConnection() method.
   */
-Connection::Connection( const std::string &a_domain,
+Connection::Connection( std::string &a_domain,
         const std::string &a_proc_name, uint32_t a_proc_inst,
-        const std::string &a_broker_uri, const std::string &a_user,
+        std::string &a_broker_uri, const std::string &a_user,
         const std::string &a_pass, const std::string &a_log_dir )
     : m_running(true), m_connected(false), m_domain(a_domain),
     m_proc_name(a_proc_name), m_proc_inst(a_proc_inst),
@@ -245,10 +245,10 @@ Connection::Connection( const std::string &a_domain,
     }
 
     // Apply default protocol & port if not set
-    m_broker_uri = checkBrokerURI( m_broker_uri );
+    m_broker_uri = checkBrokerURI( a_broker_uri );
 
     // If base path is specified, ensure it ends with a '.' character
-    m_domain = checkDomain( m_domain );
+    m_domain = checkDomain( a_domain );
 
     m_proc_id += m_proc_name + "_"
         + boost::lexical_cast<string>(m_proc_inst);
@@ -375,8 +375,8 @@ Connection::checkDomain( std::string &a_domain )
   * subsequent connection events.
   */
 void
-Connection::setConnection( const std::string &a_domain,
-        const std::string &a_broker_uri, const std::string &a_user,
+Connection::setConnection( std::string &a_domain,
+        std::string &a_broker_uri, const std::string &a_user,
         const std::string &a_pass )
 {
     boost::unique_lock<boost::mutex> lock( m_status_mutex );
