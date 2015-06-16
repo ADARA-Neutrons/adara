@@ -8,6 +8,7 @@
 #include <time.h>
 #include "ComBus.h"
 #include "ComBusMessages.h"
+#include "ADARAUtils.h"
 
 using namespace std;
 
@@ -320,6 +321,9 @@ Connection::getInst()
 std::string&
 Connection::checkBrokerURI( std::string &a_broker_uri )
 {
+    // Better Sanitize the Input String, So ComBus/ActiveMQ Doesn't Crash!
+    Utils::sanitizeString( a_broker_uri, true );
+
     // Apply default protocol if not set
     if ( a_broker_uri.find("://") == string::npos )
         a_broker_uri = string("tcp://") + a_broker_uri;
