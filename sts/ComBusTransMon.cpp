@@ -213,7 +213,16 @@ ComBusTransMon::commThread()
 
                 if ( !m_combus->waitForConnect( 5 ) ) { 
                     syslog( LOG_WARNING,
-                        "STS Error: ComBus Connection Timeout" );
+                    "[%i] STS Error: %s for Domain %s to URI %s as User %s",
+                        g_pid, "ComBus Connection Timeout",
+                        m_domain.c_str(), m_broker_uri.c_str(),
+                        m_broker_user.c_str() );
+                }
+                else {
+                    syslog( LOG_INFO,
+                        "[%i] STS %s for Domain %s to URI %s as User %s",
+                        g_pid, "Connected to ComBus", m_domain.c_str(),
+                        m_broker_uri.c_str(), m_broker_user.c_str() );
                 }
 
                 // Send Translation Started message
