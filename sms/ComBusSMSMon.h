@@ -22,9 +22,9 @@
 { 							\
     int ca_unique_status_name  = (CA_ERROR_CODE); 	\
     if(!(ca_unique_status_name & CA_M_SUCCESS)) 	\
-	WARN("Channel Access Error " << 		\
+	ERROR("Channel Access Error: " << 		\
 	ca_message(ca_unique_status_name) << 		\
-	MESSAGE_STRING);				\
+	" - " << MESSAGE_STRING);				\
 }
 
 

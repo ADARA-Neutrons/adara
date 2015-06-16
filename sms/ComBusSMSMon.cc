@@ -236,7 +236,6 @@ void ComBusSMSMon::commThread()
 
 	SMSSEVCHK(ca_pend_io(1.0), "Combus thread monitor");
 
-
 	while (!m_stop) {
 
 		if (!m_combus) {
