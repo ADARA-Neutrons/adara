@@ -869,7 +869,7 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 			prefix += ":LiveClient:";
 
 			std::stringstream ss;
-			ss << clientId;
+			ss << clientId + 1; // eh, count from 1 like everything else
 			prefix += ss.str();
 
 			// Live Client Name...
@@ -930,7 +930,8 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 	DEBUG("unregisterLiveClient: clientId=" << clientId);
 
 	/* Mark this id for re-use. */
-	m_liveClients.reset(clientId);
+	if ( clientId >= 0 )
+		m_liveClients.reset(clientId);
 
 	// Note: Leave the Number of Live Client PVs, Monotonically Increasing
 	// (because we leave the old Live Client index/PVs around for
