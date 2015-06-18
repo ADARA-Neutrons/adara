@@ -1627,6 +1627,11 @@ void DataSource::updateBandwidthSecond( struct timespec & now )
 
 void DataSource::updateBandwidthMinute( struct timespec & now )
 {
+	// Log the Minute-Based Bandwidth Statistics Updates...
+	INFO("Bandwidth Per Minute:"
+		<< " Pulses=" << m_pulse_count_minute
+		<< " Events=" << m_event_count_minute);
+
 	// Update Bandwidth Count Per Minute PVs...
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
 	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
@@ -1639,6 +1644,11 @@ void DataSource::updateBandwidthMinute( struct timespec & now )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
+			if ( it->second->m_event_count_minute > 0 ) {
+				INFO("Bandwidth Per Minute"
+					<< " for HWSource HwId=" << it->second->hwId()
+					<< " Events=" << it->second->m_event_count_minute );
+			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
 				it->second->m_event_count_minute, &now);
 		}
@@ -1648,6 +1658,11 @@ void DataSource::updateBandwidthMinute( struct timespec & now )
 
 void DataSource::updateBandwidthTenMin( struct timespec & now )
 {
+	// Log the Ten-Minute-Based Bandwidth Statistics Updates...
+	INFO("Bandwidth Per Ten Minutes:"
+		<< " Pulses=" << m_pulse_count_tenmin
+		<< " Events=" << m_event_count_tenmin);
+
 	// Update Bandwidth Count Per Ten Minutes PVs...
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
 	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
@@ -1660,6 +1675,11 @@ void DataSource::updateBandwidthTenMin( struct timespec & now )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
+			if ( it->second->m_event_count_tenmin > 0 ) {
+				INFO("Bandwidth Per Ten Minutes"
+					<< " for HWSource HwId=" << it->second->hwId()
+					<< " Events=" << it->second->m_event_count_tenmin );
+			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
 				it->second->m_event_count_tenmin, &now);
 		}
