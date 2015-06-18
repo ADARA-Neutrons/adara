@@ -352,6 +352,8 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh)
 {
+	// Parse Basic Data Source Info...
+
 	m_name += " (";
 	m_name += m_basename;
 	m_name += ")";
@@ -362,15 +364,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	// Initialize Pulse/Event Bandwidth Statistics
 
-	m_last_second = -1;
-	m_pulse_count_second = 0;
-	m_event_count_second = 0;
-	m_last_minute = -1;
-	m_pulse_count_minute = 0;
-	m_event_count_minute = 0;
-	m_last_tenmin = -1;
-	m_pulse_count_tenmin = 0;
-	m_event_count_tenmin = 0;
+	resetBandwidthStatistics();
 
 	// Create Run-Time Status and Configuration PVs Per Data Source...
 
@@ -659,9 +653,11 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 {
 	m_timer->cancel();
 
+	// Dump "Last Read()" Statistics...
 	if (dumpStats)
 		dumpLastReadStats("connectionFailed()");
 
+	// Dump "Discarded Packet" Statistics...
 	if (dumpDiscarded) {
 		// Dump Discarded Packet Statistics...
 		std::string log_info;
@@ -670,6 +666,14 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		// Reset Discarded Packet Statistics...
 		Parser::resetDiscardedPacketsStats();
 	}
+
+	// Dump Any Pulse/Event Bandwidth Statistics...
+	//    - Follow "dumpDiscarded" Flag for Logging Control...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	updateBandwidthSecond( now, dumpDiscarded );
+	updateBandwidthMinute( now, dumpDiscarded );
+	updateBandwidthTenMin( now, dumpDiscarded );
 
 	if (m_fdreg) {
 		delete m_fdreg;
@@ -857,6 +861,7 @@ void DataSource::startConnect(void)
 		rc = errno;
 
 	switch (rc) {
+
 		case ECONNREFUSED:
 			/* Rate-limited logging of refused connection */
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
@@ -865,16 +870,20 @@ void DataSource::startConnect(void)
 				WARN(log_info << "Connection refused by " << m_name);
 			}
 			goto error_fd;
+
 		case EINTR:
 		case EINPROGRESS:
 			m_state = CONNECTING;
 			break;
+
 		case 0:
 			INFO("Connection established to " << m_name);
 			m_state = ACTIVE;
 			m_pvConnected->connected();
+			resetBandwidthStatistics();
 			SMSControl::getInstance()->sourceUp(m_smsSourceId);
 			break;
+
 		default:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_CONN_REQUEST_ERROR, m_name,
@@ -935,6 +944,8 @@ void DataSource::connectComplete(void)
 		m_state = ACTIVE;
 
 		m_pvConnected->connected();
+
+		resetBandwidthStatistics();
 
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
@@ -1366,7 +1377,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// Event Count Per Second
 	if ( m_last_second != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		updateBandwidthSecond( now );
+		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
+		updateBandwidthSecond( now, false );
 		// Reset Last Second
 		m_last_second = now.tv_sec;
 	}
@@ -1379,7 +1391,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	uint32_t min = now.tv_sec / 60;
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
-		updateBandwidthMinute( now );
+		updateBandwidthMinute( now, true );
 		// Reset Last Minute
 		m_last_minute = min;
 	}
@@ -1392,7 +1404,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	uint32_t tenmin = now.tv_sec / 600;
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
-		updateBandwidthTenMin( now );
+		updateBandwidthTenMin( now, true );
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
@@ -1569,7 +1581,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// Pulse Count Per Second
 	if ( m_last_second != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		updateBandwidthSecond( now );
+		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
+		updateBandwidthSecond( now, false );
 		// Reset Last Second
 		m_last_second = now.tv_sec;
 	}
@@ -1581,7 +1594,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	uint32_t min = now.tv_sec / 60;
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
-		updateBandwidthMinute( now );
+		updateBandwidthMinute( now, true );
 		// Reset Last Minute
 		m_last_minute = min;
 	}
@@ -1593,7 +1606,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	uint32_t tenmin = now.tv_sec / 600;
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
-		updateBandwidthTenMin( now );
+		updateBandwidthTenMin( now, true );
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
@@ -1604,8 +1617,35 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	return false;
 }
 
-void DataSource::updateBandwidthSecond( struct timespec & now )
+void DataSource::resetBandwidthStatistics(void)
 {
+	// Reset Bandwidth Times & Counts (Triggers Initial Logging)
+
+	// Per Second...
+	m_last_second = -1;
+	m_pulse_count_second = 0;
+	m_event_count_second = 0;
+
+	// Per Minute...
+	m_last_minute = -1;
+	m_pulse_count_minute = 0;
+	m_event_count_minute = 0;
+
+	// Per Ten Minutes...
+	m_last_tenmin = -1;
+	m_pulse_count_tenmin = 0;
+	m_event_count_tenmin = 0;
+}
+
+void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
+{
+	// Log the Second-Based Bandwidth Statistics Updates...
+	if ( do_log ) {
+		INFO("Bandwidth Per Second for " << m_name << ":"
+			<< " Pulses=" << m_pulse_count_second
+			<< " Events=" << m_event_count_second);
+	}
+
 	// Update Bandwidth Count Per Second PVs...
 	m_pvPulseBandwidthSecond->update(m_pulse_count_second, &now);
 	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
@@ -1618,6 +1658,11 @@ void DataSource::updateBandwidthSecond( struct timespec & now )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
+			if ( do_log && it->second->m_event_count_second > 0 ) {
+				INFO("Bandwidth Per Second for " << m_name << ":"
+					<< " HWSource HwId=" << it->second->hwId()
+					<< " Events=" << it->second->m_event_count_second );
+			}
 			it->second->m_pvHWSourceEventBandwidthSecond->update(
 				it->second->m_event_count_second, &now);
 		}
@@ -1625,12 +1670,14 @@ void DataSource::updateBandwidthSecond( struct timespec & now )
 	}
 }
 
-void DataSource::updateBandwidthMinute( struct timespec & now )
+void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 {
 	// Log the Minute-Based Bandwidth Statistics Updates...
-	INFO("Bandwidth Per Minute:"
-		<< " Pulses=" << m_pulse_count_minute
-		<< " Events=" << m_event_count_minute);
+	if ( do_log ) {
+		INFO("Bandwidth Per Minute for " << m_name << ":"
+			<< " Pulses=" << m_pulse_count_minute
+			<< " Events=" << m_event_count_minute);
+	}
 
 	// Update Bandwidth Count Per Minute PVs...
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
@@ -1644,9 +1691,9 @@ void DataSource::updateBandwidthMinute( struct timespec & now )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
-			if ( it->second->m_event_count_minute > 0 ) {
-				INFO("Bandwidth Per Minute"
-					<< " for HWSource HwId=" << it->second->hwId()
+			if ( do_log && it->second->m_event_count_minute > 0 ) {
+				INFO("Bandwidth Per Minute for " << m_name << ":"
+					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_minute );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
@@ -1656,12 +1703,14 @@ void DataSource::updateBandwidthMinute( struct timespec & now )
 	}
 }
 
-void DataSource::updateBandwidthTenMin( struct timespec & now )
+void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 {
 	// Log the Ten-Minute-Based Bandwidth Statistics Updates...
-	INFO("Bandwidth Per Ten Minutes:"
-		<< " Pulses=" << m_pulse_count_tenmin
-		<< " Events=" << m_event_count_tenmin);
+	if ( do_log ) {
+		INFO("Bandwidth Per Ten Minutes for " << m_name << ":"
+			<< " Pulses=" << m_pulse_count_tenmin
+			<< " Events=" << m_event_count_tenmin);
+	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
@@ -1675,9 +1724,9 @@ void DataSource::updateBandwidthTenMin( struct timespec & now )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
-			if ( it->second->m_event_count_tenmin > 0 ) {
-				INFO("Bandwidth Per Ten Minutes"
-					<< " for HWSource HwId=" << it->second->hwId()
+			if ( do_log && it->second->m_event_count_tenmin > 0 ) {
+				INFO("Bandwidth Per Ten Minutes for " << m_name << ":"
+					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_tenmin );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(

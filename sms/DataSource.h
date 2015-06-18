@@ -137,9 +137,11 @@ private:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 
-	void updateBandwidthSecond(struct timespec &now);
-	void updateBandwidthMinute(struct timespec &now);
-	void updateBandwidthTenMin(struct timespec &now);
+	void resetBandwidthStatistics(void);
+
+	void updateBandwidthSecond(struct timespec &now, bool do_log);
+	void updateBandwidthMinute(struct timespec &now, bool do_log);
+	void updateBandwidthTenMin(struct timespec &now, bool do_log);
 
 	// Last Packet Debug
 	int m_last_pkt_type; // PacketType::Enum
