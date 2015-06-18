@@ -667,7 +667,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		Parser::resetDiscardedPacketsStats();
 	}
 
-	// Dump Any Pulse/Event Bandwidth Statistics...
+	// Update/Dump Any Pulse/Event Bandwidth Statistics...
 	//    - Follow "dumpDiscarded" Flag for Logging Control...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -1779,6 +1779,16 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 			RLL_HEARTBEAT, m_name, 60, 3, 10, log_info ) ) {
 		INFO(log_info << "Heartbeat Packet for " << m_name);
 	}
+
+	// Update/Dump Any Pulse/Event Bandwidth Statistics...
+	//    - Only Do Logging If We _Just Now_ Went Idle ("1st Heartbeat"),
+	//    I.e. We Still had Some HWSources when this Heartbeat Arrived...
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	bool do_log = ( m_hwSources.size() > 0 );
+	updateBandwidthSecond( now, do_log );
+	updateBandwidthMinute( now, do_log );
+	updateBandwidthTenMin( now, do_log );
 
 	// In case this DataSource was formerly registered and sending events,
 	// we need to *Unregister All Registered SourceIds* when we receive a
