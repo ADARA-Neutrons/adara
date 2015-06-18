@@ -371,7 +371,7 @@ USAGE()
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [bmon_status] [detset_status] [combus_status] \\"
-	echo "            [live_status] \\"
+	echo "            [live_status] [bandwidth] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -397,6 +397,7 @@ USAGE()
 	echo "   detset_status         = display SMS DetectorBankSet status"
 	echo "   combus_status         = display SMS ComBus status"
 	echo "   live_status           = display SMS live client status"
+	echo "   bandwidth             = display SMS data bandwidth stats"
 	echo
 
 	echo "Available Options:"
@@ -562,7 +563,8 @@ if [[ "$command" == "status" \
 		|| "$command" == "bmon_status" \
 		|| "$command" == "detset_status" \
 		|| "$command" == "combus_status" \
-		|| "$command" == "live_status" ]]; then
+		|| "$command" == "live_status" \
+		|| "$command" == "bandwidth" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
@@ -614,28 +616,102 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
-			|| "$command" == "data_status" ]]; then
+			|| "$command" == "data_status" \
+			|| "$command" == "bandwidth" ]]; then
 
 		ndsvar="${PRE}:SMS:Control:NumDataSources"
+
 		caget $WAIT $ndsvar
+
 		if [ $? == 0 ]; then
+
 			echo
+
 			numDataSources=`caget $WAIT $ndsvar | grep $ndsvar \
 				| awk '{print $2}'`
+
 			# Count from 1...!
 			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
+
 				echo "Data Source id=${ds}:"
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:DataURI
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
-				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetryTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:RTDLNoDataThresh
+
+				dsprefix="${PRE}:SMS:DataSource:${ds}"
+
+				if [[ "$command" == "status" \
+						|| "$command" == "data_status" ]]; then
+
+					caget $WAIT -S ${dsprefix}:Name
+					caget $WAIT -S ${dsprefix}:DataURI
+					caget $WAIT ${dsprefix}:Enabled
+					caget $WAIT -a ${dsprefix}:Connected
+					caget $WAIT ${dsprefix}:ConnectTimeout
+					caget $WAIT ${dsprefix}:ConnectRetryTimeout
+					caget $WAIT ${dsprefix}:DataTimeout
+					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT -S ${dsprefix}:MaxReadChunk
+					caget $WAIT ${dsprefix}:RTDLNoDataThresh
+
+				fi
+
+				if [[ "$command" == "bandwidth" ]]; then
+
+					caget $WAIT -a \
+						${dsprefix}:PulseBandwidthSecond \
+						| sed "s/ /\n   /"
+					caget $WAIT -a \
+						${dsprefix}:EventBandwidthSecond \
+						| sed "s/ /\n   /"
+					caget $WAIT -a \
+						${dsprefix}:PulseBandwidthMinute \
+						| sed "s/ /\n   /"
+					caget $WAIT -a \
+						${dsprefix}:EventBandwidthMinute \
+						| sed "s/ /\n   /"
+					caget $WAIT -a \
+						${dsprefix}:PulseBandwidthTenMin \
+						| sed "s/ /\n   /"
+					caget $WAIT -a \
+						${dsprefix}:EventBandwidthTenMin \
+						| sed "s/ /\n   /"
+
+				fi
+
+				echo "---"
+
+				nhwsvar="${PRE}:SMS:DataSource:${ds}:NumHWSources"
+
+				caget $WAIT $nhwsvar
+
+				numHWSources=`caget $WAIT $nhwsvar | grep $nhwsvar \
+					| awk '{print $2}'`
+
+				# Count from 1...!
+				for (( hws=1 ; hws <= numHWSources ; hws++ )); do
+
+					echo "---"
+
+					echo "HW Source index=${hws}:"
+
+					hwsprefix="${PRE}:SMS:DataSource:${ds}:HWSource:${hws}"
+
+					caget $WAIT ${hwsprefix}:HwId
+					caget $WAIT ${hwsprefix}:SmsId
+
+					if [[ "$command" == "bandwidth" ]]; then
+
+						caget $WAIT -a ${hwsprefix}:EventBandwidthSecond \
+							| sed "s/ /\n   /"
+						caget $WAIT -a ${hwsprefix}:EventBandwidthMinute \
+							| sed "s/ /\n   /"
+						caget $WAIT -a ${hwsprefix}:EventBandwidthTenMin \
+							| sed "s/ /\n   /"
+
+					fi
+
+				done
+
 				echo
+
 			done
 		fi
 	fi
@@ -749,7 +825,8 @@ if [[ "$command" == "status" \
 			echo
 			numLiveClients=`caget $WAIT $nlcvar | grep $nlcvar \
 				| awk '{print $2}'`
-			for (( lc=0 ; lc < numLiveClients ; lc++ )); do
+			# Count from 1...!
+			for (( lc=1 ; lc <= numLiveClients ; lc++ )); do
 				echo "Live Client id=${lc}:"
 				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
 				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
