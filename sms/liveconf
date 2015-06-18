@@ -637,13 +637,14 @@ if [[ "$command" == "status" \
 
 				dsprefix="${PRE}:SMS:DataSource:${ds}"
 
+				caget $WAIT -S ${dsprefix}:Name
+				caget $WAIT -S ${dsprefix}:DataURI
+				caget $WAIT ${dsprefix}:Enabled
+				caget $WAIT -a ${dsprefix}:Connected
+
 				if [[ "$command" == "status" \
 						|| "$command" == "data_status" ]]; then
 
-					caget $WAIT -S ${dsprefix}:Name
-					caget $WAIT -S ${dsprefix}:DataURI
-					caget $WAIT ${dsprefix}:Enabled
-					caget $WAIT -a ${dsprefix}:Connected
 					caget $WAIT ${dsprefix}:ConnectTimeout
 					caget $WAIT ${dsprefix}:ConnectRetryTimeout
 					caget $WAIT ${dsprefix}:DataTimeout
@@ -654,6 +655,8 @@ if [[ "$command" == "status" \
 				fi
 
 				if [[ "$command" == "bandwidth" ]]; then
+
+					echo "---"
 
 					caget $WAIT -a \
 						${dsprefix}:PulseBandwidthSecond \
