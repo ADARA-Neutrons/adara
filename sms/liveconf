@@ -555,6 +555,32 @@ awkLineBreak=" \
 		printf(\"%s\n\", \$NF); \
 	}"
 
+# Dump Any Non-Zero PV Value
+#    - with optional "prefix" output line(s)...
+#       -> sets/uses Global "GOT_NON_ZERO_VALUE" for Prefix Control...
+Dump_Non_Zero_PV()
+{
+	local _pv="$1"
+	shift
+
+	local _prefix=""
+	if [[ $# > 0 ]]; then
+		_prefix="$1"
+		shift
+	fi
+
+	local _value=`caget $WAIT -a ${_pv} \
+		| sed -e "/ 0[[:space:]]*$/d" -e "s/ /\n   /"`
+
+	if [[ "#${_value}#" != '##' ]]; then
+		if [[ "#${_prefix}#" != '##' && $GOT_NON_ZERO_VALUE == 0 ]]; then
+			echo -e "${_prefix}"
+		fi
+		echo "${_value}"
+		GOT_NON_ZERO_VALUE=1
+	fi
+}
+
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
@@ -656,26 +682,17 @@ if [[ "$command" == "status" \
 
 				if [[ "$command" == "bandwidth" ]]; then
 
-					echo "---"
+					# Reset Non-Zero Prefix Global...
+					GOT_NON_ZERO_VALUE=0
 
-					caget $WAIT -a \
-						${dsprefix}:PulseBandwidthSecond \
-						| sed "s/ /\n   /"
-					caget $WAIT -a \
-						${dsprefix}:EventBandwidthSecond \
-						| sed "s/ /\n   /"
-					caget $WAIT -a \
-						${dsprefix}:PulseBandwidthMinute \
-						| sed "s/ /\n   /"
-					caget $WAIT -a \
-						${dsprefix}:EventBandwidthMinute \
-						| sed "s/ /\n   /"
-					caget $WAIT -a \
-						${dsprefix}:PulseBandwidthTenMin \
-						| sed "s/ /\n   /"
-					caget $WAIT -a \
-						${dsprefix}:EventBandwidthTenMin \
-						| sed "s/ /\n   /"
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthSecond "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthMinute "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthTenMin "---"
 
 				fi
 
@@ -702,12 +719,9 @@ if [[ "$command" == "status" \
 
 					if [[ "$command" == "bandwidth" ]]; then
 
-						caget $WAIT -a ${hwsprefix}:EventBandwidthSecond \
-							| sed "s/ /\n   /"
-						caget $WAIT -a ${hwsprefix}:EventBandwidthMinute \
-							| sed "s/ /\n   /"
-						caget $WAIT -a ${hwsprefix}:EventBandwidthTenMin \
-							| sed "s/ /\n   /"
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthTenMin
 
 					fi
 
