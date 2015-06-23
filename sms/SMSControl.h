@@ -23,6 +23,7 @@ class smsErrorPV;
 class smsUint32PV;
 class smsConnectedPV;
 class PopPulseBufferPV;
+class CleanShutdownPV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -214,6 +215,8 @@ private:
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
+
+	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumLiveClients;
 

@@ -79,6 +79,20 @@ private:
 	}
 };
 
+class CleanShutdownPV : public smsTriggerPV {
+public:
+	CleanShutdownPV(const std::string &name) :
+		smsTriggerPV(name) {}
+
+private:
+	void triggered(void)
+	{
+		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
+			<< " Cleanly Shutting Down SMS Daemon.");
+		exit(0);
+	}
+};
+
 SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
@@ -306,6 +320,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumLiveClients"));
 
+	// The Kill Switch. ["NEVER USE THIS!" Lol... (Except for Valgrind) :-]
+	m_pvCleanShutdown = boost::shared_ptr<CleanShutdownPV>(new
+						CleanShutdownPV(prefix + ":CleanShutdown"));
+
 	addPV(m_pvVersion);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
@@ -314,6 +332,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
+	addPV(m_pvCleanShutdown);
 
 	// Initialize Config/Info PVs...
 	struct timespec now;
@@ -525,13 +544,13 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	int now_complete = 0;
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-		// release now-partial pulses...
+		// Release Now-Partial Pulses...
 		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
 			marked_partial++;
 		}
-		// note the last now-completed (partial or not) pulse for handling
+		// Note the Last Now-Completed (Partial or Not) Pulse for Handling
 		if (it->second->m_pending.none()) {
 			last = it;
 			now_complete++;
@@ -554,8 +573,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
 
-		// determine how many sources are registered
-		// (including the one we are unregistering)
+		// Determine How Many Sources are Registered
+		// (Including the One We are Unregistering)
 		size_t i, max = m_eventSources.size();
 		int num_sources = 0;
 		for (i = 0; i < max; i++) {
@@ -563,29 +582,35 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				num_sources++;
 		}
 
-		// get latest No End-of-Pulse Buffer Size value from PV...
+		// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 		last_minus_buffer = last;
 		int recorded = 0;
 		uint32_t cnt = 1; // for last...
 
-		// skip past any buffering level, unless we're the last to unreg
-		// (any other remaining sources could still spew out-of-order...)
+		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
+		// (Any Other Remaining Sources could Still Spew Out-of-Order...)
 		while (cnt++ < m_noEoPPulseBufferSize && num_sources > 1) {
-			// skip over pulse to satisfy buffering requirement
+			// Skip Over Pulse to Satisfy Buffering Requirement
 			if (last_minus_buffer != m_pulses.begin()) {
 				last_minus_buffer--;
 			}
-			// no pulses to record yet, buffer not "full" enough...
+			// No Pulses to Record Yet, Buffer Not "Full" Enough...
 			else {
-				/* D-Oh... Before returning, mark this id for re-use... */
+				/* D-Oh... Before Returning, Mark This Id for Re-Use... */
 				m_eventSources.reset(smsId);
 				return;
 			}
 		}
 
-		// record complete/partial pulses past the buffering threshold
+		// Record Complete/Partial Pulses Past the Buffering Threshold
+		// TODO Note: We _Might_ Be Recording Some As-Yet-Still-Pending
+		// Pulses Here, if there are some Unresolved Pulses still
+		// Interlaced amidst the Pulses Being Released by the
+		// Now-Unregistered Data Source... ;-b
+		// (Creates a distinct mess out of the Erasing part, relative
+		// to the simple approach used here and in markComplete()... ;-)
 		DEBUG("unregisterEventSource: Recording Pulses"
 			<< std::hex << " 0x" << m_pulses.begin()->first.first
 			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
@@ -595,7 +620,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// always record the last pulse from the last source to unregister
+		// Always Record the Last Pulse from the Last Source to Unregister
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			DEBUG("unregisterEventSource Recording Last Pulse 0x"
 				<< std::hex << last->first.first << std::dec);
@@ -604,26 +629,26 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// Log the size of the remaining internal pulse buffer...
-		// (count the rest of the list we _didn't_ just process...)
+		// Log the Size of the Remaining Internal Pulse Buffer...
+		// (Count the Rest of the List We _Didn't_ Just Process...)
 		uint64_t queue_length = 0;
 		while ( it != m_pulses.end() ) {
 			queue_length++;
 			it++;
 		}
-		// account for last pulse, if recorded...
+		// Account for Last Pulse, If Recorded...
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			queue_length--;
 		}
 		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length);
 
-		// erase any now-recorded pulses
+		// Erase Any Now-Recorded Pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
 		}
 	}
 
-	/* Mark this id for re-use. */
+	/* Mark This Id for Re-Use. */
 	m_eventSources.reset(smsId);
 }
 
