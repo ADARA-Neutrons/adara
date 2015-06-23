@@ -1246,8 +1246,20 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	if ( smsId != (uint32_t) -1 )
 		pulse->m_pending.reset(smsId);
 
-	// pulse still pending from other data sources...
+	// Pulse Still Pending from Other Data Sources...
 	if (pulse->m_pending.any()) {
+		// Periodically Log the Size of the Internal Pulse Buffer...
+		if ( !(++queue_log_count % 5000) ) {
+			// Count the Full List...
+			uint64_t queue_length = 0;
+			it = m_pulses.begin();
+			while ( it != m_pulses.end() ) {
+				queue_length++;
+				it++;
+			}
+			DEBUG("[Pending] Internal Pulse Buffer Length = "
+				<< queue_length);
+		}
 		return;
 	}
 
@@ -1266,7 +1278,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
 
-	// get latest No End-of-Pulse Buffer Size value from PV...
+	// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 	current_minus_buffer = current;
@@ -1274,51 +1286,51 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	uint32_t cnt = 1; // for current...
 
 	while (cnt++ < m_noEoPPulseBufferSize) {
-		// skip over pulse to satisfy buffering requirement
+		// Skip Over Pulse to Satisfy Buffering Requirement
 		if (current_minus_buffer != m_pulses.begin()) {
 			current_minus_buffer--;
 		}
-		// no pulses to record yet, buffer not "full" enough...
+		// No Pulses to Record Yet, Buffer Not "Full" Enough...
 		else {
 			return;
 		}
 	}
 
-	// record complete/partial pulses past the buffering threshold
+	// Record Complete/Partial Pulses Past the Buffering Threshold
 	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
-		// previous pulse will never be made complete, mark as partial
+		// Previous Pulse will Never be Made Complete, Mark as Partial
 		if (it->second->m_pending.any()) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 		}
-		// recording previously complete (buffered) pulse
+		// Recording Previously Complete (Buffered) Pulse
 		recordPulse(it->second);
 		last_recorded = it;
 		recorded++;
 	}
 
-	// record the current pulse for sure, if not buffering...
+	// Record the Current Pulse for Sure, If Not Buffering...
 	if (!m_noEoPPulseBufferSize) {
 		recordPulse(current->second);
 		last_recorded = current;
 		recorded++;
 	}
 
-	// Periodically log the size of the internal pulse buffer...
+	// Periodically Log the Size of the Internal Pulse Buffer...
 	if ( !(++queue_log_count % 5000) ) {
-		// count the rest of the list we _didn't_ just process...
+		// Count the Rest of the List We _Didn't_ Just Process...
 		uint64_t queue_length = 0;
 		while ( it != m_pulses.end() ) {
 			queue_length++;
 			it++;
 		}
-		// account for last pulse, if recorded...
+		// Account for Last Pulse, If Recorded...
 		if (!m_noEoPPulseBufferSize) {
 			queue_length--;
 		}
 		DEBUG("Internal Pulse Buffer Length = " << queue_length);
 	}
 
-	// erase any now-recorded pulses
+	// Erase Any Now-Recorded Pulses
 	if (recorded) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
 	}
