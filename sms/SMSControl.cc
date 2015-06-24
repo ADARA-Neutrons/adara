@@ -648,6 +648,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
 		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
+			<< " recorded=" << recorded
 			<< " (size=" << m_pulses.size() << ")");
 	}
 
@@ -1370,6 +1371,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
 	if ( do_log ) {
 		DEBUG("Internal Pulse Buffer Length = " << queue_length
+			<< " recorded=" << recorded
 			<< " (size=" << m_pulses.size() << ")");
 	}
 }
