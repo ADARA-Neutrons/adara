@@ -640,13 +640,15 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			queue_length--;
 		}
-		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
-			<< " (size=" << m_pulses.size() << ")");
 
 		// Erase Any Now-Recorded Pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
 		}
+
+		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
+			<< " (size=" << m_pulses.size() << ")");
 	}
 
 	/* Mark This Id for Re-Use. */
@@ -1345,9 +1347,10 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	}
 
 	// Periodically Log the Size of the Internal Pulse Buffer...
+	uint64_t queue_length = 0;
+	bool do_log = false;
 	if ( !(++queue_log_count % 5000) ) {
 		// Count the Rest of the List We _Didn't_ Just Process...
-		uint64_t queue_length = 0;
 		while ( it != m_pulses.end() ) {
 			queue_length++;
 			it++;
@@ -1356,13 +1359,18 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		if (!m_noEoPPulseBufferSize) {
 			queue_length--;
 		}
-		DEBUG("Internal Pulse Buffer Length = " << queue_length
-			<< " (size=" << m_pulses.size() << ")");
+		do_log = true;
 	}
 
 	// Erase Any Now-Recorded Pulses
 	if (recorded) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
+	}
+
+	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+	if ( do_log ) {
+		DEBUG("Internal Pulse Buffer Length = " << queue_length
+			<< " (size=" << m_pulses.size() << ")");
 	}
 }
 
