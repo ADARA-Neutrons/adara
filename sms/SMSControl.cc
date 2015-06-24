@@ -640,7 +640,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			queue_length--;
 		}
-		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length);
+		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
+			<< " (size=" << m_pulses.size() << ")");
 
 		// Erase Any Now-Recorded Pulses
 		if (recorded) {
@@ -842,11 +843,13 @@ void SMSControl::setSourcesReadDelay(void)
 				<< " begin()=" << "0x" << m_pulses.begin()->first.first
 				<< " next_to_last=" << "0x" << next_to_last->first.first
 				<< std::dec
-				<< ", Internal Pulse Buffer Length = " << queue_length);
+				<< ", Internal Pulse Buffer Length = " << queue_length
+				<< " (size=" << m_pulses.size() << ")");
 		} else {
 			DEBUG(log_info
 				<< "Internal Pulse Buffer is Empty"
-				<< ", Internal Pulse Buffer Length = " << queue_length);
+				<< ", Internal Pulse Buffer Length = " << queue_length
+				<< " (size=" << m_pulses.size() << ")");
 		}
 	}
 }
@@ -1283,7 +1286,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				it++;
 			}
 			DEBUG("[Pending] Internal Pulse Buffer Length = "
-				<< queue_length);
+				<< queue_length
+				<< " (size=" << m_pulses.size() << ")");
 		}
 		return;
 	}
@@ -1352,7 +1356,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		if (!m_noEoPPulseBufferSize) {
 			queue_length--;
 		}
-		DEBUG("Internal Pulse Buffer Length = " << queue_length);
+		DEBUG("Internal Pulse Buffer Length = " << queue_length
+			<< " (size=" << m_pulses.size() << ")");
 	}
 
 	// Erase Any Now-Recorded Pulses
