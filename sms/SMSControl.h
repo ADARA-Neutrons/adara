@@ -1,15 +1,7 @@
 #ifndef __SMS_CONTROL_H
 #define __SMS_CONTROL_H
 
-// NEVER USE THIS...
-//    - it turns out Boost Pool kinda sux (at least this latest version)
-//       -> if things go awry, reallocation/unallocation TAKES FOREVER!!!
-#define DO_POOL
-
 #include <boost/property_tree/ptree.hpp>
-#ifdef DO_POOL
-#include <boost/pool/pool_alloc.hpp>
-#endif
 #include <boost/smart_ptr.hpp>
 #include <stdint.h>
 #include <string>
@@ -106,14 +98,7 @@ private:
 	typedef std::bitset<256> SourceSet;
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
 
-	typedef std::vector<ADARA::Event
-#ifdef DO_POOL
-		, boost::pool_allocator<ADARA::Event,
-			boost::default_user_allocator_new_delete,
-			boost::details::pool::default_mutex,
-			100000>
-#endif
-		> EventVector;
+	typedef std::vector<ADARA::Event> EventVector;
 
 	struct EventSource {
 		EventSource(uint32_t intraPulse, uint32_t tofField,
@@ -127,29 +112,10 @@ private:
 		uint32_t			m_intraPulseTime;
 		uint32_t			m_tofField;
 		uint32_t			m_activeBanks;
-		std::vector<EventVector
-#ifdef DO_POOL
-			, boost::pool_allocator<EventVector,
-				boost::default_user_allocator_new_delete,
-				boost::details::pool::default_mutex,
-				128>
-#endif
-			> m_banks;
+		std::vector<EventVector>	m_banks;
 	};
 
-#ifdef DO_POOL
-	typedef boost::fast_pool_allocator<
-		std::pair<uint32_t, EventSource>,
-		boost::default_user_allocator_new_delete,
-		boost::details::pool::default_mutex,
-		16> SourceMapAlloc;
-#endif
-
-	typedef std::map<uint32_t, EventSource
-#ifdef DO_POOL
-		, std::less<uint32_t>, SourceMapAlloc
-#endif
-		> SourceMap;
+	typedef std::map<uint32_t, EventSource> SourceMap;
 
 	struct BeamMonitor {
 		BeamMonitor(uint32_t srcId, uint32_t tofField) :
@@ -158,52 +124,14 @@ private:
 
 		uint32_t			m_sourceId;
 		uint32_t			m_tofField;
-		std::vector<uint32_t
-#ifdef DO_POOL
-			, boost::pool_allocator<uint32_t,
-				boost::default_user_allocator_new_delete,
-				boost::details::pool::default_mutex,
-				100000>
-#endif
-			> m_eventTof;
+		std::vector<uint32_t>		m_eventTof;
 	};
 
-#ifdef DO_POOL
-	typedef boost::fast_pool_allocator<
-		std::pair<uint32_t, BeamMonitor>,
-		boost::default_user_allocator_new_delete,
-		boost::details::pool::default_mutex,
-		16> MonitorMapAlloc;
-#endif
+	typedef std::map<uint32_t, BeamMonitor> MonitorMap;
 
-	typedef std::map<uint32_t, BeamMonitor
-#ifdef DO_POOL
-		, std::less<uint32_t>, MonitorMapAlloc
-#endif
-		> MonitorMap;
+	typedef std::vector<uint32_t> ChopperEvents;
 
-	typedef std::vector<uint32_t
-#ifdef DO_POOL
-		, boost::pool_allocator<uint32_t,
-			boost::default_user_allocator_new_delete,
-			boost::details::pool::default_mutex,
-			10000>
-#endif
-		> ChopperEvents;
-
-#ifdef DO_POOL
-	typedef boost::fast_pool_allocator<
-		std::pair<uint32_t, ChopperEvents>,
-		boost::default_user_allocator_new_delete,
-		boost::details::pool::default_mutex,
-		16> ChopperMapAlloc;
-#endif
-
-	typedef std::map<uint32_t, ChopperEvents
-#ifdef DO_POOL
-		, std::less<uint32_t>, ChopperMapAlloc
-#endif
-		> ChopperMap;
+	typedef std::map<uint32_t, ChopperEvents> ChopperMap;
 
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
@@ -240,19 +168,7 @@ private:
 
 	typedef boost::shared_ptr<Pulse> PulsePtr;
 
-#ifdef DO_POOL
-	typedef boost::fast_pool_allocator<
-		std::pair<PulseIdentifier, PulsePtr>,
-		boost::default_user_allocator_new_delete,
-		boost::details::pool::default_mutex,
-		1000> PulseMapAlloc;
-#endif
-
-	typedef std::map<PulseIdentifier, PulsePtr
-#ifdef DO_POOL
-		, std::less<PulseIdentifier>, PulseMapAlloc
-#endif
-		> PulseMap;
+	typedef std::map<PulseIdentifier, PulsePtr> PulseMap;
 
 	std::map<std::string, PVSharedPtr> m_pv_map;
 	uint32_t m_nextRunNumber;
