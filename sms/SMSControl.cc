@@ -284,9 +284,13 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
-	m_lastPulseId(0), m_lastRingPeriod(0), m_bankReserve(4096),
+	m_lastPulseId(0), m_lastRingPeriod(0),
+	m_monitorInitReserve(1024), m_bankInitReserve(4096),
+	m_chopperInitReserve(128), m_fastMetaReserve(16),
+	m_fastMetaStatWindow(m_fastMetaReserve, 10),
 	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
+	// Initialize Control PVs...
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
 
@@ -361,6 +365,13 @@ SMSControl::SMSControl() :
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
 
 	m_maxBanks = m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET;
+
+	// Initialize Bank Stat Windows for Vector Reserve...
+	StatWindow bankSW(m_bankInitReserve, 30);
+	for (uint32_t i=0 ; i < m_maxBanks ; i++) {
+		m_bankStatWindowVec.push_back(bankSW);
+		m_bankReserve.push_back(m_bankInitReserve);
+	}
 }
 
 SMSControl::~SMSControl()
@@ -970,12 +981,8 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 }
 
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
-				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
-	uint32_t rising = (pixel & 1) << 31;
-	tof &= ((1U << 21) - 1);
-	tof |= rising;
-
 	uint32_t monId = pixel >> 16;
 	monId &= 0xff;
 
@@ -989,23 +996,45 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		MonitorMap::value_type val(monId, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
 
+		// Reserve Space for the Monitor Events
+		// based on Recent Data-Rate History... ;-D
+		// (Create New Stat Window and Initialize Monitor Reserve
+		// if First Occurrence of Monitor Id...! :-)
+		StatWindowMap::iterator monSW = m_monitorStatWindowMap.find(monId);
+		if ( monSW == m_monitorStatWindowMap.end()) {
+			DEBUG("New m_monitorStatWindowMap[]"
+				<< " for monId=" << monId
+				<< " m_monitorInitReserve=" << m_monitorInitReserve);
+			StatWindow new_monSW(m_monitorInitReserve, 30);
+			StatWindowMap::value_type valSW(monId, new_monSW);
+			m_monitorStatWindowMap.insert(valSW);
+			m_monitorReserve[monId] = m_monitorInitReserve;
+		}
+		// DEBUG("m_monitorReserve[" << monId << "]="
+			// << m_monitorReserve[monId]);
+		mon->second.m_eventTof.reserve(m_monitorReserve[monId]);
+
 		/* Track the creation of overall collections of monitors...
 		 */
 		MonitorMap::iterator allMon = m_allMonitors.find(monId);
 		if (allMon == m_allMonitors.end()) {
 			INFO("New Monitor id=" << monId
-				<< " (pixelId=" << pixel
-				<< " sourceID=" << pkt.sourceID()
-				<< " tofField=" << pkt.tofField() << ")");
+				<< " (pixelId=0x" << std::hex << pixel
+				<< " sourceID=0x" << pkt.sourceID()
+				<< " tofField=0x" << pkt.tofField() << std::dec << ")");
 			m_allMonitors.insert(val);
 		}
 	}
+
+	uint32_t rising = (pixel & 1) << 31;
+	tof &= ((1U << 21) - 1);
+	tof |= rising;
 
 	mon->second.m_eventTof.push_back(tof);
 }
 
 void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
-				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;
@@ -1057,7 +1086,25 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 		clock_gettime(CLOCK_REALTIME, &now);
 		m_meta->addFastMetaDDP(now, cid_dev, ddp);
 
+		// Initialize Chopper Events Allocation History...
+		// (Create New Stat Window and Initialize Chopper Reserve...)
+		DEBUG("New m_chopperStatWindowMap[]"
+			<< " for cid=" << cid
+			<< " m_chopperInitReserve=" << m_chopperInitReserve);
+		StatWindow new_chopSW(m_chopperInitReserve, 30);
+		StatWindowMap::value_type valSW(cid, new_chopSW);
+		m_chopperStatWindowMap.insert(valSW);
+		m_chopperReserve[cid] = m_chopperInitReserve;
+
 		m_choppers.insert(cid);
+	}
+
+	/* Reserve Space for the Chopper Events
+	 * based on Recent Data-Rate History... ;-D */
+	if (pulse->m_chopperEvents[cid].empty()) {
+		// DEBUG("m_chopperReserve[" << cid << "]="
+			// << m_chopperReserve[cid]);
+		pulse->m_chopperEvents[cid].reserve(m_chopperReserve[cid]);
 	}
 
 	/* The time-of-flight value is in bits 0-20 of the field; mask
@@ -1125,77 +1172,90 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	 */
 	pulse->m_charge = pkt.pulseCharge();
 
+	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, logical;
-	uint16_t bank;
-	ADARA::Event translated;
+	uint16_t bank = 0;
 
-	for (i = 0; i < count; i++) {
+	for (i=0; i < count; i++) {
+
 		phys = events[i].pixel;
 
 		switch (phys >> 28) {
 
-		case 4: // Monitor Event
-			/* Add this event to our monitors, and go on to the
-			 * next raw event -- it doesn't go in the banked
-			 * events section.
-			 */
-			addMonitorEvent(pkt, pulse, phys, events[i].tof);
-			pulse->m_numMonEvents++;
-			continue;
-
-		case 7: // Chopper Event
-			/* Add this event to our choppers, and go on to the
-			 * next raw event -- it doesn't go into the banked
-			 * event section.
-			 */
-			addChopperEvent(pkt, pulse, phys, events[i].tof);
-			continue;
-
-		case 0: // Detector Event
-			// Already Mapped to Logical PixelId at Data Source...!
-			if (is_mapped) {
-				// PixelId Already Is Logical...!
-				logical = phys;
-				// Just Lookup Bank from Logical PixelId...
-				if (m_pixelMap->mapEventBank(logical, bank))
-					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-				bank += Pulse::REAL_BANK_OFFSET;
-			}
-			// Not Yet Mapped, Map Physical PixelId to Logical PixelId
-			// and Identify Detector Bank...
-			else {
-				if (m_pixelMap->mapEvent(phys, logical, bank))
-					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-				bank += Pulse::REAL_BANK_OFFSET;
-			}
-			break;
-
-		case 5: case 6: // Fast-Metadata Variable Update
-			/* This is a fast-metadata update, see if we have a
-			 * mapping for it. If not, let it fall through to the
-			 * common error pixel handling.
-			 */
-			if (m_fastmeta->validVariable(phys)) {
-				pulse->m_fastMetaEvents.push_back(events[i]);
+			case 4: // Monitor Event
+				/* Add this event to our monitors, and go on to the
+				 * next raw event -- it doesn't go in the banked
+				 * events section.
+				 */
+				addMonitorEvent(pkt, pulse, phys, events[i].tof);
+				pulse->m_numMonEvents++;
 				continue;
-			}
-			/* FALLTHROUGH */
 
-		case 1: case 2: case 3: // Unused as yet...
-			/* Unused sources, let them drop into error handling */
-			/* FALLTHROUGH */
+			case 7: // Chopper Event
+				/* Add this event to our choppers, and go on to the
+				 * next raw event -- it doesn't go into the banked
+				 * event section.
+				 */
+				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				continue;
 
-		default: // Error Event
-			/* Error bit is set, identity map and put in the
-			 * error bank
-			 */
-			logical = phys;
-			bank = 0;
+			case 0: // Detector Event
+				// Already Mapped to Logical PixelId at Data Source...!
+				if (is_mapped) {
+					// PixelId Already Is Logical...!
+					logical = phys;
+					// Just Lookup Bank from Logical PixelId...
+					if (m_pixelMap->mapEventBank(logical, bank)) {
+						pulse->m_flags |=
+							ADARA::BankedEventPkt::MAPPING_ERROR;
+					}
+					bank += Pulse::REAL_BANK_OFFSET;
+				}
+				// Not Yet Mapped...
+				// Map Physical PixelId to Logical PixelId
+				// and Identify Detector Bank...
+				else {
+					if (m_pixelMap->mapEvent(phys, logical, bank)) {
+						pulse->m_flags |=
+							ADARA::BankedEventPkt::MAPPING_ERROR;
+					}
+					bank += Pulse::REAL_BANK_OFFSET;
+				}
+				break;
 
-			pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
-		}
+			case 5: case 6: // Fast-Metadata Variable Update
+				/* This is a fast-metadata update, see if we have a
+				 * mapping for it. If not, let it fall through to the
+				 * common error pixel handling.
+				 */
+				if (m_fastmeta->validVariable(phys)) {
+					/* Reserve Space for the Fast-Metadata Updates
+					 * based on Recent Data-Rate History... ;-D */
+					if (pulse->m_fastMetaEvents.empty()) {
+						// DEBUG("m_fastMetaReserve=" << m_fastMetaReserve);
+						pulse->m_fastMetaEvents.reserve(m_fastMetaReserve);
+					}
+					pulse->m_fastMetaEvents.push_back(events[i]);
+					continue;
+				}
+				/* FALLTHROUGH */
+
+			case 1: case 2: case 3: // Unused as yet...
+				/* Unused sources, let them drop into error handling */
+				/* FALLTHROUGH */
+
+			default: // Error Event
+				/* Error bit is set, identity map and put in the
+				 * error bank
+				 */
+				logical = phys;
+				bank = 0;
+
+				pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
+
+		} // switch (phys >> 28)
 
 		if (src->second.m_banks[bank].empty()) {
 			/* pulse->m_numBanks will double count banks if
@@ -1205,7 +1265,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 			 */
 			pulse->m_numBanks++;
 			src->second.m_activeBanks++;
-			src->second.m_banks[bank].reserve(m_bankReserve);
+
+			src->second.m_banks[bank].reserve(m_bankReserve[bank]);
 		}
 
 		translated.pixel = logical;
@@ -1445,6 +1506,8 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 {
+	// static uint32_t update_history_count = 0;
+
 	m_iovec.clear();
 	m_hdrs.clear();
 
@@ -1498,17 +1561,62 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 		iov.iov_len = mon.m_eventTof.size();
 		iov.iov_len *= sizeof(uint32_t);
 		m_iovec.push_back(iov);
+
+		// See How We're Doing with Vector Reserve Size... ;-D
+		// if ( mon.m_eventTof.size() > m_monitorReserve[ mIt->first ] ) {
+			// DEBUG("*** Monitor Reserve Overflow for " << mIt->first
+				// << ": " << mon.m_eventTof.size() << " > "
+				// << m_monitorReserve[ mIt->first ]);
+		// }
+
+		// if ( !( update_history_count++ % 99 ) ) {
+		// Update History of Monitor Event Counts
+		// to Try to Avoid Reallocation Events! ;-D
+		StatWindowMap::iterator monSW =
+			m_monitorStatWindowMap.find( mIt->first );
+		if ( monSW != m_monitorStatWindowMap.end() ) {
+			/* DEBUG("Found m_monitorStatWindowMap[] for " << mIt->first);
+			DEBUG("mon.m_eventTof.size()=" << mon.m_eventTof.size());
+			DEBUG("Before m_monitorReserve[" << mIt->first << "]="
+				<< m_monitorReserve[ mIt->first ]);
+			DEBUG("Current window average = "
+				<< monSW->second.currentValue());
+			DEBUG("monSW:"
+				<< " m_count_data.size()=" << monSW->second.m_count_data.size()
+				<< " m_dev_data.size()=" << monSW->second.m_dev_data.size()
+				<< " m_window_size=" << monSW->second.m_window_size
+				<< " m_bessel_count=" << monSW->second.m_bessel_count
+				<< " m_stddev=" << monSW->second.m_stddev
+				<< " m_count=" << monSW->second.m_count
+				<< " m_mean_sum=" << monSW->second.m_mean_sum
+				<< " m_var_sum=" << monSW->second.m_var_sum
+				<< " m_reserve=" << monSW->second.m_reserve
+				<< " m_full=" << monSW->second.m_full);
+			for (uint32_t i=0 ; i < monSW->second.m_count_data.size() ; i++) {
+				DEBUG("m_count_data[" << i << "]=" << monSW->second.m_count_data[i]);
+				DEBUG("m_dev_data[" << i << "]=" << monSW->second.m_dev_data[i]);
+			} */
+			m_monitorReserve[ mIt->first ] =
+				monSW->second.nextValue( mon.m_eventTof.size() );
+			// DEBUG("m_monitorStatWindowMap"
+				// << " for " << mIt->first
+				// << " nextValue( " << mon.m_eventTof.size() << " )"
+				// << " returned m_monitorReserve="
+				// << m_monitorReserve[ mIt->first ]);
+		} else {
+			DEBUG("NO m_monitorStatWindowMap[] for " << mIt->first);
+			throw std::logic_error("Monitor Stat Window Not Found for Id");
+		}
+		// }
 	}
 
 	StorageManager::addPacket(m_iovec);
-
-	/* TODO update history of monitor event counts and preallocate
-	 * accordingly to try to avoid reallocation events
-	 */
 }
 
 void SMSControl::buildBankedPacket(PulsePtr &pulse)
 {
+	// static uint32_t update_history_count = 0;
+
 	m_iovec.clear();
 	m_hdrs.clear();
 
@@ -1561,6 +1669,45 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 		m_hdrs.push_back(src.m_activeBanks);
 
 		for (uint32_t i = 0; i < src.m_banks.size(); i++) {
+
+			// See How We're Doing with Vector Reserve Size... ;-D
+			// if ( src.m_banks[i].size() > m_bankReserve[i] ) {
+				// DEBUG("*** Bank Reserve Overflow for " << i
+					// << ": " << src.m_banks[i].size() << " > "
+					// << m_bankReserve[i]);
+			// }
+
+			// if ( !( update_history_count++ % 99 ) ) {
+			// Update History of Bank Event Counts
+			// to Try to Avoid Reallocation Events! ;-D
+			StatWindow bankSW = m_bankStatWindowVec[i];
+			/* DEBUG("src.m_banks[" << i << "].size()=" << src.m_banks[i].size());
+			DEBUG("Before m_bankReserve[" << i << "]=" << m_bankReserve[i]);
+			DEBUG("Current window average = " << bankSW.currentValue());
+			DEBUG("bankSW:"
+				<< " m_count_data.size()=" << bankSW.m_count_data.size()
+				<< " m_dev_data.size()=" << bankSW.m_dev_data.size()
+				<< " m_window_size=" << bankSW.m_window_size
+				<< " m_bessel_count=" << bankSW.m_bessel_count
+				<< " m_stddev=" << bankSW.m_stddev
+				<< " m_count=" << bankSW.m_count
+				<< " m_mean_sum=" << bankSW.m_mean_sum
+				<< " m_var_sum=" << bankSW.m_var_sum
+				<< " m_reserve=" << bankSW.m_reserve
+				<< " m_full=" << bankSW.m_full);
+			for (uint32_t j=0 ; j < bankSW.m_count_data.size() ; j++) {
+				DEBUG("m_count_data[" << j << "]=" << bankSW.m_count_data[j]);
+				DEBUG("m_dev_data[" << j << "]=" << bankSW.m_dev_data[j]);
+			} */
+			m_bankReserve[i] = bankSW.nextValue( src.m_banks[i].size() );
+			// DEBUG("m_bankStatWindowVec"
+				// << " for " << i
+				// << " nextValue( " << src.m_banks[i].size() << " )"
+				// << " returned m_bankReserve="
+				// << m_bankReserve[i]);
+			// Ignore Bank Stat Window If Never Defined/Used as Yet...
+			// }
+
 			if (src.m_banks[i].empty())
 				continue;
 
@@ -1585,14 +1732,12 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	}
 
 	StorageManager::addPacket(m_iovec);
-
-	/* TODO update history of bank event counts and size m_bankReserve
-	 * accordingly to try to avoid reallocation events.
-	 */
 }
 
 void SMSControl::buildChopperPackets(PulsePtr &pulse)
 {
+	// static uint32_t update_history_count = 0;
+
 	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
 
 	pkt[0] = 4 * sizeof(uint32_t);
@@ -1635,16 +1780,102 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			 */
 			StorageManager::addPacket(pkt, sizeof(pkt));
 		}
+
+		// See How We're Doing with Vector Reserve Size... ;-D
+		// if ( cit->second.size() > m_chopperReserve[ cit->first ] ) {
+			// DEBUG("*** Chopper Reserve Overflow for " << cit->first
+				// << ": " << cit->second.size() << " > "
+				// << m_chopperReserve[ cit->first ]);
+		// }
+
+		// if ( !( update_history_count++ % 99 ) ) {
+		// Update History of Chopper Event Counts
+		// to Try to Avoid Reallocation Events! ;-D
+		StatWindowMap::iterator chopSW =
+			m_chopperStatWindowMap.find( cit->first );
+		if ( chopSW != m_chopperStatWindowMap.end() ) {
+			/* DEBUG("Found m_chopperStatWindowMap[] for " << cit->first);
+			DEBUG("cit->second.size()=" << cit->second.size());
+			DEBUG("Before m_chopperReserve[" << cit->first << "]="
+				<< m_chopperReserve[ cit->first ]);
+			DEBUG("Current window average = "
+				<< chopSW->second.currentValue());
+			DEBUG("chopSW:"
+				<< " m_count_data.size()=" << chopSW->second.m_count_data.size()
+				<< " m_dev_data.size()=" << chopSW->second.m_dev_data.size()
+				<< " m_window_size=" << chopSW->second.m_window_size
+				<< " m_bessel_count=" << chopSW->second.m_bessel_count
+				<< " m_stddev=" << chopSW->second.m_stddev
+				<< " m_count=" << chopSW->second.m_count
+				<< " m_mean_sum=" << chopSW->second.m_mean_sum
+				<< " m_var_sum=" << chopSW->second.m_var_sum
+				<< " m_reserve=" << chopSW->second.m_reserve
+				<< " m_full=" << chopSW->second.m_full);
+			for (uint32_t j=0 ; j < chopSW->second.m_count_data.size() ; j++) {
+				DEBUG("m_count_data[" << j << "]=" << chopSW->second.m_count_data[j]);
+				DEBUG("m_dev_data[" << j << "]=" << chopSW->second.m_dev_data[j]);
+			} */
+			m_chopperReserve[ cit->first ] =
+				chopSW->second.nextValue( cit->second.size() );
+			// DEBUG("m_chopperStatWindowMap"
+				// << " for " << cit->first
+				// << " nextValue( " << cit->second.size() << " )"
+				// << " returned m_chopperReserve="
+				// << m_chopperReserve[ cit->first ]);
+		} else {
+			DEBUG("NO m_chopperStatWindowMap[] for " << cit->first);
+			throw std::logic_error("Chopper Stat Window Not Found for Id");
+		}
+		// }
 	}
 }
 
 void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 {
+	// static uint32_t update_history_count = 0;
+
 	uint64_t pulse_id = pulse->m_id.first;
 	EventVector::iterator it, end = pulse->m_fastMetaEvents.end();
 
 	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
 		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+
+	// See How We're Doing with Vector Reserve Size... ;-D
+	// if ( pulse->m_fastMetaEvents.size() > m_fastMetaReserve ) {
+		// DEBUG("*** Fast-Metadata Reserve Overflow: "
+			// << pulse->m_fastMetaEvents.size() << " > "
+			// << m_fastMetaReserve);
+	// }
+
+	// if ( !( update_history_count++ % 99 ) ) {
+	// Update History of Fast-Metadata Event Counts
+	// to Try to Avoid Reallocation Events! ;-D
+	/* DEBUG("pulse->m_fastMetaEvents.size()=" << pulse->m_fastMetaEvents.size());
+	DEBUG("Before m_fastMetaReserve=" << m_fastMetaReserve);
+	DEBUG("Current window average = "
+		<< m_fastMetaStatWindow.currentValue());
+	DEBUG("m_fastMetaStatWindow:"
+		<< " m_count_data.size()=" << m_fastMetaStatWindow.m_count_data.size()
+		<< " m_dev_data.size()=" << m_fastMetaStatWindow.m_dev_data.size()
+		<< " m_window_size=" << m_fastMetaStatWindow.m_window_size
+		<< " m_bessel_count=" << m_fastMetaStatWindow.m_bessel_count
+		<< " m_stddev=" << m_fastMetaStatWindow.m_stddev
+		<< " m_count=" << m_fastMetaStatWindow.m_count
+		<< " m_mean_sum=" << m_fastMetaStatWindow.m_mean_sum
+		<< " m_var_sum=" << m_fastMetaStatWindow.m_var_sum
+		<< " m_reserve=" << m_fastMetaStatWindow.m_reserve
+		<< " m_full=" << m_fastMetaStatWindow.m_full);
+	for (uint32_t j=0 ; j < m_fastMetaStatWindow.m_count_data.size() ; j++) {
+		DEBUG("m_count_data[" << j << "]=" << m_fastMetaStatWindow.m_count_data[j]);
+		DEBUG("m_dev_data[" << j << "]=" << m_fastMetaStatWindow.m_dev_data[j]);
+	} */
+	m_fastMetaReserve =
+		m_fastMetaStatWindow.nextValue( pulse->m_fastMetaEvents.size() );
+	// DEBUG("m_fastMetaStatWindow"
+		// << " nextValue( " << pulse->m_fastMetaEvents.size() << " )"
+		// << " returned m_fastMetaReserve="
+		// << m_fastMetaReserve);
+	// }
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,

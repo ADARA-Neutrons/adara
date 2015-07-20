@@ -13,6 +13,7 @@
 #include <casdef.h>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "Storage.h"
 
@@ -186,7 +187,24 @@ private:
 	PulseMap m_pulses;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
-	uint32_t m_bankReserve;
+
+	typedef std::map<uint32_t, StatWindow> StatWindowMap;
+
+	StatWindowMap m_monitorStatWindowMap;
+	std::map<uint32_t, uint32_t> m_monitorReserve;
+	uint32_t m_monitorInitReserve;
+
+	std::vector<StatWindow> m_bankStatWindowVec;
+	std::vector<uint32_t> m_bankReserve;
+	uint32_t m_bankInitReserve;
+
+	StatWindowMap m_chopperStatWindowMap;
+	std::map<uint32_t, uint32_t> m_chopperReserve;
+	uint32_t m_chopperInitReserve;
+
+	uint32_t m_fastMetaReserve;
+	StatWindow m_fastMetaStatWindow;
+
 	boost::shared_ptr<RunInfo> m_runInfo;
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
