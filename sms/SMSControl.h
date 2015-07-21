@@ -220,6 +220,9 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
 	static uint32_t m_noEoPPulseBufferSize;
 
+	boost::shared_ptr<smsUint32PV> m_pvMaxPulseBufferSize;
+	static uint32_t m_maxPulseBufferSize;
+
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;

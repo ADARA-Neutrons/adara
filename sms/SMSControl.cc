@@ -36,9 +36,10 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_PULSE        0
 #define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
-#define RLL_SET_SOURCES_READ_DELAY       3
-#define RLL_RTDL_NO_DATA                 4
-#define RLL_NO_RTDL_FOR_PULSE            5
+#define RLL_PULSE_BUFFER_OVERFLOW        3
+#define RLL_SET_SOURCES_READ_DELAY       4
+#define RLL_RTDL_NO_DATA                 5
+#define RLL_NO_RTDL_FOR_PULSE            6
 
 uint32_t SMSControl::m_targetNumber;
 
@@ -50,6 +51,7 @@ std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
+uint32_t SMSControl::m_maxPulseBufferSize;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -144,6 +146,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		INFO("Setting No-EoP-Pulse-Buffer-Size to "
 			<< m_noEoPPulseBufferSize << ".");
 	}
+
+	m_maxPulseBufferSize =
+			conf.get<uint32_t>("sms.max_pulse_buffer_size", 1000);
+	INFO("Setting Max Pulse Buffer Size to "
+		<< m_maxPulseBufferSize << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -311,6 +318,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
+	m_pvMaxPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "MaxPulseBufferSize"));
+
 	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
 						PopPulseBufferPV(prefix + ":Control:"
 							+ "PopPulseBuffer"));
@@ -332,6 +343,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
+	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
@@ -346,6 +358,9 @@ SMSControl::SMSControl() :
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
+
+	// Initialize Max Pulse Buffer Size PV from Config Value...
+	m_pvMaxPulseBufferSize->update(m_maxPulseBufferSize, &now);
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
@@ -589,7 +604,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 		last_minus_buffer = last;
-		int recorded = 0;
+		uint32_t recorded = 0;
 		uint32_t cnt = 1; // for last...
 
 		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
@@ -798,6 +813,65 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
+	// Update Max Pulse Buffer Size from PV...
+	m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+
+	// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
+	// (Give the "New Guy" a chance to exist before we dump it... ;-D)
+	if ( m_pulses.size() > m_maxPulseBufferSize ) {
+
+		// Record & Free as Many Pulses as Required to Stay Under Max...
+		// (Even after adding the next one, already in hand...!)
+		uint32_t num_to_record =
+			m_pulses.size() - m_maxPulseBufferSize + 1;
+
+		// Record Complete/Partial Pulses Past the Buffering Threshold
+		PulseMap::iterator last_recorded;
+		uint32_t recorded = 0;
+		it = m_pulses.begin();
+		for (uint32_t i=0 ;
+				i < num_to_record && it != m_pulses.end() ; i++) {
+			// Pulse will Never be Made Complete, Mark as Partial...
+			if (it->second->m_pending.any()) {
+				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+			}
+			// Record Pulse to Reduce Overflow Buffer Size...
+			recordPulse(it->second);
+			last_recorded = it++;
+			recorded++;
+		}
+
+		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+				RLL_PULSE_BUFFER_OVERFLOW, "none",
+				2, 10, 100, log_info ) ) {
+			// Count the Rest of the List We _Didn't_ Just Purge...
+			uint64_t queue_length = 0;
+			while ( it != m_pulses.end() ) {
+				queue_length++;
+				it++;
+			}
+			ERROR(log_info
+				<< "*** Internal Pulse Buffer Overflow!"
+				<< " Length = " << queue_length
+				<< " recorded=" << recorded
+				<< " (size=" << m_pulses.size()
+				<< " not counting new pulse 0x"
+				<< std::hex << id << ")"
+				<< " - Recorded Pulses 0x"
+				<< m_pulses.begin()->first.first
+				<< " up to 0x"
+				<< last_recorded->first.first << std::dec);
+		}
+
+		// Erase Any Now-Recorded Pulses
+		if (recorded) {
+			m_pulses.erase(m_pulses.begin(), ++last_recorded);
+		}
+	}
+
+	// *NOW* Record the New Pulse... ;-D
 	return m_pulses.insert(make_pair(pid, new_pulse)).first;
 }
 
@@ -1334,7 +1408,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 	current_minus_buffer = current;
-	int recorded = 0;
+	uint32_t recorded = 0;
 	uint32_t cnt = 1; // for current...
 
 	while (cnt++ < m_noEoPPulseBufferSize) {
