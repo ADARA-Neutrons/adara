@@ -121,6 +121,13 @@ option_label[$num_options]="[No EoP Pulse Buffer Size]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="max_pulse_buffer_size"
+option_pv[$num_options]="SMS:Control:MaxPulseBufferSize"
+option_value_type[$num_options]="UINT32_VALUE(max_pulses)"
+option_label[$num_options]="[Max Pulse Buffer Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="pop_pulse_buffer"
 option_no_config[$num_options]=1
 option_pv[$num_options]="SMS:Control:PopPulseBuffer"
@@ -737,6 +744,7 @@ if [[ "$command" == "status" \
 			|| "$command" == "sys_status" ]]; then
 
 		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
+		caget $WAIT ${PRE}:SMS:Control:MaxPulseBufferSize
 
 		echo
 
