@@ -71,6 +71,7 @@ private:
     void        connectPV( PVDescriptor *a_pv );
     void        disconnectPV( PVDescriptor *a_pv );
     void        controlThread();
+    void        monitorThread();
     void        sendCurrentValues();
     void        epicsConnectionHandler( struct connection_handler_args a_args );
     void        epicsEventHandler( struct event_handler_args a_args );
@@ -97,7 +98,7 @@ private:
     bool                        m_state_changed;
     bool                        m_active;
     struct ca_client_context   *m_epics_context;
-    timer_t                     m_tid;
+    boost::thread              *m_monitor_thread;
 };
 
 }}

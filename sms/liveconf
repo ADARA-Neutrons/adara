@@ -38,11 +38,17 @@ idName["monitor"]="BeamMonitor"
 is_indexed["bankset"]=1
 idName["bankset"]="DetectorBankSet"
 
+is_indexed["combus"]=0
+idName["combus"]="ComBus"
+
 is_indexed["storage"]=0
 idName["storage"]="Storage"
 
 is_indexed["sts"]=0
 idName["sts"]="STS"
+
+is_indexed["livestream"]=0
+idName["livestream"]="LiveServer"
 
 
 # Options...
@@ -73,7 +79,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetry"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_label[$num_options]="[Data Source Disconnect Retry Timeout]"
 num_options=$(( num_options + 1 ))
@@ -112,6 +118,13 @@ option_name[$num_options]="no_eop_pulse_buffer_size"
 option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
 option_value_type[$num_options]="UINT32_VALUE(pulses)"
 option_label[$num_options]="[No EoP Pulse Buffer Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="max_pulse_buffer_size"
+option_pv[$num_options]="SMS:Control:MaxPulseBufferSize"
+option_value_type[$num_options]="UINT32_VALUE(max_pulses)"
+option_label[$num_options]="[Max Pulse Buffer Size]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
@@ -223,6 +236,46 @@ option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
 option_label[$num_options]="[NeXus File NXentry Suffix for Detector Set]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="combus"
+option_name[$num_options]="restart"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:Combus:Restart"
+option_value_type[$num_options]="BOOL_VALUE(Trigger ComBus Restart)"
+option_label[$num_options]="[Trigger ComBus Restart & Reconnect]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="domain"
+option_pv[$num_options]="SMS:Combus:Domain"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Domain Name.)"
+option_label[$num_options]="[ComBus Domain]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_uri"
+option_pv[$num_options]="SMS:Combus:BrokerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker URI tcp://host:port)"
+option_label[$num_options]="[ComBus Broker URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_user"
+option_pv[$num_options]="SMS:Combus:BrokerUser"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker User)"
+option_label[$num_options]="[ComBus Broker User]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_pass"
+option_pv[$num_options]="SMS:Combus:BrokerPass"
+option_value_type[$num_options]="STRING(ComBus Broker Password)"
+option_pv_opt[$num_options]="-S"
+option_label[$num_options]="[ComBus Broker Password]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
 option_pv[$num_options]="SMS:StorageManager:Poolsize"
@@ -256,9 +309,9 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:STSClient:ConnectRetry"
+option_pv[$num_options]="SMS:STSClient:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
-option_label[$num_options]="[STS Client Time Before Re-Connection Attempt]"
+option_label[$num_options]="[STS Client Timeout for Re-Connection Attempt]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
@@ -290,6 +343,29 @@ option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_label[$num_options]="[STS Client Service URI]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="listen_retry"
+option_pv[$num_options]="SMS:LiveServer:ListenRetryTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_label[$num_options]="[Live Server Listener Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="uri"
+option_pv[$num_options]="SMS:LiveServer:ListenerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR(ip_addr or ANY)"
+option_label[$num_options]="[Live Server Listener Service IP Address]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="service"
+option_pv[$num_options]="SMS:LiveServer:ListenerService"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_PORT(service)"
+option_label[$num_options]="[Live Server Listener Service Port]"
+num_options=$(( num_options + 1 ))
+
 #
 # Dump Usage
 #
@@ -301,7 +377,8 @@ USAGE()
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
-	echo "            [bmon_status] [detset_status] [live_status] \\"
+	echo "            [bmon_status] [detset_status] [combus_status] \\"
+	echo "            [live_status] [bandwidth] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -325,7 +402,9 @@ USAGE()
 	echo "   sys_status            = display SMS internal system status"
 	echo "   bmon_status           = display SMS BeamMonitorConfig status"
 	echo "   detset_status         = display SMS DetectorBankSet status"
+	echo "   combus_status         = display SMS ComBus status"
 	echo "   live_status           = display SMS live client status"
+	echo "   bandwidth             = display SMS data bandwidth stats"
 	echo
 
 	echo "Available Options:"
@@ -483,6 +562,32 @@ awkLineBreak=" \
 		printf(\"%s\n\", \$NF); \
 	}"
 
+# Dump Any Non-Zero PV Value
+#    - with optional "prefix" output line(s)...
+#       -> sets/uses Global "GOT_NON_ZERO_VALUE" for Prefix Control...
+Dump_Non_Zero_PV()
+{
+	local _pv="$1"
+	shift
+
+	local _prefix=""
+	if [[ $# > 0 ]]; then
+		_prefix="$1"
+		shift
+	fi
+
+	local _value=`caget $WAIT -a ${_pv} \
+		| sed -e "/ 0[[:space:]]*$/d" -e "s/ /\n   /"`
+
+	if [[ "#${_value}#" != '##' ]]; then
+		if [[ "#${_prefix}#" != '##' && $GOT_NON_ZERO_VALUE == 0 ]]; then
+			echo -e "${_prefix}"
+		fi
+		echo "${_value}"
+		GOT_NON_ZERO_VALUE=1
+	fi
+}
+
 # Dump All Known SMS EPICS PVs...
 if [[ "$command" == "status" \
 		|| "$command" == "run_status" \
@@ -490,7 +595,9 @@ if [[ "$command" == "status" \
 		|| "$command" == "sys_status" \
 		|| "$command" == "bmon_status" \
 		|| "$command" == "detset_status" \
-		|| "$command" == "live_status" ]]; then
+		|| "$command" == "combus_status" \
+		|| "$command" == "live_status" \
+		|| "$command" == "bandwidth" ]]; then
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
@@ -542,28 +649,93 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
-			|| "$command" == "data_status" ]]; then
+			|| "$command" == "data_status" \
+			|| "$command" == "bandwidth" ]]; then
 
 		ndsvar="${PRE}:SMS:Control:NumDataSources"
+
 		caget $WAIT $ndsvar
+
 		if [ $? == 0 ]; then
+
 			echo
+
 			numDataSources=`caget $WAIT $ndsvar | grep $ndsvar \
 				| awk '{print $2}'`
+
 			# Count from 1...!
 			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
+
 				echo "Data Source id=${ds}:"
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:Name
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:DataURI
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:Enabled
-				caget $WAIT -a ${PRE}:SMS:DataSource:${ds}:Connected
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:ConnectRetry
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:DataTimeout
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:IgnoreEoP
-				caget $WAIT -S ${PRE}:SMS:DataSource:${ds}:MaxReadChunk
-				caget $WAIT ${PRE}:SMS:DataSource:${ds}:RTDLNoDataThresh
+
+				dsprefix="${PRE}:SMS:DataSource:${ds}"
+
+				caget $WAIT -S ${dsprefix}:Name
+				caget $WAIT -S ${dsprefix}:DataURI
+				caget $WAIT ${dsprefix}:Enabled
+				caget $WAIT -a ${dsprefix}:Connected
+
+				if [[ "$command" == "status" \
+						|| "$command" == "data_status" ]]; then
+
+					caget $WAIT ${dsprefix}:ConnectTimeout
+					caget $WAIT ${dsprefix}:ConnectRetryTimeout
+					caget $WAIT ${dsprefix}:DataTimeout
+					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT -S ${dsprefix}:MaxReadChunk
+					caget $WAIT ${dsprefix}:RTDLNoDataThresh
+
+				fi
+
+				if [[ "$command" == "bandwidth" ]]; then
+
+					# Reset Non-Zero Prefix Global...
+					GOT_NON_ZERO_VALUE=0
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthSecond "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthMinute "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthTenMin "---"
+
+				fi
+
+				echo "---"
+
+				nhwsvar="${PRE}:SMS:DataSource:${ds}:NumHWSources"
+
+				caget $WAIT $nhwsvar
+
+				numHWSources=`caget $WAIT $nhwsvar | grep $nhwsvar \
+					| awk '{print $2}'`
+
+				# Count from 1...!
+				for (( hws=1 ; hws <= numHWSources ; hws++ )); do
+
+					echo "---"
+
+					echo "HW Source index=${hws}:"
+
+					hwsprefix="${PRE}:SMS:DataSource:${ds}:HWSource:${hws}"
+
+					caget $WAIT ${hwsprefix}:HwId
+					caget $WAIT ${hwsprefix}:SmsId
+
+					if [[ "$command" == "bandwidth" ]]; then
+
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthTenMin
+
+					fi
+
+				done
+
 				echo
+
 			done
 		fi
 	fi
@@ -572,6 +744,7 @@ if [[ "$command" == "status" \
 			|| "$command" == "sys_status" ]]; then
 
 		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
+		caget $WAIT ${PRE}:SMS:Control:MaxPulseBufferSize
 
 		echo
 
@@ -586,13 +759,14 @@ if [[ "$command" == "status" \
 		echo
 
 		caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
-		caget $WAIT ${PRE}:SMS:STSClient:ConnectRetry
+		caget $WAIT ${PRE}:SMS:STSClient:ConnectRetryTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
 		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
+
 	fi
 
 	if [[ "$command" == "status" \
@@ -645,7 +819,30 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
+			|| "$command" == "combus_status" ]]; then
+
+		caget $WAIT -S ${PRE}:SMS:Combus:Restart
+
+		echo
+
+		caget $WAIT -S ${PRE}:SMS:Combus:Domain
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerURI
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerUser
+		caget $WAIT -S ${PRE}:SMS:Combus:BrokerPass
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
+
+		caget $WAIT -a ${PRE}:SMS:LiveServer:ListenStatus
+		caget $WAIT ${PRE}:SMS:LiveServer:ListenRetryTimeout
+		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerURI
+		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerService
+
+		echo
 
 		nlcvar="${PRE}:SMS:Control:NumLiveClients"
 		caget $WAIT -S $nlcvar
@@ -653,7 +850,8 @@ if [[ "$command" == "status" \
 			echo
 			numLiveClients=`caget $WAIT $nlcvar | grep $nlcvar \
 				| awk '{print $2}'`
-			for (( lc=0 ; lc < numLiveClients ; lc++ )); do
+			# Count from 1...!
+			for (( lc=1 ; lc <= numLiveClients ; lc++ )); do
 				echo "Live Client id=${lc}:"
 				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
 				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime

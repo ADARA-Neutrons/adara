@@ -1580,7 +1580,7 @@ StreamParser::rxPacket
         else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
             format = "histo";
         else
-            format = "[Unknown!]";
+            format = "[None/Unknown!]";  // "None"... (implies *NO DATA*!)
 
         syslog( LOG_INFO,
         "[%i] %s %s (%u=%s): %s=%u (%s) %s=(%u to %u by %u) %s=%lf (%s).",

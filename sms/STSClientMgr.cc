@@ -1,3 +1,4 @@
+
 #include <unistd.h>
 #include <stdint.h>
 #include <signal.h>
@@ -32,6 +33,7 @@ RateLimitedLogging::History RLLHistory_STSClientMgr;
 #define RLL_STS_FAILED_TO_CONNECT      3
 #define RLL_STS_CONNECTION_FAILED      4
 #define RLL_STS_CONNECTION_TIMED_OUT   5
+#define RLL_STS_BOGUS_LOOKUP_SIGNAL    6
 
 class MaxConnectionsPV : public smsUint32PV {
 public:
@@ -99,13 +101,13 @@ STSClientMgr::STSClientMgr() :
 	prefix += ":STSClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout"));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
 
-	m_pvConnectRetry = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetry"));
+	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":TransientTimeout"));
+		smsFloat64PV(prefix + ":TransientTimeout", 0.0));
 
 	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
 		MaxConnectionsPV(prefix + ":MaxConnections", this));
@@ -117,7 +119,7 @@ STSClientMgr::STSClientMgr() :
 		smsStringPV(prefix + ":ServiceURI"));
 
 	ctrl->addPV(m_pvConnectTimeout);
-	ctrl->addPV(m_pvConnectRetry);
+	ctrl->addPV(m_pvConnectRetryTimeout);
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
 	ctrl->addPV(m_pvMaxRequeueCount);
@@ -127,7 +129,7 @@ STSClientMgr::STSClientMgr() :
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
-	m_pvConnectRetry->update(m_connect_retry, &now);
+	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
@@ -209,9 +211,12 @@ StorageContainer::SharedPtr &STSClientMgr::nextRun(void)
 		}
 	}
 
-	m_sendingRuns[run->first] = run->second;
+	// Save Run Number for Return Indexing, as it will be Freed...! ;-D
+	// (Thanks Valgrind! ;-D)
+	uint32_t runNumber = run->first;
+	m_sendingRuns[runNumber] = run->second;
 	m_pendingRuns.erase(run);
-	return m_sendingRuns[run->first];
+	return m_sendingRuns[runNumber];
 }
 
 void STSClientMgr::startConnect(void)
@@ -233,9 +238,10 @@ void STSClientMgr::startConnect(void)
 		<< m_connections << " of " << m_max_connections << " active, "
 		<< m_pendingRuns.size() << " pending runs)");
 
-	if (m_backoff || m_connecting || m_connections >= m_max_connections ||
-					m_pendingRuns.empty())
+	if (m_backoff || m_connecting || m_connections >= m_max_connections
+			|| m_pendingRuns.empty()) {
 		return;
+	}
 
 	// Update STS Service URI from PV...
 	std::string uri = m_pvServiceURI->value();
@@ -267,11 +273,18 @@ void STSClientMgr::startConnect(void)
 
 	rc = getaddrinfo_a(GAI_NOWAIT, &gai, 1, &m_sigevent);
 	if (rc) {
-		if (rc == EAI_AGAIN)
-			return;
-
-		/* TODO better message for this non-transient error */
-		throw std::logic_error("STSClientMgr::startConnect");
+		// *Don't* Throw Exception, But Log Potentially Non-Transient Error!
+		// (and just return to Try Again Later... (via timeout, etc))
+		// (Note: "Transient" error indicated by EAI_AGAIN...?)
+		/* Rate-limited lookup error (or just once per failure type?) */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Asynchronous Lookup Failed to Enqueue for "
+				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
+		}
+		return;
 	}
 
 	m_connecting = true;
@@ -283,24 +296,37 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	int flags, rc;
 
 	/* Make sure we're expecting this signal, and that it comes from us. */
-	if (!m_connecting || info.ssi_pid != (uint32_t) getpid() ||
-				info.ssi_code != SI_ASYNCNL)
+	if ( !m_connecting || info.ssi_pid != (uint32_t) getpid()
+			|| info.ssi_code != SI_ASYNCNL ) {
+		/* Rate-limited lookup error (or just once per failure type?) */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_BOGUS_LOOKUP_SIGNAL, "none",
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info
+				<< "Unexpected Asynchronous Lookup Complete Signal?"
+				<< " Ignoring."
+				<< " m_connecting=" << m_connecting
+				<< " info.ssi_pid=" << info.ssi_pid
+				<< " getpid()=" << getpid()
+				<< " info.ssi_code=" << info.ssi_code);
+		}
 		return;
+	}
 
 	std::string log_info;
 
 	rc = gai_error(&m_gai);
 	if (rc) {
-		if (rc == EAI_MEMORY || rc == EAI_SYSTEM) {
-			ERROR("GAI unexpectedly returned " << rc);
-		} else {
-			/* Rate-limited lookup error (or just once per failure type?) */
-			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
-					RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
-					600, 3, 10, log_info ) ) {
-				ERROR(log_info << "Lookup failed for " << m_node
-					<< ":" << m_service << ": " << gai_strerror(rc));
-			}
+		// It doesn't really matter What the Error Code was (so I hope :-)
+		// just Log It, Mark the Connection as Failed, and then
+		// return to Try Again Later... (via timeout, etc)
+		/* Rate-limited lookup error (or just once per failure type?) */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Asynchronous Lookup Failed for "
+				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
 		}
 		connectFailed();
 		return;
@@ -315,8 +341,9 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 					service, sizeof(service),
 					NI_NUMERICHOST | NI_NUMERICSERV)) {
 			DEBUG("Connecting to " << host << ":" << service);
-		} else
+		} else {
 			DEBUG("Connecting to STS, getnameinfo failed");
+		}
 	}
 
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
@@ -357,7 +384,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_UNEXPECTED_CONN_ERROR, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Unexpected error " << rc << " from connect");
+			ERROR(log_info << "Unexpected error from connect - "
+				<< strerror(rc));
 		}
 		goto error;
 	}
@@ -388,11 +416,13 @@ void STSClientMgr::connectComplete(void)
 {
 	DEBUG("connectComplete() entry");
 
-	socklen_t elen = sizeof(int);
-	int e, rc;
+	socklen_t errlen = sizeof(int);
+	int err, rc;
 
-	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
-	if (!rc && !e) {
+	std::string log_info;
+
+	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
+	if (!rc && !err) {
 		DEBUG("Connected to STS");
 
 		m_fdreg.reset();
@@ -403,13 +433,38 @@ void STSClientMgr::connectComplete(void)
 		try {
 			new STSClient(m_fd, run, *this);
 			m_connections++;
-		} catch (...) {
-			ERROR("connectComplete() - STSClient() failed?");
-			/* TODO narrow what we catch? */
+		}
+		catch (std::exception &e) {
+			// Don't Throw Exception Here, Just Re-Queue Run to Try Again...
+			/* Rate-limited logging of connection issue */
+			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
+					600, 3, 10, log_info ) ) {
+				ERROR(log_info << "Connection to STS failed: "
+					<< "STSClient() failed?"
+					<< " Re-Queueing run " << run->runNumber() << "... "
+					<< e.what());
+			}
 			dequeueRun(run); // clean up...
 			queueRun(run); // re-queue run...
 			connectFailed();
-			throw;
+			return;
+		}
+		catch (...) {
+			// Don't Throw Exception Here, Just Re-Queue Run to Try Again...
+			/* Rate-limited logging of connection issue */
+			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
+					600, 3, 10, log_info ) ) {
+				ERROR(log_info << "Connection to STS failed: "
+					<< "STSClient() failed?"
+					<< " Re-Queueing run " << run->runNumber() << "... "
+					<< "Unknown Exception.");
+			}
+			dequeueRun(run); // clean up...
+			queueRun(run); // re-queue run...
+			connectFailed();
+			return;
 		}
 
 		INFO("Sending run " << run->runNumber());
@@ -419,20 +474,19 @@ void STSClientMgr::connectComplete(void)
 	}
 
 	if (rc < 0)
-		e = errno;
+		err = errno;
 
-	if (e == EINTR || e == EINPROGRESS) {
+	if (err == EINTR || err == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
 		DEBUG("connectComplete() odd-but-harmless exit");
 		return;
 	}
 
 	/* Rate-limited logging of connection issue */
-	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
 			600, 3, 10, log_info ) ) {
-		ERROR(log_info << "Connection to STS failed: " << strerror(e));
+		ERROR(log_info << "Connection to STS failed: " << strerror(err));
 	}
 	connectFailed();
 
@@ -447,7 +501,7 @@ void STSClientMgr::connectFailed(void)
 	m_fdreg.reset();
 	m_connect_timer->cancel();
 	// Update Connect Retry Timeout from PV...
-	m_connect_retry = m_pvConnectRetry->value();
+	m_connect_retry = m_pvConnectRetryTimeout->value();
 	m_reconnect_timer->start(m_connect_retry);
 }
 

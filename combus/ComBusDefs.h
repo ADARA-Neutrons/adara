@@ -73,10 +73,10 @@ enum MessageType
     MSG_CONFIG_LOGGING,
     MSG_ACK,
     MSG_NACK,
-    MSG_STS_TRANS_STARTED      = CAT_APP | APP_STS,
+    MSG_STS_TRANS_STARTED       = CAT_APP | APP_STS,
     MSG_STS_TRANS_FINISHED,
     MSG_STS_TRANS_FAILED,
-    MSG_SMS_RUN_STATUSUPDATE 	= CAT_APP | APP_SMS,
+    MSG_SMS_RUN_STATUSUPDATE    = CAT_APP | APP_SMS,
     MSG_DASMON_GET_RULES        = CAT_INPUT | APP_DASMON,
     MSG_DASMON_SET_RULES,
     MSG_DASMON_RULE_DEFINITIONS,
@@ -197,7 +197,8 @@ public:
 class MessageBase
 {
 public:
-    MessageBase() : m_timestamp(0)
+    MessageBase() :
+        m_src_id(""), m_dest_id(""), m_correlation_id(""), m_timestamp(0)
     { }
 
     virtual ~MessageBase()

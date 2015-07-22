@@ -1,9 +1,13 @@
 #ifndef __SMS_CONTROL_PV_H
 #define __SMS_CONTROL_PV_H
 
-#include <stdint.h>
 #include <time.h>
 #include <string>
+#include <stdint.h>
+
+#ifndef INT32_MAX
+#define INT32_MAX (2147483647)
+#endif
 
 #include <gddAppFuncTable.h>
 #include <smartGDDPointer.h>
@@ -62,6 +66,8 @@ protected:
 	virtual gddAppFuncTableStatus getEnums(gdd &value);
 	gddAppFuncTableStatus defaultNumber(gdd &in);
 	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
 	gddAppFuncTableStatus unusedType(gdd &in);
 
 	void initReadTable(void);
@@ -188,7 +194,9 @@ public:
 
 class smsUint32PV : public smsPV {
 public:
-	smsUint32PV(const std::string &name);
+	smsUint32PV(const std::string &name,
+		uint32_t min = 0, uint32_t max = INT32_MAX);
+		// Uint32's in EPICS are Really Int32's...
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -201,9 +209,22 @@ public:
 
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	uint32_t m_min, m_max;
+
+protected:
+	gddAppFuncTable<smsUint32PV>	m_read_table;
+
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
+
+	void initReadTable(void);
 };
 
 class smsInt32PV : public smsPV {
@@ -272,7 +293,9 @@ public:
 
 class smsFloat64PV : public smsPV {
 public:
-	smsFloat64PV(const std::string &name);
+	smsFloat64PV(const std::string &name,
+		double min = -1.7976931348623157E308,
+		double max = 1.7976931348623157E308);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -285,9 +308,22 @@ public:
 
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	double m_min, m_max;
+
+protected:
+	gddAppFuncTable<smsFloat64PV>    m_read_table;
+
+	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultString(gdd &in);
+	gddAppFuncTableStatus maximumNumber(gdd &in);
+	gddAppFuncTableStatus minimumNumber(gdd &in);
+
+	void initReadTable(void);
 };
 
 #endif /* __SMS_CONTROL_PV_H */

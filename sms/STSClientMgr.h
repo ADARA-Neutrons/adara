@@ -84,7 +84,7 @@ private:
 	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
 
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
-	boost::shared_ptr<smsFloat64PV> m_pvConnectRetry;
+	boost::shared_ptr<smsFloat64PV> m_pvConnectRetryTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvTransientTimeout;
 	boost::shared_ptr<MaxConnectionsPV> m_pvMaxConnections;
 	boost::shared_ptr<smsUint32PV> m_pvMaxRequeueCount;

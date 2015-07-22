@@ -1,3 +1,4 @@
+
 #include <boost/function.hpp>
 #include <stdint.h>
 #include <string>
@@ -37,7 +38,8 @@ private:
 	void triggered(void) { m_cb(); }
 };
 
-Markers::Markers(SMSControl *sms)
+Markers::Markers(SMSControl *sms) :
+	m_scanIndex(0)
 {
 	std::string prefix(sms->getBeamlineId());
 	prefix += ":SMS:";

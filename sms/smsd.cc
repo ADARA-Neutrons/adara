@@ -1,3 +1,42 @@
+
+//
+// SNS ADARA SYSTEM - Stream Management Service (SMS)
+//
+// This repository contains the software for the next-generation Data
+// Acquisition System (DAS) at the Spallation Neutron Source (SNS) at
+// Oak Ridge National Laboratory (ORNL) -- "ADARA".
+//
+// Copyright (c) 2015, UT-Battelle LLC
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+// LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
 #include <iostream>
 #include <stdexcept>
 #include <signal.h>
@@ -12,6 +51,7 @@
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "StorageManager.h"
+#include "ComBusSMSMon.h"
 #include "LiveServer.h"
 #include "STSClientMgr.h"
 #include "Logging.h"
@@ -29,7 +69,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.3.0";
+const std::string SMSD_VERSION = "1.3.1";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
@@ -146,6 +186,7 @@ static void load_config(const char *pname, ptree::ptree &conf,
 	setcredentials(pname, conf);
 
 	StorageManager::config(conf);
+	ComBusSMSMon::config(conf);
 	SMSControl::config(conf);
 	STSClientMgr::config(conf);
 	LiveServer::config(conf);
@@ -201,7 +242,7 @@ static void verify_log4cxx_config(void)
 
 		if (a->getLayout() == NULL) {
 			std::cerr << "Appender " << a->getName()
-				  << " is missing its layout" << std::endl;
+				<< " is missing its layout" << std::endl;
 			missing_layout = true;
 		}
 
@@ -213,7 +254,7 @@ static void verify_log4cxx_config(void)
 
 	if (!had_appender) {
 		std::cerr << "No log appenders configured, aborting"
-			  << std::endl;
+			<< std::endl;
 		exit(1);
 	}
 
@@ -292,7 +333,7 @@ static void daemonize(const char *pname)
 		if (read(initCompleteFd, &ok, sizeof(ok)) < 0) {
 			int e = errno;
 			ERROR("unable to receive child signal: "
-			      << strerror(e));
+				<< strerror(e));
 			_exit(1);
 		}
 

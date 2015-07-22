@@ -473,7 +473,8 @@ public:
 		if ( index < detBankSetCount() ) {
 			char name_c[SET_NAME_SIZE + 1];   // give them an inch...
 			memset( (void *) name_c, '\0', SET_NAME_SIZE + 1 );
-			strncpy(name_c, (char *) &(m_fields[ m_sectionOffsets[index] ]),
+			strncpy(name_c,
+				(const char *) &(m_fields[ m_sectionOffsets[index] ]),
 				SET_NAME_SIZE);
 			return( std::string(name_c) );
 		} else {
@@ -549,7 +550,7 @@ public:
 			char suffix_c[THROTTLE_SUFFIX_SIZE + 1];   // give them an inch
 			memset( (void *) suffix_c, '\0', THROTTLE_SUFFIX_SIZE + 1 );
 			strncpy(suffix_c,
-				(char *) &(m_fields[ m_after_banks_offset[index] + 5 ]),
+				(const char *) &(m_fields[m_after_banks_offset[index] + 5]),
 				THROTTLE_SUFFIX_SIZE);
 			return( std::string(suffix_c) );
 		} else {

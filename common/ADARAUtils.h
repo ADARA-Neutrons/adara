@@ -117,7 +117,8 @@ private:
 
 
 /* ---------------------------------------------------------------------- */
-class Utils {
+class Utils
+{
 
 public:
 
@@ -164,6 +165,42 @@ public:
 		}
 
 		return true;
+	}
+
+	/**
+	 * @brief Sanitizes Strings for Various Nefarious Purposes.
+	 * @param a_str - string to sanitize
+	 * @param a_preserve_uri - protect any "proto://host:service" syntax
+	 * @return true if string changed/was sanitized, else return false
+	 **/
+	static bool sanitizeString( std::string & a_str, bool a_preserve_uri )
+	{
+		std::string all_bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
+		std::string uri_bad = " \t\'\",;<>[]{}()|\\?~!@#$%^&*+=";
+
+		std::string bad = ( a_preserve_uri ) ? uri_bad : all_bad;
+
+		size_t next, last;
+
+		bool changed = false;
+
+		last = 0;
+
+		while ( (next = a_str.find_first_of( bad, last ))
+				!= std::string::npos )
+		{
+			if ( next != last + 1 || last == 0 )
+				a_str.replace( next, 1, "-" );   // replace bad with '-'...
+			else {
+				a_str.replace( next, 1, "" );   // just remove double-bad...
+			}
+
+			changed = true;
+
+			last = next;
+		}
+
+		return( changed );
 	}
 };
 
@@ -256,7 +293,10 @@ public:
 			ss << old;
 			ss << " Timestamps Marked Old out of ";
 			ss << lh->second.size();
-			ss << " Total Saved, Now Under Threshold of ";
+			ss << " Total Saved";
+			if ( lh->second.size() == old + 1 )
+				ss << " [ALL OLD]";
+			ss << ", Now Under Threshold of ";
 			ss << threshold;
 			ss << ".] ";
 			log_info.append(ss.str());

@@ -1,3 +1,4 @@
+
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -35,9 +36,10 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_PULSE        0
 #define RLL_INTERLEAVED_GLOBAL_SAWTOOTH  1
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
-#define RLL_SET_SOURCES_READ_DELAY       3
-#define RLL_RTDL_NO_DATA                 4
-#define RLL_NO_RTDL_FOR_PULSE            5
+#define RLL_PULSE_BUFFER_OVERFLOW        3
+#define RLL_SET_SOURCES_READ_DELAY       4
+#define RLL_RTDL_NO_DATA                 5
+#define RLL_NO_RTDL_FOR_PULSE            6
 
 uint32_t SMSControl::m_targetNumber;
 
@@ -49,6 +51,7 @@ std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
+uint32_t SMSControl::m_maxPulseBufferSize;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -75,6 +78,20 @@ private:
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		update(0, &now);
+	}
+};
+
+class CleanShutdownPV : public smsTriggerPV {
+public:
+	CleanShutdownPV(const std::string &name) :
+		smsTriggerPV(name) {}
+
+private:
+	void triggered(void)
+	{
+		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
+			<< " Cleanly Shutting Down SMS Daemon.");
+		exit(0);
 	}
 };
 
@@ -129,6 +146,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		INFO("Setting No-EoP-Pulse-Buffer-Size to "
 			<< m_noEoPPulseBufferSize << ".");
 	}
+
+	m_maxPulseBufferSize =
+			conf.get<uint32_t>("sms.max_pulse_buffer_size", 1000);
+	INFO("Setting Max Pulse Buffer Size to "
+		<< m_maxPulseBufferSize << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -269,9 +291,12 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
-	m_lastPulseId(0), m_lastRingPeriod(0), m_bankReserve(4096),
+	m_lastPulseId(0), m_lastRingPeriod(0),
+	m_monitorReserve(1024), m_bankReserve(4096),
+	m_chopperReserve(128), m_fastMetaReserve(16),
 	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
+	// Initialize Control PVs...
 	std::string prefix(m_beamlineId);
 	prefix += ":SMS";
 
@@ -293,6 +318,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
 
+	m_pvMaxPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "MaxPulseBufferSize"));
+
 	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
 						PopPulseBufferPV(prefix + ":Control:"
 							+ "PopPulseBuffer"));
@@ -305,14 +334,20 @@ SMSControl::SMSControl() :
 						smsUint32PV(prefix + ":Control:"
 							+ "NumLiveClients"));
 
+	// The Kill Switch. ["NEVER USE THIS!" Lol... (Except for Valgrind) :-]
+	m_pvCleanShutdown = boost::shared_ptr<CleanShutdownPV>(new
+						CleanShutdownPV(prefix + ":CleanShutdown"));
+
 	addPV(m_pvVersion);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvNoEoPPulseBufferSize);
+	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
+	addPV(m_pvCleanShutdown);
 
 	// Initialize Config/Info PVs...
 	struct timespec now;
@@ -323,6 +358,9 @@ SMSControl::SMSControl() :
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
+
+	// Initialize Max Pulse Buffer Size PV from Config Value...
+	m_pvMaxPulseBufferSize->update(m_maxPulseBufferSize, &now);
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
@@ -524,13 +562,13 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	int now_complete = 0;
 	last = m_pulses.end();
 	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-		// release now-partial pulses...
+		// Release Now-Partial Pulses...
 		if (it->second->m_pending[smsId]) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
 			marked_partial++;
 		}
-		// note the last now-completed (partial or not) pulse for handling
+		// Note the Last Now-Completed (Partial or Not) Pulse for Handling
 		if (it->second->m_pending.none()) {
 			last = it;
 			now_complete++;
@@ -553,8 +591,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
 
-		// determine how many sources are registered
-		// (including the one we are unregistering)
+		// Determine How Many Sources are Registered
+		// (Including the One We are Unregistering)
 		size_t i, max = m_eventSources.size();
 		int num_sources = 0;
 		for (i = 0; i < max; i++) {
@@ -562,29 +600,35 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				num_sources++;
 		}
 
-		// get latest No End-of-Pulse Buffer Size value from PV...
+		// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 		last_minus_buffer = last;
-		int recorded = 0;
+		uint32_t recorded = 0;
 		uint32_t cnt = 1; // for last...
 
-		// skip past any buffering level, unless we're the last to unreg
-		// (any other remaining sources could still spew out-of-order...)
+		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
+		// (Any Other Remaining Sources could Still Spew Out-of-Order...)
 		while (cnt++ < m_noEoPPulseBufferSize && num_sources > 1) {
-			// skip over pulse to satisfy buffering requirement
+			// Skip Over Pulse to Satisfy Buffering Requirement
 			if (last_minus_buffer != m_pulses.begin()) {
 				last_minus_buffer--;
 			}
-			// no pulses to record yet, buffer not "full" enough...
+			// No Pulses to Record Yet, Buffer Not "Full" Enough...
 			else {
-				/* D-Oh... Before returning, mark this id for re-use... */
+				/* D-Oh... Before Returning, Mark This Id for Re-Use... */
 				m_eventSources.reset(smsId);
 				return;
 			}
 		}
 
-		// record complete/partial pulses past the buffering threshold
+		// Record Complete/Partial Pulses Past the Buffering Threshold
+		// TODO Note: We _Might_ Be Recording Some As-Yet-Still-Pending
+		// Pulses Here, if there are some Unresolved Pulses still
+		// Interlaced amidst the Pulses Being Released by the
+		// Now-Unregistered Data Source... ;-b
+		// (Creates a distinct mess out of the Erasing part, relative
+		// to the simple approach used here and in markComplete()... ;-)
 		DEBUG("unregisterEventSource: Recording Pulses"
 			<< std::hex << " 0x" << m_pulses.begin()->first.first
 			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
@@ -594,7 +638,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// always record the last pulse from the last source to unregister
+		// Always Record the Last Pulse from the Last Source to Unregister
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			DEBUG("unregisterEventSource Recording Last Pulse 0x"
 				<< std::hex << last->first.first << std::dec);
@@ -603,26 +647,30 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// Log the size of the remaining internal pulse buffer...
-		// (count the rest of the list we _didn't_ just process...)
+		// Log the Size of the Remaining Internal Pulse Buffer...
+		// (Count the Rest of the List We _Didn't_ Just Process...)
 		uint64_t queue_length = 0;
 		while ( it != m_pulses.end() ) {
 			queue_length++;
 			it++;
 		}
-		// account for last pulse, if recorded...
+		// Account for Last Pulse, If Recorded...
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			queue_length--;
 		}
-		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length);
 
-		// erase any now-recorded pulses
+		// Erase Any Now-Recorded Pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
 		}
+
+		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
+			<< " recorded=" << recorded
+			<< " (size=" << m_pulses.size() << ")");
 	}
 
-	/* Mark this id for re-use. */
+	/* Mark This Id for Re-Use. */
 	m_eventSources.reset(smsId);
 }
 
@@ -765,6 +813,65 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
+	// Update Max Pulse Buffer Size from PV...
+	m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+
+	// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
+	// (Give the "New Guy" a chance to exist before we dump it... ;-D)
+	if ( m_pulses.size() > m_maxPulseBufferSize ) {
+
+		// Record & Free as Many Pulses as Required to Stay Under Max...
+		// (Even after adding the next one, already in hand...!)
+		uint32_t num_to_record =
+			m_pulses.size() - m_maxPulseBufferSize + 1;
+
+		// Record Complete/Partial Pulses Past the Buffering Threshold
+		PulseMap::iterator last_recorded;
+		uint32_t recorded = 0;
+		it = m_pulses.begin();
+		for (uint32_t i=0 ;
+				i < num_to_record && it != m_pulses.end() ; i++) {
+			// Pulse will Never be Made Complete, Mark as Partial...
+			if (it->second->m_pending.any()) {
+				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+			}
+			// Record Pulse to Reduce Overflow Buffer Size...
+			recordPulse(it->second);
+			last_recorded = it++;
+			recorded++;
+		}
+
+		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+				RLL_PULSE_BUFFER_OVERFLOW, "none",
+				2, 10, 100, log_info ) ) {
+			// Count the Rest of the List We _Didn't_ Just Purge...
+			uint64_t queue_length = 0;
+			while ( it != m_pulses.end() ) {
+				queue_length++;
+				it++;
+			}
+			ERROR(log_info
+				<< "*** Internal Pulse Buffer Overflow!"
+				<< " Length = " << queue_length
+				<< " recorded=" << recorded
+				<< " (size=" << m_pulses.size()
+				<< " not counting new pulse 0x"
+				<< std::hex << id << ")"
+				<< " - Recorded Pulses 0x"
+				<< m_pulses.begin()->first.first
+				<< " up to 0x"
+				<< last_recorded->first.first << std::dec);
+		}
+
+		// Erase Any Now-Recorded Pulses
+		if (recorded) {
+			m_pulses.erase(m_pulses.begin(), ++last_recorded);
+		}
+	}
+
+	// *NOW* Record the New Pulse... ;-D
 	return m_pulses.insert(make_pair(pid, new_pulse)).first;
 }
 
@@ -816,11 +923,13 @@ void SMSControl::setSourcesReadDelay(void)
 				<< " begin()=" << "0x" << m_pulses.begin()->first.first
 				<< " next_to_last=" << "0x" << next_to_last->first.first
 				<< std::dec
-				<< ", Internal Pulse Buffer Length = " << queue_length);
+				<< ", Internal Pulse Buffer Length = " << queue_length
+				<< " (size=" << m_pulses.size() << ")");
 		} else {
 			DEBUG(log_info
 				<< "Internal Pulse Buffer is Empty"
-				<< ", Internal Pulse Buffer Length = " << queue_length);
+				<< ", Internal Pulse Buffer Length = " << queue_length
+				<< " (size=" << m_pulses.size() << ")");
 		}
 	}
 }
@@ -868,7 +977,7 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 			prefix += ":LiveClient:";
 
 			std::stringstream ss;
-			ss << clientId;
+			ss << clientId + 1; // eh, count from 1 like everything else
 			prefix += ss.str();
 
 			// Live Client Name...
@@ -929,7 +1038,8 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 	DEBUG("unregisterLiveClient: clientId=" << clientId);
 
 	/* Mark this id for re-use. */
-	m_liveClients.reset(clientId);
+	if ( clientId >= 0 )
+		m_liveClients.reset(clientId);
 
 	// Note: Leave the Number of Live Client PVs, Monotonically Increasing
 	// (because we leave the old Live Client index/PVs around for
@@ -937,12 +1047,8 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 }
 
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
-				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
-	uint32_t rising = (pixel & 1) << 31;
-	tof &= ((1U << 21) - 1);
-	tof |= rising;
-
 	uint32_t monId = pixel >> 16;
 	monId &= 0xff;
 
@@ -956,23 +1062,29 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		MonitorMap::value_type val(monId, new_mon);
 		mon = pulse->m_monitors.insert(val).first;
 
+		mon->second.m_eventTof.reserve(m_monitorReserve);
+
 		/* Track the creation of overall collections of monitors...
 		 */
 		MonitorMap::iterator allMon = m_allMonitors.find(monId);
 		if (allMon == m_allMonitors.end()) {
 			INFO("New Monitor id=" << monId
-				<< " (pixelId=" << pixel
-				<< " sourceID=" << pkt.sourceID()
-				<< " tofField=" << pkt.tofField() << ")");
+				<< " (pixelId=0x" << std::hex << pixel
+				<< " sourceID=0x" << pkt.sourceID()
+				<< " tofField=0x" << pkt.tofField() << std::dec << ")");
 			m_allMonitors.insert(val);
 		}
 	}
+
+	uint32_t rising = (pixel & 1) << 31;
+	tof &= ((1U << 21) - 1);
+	tof |= rising;
 
 	mon->second.m_eventTof.push_back(tof);
 }
 
 void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
-				PulsePtr &pulse, uint32_t pixel, uint32_t tof)
+		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
 	cid >>= 16;
@@ -1025,6 +1137,10 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 		m_meta->addFastMetaDDP(now, cid_dev, ddp);
 
 		m_choppers.insert(cid);
+	}
+
+	if (pulse->m_chopperEvents[cid].empty()) {
+		pulse->m_chopperEvents[cid].reserve(m_chopperReserve);
 	}
 
 	/* The time-of-flight value is in bits 0-20 of the field; mask
@@ -1092,77 +1208,87 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	 */
 	pulse->m_charge = pkt.pulseCharge();
 
+	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, logical;
-	uint16_t bank;
-	ADARA::Event translated;
+	uint16_t bank = 0;
 
-	for (i = 0; i < count; i++) {
+	for (i=0; i < count; i++) {
+
 		phys = events[i].pixel;
 
 		switch (phys >> 28) {
 
-		case 4: // Monitor Event
-			/* Add this event to our monitors, and go on to the
-			 * next raw event -- it doesn't go in the banked
-			 * events section.
-			 */
-			addMonitorEvent(pkt, pulse, phys, events[i].tof);
-			pulse->m_numMonEvents++;
-			continue;
-
-		case 7: // Chopper Event
-			/* Add this event to our choppers, and go on to the
-			 * next raw event -- it doesn't go into the banked
-			 * event section.
-			 */
-			addChopperEvent(pkt, pulse, phys, events[i].tof);
-			continue;
-
-		case 0: // Detector Event
-			// Already Mapped to Logical PixelId at Data Source...!
-			if (is_mapped) {
-				// PixelId Already Is Logical...!
-				logical = phys;
-				// Just Lookup Bank from Logical PixelId...
-				if (m_pixelMap->mapEventBank(logical, bank))
-					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-				bank += Pulse::REAL_BANK_OFFSET;
-			}
-			// Not Yet Mapped, Map Physical PixelId to Logical PixelId
-			// and Identify Detector Bank...
-			else {
-				if (m_pixelMap->mapEvent(phys, logical, bank))
-					pulse->m_flags |= ADARA::BankedEventPkt::MAPPING_ERROR;
-				bank += Pulse::REAL_BANK_OFFSET;
-			}
-			break;
-
-		case 5: case 6: // Fast-Metadata Variable Update
-			/* This is a fast-metadata update, see if we have a
-			 * mapping for it. If not, let it fall through to the
-			 * common error pixel handling.
-			 */
-			if (m_fastmeta->validVariable(phys)) {
-				pulse->m_fastMetaEvents.push_back(events[i]);
+			case 4: // Monitor Event
+				/* Add this event to our monitors, and go on to the
+				 * next raw event -- it doesn't go in the banked
+				 * events section.
+				 */
+				addMonitorEvent(pkt, pulse, phys, events[i].tof);
+				pulse->m_numMonEvents++;
 				continue;
-			}
-			/* FALLTHROUGH */
 
-		case 1: case 2: case 3: // Unused as yet...
-			/* Unused sources, let them drop into error handling */
-			/* FALLTHROUGH */
+			case 7: // Chopper Event
+				/* Add this event to our choppers, and go on to the
+				 * next raw event -- it doesn't go into the banked
+				 * event section.
+				 */
+				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				continue;
 
-		default: // Error Event
-			/* Error bit is set, identity map and put in the
-			 * error bank
-			 */
-			logical = phys;
-			bank = 0;
+			case 0: // Detector Event
+				// Already Mapped to Logical PixelId at Data Source...!
+				if (is_mapped) {
+					// PixelId Already Is Logical...!
+					logical = phys;
+					// Just Lookup Bank from Logical PixelId...
+					if (m_pixelMap->mapEventBank(logical, bank)) {
+						pulse->m_flags |=
+							ADARA::BankedEventPkt::MAPPING_ERROR;
+					}
+					bank += Pulse::REAL_BANK_OFFSET;
+				}
+				// Not Yet Mapped...
+				// Map Physical PixelId to Logical PixelId
+				// and Identify Detector Bank...
+				else {
+					if (m_pixelMap->mapEvent(phys, logical, bank)) {
+						pulse->m_flags |=
+							ADARA::BankedEventPkt::MAPPING_ERROR;
+					}
+					bank += Pulse::REAL_BANK_OFFSET;
+				}
+				break;
 
-			pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
-		}
+			case 5: case 6: // Fast-Metadata Variable Update
+				/* This is a fast-metadata update, see if we have a
+				 * mapping for it. If not, let it fall through to the
+				 * common error pixel handling.
+				 */
+				if (m_fastmeta->validVariable(phys)) {
+					if (pulse->m_fastMetaEvents.empty()) {
+						pulse->m_fastMetaEvents.reserve(m_fastMetaReserve);
+					}
+					pulse->m_fastMetaEvents.push_back(events[i]);
+					continue;
+				}
+				/* FALLTHROUGH */
+
+			case 1: case 2: case 3: // Unused as yet...
+				/* Unused sources, let them drop into error handling */
+				/* FALLTHROUGH */
+
+			default: // Error Event
+				/* Error bit is set, identity map and put in the
+				 * error bank
+				 */
+				logical = phys;
+				bank = 0;
+
+				pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
+
+		} // switch (phys >> 28)
 
 		if (src->second.m_banks[bank].empty()) {
 			/* pulse->m_numBanks will double count banks if
@@ -1172,6 +1298,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 			 */
 			pulse->m_numBanks++;
 			src->second.m_activeBanks++;
+
 			src->second.m_banks[bank].reserve(m_bankReserve);
 		}
 
@@ -1244,8 +1371,21 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	if ( smsId != (uint32_t) -1 )
 		pulse->m_pending.reset(smsId);
 
-	// pulse still pending from other data sources...
+	// Pulse Still Pending from Other Data Sources...
 	if (pulse->m_pending.any()) {
+		// Periodically Log the Size of the Internal Pulse Buffer...
+		if ( !(++queue_log_count % 5000) ) {
+			// Count the Full List...
+			uint64_t queue_length = 0;
+			it = m_pulses.begin();
+			while ( it != m_pulses.end() ) {
+				queue_length++;
+				it++;
+			}
+			DEBUG("[Pending] Internal Pulse Buffer Length = "
+				<< queue_length
+				<< " (size=" << m_pulses.size() << ")");
+		}
 		return;
 	}
 
@@ -1264,61 +1404,69 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
 
-	// get latest No End-of-Pulse Buffer Size value from PV...
+	// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
 	current_minus_buffer = current;
-	int recorded = 0;
+	uint32_t recorded = 0;
 	uint32_t cnt = 1; // for current...
 
 	while (cnt++ < m_noEoPPulseBufferSize) {
-		// skip over pulse to satisfy buffering requirement
+		// Skip Over Pulse to Satisfy Buffering Requirement
 		if (current_minus_buffer != m_pulses.begin()) {
 			current_minus_buffer--;
 		}
-		// no pulses to record yet, buffer not "full" enough...
+		// No Pulses to Record Yet, Buffer Not "Full" Enough...
 		else {
 			return;
 		}
 	}
 
-	// record complete/partial pulses past the buffering threshold
+	// Record Complete/Partial Pulses Past the Buffering Threshold
 	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
-		// previous pulse will never be made complete, mark as partial
+		// Previous Pulse will Never be Made Complete, Mark as Partial
 		if (it->second->m_pending.any()) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 		}
-		// recording previously complete (buffered) pulse
+		// Recording Previously Complete (Buffered) Pulse
 		recordPulse(it->second);
 		last_recorded = it;
 		recorded++;
 	}
 
-	// record the current pulse for sure, if not buffering...
+	// Record the Current Pulse for Sure, If Not Buffering...
 	if (!m_noEoPPulseBufferSize) {
 		recordPulse(current->second);
 		last_recorded = current;
 		recorded++;
 	}
 
-	// Periodically log the size of the internal pulse buffer...
+	// Periodically Log the Size of the Internal Pulse Buffer...
+	uint64_t queue_length = 0;
+	bool do_log = false;
 	if ( !(++queue_log_count % 5000) ) {
-		// count the rest of the list we _didn't_ just process...
-		uint64_t queue_length = 0;
+		// Count the Rest of the List We _Didn't_ Just Process...
 		while ( it != m_pulses.end() ) {
 			queue_length++;
 			it++;
 		}
-		// account for last pulse, if recorded...
+		// Account for Last Pulse, If Recorded...
 		if (!m_noEoPPulseBufferSize) {
 			queue_length--;
 		}
-		DEBUG("Internal Pulse Buffer Length = " << queue_length);
+		do_log = true;
 	}
 
-	// erase any now-recorded pulses
+	// Erase Any Now-Recorded Pulses
 	if (recorded) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
+	}
+
+	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+	if ( do_log ) {
+		DEBUG("Internal Pulse Buffer Length = " << queue_length
+			<< " recorded=" << recorded
+			<< " (size=" << m_pulses.size() << ")");
 	}
 }
 
@@ -1447,10 +1595,6 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	}
 
 	StorageManager::addPacket(m_iovec);
-
-	/* TODO update history of monitor event counts and preallocate
-	 * accordingly to try to avoid reallocation events
-	 */
 }
 
 void SMSControl::buildBankedPacket(PulsePtr &pulse)
@@ -1507,6 +1651,7 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 		m_hdrs.push_back(src.m_activeBanks);
 
 		for (uint32_t i = 0; i < src.m_banks.size(); i++) {
+
 			if (src.m_banks[i].empty())
 				continue;
 
@@ -1531,10 +1676,6 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	}
 
 	StorageManager::addPacket(m_iovec);
-
-	/* TODO update history of bank event counts and size m_bankReserve
-	 * accordingly to try to avoid reallocation events.
-	 */
 }
 
 void SMSControl::buildChopperPackets(PulsePtr &pulse)

@@ -13,6 +13,7 @@
 #include <casdef.h>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "Storage.h"
 
@@ -23,6 +24,7 @@ class smsErrorPV;
 class smsUint32PV;
 class smsConnectedPV;
 class PopPulseBufferPV;
+class CleanShutdownPV;
 class RunInfo;
 class Geometry;
 class DataSource;
@@ -117,7 +119,6 @@ private:
 	typedef std::map<uint32_t, EventSource> SourceMap;
 
 	struct BeamMonitor {
-		/* TODO preallocate m_eventTof to avoid resizing */
 		BeamMonitor(uint32_t srcId, uint32_t tofField) :
 				m_sourceId(srcId), m_tofField(tofField)
 		{ }
@@ -130,13 +131,15 @@ private:
 	typedef std::map<uint32_t, BeamMonitor> MonitorMap;
 
 	typedef std::vector<uint32_t> ChopperEvents;
+
 	typedef std::map<uint32_t, ChopperEvents> ChopperMap;
 
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
-				m_id(id), m_pending(srcs), m_numEvents(0),
-				m_numBanks(0), m_numMonEvents(0), m_charge(0),
-				m_vetoFlags(0), m_cycle(0), m_ringPeriod(0), m_flags(0)
+				m_id(id), m_pending(srcs),
+				m_numEvents(0), m_numBanks(0), m_numMonEvents(0),
+				m_charge(0), m_vetoFlags(0), m_cycle(0),
+				m_ringPeriod(0), m_flags(0)
 		{ }
 
 		PulseIdentifier			m_id;
@@ -165,6 +168,7 @@ private:
 	MonitorMap				m_allMonitors;
 
 	typedef boost::shared_ptr<Pulse> PulsePtr;
+
 	typedef std::map<PulseIdentifier, PulsePtr> PulseMap;
 
 	std::map<std::string, PVSharedPtr> m_pv_map;
@@ -183,7 +187,12 @@ private:
 	PulseMap m_pulses;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
+
+	uint32_t m_monitorReserve;
 	uint32_t m_bankReserve;
+	uint32_t m_chopperReserve;
+	uint32_t m_fastMetaReserve;
+
 	boost::shared_ptr<RunInfo> m_runInfo;
 	boost::shared_ptr<Geometry> m_geometry;
 	boost::shared_ptr<PixelMap> m_pixelMap;
@@ -211,9 +220,14 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
 	static uint32_t m_noEoPPulseBufferSize;
 
+	boost::shared_ptr<smsUint32PV> m_pvMaxPulseBufferSize;
+	static uint32_t m_maxPulseBufferSize;
+
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
+
+	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumLiveClients;
 

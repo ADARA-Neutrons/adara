@@ -1,3 +1,4 @@
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
@@ -42,6 +43,7 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 	} catch (std::runtime_error e) {
 		std::string msg("Unable to parse livestream max send size: ");
 		msg += e.what();
+		ERROR("config(): " << msg);
 		throw std::runtime_error(msg);
 	}
 }
@@ -102,8 +104,15 @@ LiveClient::LiveClient(int fd) :
 	try {
 		m_timer = new TimerAdapter<LiveClient>(this);
 		m_timer->start(m_hello_timeout);
-	} catch (...) {
-		ERROR("Unknown Exception in LiveClient() Hello Timeout"
+	}
+	catch (std::exception &e) {
+		ERROR("Exception in LiveClient() Hello Timer/Timeout"
+			<< " client=" << m_clientName << " - " << e.what());
+		delete m_read;
+		throw;
+	}
+	catch (...) {
+		ERROR("Unknown Exception in LiveClient() Hello Timer/Timeout"
 			<< " client=" << m_clientName);
 		delete m_read;
 		throw;

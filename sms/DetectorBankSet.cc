@@ -8,6 +8,7 @@
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
+#include "ADARAUtils.h"
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -97,10 +98,29 @@ public:
 			delete [] str;
 			return S_casApp_noMemory;
 		}
-		strncpy(str[0].fixed_string, "none", sizeof(str[0].fixed_string));
-		strncpy(str[1].fixed_string, "event", sizeof(str[1].fixed_string));
-		strncpy(str[2].fixed_string, "histo", sizeof(str[2].fixed_string));
-		strncpy(str[3].fixed_string, "both", sizeof(str[3].fixed_string));
+
+		uint32_t flag;
+
+		// None
+		flag = 0;
+		strncpy( str[flag].fixed_string, "none",
+			sizeof(str[flag].fixed_string));
+
+		// Event
+		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
+		strncpy(str[flag].fixed_string, "event",
+			sizeof(str[flag].fixed_string));
+
+		// Histo
+		flag = ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		strncpy(str[flag].fixed_string, "histo",
+			sizeof(str[flag].fixed_string));
+
+		// Histo
+		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+			| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		strncpy(str[flag].fixed_string, "both",
+			sizeof(str[flag].fixed_string));
 
 		in.setDimension(1);
 		in.setBound(0, 0, 4);
@@ -132,24 +152,30 @@ public:
 			std::string oldFormat;
 			if ( oldFlags == 0 )
 				oldFormat = "none";
-			else if ( oldFlags == 1 )
+			else if ( oldFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
 				oldFormat = "event";
-			else if ( oldFlags == 2 )
+			else if ( oldFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
 				oldFormat = "histo";
-			else if ( oldFlags == 3 )
+			else if ( oldFlags ==
+					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
 				oldFormat = "both";
+			}
 
 			uint32_t newFlags = value();
 
 			std::string newFormat;
 			if ( newFlags == 0 )
 				newFormat = "none";
-			else if ( newFlags == 1 )
+			else if ( newFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
 				newFormat = "event";
-			else if ( newFlags == 2 )
+			else if ( newFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
 				newFormat = "histo";
-			else if ( newFlags == 3 )
+			else if ( newFlags ==
+					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
 				newFormat = "both";
+			}
 
 			INFO("DetBankSetFormatPV: Changing Detector Bank Set "
 				<< m_info->getName() << " Output Format for "
@@ -256,7 +282,7 @@ public:
 	public:
 		DetBankSetThrottlePV(const std::string &name,
 				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsFloat64PV(name), m_config(config), m_info(info) {}
+			smsFloat64PV(name, 0.0), m_config(config), m_info(info) {}
 
 		void changed(void)
 		{
@@ -437,7 +463,7 @@ public:
 	void setSuffix(std::string suffix)
 	{
 		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( m_config->sanitizeSuffix( suffix ) ) {
+		if ( Utils::sanitizeString( suffix, false ) ) {
 			ERROR("setSuffix(): Sanitized"
 				<< " Throttle NXentry Suffix for Detector Bank Set "
 				<< m_suffix << " to " << suffix);
@@ -665,11 +691,13 @@ DetectorBankSet::DetectorBankSet(
 		// Set Format Flags...
 		flags = 0;
 		if ( !format.compare("histo") )
-			flags |= 2;
-		else if ( !format.compare("both") )
-			flags |= 1 + 2;
+			flags |= ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		else if ( !format.compare("both") ) {
+			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT
+				| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		}
 		else // if ( !format.compare("event") )
-			flags |= 1;
+			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
 
 		std::string banklistStr =
 			it->second.get<std::string>("banklist", "none");
@@ -694,7 +722,7 @@ DetectorBankSet::DetectorBankSet(
 		suffix = it->second.get<std::string>("suffix", "throttled");
 
 		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( sanitizeSuffix( suffix ) ) {
+		if ( Utils::sanitizeString( suffix, false ) ) {
 			WARN("DetectorBankSet: Sanitized"
 				<< " Throttle NXentry Suffix for Detector Bank Set "
 				<< detBankSetName
@@ -855,33 +883,6 @@ bool DetectorBankSet::truncateString( std::string & str, size_t sz,
 			ss << "will be truncated to: " << str.substr( 0, sz );
 			WARN( ss.str() );
 		}
-	}
-
-	return( changed );
-}
-
-bool DetectorBankSet::sanitizeSuffix( std::string & suffix )
-{
-	std::string bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
-
-	size_t next, last;
-
-	bool changed = false;
-
-	last = 0;
-
-	while ( (next = suffix.find_first_of( bad, last ))
-			!= std::string::npos )
-	{
-		if ( next != last + 1 || last == 0 )
-			suffix.replace( next, 1, "-" );   // replace space with '-'...
-		else {
-			suffix.replace( next, 1, "" );   // just remove double-spaces...
-		}
-
-		changed = true;
-
-		last = next;
 	}
 
 	return( changed );
