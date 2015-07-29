@@ -259,13 +259,14 @@ bool Parser::rxPacket(const ADARA::MappedDataPkt &pkt)
 
 bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 {
-	printf("%u.%09u %s EVENT DATA\n"
+	printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
 		"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
 		"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
 		"    charge %lupC, %u events\n",
 		(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
 		is_mapped ? "MAPPED" : "RAW",
+		pkt->base_type(), pkt->version(),
 		pkt->sourceID(), pkt->pktSeq(), pkt->dspSeq(),
 		pkt->endOfPulse() ? " EOP" : "",
 		pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
@@ -313,11 +314,12 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 
 bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
-	printf("%u.%09u RTDL\n"
+	printf("%u.%09u RTDL (0x%x,v%u)\n"
 		"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
 		"    intrapulse %luns tofOffset %luns%s\n"
 		"    charge %lupC period %ups\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version(),
 		pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 		pkt.vetoFlags(), pkt.badVeto() ? " (BAD)" : "",
 		pkt.timingStatus(), (int) pkt.flavor(),
@@ -341,9 +343,10 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 {
-	printf("%u.%09u BANKED EVENT DATA\n"
+	printf("%u.%09u BANKED EVENT DATA (0x%x,v%u)\n"
 		"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version(),
 		pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
 		pkt.pulseEnergy(), pkt.vetoFlags());
 	if (pkt.flags()) {
@@ -428,9 +431,10 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 {
-	printf("%u.%09u BEAM MONITOR DATA\n"
+	printf("%u.%09u BEAM MONITOR DATA (0x%x,v%u)\n"
 		"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version(),
 		pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
 		pkt.pulseEnergy(), pkt.vetoFlags());
 	if (pkt.flags()) {
@@ -500,15 +504,17 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
 {
 	// TODO display more fields (check that the table doesn't change)
-	printf("%u.%09u PIXEL MAP TABLE\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u PIXEL MAP TABLE (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 {
-	printf("%u.%09u RUN STATUS\n",(uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u RUN STATUS (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	switch (pkt.status()) {
 	case ADARA::RunStatus::NO_RUN:
 		printf("    No current run\n");
@@ -543,8 +549,9 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 bool Parser::rxPacket(const ADARA::RunInfoPkt &pkt)
 {
 	// TODO display more fields (check that the contents do not change)
-	printf("%u.%09u RUN INFO\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u RUN INFO (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 
 	if ( m_showRunInfo )
 	{
@@ -556,8 +563,9 @@ bool Parser::rxPacket(const ADARA::RunInfoPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::TransCompletePkt &pkt)
 {
-	printf("%u.%09u TRANSLATION COMPLETE\n",
-		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	printf("%u.%09u TRANSLATION COMPLETE (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	if (!pkt.status())
 		printf("    Success");
 	else if (pkt.status() < 0x8000)
@@ -573,8 +581,9 @@ bool Parser::rxPacket(const ADARA::TransCompletePkt &pkt)
 
 bool Parser::rxPacket(const ADARA::ClientHelloPkt &pkt)
 {
-	printf("%u.%09u CLIENT HELLO\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u CLIENT HELLO (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	if (pkt.requestedStartTime()) {
 		if (pkt.requestedStartTime() == 1)
 			printf("    Request data from last run transition\n");
@@ -589,8 +598,9 @@ bool Parser::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 {
-	printf("%u.%09u STREAM ANNOTATION\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u STREAM ANNOTATION (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	printf("    Type %u (%s%s)\n",
 		pkt.marker_type(), markerType(pkt.marker_type()),
 		pkt.resetHint() ? ", Reset Hint" : "");
@@ -606,23 +616,26 @@ bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 bool Parser::rxPacket(const ADARA::SyncPkt &pkt)
 {
 	// TODO display more fields
-	printf("%u.%09u SYNC\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u SYNC (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::HeartbeatPkt &pkt)
 {
-	printf("%u.%09u HEARTBEAT\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u HEARTBEAT (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::GeometryPkt &pkt)
 {
 	// TODO display more fields (check that the contents do not change)
-	printf("%u.%09u GEOMETRY\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u GEOMETRY (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 
 	if ( m_showGeom )
 	{
@@ -634,9 +647,10 @@ bool Parser::rxPacket(const ADARA::GeometryPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 {
-	printf("%u.%09u BEAMLINE INFO\n"
+	printf("%u.%09u BEAMLINE INFO (0x%x,v%u)\n"
 		"    target '%u' id '%s' short '%s' long '%s'\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version(),
 		pkt.targetNumber(),
 		pkt.id().c_str(), pkt.shortName().c_str(), pkt.longName().c_str());
 	return false;
@@ -644,8 +658,9 @@ bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::BeamMonitorConfigPkt &pkt)
 {
-	printf("%u.%09u BEAM MONITOR CONFIG\n",
-		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	printf("%u.%09u BEAM MONITOR CONFIG (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	printf("    num %u\n", pkt.beamMonCount());
 	for (uint32_t i = 0; i < pkt.beamMonCount(); i++) {
 		printf("    id %u tofOffset %u tofMax %u tofBin %u distance %lf\n",
@@ -657,8 +672,9 @@ bool Parser::rxPacket(const ADARA::BeamMonitorConfigPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::DetectorBankSetsPkt &pkt)
 {
-	printf("%u.%09u DETECTOR BANK SETS\n",
-		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId());
+	printf("%u.%09u DETECTOR BANK SETS (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	printf("    num %u\n", pkt.detBankSetCount());
 	for (uint32_t i = 0; i < pkt.detBankSetCount(); i++) {
 		printf("    name %s bankCount %u flags %u\n",
@@ -682,17 +698,19 @@ bool Parser::rxPacket(const ADARA::DetectorBankSetsPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::DataDonePkt &pkt)
 {
-	printf("%u.%09u DATA DONE\n", (uint32_t) (pkt.pulseId() >> 32),
-		(uint32_t) pkt.pulseId());
+	printf("%u.%09u DATA DONE (0x%x,v%u)\n",
+		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version());
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
 	// TODO display more fields (check that the contents don't change)
-	printf("%u.%09u DEVICE DESCRIPTOR\n"
+	printf("%u.%09u DEVICE DESCRIPTOR (0x%x,v%u)\n"
 		"    Device %u\n",
 		(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+		pkt.base_type(), pkt.version(),
 		pkt.devId());
 
 	if ( m_showDDP )
@@ -706,12 +724,12 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
 	if (m_showVars) {
-		printf("%u.%09u U32 VARIABLE\n"
+		printf("%u.%09u U32 VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value %u\n",
-			(uint32_t) (pkt.pulseId() >> 32),
-			(uint32_t) pkt.pulseId(),
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value());
 	}
@@ -721,12 +739,12 @@ bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
 	if (m_showVars) {
-		printf("%u.%09u DOUBLE VARIABLE\n"
+		printf("%u.%09u DOUBLE VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value %lf\n",
-			(uint32_t) (pkt.pulseId() >> 32),
-			(uint32_t) pkt.pulseId(),
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value());
 	}
@@ -736,12 +754,12 @@ bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
 	if (m_showVars) {
-		printf("%u.%09u String VARIABLE\n"
+		printf("%u.%09u String VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value '%s'\n",
-			(uint32_t) (pkt.pulseId() >> 32),
-			(uint32_t) pkt.pulseId(),
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value().c_str());
 	}
