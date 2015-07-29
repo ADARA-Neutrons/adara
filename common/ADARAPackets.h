@@ -29,6 +29,8 @@ public:
 	}
 
 	PacketType::Enum type(void) const { return m_type; }
+	uint32_t base_type(void) const { return (m_type >> 8); }
+	uint32_t version(void) const { return (m_type & 0xff); }
 	uint32_t payload_length(void) const { return m_payload_len; }
 	const struct timespec &timestamp(void) const { return m_timestamp; }
 	uint64_t pulseId(void) const { return m_pulseId; }
