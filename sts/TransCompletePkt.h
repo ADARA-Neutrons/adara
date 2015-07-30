@@ -85,7 +85,9 @@ private:
         uint32_t *p = (uint32_t *)m_buffer;
 
         *p++ = len + pad - sizeof(ADARA::Header);
-        *p++ = ADARA::PacketType::TRANS_COMPLETE_V0;
+        *p++ = ADARA_PKT_TYPE(
+            ADARA::PacketType::TRANS_COMPLETE_TYPE,
+            ADARA::PacketType::TRANS_COMPLETE_VERSION );
         *p++ = time(0) + ADARA::EPICS_EPOCH_OFFSET;
         *p++ = 0;
         *p++ = (m_status << 16) | (m_reason.length() & 0xFFFF);

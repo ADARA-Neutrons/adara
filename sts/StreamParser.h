@@ -120,7 +120,7 @@ private:
     void        finalizeStreamProcessing();
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &a_pkt ) const;
-    const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
+    const char* getPktName( uint32_t a_pkt_type ) const;
     void        getXmlNodeValue( xmlNode *a_node,
                     std::string & a_value ) const;
 
