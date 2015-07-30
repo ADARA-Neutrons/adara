@@ -173,7 +173,7 @@ private:
 	unsigned int	m_oversize_len;
 	unsigned int	m_oversize_offset;
 
-	std::map<PacketType::Enum, uint64_t>	m_discarded_packets;
+	std::map<PacketType::Type, uint64_t>	m_discarded_packets;
 };
 
 } /* namespacce ADARA */

@@ -243,33 +243,31 @@ bool Parser::rxPacket(const Packet &pkt)
 		return rxPacket(raw);					\
 	}
 
-	switch (pkt.type()) {
-		MAP_TYPE(PacketType::RAW_EVENT_V0, RawDataPkt);
-		MAP_TYPE(PacketType::MAPPED_EVENT_V0, MappedDataPkt);
-		MAP_TYPE(PacketType::RTDL_V0, RTDLPkt);
-		MAP_TYPE(PacketType::SOURCE_LIST_V0, SourceListPkt);
-		MAP_TYPE(PacketType::BANKED_EVENT_V0, BankedEventPkt);
-		MAP_TYPE(PacketType::BANKED_EVENT_V1, BankedEventPkt);
-		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_V0, BeamMonitorPkt);
-		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_V1, BeamMonitorPkt);
-		MAP_TYPE(PacketType::PIXEL_MAPPING_V0, PixelMappingPkt);
-		MAP_TYPE(PacketType::RUN_STATUS_V0, RunStatusPkt);
-		MAP_TYPE(PacketType::RUN_INFO_V0, RunInfoPkt);
-		MAP_TYPE(PacketType::TRANS_COMPLETE_V0, TransCompletePkt);
-		MAP_TYPE(PacketType::CLIENT_HELLO_V0, ClientHelloPkt);
-		MAP_TYPE(PacketType::STREAM_ANNOTATION_V0, AnnotationPkt);
-		MAP_TYPE(PacketType::SYNC_V0, SyncPkt);
-		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
-		MAP_TYPE(PacketType::GEOMETRY_V0, GeometryPkt);
-		MAP_TYPE(PacketType::BEAMLINE_INFO_V0, BeamlineInfoPkt);
-		MAP_TYPE(PacketType::BEAMLINE_INFO_V1, BeamlineInfoPkt);
-		MAP_TYPE(PacketType::BEAM_MONITOR_CONFIG_V0, BeamMonitorConfigPkt);
-		MAP_TYPE(PacketType::DETECTOR_BANK_SETS_V0, DetectorBankSetsPkt);
-		MAP_TYPE(PacketType::DATA_DONE_V0, DataDonePkt);
-		MAP_TYPE(PacketType::DEVICE_DESC_V0, DeviceDescriptorPkt);
-		MAP_TYPE(PacketType::VAR_VALUE_U32_V0, VariableU32Pkt);
-		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_V0, VariableDoublePkt);
-		MAP_TYPE(PacketType::VAR_VALUE_STRING_V0, VariableStringPkt);
+	switch (pkt.base_type()) {
+		MAP_TYPE(PacketType::RAW_EVENT_TYPE, RawDataPkt);
+		MAP_TYPE(PacketType::MAPPED_EVENT_TYPE, MappedDataPkt);
+		MAP_TYPE(PacketType::RTDL_TYPE, RTDLPkt);
+		MAP_TYPE(PacketType::SOURCE_LIST_TYPE, SourceListPkt);
+		MAP_TYPE(PacketType::BANKED_EVENT_TYPE, BankedEventPkt);
+		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_TYPE, BeamMonitorPkt);
+		MAP_TYPE(PacketType::PIXEL_MAPPING_TYPE, PixelMappingPkt);
+		MAP_TYPE(PacketType::RUN_STATUS_TYPE, RunStatusPkt);
+		MAP_TYPE(PacketType::RUN_INFO_TYPE, RunInfoPkt);
+		MAP_TYPE(PacketType::TRANS_COMPLETE_TYPE, TransCompletePkt);
+		MAP_TYPE(PacketType::CLIENT_HELLO_TYPE, ClientHelloPkt);
+		MAP_TYPE(PacketType::STREAM_ANNOTATION_TYPE, AnnotationPkt);
+		MAP_TYPE(PacketType::SYNC_TYPE, SyncPkt);
+		MAP_TYPE(PacketType::HEARTBEAT_TYPE, HeartbeatPkt);
+		MAP_TYPE(PacketType::GEOMETRY_TYPE, GeometryPkt);
+		MAP_TYPE(PacketType::BEAMLINE_INFO_TYPE, BeamlineInfoPkt);
+		MAP_TYPE(PacketType::BEAM_MONITOR_CONFIG_TYPE,
+			BeamMonitorConfigPkt);
+		MAP_TYPE(PacketType::DETECTOR_BANK_SETS_TYPE, DetectorBankSetsPkt);
+		MAP_TYPE(PacketType::DATA_DONE_TYPE, DataDonePkt);
+		MAP_TYPE(PacketType::DEVICE_DESC_TYPE, DeviceDescriptorPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_U32_TYPE, VariableU32Pkt);
+		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_TYPE, VariableDoublePkt);
+		MAP_TYPE(PacketType::VAR_VALUE_STRING_TYPE, VariableStringPkt);
 
 		/* No default handler; we want the compiler to warn about
 		 * the unhandled PacketType values when we add new packets.
@@ -283,7 +281,7 @@ bool Parser::rxPacket(const Packet &pkt)
 bool Parser::rxUnknownPkt(const Packet &pkt)
 {
 	/* Default is to discard the data */
-	(m_discarded_packets[pkt.type()])++;
+	(m_discarded_packets[pkt.base_type()])++;
 	return false;
 }
 
@@ -293,13 +291,13 @@ bool Parser::rxOversizePkt(const PacketHeader *hdr, const uint8_t *,
 	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Default is to discard the data */
 	if (hdr != NULL)
-		(m_discarded_packets[hdr->type()])++;
+		(m_discarded_packets[hdr->base_type()])++;
 	return false;
 }
 
 #define EXPAND_HANDLER(_class) \
 bool Parser::rxPacket(const _class &pkt) \
-	{ (m_discarded_packets[pkt.type()])++; return false; }
+	{ (m_discarded_packets[pkt.base_type()])++; return false; }
 
 EXPAND_HANDLER(RawDataPkt)
 EXPAND_HANDLER(MappedDataPkt)
@@ -332,7 +330,7 @@ void Parser::getDiscardedPacketsLogString(std::string & log_info)
 	uint64_t total_discarded = 0;
 
 	// Append Each Discarded Packet Type Count...
-	for (std::map<PacketType::Enum, uint64_t>::iterator
+	for (std::map<PacketType::Type, uint64_t>::iterator
 			it = m_discarded_packets.begin();
 			it != m_discarded_packets.end(); it++)
 	{
