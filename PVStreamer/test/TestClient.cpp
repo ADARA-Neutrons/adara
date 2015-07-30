@@ -111,9 +111,16 @@ int main( int argc, char* argv[])
         if ( rc == 16 )
         {
             ++pkt_count;
+
+            uint32_t base_type = ADARA_BASE_PKT_TYPE( hdr.pkt_format );
+
             // Get payload len from header
-            if ( hdr.pkt_format != ADARA::PacketType::HEARTBEAT_V0 )
-                cout << "[" << hex << hdr.pkt_format << dec << "] l=" << hdr.payload_len << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
+            if ( base_type != ADARA::PacketType::HEARTBEAT_TYPE )
+            {
+                cout << "[" << hex << hdr.pkt_format << dec
+                     << "] l=" << hdr.payload_len
+                     << " ts=" << hdr.ts_sec << "." << hdr.ts_nsec << endl;
+            }
 
             if ( hdr.payload_len )
             {
@@ -122,14 +129,15 @@ int main( int argc, char* argv[])
                     if ( buf )
                         delete[] buf;
 
-                    buf = new char[hdr.payload_len + 1];
+                    buf = new char[ hdr.payload_len + 1 ];
                     buf_len = hdr.payload_len;
                 }
 
                 rcount = 0;
                 while ( rcount < hdr.payload_len )
                 {
-                    rc = read( pvs_socket, buf + rcount, hdr.payload_len - rcount );
+                    rc = read( pvs_socket,
+                        buf + rcount, hdr.payload_len - rcount );
                     if ( rc == 0 )
                     {
                         cout << "  connection closed." << endl;
@@ -141,7 +149,7 @@ int main( int argc, char* argv[])
                     rcount += rc;
                 }
 
-                buf[hdr.payload_len] = 0;
+                buf[ hdr.payload_len ] = 0;
             }
 
             if ( rc <= 0 )
@@ -150,28 +158,32 @@ int main( int argc, char* argv[])
             //pkt = (PVS::ADARA::Packet*)buf;
             fields = (uint32_t*)buf;
 
-            if ( hdr.pkt_format == ADARA::PacketType::DEVICE_DESC_V0 )
+            if ( base_type == ADARA::PacketType::DEVICE_DESC_TYPE )
             {
                 cout << "DDP: ";
                 cout << " id: " << fields[0];
                 cout << ", xml len: " << fields[1] << endl;
                 cout << "  xml: " << &buf[8] << endl;
             }
-            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_U32_V0 )
+            else if ( base_type == ADARA::PacketType::VAR_VALUE_U32_TYPE )
             {
                 cout << "VVP: ";
                 cout << " id: " << fields[0] << "." << fields[1];
                 cout << ", value: " << fields[3];
-                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+                cout << ", alarm: " << ( fields[2] >> 16 )
+                     << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
-            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_DOUBLE_V0 )
+            else if ( base_type
+                    == ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE )
             {
                 cout << "VVP: ";
                 cout << " id: " << fields[0] << "." << fields[1];
                 cout << ", value: " << *((double*)&fields[3]);
-                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+                cout << ", alarm: " << ( fields[2] >> 16 )
+                     << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
-            else if ( hdr.pkt_format == ADARA::PacketType::VAR_VALUE_STRING_V0 )
+            else if ( base_type
+                    == ADARA::PacketType::VAR_VALUE_STRING_TYPE )
             {
                 // Null terminate string val
                 buf[16 + fields[3]] = 0;
@@ -180,7 +192,8 @@ int main( int argc, char* argv[])
                 cout << " id: " << fields[0] << "." << fields[1];
                 cout << ", len: " << fields[3];
                 cout << ", value: " << &buf[16];
-                cout << ", alarm: " << ( fields[2] >> 16 ) << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+                cout << ", alarm: " << ( fields[2] >> 16 )
+                     << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
             //else if ( hdr.format == 0x400900 )
                 //cout << "  heartbeat." << endl;

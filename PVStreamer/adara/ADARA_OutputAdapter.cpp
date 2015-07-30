@@ -92,7 +92,9 @@ OutputAdapter::streamProcessingThread()
     string          payload;
 
     heartbeat_pkt.payload_len = 0;
-    heartbeat_pkt.format = ::ADARA::PacketType::HEARTBEAT_V0;
+    heartbeat_pkt.format = ADARA_PKT_TYPE(
+		::ADARA::PacketType::HEARTBEAT_TYPE,
+		::ADARA::PacketType::HEARTBEAT_VERSION );
     heartbeat_pkt.nsec = 0;
 
     while ( 1 )
@@ -198,7 +200,9 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
 {
     stringstream sstr;
 
-    a_adara_pkt.format  = ::ADARA::PacketType::DEVICE_DESC_V0;
+    a_adara_pkt.format  = ADARA_PKT_TYPE(
+		::ADARA::PacketType::DEVICE_DESC_TYPE,
+		::ADARA::PacketType::DEVICE_DESC_VERSION );
     a_adara_pkt.sec     = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
     a_adara_pkt.nsec    = 0;
     a_adara_pkt.dev_id  = a_device->m_id;
@@ -306,25 +310,38 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
     {
     case PV_ENUM:
     case PV_INT:
-        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_U32_V0;     // TODO ADARA protocol doesn't support signed ints
+		// TODO ADARA protocol doesn't support signed ints
+        a_adara_pkt.format          =
+			ADARA_PKT_TYPE(
+				::ADARA::PacketType::VAR_VALUE_U32_TYPE,
+				::ADARA::PacketType::VAR_VALUE_U32_VERSION );
         a_adara_pkt.payload_len     = 16;
         a_adara_pkt.vvp.uval        = a_state.m_int_val;
         break;
 
     case PV_UINT:
-        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_U32_V0;
+        a_adara_pkt.format          =
+			ADARA_PKT_TYPE(
+				::ADARA::PacketType::VAR_VALUE_U32_TYPE,
+				::ADARA::PacketType::VAR_VALUE_U32_VERSION );
         a_adara_pkt.payload_len     = 16;
         a_adara_pkt.vvp.uval        = a_state.m_uint_val;
         break;
 
     case PV_REAL:
-        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_DOUBLE_V0;
+        a_adara_pkt.format          =
+			ADARA_PKT_TYPE(
+				::ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE,
+				::ADARA::PacketType::VAR_VALUE_DOUBLE_VERSION );
         a_adara_pkt.payload_len     = 20;
         a_adara_pkt.vvp.dval        = a_state.m_real_val;
         break;
 
     case PV_STR:
-        a_adara_pkt.format          = ::ADARA::PacketType::VAR_VALUE_STRING_V0;
+        a_adara_pkt.format          =
+			ADARA_PKT_TYPE(
+				::ADARA::PacketType::VAR_VALUE_STRING_TYPE,
+				::ADARA::PacketType::VAR_VALUE_STRING_VERSION );
         a_adara_pkt.payload_len     = 16 + a_state.m_str_val.size();
         a_adara_pkt.vvp_str.str_len = a_state.m_str_val.size();
 
@@ -639,7 +656,9 @@ OutputAdapter::sendSourceInfo( int a_socket )
     OutPacket adara_pkt;
 
     adara_pkt.payload_len = 0;
-    adara_pkt.format = ::ADARA::PacketType::SOURCE_LIST_V0;
+    adara_pkt.format = ADARA_PKT_TYPE(
+		::ADARA::PacketType::SOURCE_LIST_TYPE,
+		::ADARA::PacketType::SOURCE_LIST_VERSION );
     adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
 
