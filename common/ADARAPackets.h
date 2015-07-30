@@ -20,10 +20,8 @@ public:
 		m_type = field[1];
 
 		m_base_type = (PacketType::Type) ADARA_BASE_PKT_TYPE( m_type );
-			//( m_type >> 8 );
 
 		m_version = (PacketType::Version) ADARA_PKT_VERSION( m_type );
-			//( m_type & 0xff );
 
 		/* Convert EPICS epoch to Unix epoch,
 		 * Jan 1, 1990 ==> Jan 1, 1970
