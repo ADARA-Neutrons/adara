@@ -47,7 +47,9 @@ BeamlineInfo::BeamlineInfo(const uint32_t targetNumber,
 
 	fields = (uint32_t *) m_packet;
 	fields[0] = payload;
-	fields[1] = ADARA::PacketType::BEAMLINE_INFO_V1;
+	fields[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::BEAMLINE_INFO_TYPE,
+		ADARA::PacketType::BEAMLINE_INFO_VERSION );
 	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	fields[3] = ts.tv_nsec;
 	fields[4] = longName.length();

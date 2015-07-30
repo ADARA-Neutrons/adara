@@ -768,7 +768,9 @@ DetectorBankSet::DetectorBankSet(
 	uint32_t *fields = (uint32_t *) m_packet;
 
 	fields[0] = m_payloadSize;
-	fields[1] = ADARA::PacketType::DETECTOR_BANK_SETS_V0;
+	fields[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::DETECTOR_BANK_SETS_TYPE,
+		ADARA::PacketType::DETECTOR_BANK_SETS_VERSION );
 	fields[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	fields[3] = now.tv_nsec;
 

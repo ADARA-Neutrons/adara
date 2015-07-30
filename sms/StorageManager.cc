@@ -864,17 +864,19 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	switch (hdr->pkt_format) {
-	default:
-		/* Only pulse data should determine if it is time to take
-		 * a new state snapshot.
-		 */
-		break;
-	case ADARA::PacketType::RTDL_V0:
-	case ADARA::PacketType::BANKED_EVENT_V1:
-	case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
-		m_pulseTime = hdr->ts_sec;
-		break;
+	switch ( ADARA_BASE_PKT_TYPE( hdr->pkt_format ) ) {
+
+		default:
+			/* Only pulse data should determine if it is time to take
+			 * a new state snapshot.
+			 */
+			break;
+
+		case ADARA::PacketType::RTDL_TYPE:
+		case ADARA::PacketType::BANKED_EVENT_TYPE:
+		case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
+			m_pulseTime = hdr->ts_sec;
+			break;
 	}
 
 	/* Save off where we are in the stream, as we may need to point

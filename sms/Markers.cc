@@ -200,7 +200,9 @@ void Markers::emitPacket(const struct timespec &ts,
 	IoVector iovec;
 
 	pkt[0] = 2 * sizeof(uint32_t);
-	pkt[1] = ADARA::PacketType::STREAM_ANNOTATION_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::STREAM_ANNOTATION_TYPE,
+		ADARA::PacketType::STREAM_ANNOTATION_VERSION );
 	pkt[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = ts.tv_nsec;
 

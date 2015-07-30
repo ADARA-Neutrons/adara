@@ -1117,41 +1117,47 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		// << " nsec=" << m_last_pkt_nsec
 		// << " len=" << m_last_pkt_len );
 
-	switch (pkt.type()) {
-	case ADARA::PacketType::HEARTBEAT_V0:
-		/* We actually *do* care about these packets after all;
-		 * we need to Unregister Any DataSource that sends us one...!
-		 * (or else we'll buffer everything else and swell up & pop! ;-)
-		 */
-		return Parser::rxPacket(pkt);
-	case ADARA::PacketType::SYNC_V0:
-	case ADARA::PacketType::DATA_DONE_V0:
-		/* We don't care about these packets, just drop them */
-		return false;
-	case ADARA::PacketType::RAW_EVENT_V0:
-	case ADARA::PacketType::MAPPED_EVENT_V0:
-	case ADARA::PacketType::RTDL_V0:
-	case ADARA::PacketType::SOURCE_LIST_V0:
-	case ADARA::PacketType::DEVICE_DESC_V0:
-	case ADARA::PacketType::VAR_VALUE_U32_V0:
-	case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
-	case ADARA::PacketType::VAR_VALUE_STRING_V0:
-		/* We use a 0 pulse id to indicate that we don't have an
-		 * active pulse, and nothing should ever send one to us.
-		 */
-		if (!pkt.pulseId()) {
-			/* Rate-limited logging of pulse id 0 */
-			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_PULSEID_ZERO, m_name, 2, 10, 100, log_info ) ) {
-				WARN(log_info << "Received pulse id 0 from " << m_name);
-			}
+	switch (pkt.base_type()) {
+
+		case ADARA::PacketType::HEARTBEAT_TYPE:
+			/* We actually *do* care about these packets after all;
+			 * we need to Unregister Any DataSource that sends us one...!
+			 * (or else we'll buffer everything else, swell up & pop! ;-)
+			 */
+			return Parser::rxPacket(pkt);
+
+		case ADARA::PacketType::SYNC_TYPE:
+		case ADARA::PacketType::DATA_DONE_TYPE:
+			/* We don't care about these packets, just drop them */
 			return false;
-		}
-		return Parser::rxPacket(pkt);
-	default:
-		/* We don't expect to see any other packet types here. */
-		return rxUnknownPkt(pkt);
+
+		case ADARA::PacketType::RAW_EVENT_TYPE:
+		case ADARA::PacketType::MAPPED_EVENT_TYPE:
+		case ADARA::PacketType::RTDL_TYPE:
+		case ADARA::PacketType::SOURCE_LIST_TYPE:
+		case ADARA::PacketType::DEVICE_DESC_TYPE:
+		case ADARA::PacketType::VAR_VALUE_U32_TYPE:
+		case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+			/* We use a 0 pulse id to indicate that we don't have an
+			 * active pulse, and nothing should ever send one to us.
+			 */
+			if (!pkt.pulseId()) {
+				/* Rate-limited logging of pulse id 0 */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+						RLL_PULSEID_ZERO, m_name,
+						2, 10, 100, log_info ) ) {
+					WARN(log_info
+						<< "Received pulse id 0 from " << m_name);
+				}
+				return false;
+			}
+			return Parser::rxPacket(pkt);
+
+		default:
+			/* We don't expect to see any other packet types here. */
+			return rxUnknownPkt(pkt);
 	}
 }
 

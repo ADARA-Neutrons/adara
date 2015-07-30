@@ -227,7 +227,9 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	uint32_t pkt[size / sizeof(uint32_t)];
 	memset(pkt, 0, sizeof(pkt));
 	pkt[0] = size - sizeof(ADARA::Header);
-	pkt[1] = ADARA::PacketType::DEVICE_DESC_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::DEVICE_DESC_TYPE,
+		ADARA::PacketType::DEVICE_DESC_VERSION );
 	pkt[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = ts.tv_nsec;
 	pkt[4] = mapped_dev;

@@ -144,7 +144,7 @@ private:
 	void updateBandwidthTenMin(struct timespec &now, bool do_log);
 
 	// Last Packet Debug
-	int m_last_pkt_type; // PacketType::Enum
+	uint32_t m_last_pkt_type;
 	uint32_t m_last_pkt_len;
 	time_t m_last_pkt_sec;
 	long m_last_pkt_nsec;

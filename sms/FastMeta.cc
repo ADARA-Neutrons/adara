@@ -228,7 +228,9 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
 
 	pkt[0] = 4 * sizeof(uint32_t);
-	pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_VERSION );
 
 	/* Create a different timestamp for each variable update packet by
 	 * adding the TOF value to the pulse ID, handling overflow of the

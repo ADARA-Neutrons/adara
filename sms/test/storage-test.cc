@@ -21,7 +21,9 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 	int i;
 
 	hdr->payload_len = sizeof(pkt) - sizeof(*hdr);
-	hdr->pkt_format = ADARA::PacketType::RAW_EVENT_V0;
+	hdr->pkt_format = ADARA_PKT_TYPE(
+		ADARA::PacketType::RAW_EVENT_TYPE,
+		ADARA::PacketType::RAW_EVENT_VERSION );
 
 	boost::property_tree::ptree conf;
 	conf.put("basedir", "/SNSlocal/sms");

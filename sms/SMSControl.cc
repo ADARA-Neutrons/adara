@@ -1557,7 +1557,9 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	size *= sizeof(uint32_t);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V1);
+	m_hdrs.push_back( ADARA_PKT_TYPE(
+		ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE,
+		ADARA::PacketType::BEAM_MONITOR_EVENT_VERSION ) );
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1620,7 +1622,9 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	size += pulse->m_numEvents * sizeof(ADARA::Event);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V1);
+	m_hdrs.push_back( ADARA_PKT_TYPE(
+		ADARA::PacketType::BANKED_EVENT_TYPE,
+		ADARA::PacketType::BANKED_EVENT_VERSION ) );
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1683,7 +1687,9 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
 
 	pkt[0] = 4 * sizeof(uint32_t);
-	pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_VERSION );
 	pkt[6] = ADARA::VariableStatus::OK << 16;
 	pkt[6] |= ADARA::VariableSeverity::OK;
 
