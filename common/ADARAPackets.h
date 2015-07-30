@@ -16,7 +16,14 @@ public:
 		const uint32_t *field = (const uint32_t *) data;
 
 		m_payload_len = field[0];
-		m_type = (PacketType::Enum) field[1];
+
+		m_type = field[1];
+
+		m_base_type = (PacketType::Type) ADARA_BASE_PKT_TYPE( m_type );
+			//( m_type >> 8 );
+
+		m_version = (PacketType::Version) ADARA_PKT_VERSION( m_type );
+			//( m_type & 0xff );
 
 		/* Convert EPICS epoch to Unix epoch,
 		 * Jan 1, 1990 ==> Jan 1, 1970
@@ -28,9 +35,9 @@ public:
 		m_pulseId |= field[3];
 	}
 
-	PacketType::Enum type(void) const { return m_type; }
-	uint32_t base_type(void) const { return (m_type >> 8); }
-	uint32_t version(void) const { return (m_type & 0xff); }
+	uint32_t type(void) const { return m_type; }
+	PacketType::Type base_type(void) const { return m_base_type; }
+	PacketType::Version version(void) const { return m_version; }
 	uint32_t payload_length(void) const { return m_payload_len; }
 	const struct timespec &timestamp(void) const { return m_timestamp; }
 	uint64_t pulseId(void) const { return m_pulseId; }
@@ -40,7 +47,9 @@ public:
 
 protected:
 	uint32_t m_payload_len;
-	PacketType::Enum m_type;
+	uint32_t m_type;
+	PacketType::Type m_base_type;
+	PacketType::Version m_version;
 	struct timespec m_timestamp;
 	uint64_t m_pulseId;
 
