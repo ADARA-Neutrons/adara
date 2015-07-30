@@ -168,7 +168,9 @@ public:
 
 		uint32_t *field = (uint32_t *) packet;
 		*field++ = 120;
-		*field++ = ADARA::PacketType::RTDL_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::RTDL_TYPE,
+			ADARA::PacketType::RTDL_VERSION );
 		*field++ = p.ts.tv_sec;
 		*field++ = p.ts.tv_nsec;
 		memset(field, 0, 120);
@@ -186,7 +188,9 @@ public:
 		uint32_t *payload_len = field;
 
 		*field++ = 24;
-		*field++ = ADARA::PacketType::RAW_EVENT_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::RAW_EVENT_TYPE,
+			ADARA::PacketType::RAW_EVENT_VERSION );
 		*field++ = p.ts.tv_sec;
 		*field++ = p.ts.tv_nsec;
 
