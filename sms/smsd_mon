@@ -130,13 +130,13 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	log_used=`df $SMSD_LOG | tail -1 | awk '{print $(NF-3)}'`
 	#echo "log_used=$log_used"
-	log_avail=`df $SMSD_LOG | tail -1 | awk '{print $(NF-2)}'`
-	#echo "log_avail=$log_avail"
+	log_total=`df $SMSD_LOG | tail -1 | awk '{print $(NF-4)}'`
+	#echo "log_total=$log_total"
 
 	pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))
 	#echo "pct_log=$pct_log"
 
-	pct_used=$(( $log_used * 100 / $log_avail ))
+	pct_used=$(( $log_used * 100 / $log_total ))
 	#echo "pct_used=$pct_used"
 
 	echo \
