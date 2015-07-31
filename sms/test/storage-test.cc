@@ -4,19 +4,13 @@
 #include <time.h>
 
 #include "StorageManager.h"
+#include "ADARA.h"
 #include "ADARAUtils.h"
-
-struct adara_header {
-	uint32_t payload_len;
-	uint32_t pkt_format;
-	uint32_t ts_sec;
-	uint32_t ts_nsec;
-};
 
 int main(int UNUSED(argc), char **UNUSED(argv))
 {
 	unsigned char pkt[8192] = { 0, };
-	struct adara_header *hdr = (struct adara_header *) pkt;
+	ADARA::Header *hdr = (ADARA::Header *) pkt;
 	struct timespec ts;
 	int i;
 
