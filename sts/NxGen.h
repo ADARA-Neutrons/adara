@@ -189,13 +189,106 @@ private:
                 a_device_id, a_pv_id, a_type, a_units ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
-            m_slab_size(0)
+            m_slab_size(0),
+            m_string_data_slab_size(0)
         {
             m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
         }
 
         /// NxPVInfo destructor
         ~NxPVInfo() {}
+
+        /// Push Uint32 PV Value onto Statistics...
+        void addToStats
+        (
+            uint32_t a_value ///< Uint32 Value to Push
+        )
+        {
+            this->m_stats.push(a_value);
+        }
+
+        /// Push Double PV Value onto Statistics...
+        void addToStats
+        (
+            double a_value ///< Double Value to Push
+        )
+        {
+            this->m_stats.push(a_value);
+        }
+
+        /// Ignore String PV Value for Statistics...
+        void addToStats
+        (
+            std::string UNUSED(a_value) ///< String Value to Ignore
+        )
+        {
+        }
+
+        /// Writes Buffered Uint32 PV Values to Nexus File 
+        void flushValueBuffers
+        (
+            std::vector<uint32_t> value_buffer ///< Uint32 Buffer to Write
+        )
+        {
+            // TODO - This code may need to be optimized
+            // when fast metadata is supported
+            m_nxgen.writeSlab( m_log_path + "/value",
+                value_buffer, m_slab_size );
+        }
+
+        /// Writes Buffered Double PV Values to Nexus File 
+        void flushValueBuffers
+        (
+            std::vector<double> value_buffer ///< Double Buffer to Write
+        )
+        {
+            // TODO - This code may need to be optimized
+            // when fast metadata is supported
+            m_nxgen.writeSlab( m_log_path + "/value",
+                value_buffer, m_slab_size );
+        }
+
+        /// Writes Buffered String PV Values to Nexus File 
+        void flushValueBuffers
+        (
+            std::vector<std::string> value_buffer ///< String Buffer to Write
+        )
+        {
+            // Create String Meta-data in log,
+            // if no data has been written yet...
+            if ( !m_slab_size )
+            {
+                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
+                m_nxgen.makeDataset( m_log_path, "length", NeXus::UINT32 );
+            }
+
+            // Create String Offset, Length and Data Fields...
+            std::vector<uint32_t> offset;
+            std::vector<uint32_t> length;
+            std::vector<char> data;
+            unsigned long last_offset = 0;
+            for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+            {
+                offset.push_back( last_offset );
+                last_offset += value_buffer[i].size();
+                length.push_back( value_buffer[i].size() );
+                data.reserve( data.size() + value_buffer[i].size() );
+                data.insert( data.end(),
+                    value_buffer[i].begin(), value_buffer[i].end()) ;
+            }
+
+            // Write String Fields to NeXus File...
+            m_nxgen.writeSlab( m_log_path + "/offset",
+                offset, m_slab_size );
+            m_nxgen.writeSlab( m_log_path + "/length",
+                length, m_slab_size );
+            if ( data.size() )
+            {
+                m_nxgen.writeSlab( m_log_path + "/value",
+                    data, m_string_data_slab_size );
+                m_string_data_slab_size += data.size();
+            }
+        }
 
         /// Writes buffered PV values and time axis to Nexus file and performs finalization
         void flushBuffers
@@ -218,10 +311,10 @@ private:
                             NeXus::FLOAT64, TIME_SEC_UNITS );
                     }
 
-                    // TODO - This code may need to be optimized
-                    // when fast metadata is supported
-                    m_nxgen.writeSlab( m_log_path + "/value",
-                        this->m_value_buffer, m_slab_size );
+                    // Flush Value Buffers to NeXus File
+                    // (by Templated Data type... ;-D)
+                    flushValueBuffers( this->m_value_buffer );
+
                     m_nxgen.writeSlab( m_log_path + "/time",
                         this->m_time_buffer, m_slab_size );
 
@@ -244,9 +337,12 @@ private:
                             "offset_nanoseconds",
                             (uint32_t)a_run_metrics->start_time.tv_nsec );
 
-                        if ( m_slab_size )
+                        if ( m_slab_size
+                                // No Statistics for Strings!
+                                && this->m_type != STS::PVT_STRING )
                         {
-                            // Data has been writen, so also write statistics
+                            // Data has been written,
+                            // so also write statistics
                             m_nxgen.writeScalar( m_log_path,
                                 "minimum_value", this->m_stats.min(),
                                 this->m_units );
@@ -278,6 +374,7 @@ private:
         std::string     m_internal_name;///< Internal Nexus name of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
+        uint64_t        m_string_data_slab_size;    ///< Running size of character string data value slab
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
@@ -394,7 +491,11 @@ private:
                                 {
                                     THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
                                         "H5NXwrite_slab FAILED for path: "
-                                            << a_path );
+                                            << a_path
+                                            << " a_buffer.size()="
+                                            << a_buffer.size()
+                                            << " a_slab_size="
+                                            << a_slab_size);
                                 }
                             }
                         }
