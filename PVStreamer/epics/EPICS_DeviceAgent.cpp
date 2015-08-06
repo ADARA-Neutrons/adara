@@ -880,22 +880,14 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         a_args.dbr, state );
                     break;
                 case DBR_TIME_CHAR:
-                    // Just a (Scalar) Character...
-                    if ( a_args.count == 1 )
-                    {
-                        state.m_int_val =
-                            ((struct dbr_time_char *)a_args.dbr)->value;
-                        updateState<struct dbr_time_char>(
-                            a_args.dbr, state );
-                    }
-                    // Actually a Variable Length Character String...!
-                    else
-                    {
-                        state.m_str_val = (char *)
-                            &((struct dbr_time_char *)a_args.dbr)->value;
-                        updateState<struct dbr_time_char>(
-                            a_args.dbr, state );
-                    }
+                    // Could be (Scalar Numerical) Character
+                    // -OR- Variable Length Character String...!
+                    //    -> Therefore, Set *Both* Value Fields...! ;-D
+                    state.m_int_val =
+                        ((struct dbr_time_char *)a_args.dbr)->value;
+                    state.m_str_val = (char *)
+                        &((struct dbr_time_char *)a_args.dbr)->value;
+                    updateState<struct dbr_time_char>( a_args.dbr, state );
                     break;
                 case DBR_TIME_LONG:
                     state.m_int_val =
