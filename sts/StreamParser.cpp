@@ -2275,8 +2275,8 @@ StreamParser::finalizeStreamProcessing()
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
             ipv != m_pvs_by_key.end(); ++ipv )
     {
-        if ( ipv->second->m_time_buffer.size() > 0 )
-            ipv->second->flushBuffers( &m_run_metrics );
+        // *Always* Flush Buffers at End, to Get Run Metrics for PVs...!
+        ipv->second->flushBuffers( &m_run_metrics );
     }
 
     // Let adapter do anything else it wants to

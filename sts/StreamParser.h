@@ -233,7 +233,7 @@ StreamParser::pvValueUpdate
 
         // Check for buffer write
         if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-            pvinfo->flushBuffers();
+            pvinfo->flushBuffers(0);
     }
 }
 
