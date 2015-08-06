@@ -629,6 +629,8 @@ public:
     virtual ~PVInfo()
     {}
 
+    virtual void addToStats( T a_value ) = 0;
+
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
 };
 
