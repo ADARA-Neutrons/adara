@@ -227,7 +227,7 @@ private:
         /// Writes Buffered Uint32 PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<uint32_t> value_buffer ///< Uint32 Buffer to Write
+            std::vector<uint32_t> & value_buffer ///< Uint32 Buffer to Write
         )
         {
             // TODO - This code may need to be optimized
@@ -239,7 +239,7 @@ private:
         /// Writes Buffered Double PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<double> value_buffer ///< Double Buffer to Write
+            std::vector<double> & value_buffer ///< Double Buffer to Write
         )
         {
             // TODO - This code may need to be optimized
@@ -251,7 +251,7 @@ private:
         /// Writes Buffered String PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<std::string> value_buffer ///< String Buffer to Write
+            std::vector<std::string> & value_buffer ///< String Buffer to Write
         )
         {
             // Create String Meta-data in log,
@@ -266,7 +266,7 @@ private:
             std::vector<uint32_t> offset;
             std::vector<uint32_t> length;
             std::vector<char> data;
-            unsigned long last_offset = 0;
+            unsigned long last_offset = m_string_data_slab_size;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
                 offset.push_back( last_offset );
@@ -311,14 +311,18 @@ private:
                             NeXus::FLOAT64, TIME_SEC_UNITS );
                     }
 
-                    // Flush Value Buffers to NeXus File
-                    // (by Templated Data type... ;-D)
-                    flushValueBuffers( this->m_value_buffer );
+                    // Flush Any Pending Value/Time Data...
+                    if ( this->m_value_buffer.size() )
+                    {
+                        // Flush Value Buffers to NeXus File
+                        // (by Templated Data type... ;-D)
+                        flushValueBuffers( this->m_value_buffer );
 
-                    m_nxgen.writeSlab( m_log_path + "/time",
-                        this->m_time_buffer, m_slab_size );
+                        m_nxgen.writeSlab( m_log_path + "/time",
+                            this->m_time_buffer, m_slab_size );
 
-                    m_slab_size += this->m_value_buffer.size();
+                        m_slab_size += this->m_value_buffer.size();
+                    }
 
                     if ( a_run_metrics )
                     {
