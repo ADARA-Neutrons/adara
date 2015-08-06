@@ -309,6 +309,7 @@ StreamParser::rxPacket
         case ADARA::PacketType::DEVICE_DESC_TYPE:
         case ADARA::PacketType::VAR_VALUE_U32_TYPE:
         case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+        case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
         case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
@@ -326,7 +327,6 @@ StreamParser::rxPacket
         case ADARA::PacketType::CLIENT_HELLO_TYPE:
         case ADARA::PacketType::SYNC_TYPE:
         case ADARA::PacketType::HEARTBEAT_TYPE:
-        case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
             if ( m_gather_stats )
                 ++m_skipped_pkt_count;
     }
@@ -2062,6 +2062,28 @@ StreamParser::rxPacket
 )
 {
     pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+
+    return false;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Variable (string) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes character string Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA character string Variable Update packets. See the pvValueUpdate() template
+ * method in StreamParser.h for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::VariableStringPkt &a_pkt ///< [in] The ADARA Variable Update packet to process
+)
+{
+    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
