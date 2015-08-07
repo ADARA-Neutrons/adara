@@ -276,6 +276,29 @@
           </property>
          </widget>
         </item>
+        <item row="7" column="5">
+         <widget class="QLabel" name="label_48">
+          <property name="text">
+           <string>Pulse Pchg Uncor:</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="6">
+         <widget class="QLineEdit" name="pulsePchgUncorLabel">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
         <item row="6" column="3">
          <widget class="QLabel" name="label_21">
           <property name="text">

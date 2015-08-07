@@ -983,6 +983,7 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_mapping_error_count )));
     QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_veto_count )));
     QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_missing_rtdl_count )));
+    QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_pcharge_uncorrected )));
 }
 
 
@@ -1056,6 +1057,7 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
     else
     {
@@ -1074,6 +1076,7 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         setStaleText( ui->mapErrorLabel );
         setStaleText( ui->pulseVetoLabel );
         setStaleText( ui->missRTDLLabel );
+        setStaleText( ui->pulsePchgUncorLabel );
     }
 }
 
