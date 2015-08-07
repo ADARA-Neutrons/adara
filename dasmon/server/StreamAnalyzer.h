@@ -83,6 +83,7 @@ private:
         BIF_SMS_CONNECTED,
         BIF_GENERAL_PV_LIMIT,
         BIF_GENERAL_PV_ERROR,
+        BIF_PULSE_PCHG_UNCOR,
         BIF_COUNT
     };
 

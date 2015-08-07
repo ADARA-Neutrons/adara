@@ -815,6 +815,9 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     if ( flags & BankedEventPkt::DUPLICATE_PULSE )
          ++m_run_metrics.m_dup_pulse_count;
 
+    if ( flags & BankedEventPkt::PCHARGE_UNCORRECTED )
+         ++m_run_metrics.m_pulse_pcharge_uncorrected;
+
     uint32_t        source_id;
     uint32_t        bank_count;
     int16_t         bank_id;
