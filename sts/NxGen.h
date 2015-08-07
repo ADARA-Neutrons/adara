@@ -303,6 +303,14 @@ private:
                     // Create log if no data has been written yet
                     if ( !m_slab_size )
                     {
+                        // "Nothing to See Here"...! ;-D
+                        // (Never Got Any Data, and Don't Have Any Now,
+                        //    So Just Ignore This PV and Move On...! ;-)
+                        // [Need this check because _Always_ called
+                        //    in finalizeStreamProcessing() now... ;-]
+                        if ( !(this->m_value_buffer.size()) )
+                            return;
+
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
                         m_nxgen.makeDataset( m_log_path, "value",
                             m_nxgen.toNxType( this->m_type ),
