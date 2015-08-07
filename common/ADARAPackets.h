@@ -195,12 +195,13 @@ public:
 	BankedEventPkt(const BankedEventPkt &pkt);
 
 	enum Flags {
-		ERROR_PIXELS    = 0x0001,
-		PARTIAL_DATA    = 0x0002,
-		PULSE_VETO      = 0x0004,
-		MISSING_RTDL    = 0x0008,
-		MAPPING_ERROR   = 0x0010,
-		DUPLICATE_PULSE = 0x0020,
+		ERROR_PIXELS        = 0x00001,
+		PARTIAL_DATA        = 0x00002,
+		PULSE_VETO          = 0x00004,
+		MISSING_RTDL        = 0x00008,
+		MAPPING_ERROR       = 0x00010,
+		DUPLICATE_PULSE     = 0x00020,
+		PCHARGE_UNCORRECTED = 0x00040,
 	};
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
