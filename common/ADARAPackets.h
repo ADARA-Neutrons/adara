@@ -135,6 +135,12 @@ public:
 						((m_fields[0] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
+
+	void setPulseCharge(uint32_t pulseCharge) {
+		m_fields[0] &= 0xff000000;
+		m_fields[0] |= pulseCharge & 0x00ffffff;
+	}
+
 	bool badVeto(void) const { return !!(m_fields[1] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[1] & 0x40000000); }
 	uint8_t timingStatus(void) const {
@@ -168,7 +174,8 @@ public:
 	}
 
 private:
-	const uint32_t *m_fields;
+	// Note: RTDLPkt m_fields can't be "const", as we Modify Pulse Charge!
+	uint32_t *m_fields;
 
 	RTDLPkt(const uint8_t *data, uint32_t len);
 

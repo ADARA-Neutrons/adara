@@ -110,7 +110,8 @@ MappedDataPkt::MappedDataPkt(const MappedDataPkt &pkt) :
 /* ------------------------------------------------------------------------ */
 
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len), m_fields((const uint32_t *)payload())
+	Packet(data, len), m_fields((uint32_t *)payload())
+	// Note: RTDLPkt m_fields can't be "const", as we Modify Pulse Charge!
 {
 	if (m_payload_len != 120)
 		throw invalid_packet("RTDL Packet is incorrect length");
@@ -120,7 +121,8 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 }
 
 RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
-	Packet(pkt), m_fields((const uint32_t *)payload())
+	Packet(pkt), m_fields((uint32_t *)payload())
+	// Note: RTDLPkt m_fields can't be "const", as we Modify Pulse Charge!
 {}
 
 /* ------------------------------------------------------------------------ */
