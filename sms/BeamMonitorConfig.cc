@@ -416,7 +416,9 @@ BeamMonitorConfig::BeamMonitorConfig(
 	uint32_t *fields = (uint32_t *) m_packet;
 
 	fields[0] = m_payloadSize;
-	fields[1] = ADARA::PacketType::BEAM_MONITOR_CONFIG_V0;
+	fields[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::BEAM_MONITOR_CONFIG_TYPE,
+		ADARA::PacketType::BEAM_MONITOR_CONFIG_VERSION );
 	fields[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	fields[3] = now.tv_nsec;
 

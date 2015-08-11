@@ -21,6 +21,7 @@ class smsStringPV;
 class smsRunNumberPV;
 class smsRecordingPV;
 class smsErrorPV;
+class smsBooleanPV;
 class smsUint32PV;
 class smsConnectedPV;
 class PopPulseBufferPV;
@@ -225,6 +226,11 @@ private:
 
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
+	boost::shared_ptr<smsBooleanPV> m_pvDoPulsePchgCorrect;
+	static uint32_t m_interPulseTimeMin;
+	static uint32_t m_interPulseTimeMax;
+	static bool m_doPulsePchgCorrect;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
@@ -246,6 +252,7 @@ private:
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
+	void correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse);
 	void recordPulse(PulsePtr &pulse);
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,

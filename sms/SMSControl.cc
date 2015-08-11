@@ -39,7 +39,9 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
 #define RLL_RTDL_NO_DATA                 5
-#define RLL_NO_RTDL_FOR_PULSE            6
+#define RLL_PULSE_PCHG_UNCORRECTED       6
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
+#define RLL_NO_RTDL_FOR_PULSE            8
 
 uint32_t SMSControl::m_targetNumber;
 
@@ -52,6 +54,10 @@ std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
+
+uint32_t SMSControl::m_interPulseTimeMin;
+uint32_t SMSControl::m_interPulseTimeMax;
+bool SMSControl::m_doPulsePchgCorrect;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -151,6 +157,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<uint32_t>("sms.max_pulse_buffer_size", 1000);
 	INFO("Setting Max Pulse Buffer Size to "
 		<< m_maxPulseBufferSize << ".");
+
+	m_doPulsePchgCorrect =
+			conf.get<bool>("sms.do_pulse_pcharge_correction", true);
+	INFO("Setting Do Pulse Proton Charge Correction to "
+		<< m_doPulsePchgCorrect << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -326,6 +337,10 @@ SMSControl::SMSControl() :
 						PopPulseBufferPV(prefix + ":Control:"
 							+ "PopPulseBuffer"));
 
+	m_pvDoPulsePchgCorrect = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "DoPulsePchgCorrect"));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -345,6 +360,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
+	addPV(m_pvDoPulsePchgCorrect);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -364,6 +380,12 @@ SMSControl::SMSControl() :
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
+
+	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
+	uint32_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
+	m_interPulseTimeMin = 0.77 * baseInterPulseTime;
+	m_interPulseTimeMax = 1.23 * baseInterPulseTime;
+	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
 
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
@@ -633,6 +655,25 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			<< std::hex << " 0x" << m_pulses.begin()->first.first
 			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
 		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
+			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+			if ( m_doPulsePchgCorrect ) {
+				PulseMap::iterator next = it;
+				if (++next != m_pulses.end())
+					correctProtonCharge(it->second, next->second);
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "unregisterEventSource:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << it->first.first << std::dec);
+					}
+				}
+			}
 			recordPulse(it->second);
 			last_recorded = it;
 			recorded++;
@@ -642,6 +683,25 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		if (!m_noEoPPulseBufferSize || num_sources == 1) {
 			DEBUG("unregisterEventSource Recording Last Pulse 0x"
 				<< std::hex << last->first.first << std::dec);
+			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+			if ( m_doPulsePchgCorrect ) {
+				PulseMap::iterator next = last;
+				if (++next != m_pulses.end())
+					correctProtonCharge(last->second, next->second);
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "unregisterEventSource:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << last->first.first << std::dec);
+					}
+				}
+			}
 			recordPulse(last->second);
 			last_recorded = last;
 			recorded++;
@@ -770,7 +830,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
 					<< " max=0x" << max_id << std::dec);
@@ -783,7 +843,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Interleaved Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
 					<< " max=0x" << max_id << std::dec);
@@ -799,7 +859,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " versus Last Pulse id=0x" << m_lastPulseId
 					<< std::dec);
@@ -809,6 +869,10 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	}
 
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
+
+	// By Default, All New Pulses Have Yet to Have Their
+	// Proton Charge Corrected (Each Pcharge Refers to *Previous* Pulse!)
+	new_pulse->m_flags |= ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
 
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
@@ -834,6 +898,27 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			// Pulse will Never be Made Complete, Mark as Partial...
 			if (it->second->m_pending.any()) {
 				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+			}
+			// Correct Proton Charge...
+			// (This Pulse's PCharge comes from _Next_ Pulse...!)
+			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+			if ( m_doPulsePchgCorrect ) {
+				PulseMap::iterator next = it;
+				if (++next != m_pulses.end())
+					correctProtonCharge(it->second, next->second);
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "getPulse:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << it->first.first << std::dec);
+					}
+				}
 			}
 			// Record Pulse to Reduce Overflow Buffer Size...
 			recordPulse(it->second);
@@ -1342,7 +1427,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 				RLL_RTDL_NO_DATA, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< "pulseRTDL(): Pulse with No Registered Event Sources!"
+				<< "pulseRTDL: Pulse with No Registered Event Sources!"
 				<< " Marking Partial...");
 		}
 		// Mark Pulse "Partial" Because there's No Event Data,
@@ -1428,6 +1513,26 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		if (it->second->m_pending.any()) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 		}
+		// Correct Proton Charge...
+		// (This Pulse's PCharge comes from _Next_ Pulse...!)
+		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+		if ( m_doPulsePchgCorrect ) {
+			PulseMap::iterator next = it;
+			if (++next != m_pulses.end())
+				correctProtonCharge(it->second, next->second);
+			else {
+				/* Rate-limited logging of global sawtooth pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info << "markComplete:"
+						<< " No More Pulses"
+						<< " for Proton Charge Correction! 0x"
+						<< std::hex << it->first.first << std::dec);
+				}
+			}
+		}
 		// Recording Previously Complete (Buffered) Pulse
 		recordPulse(it->second);
 		last_recorded = it;
@@ -1436,6 +1541,24 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 	// Record the Current Pulse for Sure, If Not Buffering...
 	if (!m_noEoPPulseBufferSize) {
+		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+		if ( m_doPulsePchgCorrect ) {
+			PulseMap::iterator next = current;
+			if (++next != m_pulses.end())
+				correctProtonCharge(current->second, next->second);
+			else {
+				/* Rate-limited logging of global sawtooth pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info << "markComplete:"
+						<< " No More Pulses"
+						<< " for Proton Charge Correction! 0x"
+						<< std::hex << current->first.first << std::dec);
+				}
+			}
+		}
 		recordPulse(current->second);
 		last_recorded = current;
 		recorded++;
@@ -1470,6 +1593,68 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	}
 }
 
+void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
+{
+	// Check if Next Pulse is About "Pulse Frequency" Away from This Pulse
+
+	uint64_t pulse_id = pulse->m_id.first;
+	uint32_t pulse_sec = pulse_id >> 32;
+	uint32_t pulse_nsec = pulse_id & 0xffffffff;
+
+	uint64_t next_pulse_id = next_pulse->m_id.first;
+	uint32_t next_pulse_sec = next_pulse_id >> 32;
+	uint32_t next_pulse_nsec = next_pulse_id & 0xffffffff;
+
+	uint32_t interPulseTime =
+		( ( next_pulse_sec - pulse_sec ) * 1000000000 )
+			+ ( next_pulse_nsec - pulse_nsec );
+
+	if ( m_interPulseTimeMin < interPulseTime
+			&& interPulseTime < m_interPulseTimeMax )
+	{
+		// Reset the Pulse Proton Charge Uncorrected Flag
+		pulse->m_flags &= ~ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
+
+		// Set the Pulse Charge from the Next Pulse
+		pulse->m_charge = next_pulse->m_charge;
+
+		// If RTDL Packet(s) present, Adjust RTDL Proton Charge Here Too...
+		if ( pulse->m_rtdl && next_pulse->m_rtdl )
+		{
+			// Set the RTDL Pulse Charge from the Next Pulse's RTDL
+			pulse->m_rtdl->setPulseCharge(
+				next_pulse->m_rtdl->pulseCharge() );
+		}
+	}
+
+	// Log Pulse Proton Charge Correction Failure...!
+	else
+	{
+		/* Rate-limited logging of global sawtooth pulse */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+				RLL_PULSE_PCHG_UNCORRECTED, "none",
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< "correctProtonCharge: *** Next Pulse Out of Range -"
+				<< " Uncorrected Pulse Proton Charge!"
+				<< std::hex
+				<< " pulse=0x" << pulse->m_id.first
+				<< " next_pulse=0x" << next_pulse->m_id.first
+				<< std::dec
+				<< " pulse_sec=" << pulse_sec
+				<< " pulse_nsec=" << pulse_nsec
+				<< " next_pulse_sec=" << next_pulse_sec
+				<< " next_pulse_nsec=" << next_pulse_nsec
+				<< " interPulseTime=" << interPulseTime
+				<< " m_interPulseTimeMin=" << m_interPulseTimeMin
+				<< " m_interPulseTimeMax=" << m_interPulseTimeMax
+				<< " pulse->m_charge=" << pulse->m_charge
+				<< " next_pulse->m_charge=" << next_pulse->m_charge);
+		}
+	}
+}
+
 void SMSControl::recordPulse(PulsePtr &pulse)
 {
 	/* Send the RTDL packet, followed by the banked event packet */
@@ -1491,7 +1676,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 					RLL_NO_RTDL_FOR_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "recordPulse(): NO RTDL for Pulse"
+					<< "recordPulse: NO RTDL for Pulse"
 					<< " id=0x" << std::hex << pulse->m_id.first
 					<< " dup=0x" << pulse->m_id.second << std::dec);
 			}
@@ -1557,7 +1742,9 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	size *= sizeof(uint32_t);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BEAM_MONITOR_EVENT_V1);
+	m_hdrs.push_back( ADARA_PKT_TYPE(
+		ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE,
+		ADARA::PacketType::BEAM_MONITOR_EVENT_VERSION ) );
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1620,7 +1807,9 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	size += pulse->m_numEvents * sizeof(ADARA::Event);
 	size -= sizeof(ADARA::Header);
 	m_hdrs.push_back(size);
-	m_hdrs.push_back(ADARA::PacketType::BANKED_EVENT_V1);
+	m_hdrs.push_back( ADARA_PKT_TYPE(
+		ADARA::PacketType::BANKED_EVENT_TYPE,
+		ADARA::PacketType::BANKED_EVENT_VERSION ) );
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
@@ -1683,7 +1872,9 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
 
 	pkt[0] = 4 * sizeof(uint32_t);
-	pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_VERSION );
 	pkt[6] = ADARA::VariableStatus::OK << 16;
 	pkt[6] |= ADARA::VariableSeverity::OK;
 

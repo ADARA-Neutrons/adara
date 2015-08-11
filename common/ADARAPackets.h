@@ -16,7 +16,12 @@ public:
 		const uint32_t *field = (const uint32_t *) data;
 
 		m_payload_len = field[0];
-		m_type = (PacketType::Enum) field[1];
+
+		m_type = field[1];
+
+		m_base_type = (PacketType::Type) ADARA_BASE_PKT_TYPE( m_type );
+
+		m_version = (PacketType::Version) ADARA_PKT_VERSION( m_type );
 
 		/* Convert EPICS epoch to Unix epoch,
 		 * Jan 1, 1990 ==> Jan 1, 1970
@@ -28,7 +33,9 @@ public:
 		m_pulseId |= field[3];
 	}
 
-	PacketType::Enum type(void) const { return m_type; }
+	uint32_t type(void) const { return m_type; }
+	PacketType::Type base_type(void) const { return m_base_type; }
+	PacketType::Version version(void) const { return m_version; }
 	uint32_t payload_length(void) const { return m_payload_len; }
 	const struct timespec &timestamp(void) const { return m_timestamp; }
 	uint64_t pulseId(void) const { return m_pulseId; }
@@ -38,7 +45,9 @@ public:
 
 protected:
 	uint32_t m_payload_len;
-	PacketType::Enum m_type;
+	uint32_t m_type;
+	PacketType::Type m_base_type;
+	PacketType::Version m_version;
 	struct timespec m_timestamp;
 	uint64_t m_pulseId;
 
@@ -126,6 +135,12 @@ public:
 						((m_fields[0] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
+
+	void setPulseCharge(uint32_t pulseCharge) {
+		m_fields[0] &= 0xff000000;
+		m_fields[0] |= pulseCharge & 0x00ffffff;
+	}
+
 	bool badVeto(void) const { return !!(m_fields[1] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[1] & 0x40000000); }
 	uint8_t timingStatus(void) const {
@@ -159,7 +174,8 @@ public:
 	}
 
 private:
-	const uint32_t *m_fields;
+	// Note: RTDLPkt m_fields can't be "const", as we Modify Pulse Charge!
+	uint32_t *m_fields;
 
 	RTDLPkt(const uint8_t *data, uint32_t len);
 
@@ -186,12 +202,13 @@ public:
 	BankedEventPkt(const BankedEventPkt &pkt);
 
 	enum Flags {
-		ERROR_PIXELS    = 0x0001,
-		PARTIAL_DATA    = 0x0002,
-		PULSE_VETO      = 0x0004,
-		MISSING_RTDL    = 0x0008,
-		MAPPING_ERROR   = 0x0010,
-		DUPLICATE_PULSE = 0x0020,
+		ERROR_PIXELS        = 0x00001,
+		PARTIAL_DATA        = 0x00002,
+		PULSE_VETO          = 0x00004,
+		MISSING_RTDL        = 0x00008,
+		MAPPING_ERROR       = 0x00010,
+		DUPLICATE_PULSE     = 0x00020,
+		PCHARGE_UNCORRECTED = 0x00040,
 	};
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }

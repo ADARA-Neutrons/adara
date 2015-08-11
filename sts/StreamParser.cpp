@@ -189,15 +189,22 @@ StreamParser::printStats
 {
     if ( m_gather_stats )
     {
-        a_os << endl << "Pkt Type\t\t\tCount     \tTotal KB  \tMin Size  \tMax Size  " << endl;
-        for ( map<uint32_t,PktStats>::const_iterator i = m_stats.begin(); i != m_stats.end(); ++i )
+        a_os << endl
+             << "Pkt Type\t\t\tCount     \tTotal KB  \t"
+             << "Min Size  \tMax Size  " << endl;
+        for ( map<uint32_t,PktStats>::const_iterator i = m_stats.begin();
+                i != m_stats.end(); ++i )
         {
-            a_os << hex << setw(8) << left << i->first << "\t" << setw(12) << getPktName((ADARA::PacketType::Enum)i->first)
-                 << "\t" << dec << setw(10) << i->second.count << "\t" << setw(10) << (i->second.total_size >> 10)
-                 << "\t" << setw(10) << i->second.min_pkt_size << "\t" << setw(10) << i->second.max_pkt_size << endl;
+            a_os << hex << setw(8) << left << i->first << "\t" << setw(12)
+                 << getPktName( i->first ) << "\t"
+                 << dec << setw(10) << i->second.count << "\t" << setw(10)
+                 << (i->second.total_size >> 10) << "\t" << setw(10)
+                 << i->second.min_pkt_size << "\t" << setw(10)
+                 << i->second.max_pkt_size << endl;
         }
         a_os << endl << "Packets skipped: " << m_skipped_pkt_count << endl;
-        a_os << "Pulse charge stats: " << m_run_metrics.charge_stats << endl;
+        a_os << "Pulse charge stats: "
+             << m_run_metrics.charge_stats << endl;
         a_os << "Pulse freq stats: " << m_run_metrics.freq_stats << endl;
     }
     else
@@ -262,60 +269,66 @@ StreamParser::rxPacket
     if ( m_gen_adara )
         m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length());
 
-    switch (a_pkt.type())
+    switch (a_pkt.base_type())
     {
-    // These packets shall always be processed
-    case ADARA::PacketType::RUN_STATUS_V0:
-    case ADARA::PacketType::DATA_DONE_V0:
-        return Parser::rxPacket(a_pkt);
+        // These packets shall always be processed
+        case ADARA::PacketType::RUN_STATUS_TYPE:
+        case ADARA::PacketType::DATA_DONE_TYPE:
+            return Parser::rxPacket(a_pkt);
 
-    // These packets shall be processed ONCE during header and event processing
-    // Note: these should arrive before event processing, but it is no guaranteed.
-    case ADARA::PacketType::PIXEL_MAPPING_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_PIXELMAP)
+        // These packets shall be processed ONCE during header and
+        // event processing
+        // Note: these should arrive before event processing,
+        // but it is no guaranteed.
+        case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_PIXELMAP)
 
-    case ADARA::PacketType::RUN_INFO_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_RUNINFO)
+        case ADARA::PacketType::RUN_INFO_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_RUNINFO)
 
-    case ADARA::PacketType::GEOMETRY_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_GEOMETRY)
+        case ADARA::PacketType::GEOMETRY_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_GEOMETRY)
 
-    case ADARA::PacketType::BEAMLINE_INFO_V0:
-    case ADARA::PacketType::BEAMLINE_INFO_V1:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAMINFO)
+        case ADARA::PacketType::BEAMLINE_INFO_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_BEAMINFO)
 
-    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_BEAM_MONITOR_CONFIG)
+        case ADARA::PacketType::BEAM_MONITOR_CONFIG_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_BEAM_MONITOR_CONFIG)
 
-    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
-        PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,PKT_BIT_DETECTOR_BANK_SETS)
+        case ADARA::PacketType::DETECTOR_BANK_SETS_TYPE:
+            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
+                PKT_BIT_DETECTOR_BANK_SETS)
 
-    // These packets shall be processed during header & event processing
-    case ADARA::PacketType::DEVICE_DESC_V0:
-    case ADARA::PacketType::VAR_VALUE_U32_V0:
-    case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
-    case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
+        // These packets shall be processed during header and
+        // event processing
+        case ADARA::PacketType::DEVICE_DESC_TYPE:
+        case ADARA::PacketType::VAR_VALUE_U32_TYPE:
+        case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+        case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+        case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
+            PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
-    // These packets shall only be processed during event processing
-    case ADARA::PacketType::BANKED_EVENT_V0:
-    case ADARA::PacketType::BANKED_EVENT_V1:
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
-        PROCESS_IN_STATES(PROCESSING_EVENTS)
+        // These packets shall only be processed during event processing
+        case ADARA::PacketType::BANKED_EVENT_TYPE:
+        case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
+            PROCESS_IN_STATES(PROCESSING_EVENTS)
 
-    // Packet types that are not processes by StreamParser
-    case ADARA::PacketType::RAW_EVENT_V0:
-    case ADARA::PacketType::MAPPED_EVENT_V0:
-    case ADARA::PacketType::RTDL_V0:
-    case ADARA::PacketType::SOURCE_LIST_V0:
-    case ADARA::PacketType::TRANS_COMPLETE_V0:
-    case ADARA::PacketType::CLIENT_HELLO_V0:
-    case ADARA::PacketType::SYNC_V0:
-    case ADARA::PacketType::HEARTBEAT_V0:
-    case ADARA::PacketType::VAR_VALUE_STRING_V0:
-      if ( m_gather_stats )
-          ++m_skipped_pkt_count;
+        // Packet types that are not processes by StreamParser
+        case ADARA::PacketType::RAW_EVENT_TYPE:
+        case ADARA::PacketType::MAPPED_EVENT_TYPE:
+        case ADARA::PacketType::RTDL_TYPE:
+        case ADARA::PacketType::SOURCE_LIST_TYPE:
+        case ADARA::PacketType::TRANS_COMPLETE_TYPE:
+        case ADARA::PacketType::CLIENT_HELLO_TYPE:
+        case ADARA::PacketType::SYNC_TYPE:
+        case ADARA::PacketType::HEARTBEAT_TYPE:
+            if ( m_gather_stats )
+                ++m_skipped_pkt_count;
     }
 
     return false;
@@ -601,10 +614,9 @@ StreamParser::rxOversizePkt
         // Handle pulse sequence flag for this Oversized Packet
         // (so we don't get "out of sync" when we throw it away... :-)
 
-        if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-            || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1
-            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V0
-            || hdr->type() == ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
+        if ( hdr->base_type() == ADARA::PacketType::BANKED_EVENT_TYPE
+                || hdr->base_type()
+                    == ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
         {
             // Pulse flag should be 0 (no data processed yet) or 2 (monitor
             // data processed) any other value indicates an error with
@@ -615,41 +627,34 @@ StreamParser::rxOversizePkt
                 // First packet of new pulse - count it and set flag
                 // indicating it was counted
                 ++m_pulse_count;
-                if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-                    || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
+                if ( hdr->base_type()
+                        == ADARA::PacketType::BANKED_EVENT_TYPE )
                 {
                     m_pulse_flag |= 1;
                 }
-                else if ( hdr->type() ==
-                        ADARA::PacketType::BEAM_MONITOR_EVENT_V0
-                    || hdr->type() ==
-                        ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
+                else if ( hdr->base_type() ==
+                        ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
                 {
                     m_pulse_flag |= 2;
                 }
             }
-            else if ( ( ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-                            || hdr->type() ==
-                                ADARA::PacketType::BANKED_EVENT_V1 )
+            else if ( ( hdr->base_type()
+                            == ADARA::PacketType::BANKED_EVENT_TYPE
                         && m_pulse_flag == 2 )
-                    || ( ( hdr->type() ==
-                                ADARA::PacketType::BEAM_MONITOR_EVENT_V0
-                            || hdr->type() ==
-                                ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
+                    || ( hdr->base_type() ==
+                            ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE
                         && m_pulse_flag == 1 ) )
             {
                 m_pulse_flag = 0;
             }
-            else if ( hdr->type() == ADARA::PacketType::BANKED_EVENT_V0
-                || hdr->type() == ADARA::PacketType::BANKED_EVENT_V1 )
+            else if ( hdr->base_type()
+                    == ADARA::PacketType::BANKED_EVENT_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid banked event packet sequence received" )
             }
-            else if ( hdr->type() ==
-                    ADARA::PacketType::BEAM_MONITOR_EVENT_V0
-                || hdr->type() ==
-                    ADARA::PacketType::BEAM_MONITOR_EVENT_V1 )
+            else if ( hdr->base_type() ==
+                    ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid beam monitor packet sequence received" )
@@ -2062,6 +2067,28 @@ StreamParser::rxPacket
 }
 
 //---------------------------------------------------------------------------------------------------------------------
+// ADARA Variable (string) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes character string Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA character string Variable Update packets. See the pvValueUpdate() template
+ * method in StreamParser.h for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::VariableStringPkt &a_pkt ///< [in] The ADARA Variable Update packet to process
+)
+{
+    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+
+    return false;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
 // ADARA Stream Annotation packet processing
 //---------------------------------------------------------------------------------------------------------------------
 
@@ -2248,8 +2275,8 @@ StreamParser::finalizeStreamProcessing()
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
             ipv != m_pvs_by_key.end(); ++ipv )
     {
-        if ( ipv->second->m_time_buffer.size() > 0 )
-            ipv->second->flushBuffers( &m_run_metrics );
+        // *Always* Flush Buffers at End, to Get Run Metrics for PVs...!
+        ipv->second->flushBuffers( &m_run_metrics );
     }
 
     // Let adapter do anything else it wants to
@@ -2263,67 +2290,71 @@ StreamParser::finalizeStreamProcessing()
  */
 const char*
 StreamParser::getPktName(
-    ADARA::PacketType::Enum a_pkt_type   ///< [in] An ADARA packet type (defined in ADARA.h)
+    uint32_t a_pkt_type   ///< [in] ADARA packet type (defined in ADARA.h)
 ) const
 {
     // Mask out packet version number
-    switch ( a_pkt_type & 0xFFFFFF00 )
+    uint32_t type = ADARA_BASE_PKT_TYPE( a_pkt_type );
+    uint32_t version = ADARA_PKT_VERSION( a_pkt_type );
+
+    stringstream ss;
+    switch ( type )
     {
-    case ADARA::PacketType::RAW_EVENT_V0:
-        return "Raw Event";
-    case ADARA::PacketType::MAPPED_EVENT_V0:
-        return "Mapped Event";
-    case ADARA::PacketType::RTDL_V0:
-        return "RTDL";
-    case ADARA::PacketType::SOURCE_LIST_V0:
-        return "Src List";
-    case ADARA::PacketType::BANKED_EVENT_V0:
-        return "Banked Event V0";
-    case ADARA::PacketType::BANKED_EVENT_V1:
-        return "Banked Event V1";
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V0:
-        return "Beam Monitor Event V0";
-    case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
-        return "Beam Monitor Event V1";
-    case ADARA::PacketType::PIXEL_MAPPING_V0:
-        return "Pix Map";
-    case ADARA::PacketType::RUN_STATUS_V0:
-        return "Run Stat";
-    case ADARA::PacketType::RUN_INFO_V0:
-        return "Run Info";
-    case ADARA::PacketType::TRANS_COMPLETE_V0:
-        return "Tran Comp";
-    case ADARA::PacketType::CLIENT_HELLO_V0:
-        return "Cli Hello";
-    case ADARA::PacketType::STREAM_ANNOTATION_V0:
-        return "Annotation";
-    case ADARA::PacketType::SYNC_V0:
-        return "Sync";
-    case ADARA::PacketType::HEARTBEAT_V0:
-        return "Heartbeat";
-    case ADARA::PacketType::GEOMETRY_V0:
-        return "Geom Info";
-    case ADARA::PacketType::BEAMLINE_INFO_V0:
-        return "Beamline Info V0";
-    case ADARA::PacketType::BEAMLINE_INFO_V1:
-        return "Beamline Info V1";
-    case ADARA::PacketType::BEAM_MONITOR_CONFIG_V0:
-        return "Beam Monitor Config";
-    case ADARA::PacketType::DETECTOR_BANK_SETS_V0:
-        return "Detector Bank Sets";
-    case ADARA::PacketType::DATA_DONE_V0:
-        return "Data Done";
-    case ADARA::PacketType::DEVICE_DESC_V0:
-        return "DDP";
-    case ADARA::PacketType::VAR_VALUE_U32_V0:
-        return "VVP U32";
-    case ADARA::PacketType::VAR_VALUE_DOUBLE_V0:
-        return "VVP DBL";
-    case ADARA::PacketType::VAR_VALUE_STRING_V0:
-        return "VVP STR";
+        case ADARA::PacketType::RAW_EVENT_TYPE:
+            ss << "Raw Event"; break;
+        case ADARA::PacketType::MAPPED_EVENT_TYPE:
+            ss << "Mapped Event"; break;
+        case ADARA::PacketType::RTDL_TYPE:
+            ss << "RTDL"; break;
+        case ADARA::PacketType::SOURCE_LIST_TYPE:
+            ss << "Src List"; break;
+        case ADARA::PacketType::BANKED_EVENT_TYPE:
+            ss << "Banked Event"; break;
+        case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
+            ss << "Beam Monitor Event"; break;
+        case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+            ss << "Pix Map"; break;
+        case ADARA::PacketType::RUN_STATUS_TYPE:
+            ss << "Run Stat"; break;
+        case ADARA::PacketType::RUN_INFO_TYPE:
+            ss << "Run Info"; break;
+        case ADARA::PacketType::TRANS_COMPLETE_TYPE:
+            ss << "Tran Comp"; break;
+        case ADARA::PacketType::CLIENT_HELLO_TYPE:
+            ss << "Cli Hello"; break;
+        case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
+            ss << "Annotation"; break;
+        case ADARA::PacketType::SYNC_TYPE:
+            ss << "Sync"; break;
+        case ADARA::PacketType::HEARTBEAT_TYPE:
+            ss << "Heartbeat"; break;
+        case ADARA::PacketType::GEOMETRY_TYPE:
+            ss << "Geom Info"; break;
+        case ADARA::PacketType::BEAMLINE_INFO_TYPE:
+            ss << "Beamline Info"; break;
+        case ADARA::PacketType::BEAM_MONITOR_CONFIG_TYPE:
+            ss << "Beam Monitor Config"; break;
+        case ADARA::PacketType::DETECTOR_BANK_SETS_TYPE:
+            ss << "Detector Bank Sets"; break;
+        case ADARA::PacketType::DATA_DONE_TYPE:
+            ss << "Data Done"; break;
+        case ADARA::PacketType::DEVICE_DESC_TYPE:
+            ss << "DDP"; break;
+        case ADARA::PacketType::VAR_VALUE_U32_TYPE:
+            ss << "VVP U32"; break;
+        case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+            ss << "VVP DBL"; break;
+        case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+            ss << "VVP STR"; break;
+        default:
+            ss << "Unknown (0x" << hex << type << dec << ")";
+            break;
     }
 
-    return "Unknown";
+    // Append Version
+    ss << " V" << version;
+
+    return ss.str().c_str();
 }
 
 

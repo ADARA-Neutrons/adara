@@ -30,14 +30,6 @@
 
 namespace fs = boost::filesystem;
 
-/* TODO better, common place for this */
-struct header {
-	uint32_t payload_len;
-	uint32_t pkt_format;
-	uint32_t ts_sec;
-	uint32_t ts_nsec;
-};
-
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 class PoolsizePV : public smsStringPV {
@@ -857,24 +849,26 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 {
 	// DEBUG("addPacket() entry");
 
-	struct header *hdr = (struct header *) iovec[0].iov_base;
+	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
 	off_t size, blocks, resumeLocation;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	switch (hdr->pkt_format) {
-	default:
-		/* Only pulse data should determine if it is time to take
-		 * a new state snapshot.
-		 */
-		break;
-	case ADARA::PacketType::RTDL_V0:
-	case ADARA::PacketType::BANKED_EVENT_V1:
-	case ADARA::PacketType::BEAM_MONITOR_EVENT_V1:
-		m_pulseTime = hdr->ts_sec;
-		break;
+	switch ( ADARA_BASE_PKT_TYPE( hdr->pkt_format ) ) {
+
+		default:
+			/* Only pulse data should determine if it is time to take
+			 * a new state snapshot.
+			 */
+			break;
+
+		case ADARA::PacketType::RTDL_TYPE:
+		case ADARA::PacketType::BANKED_EVENT_TYPE:
+		case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
+			m_pulseTime = hdr->ts_sec;
+			break;
 	}
 
 	/* Save off where we are in the stream, as we may need to point
@@ -940,7 +934,7 @@ uint32_t StorageManager::validatePacket(const IoVector &iovec)
 	if (iovec[0].iov_len < (4 * sizeof(uint32_t)))
 		throw std::logic_error("Initial fragment too small");
 
-	if (len < sizeof(struct header))
+	if (len < sizeof(ADARA::Header))
 		throw std::logic_error("Packet too small");
 
 	return len;

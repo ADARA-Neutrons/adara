@@ -180,7 +180,9 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 
 	u32 = (uint32_t *) pkt.get();
 	*u32++ = payload;
-	*u32++ = ADARA::PacketType::PIXEL_MAPPING_V0;
+	*u32++ = ADARA_PKT_TYPE(
+		ADARA::PacketType::PIXEL_MAPPING_TYPE,
+		ADARA::PacketType::PIXEL_MAPPING_VERSION );
 	*u32++ = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	*u32++ = now.tv_nsec;
 

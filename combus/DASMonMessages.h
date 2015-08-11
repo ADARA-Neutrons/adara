@@ -665,6 +665,9 @@ protected:
         m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0UL );
         m_mapping_error_count   = a_prop_tree.get( "mapping_error_count", 0UL );
         m_missing_rtdl_count    = a_prop_tree.get( "missing_rtdl_count", 0UL );
+        m_pulse_pcharge_uncorrected
+                                = a_prop_tree.get(
+                                      "pulse_pcharge_uncorrected", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -679,6 +682,8 @@ protected:
         a_prop_tree.put( "pulse_veto_count", m_pulse_veto_count );
         a_prop_tree.put( "mapping_error_count", m_mapping_error_count );
         a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
+        a_prop_tree.put( "pulse_pcharge_uncorrected",
+            m_pulse_pcharge_uncorrected );
     }
 };
 

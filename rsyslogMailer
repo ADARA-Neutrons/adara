@@ -26,7 +26,7 @@ SEND_EMAIL()
       # echo -e "criticalMessages:\n${criticalMessages}"
       # send the alert
       echo -e "${criticalMessages}" \
-         | mailx -s "*** Critical ADARA Syslog Error(s) on $hostName ***" \
+         | mailx -s "*** Critical ADARA Syslog Error $hostName ***" \
             ${alertRecipient}
    fi
    exit 0

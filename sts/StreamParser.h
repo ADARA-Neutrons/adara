@@ -89,6 +89,7 @@ private:
     bool        rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableStringPkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
     bool        rxOversizePkt( const ADARA::PacketHeader *hdr,
@@ -120,7 +121,7 @@ private:
     void        finalizeStreamProcessing();
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &a_pkt ) const;
-    const char* getPktName( ADARA::PacketType::Enum a_pkt_type ) const;
+    const char* getPktName( uint32_t a_pkt_type ) const;
     void        getXmlNodeValue( xmlNode *a_node,
                     std::string & a_value ) const;
 
@@ -228,11 +229,11 @@ StreamParser::pvValueUpdate
         pvinfo->m_last_time = ts_nano;
         pvinfo->m_value_buffer.push_back(a_value);
         pvinfo->m_time_buffer.push_back(t);
-        pvinfo->m_stats.push(a_value);
+        pvinfo->addToStats(a_value);
 
         // Check for buffer write
         if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-            pvinfo->flushBuffers();
+            pvinfo->flushBuffers(0);
     }
 }
 

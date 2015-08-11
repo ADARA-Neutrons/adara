@@ -62,6 +62,7 @@ private:
         bool                            m_connected;
         bool                            m_subscribed;
         unsigned long                   m_ca_type;
+        unsigned long                   m_ca_elem_count;
         std::string                     m_ca_units;
         std::map<int32_t,std::string>   m_ca_enum_vals;
     };
@@ -75,7 +76,7 @@ private:
     void        sendCurrentValues();
     void        epicsConnectionHandler( struct connection_handler_args a_args );
     void        epicsEventHandler( struct event_handler_args a_args );
-    PVType      epicsToPVType( uint32_t a_rec_type );
+    PVType      epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count );
     int32_t     epicsToTimeRecordType( uint32_t a_rec_type );
     int32_t     epicsToCtrlRecordType( uint32_t a_rec_type );
     bool        epicsIsTimeRecordType( uint32_t a_rec_type );

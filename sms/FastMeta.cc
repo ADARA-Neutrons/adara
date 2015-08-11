@@ -53,11 +53,11 @@ void FastMeta::addDevices(const ptree &conf)
 		}
 
 		addDevice(name, it->second);
-        }
+	}
 }
 
 static void readFile(const std::string &name, const std::string &path,
-		     std::stringstream &out)
+		std::stringstream &out)
 {
 	std::ifstream f(path.c_str());
 	if (f.fail()) {
@@ -81,8 +81,8 @@ static void readFile(const std::string &name, const std::string &path,
 }
 
 static void parseEntry(const std::string &name, const std::string &var,
-		       const std::string &val, uint32_t &varId, uint32_t &key,
-		       bool &persist)
+		const std::string &val, uint32_t &varId, uint32_t &key,
+		bool &persist)
 {
 	/* Build the common error string */
 	std::string msg("fastmeta '");
@@ -163,7 +163,7 @@ static void parseEntry(const std::string &name, const std::string &var,
 }
 
 void FastMeta::addDevice(const std::string &name,
-			 const ptree &info)
+			const ptree &info)
 {
 	ptree::const_assoc_iterator path;
 	std::stringstream ddp;
@@ -228,7 +228,9 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
 
 	pkt[0] = 4 * sizeof(uint32_t);
-        pkt[1] = ADARA::PacketType::VAR_VALUE_U32_V0;
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_VERSION );
 
 	/* Create a different timestamp for each variable update packet by
 	 * adding the TOF value to the pulse ID, handling overflow of the
@@ -276,7 +278,7 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 		 * when we can really drop the device.
 		 */
 		m_meta->updateMappedVariable(pkt[4], pkt[5], (uint8_t *) pkt,
-					     sizeof(pkt));
+					sizeof(pkt));
 	} else
 		StorageManager::addPacket(pkt, sizeof(pkt));
 }

@@ -11,6 +11,7 @@
 
 #include <boost/filesystem.hpp>
 
+#include "ADARA.h"
 #include "StorageFile.h"
 #include "StorageContainer.h"
 #include "StorageManager.h"
@@ -21,16 +22,8 @@ namespace fs = boost::filesystem;
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
 
-/* TODO find a better place for these packet structures */
-struct header {
-	uint32_t payload_len;
-	uint32_t pkt_format;
-	uint32_t ts_sec;
-	uint32_t ts_nsec;
-};
-
 struct sync_packet {
-	struct header	hdr;
+	ADARA::Header	hdr;
 	uint8_t		signature[16];
 	uint64_t	offset;
 	uint32_t	comment_len;
@@ -38,7 +31,7 @@ struct sync_packet {
 } __attribute__((packed));
 
 struct run_status_packet {
-	struct header	hdr;
+	ADARA::Header	hdr;
 	uint32_t	run_number;
 	uint32_t	run_start;
 	uint32_t	status_number;
@@ -148,7 +141,9 @@ void StorageFile::addSync(void)
 	struct sync_packet sync = {
 		hdr : {
 			payload_len : 28,
-			pkt_format : ADARA::PacketType::SYNC_V0,
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::SYNC_TYPE,
+				ADARA::PacketType::SYNC_VERSION ),
 		},
 		signature : { 0x53, 0x4e, 0x53, 0x41, 0x44, 0x41, 0x52, 0x41,
 			      0x4f, 0x52, 0x4e, 0x4c, 0x00, 0x00, 0xf0, 0x7f },
@@ -189,7 +184,9 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	struct run_status_packet spkt = {
 		hdr : {
 			payload_len : 12,
-			pkt_format : ADARA::PacketType::RUN_STATUS_V0,
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::RUN_STATUS_TYPE,
+				ADARA::PacketType::RUN_STATUS_VERSION ),
 		},
 	};
 	struct timespec now;

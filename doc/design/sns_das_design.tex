@@ -51,6 +51,10 @@
             pdftitle={Accelerating Data Acquisition, Reduction, and Analysis (ADARA) at the Spallation Neutron Source},
             pdfsubject={ADARA}}
 
+% \usepackage{makeidx}
+
+% \makeindex
+
 \definecolor{lightgrey}{gray}{0.8}
 
 % Set to false to hide comments
@@ -67,7 +71,7 @@
 \par%
 \addvspace{\baselineskip}%
 \noindent%
-\index{#1}{#4}%
+\index{#1: #4}%
 \fcolorbox{black}{#2}{%
 \begin{minipage}{\textwidth}%
 {\large \bf #3: #4 }\\[2pt]%
@@ -255,5 +259,7 @@ built on \today
 \input 7_Slow_Controls/component.tex
 \newpage
 \input 8_Translation_Services/component.tex
+
+% \printindex
 
 \end{document}

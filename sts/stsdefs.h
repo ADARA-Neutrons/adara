@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.3.0"
+#define STS_VERSION "1.4.0"
 extern pid_t g_pid;
 
 namespace STS {
@@ -628,6 +628,8 @@ public:
     /// PVInfo destructor
     virtual ~PVInfo()
     {}
+
+    virtual void addToStats( T a_value ) = 0;
 
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
 };

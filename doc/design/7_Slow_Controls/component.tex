@@ -128,7 +128,7 @@ design).
 10 Msps sufficient?}
 
 The interface must provide a network stream of data to one 
-\todo{One always sufficient?}
+\todo{Network Data Stream}{One always sufficient?}
 
 listeners at this data rate. The stream must provide accelerator
 pulse information (charge) and neutron event information (pixel ID
@@ -152,7 +152,7 @@ data with data processing within the computer system. This may be required
 for detector development and upgrades and can provide for prototyping
 solutions as has been used recently with the Anger camera detectors.
 
-\todo{Necessary?}{%
+\todo{Histogram Mode Necessary?}{%
 The interface must be capable of supporting either event mode or
 histogramming mode, with the ability to switch between these modes on
 an experiment by experiment level}
@@ -174,8 +174,6 @@ slow controls data in addition to neutron event data.
 electronics. Possibility includes an evaluation board which could replace
 the `DSP' module and a GigE network card to replace the `OCC' card.
 TBD: hardware design.
-\todo{}{%
-}
 
 \item TBD: software.
 
@@ -269,14 +267,14 @@ David Dillow).
 
 \end{enumerate}
 
-\todo{}{%
+\todo{Channel Finder}{%
 Can BNL NSLS-2's ``Channel Finder'' provide a useful mechanism for
 flagging which PVs are available at a given beam line? Scan service and
 UI could potentially use this to discover which parameters are available.
 Otherwise, XML text files?
 }
 
-\todo{}{%
+\todo{Non-Standard Equipment}{%
 integration for non-standard equipment
 }
 
@@ -345,7 +343,7 @@ data to Translation Service.
 
 \end{enumerate}
 
-\todo{}{%
+\todo{Run Control}{%
 
 TBD: define reasonable system defaults and error responses
 
@@ -391,7 +389,7 @@ the current conditions of the sample environment, current run number,
 status of scan queue, data rates and other generic information to inform
 the User as to the status of the experiment.
 
-\todo{}{%
+\todo{Remote Monitoring}{%
 network infrastructure requirements and networking policy implications
 }
 
@@ -425,7 +423,7 @@ monitoring capability.
 notification.
 
 \end{enumerate}
-\todo{}{%
+\todo{Scientific Control}{%
 TBD: abstraction layer to meaningful ``physics'' units
 
 TBD: archiving of status information, i.e. non experiment data or
@@ -509,7 +507,7 @@ of profile.
 \item Additional user input is required to refine requirements.
 
 \end{enumerate}
-\todo{}{%
+\todo{Histogramming Service}{%
 TBD: refine requirements for histogramming service and it's interaction
 with the data stream Aggregator service.
 
@@ -528,7 +526,7 @@ database for later retrieval.
 The data should be archived with a database catalog to link various data
 related to the experiment and provide a means for analysis and download
 tools to locate and access the stored data.
-\todo{}{%
+\todo{ICAT}{%
 TBD: ICAT3~\footnote{``ICAT Project,''
 \texttt{http://www.icatproject.org/}}. 
 
@@ -551,7 +549,7 @@ can be found in the document "Streaming Translation Service" by Kohl, et al.
 
 \end{enumerate}
 
-\todo{}{%
+\todo{ICAT}{%
 TBD: ICAT3 integration
 
 TBD: translation monitoring
@@ -563,7 +561,7 @@ TBD: data download options (topcat?)
 
 \subsubsection{Requirements}
 
-\todo{}{%
+\todo{Network Architecture Requirements}{%
 TBD
 }
 
@@ -585,7 +583,7 @@ network. No unnecessary external dependencies.
 
 \subsubsection{Implementation Plan}
 
-\todo{}{%
+\todo{Fiber Installation}{%
 Installation of fibers connecting 8700 A103 to
 8600 J115 
 

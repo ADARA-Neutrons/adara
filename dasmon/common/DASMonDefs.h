@@ -127,14 +127,15 @@ public:
 
     void clear()
     {
-        m_time                  = 0.0;
-        m_total_counts          = 0;
-        m_total_charge          = 0.0;
-        m_pixel_error_count     = 0;
-        m_dup_pulse_count       = 0;
-        m_pulse_veto_count      = 0;
-        m_mapping_error_count   = 0;
-        m_missing_rtdl_count    = 0;
+        m_time                      = 0.0;
+        m_total_counts              = 0;
+        m_total_charge              = 0.0;
+        m_pixel_error_count         = 0;
+        m_dup_pulse_count           = 0;
+        m_pulse_veto_count          = 0;
+        m_mapping_error_count       = 0;
+        m_missing_rtdl_count        = 0;
+        m_pulse_pcharge_uncorrected = 0;
     }
 
     double          m_time;                 ///< Run time (seconds)
@@ -145,6 +146,7 @@ public:
     uint32_t        m_pulse_veto_count;
     uint32_t        m_mapping_error_count;
     uint32_t        m_missing_rtdl_count;
+    uint32_t        m_pulse_pcharge_uncorrected;
 };
 
 

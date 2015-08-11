@@ -119,7 +119,9 @@ public:
 		uint32_t *field = (uint32_t *) packet;
 
 		*field++ = 8 + ((strlen(desc) + 3) & ~3);
-		*field++ = ADARA::PacketType::DEVICE_DESC_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::DEVICE_DESC_TYPE,
+			ADARA::PacketType::DEVICE_DESC_VERSION );
 		*field++ = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
 		*field++ = 0;
 
@@ -136,7 +138,9 @@ public:
 		uint32_t *field = (uint32_t *) packet;
 
 		*field++ = 16;
-		*field++ = ADARA::PacketType::VAR_VALUE_U32_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::VAR_VALUE_U32_TYPE,
+			ADARA::PacketType::VAR_VALUE_U32_VERSION );
 		*field++ = u.ts.tv_sec;
 		*field++ = u.ts.tv_nsec;
 

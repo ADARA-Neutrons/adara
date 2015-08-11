@@ -69,7 +69,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.3.1";
+const std::string SMSD_VERSION = "1.4.0";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
