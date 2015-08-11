@@ -40,7 +40,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_SET_SOURCES_READ_DELAY       4
 #define RLL_RTDL_NO_DATA                 5
 #define RLL_PULSE_PCHG_UNCORRECTED       6
-#define RLL_NO_RTDL_FOR_PULSE            7
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
+#define RLL_NO_RTDL_FOR_PULSE            8
 
 uint32_t SMSControl::m_targetNumber;
 
@@ -659,7 +660,19 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				PulseMap::iterator next = it;
 				if (++next != m_pulses.end())
 					correctProtonCharge(it->second, next->second);
-				// else DEBUG("OOPS No More Pulses...");
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "unregisterEventSource:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << it->first.first << std::dec);
+					}
+				}
 			}
 			recordPulse(it->second);
 			last_recorded = it;
@@ -675,7 +688,19 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				PulseMap::iterator next = last;
 				if (++next != m_pulses.end())
 					correctProtonCharge(last->second, next->second);
-				// else DEBUG("OOPS No More Pulses...");
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "unregisterEventSource:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << last->first.first << std::dec);
+					}
+				}
 			}
 			recordPulse(last->second);
 			last_recorded = last;
@@ -805,7 +830,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
 					<< " max=0x" << max_id << std::dec);
@@ -818,7 +843,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Interleaved Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Interleaved Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
 					<< " max=0x" << max_id << std::dec);
@@ -834,7 +859,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "getPulse(): Global SAWTOOTH Pulse(0x"
+					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " versus Last Pulse id=0x" << m_lastPulseId
 					<< std::dec);
@@ -881,7 +906,19 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 				PulseMap::iterator next = it;
 				if (++next != m_pulses.end())
 					correctProtonCharge(it->second, next->second);
-				// else DEBUG("OOPS No More Pulses...");
+				else {
+					/* Rate-limited logging of global sawtooth pulse */
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info << "getPulse:"
+							<< " No More Pulses"
+							<< " for Proton Charge Correction! 0x"
+							<< std::hex << it->first.first << std::dec);
+					}
+				}
 			}
 			// Record Pulse to Reduce Overflow Buffer Size...
 			recordPulse(it->second);
@@ -1390,7 +1427,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 				RLL_RTDL_NO_DATA, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< "pulseRTDL(): Pulse with No Registered Event Sources!"
+				<< "pulseRTDL: Pulse with No Registered Event Sources!"
 				<< " Marking Partial...");
 		}
 		// Mark Pulse "Partial" Because there's No Event Data,
@@ -1483,7 +1520,18 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			PulseMap::iterator next = it;
 			if (++next != m_pulses.end())
 				correctProtonCharge(it->second, next->second);
-			// else DEBUG("OOPS No More Pulses...");
+			else {
+				/* Rate-limited logging of global sawtooth pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info << "markComplete:"
+						<< " No More Pulses"
+						<< " for Proton Charge Correction! 0x"
+						<< std::hex << it->first.first << std::dec);
+				}
+			}
 		}
 		// Recording Previously Complete (Buffered) Pulse
 		recordPulse(it->second);
@@ -1498,7 +1546,18 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			PulseMap::iterator next = current;
 			if (++next != m_pulses.end())
 				correctProtonCharge(current->second, next->second);
-			// else DEBUG("OOPS No More Pulses...");
+			else {
+				/* Rate-limited logging of global sawtooth pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info << "markComplete:"
+						<< " No More Pulses"
+						<< " for Proton Charge Correction! 0x"
+						<< std::hex << current->first.first << std::dec);
+				}
+			}
 		}
 		recordPulse(current->second);
 		last_recorded = current;
@@ -1577,7 +1636,7 @@ void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
 				RLL_PULSE_PCHG_UNCORRECTED, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< "correctProtonCharge(): *** Next Pulse Out of Range -"
+				<< "correctProtonCharge: *** Next Pulse Out of Range -"
 				<< " Uncorrected Pulse Proton Charge!"
 				<< std::hex
 				<< " pulse=0x" << pulse->m_id.first
@@ -1617,7 +1676,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 					RLL_NO_RTDL_FOR_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< "recordPulse(): NO RTDL for Pulse"
+					<< "recordPulse: NO RTDL for Pulse"
 					<< " id=0x" << std::hex << pulse->m_id.first
 					<< " dup=0x" << pulse->m_id.second << std::dec);
 			}
