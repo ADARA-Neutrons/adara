@@ -489,6 +489,19 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(
 		delete[] m_after_banks_offset;
 }
 
+DetectorBankSetsPkt::~DetectorBankSetsPkt()
+{
+	uint32_t numSets = detBankSetCount();
+
+	// Didn't Allocate Anything if there were No Detector Bank Sets...
+	if ( numSets < 1 )
+		return;
+
+	delete [] m_sectionOffsets;
+
+	delete [] m_after_banks_offset;
+}
+
 /* ------------------------------------------------------------------------ */
 
 DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
