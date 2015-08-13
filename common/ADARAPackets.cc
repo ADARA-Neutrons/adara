@@ -481,25 +481,15 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 DetectorBankSetsPkt::DetectorBankSetsPkt(
 		const DetectorBankSetsPkt &pkt ) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
+{}
+
+DetectorBankSetsPkt::~DetectorBankSetsPkt()
 {
 	if ( m_sectionOffsets != NULL )
 		delete[] m_sectionOffsets;
 
 	if ( m_after_banks_offset != NULL )
 		delete[] m_after_banks_offset;
-}
-
-DetectorBankSetsPkt::~DetectorBankSetsPkt()
-{
-	uint32_t numSets = detBankSetCount();
-
-	// Didn't Allocate Anything if there were No Detector Bank Sets...
-	if ( numSets < 1 )
-		return;
-
-	delete [] m_sectionOffsets;
-
-	delete [] m_after_banks_offset;
 }
 
 /* ------------------------------------------------------------------------ */
