@@ -1120,7 +1120,8 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     setComBusActive( a_connected );
 
     // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
-    if ( m_init && a_connected )
+    //if ( m_init && a_connected )
+    if ( a_connected )
     {
         ADARA::ComBus::EmitStateCommand cmd;
         m_combus->send( cmd, "DASMON_0" );
@@ -1171,7 +1172,8 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
 
             if ( a_msg.getSourceID().compare( 0, 3, "STS" ) == 0 )
             {
-                for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
+                map<unsigned long,TransStatus>::iterator ts;
+                for ( ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
                 {
                     if ( ts->second.sts_pid == a_msg.getSourceID() )
                     {
@@ -1183,6 +1185,19 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                         ts->second.last_updated = time(0);
                         break;
                     }
+                }
+
+                if ( ts == m_trans_status.end())
+                {
+                    TransStatus status;
+                    status.running = true;
+                    status.run_num = 0;
+                    status.sts_pid = a_msg.getSourceID();
+                    status.sts_host = "?";
+                    status.run_status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
+                    status.last_updated = time(0);
+                    m_trans_status[status.run_num] = status;
+                    m_refresh_trans_table = true;
                 }
             }
 

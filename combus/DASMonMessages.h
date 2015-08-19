@@ -50,6 +50,7 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("rules"))
             {
+                rule.enabled = v.second.get( "enabled", false );
                 rule.fact = v.second.get( "fact", "" );
                 rule.expr = v.second.get( "expr", "" );
                 rule.desc = v.second.get( "desc", "" );
@@ -63,6 +64,7 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("signals"))
             {
+                signal.enabled = v.second.get( "enabled", false );
                 signal.name = v.second.get( "name", "" );
                 signal.fact = v.second.get( "fact", "" );
                 signal.source = v.second.get( "source", "" );
@@ -80,6 +82,7 @@ protected:
         for ( std::vector<RuleEngine::RuleInfo>::iterator r = m_rules.begin(); r != m_rules.end(); ++r )
         {
             boost::property_tree::ptree pt;
+            pt.put( "enabled", r->enabled );
             pt.put( "fact", r->fact );
             pt.put( "expr", r->expr );
             pt.put( "desc", r->desc );
@@ -89,6 +92,7 @@ protected:
         for ( std::vector<ADARA::DASMON::SignalInfo>::iterator s = m_signals.begin(); s != m_signals.end(); ++s )
         {
             boost::property_tree::ptree pt;
+            pt.put( "enabled", s->enabled );
             pt.put( "name", s->name );
             pt.put( "fact", s->fact );
             pt.put( "source", s->source );

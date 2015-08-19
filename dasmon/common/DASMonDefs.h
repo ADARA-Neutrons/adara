@@ -23,6 +23,7 @@ enum PVState
 
 struct SignalInfo
 {
+    bool            enabled;
     std::string     name;
     std::string     fact;
     std::string     source;

@@ -112,7 +112,7 @@ ComBusRouter::run()
         {
             if ( ++proc_stall == 3 )
             {
-                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u", m_monitor.getProcState() );
+                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getProcState(), m_monitor.getNotifyState() );
             }
         }
         else
@@ -127,7 +127,7 @@ ComBusRouter::run()
         if ( last_metrics_ticker == m_monitor.getMetricsTicker() )
         {
             if ( ++metrics_stall == 3 )
-                syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u", m_monitor.getMetricsState() );
+                syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getMetricsState(), m_monitor.getNotifyState() );
         }
         else
         {
@@ -144,7 +144,7 @@ ComBusRouter::run()
             if ( last_db_ticker == m_monitor.getDbTicker() )
             {
                 if ( ++db_stall == 3 )
-                    syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u", m_monitor.getDbState() );
+                    syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getDbState(), m_monitor.getNotifyState() );
             }
             else
             {
@@ -310,7 +310,7 @@ void
 ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
     // Only respond if recording state has changed
-    if ( a_recording != m_recording )
+    //if ( a_recording != m_recording )
     {
         boost::unique_lock<boost::mutex> lock(m_mutex);
         m_pvs.clear();

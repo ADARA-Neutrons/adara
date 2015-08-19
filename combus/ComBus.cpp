@@ -480,7 +480,7 @@ Connection::reconnectThread()
     {
         lock.lock();
 
-        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri);
+        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri + "?soConnectTimeout=500" );
 
         // Exit if terminating
         if ( !m_running )
@@ -492,6 +492,7 @@ Connection::reconnectThread()
                 dynamic_cast<activemq::core::ActiveMQConnection*>(
                     factory.createConnection(
                         m_broker_user, m_broker_pass ) );
+
             if ( !m_connection )
             {
                 throw std::runtime_error(

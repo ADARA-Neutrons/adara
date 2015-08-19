@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>869</width>
+    <width>1110</width>
     <height>536</height>
    </rect>
   </property>
@@ -23,40 +23,10 @@
       <enum>Qt::Horizontal</enum>
      </property>
      <widget class="QWidget" name="layoutWidget">
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0">
        <property name="spacing">
         <number>0</number>
        </property>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_6">
-         <item>
-          <widget class="QLabel" name="label">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="text">
-            <string>Rules:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_5">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
        <item>
         <widget class="QTableWidget" name="ruleTable">
          <property name="alternatingRowColors">
@@ -81,7 +51,7 @@
           <bool>false</bool>
          </attribute>
          <attribute name="horizontalHeaderStretchLastSection">
-          <bool>false</bool>
+          <bool>true</bool>
          </attribute>
          <attribute name="verticalHeaderVisible">
           <bool>false</bool>
@@ -94,6 +64,19 @@
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Rules:</string>
+           </property>
+          </widget>
+         </item>
          <item>
           <spacer name="horizontalSpacer_7">
            <property name="orientation">
@@ -116,8 +99,11 @@
              <kerning>true</kerning>
             </font>
            </property>
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a new rule&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
-            <string>Add Rule</string>
+            <string>Add</string>
            </property>
           </widget>
          </item>
@@ -130,8 +116,11 @@
              <kerning>true</kerning>
             </font>
            </property>
+           <property name="toolTip">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Delete selected rule&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
            <property name="text">
-            <string>Delete Rule</string>
+            <string>Delete</string>
            </property>
            <property name="popupMode">
             <enum>QToolButton::InstantPopup</enum>
@@ -141,34 +130,20 @@
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_5">
-         <item>
-          <widget class="QLabel" name="label_2">
-           <property name="font">
-            <font>
-             <weight>75</weight>
-             <bold>true</bold>
-            </font>
-           </property>
-           <property name="text">
-            <string>Signals:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_2">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>1</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
        </item>
        <item>
         <widget class="QTableWidget" name="signalTable">
@@ -194,7 +169,7 @@
           <bool>false</bool>
          </attribute>
          <attribute name="horizontalHeaderStretchLastSection">
-          <bool>false</bool>
+          <bool>true</bool>
          </attribute>
          <attribute name="verticalHeaderVisible">
           <bool>false</bool>
@@ -213,6 +188,19 @@
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_2">
+           <property name="font">
+            <font>
+             <weight>75</weight>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>Signals:</string>
+           </property>
+          </widget>
+         </item>
          <item>
           <spacer name="horizontalSpacer_6">
            <property name="orientation">
@@ -235,7 +223,7 @@
             </font>
            </property>
            <property name="text">
-            <string>Add Signal</string>
+            <string>Add</string>
            </property>
           </widget>
          </item>
@@ -248,11 +236,27 @@
             </font>
            </property>
            <property name="text">
-            <string>Delete Signal</string>
+            <string>Delete</string>
            </property>
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>1</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -411,12 +415,18 @@
        <property name="text">
         <string>Help</string>
        </property>
+       <property name="autoDefault">
+        <bool>false</bool>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="cancelButton">
        <property name="text">
         <string>Cancel</string>
+       </property>
+       <property name="autoDefault">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -425,12 +435,33 @@
        <property name="text">
         <string>Ok</string>
        </property>
+       <property name="default">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
     </layout>
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>ruleTable</tabstop>
+  <tabstop>addRuleButton</tabstop>
+  <tabstop>removeRuleButton</tabstop>
+  <tabstop>signalTable</tabstop>
+  <tabstop>addSignalButton</tabstop>
+  <tabstop>removeSignalButton</tabstop>
+  <tabstop>getCfgButton</tabstop>
+  <tabstop>setCfgButton</tabstop>
+  <tabstop>restoreDefCfgButton</tabstop>
+  <tabstop>setDefCfgButton</tabstop>
+  <tabstop>factList</tabstop>
+  <tabstop>refreshFactButton</tabstop>
+  <tabstop>factFilterCB</tabstop>
+  <tabstop>helpButton</tabstop>
+  <tabstop>cancelButton</tabstop>
+  <tabstop>okButton</tabstop>
+ </tabstops>
  <resources/>
  <connections>
   <connection>
@@ -626,22 +657,6 @@
    </hints>
   </connection>
   <connection>
-   <sender>RuleConfigDialog</sender>
-   <signal>readAllowed(bool)</signal>
-   <receiver>removeSignalButton</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>555</x>
-     <y>334</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>536</x>
-     <y>472</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
    <sender>addRuleButton</sender>
    <signal>clicked()</signal>
    <receiver>RuleConfigDialog</receiver>
@@ -702,22 +717,6 @@
     <hint type="destinationlabel">
      <x>536</x>
      <y>197</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>removeSignalButton</sender>
-   <signal>clicked()</signal>
-   <receiver>RuleConfigDialog</receiver>
-   <slot>removeSelectedSignal()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>905</x>
-     <y>346</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>465</x>
-     <y>232</y>
     </hint>
    </hints>
   </connection>
@@ -798,6 +797,38 @@
     <hint type="destinationlabel">
      <x>555</x>
      <y>334</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>removeSignalButton</sender>
+   <signal>clicked()</signal>
+   <receiver>RuleConfigDialog</receiver>
+   <slot>removeSelectedSignal()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>905</x>
+     <y>346</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>465</x>
+     <y>232</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>RuleConfigDialog</sender>
+   <signal>readAllowed(bool)</signal>
+   <receiver>removeSignalButton</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>555</x>
+     <y>334</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>536</x>
+     <y>472</y>
     </hint>
    </hints>
   </connection>

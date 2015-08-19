@@ -117,6 +117,8 @@ private:
     RuleEngine                         *m_engine;
     std::vector<ISignalListener*>       m_listeners;
     std::map<std::string,SignalInfo>    m_signals;
+    std::vector<SignalInfo>             m_signals_disabled;
+    std::vector<RuleEngine::RuleInfo>   m_rules_disabled;
     std::string                         m_pv_prefix;
     std::string                         m_pv_err_prefix;
     std::string                         m_pv_lim_prefix;
