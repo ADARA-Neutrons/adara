@@ -481,6 +481,9 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 DetectorBankSetsPkt::DetectorBankSetsPkt(
 		const DetectorBankSetsPkt &pkt ) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
+{}
+
+DetectorBankSetsPkt::~DetectorBankSetsPkt()
 {
 	if ( m_sectionOffsets != NULL )
 		delete[] m_sectionOffsets;
