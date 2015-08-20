@@ -101,13 +101,10 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		DeviceVariables &dev = dit->second;
 
 		if (dev.m_tag == tag) {
-			// Was this trip really necessary...?
-			ADARA::Packet *dev_pkt = dev.m_descriptor.get();
-			ADARA::DeviceDescriptorPkt *desc_pkt =
-				dynamic_cast<ADARA::DeviceDescriptorPkt*>(dev_pkt);
 			DEBUG("dropTag(): Sending Upstream Disconnected for"
-				<< " devId=" << desc_pkt->devId()
-				<< " (mapped_dev=" << dit->first << ")");
+				<< " devId=" << dev.m_devId
+				<< " tag=" << dev.m_tag
+				<< " mapped_dev=" << dit->first);
 			upstreamDisconnected(dev.m_variables);
 			m_devices.erase(dit++);
 			dropped = true;
@@ -172,12 +169,15 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 
 	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
 
-	DEBUG("Device Lookup returned mapped_dev = " << mapped_dev);
-
 	if (!mapped_dev) {
 		mapped_dev = allocDev(in.devId(), tag);
-		DEBUG("New Input Device/Tag = " << in.devId() << "/" << tag
-			<< " Mapped to SMS Device Index mapped_dev = " << mapped_dev);
+		DEBUG("New Input Device"
+			<< " devId=" << in.devId() << " tag=" << tag
+			<< " Mapped to SMS Output Device"
+			<< " mapped_dev=" << mapped_dev);
+	}
+	else {
+		DEBUG("Device Lookup returned mapped_dev=" << mapped_dev);
 	}
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
@@ -229,14 +229,15 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	 */
 	StorageManager::addPacket(pkt->packet(), pkt->packet_length());
 	m_devices[mapped_dev].m_descriptor = pkt;
+	m_devices[mapped_dev].m_devId = in.devId();
 	m_devices[mapped_dev].m_tag = tag;
 }
 
 void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 				 const std::string &ddp)
 {
-	DEBUG("addFastMetaDDP(): Add New Device devId=" << mapped_dev
-		<< " (tag=0)");
+	DEBUG("addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
+		<< " (devId=-1 tag=0)");
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
@@ -248,8 +249,8 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 				RLL_ADD_EXISTING_DEVICE, ss.str(),
 				60, 3, 10, log_info ) ) {
 			ERROR(log_info
-				<< "addFastMetaDDP() adding existing (mapped) device 0x"
-				<< std::hex << mapped_dev << std::dec);
+				<< "addFastMetaDDP(): tried to add existing (mapped) device"
+				<< " mapped_dev=" << mapped_dev);
 		}
 		return;
 	}
@@ -287,6 +288,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	if (StorageManager::streaming())
 		StorageManager::addPacket(pkt, size);
 	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(wrapped));
+	m_devices[mapped_dev].m_devId = -1; // FastMetaDDP...!
 	m_devices[mapped_dev].m_tag = 0;
 }
 
@@ -308,7 +310,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 				<< "updateValue(U32): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
-				<< " (varId=" << in.varId() << ")");
+				<< " varId=" << in.varId());
 		}
 		return;
 	}
@@ -341,7 +343,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in,
 				<< "updateValue(Double): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
-				<< " (varId=" << in.varId() << ")");
+				<< " varId=" << in.varId());
 		}
 		return;
 	}
@@ -374,7 +376,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
 				<< "updateValue(String): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
-				<< " (varId=" << in.varId() << ")");
+				<< " varId=" << in.varId());
 		}
 		return;
 	}

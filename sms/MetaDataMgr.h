@@ -46,6 +46,7 @@ private:
 	typedef std::map<uint32_t, PacketSharedPtr> VariableMap;
 
 	struct DeviceVariables {
+		uint32_t	m_devId;
 		uint32_t	m_tag;
 		PacketSharedPtr	m_descriptor;
 		VariableMap	m_variables;
