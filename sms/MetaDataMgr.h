@@ -61,7 +61,7 @@ private:
 
 	void upstreamDisconnected(VariableMap &vars);
 
-	uint32_t remapDevice(uint32_t dev, uint32_t tag);
+	uint32_t lookupMappedDeviceId(uint32_t dev, uint32_t tag);
 	void updateVariable(uint32_t dev, uint32_t var,
 			    PacketSharedPtr &in, uint32_t tag);
 	void onPrologue(void);
