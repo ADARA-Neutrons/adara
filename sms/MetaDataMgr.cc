@@ -19,13 +19,17 @@ static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
 RateLimitedLogging::History RLLHistory_MetaDataMgr;
 
 // Rate-Limited Logging IDs...
-#define RLL_DESC_INCORRECT_TAG     0
-#define RLL_ADD_EXISTING_DEVICE    1
-#define RLL_UNABLE_REMAP_U32_VAR   2
-#define RLL_UNABLE_REMAP_DBL_VAR   3
-#define RLL_UNABLE_REMAP_STR_VAR   4
-#define RLL_VAR_UPDATE_NO_DESC     5
-#define RLL_VAR_UPDATE_BAD_TAG     6
+#define RLL_DROP_DEVICES_FOR_TAG   0
+#define RLL_NO_DEVICES_TO_DROP     1
+#define RLL_UPDATE_DESCRIPTOR      2
+#define RLL_ADD_FAST_META_DDP      3
+#define RLL_DESC_INCORRECT_TAG     4
+#define RLL_ADD_EXISTING_DEVICE    5
+#define RLL_UNABLE_REMAP_U32_VAR   6
+#define RLL_UNABLE_REMAP_DBL_VAR   7
+#define RLL_UNABLE_REMAP_STR_VAR   8
+#define RLL_VAR_UPDATE_NO_DESC     9
+#define RLL_VAR_UPDATE_BAD_TAG    10
 
 MetaDataMgr::MetaDataMgr() : m_nextDevId(1)
 {
@@ -84,15 +88,28 @@ void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
 			var_log_ss << ", " << vit->first;
 	}
 
-	DEBUG("Sending Upstream Disconnected for"
-		<< " varIds = [ " << var_log_ss.str() << " ]");
+	if ( !var_log_ss.str().empty() ) {
+		DEBUG("Sending Upstream Disconnected for"
+			<< " varIds = [ " << var_log_ss.str() << " ]");
+	}
 
 	delete[] pkt;
 }
 
 void MetaDataMgr::dropTag(uint32_t tag)
 {
-	DEBUG("dropTag(): Dropping Devices for Data Source, tag=" << tag);
+	/* Rate-limited log that we got disconnected from a DataSource (tag)
+	 * and are Dropping All Associated Devices...
+	 */
+	std::string log_info;
+	std::stringstream ss;
+	ss << tag;
+	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+			RLL_DROP_DEVICES_FOR_TAG, ss.str(),
+			10, 3, 50, log_info ) ) {
+		DEBUG(log_info
+			<< "dropTag(): Dropping Devices for Data Source, tag=" << tag);
+	}
 
 	DeviceMap::iterator dit, dend = m_devices.end();
 	bool dropped = false;
@@ -115,7 +132,17 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	if (dropped)
 		StorageManager::notify();
 	else {
-		DEBUG("dropTag(): Warning No Devices Found! tag=" << tag);
+		/* Rate-limited log that there were No Associated Devices to Drop
+		 * from the disconnected DataSource (tag)...
+		 */
+		// re-use "ss" from above...
+		log_info.clear();
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_NO_DEVICES_TO_DROP, ss.str(),
+				10, 3, 50, log_info ) ) {
+			DEBUG(log_info
+				<< "dropTag(): Warning No Devices Found! tag=" << tag);
+		}
 	}
 
 	/* Remove the mapped device ids for this tag */
@@ -165,18 +192,31 @@ uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t tag)
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 				   uint32_t tag)
 {
-	DEBUG("Update Descriptor devId=" << in.devId() << " tag=" << tag);
+	/* Rate-limited log that we received a DeviceDescriptorPkt. */
+	std::string log_info;
+	std::stringstream ss;
+	ss << in.devId() << "/" << tag;
+	bool do_log = false;
+	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+			RLL_UPDATE_DESCRIPTOR, ss.str(),
+			10, 3, 50, log_info ) ) {
+		DEBUG(log_info
+			<< "Update Descriptor devId=" << in.devId() << " tag=" << tag);
+		do_log = true; // link this rate-limited log to other related logs
+	}
 
 	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
 
 	if (!mapped_dev) {
 		mapped_dev = allocDev(in.devId(), tag);
-		DEBUG("New Input Device"
-			<< " devId=" << in.devId() << " tag=" << tag
-			<< " Mapped to SMS Output Device"
-			<< " mapped_dev=" << mapped_dev);
+		if ( do_log ) {
+			DEBUG("New Input Device"
+				<< " devId=" << in.devId() << " tag=" << tag
+				<< " Mapped to SMS Output Device"
+				<< " mapped_dev=" << mapped_dev);
+		}
 	}
-	else {
+	else if ( do_log ) {
 		DEBUG("Device Lookup returned mapped_dev=" << mapped_dev);
 	}
 
@@ -187,15 +227,15 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		ADARA::Packet *dev_pkt = dev.m_descriptor.get();
 
 		if (it->second.m_tag != tag) {
-			/* Rate-limited log that we got a descriptor from
-			 * an incorrect tag (ie, wrong source)
+			/* Rate-limited log that we got a Descriptor from
+			 * an Incorrect Tag (i.e., wrong/unexpected Data Source)
 			 */
 			std::string log_info;
 			std::stringstream ss;
 			ss << tag;
 			if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 					RLL_DESC_INCORRECT_TAG, ss.str(),
-					2, 10, 100, log_info ) ) {
+					10, 3, 50, log_info ) ) {
 				DEBUG(log_info << "Got descriptor from incorrect tag "
 					<< it->second.m_tag << " != " << tag);
 			}
@@ -205,7 +245,9 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		if (dev_pkt->packet_length() == in.packet_length() &&
 				!memcmp(dev_pkt->payload(), in.payload(),
 					dev_pkt->payload_length())) {
-			DEBUG("Inbound descriptor was identical");
+			if ( do_log ) {
+				DEBUG("Inbound descriptor was identical");
+			}
 			return;
 		}
 
@@ -213,7 +255,9 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		 * (don't notify, we'll be pushing the new descriptor in a
 		 * moment).
 		 */
-		INFO("Updating existing descriptor");
+		if ( do_log ) {
+			DEBUG("Updating existing descriptor");
+		}
 		m_devices.erase(it);
 	}
 
@@ -236,8 +280,16 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 				 const std::string &ddp)
 {
-	DEBUG("addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
-		<< " (devId=-1 tag=0)");
+	/* Rate-limited log that we Added a New Fast Meta-Data DDP (Descriptor)
+	 */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+			RLL_ADD_FAST_META_DDP, "none",
+			2, 10, 100, log_info ) ) {
+		DEBUG(log_info
+			<< "addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
+			<< " (devId=-1 tag=0)");
+	}
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
@@ -300,9 +352,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 		/* Rate-limited logging of variable device lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId();
-		ss << "/";
-		ss << tag;
+		ss << in.devId() << "/" << tag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -333,9 +383,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in,
 		/* Rate-limited logging of unable to remap variable? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId();
-		ss << "/";
-		ss << tag;
+		ss << in.devId() << "/" << tag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -366,9 +414,7 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
 		/* Rate-limited logging of unable to remap variable? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId();
-		ss << "/";
-		ss << tag;
+		ss << in.devId() << "/" << tag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_STR_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -412,9 +458,7 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		 */
 		std::string log_info;
 		std::stringstream ss;
-		ss << dev;
-		ss << "/";
-		ss << tag;
+		ss << dev << "/" << tag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_NO_DESC, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -433,9 +477,7 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		 */
 		std::string log_info;
 		std::stringstream ss;
-		ss << dev;
-		ss << "/";
-		ss << tag;
+		ss << dev << "/" << tag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_BAD_TAG, ss.str(),
 				60, 3, 10, log_info ) ) {
