@@ -370,6 +370,17 @@ private:
                                 this->m_stats.stdDev(), this->m_units );
                         }
                     }
+
+                    if ( this->m_enum != NULL )
+                    {
+                        std::stringstream ss_src;
+                        ss_src << m_nxgen.m_daslogs_path << "/"
+                            << "Device" << this->m_device_id
+                            << ":" << "Enum" << ":" << this->m_enum->name;
+                        std::stringstream ss_dst;
+                        ss_dst << m_log_path << "/" << "enum";
+                        m_nxgen.makeGroupLink( ss_src.str(), ss_dst.str() );
+                    }
                 }
             }
             catch( TraceException &e )
@@ -484,6 +495,8 @@ private:
                             std::vector<hsize_t> &a_dims,
                             const std::string units = "" );
     void                makeLink( const std::string &source_path,
+                            const std::string &dest_name );
+    void                makeGroupLink( const std::string &source_path,
                             const std::string &dest_name );
     void                writeString( const std::string &a_path,
                             const std::string &a_dataset,

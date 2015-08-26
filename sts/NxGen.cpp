@@ -1404,6 +1404,9 @@ NxGen::writeDeviceEnums
 
             writeSlab( ss.str() + "/values", ienum->element_values, 0 );
 
+            // Manually Create "Target" String for Linking
+            // (as per makeGroupLink usage...)
+            writeString( ss.str(), "target", ss.str() );
         }
         catch( TraceException &e )
         {
@@ -1546,7 +1549,8 @@ NxGen::writeMultidimDataset
 
 /*! \brief Creates a Nexus link
  *
- * This method creates a link from the source path to the destination path in the output Nexus file.
+ * This method creates a link from the source path
+ * to the destination path in the output Nexus file.
  */
 void
 NxGen::makeLink
@@ -1557,8 +1561,34 @@ NxGen::makeLink
 {
     if ( m_h5nx.H5NXmake_link( a_source_path, a_dest_name ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_link() failed for source: " << a_source_path << ", dest: "
-                     << a_dest_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_link() failed for source: "
+                << a_source_path << ", dest: " << a_dest_name )
+    }
+}
+
+
+/*! \brief Creates a Nexus link to a GROUP (duh)
+ *
+ * This method creates a link from the source path of a GROUP
+ * to the destination path in the output Nexus file.
+ *
+ * (and doesn't try to create any "target" attributes
+ * for a dataset that doesn't actually exist... ;-b)
+ */
+void
+NxGen::makeGroupLink
+(
+    const string &a_source_path,  ///< [in] Source path in Nexus file (must already exist)
+    const string &a_dest_name     ///< [in] Destination path in Nexus file (must NOT exist)
+)
+{
+    if ( m_h5nx.H5NXmake_group_link( a_source_path, a_dest_name )
+            != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_group_link() failed for source: "
+                << a_source_path << ", dest: " << a_dest_name )
     }
 }
 
