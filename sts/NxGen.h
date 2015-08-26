@@ -463,6 +463,8 @@ protected:
                             const std::string &a_comment  );
     void                markerComment( double a_time,
                             const std::string &a_comment );
+    void                writeDeviceEnums( STS::Identifier a_devId,
+                            std::vector<STS::PVEnumeratedType> a_enumVec );
 
 private:
     void                flushPauseData();

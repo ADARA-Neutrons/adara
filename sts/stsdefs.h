@@ -757,6 +757,9 @@ public:
                                 const std::string &a_comment ) = 0;
     virtual void            markerComment( double a_time,
                                 const std::string &a_comment ) = 0;
+    virtual void            writeDeviceEnums( Identifier a_devId,
+                                std::vector<STS::PVEnumeratedType>
+                                    a_enumVec ) = 0;
 };
 
 

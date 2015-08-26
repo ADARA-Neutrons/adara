@@ -1294,7 +1294,7 @@ NxGen::flushCommentData()
         writeSlab( m_daslogs_path + "/comments/length",
             m_comment_length, 0 );
 
-        if ( m_comment_data.size())
+        if ( m_comment_data.size() )
         {
             writeSlab( m_daslogs_path + "/comments/data",
                 m_comment_data, 0 );
@@ -1308,6 +1308,87 @@ NxGen::flushCommentData()
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "flushCommentData() failed." )
+    }
+}
+
+
+/*! \brief Writes PV Enumerated Type Definitions to NeXus logs
+ *
+ * This method creates Enumerated Type groups for the given DeviceId
+ * in the NeXus DAS Logs.
+ */
+void
+NxGen::writeDeviceEnums
+(
+    STS::Identifier a_devId,                ///< [in] DeviceId
+    vector<STS::PVEnumeratedType> a_enumVec ///< [in] Vector of Enumerated Type Structs
+)
+{
+    for ( vector<STS::PVEnumeratedType>::iterator ienum =
+                a_enumVec.begin();
+            ienum != a_enumVec.end(); ++ienum )
+    {
+        try
+        {
+            // Enum Group (NXcollection)
+
+            stringstream ss;
+            ss << m_daslogs_path << "/" << "Device" << a_devId
+                << ":" << "Enum" << ":" << ienum->name;
+
+            makeGroup( ss.str(), "NXcollection" );
+
+            makeDataset( ss.str(), "names_offset", NeXus::UINT32 );
+            makeDataset( ss.str(), "names_length", NeXus::UINT32 );
+            makeDataset( ss.str(), "names_data", NeXus::CHAR );
+
+            makeDataset( ss.str(), "values", NeXus::UINT32 );
+
+            // Enum Element Names (concatenate like comment strings... ;-b)
+
+            vector<uint32_t> names_offset;
+            vector<uint32_t> names_length;
+            vector<char> names_data;
+
+            unsigned long names_last_offset = 0;
+
+            for ( vector<string>::iterator ielem =
+                        ienum->element_names.begin();
+                    ielem != ienum->element_names.end(); ++ielem )
+            {
+                names_offset.push_back( names_last_offset );
+                names_last_offset += ielem->size();
+                names_length.push_back( ielem->size() );
+
+                names_data.reserve( names_data.size() + ielem->size() );
+                names_data.insert( names_data.end(),
+                    ielem->begin(), ielem->end()) ;
+            }
+
+            writeSlab( ss.str() + "/names_offset", names_offset, 0 );
+            writeSlab( ss.str() + "/names_length", names_length, 0 );
+
+            if ( names_data.size() )
+            {
+                writeSlab( ss.str() + "/names_data", names_data, 0 );
+            }
+
+            // Enum Element Values
+
+            writeSlab( ss.str() + "/values", ienum->element_values, 0 );
+
+        }
+        catch( TraceException &e )
+        {
+            // Don't Propagate TraceException, Just Log Failure...
+            // (Enumerated Types are _Not_ Mission Critical (Hopefully!).
+            stringstream sse;
+            sse << "writeDeviceEnums() failed"
+                << " for Device " << a_devId
+                << " Enum " << ienum->name
+                << " " << e.toString( true, true );
+            syslog( LOG_ERR, "[%i] %s", g_pid, sse.str().c_str() );
+        }
     }
 }
 
