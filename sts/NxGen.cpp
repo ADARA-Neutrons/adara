@@ -1357,6 +1357,14 @@ NxGen::writeDeviceEnums
             if ( ienum->element_values.size()
                     != ienum->element_names.size() )
             {
+                // Dang, No Easy Solution... (I.e. Element Array Mismatch!)
+                stringstream sss;
+                sss << "writeDeviceEnums() Element Array Mismatch"
+                    << " for Device " << a_devId
+                    << " Enum " << ienum->name
+                    << " - No Easy Strings!";
+                syslog( LOG_ERR, "[%i] %s", g_pid, sss.str().c_str() );
+
                 easy = false;
             }
 
