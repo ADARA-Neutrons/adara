@@ -175,18 +175,19 @@ private:
         /// NxPVInfo constructor
         NxPVInfo
         (
-            const std::string  &a_name,         ///< [in] Name of PV
-            const std::string  &a_internal_name,///< [in] Internal (Nexus) name of PV
-            const std::string  &a_device_name,  ///< [in] Name of owning device
-            STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
-            STS::Identifier     a_pv_id,        ///< [in] ID of the PV
-            STS::PVType         a_type,         ///< [in] Type of PV
-            const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
-            NxGen              &a_nxgen         ///< [in] NxGen instance needed for Nexus output
+            const std::string     &a_name,         ///< [in] Name of PV
+            const std::string     &a_internal_name,///< [in] Internal (Nexus) name of PV
+            const std::string     &a_device_name,  ///< [in] Name of owning device
+            STS::Identifier        a_device_id,    ///< [in] ID of device that owns the PV
+            STS::Identifier        a_pv_id,        ///< [in] ID of the PV
+            STS::PVType            a_type,         ///< [in] Type of PV
+            STS::PVEnumeratedType *a_enum,         ///< [in] Enumerated Type
+            const std::string     &a_units,        ///< [in] Units of PV (empty if not needed)
+            NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_name, a_device_name,
-                a_device_id, a_pv_id, a_type, a_units ),
+                a_device_id, a_pv_id, a_type, a_enum, a_units ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_slab_size(0),
@@ -423,7 +424,9 @@ protected:
     STS::PVInfoBase*    makePVInfo( const std::string & a_name,
                             const std::string & a_device_name,
                             STS::Identifier a_device_id,
-                            STS::Identifier a_pv_id, STS::PVType a_type,
+                            STS::Identifier a_pv_id,
+                            STS::PVType a_type,
+                            STS::PVEnumeratedType *a_enum,
                             const std::string & a_units );
     STS::BankInfo*      makeBankInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
