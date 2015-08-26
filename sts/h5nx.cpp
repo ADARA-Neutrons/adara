@@ -1329,6 +1329,24 @@ int H5nx::H5NXmake_link(const std::string &current_name, const std::string &dest
 }
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//H5NXmake_group_link
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+int H5nx::H5NXmake_group_link(const std::string &current_name, const std::string &destination_name )
+{
+
+    if ( H5Lcreate_hard( this->m_fid, current_name.c_str(), H5L_SAME_LOC, destination_name.c_str(), H5P_DEFAULT, H5P_DEFAULT) < 0 )
+    {
+        return FAIL;
+    }
+
+    // Don't Do the Target Attribute for Groups...
+    // (Create a scalar "target" string instead, allows multiple links...)
+
+    return SUCCEED;
+}
+
+
  //
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //H5NXflush
