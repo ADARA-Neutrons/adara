@@ -1352,17 +1352,36 @@ NxGen::writeDeviceEnums
 
             unsigned long names_last_offset = 0;
 
-            for ( vector<string>::iterator ielem =
-                        ienum->element_names.begin();
-                    ielem != ienum->element_names.end(); ++ielem )
+            // Does Everything "Match Up" for the "Easy" Enum Format...?
+            bool easy = true;
+            if ( ienum->element_values.size()
+                    != ienum->element_names.size() )
             {
-                names_offset.push_back( names_last_offset );
-                names_last_offset += ielem->size();
-                names_length.push_back( ielem->size() );
+                easy = false;
+            }
 
-                names_data.reserve( names_data.size() + ielem->size() );
+            for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
+            {
+                // Capture Offset and Length of Element Name in Data Str
+
+                names_offset.push_back( names_last_offset );
+                names_last_offset += ienum->element_names[i].size();
+                names_length.push_back( ienum->element_names[i].size() );
+
+                names_data.reserve( names_data.size()
+                    + ienum->element_names[i].size() );
                 names_data.insert( names_data.end(),
-                    ielem->begin(), ielem->end()) ;
+                    ienum->element_names[i].begin(),
+                    ienum->element_names[i].end()) ;
+
+                // Also Stuff in "Easy-to-Read" Per-Element Scalar Strings!
+                if ( easy )
+                {
+                    stringstream ss_easy;
+                    ss_easy << "name_" << ienum->element_values[i];
+                    writeString( ss.str(), ss_easy.str(),
+                        ienum->element_names[i] );
+                }
             }
 
             writeSlab( ss.str() + "/names_offset", names_offset, 0 );
