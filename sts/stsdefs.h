@@ -546,6 +546,45 @@ enum PVType
     PVT_STRING
 };
 
+/// Enumerated Type structure (for PVs of type PVT_ENUM)
+struct PVEnumeratedType
+{
+    std::string                name;
+    std::vector<std::string>   element_names;
+    std::vector<uint32_t>      element_values;
+
+    bool sameEnum( PVEnumeratedType *a_enum )
+    {
+        if ( a_enum == NULL )
+            return( false );
+
+        if ( name.compare( a_enum->name ) != 0 )
+            return( false );
+
+        if ( element_names.size() != a_enum->element_names.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < element_names.size() ; i++ )
+        {
+            if ( element_names[i].compare( a_enum->element_names[i] ) != 0 )
+            {
+                return( false );
+            }
+        }
+
+        if ( element_values.size() != a_enum->element_values.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < element_values.size() ; i++ )
+        {
+            if ( element_values[i] != a_enum->element_values[i] )
+                return( false );
+        }
+
+        return( true );
+    }
+};
+
 /// Base class for all process variable (PV) types
 class PVInfoBase
 {
@@ -558,6 +597,7 @@ public:
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
+        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
     :
@@ -566,6 +606,7 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
+        m_enum(a_enum),
         m_units(a_units),
         m_last_time(0)
     {}
@@ -574,23 +615,47 @@ public:
     virtual ~PVInfoBase()
     {}
 
-    bool sameDefiniton( const std::string &a_name, const std::string &a_device_name, PVType a_type, const std::string &a_units )
+    bool diffEnum( PVEnumeratedType *a_enum1, PVEnumeratedType *a_enum2 )
     {
-        // TODO - Add enumeration check when supported
-        if ( m_name == a_name && m_device_name == a_device_name && m_type == a_type && m_units == a_units )
+        // Both NULL Enum Pointers... (Most Common Case...)
+        if ( a_enum1 == NULL && a_enum2 == NULL )
+            return( false );
+
+        // Mismatched NULL Enum Pointers...
+        if ( ( a_enum1 == NULL && a_enum2 != NULL )
+                || ( a_enum1 != NULL && a_enum2 == NULL ) )
+            return( true );
+
+        // Compare 2 Non-Null Enums
+        return( ! a_enum1->sameEnum( a_enum2 ) );
+    }
+
+    bool sameDefinition( const std::string &a_name,
+            const std::string &a_device_name,
+            PVType a_type, PVEnumeratedType *a_enum,
+            const std::string &a_units )
+    {
+        if ( m_name == a_name && m_device_name == a_device_name
+                && m_type == a_type && !diffEnum( m_enum, a_enum )
+                && m_units == a_units ) {
             return true;
-        else
+        }
+        else {
             return false;
+        }
     }
 
     /// Determine if PVs have equivalent definitions
-    bool sameDefiniton( const PVInfoBase &a_pv )
+    bool sameDefinition( const PVInfoBase &a_pv )
     {
-        // TODO - Add enumeration check when supported
-        if ( m_name == a_pv.m_name && m_device_name == a_pv.m_device_name && m_type == a_pv.m_type && m_units == a_pv.m_units )
+        if ( m_name == a_pv.m_name && m_device_name == a_pv.m_device_name
+                && m_type == a_pv.m_type && !diffEnum( m_enum, a_pv.m_enum )
+                && m_units == a_pv.m_units ) {
             return true;
-        else
+        }
+        else {
             return false;
+        }
     }
 
     /// Virtual method to allow subclasses to write buffered PV values and time axis
@@ -601,6 +666,7 @@ public:
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
+    PVEnumeratedType   *m_enum;         ///< Enumerated Type of PV
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
@@ -620,9 +686,11 @@ public:
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
+        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
-    : PVInfoBase( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units )
+    : PVInfoBase( a_name, a_device_name, a_device_id, a_pv_id,
+        a_type, a_enum, a_units )
     {}
 
     /// PVInfo destructor
@@ -648,7 +716,9 @@ public:
     virtual PVInfoBase*     makePVInfo( const std::string & a_name,
                                 const std::string & a_device_name,
                                 Identifier a_device_id,
-                                Identifier a_pv_id, PVType a_type,
+                                Identifier a_pv_id,
+                                PVType a_type,
+                                PVEnumeratedType *a_enum,
                                 const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
