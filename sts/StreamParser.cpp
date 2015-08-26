@@ -2619,6 +2619,15 @@ StreamParser::finalizeStreamProcessing()
     if ( m_pulse_info.times.size())
         pulseBuffersReady( m_pulse_info );
 
+    // Write any Enumerated Types, per DeviceId, into logs...
+
+    for ( map<Identifier,std::vector<PVEnumeratedType> >::iterator ienum =
+                m_enums_by_dev.begin();
+            ienum != m_enums_by_dev.end(); ++ienum )
+    {
+        writeDeviceEnums( ienum->first, ienum->second );
+    }
+
     // Write any remaining data in PV buffers
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
