@@ -1328,13 +1328,62 @@ NxGen::writeDeviceEnums
                 a_enumVec.begin();
             ienum != a_enumVec.end(); ++ienum )
     {
+        // First Check for Name Clashes - Increment Counter Til Clean...
+
+        string enum_name = ienum->name;
+        uint32_t count = 1;
+        bool done;
+
+        do
+        {
+            done = true;
+
+            // Search Preceding Enums...
+            for ( vector<STS::PVEnumeratedType>::iterator idup =
+                        a_enumVec.begin();
+                    idup != ienum; ++idup )
+            {
+                // Name Clash...!
+                if ( !enum_name.compare( idup->name ) )
+                {
+                    count++;
+
+                    stringstream ss;
+                    ss << "Enum Log Group Name Clash - Device " << a_devId
+                        << " Duplicate Enum Name " << enum_name
+                        << ", Bumping Count to " << count
+                        << " - Next Enum Name to Try: "
+                        << ienum->name << "_" << count;
+                    syslog( LOG_INFO, "[%i] %s", g_pid,
+                        ss.str().c_str() );
+
+                    stringstream ss_new;
+                    ss_new << ienum->name << "_" << count;
+                    enum_name = ss_new.str();
+
+                    done = false;
+
+                    break;
+                }
+            }
+        }
+        while ( !done );
+
+        stringstream ss;
+        ss << "Creating Enum Log Group for Device " << a_devId
+            << " enum_name=" << enum_name;
+        syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+
+        // Save "New Name" for Enum, For Subsequent Comparisons...!
+        ienum->name = enum_name;
+
         try
         {
             // Enum Group (NXcollection)
 
             stringstream ss;
             ss << m_daslogs_path << "/" << "Device" << a_devId
-                << ":" << "Enum" << ":" << ienum->name;
+                << ":" << "Enum" << ":" << enum_name;
 
             makeGroup( ss.str(), "NXcollection" );
 
@@ -1362,7 +1411,7 @@ NxGen::writeDeviceEnums
                 sss << "STS Error:"
                     << " writeDeviceEnums() Element Array Mismatch"
                     << " for Device " << a_devId
-                    << " Enum " << ienum->name
+                    << " Enum " << enum_name
                     << " - No Easy Strings!";
                 syslog( LOG_ERR, "[%i] %s", g_pid, sss.str().c_str() );
 
@@ -1417,7 +1466,7 @@ NxGen::writeDeviceEnums
             sse << "STS Error:"
                 << " writeDeviceEnums() failed"
                 << " for Device " << a_devId
-                << " Enum " << ienum->name
+                << " Enum " << enum_name
                 << " " << e.toString( true, true );
             syslog( LOG_ERR, "[%i] %s", g_pid, sse.str().c_str() );
         }
