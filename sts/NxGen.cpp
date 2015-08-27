@@ -1359,7 +1359,8 @@ NxGen::writeDeviceEnums
             {
                 // Dang, No Easy Solution... (I.e. Element Array Mismatch!)
                 stringstream sss;
-                sss << "writeDeviceEnums() Element Array Mismatch"
+                sss << "STS Error:"
+                    << " writeDeviceEnums() Element Array Mismatch"
                     << " for Device " << a_devId
                     << " Enum " << ienum->name
                     << " - No Easy Strings!";
@@ -1413,7 +1414,8 @@ NxGen::writeDeviceEnums
             // Don't Propagate TraceException, Just Log Failure...
             // (Enumerated Types are _Not_ Mission Critical (Hopefully!).
             stringstream sse;
-            sse << "writeDeviceEnums() failed"
+            sse << "STS Error:"
+                << " writeDeviceEnums() failed"
                 << " for Device " << a_devId
                 << " Enum " << ienum->name
                 << " " << e.toString( true, true );
