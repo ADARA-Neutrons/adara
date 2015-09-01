@@ -70,14 +70,23 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    map<string,DeviceAgent*>::iterator idev = m_dev_agents.find( a_device->m_name );
+    map<string,DeviceAgent*>::iterator idev =
+        m_dev_agents.find( a_device->m_name );
+
     if ( idev != m_dev_agents.end())
     {
+        syslog( LOG_DEBUG, "Updating Device Agent for: %s",
+            a_device->m_name.c_str() );
+
         idev->second->update( a_device );
     }
     else
     {
-        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
+        syslog( LOG_DEBUG, "Starting New Device Agent for: %s",
+            a_device->m_name.c_str() );
+
+        m_dev_agents[a_device->m_name] =
+            new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
     }
 }
 
@@ -92,12 +101,23 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    map<string,DeviceAgent*>::iterator idev = m_dev_agents.find( a_dev_name );
+    map<string,DeviceAgent*>::iterator idev =
+        m_dev_agents.find( a_dev_name );
+
     if ( idev != m_dev_agents.end())
     {
+        syslog( LOG_DEBUG,
+            "Stopping old device agent (device no longer defined) for: %s",
+            a_dev_name.c_str() );
+
         idev->second->stop();
         m_garbage.push_back( idev->second );
         m_dev_agents.erase( idev );
+    }
+    else
+    {
+        syslog( LOG_ERR, "Error Stopping Device Agent: %s Not Found!",
+            a_dev_name.c_str() );
     }
 }
 
@@ -275,9 +295,6 @@ InputAdapter::configFileMonitorThread()
                                 for ( idev = devices.begin();
                                         idev != devices.end(); ++idev )
                                 {
-                                    //syslog( LOG_DEBUG,
-                                        //"Starting device agent for: %s",
-                                        //(*idev)->m_name.c_str() );
                                     startDevice( *idev );
                                 }
 
