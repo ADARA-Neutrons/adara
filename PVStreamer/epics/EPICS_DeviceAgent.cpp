@@ -191,6 +191,10 @@ DeviceAgent::metadataUpdated()
 
         if ( ich->second.m_chan_state == INFO_AVAILABLE )
         {
+            syslog( LOG_INFO, "Updating metadata for PV %s: %s",
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str() );
+
             ich->second.m_pv->setMetadata(
                 epicsToPVType( ich->second.m_ca_type,
                     ich->second.m_ca_elem_count ),
@@ -199,6 +203,10 @@ DeviceAgent::metadataUpdated()
         }
         else if ( ich->second.m_chan_state == READY )
         {
+            syslog( LOG_INFO, "Re-requesting metadata for PV %s: %s",
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str() );
+
             // Re-request metadata from all other PV
             // (they may have changed too)
             ich->second.m_chan_state = INFO_NEEDED;
@@ -293,7 +301,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         m_chan_info[info.m_chid] = info;
         m_pv_index[a_pv->m_connection] = info.m_chid;
         //cout << "connected chid: " << info.m_chid
-		    //<< " for PV: " << a_pv->m_connection << endl;
+            //<< " for PV: " << a_pv->m_connection << endl;
     }
     else
     {
@@ -397,6 +405,7 @@ DeviceAgent::controlThread()
             m_state_changed = false;
 
             // Check channel state of member process variables
+            std::vector<std::string> pendingPVs;
             ready = 0;
             for ( ich = m_chan_info.begin();
                     ich != m_chan_info.end() && !m_state_changed; ++ich )
@@ -421,9 +430,11 @@ DeviceAgent::controlThread()
                     else
                     {
                         syslog( LOG_ERR,
-                            "Failed to get channel info for PV: %s",
+                            "Failed to get channel info for PV %s: %s",
+                            ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
                     }
+                    pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
                 case INFO_AVAILABLE:
                     if ( m_defined )
@@ -468,6 +479,7 @@ DeviceAgent::controlThread()
                     ++ready;
                     break;
                 default:
+                    pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
                 }
             }
@@ -481,53 +493,73 @@ DeviceAgent::controlThread()
             // an invalid state (i.e. connected but not processed)
             // This is OK as it tells us that the channel is working,
             // and the SMS should handle the PV state appropriately.
-            if ( m_dev_desc && !m_defined && ready > 0
-                    && ready == m_dev_desc->m_pvs.size() )
+            if ( m_dev_desc && !m_defined && ready > 0 )
             {
-                device_changed = false;
-
-                // Defined device with ConfigManager - this will return
-                // the "real" DeviceDescriptor record
-                DeviceRecordPtr new_rec =
-                    m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
-
-                // If new record is the same as existing record,
-                // then nothing has changed
-                if ( new_rec != m_dev_record )
-                    device_changed = true;
-
-                // Save new device record
-                m_dev_record = new_rec;
-
-                // Update channel info objects with new device & pv
-                // pointers (replaces m_dev_desc pointers)
-                for ( idx = m_pv_index.begin();
-                        idx != m_pv_index.end(); ++idx )
+                if ( ready == m_dev_desc->m_pvs.size() )
                 {
-                    // Careful! PV names can be changed in new_rec
-                    // due to name conflicts!!!
-                    pv = m_dev_record->getPvByConnection( idx->first );
-                    ich = m_chan_info.find( idx->second );
-                    if ( pv && ich != m_chan_info.end() )
+                    device_changed = false;
+
+                    // Defined device with ConfigManager - this will return
+                    // the "real" DeviceDescriptor record
+                    DeviceRecordPtr new_rec =
+                        m_stream_api.getCfgMgr().defineDevice(
+                            *m_dev_desc );
+
+                    // If new record is the same as existing record,
+                    // then nothing has changed
+                    if ( new_rec != m_dev_record )
+                        device_changed = true;
+
+                    // Save new device record
+                    m_dev_record = new_rec;
+
+                    // Update channel info objects with new device & pv
+                    // pointers (replaces m_dev_desc pointers)
+                    for ( idx = m_pv_index.begin();
+                            idx != m_pv_index.end(); ++idx )
                     {
-                        // Replace temporary device and PV records
-                        // with new managed records
-                        ich->second.m_device = m_dev_record;
-                        ich->second.m_pv = pv;
+                        // Careful! PV names can be changed in new_rec
+                        // due to name conflicts!!!
+                        pv = m_dev_record->getPvByConnection( idx->first );
+                        ich = m_chan_info.find( idx->second );
+                        if ( pv && ich != m_chan_info.end() )
+                        {
+                            // Replace temporary device and PV records
+                            // with new managed records
+                            ich->second.m_device = m_dev_record;
+                            ich->second.m_pv = pv;
+                        }
                     }
+
+                    // Send cached PV values only if the device
+                    // actually changed
+                    if ( device_changed )
+                        sendCurrentValues();
+
+                    m_defined = true;
+                    device_changed = false;
+
+                    // Delete temporary device descriptor
+                    delete m_dev_desc;
+                    m_dev_desc = 0;
                 }
 
-                // Send cached PV values only if the device
-                // actually changed
-                if ( device_changed )
-                    sendCurrentValues();
+                // Device Not Ready to Define, Some PVs Still Pending...
+                else
+                {
+                    syslog( LOG_INFO,
+                       "Device %s Waiting for %ld Pending PVs",
+                        m_dev_desc->m_name.c_str(),
+                        m_dev_desc->m_pvs.size() - ready );
 
-                m_defined = true;
-                device_changed = false;
-
-                // Delete temporary device descriptor
-                delete m_dev_desc;
-                m_dev_desc = 0;
+                    for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
+                    {
+                        syslog( LOG_INFO,
+                            "Device %s - Pending PV Connection: %s",
+                            m_dev_desc->m_name.c_str(),
+                            pendingPVs[i].c_str() );
+                    }
+                }
             }
         }
         catch ( TraceException &e )
