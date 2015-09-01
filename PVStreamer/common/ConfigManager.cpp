@@ -73,6 +73,10 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     {
         if ( a_descriptor == *idev->second )
         {
+            syslog( LOG_INFO, "Device Definition Unchanged: %s:%s:%lu",
+                a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
+                (unsigned long) a_descriptor.m_protocol );
+
             // Descriptor has not changed, so just return existing record
             record = idev->second;
         }
