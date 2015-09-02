@@ -361,6 +361,12 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s Descriptor Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+            a_dev_desc->m_name.c_str() );
+    }
 }
 
 
@@ -376,11 +382,18 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s Undefined Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
+            a_dev_desc->m_name.c_str() );
+    }
 }
 
 
 void
-ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr a_old_dev_desc )
+ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
+        DeviceRecordPtr a_old_dev_desc )
 {
     bool timeout;
     StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
@@ -391,6 +404,12 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr 
         pkt->old_device = a_old_dev_desc;
 
         m_stream_api->putFilledPacket( pkt );
+    }
+    else {
+        syslog( LOG_ERR,
+        "%s No Free Packets! %s Device %s (Old %s) Descriptor Update Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
+            a_dev_desc->m_name.c_str(), a_old_dev_desc->m_name.c_str() );
     }
 }
 
@@ -405,9 +424,18 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
         pkt->type = VariableUpdate;
         pkt->device = a_dev_desc;
         pkt->pv = a_pv_desc;
-        pkt->state = PVState( ::ADARA::VariableStatus::UPSTREAM_DISCONNECTED, ::ADARA::VariableSeverity::INVALID );
+        pkt->state = PVState(
+            ::ADARA::VariableStatus::UPSTREAM_DISCONNECTED,
+            ::ADARA::VariableSeverity::INVALID );
 
         m_stream_api->putFilledPacket( pkt );
+    }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s PV %s (%s) Undefined Lost!",
+            "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
+            a_dev_desc->m_name.c_str(), a_pv_desc->m_name.c_str(),
+            a_pv_desc->m_connection.c_str() );
     }
 }
 
