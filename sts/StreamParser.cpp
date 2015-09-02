@@ -1777,9 +1777,11 @@ StreamParser::rxPacket
 /*! \brief This method processes Device Descriptor ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Device Descriptor packets. Process variable information is extracted from the XML payload
- * of the packet and used to create type-specific PVInfo instances via the makePVInfo() virtual factory method. (A
- * stream adapter subclass should perform all required format-specific initialization within this factory method.)
+ * This method processes ADARA Device Descriptor packets. Process variable
+ * information is extracted from the XML payload of the packet and used
+ * to create type-specific PVInfo instances via the makePVInfo() virtual
+ * factory method. (A stream adapter subclass should perform all required
+ * format-specific initialization within this factory method.)
  */
 bool
 StreamParser::rxPacket
@@ -1789,62 +1791,117 @@ StreamParser::rxPacket
 {
     const string &xml =  a_pkt.description();
 
-    xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0, 0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
+    xmlDocPtr doc = xmlReadMemory( xml.c_str(), xml.length(), 0, 0,
+        0 /* XML_PARSE_NOERROR | XML_PARSE_NOWARNING */ );
+
     if ( doc )
     {
-        string      dev_name;
-        Identifier  pv_id = 0;
-        string      pv_name;
-        string      pv_units;
-        PVType      pv_type = PVT_INT;
-        short       found;
-        string      tag;
-        string      value;
-        PVInfoBase *info;
+        string              dev_name;
+        Identifier          pv_id = 0;
+        string              pv_name;
+        string              pv_units;
+        PVType              pv_type = PVT_INT;
+        PVEnumeratedType   *pv_enum = NULL;
+        short               found;
+        string              tag;
+        string              value;
+        PVInfoBase         *info;
 
         try
         {
             xmlNode *root = xmlDocGetRootElement( doc );
 
-            for ( xmlNode* lev1 = root->children; lev1 != 0; lev1 = lev1->next )
+            for ( xmlNode* lev1 = root->children; lev1 != 0;
+                    lev1 = lev1->next )
             {
-                if ( xmlStrcmp( lev1->name, (const xmlChar*)"device_name" ) == 0)
+                if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"device_name" ) == 0 )
                 {
                     if ( lev1->children )
                         getXmlNodeValue( lev1->children, dev_name );
                 }
-                else if ( xmlStrcmp( lev1->name, (const xmlChar*)"process_variables" ) == 0)
-                {
-                    xmlNode *pvnode;
 
-                    for ( xmlNode *pvsnode = lev1->children; pvsnode; pvsnode = pvsnode->next )
+                else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"process_variables" ) == 0 )
+                {
+                    for ( xmlNode *pvsnode = lev1->children; pvsnode;
+                            pvsnode = pvsnode->next )
                     {
-                        if ( xmlStrcmp( pvsnode->name, (const xmlChar*)"process_variable" ) == 0)
+                        if ( xmlStrcmp( pvsnode->name,
+                                (const xmlChar*)"process_variable" ) == 0 )
                         {
                             pv_units = "";
                             found = 0;
 
-                            for ( pvnode = pvsnode->children; pvnode; pvnode = pvnode->next )
+                            for ( xmlNode *pvnode = pvsnode->children;
+                                    pvnode; pvnode = pvnode->next )
                             {
                                 tag = (char*)pvnode->name;
                                 getXmlNodeValue( pvnode, value );
 
-                                if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_name" ) == 0)
+                                if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_name" ) == 0 )
                                 {
                                     found |= 1;
                                     pv_name = value;
                                 }
-                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_id" ) == 0)
+
+                                else if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_id" ) == 0 )
                                 {
                                     found |= 2;
-                                    pv_id = boost::lexical_cast<Identifier>( value );
+                                    pv_id =
+                                        boost::lexical_cast<Identifier>(
+                                            value );
                                 }
-                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_type" ) == 0)
+
+                                else if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_type" ) == 0 )
                                 {
                                     found |= 4;
                                     pv_type = toPVType( value.c_str() );
+
+                                    // Look for Any Enumerated Types!
+                                    pv_enum = NULL;
+                                    if ( pv_type == PVT_ENUM )
+                                    {
+                                        map<Identifier,
+                                            std::vector<PVEnumeratedType> >
+                                                ::iterator ienum =
+                                                    m_enums_by_dev.find(
+                                                        a_pkt.devId() );
+                                        if ( ienum
+                                                != m_enums_by_dev.end() )
+                                        {
+                                            for ( uint32_t i=0 ;
+                                                i < ienum->second.size() ;
+                                                i++ )
+                                            {
+                                                if ( ienum->second[i].name.
+                                                        compare( value ) )
+                                                {
+                                                    stringstream ss;
+                                                    ss << "Device "
+                                                        << a_pkt.devId()
+                                                        << " Found Enum "
+                                                        << ienum->second[i]
+                                                            .name
+                                                        << " for PV "
+                                                        << pv_name;
+                                                    syslog( LOG_INFO,
+                                                        "[%i] %s", g_pid,
+                                                        ss.str().c_str() );
+
+                                                    pv_enum =
+                                                       &(ienum->second[i]);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-                                else if ( xmlStrcmp( pvnode->name, (const xmlChar*)"pv_units" ) == 0)
+
+                                else if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_units" ) == 0 )
                                 {
                                     pv_units = value;
                                 }
@@ -1852,135 +1909,237 @@ StreamParser::rxPacket
 
                             if ( found == 7 )
                             {
-                                // Note: due to the possibility of certain uncontrollable external events relating to
-                                // beam-line re-configuration, it is no longer possible for ADARA to guarantee that
-                                // the name and/or definition of a PV will remain constant throughout a run. PV values
-                                // are stored in name-indexed logs in the /DASlogs entry of the generated Nexus file.
-                                // IF a previously defined ID-to-PV mapping changes, and there are no differences
-                                // with the PV itself (name, type, units), then the internal ID-to-name mapping will
-                                // be updated. However, if the type or units of an previously defined PV ever change,
-                                // then a new PV must be dynamically created to prevent an error in the Nexus output.
-                                // To avoid collisions with other PVs, the name will be algorithmically generated by
-                                // appending a numeric suffix (i.e. "(N)", where N is the next available, non-
-                                // conflicting suffix).
+                                // Note: due to the possibility of certain
+                                // uncontrollable external events relating
+                                // to beam-line re-configuration, it is no
+                                // longer possible for ADARA to guarantee
+                                // that the name and/or definition of a PV
+                                // will remain constant throughout a run.
+                                // PV values are stored in name-indexed
+                                // logs in the /DASlogs entry of the
+                                // generated Nexus file.
+                                // IF a previously defined ID-to-PV mapping
+                                // changes, and there are no differences
+                                // with the PV itself (name, type, units),
+                                // then the internal ID-to-name mapping
+                                // will be updated. However, if the type
+                                // or units of an previously defined PV
+                                // ever change, then a new PV must be
+                                // dynamically created to prevent an error
+                                // in the Nexus output.
+                                // To avoid collisions with other PVs, the
+                                // name will be algorithmically generated
+                                // by appending a numeric suffix (i.e.
+                                // "(N)", where N is the next available,
+                                // non-conflicting suffix).
 
-                                // Note that PV name ~should~ be unique within the stream, but currently the SMS does
-                                // not perform any checks to prevent datasources from publishing duplicate PV names;
-                                // thus it will eventually happen. The STS will try to handle name collisions without
-                                // aborting, but the above behavior that tries to gracefully handle pvsd restarts
-                                // enables a fatal error condition IF the PV being replaced is actually a duplicate
-                                // PV that is still live. On the next value update of the replaced PV, the STS will
-                                // detect that there is no KEY present for that variable. This is a ~very~ unlikely
-                                // scenario given that there is no use case for running multiple pvsd instances, and
-                                // even if there were, they would have to be publishing the exact same DDP content.
-                                // Therefore, this code will assume a PV with a new ID but identacle content is due to
-                                // a pvsd restart condition.
+                                // Note that PV name ~should~ be unique
+                                // within the stream, but currently the
+                                // SMS does not perform any checks to
+                                // prevent DataSources from publishing
+                                // duplicate PV names; thus it will
+                                // eventually happen. The STS will try
+                                // to handle name collisions without
+                                // aborting, but the above behavior that
+                                // tries to gracefully handle pvsd restarts
+                                // enables a fatal error condition IF the
+                                // PV being replaced is actually a
+                                // duplicate PV that is still live.
+                                // On the next value update of the
+                                // replaced PV, the STS will detect that
+                                // there is no KEY present for that
+                                // variable. This is a ~very~ unlikely
+                                // scenario given that there is no use case
+                                // for running multiple pvsd instances,
+                                // and even if there were, they would have
+                                // to be publishing the exact same DDP
+                                // content. Therefore, this code will
+                                // assume a PV with a new ID but identical
+                                // content is due to a pvsd restart
+                                // condition.
 
-                                // Also note that the following code favors the most recently received configuration
-                                // data when collisions do occur. If there is a name conflict, the most recently
-                                // received definition will overwrite the previous defintion, and if value updates
-                                // are recievd for the over-written definition, the STS will throw an error.
+                                // Also note that the following code favors
+                                // the most recently received configuration
+                                // data when collisions do occur. If there
+                                // is a name conflict, the most recently
+                                // received definition will overwrite the
+                                // previous definition, and if value
+                                // updates are received for the
+                                // over-written definition, the STS will
+                                // throw an error.
 
-                                PVKey       key(a_pkt.devId(),pv_id);
-                                map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find( key );
+                                PVKey key(a_pkt.devId(),pv_id);
+                                map<PVKey,PVInfoBase*>::iterator ipv =
+                                    m_pvs_by_key.find( key );
                                 map<string,PVKey>::iterator xref;
 
                                 if ( ipv == m_pvs_by_key.end() )
                                 {
-                                    // This is a NEW key - see if there is an existing entry (by dev:name) that matches this PV EXACTLY
+                                    // This is a NEW key - see if there is
+                                    // an existing entry (by dev:name)
+                                    // that matches this PV EXACTLY
 
                                     bool create = true;
-                                    xref = m_pv_name_xref.find( dev_name + ":" + pv_name );
+                                    xref = m_pv_name_xref.find(
+                                        dev_name + ":" + pv_name );
 
                                     if ( xref != m_pv_name_xref.end() )
                                     {
-                                        ipv = m_pvs_by_key.find( xref->second );
+                                        ipv = m_pvs_by_key.find(
+                                            xref->second );
                                         if ( ipv != m_pvs_by_key.end())
                                         {
-                                            if ( ipv->second->sameDefiniton( pv_name, dev_name, pv_type, pv_units ) )
+                                            if ( ipv->second->
+                                                sameDefinition(
+                                                    pv_name, dev_name,
+                                                    pv_type, pv_enum,
+                                                    pv_units ) )
                                             {
-                                                // There is an existing PVInfo instance with EXACTLY the same definition
-                                                // This will happen if PVSD restarts during a recording
+                                                // There is an existing
+                                                // PVInfo instance with
+                                                // EXACTLY the same
+                                                // definition.
+                                                // This will happen if
+                                                // PVSD restarts during
+                                                // a recording.
 
                                                 // Re-use this entry
                                                 create = false;
 
                                                 // Update key mappings
-                                                m_pvs_by_key[key] = ipv->second;
+                                                m_pvs_by_key[key] =
+                                                    ipv->second;
                                                 m_pvs_by_key.erase( ipv );
 
-                                                // Update xref entry to point to new key
+                                                // Update xref entry to
+                                                // point to new key
                                                 xref->second = key;
                                             }
                                             else
                                             {
-                                                // There is an existing PVInfo instance with a different definition
-                                                // This will happen if PVSD is reconfigured and restarted during a recording
+                                                // There is an existing
+                                                // PVInfo instance with a
+                                                // different definition.
+                                                // This will happen if
+                                                // PVSD is reconfigured
+                                                // and restarted during
+                                                // a recording.
 
-                                                // Existing entry differs, flush and delete old entry
-                                                ipv->second->flushBuffers(0);
+                                                // Existing entry differs,
+                                                // flush and delete
+                                                // old entry
+                                                ipv->second->flushBuffers(
+                                                    0 );
                                                 delete ipv->second;
 
                                                 // Update maps
                                                 m_pvs_by_key.erase( ipv );
-                                                m_pv_name_xref.erase( xref );
+                                                m_pv_name_xref.erase(
+                                                    xref );
 
-                                                // New PVInfo entry will be created below
+                                                // New PVInfo entry will
+                                                // be created below
                                             }
                                         }
                                         else
                                         {
-                                            // This is an error - there shouldn't be an xref entry without a corresponding PVInfo entry
+                                            // This is an error - there
+                                            // shouldn't be an xref entry
+                                            // without a corresponding
+                                            // PVInfo entry.
                                             // Delete bad xref entry
                                             m_pv_name_xref.erase( xref );
                                         }
                                     }
 
-                                    // If no existing matching PV was found, make a new one
+                                    // If no existing matching PV was found
+                                    // make a new one
                                     if ( create )
                                     {
-                                        // If adapter doesn't support PV type, makePVInfo will return NULL
-                                        info = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        // If adapter doesn't support
+                                        // PV type, makePVInfo will
+                                        // return NULL
+                                        info = makePVInfo(
+                                                pv_name, dev_name,
+                                                a_pkt.devId(), pv_id,
+                                                pv_type, pv_enum,
+                                                pv_units );
                                         if ( info )
                                         {
                                             m_pvs_by_key[key] = info;
-                                            m_pv_name_xref[dev_name + ":" + pv_name] = key;
+                                            m_pv_name_xref[
+                                                dev_name + ":" + pv_name] =
+                                                    key;
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    // PV Key is already in use - An existing key will be received here when the SMS re-
-                                    // broadcasts DDPs at file boundaries (in which case the definitions will match).
-                                    // They can also be received if pvsd is reconfigured (in which case the definition
-                                    // can be different). Pvsd tries to keep ID-to-Name mappings consistent accross re-
-                                    // configurations, but it may not always be able to.
+                                    // PV Key is already in use -
+                                    // An existing key will be received
+                                    // here when the SMS re-broadcasts
+                                    // DDPs at file boundaries (in which
+                                    // case the definitions will match).
+                                    // They can also be received if pvsd
+                                    // is reconfigured (in which case the
+                                    // definition can be different).
+                                    // Pvsd tries to keep ID-to-Name
+                                    // mappings consistent accross re-
+                                    // configurations, but it may
+                                    // not always be able to.
 
-                                    if ( !ipv->second->sameDefiniton( pv_name, dev_name, pv_type, pv_units ))
+                                    if ( !ipv->second->sameDefinition(
+                                            pv_name, dev_name,
+                                            pv_type, pv_enum,
+                                            pv_units ) )
                                     {
                                         // Did the name change?
-                                        if ( dev_name != ipv->second->m_device_name || pv_name != ipv->second->m_name )
+                                        if ( dev_name !=
+                                                ipv->second->m_device_name
+                                            || pv_name !=
+                                                ipv->second->m_name )
                                         {
-                                            // Delete existing name-key xref entry
-                                            xref = m_pv_name_xref.find( ipv->second->m_device_name + ":" + ipv->second->m_name );
-                                            if ( xref != m_pv_name_xref.end())
-                                                m_pv_name_xref.erase( xref );
+                                            // Delete existing name-key
+                                            // xref entry
+                                            xref = m_pv_name_xref.find(
+                                                ipv->second->m_device_name
+                                                    + ":"
+                                                    + ipv->second->m_name
+                                            );
+                                            if ( xref !=
+                                                    m_pv_name_xref.end() )
+                                            {
+                                                m_pv_name_xref.erase(
+                                                    xref );
+                                            }
 
-                                            // There is nothing the STS can do if there is a name conlfict here,
-                                            // the existing name-to-key entry will be overwritten below (if PV type
-                                            // is supported)
+                                            // There is nothing the STS
+                                            // can do if there is a name
+                                            // conflict here, the existing
+                                            // name-to-key entry will be
+                                            // overwritten below
+                                            // (if PV type is supported)
                                         }
 
-                                        // PV definition has changed, flush and replace existing PVInfo object
+                                        // PV definition has changed,
+                                        // flush and replace existing
+                                        // PVInfo object
                                         ipv->second->flushBuffers(0);
                                         delete ipv->second;
 
-                                        // If PV type not supported, makePVInfo will return NULL
-                                        info = makePVInfo( pv_name, dev_name, a_pkt.devId(), pv_id, pv_type, pv_units );
+                                        // If PV type not supported,
+                                        // makePVInfo will return NULL
+                                        info = makePVInfo(
+                                            pv_name, dev_name,
+                                            a_pkt.devId(), pv_id,
+                                            pv_type, pv_enum,
+                                            pv_units );
                                         if ( info )
                                         {
                                             m_pvs_by_key[key] = info;
-                                            m_pv_name_xref[dev_name + ":" + pv_name] = key;
+                                            m_pv_name_xref[
+                                                dev_name + ":" + pv_name] =
+                                                    key;
                                         }
                                         else
                                         {
@@ -1991,28 +2150,218 @@ StreamParser::rxPacket
                             }
                             else
                             {
-                               //TODO Log this: "Skipping PV " << a_pkt.devId() << "." << pv_id << endl;
+                                stringstream ss;
+                                ss << "STS Error:"
+                                    << " Skipping PV "
+                                    << " devId=" << a_pkt.devId()
+                                    << " pvId=" << pv_id;
+                                syslog( LOG_ERR, "[%i] %s", g_pid,
+                                    ss.str().c_str() );
                             }
                         }
                     }
                 }
-                else if ( xmlStrcmp( lev1->name, (const xmlChar*)"enumerations" ) == 0)
+
+                else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"enumerations" ) == 0 )
                 {
-                    // TODO Handle enumeration definitions
+                    for ( xmlNode *enumsnode = lev1->children; enumsnode;
+                            enumsnode = enumsnode->next )
+                    {
+                        if ( xmlStrcmp( enumsnode->name,
+                                (const xmlChar*)"enumeration" ) == 0 )
+                        {
+                            PVEnumeratedType devEnum;
+                            devEnum.name = "(unset)";
+
+                            found = 0;
+
+                            for ( xmlNode *enumnode = enumsnode->children;
+                                    enumnode; enumnode = enumnode->next )
+                            {
+                                tag = (char*)enumnode->name;
+                                getXmlNodeValue( enumnode, value );
+
+                                if ( xmlStrcmp( enumnode->name,
+                                        (const xmlChar*)"enum_name" )
+                                            == 0 )
+                                {
+                                    found |= 1;
+                                    devEnum.name = value;
+                                }
+                                else if ( xmlStrcmp( enumnode->name,
+                                        (const xmlChar*)"enum_element" )
+                                            == 0 )
+                                {
+                                    std::string elem_name = "(unset)";
+                                    Identifier elem_value = -1;
+                                    short elem_found = 0;
+
+                                    for ( xmlNode *elemnode =
+                                                enumnode->children;
+                                            elemnode;
+                                            elemnode = elemnode->next )
+                                    {
+                                        tag = (char*)elemnode->name;
+                                        getXmlNodeValue( elemnode, value );
+
+                                        if ( xmlStrcmp( elemnode->name,
+                                                (const xmlChar*)
+                                                    "enum_element_name" )
+                                                        == 0 )
+                                        {
+                                            elem_found |= 1;
+                                            elem_name = value;
+                                        }
+                                        else if ( xmlStrcmp(
+                                                elemnode->name,
+                                                (const xmlChar*)
+                                                    "enum_element_value" )
+                                                        == 0 )
+                                        {
+                                            elem_found |= 2;
+                                            elem_value =
+                                                boost::lexical_cast<
+                                                    Identifier>( value );
+                                        }
+                                    }
+
+                                    if ( elem_found == 3 )
+                                    {
+                                        devEnum.element_names.push_back(
+                                            elem_name );
+                                        devEnum.element_values.push_back(
+                                            elem_value );
+                                        found |= 2;
+                                    }
+                                    else
+                                    {
+                                        stringstream ss;
+                                        ss << "STS Error:"
+                                            << " Skipping Incomplete"
+                                            << " Enum Element"
+                                            << " devId=" << a_pkt.devId()
+                                            << " enumName=" << devEnum.name
+                                            << " elemName=" << elem_name
+                                            << " elemValue=" << elem_value;
+                                        syslog( LOG_ERR, "[%i] %s", g_pid,
+                                            ss.str().c_str() );
+                                    }
+                                }
+                            }
+
+                            if ( found == 3 )
+                            {
+                                map<Identifier,
+                                    std::vector<PVEnumeratedType> >
+                                        ::iterator ienum =
+                                            m_enums_by_dev.find(
+                                                a_pkt.devId() );
+
+                                // First Enum for This Device...
+                                if ( ienum == m_enums_by_dev.end() )
+                                {
+                                    stringstream ss;
+                                    ss << "Device " << a_pkt.devId()
+                                        << " First Enum " << devEnum.name;
+                                    syslog( LOG_INFO, "[%i] %s", g_pid,
+                                        ss.str().c_str() );
+
+                                    std::vector<PVEnumeratedType> enumVec;
+                                    enumVec.push_back( devEnum );
+                                    m_enums_by_dev[ a_pkt.devId() ] =
+                                        enumVec;
+                                }
+
+                                // Check for Duplicates...
+                                // Add Any New Enums
+                                else
+                                {
+                                    bool addEnum = true;
+
+                                    for ( uint32_t i=0 ;
+                                            i < ienum->second.size()
+                                                && addEnum ;
+                                            i++ )
+                                    {
+                                        if ( ienum->second[i].sameEnum(
+                                                &devEnum ) )
+                                        {
+                                            stringstream ss;
+                                            ss << "STS Error:"
+                                                << " Device "
+                                                << a_pkt.devId()
+                                                << " Duplicate Enum "
+                                                << devEnum.name
+                                                << " Ignoring...";
+                                            syslog( LOG_ERR,
+                                                "[%i] %s", g_pid,
+                                                ss.str().c_str() );
+                                            addEnum = false;
+                                        }
+                                        else if ( !ienum->second[i].name
+                                                .compare( devEnum.name ) )
+                                        {
+                                            stringstream ss;
+                                            ss << "STS Error:"
+                                                << " Device "
+                                                << a_pkt.devId()
+                                                << " Enum " << devEnum.name
+                                                << " Name Clash!"
+                                                << " (Include Anyway)";
+                                            syslog( LOG_ERR,
+                                                "[%i] %s", g_pid,
+                                                ss.str().c_str() );
+                                            // Still Include Enum in File?
+                                        }
+                                    }
+
+                                    // New Enum, Add It...
+                                    if ( addEnum )
+                                    {
+                                        stringstream ss;
+                                        ss << "Device " << a_pkt.devId()
+                                            << " Add Enum "
+                                            << devEnum.name;
+                                        syslog( LOG_INFO, "[%i] %s", g_pid,
+                                            ss.str().c_str() );
+
+                                        ienum->second.push_back( devEnum );
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                stringstream ss;
+                                ss << "STS Error:"
+                                    << " Skipping Incomplete Enum "
+                                    << " devId=" << a_pkt.devId()
+                                    << " enumName=" << devEnum.name;
+                                syslog( LOG_ERR, "[%i] %s", g_pid,
+                                    ss.str().c_str() );
+                            }
+                        }
+                    }
                 }
             }
         }
         catch( TraceException &e )
         {
-            RETHROW_TRACE( e, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value )
+            RETHROW_TRACE( e,
+                "Failed parsing Device Descriptor packet on tag: "
+                    << tag << ", value: " << value )
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value << "; " << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                "Failed parsing Device Descriptor packet on tag: "
+                    << tag << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing Device Descriptor packet on tag: " << tag << ", value: " << value )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                "Failed parsing Device Descriptor packet on tag: "
+                    << tag << ", value: " << value )
         }
 
         xmlFreeDoc( doc );
@@ -2269,6 +2618,15 @@ StreamParser::finalizeStreamProcessing()
 
     if ( m_pulse_info.times.size())
         pulseBuffersReady( m_pulse_info );
+
+    // Write any Enumerated Types, per DeviceId, into logs...
+
+    for ( map<Identifier,std::vector<PVEnumeratedType> >::iterator ienum =
+                m_enums_by_dev.begin();
+            ienum != m_enums_by_dev.end(); ++ienum )
+    {
+        writeDeviceEnums( ienum->first, ienum->second );
+    }
 
     // Write any remaining data in PV buffers
 

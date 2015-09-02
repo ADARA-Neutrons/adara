@@ -108,6 +108,7 @@ public:
     // PARAMETER LIST SUBJECT TO CHANGE
     ////////////////////////////////////////////
     int H5NXmake_link(const std::string &current_name, const std::string &destination_name );
+    int H5NXmake_group_link(const std::string &current_name, const std::string &destination_name );
 
     //call H5Fflush: causes all buffers associated with a file to be immediately flushed to disk
     int H5NXflush();
