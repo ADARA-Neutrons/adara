@@ -304,8 +304,6 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
     a_adara_pkt.vvp.status      = a_state.m_status;
     a_adara_pkt.vvp.severity    = a_state.m_severity;
 
-    //cout << "VVP for PV " << a_pv->m_device->m_id << "." << a_pv->m_id << ", stat = " <<  a_state.m_status << ", sev: " <<  a_state.m_severity << endl;
-
     switch ( a_pv->m_type )
     {
     case PV_ENUM:
@@ -484,7 +482,9 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
 
     set<DeviceRecordPtr>::iterator idev = m_devices.find( a_device );
     if ( idev != m_devices.end())
+    {
         m_devices.erase( idev );
+    }
 }
 
 
@@ -559,7 +559,7 @@ OutputAdapter::initSockets()
     catch ( TraceException &e )
     {
         e.addContext( "Unable to configure ADARA tcp socket (port " + boost::lexical_cast<string>(m_port) + ")" );
-        throw e;
+        throw;
     }
     catch (...)
     {
