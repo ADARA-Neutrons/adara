@@ -191,7 +191,9 @@ DeviceAgent::metadataUpdated()
 
         if ( ich->second.m_chan_state == INFO_AVAILABLE )
         {
-            syslog( LOG_INFO, "Updating metadata for PV %s: %s",
+            syslog( LOG_INFO,
+                "Device %s - Updating metadata for PV %s: %s",
+                m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
 
@@ -203,7 +205,9 @@ DeviceAgent::metadataUpdated()
         }
         else if ( ich->second.m_chan_state == READY )
         {
-            syslog( LOG_INFO, "Re-requesting metadata for PV %s: %s",
+            syslog( LOG_INFO,
+                "Device %s - Re-requesting metadata for PV %s: %s",
+                m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
 
@@ -284,7 +288,12 @@ DeviceAgent::stopped()
 void
 DeviceAgent::connectPV( PVDescriptor *a_pv )
 {
-    syslog( LOG_INFO, "Creating channel for PV %s: %s",
+    std::string deviceStr = "";
+    if ( a_pv->m_device != NULL && !a_pv->m_device->m_name.empty() )
+        deviceStr = "Device " + a_pv->m_device->m_name + " - ";
+
+    syslog( LOG_INFO, "%sCreating channel for PV %s: %s",
+        deviceStr.c_str(),
         a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
 
     ChanInfo info;
@@ -305,7 +314,8 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     }
     else
     {
-        syslog( LOG_ERR, "Failed to create channel for PV: %s",
+        syslog( LOG_ERR, "%sFailed to create channel for PV: %s",
+            deviceStr.c_str(),
             a_pv->m_connection.c_str() );
     }
 }
@@ -321,12 +331,17 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
 void
 DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 {
+    std::string deviceStr = "";
+    if ( a_pv->m_device != NULL && !a_pv->m_device->m_name.empty() )
+        deviceStr = "Device " + a_pv->m_device->m_name + " - ";
+
     map<std::string,chid>::iterator ipv =
         m_pv_index.find( a_pv->m_connection );
 
     if ( ipv != m_pv_index.end())
     {
-        syslog( LOG_INFO, "Disconnecting channel for PV %s: %s",
+        syslog( LOG_INFO, "%sDisconnecting channel for PV %s: %s",
+            deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
 
         map<chid,ChanInfo>::iterator ich = m_chan_info.find( ipv->second );
@@ -346,7 +361,8 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
         else
         {
             syslog( LOG_WARNING,
-                "Warning: No Channel Info Found for PV %s (%s)",
+                "%sWarning: No Channel Info Found for PV %s (%s)",
+                deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
         }
 
@@ -356,7 +372,8 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
     else
     {
         syslog( LOG_ERR,
-            "Failed to disconnect channel for PV %s: %s Not Found",
+            "%sFailed to disconnect channel for PV %s: %s Not Found",
+            deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
     }
 }
@@ -429,8 +446,17 @@ DeviceAgent::controlThread()
                     }
                     else
                     {
+                        std::string deviceStr = "";
+                        if ( m_dev_desc != NULL
+                                && !m_dev_desc->m_name.empty() )
+                        {
+                            deviceStr = "Device "
+                                + m_dev_desc->m_name + " - ";
+                        }
+
                         syslog( LOG_ERR,
-                            "Failed to get channel info for PV %s: %s",
+                            "%sFailed to get channel info for PV %s: %s",
+                            deviceStr.c_str(),
                             ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
                     }
@@ -547,17 +573,18 @@ DeviceAgent::controlThread()
                 // Device Not Ready to Define, Some PVs Still Pending...
                 else
                 {
-                    syslog( LOG_INFO,
-                       "Device %s Waiting for %ld Pending PVs",
-                        m_dev_desc->m_name.c_str(),
+                    std::string deviceStr = "";
+                    if ( !m_dev_desc->m_name.empty() )
+                        deviceStr = "Device " + m_dev_desc->m_name + " - ";
+
+                    syslog( LOG_INFO, "%sWaiting for %ld Pending PVs",
+                        deviceStr.c_str(),
                         m_dev_desc->m_pvs.size() - ready );
 
                     for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
                     {
-                        syslog( LOG_INFO,
-                            "Device %s - Pending PV Connection: %s",
-                            m_dev_desc->m_name.c_str(),
-                            pendingPVs[i].c_str() );
+                        syslog( LOG_INFO, "%sPending PV Connection: %s",
+                            deviceStr.c_str(), pendingPVs[i].c_str() );
                     }
                 }
             }
@@ -737,7 +764,7 @@ DeviceAgent::epicsConnectionHandler(
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
 
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 ich->second.m_connected = true;
 
@@ -763,8 +790,10 @@ DeviceAgent::epicsConnectionHandler(
                     }
                     else
                     {
-                        syslog( LOG_ERR,
-                            "Failed to create subscription for PV: %s",
+                        syslog( LOG_ERR, "Device %s - %s for PV %s: %s",
+                            ich->second.m_device->m_name.c_str(),
+                            "Failed to create subscription",
+                            ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
                     }
 
@@ -785,6 +814,7 @@ DeviceAgent::epicsConnectionHandler(
                 }
             }
         }
+
         // Connection lost?
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
@@ -793,12 +823,18 @@ DeviceAgent::epicsConnectionHandler(
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
 
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 ich->second.m_connected = false;
 
                 if ( ich->second.m_subscribed )
                 {
+                    syslog( LOG_ERR, "Device %s - %s PV %s: %s",
+                        ich->second.m_device->m_name.c_str(),
+                        "Clearing subscription for (Down?)",
+                        ich->second.m_pv->m_name.c_str(),
+                        ich->second.m_pv->m_connection.c_str() );
+
                     ca_clear_subscription( ich->second.m_evid );
                     ich->second.m_subscribed = false;
                 }
