@@ -267,6 +267,7 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
     {
         sstr << "    <process_variable>" << endl;
         sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
+        sstr << "      <pv_connection>" << (*ipv)->m_connection << "</pv_connection>" << endl;
         sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
         if ( (*ipv)->m_type == PV_ENUM )
             sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->m_id << "</pv_type>" << endl;
