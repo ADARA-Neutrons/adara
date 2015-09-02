@@ -338,9 +338,9 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         // Only Change the Name as Needed... ;-D
         if ( count )
         {
-            syslog( LOG_INFO,
-                "Device %s: Renaming Name-Clash PV from %s to %s!",
-                a_descriptor.m_name.c_str(),
+            syslog( LOG_ERR,
+                "%s Device %s: Renaming Name-Clash PV from %s to %s!",
+                "PVSD ERROR:", a_descriptor.m_name.c_str(),
                 (*ipv)->m_name.c_str(), new_name.c_str() );
 
             (*ipv)->m_name = new_name;

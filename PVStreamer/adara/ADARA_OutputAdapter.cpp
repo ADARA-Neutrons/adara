@@ -170,7 +170,7 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
 {
     // A Little Gratuitous Debug Logging... ;-b
     if ( a_pv_pkt.device == NULL ) {
-        syslog( LOG_INFO, "%s() Null Device! type=%d",
+        syslog( LOG_ERR, "PVSD ERROR: %s() Null Device! type=%d",
             "OutputAdapter::translate", a_pv_pkt.type );
     }
 
@@ -190,11 +190,12 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
 
     case VariableUpdate:
         if ( a_pv_pkt.pv == NULL ) {
-            syslog( LOG_INFO, "%s() Null PV! type=%d",
+            syslog( LOG_ERR, "PVSD ERROR: %s() Null PV! type=%d",
                 "OutputAdapter::translate", a_pv_pkt.type );
         }
         else if ( a_pv_pkt.pv->m_device == NULL ) {
-            syslog( LOG_INFO, "%s() Null PV Device! type=%d varId=0x%x/%d",
+            syslog( LOG_ERR,
+                "PVSD ERROR: %s() Null PV Device! type=%d varId=0x%x/%d",
                 "OutputAdapter::translate", a_pv_pkt.type,
                 a_pv_pkt.pv->m_id, a_pv_pkt.pv->m_id );
         }

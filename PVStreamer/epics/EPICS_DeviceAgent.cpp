@@ -314,8 +314,8 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     }
     else
     {
-        syslog( LOG_ERR, "%sFailed to create channel for PV: %s",
-            deviceStr.c_str(),
+        syslog( LOG_ERR, "%s %sFailed to create channel for PV: %s",
+            "PVSD ERROR:", deviceStr.c_str(),
             a_pv->m_connection.c_str() );
     }
 }
@@ -372,8 +372,8 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
     else
     {
         syslog( LOG_ERR,
-            "%sFailed to disconnect channel for PV %s: %s Not Found",
-            deviceStr.c_str(),
+            "%s %sFailed to disconnect channel for PV %s: %s Not Found",
+            "PVSD ERROR:", deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
     }
 }
@@ -455,8 +455,8 @@ DeviceAgent::controlThread()
                         }
 
                         syslog( LOG_ERR,
-                            "%sFailed to get channel info for PV %s: %s",
-                            deviceStr.c_str(),
+                        "%s %sFailed to get channel info for PV %s: %s",
+                            "PVSD ERROR:", deviceStr.c_str(),
                             ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
                     }
@@ -592,19 +592,22 @@ DeviceAgent::controlThread()
         catch ( TraceException &e )
         {
             syslog( LOG_ERR,
-                "TraceException thrown in DevAgent::controlThread!" );
+                "%s TraceException thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
             syslog( LOG_ERR, "content: %s", e.toString( true ).c_str() );
         }
         catch ( exception &e )
         {
             syslog( LOG_ERR,
-                "std::exception thrown in DevAgent::controlThread!" );
+                "%s std::exception thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
             syslog( LOG_ERR, "content: %s", e.what() );
         }
         catch(...)
         {
             syslog( LOG_ERR,
-                "Unknown exception thrown in DevAgent::controlThread!" );
+                "%s Unknown exception thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
         }
     }
 }
@@ -679,7 +682,9 @@ DeviceAgent::monitorThread()
                     {
                         dev_name = m_dev_desc->m_name;
                         sid = string("SID_EPICS_DEV_") + dev_name;
-                        message = string("Device (") + dev_name + ") has hung while initializing";
+                        message = "PVSD ERROR: "
+                            + string("Device (") + dev_name
+                            + ") has hung while initializing";
                         ADARA::ComBus::SignalAssertMessage sigmsg( sid, "EPICS", message, ADARA::ERROR );
                         ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
 
@@ -706,7 +711,9 @@ DeviceAgent::monitorThread()
                     ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
 
                     // Log the recovery
-                    string message = string("Device (") + dev_name + ") has recovered from hung state.";
+                    string message = "PVSD ERROR: "
+                        + string("Device (") + dev_name
+                        + ") has recovered from hung state.";
                     syslog( LOG_ERR, message.c_str() );
 
                     // Change state
@@ -790,7 +797,8 @@ DeviceAgent::epicsConnectionHandler(
                     }
                     else
                     {
-                        syslog( LOG_ERR, "Device %s - %s for PV %s: %s",
+                        syslog( LOG_ERR, "%s Device %s - %s for PV %s: %s",
+                            "PVSD ERROR:",
                             ich->second.m_device->m_name.c_str(),
                             "Failed to create subscription",
                             ich->second.m_pv->m_name.c_str(),
@@ -829,7 +837,8 @@ DeviceAgent::epicsConnectionHandler(
 
                 if ( ich->second.m_subscribed )
                 {
-                    syslog( LOG_ERR, "Device %s - %s PV %s: %s",
+                    syslog( LOG_ERR, "%s Device %s - %s PV %s: %s",
+                        "PVSD ERROR:",
                         ich->second.m_device->m_name.c_str(),
                         "Clearing subscription for (Down?)",
                         ich->second.m_pv->m_name.c_str(),
@@ -866,19 +875,22 @@ DeviceAgent::epicsConnectionHandler(
     catch( TraceException &e )
     {
         syslog( LOG_ERR,
-            "TraceException in DeviceAgent::epicsConnectionHandler()" );
+            "%s TraceException in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.toString().c_str() );
     }
     catch( std::exception &e )
     {
         syslog( LOG_ERR,
-            "Exception in DeviceAgent::epicsConnectionHandler()" );
+            "%s Exception in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.what() );
     }
     catch(...)
     {
         syslog( LOG_ERR,
-            "Unknown exception in DeviceAgent::epicsConnectionHandler()" );
+        "%s Unknown exception in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
     }
 }
 
@@ -1070,17 +1082,23 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
     }
     catch( TraceException &e )
     {
-        syslog( LOG_ERR, "TraceException in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s TraceException in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.toString().c_str() );
     }
     catch( std::exception &e )
     {
-        syslog( LOG_ERR, "Exception in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s Exception in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.what() );
     }
     catch(...)
     {
-        syslog( LOG_ERR, "Unknown exception in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s Unknown exception in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
     }
 }
 

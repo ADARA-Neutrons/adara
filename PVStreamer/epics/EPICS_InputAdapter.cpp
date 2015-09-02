@@ -116,8 +116,8 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
     }
     else
     {
-        syslog( LOG_ERR, "Error Stopping Device Agent: %s Not Found!",
-            a_dev_name.c_str() );
+        syslog( LOG_ERR, "%s Error Stopping Device Agent: %s Not Found!",
+            "PVSD ERROR:", a_dev_name.c_str() );
     }
 }
 
@@ -276,7 +276,6 @@ InputAdapter::configFileMonitorThread()
                             // NOTE: The DeviceDescriptor ptrs in devices vector will be deleted by the startDevice call
                             for ( idev = devices.begin(); idev != devices.end(); ++idev )
                             {
-                                //syslog( LOG_DEBUG, "Starting device agent for: %s", (*idev)->m_name.c_str() );
                                 startDevice( *idev );
                             }
 
@@ -296,7 +295,9 @@ InputAdapter::configFileMonitorThread()
                         }
                         else
                         {
-                            syslog( LOG_ERR, "EPICS beam config file parse FAILED" );
+                            syslog( LOG_ERR,
+                                "%s EPICS beam config file parse FAILED",
+                                "PVSD ERROR:" );
 
                             ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "EPICS beam config file (beamline.xml) failed to parse", ADARA::ERROR );
                             ADARA::ComBus::Connection::getInst().broadcast( msg );
@@ -308,7 +309,7 @@ InputAdapter::configFileMonitorThread()
         catch( std::exception &e )
         {
             stringstream ss;
-            ss << "Exception thrown"
+            ss << "PVSD ERROR: Exception thrown"
                 << " while parsing EPICS configuration file"
                 << " (beamline.xml)";
 
@@ -322,7 +323,7 @@ InputAdapter::configFileMonitorThread()
         catch( ... )
         {
             stringstream ss;
-            ss << "Unexpected exception thrown"
+            ss << "PVSD ERROR: Unexpected exception thrown"
                 << " while parsing EPICS configuration file"
                 << " (beamline.xml)";
 
@@ -424,7 +425,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                 tmp_node = xmlFind( "name", cnode );
                                                 if ( !tmp_node )
                                                 {
-                                                    syslog( LOG_ERR, "PV Name is missing or empty" );
+                                                    syslog( LOG_ERR,
+                                                        "PVSD ERROR: PV Name is missing or empty" );
                                                     throw -1;
                                                 }
 
@@ -444,7 +446,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                     if ( dev_name.empty())
                                     {
                                         // It's an error to omit the device name
-                                        syslog( LOG_ERR, "Device name is missing or empty" );
+                                        syslog( LOG_ERR,
+                                            "PVSD ERROR: Device name is missing or empty" );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
@@ -466,7 +469,9 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
         }
         catch(...)
         {
-            syslog( LOG_ERR, "Exception while parsing EPICS beamline XML" );
+            syslog( LOG_ERR,
+                "%s Exception while parsing EPICS beamline XML",
+                "PVSD ERROR:" );
             res = false;
         }
     }
