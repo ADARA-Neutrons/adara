@@ -786,6 +786,21 @@ DeviceAgent::epicsConnectionHandler(
                         // << " ca_type = " << type << " for PV: "
                         // << ich->second.m_pv->m_connection << endl;
 
+                    std::string deviceStr = "";
+                    if ( ich->second.m_device != NULL )
+                    {
+                        deviceStr = " - Device "
+                            + ich->second.m_device->m_name;
+                    }
+
+                    std::string pvStr = "";
+                    if ( ich->second.m_pv != NULL )
+                    {
+                        pvStr = " for PV "
+                            + ich->second.m_pv->m_name + ": "
+                            + ich->second.m_pv->m_connection;
+                    }
+
                     if ( ca_create_subscription(
                             epicsToTimeRecordType( type ), 0,
                             ich->second.m_chid,
@@ -793,16 +808,17 @@ DeviceAgent::epicsConnectionHandler(
                             &epicsEventCallback, this,
                             &ich->second.m_evid ) == ECA_NORMAL )
                     {
+                        syslog( LOG_INFO, "Subscription created%s%s",
+                            deviceStr.c_str(), pvStr.c_str() );
+
                         ich->second.m_subscribed = true;
                     }
                     else
                     {
-                        syslog( LOG_ERR, "%s Device %s - %s for PV %s: %s",
+                        syslog( LOG_ERR,
+                            "%s Failed to create subscription%s%s",
                             "PVSD ERROR:",
-                            ich->second.m_device->m_name.c_str(),
-                            "Failed to create subscription",
-                            ich->second.m_pv->m_name.c_str(),
-                            ich->second.m_pv->m_connection.c_str() );
+                            deviceStr.c_str(), pvStr.c_str() );
                     }
 
                     ca_flush_io();
@@ -835,14 +851,27 @@ DeviceAgent::epicsConnectionHandler(
             {
                 ich->second.m_connected = false;
 
+                std::string deviceStr = "";
+                if ( ich->second.m_device != NULL )
+                {
+                    deviceStr = " - Device "
+                        + ich->second.m_device->m_name;
+                }
+
+                std::string pvStr = "";
+                if ( ich->second.m_pv != NULL )
+                {
+                    pvStr = " for PV "
+                        + ich->second.m_pv->m_name + ": "
+                        + ich->second.m_pv->m_connection;
+                }
+
                 if ( ich->second.m_subscribed )
                 {
-                    syslog( LOG_ERR, "%s Device %s - %s PV %s: %s",
+                    syslog( LOG_ERR, "%s %s%s%s",
                         "PVSD ERROR:",
-                        ich->second.m_device->m_name.c_str(),
-                        "Clearing subscription for (Down?)",
-                        ich->second.m_pv->m_name.c_str(),
-                        ich->second.m_pv->m_connection.c_str() );
+                        "Clearing subscription (Down?)",
+                        deviceStr.c_str(), pvStr.c_str() );
 
                     ca_clear_subscription( ich->second.m_evid );
                     ich->second.m_subscribed = false;
@@ -868,6 +897,13 @@ DeviceAgent::epicsConnectionHandler(
                     pkt->state = ich->second.m_pv_state;
 
                     m_stream_api.putFilledPacket( pkt );
+                }
+                else
+                {
+                    syslog( LOG_ERR, "%s %s %s%s%s",
+                        "PVSD ERROR:", "No Free Packets!",
+                        "VariableUpdate Lost",
+                        deviceStr.c_str(), pvStr.c_str() );
                 }
             }
         }
@@ -1017,7 +1053,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 if ( m_defined )
                 {
                     bool timeout;
-                    StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
+                    StreamPacket *pkt =
+                        m_stream_api.getFreePacket( 5000, timeout );
                     if ( pkt )
                     {
                         pkt->type = VariableUpdate;
@@ -1026,6 +1063,28 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         pkt->state = state;
 
                         m_stream_api.putFilledPacket( pkt );
+                    }
+                    else
+                    {
+                        std::string deviceStr = "";
+                        if ( ich->second.m_device != NULL )
+                        {
+                            deviceStr = " Device "
+                                + ich->second.m_device->m_name;
+                        }
+
+                        std::string pvStr = "";
+                        if ( ich->second.m_pv != NULL )
+                        {
+                            pvStr = " for PV "
+                                + ich->second.m_pv->m_name + ": "
+                                + ich->second.m_pv->m_connection;
+                        }
+
+                        syslog( LOG_ERR, "%s %s %s%s",
+                            "PVSD ERROR:",
+                            "No Free Packets! VariableUpdate Lost",
+                            deviceStr.c_str(), pvStr.c_str() );
                     }
                 }
             }
@@ -1120,9 +1179,35 @@ DeviceAgent::sendCurrentValues()
             pkt->pv = ich->second.m_pv;
             pkt->state = ich->second.m_pv_state;
 
-            //cout << "Sending PV " << ich->second.m_device->m_id << "." << ich->second.m_pv->m_id << " on chid " << ich->first << ", stat = " <<  pkt->state.m_status << ", sev: " <<  pkt->state.m_severity << endl;
+            //cout << "Sending PV " << ich->second.m_device->m_id
+                //<< "." << ich->second.m_pv->m_id
+                //<< " on chid " << ich->first
+                //<< ", stat = " <<  pkt->state.m_status
+                //<< ", sev: " <<  pkt->state.m_severity << endl;
 
             m_stream_api.putFilledPacket( pkt );
+        }
+        else
+        {
+            std::string deviceStr = "";
+            if ( ich->second.m_device != NULL )
+            {
+                deviceStr = " Device "
+                    + ich->second.m_device->m_name;
+            }
+
+            std::string pvStr = "";
+            if ( ich->second.m_pv != NULL )
+            {
+                pvStr = " for PV "
+                    + ich->second.m_pv->m_name + ": "
+                    + ich->second.m_pv->m_connection;
+            }
+
+            syslog( LOG_ERR, "%s %s %s%s",
+                "PVSD ERROR:",
+                "No Free Packets! VariableUpdate Lost for",
+                deviceStr.c_str(), pvStr.c_str() );
         }
     }
 }
