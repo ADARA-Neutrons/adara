@@ -83,8 +83,9 @@ NxGen::~NxGen()
 STS::PVInfoBase*
 NxGen::makePVInfo
 (
-    const string           &a_name,         ///< [in] Name of PV
     const string           &a_device_name,  ///< [in] Name of device that owns the PV
+    const string           &a_name,         ///< [in] Name of PV
+    const string           &a_connection,   ///< [in] PV Connection String
     STS::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
     STS::Identifier         a_pv_id,        ///< [in] ID of the PV
     STS::PVType             a_type,         ///< [in] Type of PV
@@ -94,24 +95,81 @@ NxGen::makePVInfo
 {
     set<string>::iterator i;
     string internal_name = a_name;
-    uint32_t ver = 0;
+    string internal_connection = a_connection;
+    uint32_t name_ver = 0;
+    uint32_t connection_ver = 0;
 
-    // Check for name collisions: This code looks for name across
+    // Check for Name Collisions: This code looks for the Name across
     // all PV names and if found increments a version number.
     // Then it checks again to make sure the auto-generated internal
-    // name doesn't collide with an existing (top-level) name.
+    // Name doesn't collide with an existing (top-level) Name.
     // This continues until a version is found that doesn't collide.
+
     while ( 1 )
     {
         i = m_pv_name_history.find( internal_name );
         if ( i != m_pv_name_history.end())
         {
             internal_name = a_name + "("
-                + boost::lexical_cast<string>( ++ver ) + ")";
+                + boost::lexical_cast<string>( ++name_ver ) + ")";
         }
         else
         {
+            if ( name_ver > 0 )
+            {
+                syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Name Clash %s -> %s",
+                    g_pid, a_device_name.c_str(),
+                    a_name.c_str(), internal_name.c_str() );
+            }
             m_pv_name_history.insert( internal_name );
+            break;
+        }
+    }
+
+    // Now Handle Connection String Issues/Collisions.
+
+    // If the Name and Connection String were the same before,
+    // then make them the same again... ;-D
+    if ( a_name == a_connection )
+    {
+        internal_connection = internal_name;
+        connection_ver = name_ver;
+    }
+
+    // Now Check for Connection String Collisions: This code looks for
+    // Connection Strings across all PVs and if found increments a
+    // version number.  Then it checks again to make sure the
+    // auto-generated internal Connection String doesn't collide with
+    // an existing (top-level) Connection String.  This continues until
+    // a version is found that doesn't collide.
+
+    // (Note: If the Name matches the Connection String, then we may have
+    // _Already_ made the Connection String unique above, by copying...)
+
+    // Let's *Not* Assume that any Connection String collisions
+    // correspond to 2 Different Aliases of the Same Variable, just
+    // in case that happens Not to be true... Better to duplicate a
+    // PV than throw away the values for a distinct PV with a Name Clash.)
+
+    while ( 1 )
+    {
+        i = m_pv_connection_history.find( internal_connection );
+        if ( i != m_pv_connection_history.end())
+        {
+            internal_connection = a_connection + "("
+                + boost::lexical_cast<string>( ++connection_ver ) + ")";
+        }
+        else
+        {
+            if ( connection_ver > 0 )
+            {
+                syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Connection String Clash %s -> %s",
+                    g_pid, a_device_name.c_str(),
+                    a_connection.c_str(), internal_connection.c_str() );
+            }
+            m_pv_connection_history.insert( internal_connection );
             break;
         }
     }
@@ -121,18 +179,18 @@ NxGen::makePVInfo
     case STS::PVT_INT:  // ADARA only supports uint32_t currently
     case STS::PVT_ENUM:
     case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_name, internal_name,
-            a_device_name, a_device_id, a_pv_id, a_type, a_enum,
-            a_units, *this );
+        return new NxPVInfo<uint32_t>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_name, internal_name,
-            a_device_name, a_device_id, a_pv_id, a_type, a_enum,
-            a_units, *this );
+        return new NxPVInfo<double>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     case STS::PVT_STRING:
-        return new NxPVInfo<string>( a_name, internal_name,
-            a_device_name, a_device_id, a_pv_id, a_type, a_enum,
-            a_units, *this );
+        return new NxPVInfo<string>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
