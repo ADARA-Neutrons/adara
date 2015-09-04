@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <syslog.h>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -175,9 +176,11 @@ private:
         /// NxPVInfo constructor
         NxPVInfo
         (
+            const std::string     &a_device_name,  ///< [in] Name of owning device
             const std::string     &a_name,         ///< [in] Name of PV
             const std::string     &a_internal_name,///< [in] Internal (Nexus) name of PV
-            const std::string     &a_device_name,  ///< [in] Name of owning device
+            const std::string     &a_connection,   ///< [in] PV Connection String
+            const std::string     &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
             STS::Identifier        a_device_id,    ///< [in] ID of device that owns the PV
             STS::Identifier        a_pv_id,        ///< [in] ID of the PV
             STS::PVType            a_type,         ///< [in] Type of PV
@@ -186,14 +189,32 @@ private:
             NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
-            STS::PVInfo<T>( a_name, a_device_name,
+            STS::PVInfo<T>( a_device_name, a_name, a_connection,
                 a_device_id, a_pv_id, a_type, a_enum, a_units ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
+            m_internal_connection(a_internal_connection),
             m_slab_size(0),
             m_string_data_slab_size(0)
         {
-            m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
+            // If the PV Name and Connection String are the Same,
+            // then there's No Alias, and No Need for a Distinct Link.
+            if ( m_internal_name == m_internal_connection )
+            {
+                m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
+                m_link_path = "";
+            }
+
+            // Otherwise, If the PV Name and Connection String are Distinct,
+            // then Use the Connection String for the Actual Data and
+            // Create a Link Path using the (Alias) Name...
+            else
+            {
+                m_log_path = m_nxgen.m_daslogs_path
+                    + "/" + m_internal_connection;
+                m_link_path = m_nxgen.m_daslogs_path
+                    + "/" + m_internal_name;
+            }
         }
 
         /// NxPVInfo destructor
@@ -369,17 +390,44 @@ private:
                                 "average_value_error",
                                 this->m_stats.stdDev(), this->m_units );
                         }
-                    }
 
-                    if ( this->m_enum != NULL )
-                    {
-                        std::stringstream ss_src;
-                        ss_src << m_nxgen.m_daslogs_path << "/"
-                            << "Device" << this->m_device_id
-                            << ":" << "Enum" << ":" << this->m_enum->name;
-                        std::stringstream ss_dst;
-                        ss_dst << m_log_path << "/" << "enum";
-                        m_nxgen.makeGroupLink( ss_src.str(), ss_dst.str() );
+                        // Last Pass, Create Any Enumerated Type Link Now!
+                        if ( this->m_enum != NULL )
+                        {
+                            std::stringstream ss_src;
+                            ss_src << m_nxgen.m_daslogs_path << "/"
+                                << "Device" << this->m_device_id
+                                << ":" << "Enum"
+                                << ":" << this->m_enum->name;
+
+                            std::stringstream ss_dst;
+                            ss_dst << m_log_path << "/" << "enum";
+
+                            syslog( LOG_INFO,
+                                "[%i] Linking Enum Group %s to %s",
+                                g_pid, ss_src.str().c_str(),
+                                ss_dst.str().c_str() );
+
+                            m_nxgen.makeGroupLink(
+                                ss_src.str(), ss_dst.str() );
+                        }
+
+                        // Last Pass, Create Any PV (Alias) Link Now!
+                        if ( !m_link_path.empty() )
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] Linking PV Channel %s to Alias %s",
+                                g_pid, m_log_path.c_str(),
+                                m_link_path.c_str() );
+
+                            // Manually Create "Target" String for Linking
+                            // (as per makeGroupLink usage...)
+                            m_nxgen.writeString( m_log_path,
+                                "target", m_log_path );
+
+                            m_nxgen.makeGroupLink(
+                                m_log_path, m_link_path );
+                        }
                     }
                 }
             }
@@ -396,7 +444,9 @@ private:
 
         NxGen&          m_nxgen;        ///< NxGen instance used for Nexus ouput
         std::string     m_internal_name;///< Internal Nexus name of variable
+        std::string     m_internal_connection;///< Internal Nexus connection string of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
+        std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
         uint64_t        m_string_data_slab_size;    ///< Running size of character string data value slab
     };
@@ -432,8 +482,9 @@ protected:
 
     void                initialize();
     void                finalize( const STS::RunMetrics &a_run_metrics );
-    STS::PVInfoBase*    makePVInfo( const std::string & a_name,
-                            const std::string & a_device_name,
+    STS::PVInfoBase*    makePVInfo( const std::string & a_device_name,
+                            const std::string & a_name,
+                            const std::string & a_connection,
                             STS::Identifier a_device_id,
                             STS::Identifier a_pv_id,
                             STS::PVType a_type,
@@ -608,6 +659,7 @@ private:
     std::vector<char>           m_comment_data;         /// Comment data buffer
     unsigned long               m_comment_last_offset;  /// Last slab offset written to Nexus
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
+    std::set<std::string>       m_pv_connection_history;/// Connection String/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
 };
 
