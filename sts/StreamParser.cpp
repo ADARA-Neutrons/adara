@@ -1799,6 +1799,7 @@ StreamParser::rxPacket
         string              dev_name;
         Identifier          pv_id = 0;
         string              pv_name;
+        string              pv_connection;
         string              pv_units;
         PVType              pv_type = PVT_INT;
         PVEnumeratedType   *pv_enum = NULL;
@@ -1847,6 +1848,14 @@ StreamParser::rxPacket
                                 }
 
                                 else if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_connection" )
+                                        == 0 )
+                                {
+                                    found |= 1;
+                                    pv_connection = value;
+                                }
+
+                                else if ( xmlStrcmp( pvnode->name,
                                         (const xmlChar*)"pv_id" ) == 0 )
                                 {
                                     found |= 2;
@@ -1887,7 +1896,10 @@ StreamParser::rxPacket
                                                         << ienum->second[i]
                                                             .name
                                                         << " for PV "
-                                                        << pv_name;
+                                                        << pv_name
+                                                        << "("
+                                                        << pv_connection
+                                                        << ")";
                                                     syslog( LOG_INFO,
                                                         "[%i] %s", g_pid,
                                                         ss.str().c_str() );
@@ -1909,6 +1921,30 @@ StreamParser::rxPacket
 
                             if ( found == 7 )
                             {
+                                // Handle Various Name/Connection String
+                                // Combinations... ;-D
+                                // (Make Sure We Always Have "Both"...)
+
+                                // No Name, Just Connection String...
+                                // -> Set Name to Connection String.
+                                if ( pv_name.empty()
+                                        && !pv_connection.empty() )
+                                {
+                                    pv_name = pv_connection;
+                                }
+
+                                // Just Name, No Connection String...
+                                // -> Set Connection String to Name.
+                                else if ( !pv_name.empty()
+                                        && pv_connection.empty() )
+                                {
+                                    pv_connection = pv_name;
+                                }
+
+                                // Else *Both* Name & Connection String
+                                // Were Specified (May or May Not Match!)
+                                // (Could be a PV Alias...)
+
                                 // Note: due to the possibility of certain
                                 // uncontrollable external events relating
                                 // to beam-line re-configuration, it is no
@@ -1981,7 +2017,8 @@ StreamParser::rxPacket
 
                                     bool create = true;
                                     xref = m_pv_name_xref.find(
-                                        dev_name + ":" + pv_name );
+                                        dev_name + ":" + pv_name
+                                            + ":" + pv_connection );
 
                                     if ( xref != m_pv_name_xref.end() )
                                     {
@@ -1990,8 +2027,8 @@ StreamParser::rxPacket
                                         if ( ipv != m_pvs_by_key.end())
                                         {
                                             if ( ipv->second->
-                                                sameDefinition(
-                                                    pv_name, dev_name,
+                                                sameDefinition( dev_name,
+                                                    pv_name, pv_connection,
                                                     pv_type, pv_enum,
                                                     pv_units ) )
                                             {
@@ -2059,8 +2096,8 @@ StreamParser::rxPacket
                                         // If adapter doesn't support
                                         // PV type, makePVInfo will
                                         // return NULL
-                                        info = makePVInfo(
-                                                pv_name, dev_name,
+                                        info = makePVInfo( dev_name,
+                                                pv_name, pv_connection,
                                                 a_pkt.devId(), pv_id,
                                                 pv_type, pv_enum,
                                                 pv_units );
@@ -2068,8 +2105,9 @@ StreamParser::rxPacket
                                         {
                                             m_pvs_by_key[key] = info;
                                             m_pv_name_xref[
-                                                dev_name + ":" + pv_name] =
-                                                    key;
+                                                dev_name + ":" + pv_name
+                                                    + ":" + pv_connection ]
+                                                = key;
                                         }
                                     }
                                 }
@@ -2089,7 +2127,8 @@ StreamParser::rxPacket
                                     // not always be able to.
 
                                     if ( !ipv->second->sameDefinition(
-                                            pv_name, dev_name,
+                                            dev_name, pv_name,
+                                            pv_connection,
                                             pv_type, pv_enum,
                                             pv_units ) )
                                     {
@@ -2097,14 +2136,18 @@ StreamParser::rxPacket
                                         if ( dev_name !=
                                                 ipv->second->m_device_name
                                             || pv_name !=
-                                                ipv->second->m_name )
+                                                ipv->second->m_name
+                                            || pv_connection !=
+                                                ipv->second->m_connection )
                                         {
                                             // Delete existing name-key
                                             // xref entry
                                             xref = m_pv_name_xref.find(
                                                 ipv->second->m_device_name
-                                                    + ":"
-                                                    + ipv->second->m_name
+                                                + ":"
+                                                + ipv->second->m_name
+                                                + ":"
+                                                + ipv->second->m_connection
                                             );
                                             if ( xref !=
                                                     m_pv_name_xref.end() )
@@ -2129,8 +2172,8 @@ StreamParser::rxPacket
 
                                         // If PV type not supported,
                                         // makePVInfo will return NULL
-                                        info = makePVInfo(
-                                            pv_name, dev_name,
+                                        info = makePVInfo( dev_name,
+                                            pv_name, pv_connection,
                                             a_pkt.devId(), pv_id,
                                             pv_type, pv_enum,
                                             pv_units );
@@ -2138,8 +2181,9 @@ StreamParser::rxPacket
                                         {
                                             m_pvs_by_key[key] = info;
                                             m_pv_name_xref[
-                                                dev_name + ":" + pv_name] =
-                                                    key;
+                                                dev_name + ":" + pv_name
+                                                    + ":" + pv_connection ]
+                                                = key;
                                         }
                                         else
                                         {
@@ -2158,6 +2202,11 @@ StreamParser::rxPacket
                                 syslog( LOG_ERR, "[%i] %s", g_pid,
                                     ss.str().c_str() );
                             }
+
+                            // Reset PV Name and Connection String...!
+                            // (So we start with a clean state there... :-)
+                            pv_name.clear();
+                            pv_connection.clear();
                         }
                     }
                 }
