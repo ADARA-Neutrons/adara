@@ -24,7 +24,7 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-usage="   usage:  deploy_adara [ sms | sts | sts_test ]"
+usage="   usage:  deploy_adara [ sms | sts | sts_test | pvsd ]"
 
 if [ $# != 1 ]; then
 	echo -e "\n$usage\n"
@@ -34,9 +34,13 @@ fi
 # Be Group-Friendly...
 umask 002
 
+# Catch Errors Amidst Pipelines... ;-Q
+set -o pipefail
+
 # Parse Command Line Options
 
 IS_STS=0
+IS_PVSD=0
 
 if [ "$1" == "sms" ]; then
 	PROG="SMS"
@@ -49,6 +53,10 @@ elif [ "$1" == "sts_test" ]; then
 	PROG="STS_TEST"
 	prog="sts"
 	IS_STS=1
+elif [ "$1" == "pvsd" ]; then
+	PROG="PVSD"
+	prog="pvsd"
+	IS_PVSD=1
 else
 	echo -e "\n   Unknown Deployment Target: $1"
 	echo -e "\n$usage\n"
@@ -100,19 +108,34 @@ if [ $IS_STS == 1 ]; then
 	install_host=`hostname`
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
 	HOST_TYPE="STS"
-else
+elif [ $IS_PVSD == 1 ]; then
 	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
-	if [[ "#$install_suffix#" != '##' \
-			&& "#$install_suffix#" != '#sms#' ]]; then
-		install_branch="${install_branch}-${install_suffix}"
-		CONFIG="${CONFIG}-${install_suffix}"
-	fi
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
 		install_host=`hostname`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
+		install_suffix="dassrv1"
+	fi
+	if [[ "#$install_suffix#" != '##' ]]; then
+		install_branch="${install_branch}-${install_suffix}"
+		CONFIG="${CONFIG}-${install_suffix}"
+	fi
+	HOST_TYPE="PVSD"
+else
+	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	install_branch=`echo "$install_host" | sed 's/-.*//'`
+	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
+	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
+	if [[ -z $install_host || -z $install_branch ]]; then
+		install_host=`hostname`
+		install_branch=`echo "$install_host" | sed 's/\..*//'`
+	fi
+	if [[ "#$install_suffix#" != '##' \
+			&& "#$install_suffix#" != '#sms#' ]]; then
+		install_branch="${install_branch}-${install_suffix}"
+		CONFIG="${CONFIG}-${install_suffix}"
 	fi
 	HOST_TYPE="Beamline"
 fi
@@ -521,6 +544,26 @@ if [ $need_build == 1 ]; then
 
 	ls -l "$tag_archive/sts" |& tee -a $LOG
 
+	# PVSD Server
+
+	echo -e \
+		"\nCopying PVSD Server Executable into Archive Release Tag:\n" \
+		| tee -a $LOG
+
+	cp -i -p PVStreamer/pvsd/pvsd "$tag_archive" |& tee -a $LOG
+
+	copy_ok=$?
+
+	if [ $copy_ok != 0 ]; then
+		echo -e \
+		"\nError Copying PVSD into Release Tag Directory! ($copy_ok)\n" \
+			| tee -a $LOG
+		echo "Bailing Out..." | tee -a $LOG
+		exit -12
+	fi
+
+	ls -l "$tag_archive/pvsd" |& tee -a $LOG
+
 	# DASMON Server
 
 	echo -e \
@@ -840,6 +883,8 @@ ls -l | tee -a $LOG
 
 if [ $IS_STS == 1 ]; then
 	deploy_history_base="sts.deployment.history.txt"
+elif [ $IS_PVSD == 1 ]; then
+	deploy_history_base="pvsd.deployment.history.txt"
 else
 	deploy_history_base="sms/deployment.history.txt"
 fi
@@ -1020,10 +1065,42 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 /bin/rm -rf "$TMP_DIR/ADARA" |& tee -a $LOG
 
 #
-# (Optionally restart the SMS Daemon Service...?)
+# Optionally restart the SMS Daemon Service...? (Or PVSD Service...)
 #
 
-if [ $PROG == "SMS" ]; then
+if [ $PROG == "PVSD" ]; then
+
+	echo -e "\nCurrent PVSD Status:\n" | tee -a $LOG
+
+	echo "sudo /sbin/service pvsd status" | tee -a $LOG
+	sudo /sbin/service pvsd status |& tee -a $LOG
+
+	echo -e -n \
+		"\nDo You want to Restart the PVSD service now [yes/No]? "
+
+	read restart_ck
+
+	if [ "#$restart_ck#" == '#yes#' ]; then
+
+		echo -e "\nRestarting PVSD service now on `hostname`." \
+			| tee -a $LOG
+
+		echo "sudo /sbin/service pvsd restart" | tee -a $LOG
+		sudo /sbin/service pvsd restart |& tee -a $LOG
+
+		restart_ok=$?
+
+		if [ $restart_ok != 0 ]; then
+			echo -e \
+				"\nError Restarting PVSD Service! ($restart_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -24
+		fi
+
+	fi
+
+elif [ $PROG == "SMS" ]; then
 
 	echo -e "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
 
