@@ -717,12 +717,12 @@ if [ $tag_ok != 0 ]; then
 			exit -4
 		fi
 
-		echo -e "\nPushing New Config $HOST_TYPE Branch to Origin:\n" \
+		echo -e "\nPushing New Config $HOST_TYPE Branch to Origin:" \
 			| tee -a $LOG
 
 		echo
 		echo "git push origin $install_branch"
-		git push origin "$install_branch"
+		git push --set-upstream origin "$install_branch"
 
 		pushbranch_ok=$?
 
