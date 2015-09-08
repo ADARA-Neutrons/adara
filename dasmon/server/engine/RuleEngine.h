@@ -38,6 +38,7 @@ public:
 
     struct RuleInfo
     {
+        bool            enabled;
         std::string     fact;
         std::string     expr;
         std::string     desc;

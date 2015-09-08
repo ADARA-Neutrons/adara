@@ -119,6 +119,8 @@ StreamAnalyzer::loadConfig()
     ifstream inf( cfg.c_str());
     string line;
     int mode = 0;
+    int line_no = 0;
+    size_t num_tok;
 
     if ( !inf.is_open())
     {
@@ -131,6 +133,7 @@ StreamAnalyzer::loadConfig()
             while( !inf.eof())
             {
                 getline( inf, line );
+                ++line_no;
 
                 if ( line.empty() || line[0] == '#' )
                     continue;
@@ -144,14 +147,15 @@ StreamAnalyzer::loadConfig()
                     if ( mode == 1 )
                     {
                         boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
-                        tok = tokens.begin();
-
-                        if ( tok == tokens.end())
+                        num_tok = distance( tokens.begin(), tokens.end() );
+                        if ( num_tok < 3 )
                             throw -1;
+
+                        tok = tokens.begin();
+                        rule.enabled = boost::lexical_cast<bool>(*tok++);
                         rule.fact = *tok++;
-                        if ( tok == tokens.end())
-                            throw -2;
                         rule.expr = *tok++;
+
                         if ( tok != tokens.end())
                         {
                             rule.desc = *tok++;
@@ -166,24 +170,18 @@ StreamAnalyzer::loadConfig()
                     else if ( mode == 2 )
                     {
                         boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
+                        num_tok = distance( tokens.begin(), tokens.end() );
+                        if ( num_tok < 6 )
+                            throw -1;
+
                         tok = tokens.begin();
-
-                        if ( tok == tokens.end())
-                            throw -10;
+                        signal.enabled = boost::lexical_cast<bool>(*tok++);
                         signal.name = *tok++;
-                        if ( tok == tokens.end())
-                            throw -11;
                         signal.fact = *tok++;
-                        if ( tok == tokens.end())
-                            throw -12;
                         signal.source = *tok++;
-                        if ( tok == tokens.end())
-                            throw -13;
                         signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
-                        if ( tok == tokens.end())
-                            throw -14;
-
                         signal.msg = *tok++;
+
                         if ( tok != tokens.end())
                         {
                             signal.desc = *tok++;
@@ -204,7 +202,7 @@ StreamAnalyzer::loadConfig()
             map<string,string> errors;
             if ( !setDefinitions( loaded_rules, loaded_signals, errors ))
             {
-                syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+                syslog( LOG_ERR, "Failed setting rules from configuration file: %s", cfg.c_str() );
 
                 for ( map<string,string>::iterator ie = errors.begin(); ie != errors.end(); ++ie )
                     syslog( LOG_ERR, "Config error on %s: %s", ie->first.c_str(), ie->second.c_str() );
@@ -213,7 +211,7 @@ StreamAnalyzer::loadConfig()
         catch ( ... )
         {
             inf.close();
-            syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+            syslog( LOG_ERR, "Error at line %i in configuration file: %s", line_no, cfg.c_str() );
         }
     }
 }
@@ -236,26 +234,39 @@ StreamAnalyzer::saveConfig()
         return;
     }
 
-    // FACT_ID  Rule expression
+    // enabled;FACT_ID;Rule expression;comment
 
     outf << "[rules]" << endl;
 
     vector<RuleEngine::RuleInfo> rules;
+    vector<RuleEngine::RuleInfo>::iterator rule;
+
     m_engine->getDefinedRules( rules );
 
-    for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
+    for ( rule = rules.begin(); rule != rules.end(); ++rule )
     {
-        outf << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
+        outf << true << ";" << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
     }
 
-    // SIGNAL_ID,FACT_ID,SOURCE,LEVEL,Message
+    for ( rule = m_rules_disabled.begin(); rule != m_rules_disabled.end(); ++rule )
+    {
+        outf << false << ";" << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
+    }
+
+    // enabled;SIGNAL_ID;FACT_ID;SOURCE;LEVEL;Message;Comment
 
     outf << "[signals]" << endl;
 
     for ( map<string,SignalInfo>::iterator sig = m_signals.begin(); sig != m_signals.end(); ++sig )
     {
-        outf << sig->second.name << ";" << sig->second.fact << ";" << sig->second.source << ";";
+        outf << true << ";" << sig->second.name << ";" << sig->second.fact << ";" << sig->second.source << ";";
         outf << sig->second.level << ";" << sig->second.msg << ";" << sig->second.desc << endl;
+    }
+
+    for ( vector<SignalInfo>::iterator sig = m_signals_disabled.begin(); sig != m_signals_disabled.end(); ++sig )
+    {
+        outf << false << ";" << sig->name << ";" << sig->fact << ";" << sig->source << ";";
+        outf << sig->level << ";" << sig->msg << ";" << sig->desc << endl;
     }
 
     outf.close();
@@ -371,9 +382,15 @@ StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std:
 {
     m_engine->getDefinedRules( a_rules );
 
+    for ( vector<RuleEngine::RuleInfo>::iterator r = m_rules_disabled.begin(); r != m_rules_disabled.end(); ++r )
+        a_rules.push_back( *r );
+
     a_signals.clear();
     for ( map<string,SignalInfo>::const_iterator s = m_signals.begin(); s != m_signals.end(); ++s )
         a_signals.push_back( s->second );
+
+    for ( vector<SignalInfo>::iterator s = m_signals_disabled.begin(); s != m_signals_disabled.end(); ++s )
+        a_signals.push_back( *s );
 }
 
 
@@ -399,12 +416,17 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     bool res = true;
     RuleEngine *engine = new RuleEngine();
     vector<RuleEngine::RuleInfo>::const_iterator r;
+    vector<RuleEngine::RuleInfo> rules_disabled;
+    vector<SignalInfo> signals_disabled;
 
     for ( r = a_rules.begin(); r != a_rules.end(); ++r )
     {
         try
         {
-            engine->defineRule( r->fact, r->expr, r->desc );
+            if ( r->enabled )
+                engine->defineRule( r->fact, r->expr, r->desc );
+            else
+                rules_disabled.push_back( *r );
         }
         catch ( std::exception &e )
         {
@@ -428,42 +450,53 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     for ( vector<SignalInfo>::const_iterator sig = a_signals.begin(); sig != a_signals.end(); ++sig )
     {
-        // Rule engine converts facts to upper case and trims spaces
-        sig_fact = boost::to_upper_copy( sig->fact );
-        boost::algorithm::trim( sig_fact );
-
-        // The only real check to do here is to ensure referential integrity
-        for ( r = a_rules.begin(); r != a_rules.end(); ++r )
+        // Ignore disabled signals
+        if ( sig->enabled )
         {
             // Rule engine converts facts to upper case and trims spaces
-            tmp = boost::to_upper_copy( r->fact );
-            boost::algorithm::trim( tmp );
+            sig_fact = boost::to_upper_copy( sig->fact );
+            boost::algorithm::trim( sig_fact );
 
-            if ( sig_fact == tmp )
+            // The only real check to do here is to ensure referential integrity
+            for ( r = a_rules.begin(); r != a_rules.end(); ++r )
             {
-                tmp_signals[sig_fact] = *sig;
-                break;
-            }
-        }
+                if ( !r->enabled )
+                    continue;
 
-        if ( r == a_rules.end())
-        {
-            // Is this a built-in fact?
-            for ( i = 0; i < BIF_COUNT; ++i )
-            {
-                if ( m_fact_name[i] == sig_fact )
+                // Rule engine converts facts to upper case and trims spaces
+                tmp = boost::to_upper_copy( r->fact );
+                boost::algorithm::trim( tmp );
+
+                if ( sig_fact == tmp )
                 {
                     tmp_signals[sig_fact] = *sig;
                     break;
                 }
             }
 
-            // If unassociated signal found, abort (probably a mistake)
-            if ( i == BIF_COUNT )
+            if ( r == a_rules.end())
             {
-                a_errors[sig->name] = "References undefined rule";
-                res = false;
+                // Is this a built-in fact?
+                for ( i = 0; i < BIF_COUNT; ++i )
+                {
+                    if ( m_fact_name[i] == sig_fact )
+                    {
+                        tmp_signals[sig_fact] = *sig;
+                        break;
+                    }
+                }
+
+                // If unassociated signal found, abort (probably a mistake)
+                if ( i == BIF_COUNT )
+                {
+                    a_errors[sig->name] = "References undefined rule";
+                    res = false;
+                }
             }
+        }
+        else
+        {
+            signals_disabled.push_back( *sig );
         }
     }
 
@@ -578,6 +611,8 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     // Make new engine and new signals active
     m_engine = engine;
+    m_rules_disabled = rules_disabled;
+    m_signals_disabled = signals_disabled;
 
     return true;
 }
@@ -1220,7 +1255,7 @@ void
 StreamAnalyzer::onAssert( const std::string &a_fact )
 {
     map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
-    if ( isig != m_signals.end())
+    if ( isig != m_signals.end() )
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
             (*l)->signalAssert( isig->second );

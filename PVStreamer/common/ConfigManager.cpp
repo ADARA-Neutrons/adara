@@ -67,24 +67,33 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     string key = makeDeviceKey( a_descriptor.m_name, a_descriptor.m_source, a_descriptor.m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
-    if ( idev != m_devices.end())
-    {
-        // This is an existing device
 
+    // This is an existing device
+    if ( idev != m_devices.end() )
+    {
         if ( a_descriptor == *idev->second )
         {
+            syslog( LOG_INFO, "Device Definition Unchanged: %s:%s:%lu",
+                a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
+                (unsigned long) a_descriptor.m_protocol );
+
             // Descriptor has not changed, so just return existing record
             record = idev->second;
         }
         else
         {
-            // The descriptor is not identical to existing record, analyze differences
+            // The descriptor is not identical to existing record,
+            // analyze differences
 
-            syslog( LOG_INFO, "Re-defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
+            syslog( LOG_INFO, "Re-defining device: %s:%s:%lu",
+                a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
+                (unsigned long) a_descriptor.m_protocol );
 
-            // Record is different, must make new record but try to re-use identifiers
+            // Record is different, must make new record but
+            // try to re-use identifiers
             //const DeviceDescriptor *old_desc = idev->second.get();
-            DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
+            DeviceDescriptor *new_desc = new DeviceDescriptor(
+                a_descriptor ); // Deep copy
 
             // Now assign/reassign IDs
             new_desc->m_id = idev->second->m_id;
@@ -104,8 +113,13 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     (*ipv)->m_id = old_pv->m_id;
                 else
                 {
+                    syslog( LOG_INFO, "Found New PV %s: %s",
+                        (*ipv)->m_name.c_str(),
+                        (*ipv)->m_connection.c_str() );
+
                     // New PV, find a free ID (not in old IDs)
-                    for ( ipv2 = idev->second->m_pvs.begin(); ipv2 != idev->second->m_pvs.end(); ++ipv2 )
+                    for ( ipv2 = idev->second->m_pvs.begin();
+                            ipv2 != idev->second->m_pvs.end(); ++ipv2 )
                     {
                         if ( next_id < (*ipv2)->m_id )
                             break;
@@ -117,11 +131,19 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 }
             }
 
-            // Send PV disconnected packets for old PVs that are not in new descriptor
-            for ( ipv = idev->second->m_pvs.begin(); ipv != idev->second->m_pvs.end(); ++ipv )
+            // Send PV disconnected packets for old PVs that are
+            // not in new descriptor
+            for ( ipv = idev->second->m_pvs.begin();
+                    ipv != idev->second->m_pvs.end(); ++ipv )
             {
                 if ( !new_desc->getPvByName( (*ipv)->m_name ))
+                {
+                    syslog( LOG_INFO, "Undefining Old PV %s: %s",
+                        (*ipv)->m_name.c_str(),
+                        (*ipv)->m_connection.c_str() );
+
                     sendPvUndefined( idev->second, *ipv );
+                }
             }
 
             // Ensure all new PV names are unique
@@ -134,22 +156,29 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             idev->second = record;
         }
     }
+
+    // This is a NEW device
     else
     {
-        // This is a NEW device
+        syslog( LOG_INFO, "Defining device: %s:%s:%lu",
+            a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
+            (unsigned long) a_descriptor.m_protocol );
 
-        syslog( LOG_INFO, "Defining device: %s:%s:%lu", a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(), (unsigned long)a_descriptor.m_protocol );
-
-        // No existing record, create a new one copied from the passed-in descriptor
-        DeviceDescriptor *new_desc = new DeviceDescriptor( a_descriptor ); // Deep copy
+        // No existing record, create a new one copied from the
+        // passed-in descriptor
+        DeviceDescriptor *new_desc =
+            new DeviceDescriptor( a_descriptor ); // Deep copy
 
         // Assign an ID to the device and PVs
         new_desc->m_id = getNextDeviceID();
 
         // PV IDs can be assigned arbitrarily for new devices
         Identifier id = 1;
-        for ( vector<PVDescriptor*>::iterator ipv = new_desc->m_pvs.begin(); ipv != new_desc->m_pvs.end(); ++ipv )
+        for ( vector<PVDescriptor*>::iterator ipv = new_desc->m_pvs.begin();
+                ipv != new_desc->m_pvs.end(); ++ipv )
+        {
             (*ipv)->m_id = id++;
+        }
 
         // Ensure all new PV names are unique
         makePvNamesUnique( key, *new_desc );
@@ -248,38 +277,46 @@ ConfigManager::getNextDeviceID() const
  * @param a_key - Device map key for device being checked
  * @param a_descriptor - Descriptor for device being checked
  *
- * This method examines the PV names of the specfied descriptor agains all currently configure
- * PVs except for a descriptor being redefined (i.e. with the same key). If a conflict is found
- * the new conflicting PV is renamed by appeding a "_dupX" suffix (where X is a conflict
- * counter) and checked again. This continues until all conflicts have been resolved.
+ * This method examines the PV names of the specified descriptor against
+ * all currently configured PVs except for a descriptor being redefined
+ * (i.e. with the same key). If a conflict is found the new conflicting PV
+ * is renamed by appending a "_dupX" suffix (where X is a conflict counter)
+ * and checked again. This continues until all conflicts have been resolved.
  *
- * This step tries to ensure that ADARA clients will receive PVs with unique names. PV names are
- * required to be unique, and this routine is a "just-in-case" measure to prevent editing errors
- * from causing serious client issues. This method can not prevent other data sources from
- * injecting Device Descriptor packets with conflicting names. This condition must be trapped by
- * the SMS.
+ * This step tries to ensure that ADARA clients will receive PVs with
+ * unique names. PV names are required to be unique, and this routine is
+ * a "just-in-case" measure to prevent editing errors from causing serious
+ * client issues. This method cannot prevent other data sources from
+ * injecting Device Descriptor packets with conflicting names. This
+ * condition must be trapped by the SMS.
  */
 void
-ConfigManager::makePvNamesUnique( const string &a_key, DeviceDescriptor &a_descriptor )
+ConfigManager::makePvNamesUnique( const string &a_key,
+        DeviceDescriptor &a_descriptor )
 {
     vector<PVDescriptor*>::const_iterator ipv;
     set<string> names;
     set<string>::iterator inames;
 
-    for ( map<string,DeviceRecordPtr>::iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
+    for ( map<string,DeviceRecordPtr>::iterator idev = m_devices.begin();
+            idev != m_devices.end(); ++idev )
     {
         // Skip device being redefined
         if ( idev->first == a_key )
             continue;
 
-        for ( ipv = idev->second->m_pvs.begin(); ipv != idev->second->m_pvs.end(); ++ipv )
+        for ( ipv = idev->second->m_pvs.begin();
+                ipv != idev->second->m_pvs.end(); ++ipv )
+        {
             names.insert( (*ipv)->m_name );
+        }
     }
 
-    string          new_name;
-    unsigned short  count;
+    string new_name;
+    unsigned short count;
 
-    for ( ipv = a_descriptor.m_pvs.begin(); ipv != a_descriptor.m_pvs.end(); ++ipv )
+    for ( ipv = a_descriptor.m_pvs.begin();
+            ipv != a_descriptor.m_pvs.end(); ++ipv )
     {
         count = 0;
         new_name = (*ipv)->m_name;
@@ -287,7 +324,10 @@ ConfigManager::makePvNamesUnique( const string &a_key, DeviceDescriptor &a_descr
         while ( 1 )
         {
             if ( count )
-                new_name = (*ipv)->m_name + "_dup" + boost::lexical_cast<string>(count);
+            {
+                new_name = (*ipv)->m_name + "_dup"
+                    + boost::lexical_cast<string>(count);
+            }
 
             if ( names.find( new_name ) != names.end() )
                 ++count;
@@ -295,7 +335,16 @@ ConfigManager::makePvNamesUnique( const string &a_key, DeviceDescriptor &a_descr
                 break;
         }
 
-        (*ipv)->m_name = new_name;
+        // Only Change the Name as Needed... ;-D
+        if ( count )
+        {
+            syslog( LOG_ERR,
+                "%s Device %s: Renaming Name-Clash PV from %s to %s!",
+                "PVSD ERROR:", a_descriptor.m_name.c_str(),
+                (*ipv)->m_name.c_str(), new_name.c_str() );
+
+            (*ipv)->m_name = new_name;
+        }
     }
 }
 
@@ -312,6 +361,12 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s Descriptor Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+            a_dev_desc->m_name.c_str() );
+    }
 }
 
 
@@ -327,11 +382,18 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s Undefined Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
+            a_dev_desc->m_name.c_str() );
+    }
 }
 
 
 void
-ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr a_old_dev_desc )
+ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
+        DeviceRecordPtr a_old_dev_desc )
 {
     bool timeout;
     StreamPacket *pkt = m_stream_api->getFreePacket( 5000, timeout );
@@ -342,6 +404,12 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr 
         pkt->old_device = a_old_dev_desc;
 
         m_stream_api->putFilledPacket( pkt );
+    }
+    else {
+        syslog( LOG_ERR,
+        "%s No Free Packets! %s Device %s (Old %s) Descriptor Update Lost!",
+            "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
+            a_dev_desc->m_name.c_str(), a_old_dev_desc->m_name.c_str() );
     }
 }
 
@@ -356,9 +424,18 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
         pkt->type = VariableUpdate;
         pkt->device = a_dev_desc;
         pkt->pv = a_pv_desc;
-        pkt->state = PVState( ::ADARA::VariableStatus::UPSTREAM_DISCONNECTED, ::ADARA::VariableSeverity::INVALID );
+        pkt->state = PVState(
+            ::ADARA::VariableStatus::UPSTREAM_DISCONNECTED,
+            ::ADARA::VariableSeverity::INVALID );
 
         m_stream_api->putFilledPacket( pkt );
+    }
+    else {
+        syslog( LOG_ERR,
+            "%s No Free Packets! %s Device %s PV %s (%s) Undefined Lost!",
+            "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
+            a_dev_desc->m_name.c_str(), a_pv_desc->m_name.c_str(),
+            a_pv_desc->m_connection.c_str() );
     }
 }
 

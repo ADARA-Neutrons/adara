@@ -138,6 +138,8 @@ private:
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
     std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
+    std::map<Identifier,std::vector<PVEnumeratedType> >
+                                            m_enums_by_dev;             ///< Container of Enumerated Types (by device)
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
     unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received

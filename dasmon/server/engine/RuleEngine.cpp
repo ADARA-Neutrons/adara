@@ -562,6 +562,7 @@ RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
     a_rules.clear();
     for ( map<string,Rule*>::const_iterator r = m_rules.begin(); r != m_rules.end(); ++r )
     {
+        info.enabled = true;
         info.fact = r->first;
         info.expr = r->second->getExpr();
         info.desc = r->second->getDesc();

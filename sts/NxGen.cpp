@@ -75,37 +75,101 @@ NxGen::~NxGen()
 /*! \brief Factory method for PVInfoBase instances
  *  \return A new PVInfoBase (derived) instance
  *
- * This method constructs Nexus-specific PVInfoBase objects for use by the generalizes process variable hanlders in the
- * StreamParser class. Due to ADARA protocol limitations, only uint32 and double types are supported (others are
- * mapped to these).
+ * This method constructs Nexus-specific PVInfoBase objects for use by
+ * the generalized process variable handlers in the StreamParser class.
+ * Due to ADARA protocol limitations, only uint32, double and string
+ * types are supported (others are mapped to these).
  */
 STS::PVInfoBase*
 NxGen::makePVInfo
 (
-    const string       &a_name,         ///< [in] Name of PV
-    const string       &a_device_name,  ///< [in] Name of device that owns the PV
-    STS::Identifier     a_device_id,    ///< [in] ID of device that owns the PV
-    STS::Identifier     a_pv_id,        ///< [in] ID of the PV
-    STS::PVType         a_type,         ///< [in] Type of PV
-    const string       &a_units         ///< [in] Units of PV (empty if not needed)
+    const string           &a_device_name,  ///< [in] Name of device that owns the PV
+    const string           &a_name,         ///< [in] Name of PV
+    const string           &a_connection,   ///< [in] PV Connection String
+    STS::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
+    STS::Identifier         a_pv_id,        ///< [in] ID of the PV
+    STS::PVType             a_type,         ///< [in] Type of PV
+    STS::PVEnumeratedType  *a_enum,         ///< [in] Enumerated Type of PV
+    const string           &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
     set<string>::iterator i;
     string internal_name = a_name;
-    uint32_t ver = 0;
+    string internal_connection = a_connection;
+    uint32_t name_ver = 0;
+    uint32_t connection_ver = 0;
 
-    // Check for name collisions: This code looks for name accross all PV names and if found
-    // increments a version number. Then it checks again to make sure the auto-generated internal
-    // name doesn't collide with an existing (top-level) name. This continues until a version
-    // is found that doesn't collide.
+    // Check for Name Collisions: This code looks for the Name across
+    // all PV names and if found increments a version number.
+    // Then it checks again to make sure the auto-generated internal
+    // Name doesn't collide with an existing (top-level) Name.
+    // This continues until a version is found that doesn't collide.
+
     while ( 1 )
     {
         i = m_pv_name_history.find( internal_name );
         if ( i != m_pv_name_history.end())
-            internal_name = a_name + "(" + boost::lexical_cast<string>( ++ver ) + ")";
+        {
+            internal_name = a_name + "("
+                + boost::lexical_cast<string>( ++name_ver ) + ")";
+        }
         else
         {
+            if ( name_ver > 0 )
+            {
+                syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Name Clash %s -> %s",
+                    g_pid, a_device_name.c_str(),
+                    a_name.c_str(), internal_name.c_str() );
+            }
             m_pv_name_history.insert( internal_name );
+            break;
+        }
+    }
+
+    // Now Handle Connection String Issues/Collisions.
+
+    // If the Name and Connection String were the same before,
+    // then make them the same again... ;-D
+    if ( a_name == a_connection )
+    {
+        internal_connection = internal_name;
+        connection_ver = name_ver;
+    }
+
+    // Now Check for Connection String Collisions: This code looks for
+    // Connection Strings across all PVs and if found increments a
+    // version number.  Then it checks again to make sure the
+    // auto-generated internal Connection String doesn't collide with
+    // an existing (top-level) Connection String.  This continues until
+    // a version is found that doesn't collide.
+
+    // (Note: If the Name matches the Connection String, then we may have
+    // _Already_ made the Connection String unique above, by copying...)
+
+    // Let's *Not* Assume that any Connection String collisions
+    // correspond to 2 Different Aliases of the Same Variable, just
+    // in case that happens Not to be true... Better to duplicate a
+    // PV than throw away the values for a distinct PV with a Name Clash.)
+
+    while ( 1 )
+    {
+        i = m_pv_connection_history.find( internal_connection );
+        if ( i != m_pv_connection_history.end())
+        {
+            internal_connection = a_connection + "("
+                + boost::lexical_cast<string>( ++connection_ver ) + ")";
+        }
+        else
+        {
+            if ( connection_ver > 0 )
+            {
+                syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Connection String Clash %s -> %s",
+                    g_pid, a_device_name.c_str(),
+                    a_connection.c_str(), internal_connection.c_str() );
+            }
+            m_pv_connection_history.insert( internal_connection );
             break;
         }
     }
@@ -115,15 +179,22 @@ NxGen::makePVInfo
     case STS::PVT_INT:  // ADARA only supports uint32_t currently
     case STS::PVT_ENUM:
     case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+        return new NxPVInfo<uint32_t>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+        return new NxPVInfo<double>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     case STS::PVT_STRING:
-        return new NxPVInfo<string>( a_name, internal_name, a_device_name, a_device_id, a_pv_id, a_type, a_units, *this );
+        return new NxPVInfo<string>( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
     }
 
-    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "makePVInfo() failed - invalid PV type: " << a_type );
+    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
+        "makePVInfo() failed - invalid PV type: " << a_type );
 }
 
 
@@ -1281,7 +1352,7 @@ NxGen::flushCommentData()
         writeSlab( m_daslogs_path + "/comments/length",
             m_comment_length, 0 );
 
-        if ( m_comment_data.size())
+        if ( m_comment_data.size() )
         {
             writeSlab( m_daslogs_path + "/comments/data",
                 m_comment_data, 0 );
@@ -1295,6 +1366,168 @@ NxGen::flushCommentData()
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "flushCommentData() failed." )
+    }
+}
+
+
+/*! \brief Writes PV Enumerated Type Definitions to NeXus logs
+ *
+ * This method creates Enumerated Type groups for the given DeviceId
+ * in the NeXus DAS Logs.
+ */
+void
+NxGen::writeDeviceEnums
+(
+    STS::Identifier a_devId,                ///< [in] DeviceId
+    vector<STS::PVEnumeratedType> a_enumVec ///< [in] Vector of Enumerated Type Structs
+)
+{
+    for ( vector<STS::PVEnumeratedType>::iterator ienum =
+                a_enumVec.begin();
+            ienum != a_enumVec.end(); ++ienum )
+    {
+        // First Check for Name Clashes - Increment Counter Til Clean...
+
+        string enum_name = ienum->name;
+        uint32_t count = 1;
+        bool done;
+
+        do
+        {
+            done = true;
+
+            // Search Preceding Enums...
+            for ( vector<STS::PVEnumeratedType>::iterator idup =
+                        a_enumVec.begin();
+                    idup != ienum; ++idup )
+            {
+                // Name Clash...!
+                if ( !enum_name.compare( idup->name ) )
+                {
+                    count++;
+
+                    stringstream ss;
+                    ss << "Enum Log Group Name Clash - Device " << a_devId
+                        << " Duplicate Enum Name " << enum_name
+                        << ", Bumping Count to " << count
+                        << " - Next Enum Name to Try: "
+                        << ienum->name << "_" << count;
+                    syslog( LOG_INFO, "[%i] %s", g_pid,
+                        ss.str().c_str() );
+
+                    stringstream ss_new;
+                    ss_new << ienum->name << "_" << count;
+                    enum_name = ss_new.str();
+
+                    done = false;
+
+                    break;
+                }
+            }
+        }
+        while ( !done );
+
+        stringstream ss;
+        ss << "Creating Enum Log Group for Device " << a_devId
+            << " enum_name=" << enum_name;
+        syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+
+        // Save "New Name" for Enum, For Subsequent Comparisons...!
+        ienum->name = enum_name;
+
+        try
+        {
+            // Enum Group (NXcollection)
+
+            stringstream ss;
+            ss << m_daslogs_path << "/" << "Device" << a_devId
+                << ":" << "Enum" << ":" << enum_name;
+
+            makeGroup( ss.str(), "NXcollection" );
+
+            makeDataset( ss.str(), "names_offset", NeXus::UINT32 );
+            makeDataset( ss.str(), "names_length", NeXus::UINT32 );
+            makeDataset( ss.str(), "names_data", NeXus::CHAR );
+
+            makeDataset( ss.str(), "values", NeXus::UINT32 );
+
+            // Enum Element Names (concatenate like comment strings... ;-b)
+
+            vector<uint32_t> names_offset;
+            vector<uint32_t> names_length;
+            vector<char> names_data;
+
+            unsigned long names_last_offset = 0;
+
+            // Does Everything "Match Up" for the "Easy" Enum Format...?
+            bool easy = true;
+            if ( ienum->element_values.size()
+                    != ienum->element_names.size() )
+            {
+                // Dang, No Easy Solution... (I.e. Element Array Mismatch!)
+                stringstream sss;
+                sss << "STS Error:"
+                    << " writeDeviceEnums() Element Array Mismatch"
+                    << " for Device " << a_devId
+                    << " Enum " << enum_name
+                    << " - No Easy Strings!";
+                syslog( LOG_ERR, "[%i] %s", g_pid, sss.str().c_str() );
+
+                easy = false;
+            }
+
+            for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
+            {
+                // Capture Offset and Length of Element Name in Data Str
+
+                names_offset.push_back( names_last_offset );
+                names_last_offset += ienum->element_names[i].size();
+                names_length.push_back( ienum->element_names[i].size() );
+
+                names_data.reserve( names_data.size()
+                    + ienum->element_names[i].size() );
+                names_data.insert( names_data.end(),
+                    ienum->element_names[i].begin(),
+                    ienum->element_names[i].end()) ;
+
+                // Also Stuff in "Easy-to-Read" Per-Element Scalar Strings!
+                if ( easy )
+                {
+                    stringstream ss_easy;
+                    ss_easy << "name_" << ienum->element_values[i];
+                    writeString( ss.str(), ss_easy.str(),
+                        ienum->element_names[i] );
+                }
+            }
+
+            writeSlab( ss.str() + "/names_offset", names_offset, 0 );
+            writeSlab( ss.str() + "/names_length", names_length, 0 );
+
+            if ( names_data.size() )
+            {
+                writeSlab( ss.str() + "/names_data", names_data, 0 );
+            }
+
+            // Enum Element Values
+
+            writeSlab( ss.str() + "/values", ienum->element_values, 0 );
+
+            // Manually Create "Target" String for Linking
+            // (as per makeGroupLink usage...)
+            writeString( ss.str(), "target", ss.str() );
+        }
+        catch( TraceException &e )
+        {
+            // Don't Propagate TraceException, Just Log Failure...
+            // (Enumerated Types are _Not_ Mission Critical (Hopefully!).
+            stringstream sse;
+            sse << "STS Error:"
+                << " writeDeviceEnums() failed"
+                << " for Device " << a_devId
+                << " Enum " << enum_name
+                << " " << e.toString( true, true );
+            syslog( LOG_ERR, "[%i] %s", g_pid, sse.str().c_str() );
+        }
     }
 }
 
@@ -1425,7 +1658,8 @@ NxGen::writeMultidimDataset
 
 /*! \brief Creates a Nexus link
  *
- * This method creates a link from the source path to the destination path in the output Nexus file.
+ * This method creates a link from the source path
+ * to the destination path in the output Nexus file.
  */
 void
 NxGen::makeLink
@@ -1436,8 +1670,34 @@ NxGen::makeLink
 {
     if ( m_h5nx.H5NXmake_link( a_source_path, a_dest_name ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_link() failed for source: " << a_source_path << ", dest: "
-                     << a_dest_name )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_link() failed for source: "
+                << a_source_path << ", dest: " << a_dest_name )
+    }
+}
+
+
+/*! \brief Creates a Nexus link to a GROUP (duh)
+ *
+ * This method creates a link from the source path of a GROUP
+ * to the destination path in the output Nexus file.
+ *
+ * (and doesn't try to create any "target" attributes
+ * for a dataset that doesn't actually exist... ;-b)
+ */
+void
+NxGen::makeGroupLink
+(
+    const string &a_source_path,  ///< [in] Source path in Nexus file (must already exist)
+    const string &a_dest_name     ///< [in] Destination path in Nexus file (must NOT exist)
+)
+{
+    if ( m_h5nx.H5NXmake_group_link( a_source_path, a_dest_name )
+            != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXmake_group_link() failed for source: "
+                << a_source_path << ", dest: " << a_dest_name )
     }
 }
 

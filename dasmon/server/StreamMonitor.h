@@ -256,7 +256,8 @@ enum ThreadState
     TS_PKT_STREAM_ANNOTATION,
     TS_PKT_BEAM_MONITOR_EVENT,
     TS_PKT_BANKED_EVENT,
-    TS_NOTIFY_RUN_INFO          = 200,
+    TS_NOTIFY_NONE              = 200,
+    TS_NOTIFY_RUN_INFO,
     TS_NOTIFY_BEAM_INFO,
     TS_NOTIFY_CONN_STATUS,
     TS_NOTIFY_RUN_STATUS,
@@ -300,6 +301,7 @@ public:
 
     inline uint32_t getProcTicker() { return m_proc_ticker; }
     inline uint32_t getProcState() { return m_proc_state; }
+    inline uint32_t getNotifyState() { return m_notify_state; }
     inline uint32_t getMetricsTicker() { return m_metrics_ticker; }
     inline uint32_t getMetricsState() { return m_metrics_state; }
 #ifndef NO_DB
@@ -423,6 +425,7 @@ private:
     bool                            m_pixmap_processed;
     uint32_t                        m_proc_ticker;      ///< "Alive" indicator for stream processing thread
     static uint32_t                 m_proc_state;       ///< General state/step of stream processing thread.
+    static uint32_t                 m_notify_state;
     uint32_t                        m_metrics_ticker;   ///< "Alive" indicator for stream metrics thread
     uint32_t                        m_metrics_state;    ///< General state/step of stream metrics thread.
     bool                            m_in_prolog;

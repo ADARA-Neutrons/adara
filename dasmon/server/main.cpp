@@ -49,7 +49,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.3.8"
+#define DASMON_VERSION "1.4.0"
 
 
 bool g_child_signal = false;
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
         // Connect to and process the stream
         monitor.start();
 
-        // If we mad it here as a daemon, signal parent that all is well
+        // If we made it here as a daemon, signal parent that all is well
         if ( daemon )
             signalParent(0);
 

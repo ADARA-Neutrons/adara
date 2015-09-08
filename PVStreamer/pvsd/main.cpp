@@ -92,7 +92,8 @@ signalParent( int ret_code )
     if ( sigqueue( pid, SIGUSR1, data ) < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "Unable to signal parent: %s", strerror(e));
+        syslog( LOG_ERR, "PVSD ERROR: Unable to signal parent: %s",
+            strerror(e) );
     }
 }
 
@@ -105,7 +106,7 @@ daemonize()
     if ( pid < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "Unable to fork: %s", strerror(e));
+        syslog( LOG_ERR, "PVSD ERROR: Unable to fork: %s", strerror(e) );
         exit(1);
     }
 
@@ -124,7 +125,7 @@ daemonize()
     if ( setsid() < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "Unable to setsid: %s", strerror(e));
+        syslog( LOG_ERR, "PVSD ERROR: Unable to setsid: %s", strerror(e) );
         exit(1);
     }
 
@@ -132,7 +133,8 @@ daemonize()
     if ( pid < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "Second fork failed: %s", strerror(e));
+        syslog( LOG_ERR, "PVSD ERROR: Second fork failed: %s",
+            strerror(e) );
         exit(1);
     }
     else if ( pid )
@@ -162,7 +164,7 @@ daemonize()
     if ( chdir("/") < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "Chdir failed: %s", strerror(e));
+        syslog( LOG_ERR, "PVSD ERROR: Chdir failed: %s", strerror(e) );
         exit(1);
     }
 }
@@ -270,7 +272,11 @@ int main(int argc, char *argv[])
     }
 
     if ( !opt_map.count( "domain" ))
-        syslog( LOG_WARNING, "No communication domain specified - probably an error." );
+    {
+        syslog( LOG_WARNING,
+            "%s No communication domain specified - probably an error.",
+            "PVSD ERROR:" );
+    }
 
     // Parent process will exit in this call
     if ( daemon )
@@ -307,17 +313,17 @@ int main(int argc, char *argv[])
     }
     catch( TraceException &e )
     {
-        syslog( LOG_ERR, e.toString().c_str() );
+        syslog( LOG_ERR, "PVSD ERROR: %s", e.toString().c_str() );
         ret_code = 1;
     }
     catch( exception &e )
     {
-        syslog( LOG_ERR, "Unhandled exception: %s", e.what());
+        syslog( LOG_ERR, "PVSD ERROR: Unhandled exception: %s", e.what());
         ret_code = 1;
     }
     catch( ... )
     {
-        syslog( LOG_ERR, "Unknown exception" );
+        syslog( LOG_ERR, "PVSD ERROR: Unknown exception" );
         ret_code = 1;
     }
 

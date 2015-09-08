@@ -175,13 +175,13 @@ public:
                         m_tof_bin_size = (*dbs)->tofBin;
                     }
 
-                    syslog( LOG_ERR,
-                        "[%i] %s %u Histogram: %s=%u %s=%u %s=%u (%u)",
-                        g_pid, "Detector Bank", m_id,
-                        "num_tof_bins", m_num_tof_bins,
-                        "tof_bin_size", m_tof_bin_size,
-                        "num_pids", num_pids,
-                        num_pids * ( m_num_tof_bins - 1 ) );
+                    // syslog( LOG_ERR,
+                        // "[%i] %s %u Histogram: %s=%u %s=%u %s=%u (%u)",
+                        // g_pid, "Detector Bank", m_id,
+                        // "num_tof_bins", m_num_tof_bins,
+                        // "tof_bin_size", m_tof_bin_size,
+                        // "num_pids", num_pids,
+                        // num_pids * ( m_num_tof_bins - 1 ) );
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -191,9 +191,10 @@ public:
                     m_tofbin_buffer.reserve(m_num_tof_bins);
 
                     syslog( LOG_INFO,
-                    "[%i] %s %u Histogram: %u Time Bin Values, %u to %u.",
+                        "[%i] %s %u Histogram: %u %s, %u to %u by %u",
                         g_pid, "Detector Bank", m_id, m_num_tof_bins,
-                        (*dbs)->tofOffset, (*dbs)->tofMax );
+                        "Time Bin Values",
+                        (*dbs)->tofOffset, (*dbs)->tofMax, m_tof_bin_size );
 
                     uint32_t tofbin = (*dbs)->tofOffset;
                     for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -244,9 +245,11 @@ public:
                     size_t offset_size = maxPid - minPid + 1;
 
                     syslog( LOG_ERR,
-                "[%i] %s %u Histogram: minPid=%u maxPid=%u offset_size=%lu",
-                        g_pid, "Detector Bank", m_id, minPid, maxPid,
-                        offset_size );
+                        "[%i] %s %u Histogram: %s=%u %s=%u %s=%lu (%u)",
+                        g_pid, "Detector Bank", m_id,
+                        "minPid", minPid, "maxPid", maxPid,
+                        "offset_size", offset_size,
+                        num_pids * ( m_num_tof_bins - 1 ) );
 
                     // Reserve Required Index Size & Initialize Vector...
                     // (I hope there aren't huge gaps in the PixelIds...!)
@@ -254,9 +257,9 @@ public:
                     for (size_t i=0 ; i < offset_size ; i++)
                         m_histo_pid_offset.push_back( -1 );
 
-                    syslog( LOG_ERR,
-                        "[%i] %s %u Histogram: Filling in Offsets...",
-                        g_pid, "Detector Bank", m_id );
+                    // syslog( LOG_ERR,
+                        // "[%i] %s %u Histogram: Filling in Offsets...",
+                        // g_pid, "Detector Bank", m_id );
 
                     // Fill In Offsets per PixelId...
                     size_t offset = 0;
@@ -424,9 +427,9 @@ public:
             m_tofbin_buffer.reserve(m_num_tof_bins);
 
             syslog( LOG_INFO,
-            "[%i] Beam Monitor %u Histogram: %u Time Bin Values, %u to %u.",
-                g_pid, m_id, m_num_tof_bins,
-                m_config->tofOffset, m_config->tofMax );
+                "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
+                g_pid, m_id, m_num_tof_bins, "Time Bin Values",
+                m_config->tofOffset, m_config->tofMax, m_config->tofBin );
 
             uint32_t tofbin = m_config->tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -546,6 +549,45 @@ enum PVType
     PVT_STRING
 };
 
+/// Enumerated Type structure (for PVs of type PVT_ENUM)
+struct PVEnumeratedType
+{
+    std::string                name;
+    std::vector<std::string>   element_names;
+    std::vector<uint32_t>      element_values;
+
+    bool sameEnum( PVEnumeratedType *a_enum )
+    {
+        if ( a_enum == NULL )
+            return( false );
+
+        if ( name.compare( a_enum->name ) != 0 )
+            return( false );
+
+        if ( element_names.size() != a_enum->element_names.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < element_names.size() ; i++ )
+        {
+            if ( element_names[i].compare( a_enum->element_names[i] ) != 0 )
+            {
+                return( false );
+            }
+        }
+
+        if ( element_values.size() != a_enum->element_values.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < element_values.size() ; i++ )
+        {
+            if ( element_values[i] != a_enum->element_values[i] )
+                return( false );
+        }
+
+        return( true );
+    }
+};
+
 /// Base class for all process variable (PV) types
 class PVInfoBase
 {
@@ -553,19 +595,23 @@ public:
     /// PVInfoBase constructor
     PVInfoBase
     (
-        const std::string  &a_name,         ///< [in] Name of PV
         const std::string  &a_device_name,  ///< [in] Name of device that owns the PV
+        const std::string  &a_name,         ///< [in] Name of PV
+        const std::string  &a_connection,   ///< [in] PV Connection String
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
+        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
     :
-        m_name(a_name),
         m_device_name(a_device_name),
+        m_name(a_name),
+        m_connection(a_connection),
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
+        m_enum(a_enum),
         m_units(a_units),
         m_last_time(0)
     {}
@@ -574,33 +620,64 @@ public:
     virtual ~PVInfoBase()
     {}
 
-    bool sameDefiniton( const std::string &a_name, const std::string &a_device_name, PVType a_type, const std::string &a_units )
+    bool diffEnum( PVEnumeratedType *a_enum1, PVEnumeratedType *a_enum2 )
     {
-        // TODO - Add enumeration check when supported
-        if ( m_name == a_name && m_device_name == a_device_name && m_type == a_type && m_units == a_units )
+        // Both NULL Enum Pointers... (Most Common Case...)
+        if ( a_enum1 == NULL && a_enum2 == NULL )
+            return( false );
+
+        // Mismatched NULL Enum Pointers...
+        if ( ( a_enum1 == NULL && a_enum2 != NULL )
+                || ( a_enum1 != NULL && a_enum2 == NULL ) )
+            return( true );
+
+        // Compare 2 Non-Null Enums
+        return( ! a_enum1->sameEnum( a_enum2 ) );
+    }
+
+    bool sameDefinition(
+            const std::string &a_device_name,
+            const std::string &a_name,
+            const std::string &a_connection,
+            PVType a_type, PVEnumeratedType *a_enum,
+            const std::string &a_units )
+    {
+        if ( m_device_name == a_device_name
+                && m_name == a_name && m_connection == a_connection
+                && m_type == a_type && !diffEnum( m_enum, a_enum )
+                && m_units == a_units ) {
             return true;
-        else
+        }
+        else {
             return false;
+        }
     }
 
     /// Determine if PVs have equivalent definitions
-    bool sameDefiniton( const PVInfoBase &a_pv )
+    bool sameDefinition( const PVInfoBase &a_pv )
     {
-        // TODO - Add enumeration check when supported
-        if ( m_name == a_pv.m_name && m_device_name == a_pv.m_device_name && m_type == a_pv.m_type && m_units == a_pv.m_units )
+        if ( m_device_name == a_pv.m_device_name
+                && m_name == a_pv.m_name
+                && m_connection == a_pv.m_connection
+                && m_type == a_pv.m_type && !diffEnum( m_enum, a_pv.m_enum )
+                && m_units == a_pv.m_units ) {
             return true;
-        else
+        }
+        else {
             return false;
+        }
     }
 
     /// Virtual method to allow subclasses to write buffered PV values and time axis
     virtual void flushBuffers( struct RunMetrics *a_run_metrics = 0 ) = 0;
 
-    std::string         m_name;         ///< Name of PV
     std::string         m_device_name;  ///< Name of device that owns the PV
+    std::string         m_name;         ///< Name of PV
+    std::string         m_connection;   ///< PV Connection String
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
+    PVEnumeratedType   *m_enum;         ///< Enumerated Type of PV
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
@@ -615,14 +692,17 @@ public:
     /// PVInfo constructor
     PVInfo
     (
-        const std::string  &a_name,         ///< [in] Name of PV
         const std::string  &a_device_name,  ///< [in] Name of device that owns the PV
+        const std::string  &a_name,         ///< [in] Name of PV
+        const std::string  &a_connection,   ///< [in] PV Connection String
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
+        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
-    : PVInfoBase( a_name, a_device_name, a_device_id, a_pv_id, a_type, a_units )
+    : PVInfoBase( a_device_name, a_name, a_connection,
+        a_device_id, a_pv_id, a_type, a_enum, a_units )
     {}
 
     /// PVInfo destructor
@@ -645,10 +725,13 @@ class IStreamAdapter
 public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
-    virtual PVInfoBase*     makePVInfo( const std::string & a_name,
-                                const std::string & a_device_name,
+    virtual PVInfoBase*     makePVInfo( const std::string & a_device_name,
+                                const std::string & a_name,
+                                const std::string & a_connection,
                                 Identifier a_device_id,
-                                Identifier a_pv_id, PVType a_type,
+                                Identifier a_pv_id,
+                                PVType a_type,
+                                PVEnumeratedType *a_enum,
                                 const std::string & a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
@@ -687,6 +770,9 @@ public:
                                 const std::string &a_comment ) = 0;
     virtual void            markerComment( double a_time,
                                 const std::string &a_comment ) = 0;
+    virtual void            writeDeviceEnums( Identifier a_devId,
+                                std::vector<STS::PVEnumeratedType>
+                                    a_enumVec ) = 0;
 };
 
 

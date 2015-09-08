@@ -107,7 +107,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                 disconnectPV( *ipv );
         }
 
-        // If a decive is already defined, reuse any shared PV connections
+        // If a device is already defined, reuse any shared PV connections
         // Make connections for new PVs in updated device
         for ( ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
         {
@@ -152,7 +152,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     m_dev_desc = a_device;
     ca_flush_io();
 
-    // If no new PV channels were created, state machne will not progress on it's own
+    // If no new PV channels were created, state machine will not progress on it's own
     // Wake state machine in this case (doesn't matter if its notified more than once)
     m_state_changed = true;
     m_state_cond.notify_one();
@@ -191,6 +191,12 @@ DeviceAgent::metadataUpdated()
 
         if ( ich->second.m_chan_state == INFO_AVAILABLE )
         {
+            syslog( LOG_INFO,
+                "Device %s - Updating metadata for PV %s: %s",
+                m_dev_desc->m_name.c_str(),
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str() );
+
             ich->second.m_pv->setMetadata(
                 epicsToPVType( ich->second.m_ca_type,
                     ich->second.m_ca_elem_count ),
@@ -199,6 +205,12 @@ DeviceAgent::metadataUpdated()
         }
         else if ( ich->second.m_chan_state == READY )
         {
+            syslog( LOG_INFO,
+                "Device %s - Re-requesting metadata for PV %s: %s",
+                m_dev_desc->m_name.c_str(),
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str() );
+
             // Re-request metadata from all other PV
             // (they may have changed too)
             ich->second.m_chan_state = INFO_NEEDED;
@@ -268,28 +280,44 @@ DeviceAgent::stopped()
  * @brief Creates data connections to specified process variable
  * @param a_pv - Process variable descriptor for connection
  *
- * This method makes EPICS calls to connect to the specified process variable. This call is
- * asynchronous. Once the connections have been established, the epicsConnectionCallback method
- * will be called and the DeviceAgent state machine will be stimulated.
+ * This method makes EPICS calls to connect to the specified process
+ * variable. This call is asynchronous. Once the connections have been
+ * established, the epicsConnectionCallback method will be called and
+ * the DeviceAgent state machine will be stimulated.
  */
 void
 DeviceAgent::connectPV( PVDescriptor *a_pv )
 {
+    std::string deviceStr = "";
+    if ( a_pv->m_device != NULL && !a_pv->m_device->m_name.empty() )
+        deviceStr = "Device " + a_pv->m_device->m_name + " - ";
+
+    syslog( LOG_INFO, "%sCreating channel for PV %s: %s",
+        deviceStr.c_str(),
+        a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+
     ChanInfo info;
     info.m_pv = a_pv;
 
     // Create a CA channel
-    if ( ca_create_channel( a_pv->m_connection.c_str(), &epicsConnectionCallback, this, 0, &info.m_chid ) == ECA_NORMAL )
+    if ( ca_create_channel( a_pv->m_connection.c_str(),
+                &epicsConnectionCallback, this, 0, &info.m_chid )
+            == ECA_NORMAL )
     {
         // Note: don't flush I/O here - update() method will call it
 
         // Update channel info and PV name index structures
         m_chan_info[info.m_chid] = info;
         m_pv_index[a_pv->m_connection] = info.m_chid;
-        //cout << "connected chid: " << info.m_chid << " for PV: " << a_pv->m_connection << endl;
+        //cout << "connected chid: " << info.m_chid
+            //<< " for PV: " << a_pv->m_connection << endl;
     }
     else
-        syslog( LOG_ERR, "Failed to create channel for PV: %s", a_pv->m_connection.c_str() );
+    {
+        syslog( LOG_ERR, "%s %sFailed to create channel for PV: %s",
+            "PVSD ERROR:", deviceStr.c_str(),
+            a_pv->m_connection.c_str() );
+    }
 }
 
 
@@ -297,17 +325,28 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
  * @brief Disconnects the specified process variable
  * @param a_pv - Process variable descriptor for diconnection
  *
- * This method makes EPICS calls to disconnect to the specified process variable. This call is
- * synchronous (for now).
+ * This method makes EPICS calls to disconnect to the specified process
+ * variable. This call is synchronous (for now).
  */
 void
 DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 {
-    map<std::string,chid>::iterator ipv = m_pv_index.find( a_pv->m_connection );
+    std::string deviceStr = "";
+    if ( a_pv->m_device != NULL && !a_pv->m_device->m_name.empty() )
+        deviceStr = "Device " + a_pv->m_device->m_name + " - ";
+
+    map<std::string,chid>::iterator ipv =
+        m_pv_index.find( a_pv->m_connection );
+
     if ( ipv != m_pv_index.end())
     {
-        map<chid,ChanInfo>::iterator ich = m_chan_info.find(ipv->second);
-        if ( ich != m_chan_info.end())
+        syslog( LOG_INFO, "%sDisconnecting channel for PV %s: %s",
+            deviceStr.c_str(),
+            a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+
+        map<chid,ChanInfo>::iterator ich = m_chan_info.find( ipv->second );
+
+        if ( ich != m_chan_info.end() )
         {
             if ( ich->second.m_subscribed )
                 ca_clear_subscription( ich->second.m_evid );
@@ -319,9 +358,23 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 
             // Don't flush I/O here - update() method will call it
         }
+        else
+        {
+            syslog( LOG_WARNING,
+                "%sWarning: No Channel Info Found for PV %s (%s)",
+                deviceStr.c_str(),
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+        }
 
         // Update name index structures
         m_pv_index.erase( ipv );
+    }
+    else
+    {
+        syslog( LOG_ERR,
+            "%s %sFailed to disconnect channel for PV %s: %s Not Found",
+            "PVSD ERROR:", deviceStr.c_str(),
+            a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
     }
 }
 
@@ -369,6 +422,7 @@ DeviceAgent::controlThread()
             m_state_changed = false;
 
             // Check channel state of member process variables
+            std::vector<std::string> pendingPVs;
             ready = 0;
             for ( ich = m_chan_info.begin();
                     ich != m_chan_info.end() && !m_state_changed; ++ich )
@@ -392,10 +446,21 @@ DeviceAgent::controlThread()
                     }
                     else
                     {
+                        std::string deviceStr = "";
+                        if ( m_dev_desc != NULL
+                                && !m_dev_desc->m_name.empty() )
+                        {
+                            deviceStr = "Device "
+                                + m_dev_desc->m_name + " - ";
+                        }
+
                         syslog( LOG_ERR,
-                            "Failed to get channel info for PV: %s",
+                        "%s %sFailed to get channel info for PV %s: %s",
+                            "PVSD ERROR:", deviceStr.c_str(),
+                            ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
                     }
+                    pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
                 case INFO_AVAILABLE:
                     if ( m_defined )
@@ -440,6 +505,7 @@ DeviceAgent::controlThread()
                     ++ready;
                     break;
                 default:
+                    pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
                 }
             }
@@ -453,71 +519,95 @@ DeviceAgent::controlThread()
             // an invalid state (i.e. connected but not processed)
             // This is OK as it tells us that the channel is working,
             // and the SMS should handle the PV state appropriately.
-            if ( m_dev_desc && !m_defined && ready > 0
-                    && ready == m_dev_desc->m_pvs.size() )
+            if ( m_dev_desc && !m_defined && ready > 0 )
             {
-                device_changed = false;
-
-                // Defined device with ConfigManager - this will return
-                // the "real" DesviceDescriptor record
-                DeviceRecordPtr new_rec =
-                    m_stream_api.getCfgMgr().defineDevice( *m_dev_desc );
-
-                // If new record is the same as existing record,
-                // then nothing has changed
-                if ( new_rec != m_dev_record )
-                    device_changed = true;
-
-                // Save new device record
-                m_dev_record = new_rec;
-
-                // Update channel info objects with new device & pv
-                // pointers (replaces m_dev_desc pointers)
-                for ( idx = m_pv_index.begin();
-                        idx != m_pv_index.end(); ++idx )
+                if ( ready == m_dev_desc->m_pvs.size() )
                 {
-                    // Careful! PV names can be changed in new_rec
-                    // due to name conflicts!!!
-                    pv = m_dev_record->getPvByConnection( idx->first );
-                    ich = m_chan_info.find( idx->second );
-                    if ( pv && ich != m_chan_info.end() )
+                    device_changed = false;
+
+                    // Defined device with ConfigManager - this will return
+                    // the "real" DeviceDescriptor record
+                    DeviceRecordPtr new_rec =
+                        m_stream_api.getCfgMgr().defineDevice(
+                            *m_dev_desc );
+
+                    // If new record is the same as existing record,
+                    // then nothing has changed
+                    if ( new_rec != m_dev_record )
+                        device_changed = true;
+
+                    // Save new device record
+                    m_dev_record = new_rec;
+
+                    // Update channel info objects with new device & pv
+                    // pointers (replaces m_dev_desc pointers)
+                    for ( idx = m_pv_index.begin();
+                            idx != m_pv_index.end(); ++idx )
                     {
-                        // Replace temporary device and PV records
-                        // with new managed records
-                        ich->second.m_device = m_dev_record;
-                        ich->second.m_pv = pv;
+                        // Careful! PV names can be changed in new_rec
+                        // due to name conflicts!!!
+                        pv = m_dev_record->getPvByConnection( idx->first );
+                        ich = m_chan_info.find( idx->second );
+                        if ( pv && ich != m_chan_info.end() )
+                        {
+                            // Replace temporary device and PV records
+                            // with new managed records
+                            ich->second.m_device = m_dev_record;
+                            ich->second.m_pv = pv;
+                        }
                     }
+
+                    // Send cached PV values only if the device
+                    // actually changed
+                    if ( device_changed )
+                        sendCurrentValues();
+
+                    m_defined = true;
+                    device_changed = false;
+
+                    // Delete temporary device descriptor
+                    delete m_dev_desc;
+                    m_dev_desc = 0;
                 }
 
-                // Send cached PV values only if the device
-                // actually changed
-                if ( device_changed )
-                    sendCurrentValues();
+                // Device Not Ready to Define, Some PVs Still Pending...
+                else
+                {
+                    std::string deviceStr = "";
+                    if ( !m_dev_desc->m_name.empty() )
+                        deviceStr = "Device " + m_dev_desc->m_name + " - ";
 
-                m_defined = true;
-                device_changed = false;
+                    syslog( LOG_INFO, "%sWaiting for %ld Pending PVs",
+                        deviceStr.c_str(),
+                        m_dev_desc->m_pvs.size() - ready );
 
-                // Delete temporary device descriptor
-                delete m_dev_desc;
-                m_dev_desc = 0;
+                    for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
+                    {
+                        syslog( LOG_INFO, "%sPending PV Connection: %s",
+                            deviceStr.c_str(), pendingPVs[i].c_str() );
+                    }
+                }
             }
         }
         catch ( TraceException &e )
         {
             syslog( LOG_ERR,
-                "TraceException thrown in DevAgent::controlThread!" );
+                "%s TraceException thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
             syslog( LOG_ERR, "content: %s", e.toString( true ).c_str() );
         }
         catch ( exception &e )
         {
             syslog( LOG_ERR,
-                "std::exception thrown in DevAgent::controlThread!" );
+                "%s std::exception thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
             syslog( LOG_ERR, "content: %s", e.what() );
         }
         catch(...)
         {
             syslog( LOG_ERR,
-                "Unkown exception thrown in DevAgent::controlThread!" );
+                "%s Unknown exception thrown in DevAgent::controlThread!",
+                "PVSD ERROR:" );
         }
     }
 }
@@ -592,7 +682,9 @@ DeviceAgent::monitorThread()
                     {
                         dev_name = m_dev_desc->m_name;
                         sid = string("SID_EPICS_DEV_") + dev_name;
-                        message = string("Device (") + dev_name + ") has hung while initializing";
+                        message = "PVSD ERROR: "
+                            + string("Device (") + dev_name
+                            + ") has hung while initializing";
                         ADARA::ComBus::SignalAssertMessage sigmsg( sid, "EPICS", message, ADARA::ERROR );
                         ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
 
@@ -619,7 +711,9 @@ DeviceAgent::monitorThread()
                     ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
 
                     // Log the recovery
-                    string message = string("Device (") + dev_name + ") has recovered from hung state.";
+                    string message = "PVSD ERROR: "
+                        + string("Device (") + dev_name
+                        + ") has recovered from hung state.";
                     syslog( LOG_ERR, message.c_str() );
 
                     // Change state
@@ -677,7 +771,7 @@ DeviceAgent::epicsConnectionHandler(
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
 
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 ich->second.m_connected = true;
 
@@ -692,6 +786,21 @@ DeviceAgent::epicsConnectionHandler(
                         // << " ca_type = " << type << " for PV: "
                         // << ich->second.m_pv->m_connection << endl;
 
+                    std::string deviceStr = "";
+                    if ( ich->second.m_device != NULL )
+                    {
+                        deviceStr = " - Device "
+                            + ich->second.m_device->m_name;
+                    }
+
+                    std::string pvStr = "";
+                    if ( ich->second.m_pv != NULL )
+                    {
+                        pvStr = " for PV "
+                            + ich->second.m_pv->m_name + ": "
+                            + ich->second.m_pv->m_connection;
+                    }
+
                     if ( ca_create_subscription(
                             epicsToTimeRecordType( type ), 0,
                             ich->second.m_chid,
@@ -699,13 +808,17 @@ DeviceAgent::epicsConnectionHandler(
                             &epicsEventCallback, this,
                             &ich->second.m_evid ) == ECA_NORMAL )
                     {
+                        syslog( LOG_INFO, "Subscription created%s%s",
+                            deviceStr.c_str(), pvStr.c_str() );
+
                         ich->second.m_subscribed = true;
                     }
                     else
                     {
                         syslog( LOG_ERR,
-                            "Failed to create subscription for PV: %s",
-                            ich->second.m_pv->m_connection.c_str() );
+                            "%s Failed to create subscription%s%s",
+                            "PVSD ERROR:",
+                            deviceStr.c_str(), pvStr.c_str() );
                     }
 
                     ca_flush_io();
@@ -725,6 +838,7 @@ DeviceAgent::epicsConnectionHandler(
                 }
             }
         }
+
         // Connection lost?
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
@@ -733,12 +847,32 @@ DeviceAgent::epicsConnectionHandler(
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
 
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 ich->second.m_connected = false;
 
+                std::string deviceStr = "";
+                if ( ich->second.m_device != NULL )
+                {
+                    deviceStr = " - Device "
+                        + ich->second.m_device->m_name;
+                }
+
+                std::string pvStr = "";
+                if ( ich->second.m_pv != NULL )
+                {
+                    pvStr = " for PV "
+                        + ich->second.m_pv->m_name + ": "
+                        + ich->second.m_pv->m_connection;
+                }
+
                 if ( ich->second.m_subscribed )
                 {
+                    syslog( LOG_ERR, "%s %s%s%s",
+                        "PVSD ERROR:",
+                        "Clearing subscription (Down?)",
+                        deviceStr.c_str(), pvStr.c_str() );
+
                     ca_clear_subscription( ich->second.m_evid );
                     ich->second.m_subscribed = false;
                 }
@@ -764,25 +898,35 @@ DeviceAgent::epicsConnectionHandler(
 
                     m_stream_api.putFilledPacket( pkt );
                 }
+                else
+                {
+                    syslog( LOG_ERR, "%s %s %s%s%s",
+                        "PVSD ERROR:", "No Free Packets!",
+                        "VariableUpdate Lost",
+                        deviceStr.c_str(), pvStr.c_str() );
+                }
             }
         }
     }
     catch( TraceException &e )
     {
         syslog( LOG_ERR,
-            "TraceException in DeviceAgent::epicsConnectionHandler()" );
+            "%s TraceException in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.toString().c_str() );
     }
     catch( std::exception &e )
     {
         syslog( LOG_ERR,
-            "Exception in DeviceAgent::epicsConnectionHandler()" );
+            "%s Exception in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.what() );
     }
     catch(...)
     {
         syslog( LOG_ERR,
-            "Unknown exception in DeviceAgent::epicsConnectionHandler()" );
+        "%s Unknown exception in DeviceAgent::epicsConnectionHandler()",
+            "PVSD ERROR:" );
     }
 }
 
@@ -909,7 +1053,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 if ( m_defined )
                 {
                     bool timeout;
-                    StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
+                    StreamPacket *pkt =
+                        m_stream_api.getFreePacket( 5000, timeout );
                     if ( pkt )
                     {
                         pkt->type = VariableUpdate;
@@ -918,6 +1063,28 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         pkt->state = state;
 
                         m_stream_api.putFilledPacket( pkt );
+                    }
+                    else
+                    {
+                        std::string deviceStr = "";
+                        if ( ich->second.m_device != NULL )
+                        {
+                            deviceStr = " Device "
+                                + ich->second.m_device->m_name;
+                        }
+
+                        std::string pvStr = "";
+                        if ( ich->second.m_pv != NULL )
+                        {
+                            pvStr = " for PV "
+                                + ich->second.m_pv->m_name + ": "
+                                + ich->second.m_pv->m_connection;
+                        }
+
+                        syslog( LOG_ERR, "%s %s %s%s",
+                            "PVSD ERROR:",
+                            "No Free Packets! VariableUpdate Lost",
+                            deviceStr.c_str(), pvStr.c_str() );
                     }
                 }
             }
@@ -974,17 +1141,23 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
     }
     catch( TraceException &e )
     {
-        syslog( LOG_ERR, "TraceException in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s TraceException in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.toString().c_str() );
     }
     catch( std::exception &e )
     {
-        syslog( LOG_ERR, "Exception in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s Exception in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
         syslog( LOG_ERR, e.what() );
     }
     catch(...)
     {
-        syslog( LOG_ERR, "Unknown exception in DeviceAgent::epicsEventHandler()" );
+        syslog( LOG_ERR,
+            "%s Unknown exception in DeviceAgent::epicsEventHandler()",
+            "PVSD ERROR:" );
     }
 }
 
@@ -1006,9 +1179,35 @@ DeviceAgent::sendCurrentValues()
             pkt->pv = ich->second.m_pv;
             pkt->state = ich->second.m_pv_state;
 
-            //cout << "Sending PV " << ich->second.m_device->m_id << "." << ich->second.m_pv->m_id << " on chid " << ich->first << ", stat = " <<  pkt->state.m_status << ", sev: " <<  pkt->state.m_severity << endl;
+            //cout << "Sending PV " << ich->second.m_device->m_id
+                //<< "." << ich->second.m_pv->m_id
+                //<< " on chid " << ich->first
+                //<< ", stat = " <<  pkt->state.m_status
+                //<< ", sev: " <<  pkt->state.m_severity << endl;
 
             m_stream_api.putFilledPacket( pkt );
+        }
+        else
+        {
+            std::string deviceStr = "";
+            if ( ich->second.m_device != NULL )
+            {
+                deviceStr = " Device "
+                    + ich->second.m_device->m_name;
+            }
+
+            std::string pvStr = "";
+            if ( ich->second.m_pv != NULL )
+            {
+                pvStr = " for PV "
+                    + ich->second.m_pv->m_name + ": "
+                    + ich->second.m_pv->m_connection;
+            }
+
+            syslog( LOG_ERR, "%s %s %s%s",
+                "PVSD ERROR:",
+                "No Free Packets! VariableUpdate Lost for",
+                deviceStr.c_str(), pvStr.c_str() );
         }
     }
 }

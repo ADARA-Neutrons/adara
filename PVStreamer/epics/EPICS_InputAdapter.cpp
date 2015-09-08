@@ -70,14 +70,23 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    map<string,DeviceAgent*>::iterator idev = m_dev_agents.find( a_device->m_name );
+    map<string,DeviceAgent*>::iterator idev =
+        m_dev_agents.find( a_device->m_name );
+
     if ( idev != m_dev_agents.end())
     {
+        syslog( LOG_DEBUG, "Updating Device Agent for: %s",
+            a_device->m_name.c_str() );
+
         idev->second->update( a_device );
     }
     else
     {
-        m_dev_agents[a_device->m_name] = new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
+        syslog( LOG_DEBUG, "Starting New Device Agent for: %s",
+            a_device->m_name.c_str() );
+
+        m_dev_agents[a_device->m_name] =
+            new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
     }
 }
 
@@ -92,12 +101,23 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    map<string,DeviceAgent*>::iterator idev = m_dev_agents.find( a_dev_name );
+    map<string,DeviceAgent*>::iterator idev =
+        m_dev_agents.find( a_dev_name );
+
     if ( idev != m_dev_agents.end())
     {
+        syslog( LOG_DEBUG,
+            "Stopping old device agent (device no longer defined) for: %s",
+            a_dev_name.c_str() );
+
         idev->second->stop();
         m_garbage.push_back( idev->second );
         m_dev_agents.erase( idev );
+    }
+    else
+    {
+        syslog( LOG_ERR, "%s Error Stopping Device Agent: %s Not Found!",
+            "PVSD ERROR:", a_dev_name.c_str() );
     }
 }
 
@@ -161,13 +181,13 @@ InputAdapter::gcThread()
 
 /** \brief Configuration file monitoring thread
   *
-  * This method slowly polls the update time on the provided EPICS configuration
-  * file, and when changed, reads and parses the xml content to extract a
-  * payload of DeviceDescriptors for configured devices (and PVs). These
-  * descriptors are used to start (or update) DeviceAgent instances, and any
-  * previously configured devices that are no longer needed are stopped.
-  * Starting/updating and stopping of DeviceAgents is handled by the
-  * startDevice() and stopDevice() methods, respectively.
+  * This method slowly polls the update time on the provided EPICS beamline
+  * configuration file, and when changed, reads and parses the xml content
+  * to extract a payload of DeviceDescriptors for configured devices (and
+  * PVs). These descriptors are used to start (or update) DeviceAgent
+  * instances, and any previously configured devices that are no longer
+  * needed are stopped. Starting/updating and stopping of DeviceAgents
+  * is handled by the startDevice() and stopDevice() methods, respectively.
   */
 void
 InputAdapter::configFileMonitorThread()
@@ -176,104 +196,111 @@ InputAdapter::configFileMonitorThread()
     vector<PVDescriptor*>::iterator ipv;
     set<string>::iterator icur;
     boost::filesystem::path cfg_path( m_config_file );
-    time_t          t_now, t_last = 0;
     bool            changed;
     unsigned short  count = 0;
     vector<char>    buffer;
+    int             poll_rate = 15;
 
     ca_attach_context( m_epics_context );
 
-    while( m_active )
+    while ( m_active )
     {
         try
         {
-            if ( !(count % 5 )) // Check every 5 seconds
+            if ( count++ == poll_rate ) // Check based on current poll rate
             {
                 count = 0;
 
-                // If config file has been updated, read & process
-                // (last_write_time will throw if it can't access the file)
-                t_now = boost::filesystem::last_write_time( cfg_path );
-                if ( t_now > t_last )
+                // Open, read, and compare contents of config file
+                // If contents differ (binary compare), then attempt to parse the buffer
+                // If parsing succeeds, apply new configuration
+                ifstream inf( m_config_file.c_str() );
+                if ( inf.is_open())
                 {
+                    // Calculate size of config file
+                    filebuf *fbuf = inf.rdbuf();
+                    size_t  fsz = fbuf->pubseekoff( 0, inf.end, inf.in );
+
                     // Open, read, and compare contents of config file
-                    // If contents differ (binary compare), then attempt to parse the buffer
-                    // If parsing succeeds, apply new configuration
+                    // If contents differ (binary compare), then attempt
+                    // to parse the buffer. If parsing succeeds, apply
+                    // new configuration
 
-                    ifstream inf( m_config_file.c_str() );
-                    if ( inf.is_open())
+                    fbuf->pubseekpos( 0, inf.in );
+                    if ( fsz > 0 )
                     {
-                        filebuf *fbuf = inf.rdbuf();
-                        size_t  fsz = fbuf->pubseekoff( 0, inf.end, inf.in );
+                        // Adjust buffer size and read entire file
+                        buffer.resize( fsz );
+                        fsz = fbuf->sgetn( buffer.data(), fsz );
 
-                        fbuf->pubseekpos( 0, inf.in );
-                        if ( fsz > 0 )
-                        {
+                        // If file was truncated while reading, adjust buffer size
+                        if ( fsz < buffer.size() )
                             buffer.resize( fsz );
-                            fbuf->sgetn( buffer.data(), fsz );
-                        }
+                    }
 
-                        inf.close();
-                        t_last = t_now; // Reset last write time even if buffer doesn't parse
+                    inf.close();
 
-                        // See if contents have actually change
+                    // See if contents have actually change
+                    changed = false;
+                    if ( buffer.size() != m_config_buffer.size() )
                         changed = true;
-                        if ( buffer.size() == m_config_buffer.size() )
+                    else
+                    {
+                        if ( memcmp( buffer.data(), m_config_buffer.data(), buffer.size() ) != 0 )
+                                changed = true;
+                    }
+
+                    if ( changed )
+                    {
+                        syslog( LOG_INFO, "EPICS beam config file %s has changed", m_config_file.c_str() );
+
+                        boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+                        if ( !m_active )
+                            break;
+
+                        vector<DeviceDescriptor*> devices;
+
+                        if ( parseConfigBuffer( buffer.data(), buffer.size(), devices ))
                         {
-                            if ( memcmp( buffer.data(), m_config_buffer.data(), buffer.size() ) == 0 )
-                                 changed = false;
+                            // Parsed successfully
+                            syslog( LOG_INFO, "EPICS beam config file parse OK" );
+
+                            // Keep track of new device names
+                            set<string> new_devices;
+                            for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                                new_devices.insert( (*idev)->m_name );
+
+                            // Start device agents for all configured devices
+                            // It's OK if agents are already running
+                            // NOTE: The DeviceDescriptor ptrs in devices vector will be deleted by the startDevice call
+                            for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                            {
+                                startDevice( *idev );
+                            }
+
+                            // Stop device agents that are no longer configured
+                            for ( icur = m_cur_devices.begin(); icur != m_cur_devices.end(); ++icur )
+                            {
+                                if ( new_devices.find( *icur ) == new_devices.end())
+                                    stopDevice( *icur );
+                            }
+
+                            // Save new device names and new buffer
+                            m_cur_devices = new_devices;
+                            m_config_buffer = buffer;
+
+                            ADARA::ComBus::SignalRetractMessage msg( "SID_EPICS_CFG_ERROR" );
+                            ADARA::ComBus::Connection::getInst().broadcast( msg );
                         }
-
-                        if ( changed )
+                        else
                         {
-                            syslog( LOG_INFO, "EPICS beam config file has changed" );
+                            syslog( LOG_ERR,
+                                "%s EPICS beam config file parse FAILED",
+                                "PVSD ERROR:" );
 
-                            boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
-
-                            if ( !m_active )
-                                break;
-
-                            vector<DeviceDescriptor*> devices;
-
-                            if ( parseConfigBuffer( buffer.data(), buffer.size(), devices ))
-                            {
-                                // Parsed successfully
-
-                                // Keep track of new device names
-                                set<string> new_devices;
-                                for ( idev = devices.begin(); idev != devices.end(); ++idev )
-                                    new_devices.insert( (*idev)->m_name );
-
-                                // Start device agents for all configured devices
-                                // It's OK if agents are already running
-                                // NOTE: The DeviceDescriptor ptrs in devices vector will be deleted by the startDevice call
-                                for ( idev = devices.begin(); idev != devices.end(); ++idev )
-                                {
-                                    //syslog( LOG_DEBUG, "Starting device agent for: %s", (*idev)->m_name.c_str() );
-                                    startDevice( *idev );
-                                }
-
-                                // Stop device agents that are no longer configured
-                                for ( icur = m_cur_devices.begin(); icur != m_cur_devices.end(); ++icur )
-                                {
-                                    if ( new_devices.find( *icur ) == new_devices.end())
-                                        stopDevice( *icur );
-                                }
-
-                                // Save new device names and new buffer
-                                m_cur_devices = new_devices;
-                                m_config_buffer = buffer;
-
-                                ADARA::ComBus::SignalRetractMessage msg( "SID_EPICS_CFG_ERROR" );
-                                ADARA::ComBus::Connection::getInst().broadcast( msg );
-                            }
-                            else
-                            {
-                                syslog( LOG_ERR, "EPICS beam config file (beamline.xml) failed to parse" );
-
-                                ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "EPICS beam config file (beamline.xml) failed to parse", ADARA::ERROR );
-                                ADARA::ComBus::Connection::getInst().broadcast( msg );
-                            }
+                            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "EPICS beam config file (beamline.xml) failed to parse", ADARA::ERROR );
+                            ADARA::ComBus::Connection::getInst().broadcast( msg );
                         }
                     }
                 }
@@ -281,22 +308,33 @@ InputAdapter::configFileMonitorThread()
         }
         catch( std::exception &e )
         {
-            syslog( LOG_ERR, "Exception thrown while parsing EPICS configuration file (beamline.xml)" );
+            stringstream ss;
+            ss << "PVSD ERROR: Exception thrown"
+                << " while parsing EPICS configuration file"
+                << " (beamline.xml)";
+
+            syslog( LOG_ERR, "%s", ss.str().c_str() );
             syslog( LOG_ERR, e.what() );
 
-            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "Exception thrown while parsing EPICS configuration file (beamline.xml)", ADARA::ERROR );
+            ADARA::ComBus::SignalAssertMessage msg(
+                "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(), ADARA::ERROR );
             ADARA::ComBus::Connection::getInst().broadcast( msg );
         }
         catch( ... )
         {
-            syslog( LOG_ERR, "Unexpected exception thrown while parsing EPICS configuration file (beamline.xml)" );
+            stringstream ss;
+            ss << "PVSD ERROR: Unexpected exception thrown"
+                << " while parsing EPICS configuration file"
+                << " (beamline.xml)";
 
-            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "Unexpected exception thrown while parsing EPICS configuration file (beamline.xml)", ADARA::ERROR );
+            syslog( LOG_ERR, "%s", ss.str().c_str() );
+
+            ADARA::ComBus::SignalAssertMessage msg(
+                "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(), ADARA::ERROR );
             ADARA::ComBus::Connection::getInst().broadcast( msg );
         }
 
         sleep(1);
-        ++count;
     }
 }
 
@@ -387,7 +425,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                 tmp_node = xmlFind( "name", cnode );
                                                 if ( !tmp_node )
                                                 {
-                                                    syslog( LOG_ERR, "PV Name is missing or empty" );
+                                                    syslog( LOG_ERR,
+                                                        "PVSD ERROR: PV Name is missing or empty" );
                                                     throw -1;
                                                 }
 
@@ -407,7 +446,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                     if ( dev_name.empty())
                                     {
                                         // It's an error to omit the device name
-                                        syslog( LOG_ERR, "Device name is missing or empty" );
+                                        syslog( LOG_ERR,
+                                            "PVSD ERROR: Device name is missing or empty" );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
@@ -429,7 +469,9 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
         }
         catch(...)
         {
-            syslog( LOG_ERR, "Exception while parsing EPICS beamline XML" );
+            syslog( LOG_ERR,
+                "%s Exception while parsing EPICS beamline XML",
+                "PVSD ERROR:" );
             res = false;
         }
     }

@@ -35,6 +35,7 @@ bool PixPairComp( const pair<uint32_t,uint16_t> a, const pair<uint32_t,uint16_t>
 }
 
 uint32_t StreamMonitor::m_proc_state = TS_INIT;
+uint32_t StreamMonitor::m_notify_state = TS_INIT;
 
 /**
  * \brief StreamMonitor constructor.
@@ -396,7 +397,7 @@ void
 StreamMonitor::handleLostConnection()
 {
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
-    m_proc_state = TS_RUNNING;
+
     close( m_fd_in );
     m_fd_in = -1;
 
@@ -518,8 +519,6 @@ StreamMonitor::metricsThread()
             // Send stream metrics every 4 seconds
             if ( !(++count & 0x3 ))
                 m_notify.streamMetrics( m_stream_metrics );
-
-            m_proc_state = TS_RUNNING;
         }
     }
 
@@ -641,9 +640,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_pixmap_processed = false;
         resetRunStats();
 
-
         m_notify.runStatus( true, m_run_num, m_run_timestamp );
-        m_proc_state = TS_RUNNING;
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
@@ -667,7 +664,6 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
             m_scan_index = 0;
             m_notify.scanStatus( false, 0 );
         }
-        m_proc_state = TS_RUNNING;
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
@@ -934,13 +930,13 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
 bool
 StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
 {
+    m_proc_state = TS_PKT_BEAM_MONITOR_EVENT;
+
     if ( m_in_prolog )
     {
         m_in_prolog = false;
         m_notify.endProlog();
     }
-
-    m_proc_state = TS_PKT_BEAM_MONITOR_EVENT;
 
     ++m_mon_pkt_count;
 
@@ -1089,7 +1085,6 @@ StreamMonitor::rxPacket( const ADARA::RunInfoPkt &a_pkt )
     {
         m_notify.beamInfo( m_beam_info );
         m_notify.runInfo( m_run_info );
-        m_proc_state = TS_RUNNING;
     }
 
     return false;
@@ -1118,7 +1113,6 @@ StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
     {
         m_notify.beamInfo( m_beam_info );
         m_notify.runInfo( m_run_info );
-        m_proc_state = TS_RUNNING;
     }
 
     return false;
@@ -1225,7 +1219,6 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                     // a run (or while idle). At the start of a run, all pvs are cleared
                                     // before DDP are processed, so they won't be found in the m_pvs map.
                                     m_notify.pvUndefined( ipv->second->m_name );
-                                    m_proc_state = TS_RUNNING;
 
                                     delete ipv->second;
                                     m_pvs.erase( ipv );
@@ -1248,7 +1241,6 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                 }
 
                                 m_notify.pvDefined( pv_name );
-                                m_proc_state = TS_RUNNING;
                             }
                         }
                     }
@@ -1354,7 +1346,6 @@ StreamMonitor::pvValueUpdate
             pv->m_status = a_status;
             pv->m_updated = true;
             m_notify.pvValue( pv->m_name, a_value, a_status, pv->m_time );
-            m_proc_state = TS_RUNNING;
         }
     }
 }
@@ -1374,7 +1365,6 @@ StreamMonitor::clearPVs()
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
     {
         m_notify.pvUndefined( ipv->second->m_name );
-        m_proc_state = TS_RUNNING;
         delete ipv->second;
     }
 
@@ -1505,7 +1495,7 @@ StreamMonitor::dbThread()
                         idblpv->first.m_time );
 
                     res = PQexec( conn, buf );
-                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
                         syslog( LOG_ERR, "Database update call failed." );
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
@@ -1603,8 +1593,6 @@ StreamMonitor::rxPacket( const ADARA::AnnotationPkt &a_pkt )
         break;
     }
 
-    m_proc_state = TS_RUNNING;
-
     return false;
 }
 
@@ -1648,146 +1636,178 @@ StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 void
 StreamMonitor::Notifier::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_STATUS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_RUN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->runStatus( a_recording, a_run_number, a_timestamp );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::beginProlog()
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_BEGIN_PROLOG;
+    StreamMonitor::m_notify_state = TS_NOTIFY_BEGIN_PROLOG;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->beginProlog();
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::endProlog()
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_END_PROLOG;
+    StreamMonitor::m_notify_state = TS_NOTIFY_END_PROLOG;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->endProlog();
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pauseStatus( bool a_paused )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PAUSE_STATUS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PAUSE_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pauseStatus( a_paused );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::scanStatus( bool a_scanning, uint32_t a_scan_number )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_SCAN_STATUS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_SCAN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->scanStatus( a_scanning, a_scan_number );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::beamInfo( const BeamInfo &a_info )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_BEAM_INFO;
+    StreamMonitor::m_notify_state = TS_NOTIFY_BEAM_INFO;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->beamInfo( a_info );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::runInfo( const RunInfo &a_info )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_INFO;
+    StreamMonitor::m_notify_state = TS_NOTIFY_RUN_INFO;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->runInfo( a_info );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 
 void
 StreamMonitor::Notifier::beamMetrics( const BeamMetrics &a_metrics )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_BEAM_METRICS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_BEAM_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->beamMetrics( a_metrics );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::runMetrics( const RunMetrics &a_metrics )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_RUN_METRICS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_RUN_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->runMetrics( a_metrics );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::streamMetrics( const StreamMetrics &a_metrics )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_STREAM_METRICS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_STREAM_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->streamMetrics( a_metrics );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pvDefined( const std::string &a_name )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PV_DEF;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_DEF;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pvDefined( a_name );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PV_UNDEF;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_UNDEF;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pvUndefined( a_name );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_UINT;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_UINT;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_DBL;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_DBL;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_PV_VAL_STR;
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_STR;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
 StreamMonitor::Notifier::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
 {
-    StreamMonitor::m_proc_state = TS_NOTIFY_CONN_STATUS;
+    StreamMonitor::m_notify_state = TS_NOTIFY_CONN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_proc_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
         (*l)->connectionStatus( a_connected, a_host, a_port );
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 }}
