@@ -662,10 +662,67 @@ git checkout "$install_branch" |& tee -a $LOG
 tag_ok=$?
 
 if [ $tag_ok != 0 ]; then
+
 	echo -e \
 		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
-	echo "Bailing Out..." | tee -a $LOG
-	exit -4
+
+	echo "Current Local and Remote Branches:"
+	git branch -a
+
+	echo -e "\nWould you like to Create the Git $HOST_TYPE Install Branch:"
+	echo
+	echo "   $install_branch"
+	echo
+	echo -n "(yes/No/quit)? "
+
+	read mkbranch_ck
+
+	if [ "#$mkbranch_ck#" == '#yes#' ]; then
+
+		echo "Creating New Git $HOST_TYPE Install Branch:"
+		echo
+		echo "   $install_branch"
+		echo
+
+		echo "git branch $install_branch"
+		git branch "$install_branch"
+
+		mkbranch_ok=$?
+
+		if [ $mkbranch_ok != 0 ]; then
+			echo -e "\nError Creating $HOST_TYPE Install Branch!" \
+				| tee -a $LOG
+			echo -e " ($mkbranch_ok)\n" | tee -a $LOG
+			echo "   $install_branch"
+			echo "Bailing Out..." | tee -a $LOG
+			exit -4
+		fi
+
+		echo
+		echo "git push origin $install_branch"
+		git push origin "$install_branch"
+
+		pushbranch_ok=$?
+
+		if [ $pushbranch_ok != 0 ]; then
+			echo -e \
+				"\nError Pushing $HOST_TYPE Install Branch to Origin!" \
+				| tee -a $LOG
+			echo -e " ($pushbranch_ok)\n" | tee -a $LOG
+			echo "   $install_branch"
+			echo "Bailing Out..." | tee -a $LOG
+			exit -4
+		fi
+
+	elif [ "#$mkbranch_ck#" == '#quit#' ]; then
+		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
+		exit 0
+
+	else
+		echo "Bailing Out..." | tee -a $LOG
+		exit -4
+	fi
+
 fi
 
 # Make sure the parent ADARA current working set directory exists
