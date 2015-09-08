@@ -666,8 +666,8 @@ if [ $tag_ok != 0 ]; then
 	echo -e \
 		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
 
-	echo "Current Local and Remote Branches:"
-	git branch -a
+	echo "Current Local and Remote Branches:" | tee -a $LOG
+	git branch -a |& tee -a $LOG
 
 	echo -e "\nWould you like to Create the Git $HOST_TYPE Install Branch:"
 	echo
@@ -679,13 +679,14 @@ if [ $tag_ok != 0 ]; then
 
 	if [ "#$mkbranch_ck#" == '#yes#' ]; then
 
-		echo "Creating New Git $HOST_TYPE Install Branch:"
-		echo
-		echo "   $install_branch"
-		echo
+		echo -e "\nCreating New Git $HOST_TYPE Install Branch:" \
+			| tee -a $LOG
+		echo | tee -a $LOG
+		echo "   $install_branch" | tee -a $LOG
+		echo | tee -a $LOG
 
-		echo "git branch $install_branch"
-		git branch "$install_branch"
+		echo "git branch $install_branch" | tee -a $LOG
+		git branch "$install_branch" |& tee -a $LOG
 
 		mkbranch_ok=$?
 
@@ -693,10 +694,31 @@ if [ $tag_ok != 0 ]; then
 			echo -e "\nError Creating $HOST_TYPE Install Branch!" \
 				| tee -a $LOG
 			echo -e " ($mkbranch_ok)\n" | tee -a $LOG
-			echo "   $install_branch"
+			echo "   $install_branch" | tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -4
 		fi
+
+		echo -e \
+		"\nChecking out New Config $HOST_TYPE Branch: $install_branch\n" \
+			| tee -a $LOG
+
+		echo "git checkout $install_branch" | tee -a $LOG
+		git checkout "$install_branch" |& tee -a $LOG
+
+		newtag_ok=$?
+
+		if [ $newtag_ok != 0 ]; then
+			echo -e "\nError Checking Out New $HOST_TYPE Install Branch!" \
+				| tee -a $LOG
+			echo -e " ($newtag_ok)\n" | tee -a $LOG
+			echo "   $install_branch" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -4
+		fi
+
+		echo -e "\nPushing New Config $HOST_TYPE Branch to Origin:\n" \
+			| tee -a $LOG
 
 		echo
 		echo "git push origin $install_branch"
@@ -712,6 +734,19 @@ if [ $tag_ok != 0 ]; then
 			echo "   $install_branch"
 			echo "Bailing Out..." | tee -a $LOG
 			exit -4
+		fi
+
+		echo -e "\nNew Current Local and Remote Branches:" | tee -a $LOG
+		git branch -a |& tee -a $LOG
+
+		echo -e -n "\nOk to Proceed (yes/No/quit) "
+
+		read proceed_ck
+
+		if [ "#$proceed_ck#" != '#yes#' ]; then
+			echo -e "\nExiting Deploy Script at User's Request." \
+				| tee -a $LOG
+			exit 0
 		fi
 
 	elif [ "#$mkbranch_ck#" == '#quit#' ]; then
