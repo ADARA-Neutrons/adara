@@ -1870,7 +1870,7 @@ StreamParser::rxPacket
                                     found |= 4;
                                     pv_type = toPVType( value.c_str() );
 
-                                    // Look for Any Enumerated Types!
+                                    // Match Up Any Enumerated Types!
                                     pv_enum = NULL;
                                     if ( pv_type == PVT_ENUM )
                                     {
@@ -1886,28 +1886,33 @@ StreamParser::rxPacket
                                                 i < ienum->second.size() ;
                                                 i++ )
                                             {
-                                                if ( ienum->second[i].name.
+                                                if (
+                                                    !ienum->second[i].name.
                                                         compare( value ) )
                                                 {
-                                                    stringstream ss;
-                                                    ss << "Device "
-                                                        << a_pkt.devId()
-                                                        << " Found Enum "
-                                                        << ienum->second[i]
-                                                            .name
-                                                        << " for PV "
-                                                        << pv_name
-                                                        << "("
-                                                        << pv_connection
-                                                        << ")";
-                                                    syslog( LOG_INFO,
-                                                        "[%i] %s", g_pid,
-                                                        ss.str().c_str() );
-
                                                     pv_enum =
                                                        &(ienum->second[i]);
                                                 }
                                             }
+                                        }
+
+                                        // We Didn't Find the Enum Type!
+                                        if ( pv_enum == NULL )
+                                        {
+                                            stringstream ss;
+                                            ss << "STS Error: "
+                                                << "Device "
+                                                << a_pkt.devId()
+                                                << " Enum "
+                                                << value
+                                                << " Not Found for PV "
+                                                << pv_name
+                                                << "("
+                                                << pv_connection
+                                                << ")";
+                                            syslog( LOG_ERR,
+                                                "[%i] %s", g_pid,
+                                                ss.str().c_str() );
                                         }
                                     }
                                 }
@@ -2336,16 +2341,19 @@ StreamParser::rxPacket
                                         if ( ienum->second[i].sameEnum(
                                                 &devEnum ) )
                                         {
-                                            stringstream ss;
-                                            ss << "STS Error:"
-                                                << " Device "
-                                                << a_pkt.devId()
-                                                << " Duplicate Enum "
-                                                << devEnum.name
-                                                << " Ignoring...";
-                                            syslog( LOG_ERR,
-                                                "[%i] %s", g_pid,
-                                                ss.str().c_str() );
+                                            // Don't Log Duplicate Enums
+                                            // (DDP is Duplicated at
+                                            // _Every_ File Boundary! ;-)
+                                            // stringstream ss;
+                                            // ss << "STS Error:"
+                                                // << " Device "
+                                                // << a_pkt.devId()
+                                                // << " Duplicate Enum "
+                                                // << devEnum.name
+                                                // << " Ignoring...";
+                                            // syslog( LOG_ERR,
+                                                // "[%i] %s", g_pid,
+                                                // ss.str().c_str() );
                                             addEnum = false;
                                         }
                                         else if ( !ienum->second[i].name
