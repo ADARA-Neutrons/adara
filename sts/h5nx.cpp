@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include "ADARAUtils.h"
 
+#include <syslog.h>
+
+extern pid_t g_pid;
+
 #define H5NX_SANITY_CHECK
 
 using namespace std;
@@ -795,12 +799,17 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     //open dataset
     if (( did = H5Dopen2( this->m_fid, dataset_path.c_str(), H5P_DEFAULT)) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() dataset_path=%s",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dopen2",
+            dataset_path.c_str() );
         return FAIL;
     }
 
     //get type
     if ((tid = H5Dget_type(did)) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s()",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dget_type" );
         return FAIL;
     }
 
@@ -808,12 +817,17 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
 
     if (H5Dextend(did , dims) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() dims[0]=%lu",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dextend",
+            (unsigned long) dims[0] );
         return FAIL;
     }
 
     //get the new (updated) space
     if ((fsid = H5Dget_space(did)) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s()",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dget_space" );
         return FAIL;
     }
 
@@ -823,45 +837,61 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     //select space on file
     if (H5Sselect_hyperslab(fsid, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
     {
+        syslog( LOG_ERR,
+            "[%i] %s(): Error in %s() start[0]=%lu count[0]=%lu",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Sselect_hyperslab",
+            (unsigned long) start[0], (unsigned long) count[0] );
         return FAIL;
     }
 
     //memory space
     if ((msid = H5Screate_simple( 1, count, count)) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() count[0]=%lu",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Screate_simple",
+            (unsigned long) count[0] );
         return FAIL;
     }
 
     //write
     if (H5Dwrite(did, tid, msid, fsid, H5P_DEFAULT, &(vec[0])) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() (Disk Space?)",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dwrite" );
         return FAIL;
     }
 
     //close memory space
     if (H5Sclose(msid) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() (Memory Space)",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Sclose" );
         return FAIL;
     }
 
     //close file space
     if (H5Sclose(fsid) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() (File Space)",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Sclose" );
         return FAIL;
     }
 
     //close type
     if (H5Tclose(tid) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() (Type)",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Tclose" );
         return FAIL;
     }
 
     //close dataset
     if ( H5Dclose( did ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() (Dataset)",
+            g_pid, "H5nx::H5NXwrite_slab", "H5Dclose" );
         return FAIL;
     }
-
 
     return SUCCEED;
 }
