@@ -802,6 +802,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
         syslog( LOG_ERR, "[%i] %s(): Error in %s() dataset_path=%s",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dopen2",
             dataset_path.c_str() );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dopen2() Open Dataset");
         return FAIL;
     }
 
@@ -810,6 +811,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s()",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dget_type" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dget_type() Get Type");
         return FAIL;
     }
 
@@ -820,6 +822,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
         syslog( LOG_ERR, "[%i] %s(): Error in %s() dims[0]=%lu",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dextend",
             (unsigned long) dims[0] );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dextend() Extend Dataset");
         return FAIL;
     }
 
@@ -828,6 +831,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s()",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dget_space" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dget_space() Get Space");
         return FAIL;
     }
 
@@ -835,12 +839,15 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     start[0] = cur_size;
 
     //select space on file
-    if (H5Sselect_hyperslab(fsid, H5S_SELECT_SET, start, NULL, count, NULL) < 0)
+    if (H5Sselect_hyperslab(fsid, H5S_SELECT_SET,
+            start, NULL, count, NULL) < 0)
     {
         syslog( LOG_ERR,
             "[%i] %s(): Error in %s() start[0]=%lu count[0]=%lu",
             g_pid, "H5nx::H5NXwrite_slab", "H5Sselect_hyperslab",
             (unsigned long) start[0], (unsigned long) count[0] );
+        H5NXdumperr(
+            "H5nx::H5NXwrite_slab(): H5Sselect_hyperslab() Select Space");
         return FAIL;
     }
 
@@ -850,6 +857,8 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
         syslog( LOG_ERR, "[%i] %s(): Error in %s() count[0]=%lu",
             g_pid, "H5nx::H5NXwrite_slab", "H5Screate_simple",
             (unsigned long) count[0] );
+        H5NXdumperr(
+            "H5nx::H5NXwrite_slab(): H5Screate_simple() Memory Space");
         return FAIL;
     }
 
@@ -858,6 +867,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s() (Disk Space?)",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dwrite" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dwrite() Write Data");
         return FAIL;
     }
 
@@ -866,6 +876,8 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s() (Memory Space)",
             g_pid, "H5nx::H5NXwrite_slab", "H5Sclose" );
+        H5NXdumperr(
+            "H5nx::H5NXwrite_slab(): H5Sclose() Close Memory Space");
         return FAIL;
     }
 
@@ -874,6 +886,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s() (File Space)",
             g_pid, "H5nx::H5NXwrite_slab", "H5Sclose" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Sclose() Close File Space");
         return FAIL;
     }
 
@@ -882,6 +895,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s() (Type)",
             g_pid, "H5nx::H5NXwrite_slab", "H5Tclose" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Tclose() Close Type");
         return FAIL;
     }
 
@@ -890,6 +904,7 @@ int H5nx::H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT
     {
         syslog( LOG_ERR, "[%i] %s(): Error in %s() (Dataset)",
             g_pid, "H5nx::H5NXwrite_slab", "H5Dclose" );
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dclose() Close Dataset");
         return FAIL;
     }
 
@@ -1377,7 +1392,6 @@ int H5nx::H5NXmake_group_link(const std::string &current_name, const std::string
 }
 
 
- //
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //H5NXflush
 //call H5Fflush: causes all buffers associated with a file to be immediately flushed to disk
@@ -1391,6 +1405,100 @@ int H5nx::H5NXflush()
     }
 
     return SUCCEED;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+//H5NXdumperr
+//call H5Eprint: dumps most recent HDF5 error stack to temporary file
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+void H5nx::H5NXdumperr(std::string msg)
+{
+    // Make the Temporary File Path Template...
+    std::stringstream ss;
+    ss << "/tmp";
+    ss << "STS.hdf5.err.";
+    ss << g_pid;
+    ss << ".XXXXXX";
+
+    // Make a Copy of the Path String for mkstemp() Munging...
+    char *path = strdup( ss.str().c_str() );
+    if ( path == NULL )
+    {
+        syslog( LOG_ERR,
+            "[%i] %s(): Error copying temporary path string [%s]",
+            g_pid, "H5nx::H5NXdumperr", ss.str().c_str() );
+        return;
+    }
+
+    // Generate the Unique Temporary File Path and Open File...
+    int fd = mkstemp( path );
+    if ( fd < 0 )
+    {
+        syslog( LOG_ERR,
+            "[%i] %s(): Error creating temporary file path=%s",
+            g_pid, "H5nx::H5NXdumperr", path );
+        free( path );
+        return;
+    }
+
+    // Get a Regular File Pointer...
+    FILE *fp = fdopen( fd, "w" );
+    if ( fp == NULL )
+    {
+        syslog( LOG_ERR,
+            "[%i] %s(): Error opening temporary file fd=%d path=%s",
+            g_pid, "H5nx::H5NXdumperr", fd, path );
+        close( fd );
+        free( path );
+        return;
+    }
+
+    // Spew Caller Message into Temporary File...
+    int rc = fprintf( fp,
+        "[%i] %s(): Dumping HDF5 Error Stack for [%s].\n",
+        g_pid, "H5nx::H5NXdumperr", msg.c_str() );
+    if ( rc <= 0 )
+    {
+        syslog( LOG_ERR,
+        "[%i] %s(): Error %s [%s] to Temporary File (path=%s)",
+            g_pid, "H5nx::H5NXdumperr",
+            "Spewing Caller Message", msg.c_str(), path );
+        fclose( fp );
+        free( path );
+        return;
+    }
+
+    // Try to Dump the HDF5 Error Stack...
+    if ( H5Eprint( H5E_DEFAULT, fp ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s(): Error in %s() %s (path=%s)",
+            g_pid, "H5nx::H5NXdumperr", "H5Eprint",
+            "Obtaining HDF5 Error Stack", path );
+        fclose( fp );
+        free( path );
+        return;
+    }
+
+    // Spew Final Message into Temporary File...
+    rc = fprintf( fp, "[%i] %s(): After (Any) HDF5 Error Stack.\n",
+        g_pid, "H5nx::H5NXdumperr" );
+    if ( rc <= 0 )
+    {
+        syslog( LOG_ERR,
+        "[%i] %s(): Error %s to Temporary File (path=%s)",
+            g_pid, "H5nx::H5NXdumperr",
+            "Spewing Final Message", path );
+        fclose( fp );
+        free( path );
+        return;
+    }
+
+    // Done, Flush and Close Temporary File...
+    fflush( fp );
+    fclose( fp );
+    free( path );
+    return;
 }
 
 // vim: expandtab
