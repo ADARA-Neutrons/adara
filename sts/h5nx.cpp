@@ -1416,7 +1416,7 @@ void H5nx::H5NXdumperr(std::string msg)
 {
     // Make the Temporary File Path Template...
     std::stringstream ss;
-    ss << "/tmp";
+    ss << "/tmp/";
     ss << "STS.hdf5.err.";
     ss << g_pid;
     ss << ".XXXXXX";
