@@ -1497,7 +1497,7 @@ void H5nx::H5NXdumperr(std::string msg)
 
     // Done, Flush and Close Temporary File...
     syslog( LOG_ERR,
-        "[%i] %s in %s(): %s for [%s] to Temporary File (path=%s)",
+        "[%i] %s - %s(): %s for [%s] to Temporary File (path=%s)",
         g_pid, "STS Error", "H5nx::H5NXdumperr",
         "Logged HDF5 Error Stack", msg.c_str(), path );
     fflush( fp );
