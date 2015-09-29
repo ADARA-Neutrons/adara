@@ -42,6 +42,11 @@ int H5nx::H5NXclose_file()
         assert ( m_fapl != - 1 );
         if ( H5Pclose(m_fapl) < 0 )
         {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() m_fapl=%ld",
+                g_pid, "STS Error", "H5nx::H5NXclose_file", "H5Pclose",
+                (long) m_fapl );
+            H5NXdumperr(
+                "H5nx::H5NXclose_file(): H5Pclose() Close File Access");
             return FAIL;
         }
         m_fapl = -1;
@@ -49,6 +54,11 @@ int H5nx::H5NXclose_file()
 
     if ( H5Fclose(m_fid) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() m_fid=%ld",
+            g_pid, "STS Error", "H5nx::H5NXclose_file", "H5Fclose",
+            (long) m_fid );
+        H5NXdumperr(
+            "H5nx::H5NXclose_file(): H5Fclose() Close File");
         return FAIL;
     }
     m_fid = -1;
@@ -74,7 +84,6 @@ int H5nx::H5NXcreate_file(const std::string &file_name )
 {
     if ( modify_chunk_cache )
     {
-
         assert ( m_cache_size );
 
         int     mdc_nelmts;
@@ -83,39 +92,98 @@ int H5nx::H5NXcreate_file(const std::string &file_name )
         double  rdcc_w0;
 
         if (( m_fapl = H5Pcreate( H5P_FILE_ACCESS )) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file", "H5Pcreate",
+                "m_fapl", (long) m_fapl );
+            H5NXdumperr(
+                "H5nx::H5NXcreate_file(): H5Pcreate() Create File Access");
             return FAIL;
+        }
+
         //same as NeXus
-        if ( H5Pset_fclose_degree( m_fapl, H5F_CLOSE_STRONG)  < 0 )
+        if ( H5Pset_fclose_degree( m_fapl, H5F_CLOSE_STRONG) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Pset_fclose_degree", "m_fapl", (long) m_fapl );
+            H5NXdumperr("H5nx::H5NXcreate_file(): H5Pset_fclose_degree()");
             return FAIL;
-        if ( H5Pget_cache(m_fapl, &mdc_nelmts, &rdcc_nelmts, &rdcc_nbytes, &rdcc_w0) < 0 )
+        }
+
+        if ( H5Pget_cache(m_fapl, &mdc_nelmts,
+                &rdcc_nelmts, &rdcc_nbytes, &rdcc_w0) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Pget_cache", "m_fapl", (long) m_fapl );
+            H5NXdumperr("H5nx::H5NXcreate_file(): H5Pget_cache()");
             return FAIL;
+        }
 
         rdcc_nbytes = m_cache_size;
         rdcc_nelmts = rdcc_nelmts * 100;
 
-        if ( H5Pset_cache(m_fapl, mdc_nelmts, rdcc_nelmts, rdcc_nbytes, rdcc_w0) < 0 )
+        if ( H5Pset_cache(m_fapl, mdc_nelmts,
+                rdcc_nelmts, rdcc_nbytes, rdcc_w0) < 0 )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s in %s(): Error in %s() %s=%ld %s=%ld %s=%ld",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Pset_cache", "m_fapl", (long) m_fapl,
+                "rdcc_nbytes", (long) rdcc_nbytes,
+                "rdcc_nelmts", (long) rdcc_nelmts );
+            H5NXdumperr("H5nx::H5NXcreate_file(): H5Pset_cache()");
             return FAIL;
-        if (( m_fid = H5Fcreate( file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, m_fapl )) < 0 )
+        }
+
+        if (( m_fid = H5Fcreate( file_name.c_str(), H5F_ACC_TRUNC,
+                H5P_DEFAULT, m_fapl )) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Fcreate", "file_name", file_name.c_str() );
+            H5NXdumperr(
+                "H5nx::H5NXcreate_file(): H5Fcreate() Create File");
             return FAIL;
+        }
 
 #if defined (H5NX_SANITY_CHECK)
-        if ( H5Pget_cache(m_fapl, &mdc_nelmts, &rdcc_nelmts, &rdcc_nbytes, &rdcc_w0) < 0 )
+        if ( H5Pget_cache(m_fapl, &mdc_nelmts,
+                &rdcc_nelmts, &rdcc_nbytes, &rdcc_w0) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld %s",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Pget_cache", "m_fapl", (long) m_fapl, "Sanity Check" );
+            H5NXdumperr(
+                "H5nx::H5NXcreate_file(): H5Pget_cache() Sanity Check");
             return FAIL;
+        }
         assert( rdcc_nbytes == m_cache_size );
 #endif
     }
 
     else
-
     {
-
-        if (( m_fid = H5Fcreate( file_name.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT )) < 0 )
+        if (( m_fid = H5Fcreate( file_name.c_str(), H5F_ACC_TRUNC,
+                H5P_DEFAULT, H5P_DEFAULT )) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s",
+                g_pid, "STS Error", "H5nx::H5NXcreate_file",
+                "H5Fcreate", "file_name", file_name.c_str() );
+            H5NXdumperr(
+                "H5nx::H5NXcreate_file(): H5Fcreate() Create File");
             return FAIL;
-
+        }
     }
 
-    if ( this->write_root_metadata( file_name.c_str() ) < 0)
+    if ( this->write_root_metadata( file_name.c_str() ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s",
+            g_pid, "STS Error", "H5nx::H5NXcreate_file",
+            "write_root_metadata", "file_name", file_name.c_str() );
         return FAIL;
+    }
 
     return SUCCEED;
 }
@@ -132,55 +200,100 @@ int H5nx::H5NXmake_group( const std::string &group_name, const std::string &clas
     hid_t     tid;
     hid_t     sid;
 
-    if (( gid = H5Gcreate2( this->m_fid, group_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+    if ( (gid = H5Gcreate2( this->m_fid, group_name.c_str(),
+            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group",
+            "H5Gcreate2", "group_name", group_name.c_str() );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Gcreate2() Create Group");
         return FAIL;
     }
 
-    if (( sid = H5Screate(H5S_SCALAR)) < 0)
+    if ( (sid = H5Screate(H5S_SCALAR)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() Create Scalar",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Screate" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Screate() Create Scalar");
         return FAIL;
     }
 
-    if (( tid = H5Tcopy(H5T_C_S1)) < 0)
+    if ( (tid = H5Tcopy(H5T_C_S1)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() Copy Type",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Tcopy" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Tcopy() Copy Type");
         return FAIL;
     }
 
-    if ( H5Tset_size(tid, strlen(class_name.c_str())) < 0)
+    if ( H5Tset_size( tid, strlen(class_name.c_str()) ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s=%ld",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Tset_size",
+            "class_name", class_name.c_str(),
+            "strlen", (long) strlen( class_name.c_str() ) );
+        H5NXdumperr(
+            "H5nx::H5NXmake_group(): H5Tset_size() Class Name Size");
         return FAIL;
     }
 
-    if (( aid= H5Acreate2(gid, "NX_class", tid, sid, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+    if ( (aid= H5Acreate2(gid, "NX_class", tid, sid,
+            H5P_DEFAULT, H5P_DEFAULT)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Acreate2",
+            "Create NX_class Attribute" );
+        H5NXdumperr(
+         "H5nx::H5NXmake_group(): H5Acreate2() Create NX_class Attribute");
         return FAIL;
     }
 
     if ( H5Awrite( aid, tid, class_name.c_str()) < 0)
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Awrite",
+            "class_name", class_name.c_str(), "Write NX_class Attribute" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_group(): H5Awrite() Write NX_class Attribute");
         return FAIL;
     }
 
     if ( H5Tclose( tid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Tclose",
+            "Close Type" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Tclose() Close Type");
         return FAIL;
     }
 
     if ( H5Sclose( sid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Sclose",
+            "Close Scalar" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Sclose() Close Scalar");
         return FAIL;
     }
 
     if ( H5Aclose( aid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Aclose",
+            "Close Attribute" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Aclose() Close Attribute");
         return FAIL;
     }
 
     if ( H5Gclose( gid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Gclose",
+            "Close Group" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Gclose() Close Group");
         return FAIL;
     }
+
     return SUCCEED;
 }
 
@@ -236,6 +349,9 @@ hid_t H5nx::nx_to_hdf5_type(int nx_datatype)
     }
     else
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error Unknown Type %s=%ld",
+            g_pid, "STS Error", "H5nx::nx_to_hdf5_type",
+            "nx_datatype", (long) nx_datatype );
         type = -1;
         assert ( 0 );
     }
@@ -245,7 +361,8 @@ hid_t H5nx::nx_to_hdf5_type(int nx_datatype)
 ///////////////////////////////////////////////////////////////////
 // H5NXmake_attribute_string
 ////////////////////////////////////////////////////////////////////
-int H5nx::H5NXmake_attribute_string( const std::string &dataset_path, const std::string &attr_name, const std::string &attr_value  )
+int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
+        const std::string &attr_name, const std::string &attr_value  )
 {
     hid_t   aid;  // attribute ID
     hid_t   sid;  // dataspace ID
@@ -256,62 +373,120 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path, const std:
     size_t size_attr = attr_value.size();
 
     //create a scalar dataspace
-    if (( sid = H5Screate( H5S_SCALAR )) < 0)
+    if ( (sid = H5Screate( H5S_SCALAR )) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Screate", "Create Scalar" );
+        H5NXdumperr(
+          "H5nx::H5NXmake_attribute_string(): H5Screate() Create Scalar");
         return FAIL;
     }
 
     //copy type
-    if (( tid = H5Tcopy(H5T_C_S1)) < 0)
+    if ( (tid = H5Tcopy(H5T_C_S1)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Tcopy", "Copy Type" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Tcopy() Copy Type");
         return FAIL;
     }
 
-    if ( H5Tset_size( tid, size_attr ) < 0)
+    if ( H5Tset_size( tid, size_attr ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Tset_size", "size_attr", (long) size_attr );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Tset_size()");
         return FAIL;
     }
 
-    if (H5Tset_strpad(tid, H5T_STR_NULLTERM) < 0)
+    if ( H5Tset_strpad(tid, H5T_STR_NULLTERM) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s()",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Tset_strpad" );
+        H5NXdumperr("H5nx::H5NXmake_attribute_string(): H5Tset_strpad()");
         return FAIL;
     }
 
-    if (( did = H5Dopen2( this->m_fid, dataset_path.c_str(), H5P_DEFAULT)) < 0)
+    if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
+            H5P_DEFAULT)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Dopen2", "dataset_path", dataset_path.c_str(),
+            "Open Dataset" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Dopen2() Open Dataset");
         return FAIL;
     }
 
-    if (( aid = H5Acreate( did, attr_name.c_str(), tid, sid, H5P_DEFAULT, H5P_DEFAULT)) < 0)
+    if ( (aid = H5Acreate( did, attr_name.c_str(), tid, sid,
+            H5P_DEFAULT, H5P_DEFAULT)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Acreate", "attr_name", attr_name.c_str(),
+            "Create Attribute" );
+        H5NXdumperr(
+        "H5nx::H5NXmake_attribute_string(): H5Acreate() Create Attribute");
         return FAIL;
     }
 
     if ( H5Awrite( aid, tid , &(attr_value[0]) ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Awrite", "attr_value", attr_value.c_str(),
+            "Write Attribute" );
+        H5NXdumperr(
+          "H5nx::H5NXmake_attribute_string(): H5Awrite() Write Attribute");
         return FAIL;
     }
 
     if ( H5Tclose( tid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Tclose", "Close Type" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Tclose() Close Type");
         return FAIL;
     }
 
     if ( H5Sclose( sid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Sclose", "Close Scalar" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Sclose() Close Scalar");
         return FAIL;
     }
 
     if ( H5Aclose( aid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Aclose", "Close Attribute" );
+        H5NXdumperr(
+          "H5nx::H5NXmake_attribute_string(): H5Aclose() Close Attribute");
         return FAIL;
     }
 
     if ( H5Dclose( did ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
+            "H5Dclose", "Close Dataset" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_attribute_string(): H5Dclose() Close Dataset");
         return FAIL;
     }
-
 
     return SUCCEED;
 }
