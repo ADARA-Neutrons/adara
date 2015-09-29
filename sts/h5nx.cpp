@@ -212,9 +212,10 @@ int H5nx::H5NXmake_group( const std::string &group_name, const std::string &clas
 
     if ( (sid = H5Screate(H5S_SCALAR)) < 0 )
     {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() Create Scalar",
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() Create Dataspace",
             g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Screate" );
-        H5NXdumperr("H5nx::H5NXmake_group(): H5Screate() Create Scalar");
+        H5NXdumperr(
+            "H5nx::H5NXmake_group(): H5Screate() Create Dataspace");
         return FAIL;
     }
 
@@ -271,8 +272,8 @@ int H5nx::H5NXmake_group( const std::string &group_name, const std::string &clas
     {
         syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
             g_pid, "STS Error", "H5nx::H5NXmake_group", "H5Sclose",
-            "Close Scalar" );
-        H5NXdumperr("H5nx::H5NXmake_group(): H5Sclose() Close Scalar");
+            "Close Dataspace" );
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Sclose() Close Dataspace");
         return FAIL;
     }
 
@@ -377,9 +378,9 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
     {
         syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
             g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
-            "H5Screate", "Create Scalar" );
+            "H5Screate", "Create Dataspace" );
         H5NXdumperr(
-          "H5nx::H5NXmake_attribute_string(): H5Screate() Create Scalar");
+        "H5nx::H5NXmake_attribute_string(): H5Screate() Create Dataspace");
         return FAIL;
     }
 
@@ -462,9 +463,9 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
     {
         syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
             g_pid, "STS Error", "H5nx::H5NXmake_attribute_string",
-            "H5Sclose", "Close Scalar" );
+            "H5Sclose", "Close Dataspace" );
         H5NXdumperr(
-            "H5nx::H5NXmake_attribute_string(): H5Sclose() Close Scalar");
+          "H5nx::H5NXmake_attribute_string(): H5Sclose() Close Dataspace");
         return FAIL;
     }
 
@@ -508,48 +509,95 @@ int H5nx::H5NXmake_dataset_string(const std::string &group_path, const std::stri
     size_t size_data = data.size();
 
     //create a 1D dataspace with a dimension of 1 element
-    if (( sid = H5Screate_simple( 1, dim, NULL )) < 0)
+    if ( (sid = H5Screate_simple( 1, dim, NULL )) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Screate_simple", "Create Dataspace" );
+        H5NXdumperr(
+   "H5nx::H5NXmake_dataset_string(): H5Screate_simple() Create Dataspace");
         return FAIL;
     }
 
-    if (( tid = H5Tcopy(H5T_C_S1)) < 0)
+    if ( (tid = H5Tcopy(H5T_C_S1)) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Tcopy", "Copy Type" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_string(): H5Tcopy() Copy Type");
         return FAIL;
     }
 
-    if ( H5Tset_size( tid, size_data ) < 0)
+    if ( H5Tset_size( tid, size_data ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%ld",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Tset_size", "size_data", (long) size_data );
+        H5NXdumperr("H5nx::H5NXmake_dataset_string(): H5Tset_size()");
         return FAIL;
     }
 
-    if (H5Tset_strpad(tid, H5T_STR_NULLTERM) < 0)
+    if ( H5Tset_strpad(tid, H5T_STR_NULLTERM) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s()",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Tset_strpad" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_string(): H5Tset_strpad()");
         return FAIL;
     }
 
-    if ((did = H5Dcreate2 ( m_fid, absolute_dataset_name.c_str(), tid, sid, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT )) < 0)
+    if ( (did = H5Dcreate2( m_fid, absolute_dataset_name.c_str(), tid, sid,
+            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT )) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Dcreate2",
+            "absolute_dataset_name", absolute_dataset_name.c_str(),
+            "Create Dataset" );
+        H5NXdumperr(
+          "H5nx::H5NXmake_dataset_string(): H5Dcreate2() Create Dataset");
         return FAIL;
     }
 
-    if ( H5Dwrite( did, tid , H5S_ALL, H5S_ALL, H5P_DEFAULT, &(data[0]) ) < 0 )
+    if ( H5Dwrite( did, tid,
+            H5S_ALL, H5S_ALL, H5P_DEFAULT, &(data[0]) ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Dwrite", "Write Dataset" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_string(): H5Dwrite() Write Dataset");
         return FAIL;
     }
 
     if ( H5Tclose( tid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Tclose", "Close Type" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_string(): H5Tclose() Close Type");
         return FAIL;
     }
 
     if ( H5Sclose( sid ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Sclose", "Close Dataspace" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_string(): H5Sclose() Close Dataspace");
         return FAIL;
     }
 
     if ( H5Dclose( did ) < 0 )
     {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_string",
+            "H5Dclose", "Close Dataset" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_string(): H5Dclose() Close Dataset");
         return FAIL;
     }
 
