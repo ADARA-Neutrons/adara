@@ -89,6 +89,54 @@ VISION SMS bl16b-daq1:
        intrapulse 16666200ns tofOffset 0ns
        charge 0pC period 955005ps
 
+
+Legacy NOMAD:
+-------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy BASIS:
+-------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy SNAP:   [Consistent]
+------------
+   Veto Index = -1
+   Proton Charge Index = -1
+
+Legacy REF_L:   [*** Inconsistent]
+-------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy CNCS:
+------------
+   *** ALL Pulse Vetoes Ignored...
+
+Legacy VULCAN:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy POWGEN:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy TOPAZ:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy ARCS:
+------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy MANDI:   [*** Inconsistent]
+-------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+
 HYS_10601 ADARA Test Harness:
 -----------------------------
    Flavor Index = 0*
