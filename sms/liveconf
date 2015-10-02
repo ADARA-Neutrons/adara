@@ -142,6 +142,13 @@ option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_label[$num_options]="[Do Pulse Proton Charge Correction]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="do_pulse_veto_correction"
+option_pv[$num_options]="SMS:Control:DoPulseVetoCorrect"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_label[$num_options]="[Do Pulse Veto Flags Correction]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -753,6 +760,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
 		caget $WAIT ${PRE}:SMS:Control:MaxPulseBufferSize
 		caget $WAIT ${PRE}:SMS:Control:DoPulsePchgCorrect
+		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
 
 		echo
 
