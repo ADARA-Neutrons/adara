@@ -227,9 +227,11 @@ private:
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
 	boost::shared_ptr<smsBooleanPV> m_pvDoPulsePchgCorrect;
+	boost::shared_ptr<smsBooleanPV> m_pvDoPulseVetoCorrect;
 	static uint32_t m_interPulseTimeMin;
 	static uint32_t m_interPulseTimeMax;
 	static bool m_doPulsePchgCorrect;
+	static bool m_doPulseVetoCorrect;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
@@ -252,7 +254,7 @@ private:
 	bool setRecording(bool val);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
-	void correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse);
+	void correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse);
 	void recordPulse(PulsePtr &pulse);
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
