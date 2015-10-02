@@ -365,6 +365,8 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 			printf(" DUP_PULSE");
 		if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
 			printf(" PCHG_UNCOR");
+		if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			printf(" VETO_UNCOR");
 		printf("\n");
 	}
 
@@ -455,6 +457,8 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 			printf(" DUP_PULSE");
 		if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
 			printf(" PCHG_UNCOR");
+		if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			printf(" VETO_UNCOR");
 		printf("\n");
 	}
 
