@@ -356,8 +356,8 @@ StreamMonitor::connect()
 
             data[0] = 4;
             data[1] = ADARA_PKT_TYPE(
-				ADARA::PacketType::CLIENT_HELLO_TYPE,
-				ADARA::PacketType::CLIENT_HELLO_VERSION );
+                ADARA::PacketType::CLIENT_HELLO_TYPE,
+                ADARA::PacketType::CLIENT_HELLO_VERSION );
             data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
             data[3] = 0;
             data[4] = 0;
@@ -551,36 +551,36 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
     {
         switch (a_pkt.base_type())
         {
-        	// These packets shall always be processed
-        	case ADARA::PacketType::RUN_STATUS_TYPE:
-        	case ADARA::PacketType::PIXEL_MAPPING_TYPE:
-        	case ADARA::PacketType::RUN_INFO_TYPE:
-        	case ADARA::PacketType::BEAMLINE_INFO_TYPE:
-        	case ADARA::PacketType::DEVICE_DESC_TYPE:
-        	case ADARA::PacketType::VAR_VALUE_U32_TYPE:
-        	case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
-        	case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
-        	case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
-        	case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
-        	case ADARA::PacketType::BANKED_EVENT_TYPE:
-            	return Parser::rxPacket(a_pkt);
+            // These packets shall always be processed
+            case ADARA::PacketType::RUN_STATUS_TYPE:
+            case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+            case ADARA::PacketType::RUN_INFO_TYPE:
+            case ADARA::PacketType::BEAMLINE_INFO_TYPE:
+            case ADARA::PacketType::DEVICE_DESC_TYPE:
+            case ADARA::PacketType::VAR_VALUE_U32_TYPE:
+            case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+            case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+            case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
+            case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
+            case ADARA::PacketType::BANKED_EVENT_TYPE:
+                return Parser::rxPacket(a_pkt);
 
-        	// Packet types that are not processes by StreamParser
-        	case ADARA::PacketType::GEOMETRY_TYPE:
-        	case ADARA::PacketType::RAW_EVENT_TYPE:
-        	case ADARA::PacketType::MAPPED_EVENT_TYPE:
-        	case ADARA::PacketType::RTDL_TYPE:
-        	case ADARA::PacketType::SOURCE_LIST_TYPE:
-        	case ADARA::PacketType::TRANS_COMPLETE_TYPE:
-        	case ADARA::PacketType::CLIENT_HELLO_TYPE:
-        	case ADARA::PacketType::SYNC_TYPE:
-        	case ADARA::PacketType::HEARTBEAT_TYPE:
-        	case ADARA::PacketType::DATA_DONE_TYPE:
-            	break;
+            // Packet types that are not processes by StreamParser
+            case ADARA::PacketType::GEOMETRY_TYPE:
+            case ADARA::PacketType::RAW_EVENT_TYPE:
+            case ADARA::PacketType::MAPPED_EVENT_TYPE:
+            case ADARA::PacketType::RTDL_TYPE:
+            case ADARA::PacketType::SOURCE_LIST_TYPE:
+            case ADARA::PacketType::TRANS_COMPLETE_TYPE:
+            case ADARA::PacketType::CLIENT_HELLO_TYPE:
+            case ADARA::PacketType::SYNC_TYPE:
+            case ADARA::PacketType::HEARTBEAT_TYPE:
+            case ADARA::PacketType::DATA_DONE_TYPE:
+                break;
 
-        	default:
-            	++m_stream_metrics.m_invalid_pkt_type;
-            	break;
+            default:
+                ++m_stream_metrics.m_invalid_pkt_type;
+                break;
         }
     }
     catch(...)
@@ -811,8 +811,11 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     if ( flags & BankedEventPkt::DUPLICATE_PULSE )
          ++m_run_metrics.m_dup_pulse_count;
 
-    if ( flags & BankedEventPkt::PCHARGE_UNCORRECTED )
+    if ( flags & BankedEventPkt::PCHARGE_UNCORRECTED
+            || flags & BankedEventPkt::VETO_UNCORRECTED )
+    {
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
+    }
 
     uint32_t        source_id;
     uint32_t        bank_count;
