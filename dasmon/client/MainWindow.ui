@@ -147,7 +147,7 @@
         <item row="4" column="5">
          <widget class="QLabel" name="label_48">
           <property name="text">
-           <string>Pulse Chg Uncor:</string>
+           <string>Pulse Uncor:</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
