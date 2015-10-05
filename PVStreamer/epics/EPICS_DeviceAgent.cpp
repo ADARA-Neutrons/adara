@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <sstream>
 #include <syslog.h>
 #include <alarm.h>
 
@@ -586,6 +587,10 @@ DeviceAgent::controlThread()
                         syslog( LOG_INFO, "%sPending PV Connection: %s",
                             deviceStr.c_str(), pendingPVs[i].c_str() );
                     }
+
+                    // Save Number of "Ready" PVs, in case Device Hangs
+                    // on Initialization (include pending count in signal)
+                    m_dev_desc->m_ready = ready;
                 }
             }
         }
@@ -640,7 +645,6 @@ DeviceAgent::monitorThread()
     struct itimerspec   timeout;
     string              sid;
     string              dev_name;
-    string              message;
     DeviceStartupState  state = DSS_READY;
 
     // Create but don't start timer
@@ -676,24 +680,33 @@ DeviceAgent::monitorThread()
                 }
                 else
                 {
-                    // Else did timer expire? If so, assert signal and go to FAULT state
+                    // Else did timer expire?
+                    // If so, assert signal and go to FAULT state
                     timer_gettime( tid, &timeout );
-                    if ( timeout.it_value.tv_sec == 0 && timeout.it_value.tv_nsec == 0 )
+                    if ( timeout.it_value.tv_sec == 0
+                            && timeout.it_value.tv_nsec == 0 )
                     {
                         dev_name = m_dev_desc->m_name;
                         sid = string("SID_EPICS_DEV_") + dev_name;
-                        message = "PVSD ERROR: "
-                            + string("Device (") + dev_name
-                            + ") has hung while initializing";
-                        ADARA::ComBus::SignalAssertMessage sigmsg( sid, "EPICS", message, ADARA::ERROR );
-                        ADARA::ComBus::Connection::getInst().broadcast( sigmsg );
+                        stringstream ss;
+                        ss << "PVSD ERROR: ";
+                        ss << string("Device (") + dev_name;
+                        ss << ") INIT HUNG, Check beamline.xml - ";
+                        ss << ( m_dev_desc->m_pvs.size()
+                            - m_dev_desc->m_ready );
+                        ss << " PVs Pending!";
+                        ADARA::ComBus::SignalAssertMessage sigmsg( sid,
+                            "EPICS", ss.str(), ADARA::ERROR );
+                        ADARA::ComBus::Connection::getInst().broadcast(
+                            sigmsg );
 
                         // Also log the error
-                        syslog( LOG_ERR, message.c_str() );
+                        syslog( LOG_ERR, ss.str().c_str() );
 
                         if ( m_dev_record.get() )
                         {
-                            m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+                            m_stream_api.getCfgMgr().undefineDevice(
+                                m_dev_record );
                             m_dev_record.reset();
                         }
 
