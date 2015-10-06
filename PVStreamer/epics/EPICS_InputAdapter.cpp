@@ -295,12 +295,18 @@ InputAdapter::configFileMonitorThread()
                         }
                         else
                         {
-                            syslog( LOG_ERR,
-                                "%s EPICS beam config file parse FAILED",
-                                "PVSD ERROR:" );
+                            stringstream ss;
+                            ss << "PVSD ERROR:"
+                                << " Failed to parse"
+                                << " EPICS beamline.xml config file!";
 
-                            ADARA::ComBus::SignalAssertMessage msg( "SID_EPICS_CFG_ERROR", "CONFIG", "EPICS beam config file (beamline.xml) failed to parse", ADARA::ERROR );
-                            ADARA::ComBus::Connection::getInst().broadcast( msg );
+                            syslog( LOG_ERR, "%s", ss.str().c_str() );
+
+                            ADARA::ComBus::SignalAssertMessage msg(
+                                "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(),
+                                ADARA::ERROR );
+                            ADARA::ComBus::Connection::getInst().broadcast(
+                                msg );
                         }
                     }
                 }
@@ -309,9 +315,9 @@ InputAdapter::configFileMonitorThread()
         catch( std::exception &e )
         {
             stringstream ss;
-            ss << "PVSD ERROR: Exception thrown"
-                << " while parsing EPICS configuration file"
-                << " (beamline.xml)";
+            ss << "PVSD ERROR:"
+                << " Exception parsing"
+                << " EPICS beamline.xml config file!";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
             syslog( LOG_ERR, e.what() );
@@ -323,9 +329,9 @@ InputAdapter::configFileMonitorThread()
         catch( ... )
         {
             stringstream ss;
-            ss << "PVSD ERROR: Unexpected exception thrown"
-                << " while parsing EPICS configuration file"
-                << " (beamline.xml)";
+            ss << "PVSD ERROR:"
+                << " Unexpected exception parsing"
+                << " EPICS beamline.xml config file!";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
