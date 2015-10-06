@@ -2,6 +2,7 @@
 #include <string>
 #include <sstream>
 #include <syslog.h>
+#include <unistd.h>
 #include <alarm.h>
 
 #include "CoreDefs.h"
@@ -197,6 +198,7 @@ DeviceAgent::metadataUpdated()
                 m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
+            usleep(30); // give syslog a chance...
 
             ich->second.m_pv->setMetadata(
                 epicsToPVType( ich->second.m_ca_type,
@@ -211,6 +213,7 @@ DeviceAgent::metadataUpdated()
                 m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
+            usleep(30); // give syslog a chance...
 
             // Re-request metadata from all other PV
             // (they may have changed too)
@@ -296,6 +299,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     syslog( LOG_INFO, "%sCreating channel for PV %s: %s",
         deviceStr.c_str(),
         a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+    usleep(30); // give syslog a chance...
 
     ChanInfo info;
     info.m_pv = a_pv;
@@ -318,6 +322,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         syslog( LOG_ERR, "%s %sFailed to create channel for PV: %s",
             "PVSD ERROR:", deviceStr.c_str(),
             a_pv->m_connection.c_str() );
+        usleep(30); // give syslog a chance...
     }
 }
 
@@ -344,6 +349,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
         syslog( LOG_INFO, "%sDisconnecting channel for PV %s: %s",
             deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+        usleep(30); // give syslog a chance...
 
         map<chid,ChanInfo>::iterator ich = m_chan_info.find( ipv->second );
 
@@ -365,6 +371,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
                 "%sWarning: No Channel Info Found for PV %s (%s)",
                 deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+            usleep(30); // give syslog a chance...
         }
 
         // Update name index structures
@@ -376,6 +383,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
             "%s %sFailed to disconnect channel for PV %s: %s Not Found",
             "PVSD ERROR:", deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+        usleep(30); // give syslog a chance...
     }
 }
 
@@ -460,6 +468,7 @@ DeviceAgent::controlThread()
                             "PVSD ERROR:", deviceStr.c_str(),
                             ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
+                        usleep(30); // give syslog a chance...
                     }
                     pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
@@ -581,11 +590,13 @@ DeviceAgent::controlThread()
                     syslog( LOG_INFO, "%sWaiting for %ld Pending PVs",
                         deviceStr.c_str(),
                         m_dev_desc->m_pvs.size() - ready );
+                    usleep(30); // give syslog a chance...
 
                     for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
                     {
                         syslog( LOG_INFO, "%sPending PV Connection: %s",
                             deviceStr.c_str(), pendingPVs[i].c_str() );
+                        usleep(30); // give syslog a chance...
                     }
 
                     // Save Number of "Ready" PVs, in case Device Hangs
@@ -702,6 +713,7 @@ DeviceAgent::monitorThread()
 
                         // Also log the error
                         syslog( LOG_ERR, ss.str().c_str() );
+                        usleep(30); // give syslog a chance...
 
                         if ( m_dev_record.get() )
                         {
@@ -728,6 +740,7 @@ DeviceAgent::monitorThread()
                         + string("Device (") + dev_name
                         + ") has recovered from hung state.";
                     syslog( LOG_ERR, message.c_str() );
+                    usleep(30); // give syslog a chance...
 
                     // Change state
                     state = DSS_READY;
@@ -823,6 +836,7 @@ DeviceAgent::epicsConnectionHandler(
                     {
                         syslog( LOG_INFO, "Subscription created%s%s",
                             deviceStr.c_str(), pvStr.c_str() );
+                        usleep(30); // give syslog a chance...
 
                         ich->second.m_subscribed = true;
                     }
@@ -832,6 +846,7 @@ DeviceAgent::epicsConnectionHandler(
                             "%s Failed to create subscription%s%s",
                             "PVSD ERROR:",
                             deviceStr.c_str(), pvStr.c_str() );
+                        usleep(30); // give syslog a chance...
                     }
 
                     ca_flush_io();
@@ -885,6 +900,7 @@ DeviceAgent::epicsConnectionHandler(
                         "PVSD ERROR:",
                         "Clearing subscription (Down?)",
                         deviceStr.c_str(), pvStr.c_str() );
+                    usleep(30); // give syslog a chance...
 
                     ca_clear_subscription( ich->second.m_evid );
                     ich->second.m_subscribed = false;
@@ -917,6 +933,7 @@ DeviceAgent::epicsConnectionHandler(
                         "PVSD ERROR:", "No Free Packets!",
                         "VariableUpdate Lost",
                         deviceStr.c_str(), pvStr.c_str() );
+                    usleep(30); // give syslog a chance...
                 }
             }
         }
@@ -1098,6 +1115,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                             "PVSD ERROR:",
                             "No Free Packets! VariableUpdate Lost",
                             deviceStr.c_str(), pvStr.c_str() );
+                        usleep(30); // give syslog a chance...
                     }
                 }
             }
@@ -1221,6 +1239,7 @@ DeviceAgent::sendCurrentValues()
                 "PVSD ERROR:",
                 "No Free Packets! VariableUpdate Lost for",
                 deviceStr.c_str(), pvStr.c_str() );
+            usleep(30); // give syslog a chance...
         }
     }
 }
