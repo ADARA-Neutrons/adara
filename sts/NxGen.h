@@ -575,7 +575,7 @@ private:
                                             << a_path
                                             << " a_buffer.size()="
                                             << a_buffer.size()
-                                            << " a_slab_size="
+                                            << " a_slab_size(offset)="
                                             << a_slab_size);
                                 }
                             }

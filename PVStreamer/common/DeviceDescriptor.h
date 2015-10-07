@@ -84,6 +84,7 @@ public:
     std::string                     m_source;
     std::vector<PVDescriptor*>      m_pvs;
     std::vector<EnumDescriptor*>    m_enums;
+    size_t                          m_ready;
 };
 
 }

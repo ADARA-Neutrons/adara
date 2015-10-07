@@ -1,28 +1,28 @@
 
 Instructions for Installing and Configuring the RSyslog Mailer script!
 
-- to generate email notifications for ADARA SMS/STS syslog log entries
+- to generate email notifications for ADARA SMS/STS rsyslog log entries
 that might be of interest to developers and maintainers of the system. :-)
 
 - this setup includes:
-   * creation of a named pipe for buffering critical syslog messages
+   * creation of a named pipe for buffering critical rsyslog messages
    * cron script to drain named pipe and construct an alarm email
    * configuration rules for RSyslog on Linux platforms
 
-1. Create a Named Pipe for buffering critical ADARA syslog messages:
+1. Create a Named Pipe for buffering critical ADARA rsyslog messages:
 
-   $ sudo mkdir /etc/syslog.pipes
-   $ sudo mknod /etc/syslog.pipes/criticalMessages p
-   $ sudo chgrp snswheel /etc/syslog.pipes/criticalMessages
-   $ sudo chmod 660 /etc/syslog.pipes/criticalMessages
+   $ sudo mkdir /etc/rsyslog.pipes
+   $ sudo mknod /etc/rsyslog.pipes/criticalMessages p
+   $ sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+   $ sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
 
 2. Install "rsyslogMailer" cron script (from ADARA Git repository):
 
-   $ sudo cp ADARA/rsyslogMailer /usr/bin
+   $ sudo cp ADARA/rsyslogMailer /usr/local/bin
 
    -> add cron job to periodically run the script, every 5 minutes:
 
-   $ sudo crontab -e
+   $ sudo crontab -e   (or edit /etc/crontab)
 
    . . .
 
@@ -31,7 +31,7 @@ that might be of interest to developers and maintainers of the system. :-)
 
    . . .
 
-   0-59/5 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+   */5 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
    (Note: the named pipe "/etc/rsyslog.pipes/criticalMessages" is
    now hard-coded as $namedPipeFile in the actual "rsyslogMailer" script!)
@@ -40,14 +40,20 @@ that might be of interest to developers and maintainers of the system. :-)
 ADARA SMS/STS syslog error messages:
 
    -> in "/etc/rsyslog.conf" add the following lines,
-   *Before* any existing configuration to redirect ADARA logs:
+   *Before* any existing configuration to redirect ADARA logs
+   (or place these contents in "/etc/rsyslog.d/adaraMailer.conf"
+   for inclusion in the "/etc/rsyslog.conf" configuration):
 
    . . .
 
    # Critical ADARA SMS Messages - Email Notification
+   :msg, contains, "OversizePkt"   |/etc/rsyslog.pipes/criticalMessages
    :msg, contains, "ERROR SMS"     |/etc/rsyslog.pipes/criticalMessages
    :msg, contains, "STS failed"    |/etc/rsyslog.pipes/criticalMessages
-   :msg, contains, "OversizePkt"   |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Unexpected input" |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STS Error"     |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "PVSD ERROR"    |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Subscription created" |/etc/rsyslog.pipes/criticalMessages
 
    . . .
 

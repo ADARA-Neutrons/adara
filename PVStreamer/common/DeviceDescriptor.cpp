@@ -150,19 +150,24 @@ PVDescriptor::setMetadata( PVType a_type, const std::string &a_units, const std:
 //===== DeviceDescriptor Class ================================================
 
 
-DeviceDescriptor::DeviceDescriptor( const std::string &a_device_name, const std::string &a_source, Protocol a_protocol )
- : m_id(0), m_name(a_device_name), m_protocol(a_protocol), m_source(a_source)
+DeviceDescriptor::DeviceDescriptor( const std::string &a_device_name,
+        const std::string &a_source, Protocol a_protocol )
+    : m_id(0), m_name(a_device_name), m_protocol(a_protocol),
+    m_source(a_source), m_ready(0)
 {
 }
 
 
 DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
- : m_id(0), m_name(a_source.m_name), m_protocol(a_source.m_protocol), m_source(a_source.m_source)
+    : m_id(0), m_name(a_source.m_name), m_protocol(a_source.m_protocol),
+    m_source(a_source.m_source), m_ready(0)
 {
-    for ( vector<EnumDescriptor*>::const_iterator e = a_source.m_enums.begin(); e != a_source.m_enums.end(); ++e )
+    for ( vector<EnumDescriptor*>::const_iterator e =
+            a_source.m_enums.begin(); e != a_source.m_enums.end(); ++e )
         m_enums.push_back( new EnumDescriptor( **e ));
 
-    for( vector<PVDescriptor*>::const_iterator p = a_source.m_pvs.begin(); p != a_source.m_pvs.end(); ++p )
+    for( vector<PVDescriptor*>::const_iterator p = a_source.m_pvs.begin();
+            p != a_source.m_pvs.end(); ++p )
         m_pvs.push_back( new PVDescriptor( this, **p ));
 
 }
@@ -265,22 +270,28 @@ DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
 {
     bool res = false;
 
-    // If device name, protocol, and source differ, then devices are not the same
-    if ( m_name == a_desc.m_name && m_protocol == a_desc.m_protocol && m_source == a_desc.m_source && m_pvs.size() == a_desc.m_pvs.size() )
+    // If device name, protocol, and source differ,
+    // then devices are not the same
+    // (Note: Ignore Temp Device's "Ready" Count Here!)
+    if ( m_name == a_desc.m_name
+            && m_protocol == a_desc.m_protocol
+            && m_source == a_desc.m_source
+            && m_pvs.size() == a_desc.m_pvs.size() )
     {
         const PVDescriptor *ppv;
         res = true;
 
-        for( vector<PVDescriptor*>::const_iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+        for ( vector<PVDescriptor*>::const_iterator ipv = m_pvs.begin();
+                ipv != m_pvs.end(); ++ipv )
         {
-           ppv = a_desc.getPvByName( (*ipv)->m_name );
+            ppv = a_desc.getPvByName( (*ipv)->m_name );
 
-           // If not found, devices differ
-           if ( ppv == 0 || *ppv != **ipv )
-           {
-               res = false;
-               break;
-           }
+            // If not found, devices differ
+            if ( ppv == 0 || *ppv != **ipv )
+            {
+                res = false;
+                break;
+            }
         }
     }
 
@@ -298,14 +309,17 @@ DeviceDescriptor::operator!=( const DeviceDescriptor &a_desc ) const
 ostream&
 DeviceDescriptor::print( ostream &a_out ) const
 {
-    a_out << m_id << "," << m_name << "," << m_protocol << "," << m_source << endl;
+    a_out << m_id << "," << m_name << "," << m_protocol << "," << m_source
+        << "," << m_ready << endl;
 /*
-    a_out << "ID:   " << m_id << endl;
-    a_out << "Name: " << m_name << endl;
-    a_out << "Prot: " << m_protocol << endl;
-    a_out << "Src:  " << m_source << endl;
+    a_out << "ID:    " << m_id << endl;
+    a_out << "Name:  " << m_name << endl;
+    a_out << "Prot:  " << m_protocol << endl;
+    a_out << "Src:   " << m_source << endl;
+    a_out << "Ready: " << m_ready << endl;
 */
-    for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
+    for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin();
+            p != m_pvs.end(); ++p )
         (*p)->print( a_out );
 
     return a_out;

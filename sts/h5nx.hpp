@@ -140,6 +140,9 @@ private:
     hid_t m_fapl;
 
     unsigned short m_compression_level;
+
+    //Dump HDF5 Error Stack...
+    void H5NXdumperr(std::string msg);
 };
 
 #endif

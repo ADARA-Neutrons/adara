@@ -58,6 +58,7 @@ uint32_t SMSControl::m_maxPulseBufferSize;
 uint32_t SMSControl::m_interPulseTimeMin;
 uint32_t SMSControl::m_interPulseTimeMax;
 bool SMSControl::m_doPulsePchgCorrect;
+bool SMSControl::m_doPulseVetoCorrect;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -162,6 +163,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.do_pulse_pcharge_correction", true);
 	INFO("Setting Do Pulse Proton Charge Correction to "
 		<< m_doPulsePchgCorrect << ".");
+
+	m_doPulseVetoCorrect =
+			conf.get<bool>("sms.do_pulse_veto_correction", true);
+	INFO("Setting Do Pulse Veto Flags Correction to "
+		<< m_doPulseVetoCorrect << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -341,6 +347,10 @@ SMSControl::SMSControl() :
 						smsBooleanPV(prefix + ":Control:"
 							+ "DoPulsePchgCorrect"));
 
+	m_pvDoPulseVetoCorrect = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "DoPulseVetoCorrect"));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -361,6 +371,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
 	addPV(m_pvDoPulsePchgCorrect);
+	addPV(m_pvDoPulseVetoCorrect);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -386,6 +397,7 @@ SMSControl::SMSControl() :
 	m_interPulseTimeMin = 0.77 * baseInterPulseTime;
 	m_interPulseTimeMax = 1.23 * baseInterPulseTime;
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
+	m_pvDoPulseVetoCorrect->update(m_doPulseVetoCorrect, &now);
 
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
@@ -656,10 +668,11 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
 		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
 			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			if ( m_doPulsePchgCorrect ) {
+			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 				PulseMap::iterator next = it;
 				if (++next != m_pulses.end())
-					correctProtonCharge(it->second, next->second);
+					correctPChargeVeto(it->second, next->second);
 				else {
 					/* Rate-limited logging of global sawtooth pulse */
 					std::string log_info;
@@ -668,8 +681,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
 						ERROR(log_info << "unregisterEventSource:"
-							<< " No More Pulses"
-							<< " for Proton Charge Correction! 0x"
+							<< " No More Pulses for "
+							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << it->first.first << std::dec);
 					}
 				}
@@ -684,10 +697,11 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			DEBUG("unregisterEventSource Recording Last Pulse 0x"
 				<< std::hex << last->first.first << std::dec);
 			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			if ( m_doPulsePchgCorrect ) {
+			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 				PulseMap::iterator next = last;
 				if (++next != m_pulses.end())
-					correctProtonCharge(last->second, next->second);
+					correctPChargeVeto(last->second, next->second);
 				else {
 					/* Rate-limited logging of global sawtooth pulse */
 					std::string log_info;
@@ -696,8 +710,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
 						ERROR(log_info << "unregisterEventSource:"
-							<< " No More Pulses"
-							<< " for Proton Charge Correction! 0x"
+							<< " No More Pulses for"
+							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << last->first.first << std::dec);
 					}
 				}
@@ -871,8 +885,10 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
 
 	// By Default, All New Pulses Have Yet to Have Their
-	// Proton Charge Corrected (Each Pcharge Refers to *Previous* Pulse!)
+	// Proton Charge or Veto Flags Corrected...
+	// (Each Proton Charge/Veto Flag Usually Refers to *Previous* Pulse!)
 	new_pulse->m_flags |= ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
+	new_pulse->m_flags |= ADARA::BankedEventPkt::VETO_UNCORRECTED;
 
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
@@ -902,10 +918,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			// Correct Proton Charge...
 			// (This Pulse's PCharge comes from _Next_ Pulse...!)
 			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			if ( m_doPulsePchgCorrect ) {
+			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 				PulseMap::iterator next = it;
 				if (++next != m_pulses.end())
-					correctProtonCharge(it->second, next->second);
+					correctPChargeVeto(it->second, next->second);
 				else {
 					/* Rate-limited logging of global sawtooth pulse */
 					std::string log_info;
@@ -914,8 +931,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
 						ERROR(log_info << "getPulse:"
-							<< " No More Pulses"
-							<< " for Proton Charge Correction! 0x"
+							<< " No More Pulses for"
+							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << it->first.first << std::dec);
 					}
 				}
@@ -1281,10 +1298,10 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 
 	/* We'll say this time and time again, but we can't use the one
 	 * from the RTDL packet -- that was for the previous pulse.
-	 * XXX validate that assertion when we have beam again
+	 *
 	 * Note: Nope, the charge in the RawDataPkt/MappedDataPkt is
-	 * "Off By One" too, for Previous Pulse, just like the RTDL...
-	 * FIXME -Jeeeem
+	 * "Off By One" too, for Previous Pulse, just like with the RTDL...
+	 *
 	 * Also Note: By capturing the charge from RawDataPkt/MappedDataPkt,
 	 * there is a subtle side benefit, which is that any Pulses with
 	 * No Events will go thru _Without_ any Proton Charge (set to 0.0),
@@ -1409,6 +1426,10 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	 * previous pulse. (Same is true for RawDataPkt/MappedDataPkt tho,
 	 * however doing it this way is "Better"... Please see comment
 	 * in pulseEvents() above... ;-)
+	 *
+	 * Note: the Veto Flags here are _Also_ for the previous pulse,
+	 * but this will be corrected along with the Proton Charge,
+	 * if possible, in correctPChargeVeto().
 	 */
 	pulse->m_vetoFlags = pkt.vetoFlags();
 	pulse->m_cycle = pkt.cycle();
@@ -1516,10 +1537,11 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		// Correct Proton Charge...
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
 		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-		if ( m_doPulsePchgCorrect ) {
+		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 			PulseMap::iterator next = it;
 			if (++next != m_pulses.end())
-				correctProtonCharge(it->second, next->second);
+				correctPChargeVeto(it->second, next->second);
 			else {
 				/* Rate-limited logging of global sawtooth pulse */
 				std::string log_info;
@@ -1527,8 +1549,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 						2, 10, 100, log_info ) ) {
 					ERROR(log_info << "markComplete:"
-						<< " No More Pulses"
-						<< " for Proton Charge Correction! 0x"
+						<< " No More Pulses for"
+						<< " Proton Charge/Veto Flags Correction! 0x"
 						<< std::hex << it->first.first << std::dec);
 				}
 			}
@@ -1542,10 +1564,11 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Record the Current Pulse for Sure, If Not Buffering...
 	if (!m_noEoPPulseBufferSize) {
 		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-		if ( m_doPulsePchgCorrect ) {
+		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 			PulseMap::iterator next = current;
 			if (++next != m_pulses.end())
-				correctProtonCharge(current->second, next->second);
+				correctPChargeVeto(current->second, next->second);
 			else {
 				/* Rate-limited logging of global sawtooth pulse */
 				std::string log_info;
@@ -1553,8 +1576,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 						2, 10, 100, log_info ) ) {
 					ERROR(log_info << "markComplete:"
-						<< " No More Pulses"
-						<< " for Proton Charge Correction! 0x"
+						<< " No More Pulses for"
+						<< " Proton Charge/Veto Flags Correction! 0x"
 						<< std::hex << current->first.first << std::dec);
 				}
 			}
@@ -1593,7 +1616,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	}
 }
 
-void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
+void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 {
 	// Check if Next Pulse is About "Pulse Frequency" Away from This Pulse
 
@@ -1612,18 +1635,40 @@ void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
 	if ( m_interPulseTimeMin < interPulseTime
 			&& interPulseTime < m_interPulseTimeMax )
 	{
-		// Reset the Pulse Proton Charge Uncorrected Flag
-		pulse->m_flags &= ~ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
+		if ( m_doPulsePchgCorrect )
+		{
+			// Reset the Pulse Proton Charge Uncorrected Flag
+			pulse->m_flags &= ~ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
 
-		// Set the Pulse Charge from the Next Pulse
-		pulse->m_charge = next_pulse->m_charge;
+			// Set the Pulse Charge from the Next Pulse
+			pulse->m_charge = next_pulse->m_charge;
+		}
+
+		if ( m_doPulseVetoCorrect )
+		{
+			// Reset the Pulse Veto Flags Uncorrected Flag
+			pulse->m_flags &= ~ADARA::BankedEventPkt::VETO_UNCORRECTED;
+
+			// Set the Veto Flags from the Next Pulse
+			pulse->m_vetoFlags = next_pulse->m_vetoFlags;
+		}
 
 		// If RTDL Packet(s) present, Adjust RTDL Proton Charge Here Too...
 		if ( pulse->m_rtdl && next_pulse->m_rtdl )
 		{
 			// Set the RTDL Pulse Charge from the Next Pulse's RTDL
-			pulse->m_rtdl->setPulseCharge(
-				next_pulse->m_rtdl->pulseCharge() );
+			if ( m_doPulsePchgCorrect )
+			{
+				pulse->m_rtdl->setPulseCharge(
+					next_pulse->m_rtdl->pulseCharge() );
+			}
+
+			// Set the RTDL Veto Flags from the Next Pulse's RTDL
+			if ( m_doPulseVetoCorrect )
+			{
+				pulse->m_rtdl->setVetoFlags(
+					next_pulse->m_rtdl->vetoFlags() );
+			}
 		}
 	}
 
@@ -1636,8 +1681,8 @@ void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
 				RLL_PULSE_PCHG_UNCORRECTED, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< "correctProtonCharge: *** Next Pulse Out of Range -"
-				<< " Uncorrected Pulse Proton Charge!"
+				<< "correctPChargeVeto: *** Next Pulse Out of Range -"
+				<< " Uncorrected Pulse Proton Charge/Veto Flags!"
 				<< std::hex
 				<< " pulse=0x" << pulse->m_id.first
 				<< " next_pulse=0x" << next_pulse->m_id.first
@@ -1649,8 +1694,12 @@ void SMSControl::correctProtonCharge(PulsePtr &pulse, PulsePtr &next_pulse)
 				<< " interPulseTime=" << interPulseTime
 				<< " m_interPulseTimeMin=" << m_interPulseTimeMin
 				<< " m_interPulseTimeMax=" << m_interPulseTimeMax
+				<< " m_doPulsePchgCorrect=" << m_doPulsePchgCorrect
 				<< " pulse->m_charge=" << pulse->m_charge
-				<< " next_pulse->m_charge=" << next_pulse->m_charge);
+				<< " next_pulse->m_charge=" << next_pulse->m_charge
+				<< " m_doPulseVetoCorrect=" << m_doPulseVetoCorrect
+				<< " pulse->m_vetoFlags=" << pulse->m_vetoFlags
+				<< " next_pulse->m_vetoFlags=" << next_pulse->m_vetoFlags);
 		}
 	}
 }

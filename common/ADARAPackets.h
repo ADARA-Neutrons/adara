@@ -134,6 +134,7 @@ public:
 		return static_cast<PulseFlavor::Enum>
 						((m_fields[0] >> 24) & 0x7);
 	}
+
 	uint32_t pulseCharge(void) const { return m_fields[0] & 0x00ffffff; }
 
 	void setPulseCharge(uint32_t pulseCharge) {
@@ -146,7 +147,14 @@ public:
 	uint8_t timingStatus(void) const {
 		return (uint8_t) (m_fields[1] >> 22);
 	}
+
 	uint16_t vetoFlags(void) const { return (m_fields[1] >> 10) & 0xfff; }
+
+	void setVetoFlags(uint16_t vetoFlags) {
+		m_fields[1] &= 0xffc003ff;
+		m_fields[1] |= ( vetoFlags & 0xfff ) << 10;
+	}
+
 	uint16_t cycle(void) const { return m_fields[1] & 0x3ff; }
 	uint32_t intraPulseTime(void) const { return m_fields[2]; }
 	bool tofCorrected(void) const { return !!(m_fields[3] & 0x80000000); }
@@ -209,6 +217,7 @@ public:
 		MAPPING_ERROR       = 0x00010,
 		DUPLICATE_PULSE     = 0x00020,
 		PCHARGE_UNCORRECTED = 0x00040,
+		VETO_UNCORRECTED    = 0x00080,
 	};
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
