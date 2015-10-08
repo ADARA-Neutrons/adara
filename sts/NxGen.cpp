@@ -7,6 +7,9 @@
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 
+// Do Stu's Dummy PixelId-Filled Histogram Test...
+// #define HISTO_TEST
+
 using namespace std;
 
 /*! \brief Constructor for NxGen class.
@@ -945,8 +948,26 @@ NxGen::bankFinalize
             std::vector<hsize_t> dims;
             dims.push_back( bi->m_logical_pixelids.size() );
             dims.push_back( bi->m_num_tof_bins - 1 );
+#ifdef HISTO_TEST
+            uint32_t num_pids = bi->m_logical_pixelids.size();
+            syslog( LOG_INFO, "[%i] %s for %s [%u x %u]",
+                g_pid, "Creating Dummy Histogram",
+                bi->m_instr_path.c_str(),
+                num_pids, bi->m_num_tof_bins - 1 );
+            std::vector<uint32_t> dummy_histo;
+            dummy_histo.reserve( num_pids
+                * ( bi->m_num_tof_bins - 1 ) );
+            for (uint32_t p=0 ; p < num_pids ; p++)
+            {
+                for (uint32_t i=0 ; i < bi->m_num_tof_bins - 1 ; i++)
+                    dummy_histo.push_back( bi->m_logical_pixelids[p] );
+            }
+            writeMultidimDataset( bi->m_instr_path, m_data_name,
+                dummy_histo, dims );
+#else
             writeMultidimDataset( bi->m_instr_path, m_data_name,
                 bi->m_data_buffer, dims );
+#endif
 
             // Add "Axes" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
