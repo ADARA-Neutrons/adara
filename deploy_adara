@@ -897,6 +897,8 @@ pwd | tee -a $LOG
 
 ls -l | tee -a $LOG
 
+deploy_str="ADARA $PROG $release_tag$already_deployed\n\n$log_desc"
+
 if [ $adara_current_new == 1 ]; then
 
 	echo -e "\nNew Deployment Directory to Commit:\n" | tee -a $LOG
@@ -920,11 +922,12 @@ if [ $adara_current_new == 1 ]; then
 		exit -20
 	fi
 
-	echo \
-		"git commit -m 'Initial Config Deploy Directory Creation' deploy" \
+	echo -e "Initial Config Deploy Directory Creation\n\n$deploy_str\n" \
 		| tee -a $LOG
-	git commit -m 'Initial Config Deploy Directory Creation' deploy \
-		|& tee -a $LOG
+	echo "git commit -F - deploy" | tee -a $LOG
+
+	echo -e "Initial Config Deploy Directory Creation\n\n$deploy_str" \
+		| git commit -F - deploy |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -940,12 +943,10 @@ else
 
 	git diff . | tee -a $LOG
 
-	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc\n" \
-		| tee -a $LOG
+	echo -e "Deployed $deploy_str\n" | tee -a $LOG
 	echo "git commit -F - ." | tee -a $LOG
 
-	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc" \
-		| git commit -F - . |& tee -a $LOG
+	echo -e "Deployed $deploy_str" | git commit -F - . |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -1019,10 +1020,11 @@ if [ ! -e "$deploy_history" ]; then
 		exit -20
 	fi
 
-	echo "git commit -m 'Initial History Creation' $deploy_history_base" \
-		| tee -a $LOG
-	git commit -m 'Initial History Creation' "$deploy_history_base" \
-		|& tee -a $LOG
+	echo -e "Initial History Creation\n\n$deploy_str\n" | tee -a $LOG
+	echo "git commit -F - $deploy_history_base" | tee -a $LOG
+
+	echo -e "Initial History Creation\n\n$deploy_str" \
+		git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -1104,18 +1106,15 @@ echo -e "\n$CONFIG_LINE\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 
-echo \
-	"Committing Current Deployment History Additions to Git." | tee -a $LOG
+echo "Committing Current Deployment History Additions to Git." \
+	| tee -a $LOG
 
 echo -e "\nCommit Log:\n" | tee -a $LOG
 
-echo -e \
-	"Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
-	| tee -a $LOG
+echo -e "Deployment History for $deploy_str\n" | tee -a $LOG
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
 
-echo -e \
-	"Deployment History for $release_tag$already_deployed\n\n$log_desc" \
+echo -e "Deployment History for $deploy_str" \
 	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 commit_ok=$?
