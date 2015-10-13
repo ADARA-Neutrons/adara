@@ -106,7 +106,7 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	ss << tag;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_DROP_DEVICES_FOR_TAG, ss.str(),
-			10, 3, 50, log_info ) ) {
+			600, 3, 10, log_info ) ) {
 		DEBUG(log_info
 			<< "dropTag(): Dropping Devices for Data Source, tag=" << tag);
 	}
@@ -139,7 +139,7 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		log_info.clear();
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_NO_DEVICES_TO_DROP, ss.str(),
-				10, 3, 50, log_info ) ) {
+				600, 3, 10, log_info ) ) {
 			DEBUG(log_info
 				<< "dropTag(): Warning No Devices Found! tag=" << tag);
 		}
@@ -199,7 +199,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	bool do_log = false;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_UPDATE_DESCRIPTOR, ss.str(),
-			10, 3, 50, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info
 			<< "Update Descriptor devId=" << in.devId() << " tag=" << tag);
 		do_log = true; // link this rate-limited log to other related logs
@@ -285,7 +285,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_ADD_FAST_META_DDP, "none",
-			2, 10, 100, log_info ) ) {
+			60, 10, 10, log_info ) ) {
 		DEBUG(log_info
 			<< "addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
 			<< " (devId=-1 tag=0)");
