@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Dasmon Daemon - Wrapper Script
+#    - installed in /usr/local/bin/dasmond
+#       -> calls binary in /home/dasmon/dasmond (for now... :-)
+#    - started via Upstart with config /etc/initdasmond.conf
+#       -> to start:     /sbin/start dasmond
+#       -> to stop:      /sbin/stop dasmond
+#       -> to restart:   /sbin/restart dasmond
+#       -> for status:   /sbin/status dasmond
+#
+
+/home/dasmon/dasmond --sms_host XXX-daq1.sns.gov --maxtof 66664 \
+	--broker_uri tcp://amqbroker.sns.gov:61616 --broker_user wfclient \
+	--broker_pass w0rkfl0w -c /home/dasmon/ --domain SNS.XXX \
+	--db_name reporting_db --db_host workflowdb2.sns.gov --db_port 5432 \
+	--db_user workflow --db_pass hcionws12
+

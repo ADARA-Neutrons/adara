@@ -1,0 +1,20 @@
+# THIS FILE CREATED BY CFENGINE
+# DO NOT EDIT DIRECTLY
+
+#!/bin/sh
+#
+# Dasmon Client GUI - X Server XInit Configuration Script
+#    - installed in /etc/X11/xinit/xinitrc.dasmon
+#    - calls Dasmon Client GUI binary in /home/dasmon/dasmon (for now... :-)
+#
+
+touch /tmp/rcw
+/usr/bin/xsetroot -solid black
+/usr/bin/xset -dpms
+
+#/usr/bin/xset s off
+
+su -l -s /bin/bash -c /usr/bin/ratpoison dasmon &
+
+exec su -l -s /bin/bash -c "/home/dasmon/dasmon -k --domain SNS.HYS -b amqbroker.sns.gov -u wfclient -p w0rkfl0w --master" dasmon
+
