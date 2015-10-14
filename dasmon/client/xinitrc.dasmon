@@ -16,5 +16,5 @@ touch /tmp/rcw
 
 su -l -s /bin/bash -c /usr/bin/ratpoison dasmon &
 
-exec su -l -s /bin/bash -c "/home/dasmon/dasmon -k --domain SNS.HYS -b amqbroker.sns.gov -u wfclient -p w0rkfl0w --master" dasmon
+exec su -l -s /bin/bash -c "/home/dasmon/dasmon -k --domain SNS.XXX -b amqbroker.sns.gov -u wfclient -p w0rkfl0w --master" dasmon
 
