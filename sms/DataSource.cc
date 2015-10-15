@@ -120,6 +120,7 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_DROPPED_PACKETS, m_name, 2, 10, 100, log_info ) ) {
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Dropped packet from " << m_name << " src 0x"
 					<< std::hex << m_hwId << std::dec);
 			}
@@ -160,7 +161,9 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
 					2, 10, 100, log_info ) ) {
+				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local Duplicate pulse from "
 					<< m_name
 					<< std::hex << " src=0x" << m_hwId
@@ -179,7 +182,9 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_SAWTOOTH_PULSE, m_name,
 					2, 10, 100, log_info ) ) {
+				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
 					<< std::hex << " m_lastPulse=" << m_lastPulse
@@ -204,7 +209,9 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_RAWDATA_PULSE_IN_PAST, m_name,
 					2, 10, 100, log_info ) ) {
+				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Past (Before Facility Start Time)!"
 					<< std::hex << " pulseId=0x"
@@ -222,7 +229,9 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_RAWDATA_PULSE_IN_FUTURE, m_name,
 					2, 10, 100, log_info ) ) {
+				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Future (Over One Week from Now)!"
 					<< std::hex << " pulseId=0x"
@@ -286,7 +295,9 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_PACKET_SEQUENCE, m_name,
 					2, 10, 100, log_info ) ) {
+				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "checkSeq() Local Packet Sequence Out-of-Order: "
 					<< pkt.pktSeq() << " != " << m_pktSeq
 					<< std::hex << " m_activePulse=0x" << m_activePulse
@@ -487,7 +498,8 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			freeaddrinfo(m_addrinfo);
 			m_addrinfo = NULL;
 		}
-		std::string msg("Unable to Create TimerAdapter for Data Source ");
+		std::string msg( ( ctrl->getRecording() ? "[RECORDING] " : "" ) );
+		msg += "Unable to Create TimerAdapter for Data Source ";
 		msg += m_name;
 		msg += ": Bailing! ";
 		msg += e.what();
@@ -499,7 +511,8 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			freeaddrinfo(m_addrinfo);
 			m_addrinfo = NULL;
 		}
-		std::string msg("Unable to Create TimerAdapter for Data Source ");
+		std::string msg( ( ctrl->getRecording() ? "[RECORDING] " : "" ) );
+		msg += "Unable to Create TimerAdapter for Data Source ";
 		msg += m_name;
 		msg += ": Bailing! ";
 		msg += "Unknown Exception.";
@@ -594,8 +607,9 @@ void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 	clock_gettime(CLOCK_REALTIME, &now);
 
 	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
-		INFO("Unregistering Event Source " << it->second->smsId()
-			<< " for " << why << " Data Source " << m_name);
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Unregistering Event Source " << it->second->smsId()
+			<< " for " << why << " Data Source " << m_name );
 		it->second->endPulse(false);
 		// Reset HWSource PV Index Bit, Clear Out SMS Id PV Value...
 		if ( it->second->m_hwIndex >= 0 ) {
@@ -662,7 +676,8 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		// Dump Discarded Packet Statistics...
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
-		INFO(log_info);
+		SMSControl *ctrl = SMSControl::getInstance();
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" ) << log_info );
 		// Reset Discarded Packet Statistics...
 		Parser::resetDiscardedPacketsStats();
 	}
@@ -741,7 +756,9 @@ bool DataSource::timerExpired(void)
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
-				WARN("Connection request timed out to " << m_name);
+				SMSControl *ctrl = SMSControl::getInstance();
+				WARN( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Connection request timed out to " << m_name );
 				connectionFailed(false, false, IDLE);
 			}
 			break;
@@ -757,7 +774,9 @@ bool DataSource::timerExpired(void)
 				m_timer->start(m_data_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
-				WARN("Timed out waiting for data from " << m_name);
+				SMSControl *ctrl = SMSControl::getInstance();
+				WARN( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Timed out waiting for data from " << m_name );
 				m_pvConnected->failed();
 				connectionFailed(true, true, IDLE);
 			}
@@ -795,6 +814,8 @@ void DataSource::fdReady(void)
 
 void DataSource::startConnect(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	std::string log_info;
 	int flags, rc;
 
@@ -804,7 +825,8 @@ void DataSource::startConnect(void)
 	// Update Data URI from PV...
 	std::string uri = m_pvDataURI->value();
 	if ( uri != m_uri ) {
-		INFO("Setting New Data URI from PV: " << uri);
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Setting New Data URI from PV: " << uri );
 		m_uri = uri;
 		// Regenerate DataSource Name...
 		m_name = uri;
@@ -824,7 +846,9 @@ void DataSource::startConnect(void)
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_WONT_CONN, m_name,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "startConnect():"
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "startConnect():"
 				<< " Invalid Address Info/Lookup for Data Source "
 				<< m_name << " - *** Won't Attempt to Connect...!");
 		}
@@ -835,24 +859,29 @@ void DataSource::startConnect(void)
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_TRYING_CONN, m_name,
 			600, 3, 10, log_info ) ) {
-		INFO(log_info << "Trying connection to " << m_name);
+		INFO(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Trying connection to " << m_name);
 	}
 	m_pvConnected->trying_to_connect();
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
-		ERROR("Error creating socket for " << m_name);
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Error creating socket for " << m_name );
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0) {
-		ERROR("Error getting socket flags for " << m_name);
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Error getting socket flags for " << m_name );
 		goto error_fd;
 	}
 	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK)) {
-		ERROR("Error setting socket flags for " << m_name);
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Error setting socket flags for " << m_name );
 		goto error_fd;
 	}
 
@@ -867,7 +896,9 @@ void DataSource::startConnect(void)
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_CONN_REFUSED, m_name,
 					600, 3, 10, log_info ) ) {
-				WARN(log_info << "Connection refused by " << m_name);
+				WARN(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Connection refused by " << m_name);
 			}
 			goto error_fd;
 
@@ -877,7 +908,8 @@ void DataSource::startConnect(void)
 			break;
 
 		case 0:
-			INFO("Connection established to " << m_name);
+			INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Connection established to " << m_name );
 			m_state = ACTIVE;
 			m_pvConnected->connected();
 			resetBandwidthStatistics();
@@ -889,6 +921,7 @@ void DataSource::startConnect(void)
 					RLL_CONN_REQUEST_ERROR, m_name,
 					600, 3, 10, log_info ) ) {
 				WARN(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Unknown connection request error for " << m_name
 					<< ": " << strerror(rc) << " (Ignoring!)");
 			}
@@ -905,7 +938,8 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
-		ERROR("Bad Alloc Error for " << m_name
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Bad Alloc Error for " << m_name
 			<< " adapter: " << e.what());
 		goto error_fd;
 	}
@@ -926,6 +960,8 @@ error:
 
 void DataSource::connectComplete(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
@@ -949,7 +985,8 @@ void DataSource::connectComplete(void)
 
 		SMSControl::getInstance()->sourceUp(m_smsSourceId);
 
-		INFO("Connection established to " << m_name);
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Connection established to " << m_name );
 		return;
 	}
 
@@ -965,7 +1002,9 @@ void DataSource::connectComplete(void)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_CONN_FAILED, m_name, 600, 3, 10, log_info ) ) {
-		WARN(log_info << "Connection request to " << m_name
+		WARN(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Connection request to " << m_name
 			<< " failed: " << strerror(e));
 	}
 	// Leave m_pvConnected in its current state, latch failures
@@ -1005,7 +1044,9 @@ void DataSource::dataReady(void)
 		msg += "': ";
 		msg += e.what();
 		// *Don't* Throw std::runtime_error(msg), Just Log Instead...
-		ERROR("dataReady(): " << msg << " - Revert to Original"
+		// XXX NEED RLL HERE! :-O
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "dataReady(): " << msg << " - Revert to Original"
 			<< " m_max_read_chunk=" << m_max_read_chunk);
 		// String parse failed, revert to original value...
 		tmp_max_read_chunk = m_max_read_chunk;
@@ -1014,6 +1055,7 @@ void DataSource::dataReady(void)
 		m_max_read_chunk = tmp_max_read_chunk;
 		// Log the change...
 		std::stringstream ssMRC;
+		ssMRC << ( ctrl->getRecording() ? "[RECORDING] " : "" );
 		ssMRC << "Setting Max Read Chunk Size for " << m_name;
 		ssMRC << " to ";
 		ssMRC << m_max_read_chunk;
@@ -1024,8 +1066,9 @@ void DataSource::dataReady(void)
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
-			INFO("Connection closed with " << m_name
-				<< " log_info=(" << log_info << ")");
+			INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Connection closed with " << m_name
+				<< " log_info=(" << log_info << ")" );
 			m_pvConnected->disconnected();
 			connectionFailed(true, true, IDLE);
 			readOk = false;
@@ -1036,7 +1079,9 @@ void DataSource::dataReady(void)
 		bool dumpStats = false;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_READ_EXCEPTION, m_name, 60, 5, 10, log_info ) ) {
-			ERROR(log_info << "Exception reading from " << m_name
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Exception reading from " << m_name
 				<< ": " << e.what());
 			dumpStats = true;
 		}
@@ -1061,6 +1106,7 @@ void DataSource::dataReady(void)
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
 				ERROR(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"
 					<< " elapsed=" << elapsed << " (" << m_name << ")"
 					<< " log_info=(" << log_info << ")"
@@ -1103,7 +1149,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	if ( !( ++dump_count % 1000000 ) ) {
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
-		INFO("rxPacket(): " << log_info);
+		SMSControl *ctrl = SMSControl::getInstance();
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "rxPacket(): " << log_info );
 	}
 
 	// Save "Last Packet" Info for Debugging...
@@ -1148,7 +1196,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 						RLL_PULSEID_ZERO, m_name,
 						2, 10, 100, log_info ) ) {
+					SMSControl *ctrl = SMSControl::getInstance();
 					WARN(log_info
+						<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 						<< "Received pulse id 0 from " << m_name);
 				}
 				return false;
@@ -1167,7 +1217,10 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_UNKNOWN_PACKET, m_name, 2, 10, 100, log_info ) ) {
-		ERROR(log_info << "Unknown packet type " << pkt.type()
+		SMSControl *ctrl = SMSControl::getInstance();
+		ERROR(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Unknown packet type " << pkt.type()
 			<< " from " << m_name);
 	}
 	return true;
@@ -1182,16 +1235,21 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
+		SMSControl *ctrl = SMSControl::getInstance();
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
-			ERROR(log_info << "Oversized packet"
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Oversized packet"
 				<< " at " << hdr->timestamp().tv_sec
 				<< "." << hdr->timestamp().tv_nsec
 				<< " of type 0x" << std::hex << hdr->type() << std::dec
 				<< " payload_length=" << hdr->payload_length()
 				<< " from " << m_name);
 		} else {
-			ERROR(log_info << "Oversized packet"
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Oversized packet"
 				<< " chunk_len=" << chunk_len
 				<< " from " << m_name);
 		}
@@ -1204,7 +1262,9 @@ void DataSource::resetPacketStats(void)
 	// Dump Total Discarded Packet Statistics before Reset...
 	std::string log_info;
 	Parser::getDiscardedPacketsLogString(log_info);
-	INFO("resetPacketStats(): Totals Before Reset - " << log_info);
+	SMSControl *ctrl = SMSControl::getInstance();
+	INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		<< "resetPacketStats(): Totals Before Reset - " << log_info );
 
 	// Reset Discarded Packet Statistics...
 	Parser::resetDiscardedPacketsStats();
@@ -1227,9 +1287,10 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		for (i = 0; i < max && hwIndex < 0; i++) {
 			if (!m_hwIndices[i]) {
 				m_hwIndices.set(i);
-				DEBUG("getHWSource() assigning PV hwIndex=" << i
+				DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "getHWSource() assigning PV hwIndex=" << i
 					<< " to HWSource hwId=" << hwId
-					<< " smsId=" << smsId);
+					<< " smsId=" << smsId );
 				hwIndex = i;
 			}
 		}
@@ -1303,9 +1364,10 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 			pvEventBwTenMin = m_pvHWSourceEventBandwidthTenMin[hwIndex];
 		}
 		else {
-			DEBUG("getHWSource(): Out of PV Indices"
+			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "getHWSource(): Out of PV Indices"
 				<< " for HWSource hwId=" << hwId
-				<< " smsId=" << smsId << "!");
+				<< " smsId=" << smsId << "!" );
 			// *Don't* throw an exception here, _Not_ mission critical!
 		}
 
@@ -1429,6 +1491,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 * SMSControl.
 	 */
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	bool drop_pulse = false;
 
 	// do duplicate checking on a per-datasource basis
@@ -1439,6 +1503,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_DUPLICATE_RTDL, m_name,
 					2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local Duplicate RTDL"
 				<< " from " << m_name
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1457,6 +1522,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_SAWTOOTH_RTDL, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
 				<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 				<< " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1486,6 +1552,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_RTDL_PULSE_IN_PAST, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "*** Dropping Bogus RTDL Pulse Time"
 				<< " from Distant Past (Before Facility Start Time)!"
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1504,6 +1571,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_RTDL_PULSE_IN_FUTURE, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "*** Dropping Bogus RTDL Pulse Time"
 				<< " from Distant Future (Over One Week from Now)!"
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1521,6 +1589,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_RTDL_SEQUENCE, m_name,
 				2, 10, 100, log_info ) ) {
 			WARN(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local RTDL Cycle Out of Sequence"
 				<< " from " << m_name
 				<< " m_lastRTDLCycle=" << m_lastRTDLCycle
@@ -1533,7 +1602,6 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// Ok, Process Pulse Now (Maybe... :-)
 	if ( !drop_pulse ) {
-		SMSControl *ctrl = SMSControl::getInstance();
 		ctrl->pulseRTDL(pkt, m_dupRTDL);
 	}
 
@@ -1544,14 +1612,14 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// Update RTDL "No Data" Threshold from PV...
 	m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
 
-	SMSControl *ctrl = SMSControl::getInstance();
 	HWSrcMap::iterator it = m_hwSources.begin();
 
 	while ( it != m_hwSources.end() ) {
 
 		if ( ++(it->second->m_rtdlNoDataCount) > m_rtdlNoDataThresh ) {
 
-			ERROR("Run-Away Data Source " << m_name
+			ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Run-Away Data Source " << m_name
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 				<< ", " << it->second->m_rtdlNoDataCount
 				<< " (> " << m_rtdlNoDataThresh << ")"
@@ -1645,11 +1713,14 @@ void DataSource::resetBandwidthStatistics(void)
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO("Bandwidth Per Second for " << m_name << ":"
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Bandwidth Per Second for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_second
-			<< " Events=" << m_event_count_second);
+			<< " Events=" << m_event_count_second );
 	}
 
 	// Update Bandwidth Count Per Second PVs...
@@ -1665,7 +1736,8 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
 			if ( do_log && it->second->m_event_count_second > 0 ) {
-				INFO("Bandwidth Per Second for " << m_name << ":"
+				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Bandwidth Per Second for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_second );
 			}
@@ -1678,11 +1750,14 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 
 void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Log the Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO("Bandwidth Per Minute for " << m_name << ":"
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Bandwidth Per Minute for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_minute
-			<< " Events=" << m_event_count_minute);
+			<< " Events=" << m_event_count_minute );
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
@@ -1698,7 +1773,8 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
 			if ( do_log && it->second->m_event_count_minute > 0 ) {
-				INFO("Bandwidth Per Minute for " << m_name << ":"
+				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Bandwidth Per Minute for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_minute );
 			}
@@ -1711,11 +1787,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 
 void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Log the Ten-Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO("Bandwidth Per Ten Minutes for " << m_name << ":"
+		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_tenmin
-			<< " Events=" << m_event_count_tenmin);
+			<< " Events=" << m_event_count_tenmin );
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
@@ -1731,7 +1810,8 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
 			if ( do_log && it->second->m_event_count_tenmin > 0 ) {
-				INFO("Bandwidth Per Ten Minutes for " << m_name << ":"
+				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_tenmin );
 			}
@@ -1783,7 +1863,10 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_HEARTBEAT, m_name, 60, 3, 10, log_info ) ) {
-		INFO(log_info << "Heartbeat Packet for " << m_name);
+		SMSControl *ctrl = SMSControl::getInstance();
+		INFO(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Heartbeat Packet for " << m_name);
 	}
 
 	// Update/Dump Any Pulse/Event Bandwidth Statistics...
