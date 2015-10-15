@@ -901,7 +901,9 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
-		DEBUG("addPacket() requestPurge! goal=" << goal);
+		SMSControl *ctrl = SMSControl::getInstance();
+		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "addPacket() requestPurge! goal=" << goal);
 		requestPurge(goal);
 	}
 
@@ -1271,6 +1273,8 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 
 uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	/* Find oldest container that is purgable, and delete the oldest
 	 * file in it. To keep from wasting too much effort, we scan the
 	 * base directory once to get a list of daily directories, and
@@ -1284,7 +1288,8 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		if (m_dailyExhausted || m_dailyCache.empty())
 			populateDailyCache();
 	} catch (...) {
-		ERROR("StorageManager::purgeData() populating cache");
+		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "purgeData() populating cache");
 		/* If we cannot populate the cache, then we cannot purge. */
 		return 0;
 	}
@@ -1300,7 +1305,8 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			continue;
 		}
 
-		DEBUG("Purging daily " << *it);
+		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Purging daily " << *it);
 
 		/* We need to do the increment in the loop, as we may delete
 		 * elements from the list as we clean the directories. We
