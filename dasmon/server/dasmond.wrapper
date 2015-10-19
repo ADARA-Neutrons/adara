@@ -3,11 +3,11 @@
 # Dasmon Daemon - Wrapper Script
 #    - installed in /usr/local/bin/dasmond
 #       -> calls binary in /home/dasmon/dasmond (for now... :-)
-#    - started via Upstart with config /etc/initdasmond.conf
-#       -> to start:     /sbin/start dasmond
-#       -> to stop:      /sbin/stop dasmond
-#       -> to restart:   /sbin/restart dasmond
-#       -> for status:   /sbin/status dasmond
+#    - started via Upstart with config /etc/init/dasmond.conf
+#       -> to start:     sudo /sbin/start dasmond
+#       -> to stop:      sudo /sbin/stop dasmond
+#       -> to restart:   sudo /sbin/restart dasmond
+#       -> for status:   sudo /sbin/status dasmond
 #
 
 /home/dasmon/dasmond --sms_host XXX-daq1.sns.gov --maxtof 66664 \

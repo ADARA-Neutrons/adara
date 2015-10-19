@@ -5,7 +5,12 @@
 #
 # Dasmon Client GUI - X Server XInit Configuration Script
 #    - installed in /etc/X11/xinit/xinitrc.dasmon
-#    - calls Dasmon Client GUI binary in /home/dasmon/dasmon (for now... :-)
+#       -> calls binary in /home/dasmon/dasmon (for now... :-)
+#    - started via Upstart with config /etc/init/dasmongui.conf
+#       -> to start:     sudo /sbin/start dasmongui
+#       -> to stop:      sudo /sbin/stop dasmongui
+#       -> to restart:   sudo /sbin/restart dasmongui
+#       -> for status:   sudo /sbin/status dasmongui
 #
 
 touch /tmp/rcw
