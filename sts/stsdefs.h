@@ -725,6 +725,7 @@ class IStreamAdapter
 public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
+    virtual void            dumpProcessingStatistics(void) = 0;
     virtual PVInfoBase*     makePVInfo( const std::string & a_device_name,
                                 const std::string & a_name,
                                 const std::string & a_connection,
