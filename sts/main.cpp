@@ -288,6 +288,8 @@ int main( int argc, char** argv )
 
             syslog( LOG_INFO, "[%i] Stream processing completed", g_pid );
 
+            nxgen->dumpProcessingStatistics();
+
             // If we make it here, translation succeeded
 
             if ( move )
