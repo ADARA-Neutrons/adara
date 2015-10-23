@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <syslog.h>
+#include <time.h>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -478,6 +479,8 @@ public:
         unsigned short a_compression_level = 0 );
     ~NxGen();
 
+    void dumpProcessingStatistics(void);
+
 protected:
 
     void                initialize();
@@ -661,6 +664,9 @@ private:
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     std::set<std::string>       m_pv_connection_history;/// Connection String/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
+    float                       m_duration;             /// Save Total Run Duration (seconds)
+    uint64_t                    m_total_counts;         /// Total Run Event Counts
+    struct timespec             m_sts_start_time;       /// STS Start of Processing Time
 };
 
 #endif // NXGEN_H

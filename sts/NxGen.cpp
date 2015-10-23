@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
@@ -57,6 +58,9 @@ NxGen::NxGen
     m_comment_last_offset(0),
     m_haveRunComment(false)
 {
+    // Capture STS "Start of Processing Time"...
+    clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
+
     if ( !a_nexus_out_file.empty() )
     {
         m_gen_nexus = true;
@@ -535,16 +539,24 @@ NxGen::finalize
         flushScanData();
         flushCommentData();
 
-        float duration = calcDiffSeconds(
+        // Capture Run Total Duration (for processing bandwidth statistics)
+        m_duration = calcDiffSeconds(
             a_run_metrics.end_time, a_run_metrics.start_time );
 
-        writeScalar( m_entry_path, "duration", duration, TIME_SEC_UNITS );
+        writeScalar( m_entry_path, "duration",
+            m_duration, TIME_SEC_UNITS );
         writeScalar( m_entry_path, "total_pulses",
             a_run_metrics.charge_stats.count(), "" );
 
         // Link raw_frames to total_pulses for backward compatibility
         makeLink( m_entry_path + "/total_pulses",
             m_entry_path + "/raw_frames" );
+
+        // Capture Run Total Counts (for processing bandwidth statistics)
+        m_total_counts = a_run_metrics.events_counted
+            + a_run_metrics.events_uncounted
+            + a_run_metrics.non_events_counted;
+
         writeScalar( m_entry_path, "total_counts",
             a_run_metrics.events_counted, "" );
         writeScalar( m_entry_path, "total_uncounted_counts",
@@ -626,6 +638,52 @@ NxGen::finalize
     {
         RETHROW_TRACE( e, "finalization of nexus file failed." )
     }
+}
+
+
+/*! \brief Dump Overall STS Processing Statistics
+ *
+ * This method dump the overall processing time/event bandwidth
+ * for Nexus-specific output generation, including statistics
+ * for the _Run Itself_ and how long the STS took to process it.
+ */
+void
+NxGen::dumpProcessingStatistics(void)
+{
+    if (!m_gen_nexus)
+        return;
+
+    // Overall Run Statistics
+
+    syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
+        g_pid, "Run Total Counts", m_total_counts, m_duration );
+
+    double run_bandwidth = (double) m_total_counts / (double) m_duration;
+
+    syslog( LOG_INFO, "[%i] %s = %lf events/sec",
+        g_pid, "Overall Run Bandwidth", run_bandwidth );
+
+    // STS Processing Statistics
+
+    struct timespec sts_end_time;
+
+    clock_gettime( CLOCK_REALTIME, &sts_end_time );
+
+    float sts_duration = calcDiffSeconds( sts_end_time, m_sts_start_time );
+
+    syslog( LOG_INFO, "[%i] %s = %f seconds",
+        g_pid, "Total STS Processing Time", sts_duration );
+
+    double sts_bandwidth = (double) m_total_counts
+        / (double) sts_duration;
+
+    syslog( LOG_INFO, "[%i] %s = %lf events/sec",
+        g_pid, "Overall STS Bandwidth", sts_bandwidth );
+
+    double overhead_ratio = run_bandwidth / sts_bandwidth;
+
+    syslog( LOG_INFO, "[%i] %s = %lf",
+        g_pid, "STS Overhead Ratio", overhead_ratio );
 }
 
 
