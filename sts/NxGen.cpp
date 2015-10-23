@@ -553,9 +553,9 @@ NxGen::finalize
             m_entry_path + "/raw_frames" );
 
         // Capture Run Total Counts (for processing bandwidth statistics)
-        m_total_counts = a_run_metrics.events_counted
-            + a_run_metrics.events_uncounted
-            + a_run_metrics.non_events_counted;
+        m_total_counts = a_run_metrics.events_counted;
+        m_total_uncounts = a_run_metrics.events_uncounted;
+        m_total_non_counts = a_run_metrics.non_events_counted;
 
         writeScalar( m_entry_path, "total_counts",
             a_run_metrics.events_counted, "" );
@@ -655,13 +655,28 @@ NxGen::dumpProcessingStatistics(void)
 
     // Overall Run Statistics
 
-    syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
-        g_pid, "Run Total Counts", m_total_counts, m_duration );
+    uint64_t total_counts =
+        m_total_counts + m_total_uncounts + m_total_non_counts;
 
-    double run_bandwidth = (double) m_total_counts / (double) m_duration;
+    syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
+        g_pid, "Run Total Counts", total_counts, m_duration );
+
+    double run_bandwidth = (double) total_counts / (double) m_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
         g_pid, "Overall Run Bandwidth", run_bandwidth );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Counted(Det)", m_total_counts,
+        (double) m_total_counts / (double) m_duration );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Uncounted(Err)", m_total_uncounts,
+        (double) m_total_uncounts / (double) m_duration );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Non-Counts(Mon)", m_total_non_counts,
+        (double) m_total_non_counts / (double) m_duration );
 
     // STS Processing Statistics
 
@@ -674,7 +689,7 @@ NxGen::dumpProcessingStatistics(void)
     syslog( LOG_INFO, "[%i] %s = %f seconds",
         g_pid, "Total STS Processing Time", sts_duration );
 
-    double sts_bandwidth = (double) m_total_counts
+    double sts_bandwidth = (double) total_counts
         / (double) sts_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",

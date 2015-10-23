@@ -666,6 +666,8 @@ private:
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
     float                       m_duration;             /// Save Total Run Duration (seconds)
     uint64_t                    m_total_counts;         /// Total Run Event Counts
+    uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
+    uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
     struct timespec             m_sts_start_time;       /// STS Start of Processing Time
 };
 
