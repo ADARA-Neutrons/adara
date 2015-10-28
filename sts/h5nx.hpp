@@ -79,25 +79,31 @@ public:
     /////////////////////////////////////////////
     // WARNING
     // this is not a template function
-    // the NeXus datatype must be supplied and match the write_slab future function
+    // the NeXus datatype must be supplied and match the write_slab function
     ////////////////////////////////////////////
 
-    int H5NXcreate_dataset_extend(const std::string &group_path, const std::string &dataset_name,
-                                  int nxdatatype,
-                                  hsize_t chunk);
+    int H5NXcreate_dataset_extend( const std::string &group_path,
+								   const std::string &dataset_name,
+                                   int nxdatatype,
+                                   hsize_t chunk );
 
     /////////////////////////////////////////////
     // WARNING
     // THIS IS FOR A 1D CASE
     ////////////////////////////////////////////
     template <typename NumT>
-    int H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT> &slab, uint64_t cur_size );
+    int H5NXwrite_slab( const std::string &dataset_path,
+		const std::vector<NumT> &slab, uint64_t slab_size,
+		uint64_t cur_size );
 
     ////////////////////////////////////////////
-    int H5NXmake_link(const std::string &current_name, const std::string &destination_name );
-    int H5NXmake_group_link(const std::string &current_name, const std::string &destination_name );
+    int H5NXmake_link( const std::string &current_name,
+		const std::string &destination_name );
+    int H5NXmake_group_link( const std::string &current_name,
+		const std::string &destination_name );
 
-    //call H5Fflush: causes all buffers associated with a file to be immediately flushed to disk
+    //call H5Fflush: causes all buffers associated with a file
+	//to be immediately flushed to disk
     int H5NXflush();
 
     //set cache size

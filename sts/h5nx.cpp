@@ -1148,43 +1148,53 @@ int H5nx::H5NXcreate_dataset_extend( const std::string &group_path,
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<double> &slab, uint64_t cur_size );
+        const std::vector<double> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<float> &slab, uint64_t cur_size );
+        const std::vector<float> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint16_t> &slab, uint64_t cur_size );
+        const std::vector<uint16_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int16_t> &slab, uint64_t cur_size );
+        const std::vector<int16_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint32_t> &slab, uint64_t cur_size );
+        const std::vector<uint32_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int32_t> &slab, uint64_t cur_size );
+        const std::vector<int32_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint64_t> &slab, uint64_t cur_size );
+        const std::vector<uint64_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int64_t> &slab, uint64_t cur_size );
+        const std::vector<int64_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<char> &slab, uint64_t cur_size );
+        const std::vector<char> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template <typename NumT>
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<NumT> &vec, uint64_t cur_size )
+        const std::vector<NumT> &vec, uint64_t slab_size,
+        uint64_t cur_size )
 {
     hid_t   did;
     hid_t   tid;
@@ -1198,8 +1208,6 @@ int H5nx::H5NXwrite_slab( const std::string &dataset_path,
     ///////////////////////////////////////////////////////////////////
     // FOR 1D DATASET
     ////////////////////////////////////////////////////////////////////
-
-    hsize_t slab_size = vec.size();
 
     //open dataset
     if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
