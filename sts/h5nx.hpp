@@ -88,24 +88,11 @@ public:
 
     /////////////////////////////////////////////
     // WARNING
-    // UNDER CONSTRUCTION
-    // PARAMETER LIST SUBJECT TO CHANGE
     // THIS IS FOR A 1D CASE
     ////////////////////////////////////////////
-    //template <typename NumT>
-    //int H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT> &slab);
     template <typename NumT>
     int H5NXwrite_slab(const std::string &dataset_path, const std::vector<NumT> &slab, uint64_t cur_size );
 
-    int  H5NXslab_open( H5NXwrite_context &context, const std::string &dataset_path);
-    template <typename T>
-    int H5NXslab_write( H5NXwrite_context &context, const std::vector<T> &data );
-    int H5NXslab_close( H5NXwrite_context &context );
-    
-    /////////////////////////////////////////////
-    // WARNING
-    // UNDER CONSTRUCTION
-    // PARAMETER LIST SUBJECT TO CHANGE
     ////////////////////////////////////////////
     int H5NXmake_link(const std::string &current_name, const std::string &destination_name );
     int H5NXmake_group_link(const std::string &current_name, const std::string &destination_name );
