@@ -116,6 +116,9 @@ private:
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
                     T a_value, const timespec &a_timestamp );
+    template<class T>
+    void        resetInUseVector( std::vector<T> a_buffer,
+                    uint64_t a_buffer_size );
     //void        processPulseID( uint64_t a_pulse_id );
     void        receivedInfo( InfoBit a_bit );
     void        finalizeStreamProcessing();
@@ -237,6 +240,29 @@ StreamParser::pvValueUpdate
         if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
             pvinfo->flushBuffers(0);
     }
+}
+
+/*! \brief Resets "In Use" Portion of Critical Path Data Buffer Vectors.
+ *  \param a_buffer - Data buffer vector
+ *  \param a_buffer_size - "In Use" size of data buffer vector
+ *
+ * This method quickly resets the currently "In Use" data elements
+ * in a Critical Path data buffer vector, by spewing in "-1"s
+ * to overwrite any potentially existing data values.
+ * (This method isn't strictly required, if we do our "size" bookkeeping
+ * correctly, but it's a sure-fire indicator if we do screw things up! :-)
+ */
+template<class T>
+void
+StreamParser::resetInUseVector
+(
+    std::vector<T>   a_buffer,
+    uint64_t         a_buffer_size
+)
+{
+    T *ptr = &a_buffer[0];
+
+    memset( (void *) ptr, 0xff, a_buffer_size * sizeof( T ) );
 }
 
 /*! \brief Gathers statistics from the specified ADARA packet.
