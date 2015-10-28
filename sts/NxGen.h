@@ -565,19 +565,32 @@ private:
                         (
                             const std::string & a_path, ///< [in] Nexus path to dataset
                             std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_cur_size        ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
+                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
-                            if ( a_buffer.size())
+                            writeSlab( a_path,
+                                a_buffer, a_buffer.size(), a_cur_size );
+                        }
+    template<class T>
+    void                writeSlab
+                        (
+                            const std::string & a_path, ///< [in] Nexus path to dataset
+                            std::vector<T> & a_buffer,  ///< [in] Vector of data to write
+                            uint64_t a_buffer_size,     ///< [in] Size of Vector of data to write
+                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
+                        )
+                        {
+                            if ( a_buffer_size )
                             {
                                 if ( m_h5nx.H5NXwrite_slab( a_path,
-                                        a_buffer, a_cur_size ) != SUCCEED )
+                                        a_buffer, a_buffer_size,
+                                        a_cur_size ) != SUCCEED )
                                 {
                                     THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
                                         "H5NXwrite_slab FAILED for path: "
                                             << a_path
-                                            << " a_buffer.size()="
-                                            << a_buffer.size()
+                                            << " a_buffer_size="
+                                            << a_buffer_size
                                             << " a_cur_size(offset)="
                                             << a_cur_size);
                                 }
@@ -604,7 +617,7 @@ private:
                                 {
                                     buf.resize( m_chunk_size, a_value );
 
-                                    while( count <= ( a_count - m_chunk_size ))
+                                    while ( count <= ( a_count - m_chunk_size ) )
                                     {
                                         writeSlab( a_path, buf, cur_size );
                                         count += buf.size();
