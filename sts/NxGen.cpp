@@ -909,11 +909,13 @@ NxGen::bankBuffersReady
         if ( bi->m_has_event )
         {
             writeSlab( bi->m_tof_path,
-                a_bank.m_tof_buffer, bi->m_event_cur_size );
+                a_bank.m_tof_buffer, a_bank.m_tof_buffer_size,
+                bi->m_event_cur_size );
             writeSlab( bi->m_pid_path,
-                a_bank.m_pid_buffer, bi->m_event_cur_size );
+                a_bank.m_pid_buffer, a_bank.m_tof_buffer_size,
+                bi->m_event_cur_size );
 
-            bi->m_event_cur_size += a_bank.m_tof_buffer.size();
+            bi->m_event_cur_size += a_bank.m_tof_buffer_size;
 
             writeSlab( bi->m_index_path,
                 a_bank.m_index_buffer, bi->m_index_cur_size );
@@ -1112,8 +1114,9 @@ NxGen::monitorBuffersReady
         if ( mi->m_config == NULL )
         {
             writeSlab( mi->m_tof_path,
-                a_monitor.m_tof_buffer, mi->m_event_cur_size );
-            mi->m_event_cur_size += a_monitor.m_tof_buffer.size();
+                a_monitor.m_tof_buffer, a_monitor.m_tof_buffer_size,
+                mi->m_event_cur_size );
+            mi->m_event_cur_size += a_monitor.m_tof_buffer_size;
 
             writeSlab( mi->m_index_path,
                 a_monitor.m_index_buffer, mi->m_index_cur_size );
