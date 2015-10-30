@@ -69,6 +69,7 @@ public:
         m_histo_event_uncounted(0),
         m_last_pulse_with_data(0),
         m_has_event(false),
+        m_tof_buffer_size(0),
         m_has_histo(false)
     {
         // Save Initialization for initializeBank() method...
@@ -351,6 +352,7 @@ public:
     bool                    m_has_event;            ///< Has an Event output already been defined?
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer (microseconds)
+    uint64_t                m_tof_buffer_size;      ///< "In Use" Size of Time of flight buffer (microseconds)
     std::vector<uint32_t>   m_pid_buffer;           ///< Pixel ID buffer
 
     bool                    m_has_histo;            ///< Has a Histogram output already been defined?
@@ -393,6 +395,7 @@ public:
         m_event_count(0),
         m_event_uncounted(0),
         m_last_pulse_with_data(0),
+        m_tof_buffer_size(0),
         m_config(a_config)
     {
         // Histo-based Monitor
@@ -462,6 +465,7 @@ public:
     uint64_t                m_last_pulse_with_data; ///< Index of last pulse with data for this monitor
     std::vector<uint64_t>   m_index_buffer;         ///< Event index buffer
     std::vector<float>      m_tof_buffer;           ///< Time of flight buffer
+    uint64_t                m_tof_buffer_size;      ///< "In Use" Size of Time of flight buffer
 
     uint32_t                m_num_tof_bins;         ///< Histo Number of TOF Bins
     std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
