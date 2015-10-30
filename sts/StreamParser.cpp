@@ -780,10 +780,21 @@ StreamParser::processBankEvents
                     ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
             }
 
-            size_t sz = bi->m_tof_buffer.size();
+            size_t sz = bi->m_tof_buffer_size;
 
-            bi->m_tof_buffer.resize( sz + a_event_count );
-            bi->m_pid_buffer.resize( sz + a_event_count );
+            // *** STS CRITICAL PATH OPTIMIZATION ***
+            // *ONLY* Resize Vector if _Not_ Previously Resized...!
+            // - Huge Savings for us, because resize() pre-initializes
+            // the Values in the vector when resizing...! ;-D
+            // - we track our own "in use" vector size in the
+            // new "BankInfo::m_tof_buffer_size" field... :-D
+            if ( sz + a_event_count > bi->m_tof_buffer.size() )
+            {
+                bi->m_tof_buffer.resize( sz + a_event_count,
+                    (float) -1.0 );
+                bi->m_pid_buffer.resize( sz + a_event_count,
+                    (uint32_t) -1 );
+            }
 
             float           *tof_ptr = &bi->m_tof_buffer[sz];
             uint32_t        *pid_ptr = &bi->m_pid_buffer[sz];
@@ -798,6 +809,9 @@ StreamParser::processBankEvents
                 *pid_ptr++ = *rpos++;
             }
 
+            // Manually Track "In Use" Vector Data Buffer Size (see above!)
+            bi->m_tof_buffer_size += a_event_count;
+
             // Cache event index until large enough to write
             bi->m_index_buffer.push_back( bi->m_event_count );
             bi->m_event_count += a_event_count;
@@ -805,13 +819,17 @@ StreamParser::processBankEvents
             bi->m_last_pulse_with_data = m_pulse_count;
 
             // Check to see if buffers are ready to write
-            if ( bi->m_tof_buffer.size() >= m_event_buf_write_thresh
+            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh
                    || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
             {
                 bankBuffersReady( *bi );
 
-                bi->m_tof_buffer.clear();
-                bi->m_pid_buffer.clear();
+                resetInUseVector<float>( bi->m_tof_buffer,
+                    bi->m_tof_buffer_size );
+                resetInUseVector<uint32_t>( bi->m_pid_buffer,
+                    bi->m_tof_buffer_size );
+                bi->m_tof_buffer_size = 0;
+
                 bi->m_index_buffer.clear();
             }
 
@@ -985,8 +1003,12 @@ StreamParser::handleBankPulseGap
         bankBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
 
-        a_bi.m_tof_buffer.clear();
-        a_bi.m_pid_buffer.clear();
+        resetInUseVector<float>( a_bi.m_tof_buffer,
+            a_bi.m_tof_buffer_size );
+        resetInUseVector<uint32_t>( a_bi.m_pid_buffer,
+            a_bi.m_tof_buffer_size );
+        a_bi.m_tof_buffer_size = 0;
+
         a_bi.m_index_buffer.clear();
     }
 }
@@ -1157,9 +1179,19 @@ StreamParser::processMonitorEvents
 
         // Process Monitor Events...
 
-        size_t sz = imi->second->m_tof_buffer.size();
+        size_t sz = imi->second->m_tof_buffer_size;
 
-        imi->second->m_tof_buffer.resize( sz + a_event_count );
+        // *** STS CRITICAL PATH OPTIMIZATION ***
+        // *ONLY* Resize Vector if _Not_ Previously Resized...!
+        // - Huge Savings for us, because resize() pre-initializes
+        // the Values in the vector when resizing...! ;-D
+        // - we track our own "in use" vector size in the
+        // new "MonitorInfo::m_tof_buffer_size" field... :-D
+        if ( sz + a_event_count > imi->second->m_tof_buffer.size() )
+        {
+            imi->second->m_tof_buffer.resize( sz + a_event_count,
+                (float) -1.0 );
+        }
 
         float *tof_ptr = &imi->second->m_tof_buffer[sz];
 
@@ -1171,6 +1203,9 @@ StreamParser::processMonitorEvents
             *tof_ptr++ = ((*a_rpos++) & 0x1fffff) / 10.0;
         }
 
+        // Manually Track "In Use" Vector Data Buffer Size (see above!)
+        imi->second->m_tof_buffer_size += a_event_count;
+
         // Cache event index until large enough to write
         imi->second->m_index_buffer.push_back(
             imi->second->m_event_count );
@@ -1178,13 +1213,16 @@ StreamParser::processMonitorEvents
         imi->second->m_last_pulse_with_data = m_pulse_count;
 
         // Check to see if buffers are ready to write
-        if ( imi->second->m_tof_buffer.size() >= m_event_buf_write_thresh
+        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh
           || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
         {
             monitorBuffersReady( *imi->second );
     
+            resetInUseVector<float>( imi->second->m_tof_buffer,
+                imi->second->m_tof_buffer_size );
+            imi->second->m_tof_buffer_size = 0;
+
             imi->second->m_index_buffer.clear();
-            imi->second->m_tof_buffer.clear();
         }
     }
 }
@@ -1230,10 +1268,14 @@ StreamParser::handleMonitorPulseGap
         monitorBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
 
-        a_mi.m_tof_buffer.clear();
+        resetInUseVector<float>( a_mi.m_tof_buffer,
+            a_mi.m_tof_buffer_size );
+        a_mi.m_tof_buffer_size = 0;
+
         a_mi.m_index_buffer.clear();
     }
 }
+
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Run Info packet processing
@@ -2638,7 +2680,7 @@ StreamParser::finalizeStreamProcessing()
         }
 
         // Flush bank buffers
-        if ( (*ibi)->m_tof_buffer.size() || (*ibi)->m_index_buffer.size() )
+        if ( (*ibi)->m_tof_buffer_size || (*ibi)->m_index_buffer.size() )
             bankBuffersReady( **ibi );
 
         bankFinalize( **ibi );
@@ -2660,7 +2702,7 @@ StreamParser::finalizeStreamProcessing()
             }
 
             // Flush monitor buffers
-            if ( imi->second->m_tof_buffer.size()
+            if ( imi->second->m_tof_buffer_size
                 || imi->second->m_index_buffer.size() )
             {
                 monitorBuffersReady( *imi->second );
