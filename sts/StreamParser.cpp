@@ -824,10 +824,12 @@ StreamParser::processBankEvents
             {
                 bankBuffersReady( *bi );
 
+#ifdef PARANOID
                 resetInUseVector<float>( bi->m_tof_buffer,
                     bi->m_tof_buffer_size );
                 resetInUseVector<uint32_t>( bi->m_pid_buffer,
                     bi->m_tof_buffer_size );
+#endif
                 bi->m_tof_buffer_size = 0;
 
                 bi->m_index_buffer.clear();
@@ -1003,10 +1005,12 @@ StreamParser::handleBankPulseGap
         bankBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
 
+#ifdef PARANOID
         resetInUseVector<float>( a_bi.m_tof_buffer,
             a_bi.m_tof_buffer_size );
         resetInUseVector<uint32_t>( a_bi.m_pid_buffer,
             a_bi.m_tof_buffer_size );
+#endif
         a_bi.m_tof_buffer_size = 0;
 
         a_bi.m_index_buffer.clear();
@@ -1218,8 +1222,10 @@ StreamParser::processMonitorEvents
         {
             monitorBuffersReady( *imi->second );
     
+#ifdef PARANOID
             resetInUseVector<float>( imi->second->m_tof_buffer,
                 imi->second->m_tof_buffer_size );
+#endif
             imi->second->m_tof_buffer_size = 0;
 
             imi->second->m_index_buffer.clear();
@@ -1268,8 +1274,10 @@ StreamParser::handleMonitorPulseGap
         monitorBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
 
+#ifdef PARANOID
         resetInUseVector<float>( a_mi.m_tof_buffer,
             a_mi.m_tof_buffer_size );
+#endif
         a_mi.m_tof_buffer_size = 0;
 
         a_mi.m_index_buffer.clear();
