@@ -117,7 +117,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     syslog( LOG_INFO, "Found New PV %s: %s",
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str() );
-                    usleep(30); // give syslog a chance...
+                    usleep(30000); // give syslog a chance...
 
                     // New PV, find a free ID (not in old IDs)
                     for ( ipv2 = idev->second->m_pvs.begin();
@@ -143,7 +143,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     syslog( LOG_INFO, "Undefining Old PV %s: %s",
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str() );
-                    usleep(30); // give syslog a chance...
+                    usleep(30000); // give syslog a chance...
 
                     sendPvUndefined( idev->second, *ipv );
                 }
@@ -345,7 +345,7 @@ ConfigManager::makePvNamesUnique( const string &a_key,
                 "%s Device %s: Renaming Name-Clash PV from %s to %s!",
                 "PVSD ERROR:", a_descriptor.m_name.c_str(),
                 (*ipv)->m_name.c_str(), new_name.c_str() );
-            usleep(30); // give syslog a chance...
+            usleep(30000); // give syslog a chance...
 
             (*ipv)->m_name = new_name;
         }
@@ -370,7 +370,7 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
             "%s No Free Packets! %s Device %s Descriptor Lost!",
             "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
             a_dev_desc->m_name.c_str() );
-        usleep(30); // give syslog a chance...
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -392,7 +392,7 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
             "%s No Free Packets! %s Device %s Undefined Lost!",
             "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
             a_dev_desc->m_name.c_str() );
-        usleep(30); // give syslog a chance...
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -416,7 +416,7 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
         "%s No Free Packets! %s Device %s (Old %s) Descriptor Update Lost!",
             "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
             a_dev_desc->m_name.c_str(), a_old_dev_desc->m_name.c_str() );
-        usleep(30); // give syslog a chance...
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -443,7 +443,7 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
             "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
             a_dev_desc->m_name.c_str(), a_pv_desc->m_name.c_str(),
             a_pv_desc->m_connection.c_str() );
-        usleep(30); // give syslog a chance...
+        usleep(30000); // give syslog a chance...
     }
 }
 
