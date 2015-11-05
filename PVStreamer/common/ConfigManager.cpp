@@ -105,32 +105,51 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             // Now assign/reassign IDs
             new_desc->m_id = idev->second->m_id;
 
-            Identifier next_id = 1;
+			// Create PV IDs Set: Sorted Unique Element List
+			// - Use for Guaranteed-Unique New PV Ids...! ;-D
             vector<PVDescriptor*>::const_iterator ipv2;
-            const PVDescriptor *old_pv;
+			std::set<Identifier> pv_ids;
+            for ( ipv2 = idev->second->m_pvs.begin();
+                    ipv2 != idev->second->m_pvs.end(); ++ipv2 )
+            {
+				pv_ids.insert( (*ipv2)->m_id );
+            }
 
-            vector<PVDescriptor*>::iterator ipv = new_desc->m_pvs.begin();
-            for ( ; ipv != new_desc->m_pvs.end(); ++ipv )
+            const PVDescriptor *old_pv;
+            Identifier next_id = 1;
+
+            vector<PVDescriptor*>::iterator ipv;
+            for ( ipv = new_desc->m_pvs.begin();
+                    ipv != new_desc->m_pvs.end(); ++ipv )
             {
                 // See if new PV is in old PV list - by "friendly name"
                 old_pv = idev->second->getPvByName( (*ipv)->m_name );
 
                 // If PV exists in both devices, reuse the old PV ID
                 if ( old_pv )
+                {
                     (*ipv)->m_id = old_pv->m_id;
+
+                    syslog( LOG_INFO,
+                        "Device %s (device id=%d) %s %s: %s - %s pv id=%d",
+                        new_desc->m_name.c_str(), new_desc->m_id,
+                        "PV Persists",
+                        (*ipv)->m_name.c_str(),
+                        (*ipv)->m_connection.c_str(),
+                        "keep", (*ipv)->m_id );
+                    usleep(30000); // give syslog a chance...
+                }
                 else
                 {
-                    // New PV, find a free ID (not in old IDs)
-                    for ( ipv2 = idev->second->m_pvs.begin();
-                            ipv2 != idev->second->m_pvs.end(); ++ipv2 )
-                    {
-                        if ( next_id < (*ipv2)->m_id )
-                            break;
-                        else if ( next_id == (*ipv2)->m_id )
-                            next_id++;
-                    }
+                    // New PV, find a free ID (not in old IDs or recent new)
+			        std::set<Identifier>::iterator idi;
+					while ( (idi = pv_ids.find( next_id )) != pv_ids.end() )
+						next_id++;
 
                     (*ipv)->m_id = next_id++;
+
+					// Mark this PV ID, to be sure for the next guy... ;-D
+					pv_ids.insert( (*ipv)->m_id );
 
                     syslog( LOG_INFO,
                         "Device %s (device id=%d) %s %s: %s - %s pv id=%d",
