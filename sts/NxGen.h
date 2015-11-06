@@ -675,7 +675,6 @@ private:
     std::vector<char>           m_comment_data;         /// Comment data buffer
     unsigned long               m_comment_last_offset;  /// Last dataset offset written to Nexus
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    std::set<std::string>       m_pv_connection_history;/// Connection String/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
     float                       m_duration;             /// Save Total Run Duration (seconds)
     uint64_t                    m_total_counts;         /// Total Run Event Counts

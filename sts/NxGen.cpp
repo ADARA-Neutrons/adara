@@ -100,22 +100,25 @@ NxGen::makePVInfo
     const string           &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
-    set<string>::iterator i;
     string internal_name = a_name;
-    string internal_connection = a_connection;
     uint32_t name_ver = 0;
+
+    string internal_connection = a_connection;
     uint32_t connection_ver = 0;
 
-    // Check for Name Collisions: This code looks for the Name across
-    // all PV names and if found increments a version number.
-    // Then it checks again to make sure the auto-generated internal
-    // Name doesn't collide with an existing (top-level) Name.
+    set<string>::iterator i;
+
+    // Check for PV Name Collisions: This code looks for the Name (Alias)
+    // across all PV names and connection strings encountered thus far,
+    // and if found increments/appends a version number.
+    // Then it checks again to make sure _This_ auto-generated internal
+    // name doesn't collide with an existing (top-level) name.
     // This continues until a version is found that doesn't collide.
 
     while ( 1 )
     {
         i = m_pv_name_history.find( internal_name );
-        if ( i != m_pv_name_history.end())
+        if ( i != m_pv_name_history.end() )
         {
             internal_name = a_name + "("
                 + boost::lexical_cast<string>( ++name_ver ) + ")";
@@ -137,47 +140,48 @@ NxGen::makePVInfo
     // Now Handle Connection String Issues/Collisions.
 
     // If the Name and Connection String were the same before,
-    // then make them the same again... ;-D
+    // then just make them the same again now... ;-D
     if ( a_name == a_connection )
     {
         internal_connection = internal_name;
-        connection_ver = name_ver;
     }
 
-    // Now Check for Connection String Collisions: This code looks for
-    // Connection Strings across all PVs and if found increments a
-    // version number.  Then it checks again to make sure the
-    // auto-generated internal Connection String doesn't collide with
-    // an existing (top-level) Connection String.  This continues until
-    // a version is found that doesn't collide.
-
-    // (Note: If the Name matches the Connection String, then we may have
-    // _Already_ made the Connection String unique above, by copying...)
+    // Otherwise Check for Connection String Collisions: This code looks
+    // for this connection string across all PVs and if found increments
+    // a version number.  Then it checks again to make sure _This_
+    // auto-generated internal connection string doesn't collide with
+    // an existing (top-level) PV name or connection string.
+    // This continues until a version is found that doesn't collide.
 
     // Let's *Not* Assume that any Connection String collisions
     // correspond to 2 Different Aliases of the Same Variable, just
     // in case that happens Not to be true... Better to duplicate a
     // PV than throw away the values for a distinct PV with a Name Clash.)
 
-    while ( 1 )
+    else
     {
-        i = m_pv_connection_history.find( internal_connection );
-        if ( i != m_pv_connection_history.end())
+        while ( 1 )
         {
-            internal_connection = a_connection + "("
-                + boost::lexical_cast<string>( ++connection_ver ) + ")";
-        }
-        else
-        {
-            if ( connection_ver > 0 )
+            i = m_pv_name_history.find( internal_connection );
+            if ( i != m_pv_name_history.end())
             {
-                syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Connection String Clash %s -> %s",
-                    g_pid, a_device_name.c_str(),
-                    a_connection.c_str(), internal_connection.c_str() );
+                internal_connection = a_connection + "("
+                    + boost::lexical_cast<string>( ++connection_ver )
+                    + ")";
             }
-            m_pv_connection_history.insert( internal_connection );
-            break;
+            else
+            {
+                if ( connection_ver > 0 )
+                {
+                    syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Connection String Clash %s -> %s",
+                        g_pid, a_device_name.c_str(),
+                        a_connection.c_str(),
+                        internal_connection.c_str() );
+                }
+                m_pv_name_history.insert( internal_connection );
+                break;
+            }
         }
     }
 
