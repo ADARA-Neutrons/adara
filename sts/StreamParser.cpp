@@ -1868,8 +1868,7 @@ StreamParser::rxPacket
                 if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"device_name" ) == 0 )
                 {
-                    if ( lev1->children )
-                        getXmlNodeValue( lev1->children, dev_name );
+                    getXmlNodeValue( lev1, dev_name );
                 }
 
                 else if ( xmlStrcmp( lev1->name,
