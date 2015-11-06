@@ -340,6 +340,11 @@ private:
                             this->m_units );
                         m_nxgen.makeDataset( m_log_path, "time",
                             NeXus::FLOAT64, TIME_SEC_UNITS );
+
+                        m_nxgen.writeString( m_log_path, "device_name",
+                            this->m_device_name );
+                        m_nxgen.writeScalar( m_log_path, "device_id",
+                            this->m_device_id, "" );
                     }
 
                     // Flush Any Pending Value/Time Data...
