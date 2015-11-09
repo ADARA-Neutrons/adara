@@ -560,9 +560,15 @@ bool SMSControl::setRecording(bool v)
 	return true;
 }
 
+bool SMSControl::getRecording(void)
+{
+	return m_recording;
+}
+
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
 {
-	DEBUG("registerEventSource hwId=" << hwId);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerEventSource hwId=" << hwId);
 
 	/* We're called when a data source discovers a new hardware
 	 * source id and needs to allocate a bit position for completing
@@ -583,7 +589,8 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 
 void SMSControl::unregisterEventSource(uint32_t smsId)
 {
-	DEBUG("unregisterEventSource: smsId=" << smsId);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterEventSource: smsId=" << smsId);
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
@@ -680,7 +687,9 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 							RLLHistory_SMSControl,
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
-						ERROR(log_info << "unregisterEventSource:"
+						ERROR(log_info
+							<< ( m_recording ? "[RECORDING] " : "" )
+							<< "unregisterEventSource:"
 							<< " No More Pulses for "
 							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << it->first.first << std::dec);
@@ -709,7 +718,9 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 							RLLHistory_SMSControl,
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
-						ERROR(log_info << "unregisterEventSource:"
+						ERROR(log_info
+							<< ( m_recording ? "[RECORDING] " : "" )
+							<< "unregisterEventSource:"
 							<< " No More Pulses for"
 							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << last->first.first << std::dec);
@@ -739,7 +750,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		}
 
 		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
-		DEBUG("Remaining Internal Pulse Buffer Length = " << queue_length
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "Remaining Internal Pulse Buffer Length = " << queue_length
 			<< " recorded=" << recorded
 			<< " (size=" << m_pulses.size() << ")");
 	}
@@ -753,7 +765,8 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 	PulseMap::iterator it;
 
 	if ( m_pulses.size() == 0 ) {
-		DEBUG("popPulseBuffer: Empty Pulse Buffer, No Pulses to Pop!"
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "popPulseBuffer: Empty Pulse Buffer, No Pulses to Pop!"
 			<< " pulse_index=" << pulse_index);
 		return;
 	}
@@ -763,7 +776,8 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 	// Pop "Last" Pulse...
 	if ( pulse_index < 0 ) {
 		if ( ((uint32_t) -pulse_index) > m_pulses.size() ) {
-			DEBUG("popPulseBuffer: Pop Last - Pulse Index Out of Bounds!"
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Pop Last - Pulse Index Out of Bounds!"
 				<< " pulse_index=" << pulse_index
 				<< " size=" << m_pulses.size());
 			return;
@@ -772,12 +786,14 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 		it--;
 		int32_t pindex = -1;
 		while ( pindex > pulse_index && it != m_pulses.begin() ) {
-			DEBUG("popPulseBuffer: Skipping Last Pulse pindex=" << pindex
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Skipping Last Pulse pindex=" << pindex
 				<< std::hex << " 0x" << it->first.first << std::dec);
 			pindex--; it--;
 		}
 		if ( pindex > pulse_index ) {
-			DEBUG("popPulseBuffer: Last Pulse Not Found in Buffer"
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Last Pulse Not Found in Buffer"
 				<< " size=" << m_pulses.size());
 			return;
 		}
@@ -787,7 +803,8 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 	// Pop Pulse of Specific Index...
 	else {
 		if ( ((uint32_t) pulse_index) > m_pulses.size() ) {
-			DEBUG("popPulseBuffer: Pop Index - Pulse Index Out of Bounds!"
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Pop Index - Pulse Index Out of Bounds!"
 				<< " pulse_index=" << pulse_index
 				<< " size=" << m_pulses.size());
 			return;
@@ -795,12 +812,14 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 		it = m_pulses.begin();
 		int32_t pindex = 1;
 		while ( pindex < pulse_index && it != m_pulses.end() ) {
-			DEBUG("popPulseBuffer: Skipping Pulse pindex=" << pindex
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Skipping Pulse pindex=" << pindex
 				<< std::hex << " 0x" << it->first.first << std::dec);
 			pindex++; it++;
 		}
 		if ( pindex < pulse_index ) {
-			DEBUG("popPulseBuffer: Pulse Not Found in Buffer"
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "popPulseBuffer: Pulse Not Found in Buffer"
 				<< " size=" << m_pulses.size());
 			return;
 		}
@@ -808,9 +827,10 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 
 	// Pop Given Pulse from Buffer...
 
-	DEBUG("popPulseBuffer: Popping " << isLast << "Pulse "
-			<< " pulse_index=" << pulse_index
-			<< std::hex << " 0x" << it->first.first << std::dec);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "popPulseBuffer: Popping " << isLast << "Pulse "
+		<< " pulse_index=" << pulse_index
+		<< std::hex << " 0x" << it->first.first << std::dec);
 	m_pulses.erase(it);
 }
 
@@ -844,6 +864,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
@@ -857,6 +878,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Interleaved Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " min=0x" << min_id
@@ -873,6 +895,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
 					<< " versus Last Pulse id=0x" << m_lastPulseId
@@ -930,7 +953,9 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 							RLLHistory_SMSControl,
 							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 							2, 10, 100, log_info ) ) {
-						ERROR(log_info << "getPulse:"
+						ERROR(log_info
+							<< ( m_recording ? "[RECORDING] " : "" )
+							<< "getPulse:"
 							<< " No More Pulses for"
 							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << it->first.first << std::dec);
@@ -955,6 +980,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 				it++;
 			}
 			ERROR(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "*** Internal Pulse Buffer Overflow!"
 				<< " Length = " << queue_length
 				<< " recorded=" << recorded
@@ -1021,6 +1047,7 @@ void SMSControl::setSourcesReadDelay(void)
 			600, 10, 30, log_info ) ) {
 		if ( m_pulses.begin() != m_pulses.end() ) {
 			DEBUG(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer " << std::hex
 				<< " begin()=" << "0x" << m_pulses.begin()->first.first
 				<< " next_to_last=" << "0x" << next_to_last->first.first
@@ -1029,6 +1056,7 @@ void SMSControl::setSourcesReadDelay(void)
 				<< " (size=" << m_pulses.size() << ")");
 		} else {
 			DEBUG(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer is Empty"
 				<< ", Internal Pulse Buffer Length = " << queue_length
 				<< " (size=" << m_pulses.size() << ")");
@@ -1051,7 +1079,8 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 		boost::shared_ptr<smsStringPV> & pvCurrentFilePath,
 		boost::shared_ptr<smsConnectedPV> & pvStatus)
 {
-	DEBUG("registerLiveClient clientName=" << clientName);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerLiveClient clientName=" << clientName);
 
 	/* We're called when a new Live Client connects to the SMS,
 	 * and needs to allocate a bit index for naming status PVs.
@@ -1127,7 +1156,8 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 	}
 
 	else {
-		DEBUG("registerLiveClient Out of Live Client Ids!");
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "registerLiveClient Out of Live Client Ids!");
 		// *Don't* throw an exception here, this is _Not_ mission critical!
 		// throw std::runtime_error("No more Live Client Ids available");
 	}
@@ -1137,7 +1167,8 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 
 void SMSControl::unregisterLiveClient(int32_t clientId)
 {
-	DEBUG("unregisterLiveClient: clientId=" << clientId);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterLiveClient: clientId=" << clientId);
 
 	/* Mark this id for re-use. */
 	if ( clientId >= 0 )
@@ -1170,7 +1201,8 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		 */
 		MonitorMap::iterator allMon = m_allMonitors.find(monId);
 		if (allMon == m_allMonitors.end()) {
-			INFO("New Monitor id=" << monId
+			INFO( ( m_recording ? "[RECORDING] " : "" )
+				<< "New Monitor id=" << monId
 				<< " (pixelId=0x" << std::hex << pixel
 				<< " sourceID=0x" << pkt.sourceID()
 				<< " tofField=0x" << pkt.tofField() << std::dec << ")");
@@ -1448,6 +1480,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 				RLL_RTDL_NO_DATA, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "pulseRTDL: Pulse with No Registered Event Sources!"
 				<< " Marking Partial...");
 		}
@@ -1488,7 +1521,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				queue_length++;
 				it++;
 			}
-			DEBUG("[Pending] Internal Pulse Buffer Length = "
+			DEBUG( ( m_recording ? "[RECORDING] " : "" )
+				<< "[Pending] Internal Pulse Buffer Length = "
 				<< queue_length
 				<< " (size=" << m_pulses.size() << ")");
 		}
@@ -1548,7 +1582,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 						2, 10, 100, log_info ) ) {
-					ERROR(log_info << "markComplete:"
+					ERROR(log_info
+						<< ( m_recording ? "[RECORDING] " : "" )
+						<< "markComplete:"
 						<< " No More Pulses for"
 						<< " Proton Charge/Veto Flags Correction! 0x"
 						<< std::hex << it->first.first << std::dec);
@@ -1575,7 +1611,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
 						2, 10, 100, log_info ) ) {
-					ERROR(log_info << "markComplete:"
+					ERROR(log_info
+						<< ( m_recording ? "[RECORDING] " : "" )
+						<< "markComplete:"
 						<< " No More Pulses for"
 						<< " Proton Charge/Veto Flags Correction! 0x"
 						<< std::hex << current->first.first << std::dec);
@@ -1610,7 +1648,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
 	if ( do_log ) {
-		DEBUG("Internal Pulse Buffer Length = " << queue_length
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "Internal Pulse Buffer Length = " << queue_length
 			<< " recorded=" << recorded
 			<< " (size=" << m_pulses.size() << ")");
 	}
@@ -1681,6 +1720,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 				RLL_PULSE_PCHG_UNCORRECTED, "none",
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "correctPChargeVeto: *** Next Pulse Out of Range -"
 				<< " Uncorrected Pulse Proton Charge/Veto Flags!"
 				<< std::hex
@@ -1725,6 +1765,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 					RLL_NO_RTDL_FOR_PULSE, "none",
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "recordPulse: NO RTDL for Pulse"
 					<< " id=0x" << std::hex << pulse->m_id.first
 					<< " dup=0x" << pulse->m_id.second << std::dec);
@@ -1756,7 +1797,8 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		buildChopperPackets(pulse);
 		buildFastMetaPackets(pulse);
 	} catch (std::runtime_error e) {
-		ERROR("Failed to record pulse: " << e.what());
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "Failed to record pulse: " << e.what());
 
 		/* Abuse std::logic_error here somewhat -- we want failure to
 		 * write data to be fatal, but don't have a way to distinguish

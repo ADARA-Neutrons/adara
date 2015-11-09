@@ -158,7 +158,7 @@ daemonize()
 
     // Reopen log
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pvsd daemon starting" );
+    syslog( LOG_INFO, "pvsd daemon %s starting", PVSD_VERSION );
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
 
     // Initialize SysLog
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pvsd starting" );
+    syslog( LOG_INFO, "pvsd %s starting", PVSD_VERSION );
 
     // Setup signal handlers to catch all termination handlers so we can
     // implement orderly shutdown.

@@ -1,11 +1,15 @@
 #include <stdexcept>
 #include <string.h>
 #include <syslog.h>
+#include <time.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+
+// Do Stu's Dummy PixelId-Filled Histogram Test...
+// #define HISTO_TEST
 
 using namespace std;
 
@@ -48,12 +52,15 @@ NxGen::NxGen
     m_tofbin_name(string("time_of_flight")),
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
-    m_pulse_info_slab_size(0),
-    m_pulse_vetoes_slab_size(0),
-    m_pulse_flags_slab_size(0),
+    m_pulse_info_cur_size(0),
+    m_pulse_vetoes_cur_size(0),
+    m_pulse_flags_cur_size(0),
     m_comment_last_offset(0),
     m_haveRunComment(false)
 {
+    // Capture STS "Start of Processing Time"...
+    clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
+
     if ( !a_nexus_out_file.empty() )
     {
         m_gen_nexus = true;
@@ -93,22 +100,25 @@ NxGen::makePVInfo
     const string           &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
-    set<string>::iterator i;
     string internal_name = a_name;
-    string internal_connection = a_connection;
     uint32_t name_ver = 0;
+
+    string internal_connection = a_connection;
     uint32_t connection_ver = 0;
 
-    // Check for Name Collisions: This code looks for the Name across
-    // all PV names and if found increments a version number.
-    // Then it checks again to make sure the auto-generated internal
-    // Name doesn't collide with an existing (top-level) Name.
+    set<string>::iterator i;
+
+    // Check for PV Name Collisions: This code looks for the Name (Alias)
+    // across all PV names and connection strings encountered thus far,
+    // and if found increments/appends a version number.
+    // Then it checks again to make sure _This_ auto-generated internal
+    // name doesn't collide with an existing (top-level) name.
     // This continues until a version is found that doesn't collide.
 
     while ( 1 )
     {
         i = m_pv_name_history.find( internal_name );
-        if ( i != m_pv_name_history.end())
+        if ( i != m_pv_name_history.end() )
         {
             internal_name = a_name + "("
                 + boost::lexical_cast<string>( ++name_ver ) + ")";
@@ -130,47 +140,48 @@ NxGen::makePVInfo
     // Now Handle Connection String Issues/Collisions.
 
     // If the Name and Connection String were the same before,
-    // then make them the same again... ;-D
+    // then just make them the same again now... ;-D
     if ( a_name == a_connection )
     {
         internal_connection = internal_name;
-        connection_ver = name_ver;
     }
 
-    // Now Check for Connection String Collisions: This code looks for
-    // Connection Strings across all PVs and if found increments a
-    // version number.  Then it checks again to make sure the
-    // auto-generated internal Connection String doesn't collide with
-    // an existing (top-level) Connection String.  This continues until
-    // a version is found that doesn't collide.
-
-    // (Note: If the Name matches the Connection String, then we may have
-    // _Already_ made the Connection String unique above, by copying...)
+    // Otherwise Check for Connection String Collisions: This code looks
+    // for this connection string across all PVs and if found increments
+    // a version number.  Then it checks again to make sure _This_
+    // auto-generated internal connection string doesn't collide with
+    // an existing (top-level) PV name or connection string.
+    // This continues until a version is found that doesn't collide.
 
     // Let's *Not* Assume that any Connection String collisions
     // correspond to 2 Different Aliases of the Same Variable, just
     // in case that happens Not to be true... Better to duplicate a
     // PV than throw away the values for a distinct PV with a Name Clash.)
 
-    while ( 1 )
+    else
     {
-        i = m_pv_connection_history.find( internal_connection );
-        if ( i != m_pv_connection_history.end())
+        while ( 1 )
         {
-            internal_connection = a_connection + "("
-                + boost::lexical_cast<string>( ++connection_ver ) + ")";
-        }
-        else
-        {
-            if ( connection_ver > 0 )
+            i = m_pv_name_history.find( internal_connection );
+            if ( i != m_pv_name_history.end())
             {
-                syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Connection String Clash %s -> %s",
-                    g_pid, a_device_name.c_str(),
-                    a_connection.c_str(), internal_connection.c_str() );
+                internal_connection = a_connection + "("
+                    + boost::lexical_cast<string>( ++connection_ver )
+                    + ")";
             }
-            m_pv_connection_history.insert( internal_connection );
-            break;
+            else
+            {
+                if ( connection_ver > 0 )
+                {
+                    syslog( LOG_WARNING,
+                    "[%i] Device %s: PV Connection String Clash %s -> %s",
+                        g_pid, a_device_name.c_str(),
+                        a_connection.c_str(),
+                        internal_connection.c_str() );
+                }
+                m_pv_name_history.insert( internal_connection );
+                break;
+            }
         }
     }
 
@@ -268,11 +279,11 @@ NxGen::initializeNxBank
 
                 // Top-level Event data group
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
-                makeLink( a_bi->m_tof_slab_path,
+                makeLink( a_bi->m_tof_path,
                     a_bi->m_event_path + "/" + m_tof_name );
-                makeLink( a_bi->m_pid_slab_path,
+                makeLink( a_bi->m_pid_path,
                     a_bi->m_event_path + "/" + m_pid_name );
-                makeLink( a_bi->m_index_slab_path,
+                makeLink( a_bi->m_index_path,
                     a_bi->m_event_path + "/" + m_index_name );
 
                 // Link pulse time to bank event times
@@ -302,9 +313,9 @@ NxGen::initializeNxBank
                 // (defer linking of histogram data, which won't exist
                 //     until later in bankFinalize()... :-)
 
-                makeLink( a_bi->m_histo_pid_slab_path,
+                makeLink( a_bi->m_histo_pid_path,
                     a_bi->m_histo_path + "/" + m_histo_pid_name );
-                makeLink( a_bi->m_tofbin_slab_path,
+                makeLink( a_bi->m_tofbin_path,
                     a_bi->m_histo_path + "/" + m_tofbin_name );
             }
 
@@ -510,8 +521,8 @@ NxGen::finalize
         if ( m_pulse_vetoes.size() )
         {
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-                m_pulse_vetoes, m_pulse_vetoes_slab_size );
-            m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
+                m_pulse_vetoes, m_pulse_vetoes_cur_size );
+            m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
@@ -519,10 +530,10 @@ NxGen::finalize
         if ( m_pulse_flags_time.size() )
         {
             writeSlab( m_daslogs_path + "/pulse_flags/time",
-                m_pulse_flags_time, m_pulse_flags_slab_size );
+                m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
-                m_pulse_flags_value, m_pulse_flags_slab_size );
-            m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
+                m_pulse_flags_value, m_pulse_flags_cur_size );
+            m_pulse_flags_cur_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
         }
@@ -532,16 +543,24 @@ NxGen::finalize
         flushScanData();
         flushCommentData();
 
-        float duration = calcDiffSeconds(
+        // Capture Run Total Duration (for processing bandwidth statistics)
+        m_duration = calcDiffSeconds(
             a_run_metrics.end_time, a_run_metrics.start_time );
 
-        writeScalar( m_entry_path, "duration", duration, TIME_SEC_UNITS );
+        writeScalar( m_entry_path, "duration",
+            m_duration, TIME_SEC_UNITS );
         writeScalar( m_entry_path, "total_pulses",
             a_run_metrics.charge_stats.count(), "" );
 
         // Link raw_frames to total_pulses for backward compatibility
         makeLink( m_entry_path + "/total_pulses",
             m_entry_path + "/raw_frames" );
+
+        // Capture Run Total Counts (for processing bandwidth statistics)
+        m_total_counts = a_run_metrics.events_counted;
+        m_total_uncounts = a_run_metrics.events_uncounted;
+        m_total_non_counts = a_run_metrics.non_events_counted;
+
         writeScalar( m_entry_path, "total_counts",
             a_run_metrics.events_counted, "" );
         writeScalar( m_entry_path, "total_uncounted_counts",
@@ -623,6 +642,67 @@ NxGen::finalize
     {
         RETHROW_TRACE( e, "finalization of nexus file failed." )
     }
+}
+
+
+/*! \brief Dump Overall STS Processing Statistics
+ *
+ * This method dump the overall processing time/event bandwidth
+ * for Nexus-specific output generation, including statistics
+ * for the _Run Itself_ and how long the STS took to process it.
+ */
+void
+NxGen::dumpProcessingStatistics(void)
+{
+    if (!m_gen_nexus)
+        return;
+
+    // Overall Run Statistics
+
+    uint64_t total_counts =
+        m_total_counts + m_total_uncounts + m_total_non_counts;
+
+    syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
+        g_pid, "Run Total Counts", total_counts, m_duration );
+
+    double run_bandwidth = (double) total_counts / (double) m_duration;
+
+    syslog( LOG_INFO, "[%i] %s = %lf events/sec",
+        g_pid, "Overall Run Bandwidth", run_bandwidth );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Counted(Det)", m_total_counts,
+        (double) m_total_counts / (double) m_duration );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Uncounted(Err)", m_total_uncounts,
+        (double) m_total_uncounts / (double) m_duration );
+
+    syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
+        g_pid, "Non-Counts(Mon)", m_total_non_counts,
+        (double) m_total_non_counts / (double) m_duration );
+
+    // STS Processing Statistics
+
+    struct timespec sts_end_time;
+
+    clock_gettime( CLOCK_REALTIME, &sts_end_time );
+
+    float sts_duration = calcDiffSeconds( sts_end_time, m_sts_start_time );
+
+    syslog( LOG_INFO, "[%i] %s = %f seconds",
+        g_pid, "Total STS Processing Time", sts_duration );
+
+    double sts_bandwidth = (double) total_counts
+        / (double) sts_duration;
+
+    syslog( LOG_INFO, "[%i] %s = %lf events/sec",
+        g_pid, "Overall STS Bandwidth", sts_bandwidth );
+
+    double overhead_ratio = run_bandwidth / sts_bandwidth;
+
+    syslog( LOG_INFO, "[%i] %s = %lf",
+        g_pid, "STS Overhead Ratio", overhead_ratio );
 }
 
 
@@ -744,13 +824,13 @@ NxGen::pulseBuffersReady
     try
     {
         writeSlab( m_daslogs_freq_path + "/time",
-            a_pulse_info.times, m_pulse_info_slab_size );
+            a_pulse_info.times, m_pulse_info_cur_size );
         writeSlab( m_daslogs_freq_path + "/value",
-            a_pulse_info.freqs, m_pulse_info_slab_size );
+            a_pulse_info.freqs, m_pulse_info_cur_size );
         writeSlab( m_daslogs_pchg_path + "/value",
-            a_pulse_info.charges, m_pulse_info_slab_size );
+            a_pulse_info.charges, m_pulse_info_cur_size );
 
-        m_pulse_info_slab_size += a_pulse_info.times.size();
+        m_pulse_info_cur_size += a_pulse_info.times.size();
 
         // Must process pulse flags linearly
         vector<double>::iterator t = a_pulse_info.times.begin();
@@ -776,18 +856,18 @@ NxGen::pulseBuffersReady
         if ( m_pulse_vetoes.size() > m_chunk_size )
         {
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-                m_pulse_vetoes, m_pulse_vetoes_slab_size );
-            m_pulse_vetoes_slab_size +=  m_pulse_vetoes.size();
+                m_pulse_vetoes, m_pulse_vetoes_cur_size );
+            m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
         if ( m_pulse_flags_value.size() > m_chunk_size )
         {
             writeSlab( m_daslogs_path + "/pulse_flags/time",
-                m_pulse_flags_time, m_pulse_flags_slab_size );
+                m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
-                m_pulse_flags_value, m_pulse_flags_slab_size );
-            m_pulse_flags_slab_size +=  m_pulse_flags_time.size();
+                m_pulse_flags_value, m_pulse_flags_cur_size );
+            m_pulse_flags_cur_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
         }
@@ -832,17 +912,19 @@ NxGen::bankBuffersReady
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
-            writeSlab( bi->m_tof_slab_path,
-                a_bank.m_tof_buffer, bi->m_event_slab_size );
-            writeSlab( bi->m_pid_slab_path,
-                a_bank.m_pid_buffer, bi->m_event_slab_size );
+            writeSlab( bi->m_tof_path,
+                a_bank.m_tof_buffer, a_bank.m_tof_buffer_size,
+                bi->m_event_cur_size );
+            writeSlab( bi->m_pid_path,
+                a_bank.m_pid_buffer, a_bank.m_tof_buffer_size,
+                bi->m_event_cur_size );
 
-            bi->m_event_slab_size += a_bank.m_tof_buffer.size();
+            bi->m_event_cur_size += a_bank.m_tof_buffer_size;
 
-            writeSlab( bi->m_index_slab_path,
-                a_bank.m_index_buffer, bi->m_index_slab_size );
+            writeSlab( bi->m_index_path,
+                a_bank.m_index_buffer, bi->m_index_cur_size );
 
-            bi->m_index_slab_size += a_bank.m_index_buffer.size();
+            bi->m_index_cur_size += a_bank.m_index_buffer.size();
         }
 
         // No NeXus Histogram-based Handling Needed Here...
@@ -856,9 +938,10 @@ NxGen::bankBuffersReady
 }
 
 
-/*! \brief Fills pulse gaps in bank index slab
+/*! \brief Fills pulse gaps in bank index dataset
  *
- * This method fills pulse gaps in the index slab for a given bank in the Nexus file.
+ * This method fills pulse gaps in the index dataset for a given bank
+ * in the Nexus file.
  */
 void
 NxGen::bankPulseGap
@@ -886,9 +969,9 @@ NxGen::bankPulseGap
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
-            fillSlab( bi->m_index_slab_path,
-                bi->m_event_count, a_count, bi->m_index_slab_size );
-            bi->m_index_slab_size += a_count;
+            fillSlab( bi->m_index_path,
+                bi->m_event_count, a_count, bi->m_index_cur_size );
+            bi->m_index_cur_size += a_count;
         }
 
         // No NeXus Histogram-based Handling Needed Here...
@@ -945,8 +1028,26 @@ NxGen::bankFinalize
             std::vector<hsize_t> dims;
             dims.push_back( bi->m_logical_pixelids.size() );
             dims.push_back( bi->m_num_tof_bins - 1 );
+#ifdef HISTO_TEST
+            uint32_t num_pids = bi->m_logical_pixelids.size();
+            syslog( LOG_INFO, "[%i] %s for %s [%u x %u]",
+                g_pid, "Creating Dummy Histogram",
+                bi->m_instr_path.c_str(),
+                num_pids, bi->m_num_tof_bins - 1 );
+            std::vector<uint32_t> dummy_histo;
+            dummy_histo.reserve( num_pids
+                * ( bi->m_num_tof_bins - 1 ) );
+            for (uint32_t p=0 ; p < num_pids ; p++)
+            {
+                for (uint32_t i=0 ; i < bi->m_num_tof_bins - 1 ; i++)
+                    dummy_histo.push_back( bi->m_logical_pixelids[p] );
+            }
+            writeMultidimDataset( bi->m_instr_path, m_data_name,
+                dummy_histo, dims );
+#else
             writeMultidimDataset( bi->m_instr_path, m_data_name,
                 bi->m_data_buffer, dims );
+#endif
 
             // Add "Axes" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
@@ -957,11 +1058,11 @@ NxGen::bankFinalize
                 "signal", "1" );
 
             // Link Multi-dimensional Data into NXdata Histo group...
-            makeLink( bi->m_data_slab_path,
+            makeLink( bi->m_data_path,
                 bi->m_histo_path + "/" + m_data_name );
 
             // Write out Bank PixelIds...
-            writeSlab( bi->m_histo_pid_slab_path,
+            writeSlab( bi->m_histo_pid_path,
                 bi->m_logical_pixelids, 0 );
 
             // Add "Axis" Attribute for NeXus NXdata Standards Compat
@@ -969,7 +1070,7 @@ NxGen::bankFinalize
                 bi->m_instr_path + "/" + m_histo_pid_name, "axis", "1" );
 
             // Write out TOF Bins...
-            writeSlab( bi->m_tofbin_slab_path, bi->m_tofbin_buffer, 0 );
+            writeSlab( bi->m_tofbin_path, bi->m_tofbin_buffer, 0 );
 
             // Add "Axis" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute(
@@ -1016,13 +1117,14 @@ NxGen::monitorBuffersReady
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
-            writeSlab( mi->m_tof_slab_path,
-                a_monitor.m_tof_buffer, mi->m_event_slab_size );
-            mi->m_event_slab_size += a_monitor.m_tof_buffer.size();
+            writeSlab( mi->m_tof_path,
+                a_monitor.m_tof_buffer, a_monitor.m_tof_buffer_size,
+                mi->m_event_cur_size );
+            mi->m_event_cur_size += a_monitor.m_tof_buffer_size;
 
-            writeSlab( mi->m_index_slab_path,
-                a_monitor.m_index_buffer, mi->m_index_slab_size );
-            mi->m_index_slab_size += a_monitor.m_index_buffer.size();
+            writeSlab( mi->m_index_path,
+                a_monitor.m_index_buffer, mi->m_index_cur_size );
+            mi->m_index_cur_size += a_monitor.m_index_buffer.size();
         }
     }
     catch( TraceException &e )
@@ -1033,9 +1135,9 @@ NxGen::monitorBuffersReady
 }
 
 
-/*! \brief Fills pulse gaps in monitor index slab
+/*! \brief Fills pulse gaps in monitor index dataset
  *
- * This method fills pulse gaps in the index slab for a given monitor
+ * This method fills pulse gaps in the index dataset for a given monitor
  * in the Nexus file.
  */
 void
@@ -1060,9 +1162,9 @@ NxGen::monitorPulseGap
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
-            fillSlab( mi->m_index_slab_path, mi->m_event_count,
-                a_count, mi->m_index_slab_size );
-            mi->m_index_slab_size += a_count;
+            fillSlab( mi->m_index_path, mi->m_event_count,
+                a_count, mi->m_index_cur_size );
+            mi->m_index_cur_size += a_count;
         }
     }
     catch( TraceException &e )
@@ -1099,9 +1201,9 @@ NxGen::monitorFinalize
         // Histo-based Monitor
         if ( mi->m_config != NULL )
         {
-            writeSlab( mi->m_data_slab_path, mi->m_data_buffer, 0 );
+            writeSlab( mi->m_data_path, mi->m_data_buffer, 0 );
 
-            writeSlab( mi->m_tofbin_slab_path, mi->m_tofbin_buffer, 0 );
+            writeSlab( mi->m_tofbin_path, mi->m_tofbin_buffer, 0 );
 
             // Write Out Total Counts for Histogram Mode, too... ;-D
             writeScalar( m_entry_path + "/" + mi->m_name,

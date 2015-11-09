@@ -89,6 +89,8 @@ public:
 	void updateValue(const ADARA::VariableStringPkt &pkt,
 			 uint32_t sourceId);
 
+	bool getRecording(void);
+
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);

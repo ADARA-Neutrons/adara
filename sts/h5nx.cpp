@@ -1148,43 +1148,53 @@ int H5nx::H5NXcreate_dataset_extend( const std::string &group_path,
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<double> &slab, uint64_t cur_size );
+        const std::vector<double> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<float> &slab, uint64_t cur_size );
+        const std::vector<float> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint16_t> &slab, uint64_t cur_size );
+        const std::vector<uint16_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int16_t> &slab, uint64_t cur_size );
+        const std::vector<int16_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint32_t> &slab, uint64_t cur_size );
+        const std::vector<uint32_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int32_t> &slab, uint64_t cur_size );
+        const std::vector<int32_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<uint64_t> &slab, uint64_t cur_size );
+        const std::vector<uint64_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<int64_t> &slab, uint64_t cur_size );
+        const std::vector<int64_t> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<char> &slab, uint64_t cur_size );
+        const std::vector<char> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
 template <typename NumT>
 int H5nx::H5NXwrite_slab( const std::string &dataset_path,
-        const std::vector<NumT> &vec, uint64_t cur_size )
+        const std::vector<NumT> &vec, uint64_t slab_size,
+        uint64_t cur_size )
 {
     hid_t   did;
     hid_t   tid;
@@ -1198,8 +1208,6 @@ int H5nx::H5NXwrite_slab( const std::string &dataset_path,
     ///////////////////////////////////////////////////////////////////
     // FOR 1D DATASET
     ////////////////////////////////////////////////////////////////////
-
-    hsize_t slab_size = vec.size();
 
     //open dataset
     if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
@@ -1328,200 +1336,6 @@ int H5nx::H5NXwrite_slab( const std::string &dataset_path,
 
     return SUCCEED;
 }
-
-int H5nx::H5NXslab_open( H5NXwrite_context &context,
-        const std::string &dataset_path )
-{
-    //open dataset
-    if ( (context.did = H5Dopen2( m_fid, dataset_path.c_str(),
-            H5P_DEFAULT)) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_open", "H5Dopen2",
-            "Open Dataset" );
-        H5NXdumperr("H5nx::H5NXslab_open(): H5Dopen2() Open Dataset");
-        return FAIL;
-    }
-
-    //get type
-    if ( (context.tid = H5Dget_type(context.did)) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_open", "H5Dget_type",
-            "Get Type" );
-        H5NXdumperr("H5nx::H5NXslab_open(): H5Dget_type() Get Type");
-        return FAIL;
-    }
-
-    //get file space
-    if ( (context.fsid = H5Dget_space(context.did)) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_open", "H5Dget_space",
-            "Get File Space" );
-        H5NXdumperr(
-            "H5nx::H5NXslab_open(): H5Dget_space() Get File Space");
-        return FAIL;
-    }
-
-    //get current dimensions
-    if ( H5Sget_simple_extent_dims(context.fsid,
-            context.dims_curr, NULL) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_open",
-            "H5Sget_simple_extent_dims", "Get Current Dimensions" );
-        H5NXdumperr("H5nx::H5NXslab_open(): H5Sget_simple_extent_dims()"
-            + std::string(" Get Current Dimensions"));
-        return FAIL;
-    }
-
-    //close file space
-    if ( H5Sclose(context.fsid) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_open", "H5Sclose",
-            "Close File Space" );
-        H5NXdumperr("H5nx::H5NXslab_open(): H5Sclose() Close File Space");
-        return FAIL;
-    }
-
-    return SUCCEED;
-}
-
-template
-int H5nx::H5NXslab_write( H5NXwrite_context &context,
-        const std::vector<double> &slab );
-
-template
-int H5nx::H5NXslab_write( H5NXwrite_context &context,
-        const std::vector<uint32_t> &slab );
-
-template
-int H5nx::H5NXslab_write( H5NXwrite_context &context,
-        const std::vector<float> &slab );
-
-template
-int H5nx::H5NXslab_write( H5NXwrite_context &context,
-        const std::vector<uint64_t> &slab );
-
-template <typename T>
-int H5nx::H5NXslab_write( H5NXwrite_context &context,
-        const std::vector<T> &data )
-{
-    context.dims[0] = data.size() + context.dims_curr[0];
-
-    if ( H5Dset_extent(context.did , context.dims) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write", "H5Dset_extent",
-            "Set Dataset Extent" );
-        H5NXdumperr(
-            "H5nx::H5NXslab_write(): H5Dset_extent() Set Dataset Extent");
-        return FAIL;
-    }
-
-    //get the new (updated) space
-    if ( (context.fsid = H5Dget_space(context.did)) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write", "H5Dget_space",
-            "Get Updated Dataset Space" );
-        H5NXdumperr("H5nx::H5NXslab_write(): H5Dget_space()"
-            + std::string(" Get Updated Dataset Space"));
-        return FAIL;
-    }
-
-    context.count[0] = data.size();
-    context.start[0] = context.dims_curr[0];
-
-    //select space on file
-    if ( H5Sselect_hyperslab( context.fsid, H5S_SELECT_SET,
-            context.start, NULL, context.count, NULL) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write",
-            "H5Sselect_hyperslab", "Select Space on File" );
-        H5NXdumperr("H5nx::H5NXslab_write(): H5Sselect_hyperslab()"
-            + std::string(" Select Space on File"));
-        return FAIL;
-    }
-
-    //memory space
-    if ( (context.msid = H5Screate_simple( 1,
-            context.count, context.count)) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write", "H5Screate_simple",
-            "Create Memory Space" );
-        H5NXdumperr("H5nx::H5NXslab_write(): H5Screate_simple()"
-            + std::string(" Create Memory Space"));
-        return FAIL;
-    }
-
-    //write
-    if ( H5Dwrite( context.did, context.tid, context.msid, context.fsid,
-            H5P_DEFAULT, &(data[0])) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write", "H5Dwrite",
-            "Write Dataset" );
-        H5NXdumperr("H5nx::H5NXslab_write(): H5Dwrite() Write Dataset");
-        return FAIL;
-    }
-
-    //close memory space
-    if ( H5Sclose(context.msid) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_write", "H5Sclose",
-            "Close Memory Space" );
-        H5NXdumperr(
-            "H5nx::H5NXslab_write(): H5Sclose() Close Memory Space");
-        return FAIL;
-    }
-
-   // TODO This may not be a safe way to do this
-   context.dims_curr[0] = context.dims[0];
-
-   return SUCCEED;
-}
-
-int H5nx::H5NXslab_close( H5NXwrite_context &context )
-{
-    //close file space
-    if ( H5Sclose(context.fsid) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_close", "H5Sclose",
-            "Close File Space" );
-        H5NXdumperr("H5nx::H5NXslab_close(): H5Sclose() Close File Space");
-        return FAIL;
-    }
-
-    //close type
-    if ( H5Tclose(context.tid) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_close", "H5Tclose",
-            "Close Type" );
-        H5NXdumperr("H5nx::H5NXslab_close(): H5Tclose() Close Type");
-        return FAIL;
-    }
-
-    //close dataset
-    if ( H5Dclose( context.did ) < 0 )
-    {
-        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
-            g_pid, "STS Error", "H5nx::H5NXslab_close", "H5Dclose",
-            "Close Dataset" );
-        H5NXdumperr("H5nx::H5NXslab_close(): H5Dclose() Close Dataset");
-        return FAIL;
-    }
-
-    return SUCCEED;
-}
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //private functions

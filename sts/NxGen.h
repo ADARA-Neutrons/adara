@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <syslog.h>
+#include <time.h>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -42,8 +43,8 @@ private:
         :
             BankInfo(a_id, a_buf_reserve, a_idx_buf_reserve),
             m_nexus_init(false),
-            m_event_slab_size(0),
-            m_index_slab_size(0),
+            m_event_cur_size(0),
+            m_index_cur_size(0),
             m_nxgen(a_nxgen)
         {
             m_name = std::string("bank")
@@ -59,11 +60,11 @@ private:
 
             m_event_path = m_nxgen.m_entry_path + "/" + m_eventname;
 
-            m_tof_slab_path = m_instr_path + "/" + m_nxgen.m_tof_name;
+            m_tof_path = m_instr_path + "/" + m_nxgen.m_tof_name;
 
-            m_pid_slab_path = m_instr_path + "/" + m_nxgen.m_pid_name;
+            m_pid_path = m_instr_path + "/" + m_nxgen.m_pid_name;
 
-            m_index_slab_path = m_instr_path + "/" + m_nxgen.m_index_name;
+            m_index_path = m_instr_path + "/" + m_nxgen.m_index_name;
 
             m_time_path = m_nxgen.m_daslogs_freq_path
                 + std::string("/time");
@@ -74,30 +75,30 @@ private:
 
             m_histo_path = m_nxgen.m_entry_path + "/" + m_histoname;
 
-            m_data_slab_path = m_instr_path + "/" + m_nxgen.m_data_name;
+            m_data_path = m_instr_path + "/" + m_nxgen.m_data_name;
 
-            m_histo_pid_slab_path = m_instr_path + "/"
+            m_histo_pid_path = m_instr_path + "/"
                 + m_nxgen.m_histo_pid_name;
 
-            m_tofbin_slab_path = m_instr_path + "/" + m_nxgen.m_tofbin_name;
+            m_tofbin_path = m_instr_path + "/" + m_nxgen.m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of bank in Nexus file
         std::string             m_instr_path;       ///< Nexus path to "NXdetector" instrument group
         std::string             m_eventname;        ///< Name of bank events entry in Nexus file
         std::string             m_event_path;       ///< Nexus path to "NXevent_data" group
-        std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
-        std::string             m_pid_slab_path;    ///< Nexus path to PID slab
-        std::string             m_index_slab_path;  ///< Nexus path to event index slab
+        std::string             m_tof_path;         ///< Nexus path to TOF dataset
+        std::string             m_pid_path;         ///< Nexus path to PID dataset
+        std::string             m_index_path;       ///< Nexus path to event index dataset
         std::string             m_time_path;        ///< Nexus path to Pulse Time array
         std::string             m_histoname;        ///< Name of bank histo entry in Nexus file
         std::string             m_histo_path;       ///< Nexus path to histo "NXdata" group
-        std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
-        std::string             m_histo_pid_slab_path; ///< Nexus path to Histo PID slab
-        std::string             m_tofbin_slab_path; ///< Nexus path to Histo TOF Bin slab
+        std::string             m_data_path;        ///< Nexus path to Histo data dataset
+        std::string             m_histo_pid_path;   ///< Nexus path to Histo PID dataset
+        std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bin dataset
         bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
-        uint64_t                m_event_slab_size;  ///< Running size of TOF and PID slabs (same size)
-        uint64_t                m_index_slab_size;  ///< Running size of event index slab
+        uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
+        uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
@@ -117,8 +118,8 @@ private:
         )
         :
             MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
-            m_index_slab_size(0),
-            m_event_slab_size(0),
+            m_index_cur_size(0),
+            m_event_cur_size(0),
             m_nxgen(a_nxgen)
         {
             // "Known" Monitor - Valid Histo Config or No Configs at All
@@ -145,26 +146,26 @@ private:
 
             // Monitor Event Paths
 
-            m_index_slab_path = m_path + "/" + m_nxgen.m_index_name;
+            m_index_path = m_path + "/" + m_nxgen.m_index_name;
 
-            m_tof_slab_path = m_path + "/" + m_nxgen.m_tof_name;
+            m_tof_path = m_path + "/" + m_nxgen.m_tof_name;
 
             // Monitor Histogram Paths
 
-            m_data_slab_path = m_path + "/" + m_nxgen.m_data_name;
+            m_data_path = m_path + "/" + m_nxgen.m_data_name;
 
-            m_tofbin_slab_path = m_path + "/" + m_nxgen.m_tofbin_name;
+            m_tofbin_path = m_path + "/" + m_nxgen.m_tofbin_name;
         }
 
         std::string             m_name;             ///< Name of monitor in Nexus file
         std::string             m_path;             ///< Nexus path to monitor group
         std::string             m_group_type;       ///< Type of encompassing group in Nexus file
-        std::string             m_index_slab_path;  ///< Nexus path to event index slab
-        std::string             m_tof_slab_path;    ///< Nexus path to TOF slab
-        std::string             m_data_slab_path;   ///< Nexus path to Histo data slab
-        std::string             m_tofbin_slab_path; ///< Nexus path to Histo TOF Bins slab
-        uint64_t                m_index_slab_size;  ///< Running size of event index slab
-        uint64_t                m_event_slab_size;  ///< Running size of TOF slab
+        std::string             m_index_path;       ///< Nexus path to event index dataset
+        std::string             m_tof_path;         ///< Nexus path to TOF dataset
+        std::string             m_data_path;        ///< Nexus path to Histo data dataset
+        std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bins dataset
+        uint64_t                m_index_cur_size;   ///< Running size of event index dataset
+        uint64_t                m_event_cur_size;   ///< Running size of TOF dataset
         NxGen&                  m_nxgen;            ///< NxGen parent class
     };
 
@@ -194,8 +195,8 @@ private:
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
-            m_slab_size(0),
-            m_string_data_slab_size(0)
+            m_cur_size(0),
+            m_string_data_cur_size(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -255,7 +256,7 @@ private:
             // TODO - This code may need to be optimized
             // when fast metadata is supported
             m_nxgen.writeSlab( m_log_path + "/value",
-                value_buffer, m_slab_size );
+                value_buffer, m_cur_size );
         }
 
         /// Writes Buffered Double PV Values to Nexus File 
@@ -267,7 +268,7 @@ private:
             // TODO - This code may need to be optimized
             // when fast metadata is supported
             m_nxgen.writeSlab( m_log_path + "/value",
-                value_buffer, m_slab_size );
+                value_buffer, m_cur_size );
         }
 
         /// Writes Buffered String PV Values to Nexus File 
@@ -278,7 +279,7 @@ private:
         {
             // Create String Meta-data in log,
             // if no data has been written yet...
-            if ( !m_slab_size )
+            if ( !m_cur_size )
             {
                 m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
                 m_nxgen.makeDataset( m_log_path, "length", NeXus::UINT32 );
@@ -288,7 +289,7 @@ private:
             std::vector<uint32_t> offset;
             std::vector<uint32_t> length;
             std::vector<char> data;
-            unsigned long last_offset = m_string_data_slab_size;
+            unsigned long last_offset = m_string_data_cur_size;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
                 offset.push_back( last_offset );
@@ -301,14 +302,14 @@ private:
 
             // Write String Fields to NeXus File...
             m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_slab_size );
+                offset, m_cur_size );
             m_nxgen.writeSlab( m_log_path + "/length",
-                length, m_slab_size );
+                length, m_cur_size );
             if ( data.size() )
             {
                 m_nxgen.writeSlab( m_log_path + "/value",
-                    data, m_string_data_slab_size );
-                m_string_data_slab_size += data.size();
+                    data, m_string_data_cur_size );
+                m_string_data_cur_size += data.size();
             }
         }
 
@@ -323,7 +324,7 @@ private:
                 if ( m_nxgen.m_gen_nexus )
                 {
                     // Create log if no data has been written yet
-                    if ( !m_slab_size )
+                    if ( !m_cur_size )
                     {
                         // "Nothing to See Here"...! ;-D
                         // (Never Got Any Data, and Don't Have Any Now,
@@ -339,6 +340,11 @@ private:
                             this->m_units );
                         m_nxgen.makeDataset( m_log_path, "time",
                             NeXus::FLOAT64, TIME_SEC_UNITS );
+
+                        m_nxgen.writeString( m_log_path, "device_name",
+                            this->m_device_name );
+                        m_nxgen.writeScalar( m_log_path, "device_id",
+                            this->m_device_id, "" );
                     }
 
                     // Flush Any Pending Value/Time Data...
@@ -349,9 +355,9 @@ private:
                         flushValueBuffers( this->m_value_buffer );
 
                         m_nxgen.writeSlab( m_log_path + "/time",
-                            this->m_time_buffer, m_slab_size );
+                            this->m_time_buffer, m_cur_size );
 
-                        m_slab_size += this->m_value_buffer.size();
+                        m_cur_size += this->m_value_buffer.size();
                     }
 
                     if ( a_run_metrics )
@@ -371,7 +377,7 @@ private:
                             "offset_nanoseconds",
                             (uint32_t)a_run_metrics->start_time.tv_nsec );
 
-                        if ( m_slab_size
+                        if ( m_cur_size
                                 // No Statistics for Strings!
                                 && this->m_type != STS::PVT_STRING )
                         {
@@ -447,8 +453,8 @@ private:
         std::string     m_internal_connection;///< Internal Nexus connection string of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
-        uint64_t        m_slab_size;    ///< Running size of time and value slabs (same size for both)
-        uint64_t        m_string_data_slab_size;    ///< Running size of character string data value slab
+        uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
+        uint64_t        m_string_data_cur_size;   ///< Running size of character string data value dataset
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
@@ -477,6 +483,8 @@ public:
         unsigned long a_cache_size = 10485760,
         unsigned short a_compression_level = 0 );
     ~NxGen();
+
+    void dumpProcessingStatistics(void);
 
 protected:
 
@@ -556,63 +564,76 @@ private:
                             const std::string &a_attrib,
                             const std::string &a_value );
 
-    /// Writes data values to a Nexus (HDF5) one-dimension slab
+    /// Writes data values to a Nexus (HDF5) one-dimension dataset
     template<class T>
     void                writeSlab
                         (
-                            const std::string & a_path, ///< [in] Nexus path to slab
+                            const std::string & a_path, ///< [in] Nexus path to dataset
                             std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_slab_size        ///< [in] Current slab size (counts not bytes) [Actually "offset"...! Jeeem]
+                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
-                            if ( a_buffer.size())
+                            writeSlab( a_path,
+                                a_buffer, a_buffer.size(), a_cur_size );
+                        }
+    template<class T>
+    void                writeSlab
+                        (
+                            const std::string & a_path, ///< [in] Nexus path to dataset
+                            std::vector<T> & a_buffer,  ///< [in] Vector of data to write
+                            uint64_t a_buffer_size,     ///< [in] Size of Vector of data to write
+                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
+                        )
+                        {
+                            if ( a_buffer_size )
                             {
                                 if ( m_h5nx.H5NXwrite_slab( a_path,
-                                        a_buffer, a_slab_size ) != SUCCEED )
+                                        a_buffer, a_buffer_size,
+                                        a_cur_size ) != SUCCEED )
                                 {
                                     THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
                                         "H5NXwrite_slab FAILED for path: "
                                             << a_path
-                                            << " a_buffer.size()="
-                                            << a_buffer.size()
-                                            << " a_slab_size(offset)="
-                                            << a_slab_size);
+                                            << " a_buffer_size="
+                                            << a_buffer_size
+                                            << " a_cur_size(offset)="
+                                            << a_cur_size);
                                 }
                             }
                         }
 
-    /// Fills (appends) a Nexus (HDF5) one-dimension slab with a provided value
+    /// Fills (appends) a Nexus (HDF5) one-dimension dataset with a provided value
     template<class T>
     void                fillSlab
                         (
-                            const std::string & a_path, ///< [in] Nexus path to slab
-                            T & a_value,                ///< [in] Value to fill (append) slab with
+                            const std::string & a_path, ///< [in] Nexus path to dataset
+                            T & a_value,                ///< [in] Value to fill (append) dataset with
                             uint64_t a_count,           ///< [in] Number of values to append
-                            uint64_t a_slab_size        ///< Current slab size (counts not bytes)
+                            uint64_t a_cur_size         ///< Current dataset size (counts not bytes)
                         )
                         {
                             if ( a_count )
                             {
                                 std::vector<T> buf;
-                                uint64_t slab_size = a_slab_size;
+                                uint64_t cur_size = a_cur_size;
                                 uint64_t count = 0;
 
                                 if ( a_count >= m_chunk_size )
                                 {
                                     buf.resize( m_chunk_size, a_value );
 
-                                    while( count <= ( a_count - m_chunk_size ))
+                                    while ( count <= ( a_count - m_chunk_size ) )
                                     {
-                                        writeSlab( a_path, buf, slab_size );
+                                        writeSlab( a_path, buf, cur_size );
                                         count += buf.size();
-                                        slab_size += buf.size();
+                                        cur_size += buf.size();
                                     }
                                 }
 
                                 if ( count < a_count )
                                 {
                                     buf.resize( a_count - count, a_value );
-                                    writeSlab( a_path, buf, slab_size );
+                                    writeSlab( a_path, buf, cur_size );
                                 }
                             }
                         }
@@ -641,26 +662,30 @@ private:
     std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
     H5nx                m_h5nx;                 ///< HDF5 library object
-    uint64_t            m_pulse_info_slab_size; ///< Current size of pulse info slabs (charge, time, frequency)
+    uint64_t            m_pulse_info_cur_size;  ///< Current size of pulse info datasets (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
-    uint64_t            m_pulse_vetoes_slab_size;       ///< Current size of pulse veto slab
+    uint64_t            m_pulse_vetoes_cur_size;       ///< Current size of pulse veto dataset
 
     std::vector<double>         m_pulse_flags_time;     ///< Buffer of pulse flag times
     std::vector<uint32_t>       m_pulse_flags_value;    ///< Buffer of pulse flag values
-    uint64_t                    m_pulse_flags_slab_size;///< Current size of pulse flags slab
+    uint64_t                    m_pulse_flags_cur_size; ///< Current size of pulse flags dataset
 
     std::vector<double>         m_pause_time;           /// Pause annotation timestamp buffer
     std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
     std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
     std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
     std::vector<double>         m_comment_time;         /// Comment annotation timestamp buffer
-    std::vector<uint32_t>       m_comment_offset;       /// Comment data slab offset buffer
+    std::vector<uint32_t>       m_comment_offset;       /// Comment data dataset offset buffer
     std::vector<uint32_t>       m_comment_length;       /// Comment data length buffer
     std::vector<char>           m_comment_data;         /// Comment data buffer
-    unsigned long               m_comment_last_offset;  /// Last slab offset written to Nexus
+    unsigned long               m_comment_last_offset;  /// Last dataset offset written to Nexus
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    std::set<std::string>       m_pv_connection_history;/// Connection String/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
+    float                       m_duration;             /// Save Total Run Duration (seconds)
+    uint64_t                    m_total_counts;         /// Total Run Event Counts
+    uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
+    uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
+    struct timespec             m_sts_start_time;       /// STS Start of Processing Time
 };
 
 #endif // NXGEN_H

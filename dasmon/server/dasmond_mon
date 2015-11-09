@@ -1,0 +1,160 @@
+#!/bin/bash
+#
+# (Cron) Script to Monitor Local Dasmon Daemon Executable
+#
+# Track things like Memory/CPU Usage, as well as Note If/When DasmonD Fails!
+# (and maybe even notify via email or text message on a crash...! :-)
+#
+
+host=`hostname`
+#echo "host=$host"
+
+host_short=`echo $host | awk -F '.' '{print $1}'`
+#echo "host_short=$host_short"
+
+LOGFILE="$HOME/dasmond_mon/dasmond_mon.$host_short.log"
+LOGLOGFILE="$HOME/dasmond_mon/dasmond_mon.$host_short-log.log"
+
+DASMOND_USER="dasmon"
+DASMOND="/usr/sbin/dasmond"
+
+DASMOND_LOG="/var/log/dasmond.log"
+
+PROG="dasmond_mon"
+
+TIME="/usr/bin/time" # for Test Harness, duh... ;-b
+
+#
+# Parse Command Line Options... ;-)
+#
+
+do_notify=1
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [ "#$key#" == '#--no_notify#' ]; then
+		do_notify=0
+	elif [ "#$key#" == '#--dasmond_user#' ]; then
+		DASMOND_USER="$value"
+	elif [ "#$key#" == '#--help#' ]; then
+		echo "usage:  dasmond_mon [--no_notify] [--dasmond_user=y8y]"
+		exit 0
+	fi
+
+done
+
+#
+# Get DASMOND process status...
+#
+
+date=`date`
+#echo "date=$date"
+
+status=`ps augxww | grep $DASMOND | grep -v -e $PROG -e $TIME -e grep \
+	| grep $DASMOND_USER`
+#echo "status=$status"
+
+if [ "#$status#" == '##' ]; then
+
+	if [ $do_notify == 1 ]; then
+		echo -n "Error on ${host}: DASMOND $DASMOND"
+		echo " Not Running as User $DASMOND_USER!"
+		exit -1
+	else
+		# Just Exit Cleanly, Nothing to log here... ;-D
+		exit 0
+	fi
+fi
+
+# Extract statistics of interest
+
+log="$date $host $DASMOND as ${DASMOND_USER}:\n  "
+
+pid=`echo "$status" | awk '{print $2}'`
+#echo "pid=$pid"
+log="$log pid=$pid"
+
+cpuP=`echo "$status" | awk '{print $3}'`
+#echo "cpuP=$cpuP"
+log="$log cpu=${cpuP}%"
+
+memP=`echo "$status" | awk '{print $4}'`
+#echo "memP=$memP"
+log="$log mem=${memP}%"
+
+vsz=`echo "$status" | awk '{print $5}'`
+#echo "vsz=$vsz"
+log="$log vsz=${vsz}K"
+
+rss=`echo "$status" | awk '{print $6}'`
+#echo "rss=$rss"
+log="$log rss=${rss}K"
+
+start=`echo "$status" | awk '{print $9}'`
+#echo "start=$start"
+log="$log start=$start"
+
+cpuT=`echo "$status" | awk '{print $10}'`
+#echo "cpuT=$cpuT"
+log="$log time=$cpuT"
+
+#
+# Dump DASMOND Status Snapshot into Log file...
+#
+
+echo -e "$log" >> $LOGFILE
+
+#
+# Check on the DASMOND Log File size/usage...
+#
+
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
+	| sed 's/^0//g'`
+#echo "hour=$hour"
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
+	| sed 's/^0//g'`
+#echo "min=$min"
+
+# Only check once or twice per day maybe...?
+if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
+
+	log_bytes=`/bin/ls -l $DASMOND_LOG | awk '{print $5}'`
+	log_hbytes=`/bin/ls -lh $DASMOND_LOG | awk '{print $5}'`
+
+	touch $LOGLOGFILE
+	echo "$date $host $DASMOND_LOG = $log_hbytes" >> $LOGLOGFILE
+
+	dasmond_top_logdir=`echo $DASMOND_LOG | awk -F '/' '{print "/"$2}'`
+
+	log_used=`df $DASMOND_LOG | tail -1 | awk '{print $(NF-3)}'`
+	#echo "log_used=$log_used"
+	log_total=`df $DASMOND_LOG | tail -1 | awk '{print $(NF-4)}'`
+	#echo "log_total=$log_total"
+
+	pct_log=$(( $log_bytes * 100 / ( $log_used * 1000 ) ))
+	#echo "pct_log=$pct_log"
+
+	pct_used=$(( $log_used * 100 / $log_total ))
+	#echo "pct_used=$pct_used"
+
+	echo \
+	"   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
+		>> $LOGLOGFILE
+
+	# Seemed like a good idea at the time... ;-D
+	# if [[ $pct_log -gt 80 ]]; then
+	# 	echo "Error on ${host}: DASMOND Log is $pct_log% of Usage!"
+	# 	echo "   $DASMOND_LOG $log_bytes ($log_hbytes)"
+	# 	exit -2
+	# fi
+
+	if [[ $pct_used -gt 80 ]]; then
+		echo "Error on ${host}: $dasmond_top_logdir is $pct_used% Full!"
+		echo "   $DASMOND_LOG $log_bytes ($log_hbytes)"
+		exit -3
+	fi
+fi
+

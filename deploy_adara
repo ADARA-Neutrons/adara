@@ -24,7 +24,8 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-usage="   usage:  deploy_adara [ sms | sts | sts_test | pvsd ]"
+usage=\
+"   usage: deploy_adara [ sms | sts | sts_test | pvsd | dasmon | dasmond ]"
 
 if [ $# != 1 ]; then
 	echo -e "\n$usage\n"
@@ -41,22 +42,38 @@ set -o pipefail
 
 IS_STS=0
 IS_PVSD=0
+IS_DASMON=0
+IS_DASMOND=0
 
 if [ "$1" == "sms" ]; then
-	PROG="SMS"
+	PROG="SMS_Daemon"
 	prog="smsd"
+	service="smsd"
 elif [ "$1" == "sts" ]; then
 	PROG="STS"
 	prog="sts"
+	service=""
 	IS_STS=1
 elif [ "$1" == "sts_test" ]; then
 	PROG="STS_TEST"
 	prog="sts"
+	service=""
 	IS_STS=1
 elif [ "$1" == "pvsd" ]; then
 	PROG="PVSD"
 	prog="pvsd"
+	service="pvsd"
 	IS_PVSD=1
+elif [ "$1" == "dasmon" ]; then
+	PROG="DASMON_Client"
+	prog="dasmon"
+	service="dasmongui"
+	IS_DASMON=1
+elif [ "$1" == "dasmond" ]; then
+	PROG="DASMON_Server"
+	prog="dasmond"
+	service="dasmond"
+	IS_DASMOND=1
 else
 	echo -e "\n   Unknown Deployment Target: $1"
 	echo -e "\n$usage\n"
@@ -69,7 +86,7 @@ echo -e "\nDeploying ADARA $PROG Target.\n"
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.2.0"
+DEPLOY_VERSION="1.3.0"
 
 TMP_DIR="/tmp"
 
@@ -86,7 +103,7 @@ LOG="$TMP_DIR/ADARA_${PROG}_Deploy_Log.$$.txt"
 
 touch $LOG
 
-echo -e "\nADARA ${PROG} Deployment Log" | tee -a $LOG
+echo -e "\nADARA $PROG Deployment Log" | tee -a $LOG
 date | tee -a $LOG
 
 echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
@@ -123,6 +140,22 @@ elif [ $IS_PVSD == 1 ]; then
 		CONFIG="${CONFIG}-${install_suffix}"
 	fi
 	HOST_TYPE="PVSD"
+elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
+	install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon'`
+	install_branch=`echo "$install_host" | sed 's/-.*//'`
+	install_suffix=`echo "$install_host" | sed 's/\..*//' \
+		| sed "s/${install_branch}-//"`
+	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
+	if [[ -z $install_host || -z $install_branch ]]; then
+		install_host=`hostname`
+		install_branch=`echo "$install_host" | sed 's/\..*//'`
+		install_suffix="dasmon"
+	fi
+	if [[ "#$install_suffix#" != '##' ]]; then
+		install_branch="${install_branch}-${install_suffix}"
+		CONFIG="${CONFIG}-${install_suffix}"
+	fi
+	HOST_TYPE="DASMON"
 else
 	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
@@ -140,7 +173,7 @@ else
 	HOST_TYPE="Beamline"
 fi
 
-echo -e -n "\nInstalling ADARA/${PROG} " | tee -a $LOG
+echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
 echo "for $HOST_TYPE $install_branch ($install_host)." | tee -a $LOG
 
 #
@@ -483,6 +516,79 @@ if [ $need_build == 1 ]; then
 	echo -e "\n. . ."
 	sleep 3
 
+	# Build DASMON GUI Client, based on ADARA software suite, using QMake
+
+	if [ $IS_DASMON == 1 ]; then
+
+		echo -e "\nBuilding the DASMON GUI Client." | tee -a $LOG
+
+pwd
+
+		echo "pushd dasmon/client/" | tee -a $LOG
+		pushd dasmon/client/
+		pushd_dasmon_client_ok=$?
+
+		if [ $pushd_dasmon_client_ok != 0 ]; then
+			echo -e -n \
+				"\nError Descending into DASMON GUI Client Directory!" \
+				| tee -a $LOG
+			echo -e " ($pushd_dasmon_client_ok)\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		pwd |& tee -a $LOG
+
+		echo "qmake" | tee -a $LOG
+		qmake |& tee -a $LOG
+
+		qmake_ok=$?
+
+		if [ $qmake_ok != 0 ]; then
+			echo -e "\nError QMaking DASMON GUI Client! ($qmake_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -8
+		fi
+
+		echo "make" | tee -a $LOG
+		make |& tee -a $LOG
+
+		make_ok=$?
+
+		if [ $make_ok != 0 ]; then
+			echo -e "\nError Building DASMON GUI Client! ($make_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -9
+		fi
+
+		echo "popd" | tee -a $LOG
+		popd
+		popd_dasmon_client_ok=$?
+
+		if [ $popd_dasmon_client_ok != 0 ]; then
+			echo -e -n \
+				"\nError Returning from DASMON GUI Client Directory!" \
+				| tee -a $LOG
+			echo -e " ($popd_dasmon_client_ok)\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		pwd |& tee -a $LOG
+
+		echo -e -n "\nDASMON GUI Client Software, Release $release_tag," \
+			| tee -a $LOG
+		echo -e " Successfully Built." | tee -a $LOG
+
+		date | tee -a $LOG
+
+		echo -e "\n. . ."
+		sleep 3
+
+	fi
+
 	#
 	# Copy the ADARA binaries into /home/controls/prod archive
 	#
@@ -575,9 +681,8 @@ if [ $need_build == 1 ]; then
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-		"\nError Copying DASMON into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying DASMON Server" | tee -a $LOG
+		echo -e " into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -12
 	fi
@@ -606,6 +711,29 @@ if [ $need_build == 1 ]; then
 	rm -f "$tag_archive"/adara-*.cc >& /dev/null
 
 	ls -l "$tag_archive"/adara-* |& tee -a $LOG
+
+	# DASMON GUI Client
+
+	if [ $IS_DASMON == 1 ]; then
+
+		echo -e -n "\nCopying DASMON GUI Client Executable" | tee -a $LOG
+		echo -e " into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p dasmon/client/dasmon "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying DASMON GUI Client" | tee -a $LOG
+			echo -e " into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -12
+		fi
+
+		ls -l "$tag_archive/dasmon" |& tee -a $LOG
+
+	fi
 
 	echo -e "\n. . ."
 	sleep 3
@@ -897,6 +1025,8 @@ pwd | tee -a $LOG
 
 ls -l | tee -a $LOG
 
+deploy_str="ADARA $PROG $release_tag$already_deployed\n\n$log_desc"
+
 if [ $adara_current_new == 1 ]; then
 
 	echo -e "\nNew Deployment Directory to Commit:\n" | tee -a $LOG
@@ -920,11 +1050,12 @@ if [ $adara_current_new == 1 ]; then
 		exit -20
 	fi
 
-	echo \
-		"git commit -m 'Initial Config Deploy Directory Creation' deploy" \
+	echo -e "Initial Config Deploy Directory Creation\n\n$deploy_str\n" \
 		| tee -a $LOG
-	git commit -m 'Initial Config Deploy Directory Creation' deploy \
-		|& tee -a $LOG
+	echo "git commit -F - deploy" | tee -a $LOG
+
+	echo -e "Initial Config Deploy Directory Creation\n\n$deploy_str" \
+		| git commit -F - deploy |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -940,12 +1071,10 @@ else
 
 	git diff . | tee -a $LOG
 
-	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc\n" \
-		| tee -a $LOG
+	echo -e "Deployed $deploy_str\n" | tee -a $LOG
 	echo "git commit -F - ." | tee -a $LOG
 
-	echo -e "Deployed ADARA $release_tag$already_deployed\n\n$log_desc" \
-		| git commit -F - . |& tee -a $LOG
+	echo -e "Deployed $deploy_str" | git commit -F - . |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -977,6 +1106,8 @@ if [ $IS_STS == 1 ]; then
 	deploy_history_base="sts.deployment.history.txt"
 elif [ $IS_PVSD == 1 ]; then
 	deploy_history_base="pvsd.deployment.history.txt"
+elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
+	deploy_history_base="dasmon.deployment.history.txt"
 else
 	deploy_history_base="sms/deployment.history.txt"
 fi
@@ -991,7 +1122,7 @@ if [ ! -e "$deploy_history" ]; then
 	echo "for $HOST_TYPE $install_branch." | tee -a $LOG
 	echo -e "\n   $deploy_history\n" | tee -a $LOG
 
-	echo -e "\nADARA ${PROG} Deployment History ($install_branch)" \
+	echo -e "\nADARA $PROG Deployment History ($install_branch)" \
 		> "$deploy_history"
 
 	create_ok=$?
@@ -1019,10 +1150,11 @@ if [ ! -e "$deploy_history" ]; then
 		exit -20
 	fi
 
-	echo "git commit -m 'Initial History Creation' $deploy_history_base" \
-		| tee -a $LOG
-	git commit -m 'Initial History Creation' "$deploy_history_base" \
-		|& tee -a $LOG
+	echo -e "Initial History Creation\n\n$deploy_str\n" | tee -a $LOG
+	echo "git commit -F - $deploy_history_base" | tee -a $LOG
+
+	echo -e "Initial History Creation\n\n$deploy_str" \
+		git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 	commit_ok=$?
 
@@ -1052,8 +1184,8 @@ date >> "$deploy_history"
 echo "Deploy Script Version: $DEPLOY_VERSION" | tee -a $LOG
 echo "Deploy Script Version: $DEPLOY_VERSION" >> "$deploy_history"
 
-echo "ADARA/${PROG} Deployment by User: $gcos ($userid)." | tee -a $LOG
-echo "ADARA/${PROG} Deployment by User: $gcos ($userid)." \
+echo "ADARA/$PROG Deployment by User: $gcos ($userid)." | tee -a $LOG
+echo "ADARA/$PROG Deployment by User: $gcos ($userid)." \
 	>> "$deploy_history"
 
 echo "$HOST_TYPE $install_branch on Host $install_host" | tee -a $LOG
@@ -1104,18 +1236,15 @@ echo -e "\n$CONFIG_LINE\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 
-echo \
-	"Committing Current Deployment History Additions to Git." | tee -a $LOG
+echo "Committing Current Deployment History Additions to Git." \
+	| tee -a $LOG
 
 echo -e "\nCommit Log:\n" | tee -a $LOG
 
-echo -e \
-	"Deployment History for $release_tag$already_deployed\n\n$log_desc\n" \
-	| tee -a $LOG
+echo -e "Deployment History for $deploy_str\n" | tee -a $LOG
 echo "git commit -F - $deploy_history_base" | tee -a $LOG
 
-echo -e \
-	"Deployment History for $release_tag$already_deployed\n\n$log_desc" \
+echo -e "Deployment History for $deploy_str" \
 	| git commit -F - "$deploy_history_base" |& tee -a $LOG
 
 commit_ok=$?
@@ -1160,31 +1289,32 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 # Optionally restart the SMS Daemon Service...? (Or PVSD Service...)
 #
 
-if [ $PROG == "PVSD" ]; then
+# System Init Services...
+if [[ $PROG == "PVSD" || $PROG == "SMS" ]]; then
 
-	echo -e "\nCurrent PVSD Status:\n" | tee -a $LOG
+	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 
-	echo "sudo /sbin/service pvsd status" | tee -a $LOG
-	sudo /sbin/service pvsd status |& tee -a $LOG
+	echo "sudo /sbin/service $service status" | tee -a $LOG
+	sudo /sbin/service $service status |& tee -a $LOG
 
 	echo -e -n \
-		"\nDo You want to Restart the PVSD service now [yes/No]? "
+		"\nDo You want to Restart the $PROG service now [yes/No]? "
 
 	read restart_ck
 
 	if [ "#$restart_ck#" == '#yes#' ]; then
 
-		echo -e "\nRestarting PVSD service now on `hostname`." \
+		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
 
-		echo "sudo /sbin/service pvsd restart" | tee -a $LOG
-		sudo /sbin/service pvsd restart |& tee -a $LOG
+		echo "sudo /sbin/service $service restart" | tee -a $LOG
+		sudo /sbin/service $service restart |& tee -a $LOG
 
 		restart_ok=$?
 
 		if [ $restart_ok != 0 ]; then
 			echo -e \
-				"\nError Restarting PVSD Service! ($restart_ok)\n" \
+				"\nError Restarting $PROG Service! ($restart_ok)\n" \
 				| tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -24
@@ -1192,31 +1322,32 @@ if [ $PROG == "PVSD" ]; then
 
 	fi
 
-elif [ $PROG == "SMS" ]; then
+# Upstart Services...
+elif [[ $PROG == "DASMON_Server" || $PROG == "DASMON_Client" ]]; then
 
-	echo -e "\nCurrent SMS Daemon Status:\n" | tee -a $LOG
+	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 
-	echo "sudo /sbin/service smsd status" | tee -a $LOG
-	sudo /sbin/service smsd status |& tee -a $LOG
+	echo "sudo /sbin/status $service" | tee -a $LOG
+	sudo /sbin/status $service |& tee -a $LOG
 
 	echo -e -n \
-		"\nDo You want to Restart the SMS Daemon service now [yes/No]? "
+		"\nDo You want to Restart the $PROG service now [yes/No]? "
 
 	read restart_ck
 
 	if [ "#$restart_ck#" == '#yes#' ]; then
 
-		echo -e "\nRestarting SMS Daemon service now on `hostname`." \
+		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
 
-		echo "sudo /sbin/service smsd restart" | tee -a $LOG
-		sudo /sbin/service smsd restart |& tee -a $LOG
+		echo "sudo /sbin/restart $service" | tee -a $LOG
+		sudo /sbin/restart $service |& tee -a $LOG
 
 		restart_ok=$?
 
 		if [ $restart_ok != 0 ]; then
 			echo -e \
-				"\nError Restarting SMS Daemon Service! ($restart_ok)\n" \
+				"\nError Restarting $PROG Service! ($restart_ok)\n" \
 				| tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -24
@@ -1229,7 +1360,7 @@ fi
 # Copy Final Log File into ADARA Archive Release Tag Directory
 
 echo -e \
-	"\nDone with Deployment of ADARA/${PROG} Release Tag $release_tag.\n" \
+	"\nDone with Deployment of ADARA/$PROG Release Tag $release_tag.\n" \
 	| tee -a $LOG
 
 if [ $already_deployed_locally == 1 ]; then

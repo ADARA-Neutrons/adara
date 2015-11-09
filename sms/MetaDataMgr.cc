@@ -11,6 +11,7 @@
 #include "ADARAUtils.h"
 #include "MetaDataMgr.h"
 #include "StorageManager.h"
+#include "SMSControl.h"
 
 #include "Logging.h"
 
@@ -106,8 +107,10 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	ss << tag;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_DROP_DEVICES_FOR_TAG, ss.str(),
-			10, 3, 50, log_info ) ) {
+			600, 3, 10, log_info ) ) {
+		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "dropTag(): Dropping Devices for Data Source, tag=" << tag);
 	}
 
@@ -118,7 +121,9 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		DeviceVariables &dev = dit->second;
 
 		if (dev.m_tag == tag) {
-			DEBUG("dropTag(): Sending Upstream Disconnected for"
+			SMSControl *ctrl = SMSControl::getInstance();
+			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "dropTag(): Sending Upstream Disconnected for"
 				<< " devId=" << dev.m_devId
 				<< " tag=" << dev.m_tag
 				<< " mapped_dev=" << dit->first);
@@ -139,7 +144,7 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		log_info.clear();
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_NO_DEVICES_TO_DROP, ss.str(),
-				10, 3, 50, log_info ) ) {
+				600, 3, 10, log_info ) ) {
 			DEBUG(log_info
 				<< "dropTag(): Warning No Devices Found! tag=" << tag);
 		}
@@ -150,7 +155,9 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	end = m_devIdMap.end();
 	for (it = m_devIdMap.begin(); it != end; ) {
 		if (it->first >> 32 == tag) {
-			DEBUG("dropTag(): Removing Mapped Device"
+			SMSControl *ctrl = SMSControl::getInstance();
+			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "dropTag(): Removing Mapped Device"
 				<< " devId=" << ( it->first & 0xffff )
 				<< " tag=" << ( it->first >> 32 )
 				<< " mapped_dev=" << it->second);
@@ -199,8 +206,10 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	bool do_log = false;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_UPDATE_DESCRIPTOR, ss.str(),
-			10, 3, 50, log_info ) ) {
+			60, 3, 10, log_info ) ) {
+		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Update Descriptor devId=" << in.devId() << " tag=" << tag);
 		do_log = true; // link this rate-limited log to other related logs
 	}
@@ -236,7 +245,10 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 			if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 					RLL_DESC_INCORRECT_TAG, ss.str(),
 					10, 3, 50, log_info ) ) {
-				DEBUG(log_info << "Got descriptor from incorrect tag "
+				SMSControl *ctrl = SMSControl::getInstance();
+				DEBUG(log_info
+					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Got descriptor from incorrect tag "
 					<< it->second.m_tag << " != " << tag);
 			}
 			return;
@@ -285,8 +297,10 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_ADD_FAST_META_DDP, "none",
-			2, 10, 100, log_info ) ) {
+			60, 10, 10, log_info ) ) {
+		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
+			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
 			<< " (devId=-1 tag=0)");
 	}
@@ -300,7 +314,9 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_ADD_EXISTING_DEVICE, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "addFastMetaDDP(): tried to add existing (mapped) device"
 				<< " mapped_dev=" << mapped_dev);
 		}
@@ -356,7 +372,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(U32): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
@@ -387,7 +405,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in,
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(Double): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
@@ -418,7 +438,9 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_STR_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(String): Device Lookup Failed for Variable!"
 				<< " devId=" << in.devId()
 				<< " tag=" << tag
@@ -462,7 +484,9 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_NO_DESC, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateVariable(): Got Variable Without a Descriptor!"
 				<< " devId=" << dev
 				<< " tag=" << tag
@@ -481,7 +505,9 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_BAD_TAG, ss.str(),
 				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateVariable(): Device Tag Mismatch for Variable!"
 				<< " devId=" << dev
 				<< " tag=" << tag
