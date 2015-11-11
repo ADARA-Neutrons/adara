@@ -11,7 +11,7 @@
 #       -> for status:   sudo /sbin/status dasmond
 #
 
-exec /usr/sbin/dasmond --sms_host XXX-daq1.sns.gov --maxtof 66664 \
+exec /usr/sbin/dasmond --sms_host YYY-daq1.sns.gov --maxtof 66664 \
 	--broker_uri tcp://amqbroker.sns.gov:61616 --broker_user wfclient \
 	--broker_pass w0rkfl0w -c /home/dasmon/ --domain SNS.XXX \
 	--db_name reporting_db --db_host workflowdb2.sns.gov --db_port 5432 \
