@@ -392,7 +392,7 @@ USAGE()
 	echo "            [--repo=/home/controls/config] \\"
 	echo "            [status] [run_status] [data_status] [sys_status] \\"
 	echo "            [bmon_status] [detset_status] [combus_status] \\"
-	echo "            [live_status] [bandwidth] \\"
+	echo "            [live_status] [bandwidth] [confck] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] [--help]"
 	echo
@@ -419,6 +419,7 @@ USAGE()
 	echo "   combus_status         = display SMS ComBus status"
 	echo "   live_status           = display SMS live client status"
 	echo "   bandwidth             = display SMS data bandwidth stats"
+	echo "   confck                = compare SMS live vs. file config"
 	echo
 
 	echo "Available Options:"
@@ -599,6 +600,361 @@ Dump_Non_Zero_PV()
 		fi
 		echo "${_value}"
 		GOT_NON_ZERO_VALUE=1
+	fi
+}
+
+#
+# Get Current Live SMS Daemon Option Setting
+#
+# Uses:
+#    $optId $opt_label
+#    $PRE $PV $opt_pv_opt
+#
+# Sets:
+#    $live_value
+#
+
+GET_LIVE_SETTING()
+{
+	echo "Getting Current Live SMS Daemon Setting (PV) for:"
+	echo "   ${optId}:${opt_label}"
+	echo "   ${PRE}:${PV}"
+	echo
+	local _live_current=""
+	local _live_ok=""
+	_live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
+	_live_ok=$?
+	if [ ${_live_ok} != 0 ]; then
+		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
+	else
+		live_value=`echo ${_live_current} | awk '{print $2}'`
+		echo "   ${_live_current} ($live_value)"
+	fi
+	return ${_live_ok}
+}
+
+#
+# Get Current SMS Daemon Config File Setting
+#
+# Uses:
+#    $SMSD_CONFIG
+#    $opt_id_type $opt_id_num
+#
+# Sets:
+#    $WS
+#    $end_of_section_line_num
+#    $last_comment_line_num $last_comment_line
+#    $last_blank_line_num
+#    $config_line_num $config_value
+#    $opt_id_name
+#    $opt_str
+#    $config_end_of_section $config_use_comment
+#
+
+COMMENTED_VALUE="(commented out)"
+
+opt_id_name=""
+id_name_indent=""
+
+GET_CONFIG_SETTING()
+{
+	local _optId="$1"
+	local _opt_label="$2"
+	local _option="$3"
+	local _opt_config_str="$4"
+
+	echo "Getting Current SMS Daemon Config File Setting for:"
+	echo "   ${_optId}:${_opt_label}"
+	echo "   (in $SMSD_CONFIG)"
+
+	WS="^[[:space:]]*$"
+
+	local _config_list=""
+	local _config_size=""
+
+	_config_list=`grep -n -e '^\[' -e "${_option}" -e "$WS" $SMSD_CONFIG`
+	_config_size=`echo "${_config_list}" | wc | awk '{print $1}'`
+
+	end_of_section_line_num=""
+
+	last_comment_line_num=""
+	last_comment_line=""
+
+	last_blank_line_num=""
+
+	config_line_num=""
+	config_value=""
+
+	local _source_cnt=0
+
+	local _monitor_cnt=0
+
+	local _bankset_cnt=0
+
+	opt_id_name=""
+	id_name_indent=""
+
+	local _id_type=""
+	local _id_num=0
+
+	local _found=0
+
+	local _n=0
+
+	for (( _n=1 ; _n <= _config_size ; _n++ )); do
+
+		local _line=""
+		local _line_num=""
+		local _line_rest=""
+		local _line_type=""
+		local _line_id=""
+
+		local _is_comment=0
+		local _is_blank=0
+		local _nbytes=0
+
+		# Note: Just strip off _First_ ':' from Line Number -> '|'...
+		# (This preserves the ':' in URI values: "ip_addr:port".)
+		_line=`echo "${_config_list}" | sed -n "${_n}p" | sed "s/:/|/"`
+		# echo "config line ${_n} = [${_line}]"
+
+		_line_num=`echo "${_line}" | awk -F '|' '{print $1}'`
+		# echo "line_num=${_line_num}"
+
+		# Make Sure We Don't Interpret Any _Subsequent '|'s in Line...!
+		#_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
+		_line_rest="${_line:$(expr index "${_line}" "|")}"
+		# echo "line_rest=${_line_rest}"
+
+		# Authoritatively Determine "Line Type" Prior to
+		# Deducing Other Schtuff, like:
+		#    - "${_line_id}" which is only for Section Headings
+		#    - "${_is_comment}" which should only be for _Leading_ ';'s
+		_line_type=`echo "${_line_rest}" | sed "s/^[ \t]//"`
+
+		# Section Heading...
+		if [ "${_line_type:0:1}" == "[" ]; then
+			# echo "SECTION"
+			_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
+			# echo "line_id=${_line_id}"
+			_is_comment=0
+		# Comment...
+		elif [ "${_line_type:0:1}" == ";" ]; then
+			# echo "COMMENT"
+			_line_id=""
+			_is_comment=`echo "${_line_rest}" | grep ';' | wc \
+				| awk '{print $1}'`
+		# Config or Blank Line... (i.e. Everything Else... :-)
+		else
+			# echo "CONFIG or BLANK"
+			_line_id=""
+			_is_comment=0
+		fi
+
+		_nbytes=`echo "${_line_rest}" | awk '{print $1}' | wc \
+			| awk '{print $2}'`
+		if [ ${_nbytes} == 0 ]; then
+			_is_blank=1
+		else
+			_is_blank=0
+		fi
+
+		# Option Line
+		if [ "${_line_id}" == "" ]; then
+
+			# echo "Config Option Line..."
+			# echo "   id_type=${_id_type} id_num=${_id_num}"
+
+			if [ "#${_is_blank}#" == '#1#' ]; then
+				# echo "Blank Line at line ${_line_num} [${_line_rest}]"
+				last_blank_line_num="${_line_num}"
+				continue;
+			fi
+
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
+
+				if [ "#${_is_comment}#" == '#1#' ]; then
+					# echo "Comment: (line ${_line_num}) [${_line_rest}]"
+					last_comment_line="${_line_rest}"
+					last_comment_line_num="${_line_num}"
+					continue;
+				fi
+
+				# echo "Match!"
+
+				config_current_line="${_line_rest}"
+				# echo "Config File Line = ${config_current_line}."
+
+				config_line_num="${_line_num}"
+				# echo "Config File Line Number = ${config_line_num}."
+
+				config_value=`echo "${_line_rest}" \
+					| awk -F '=' '{print $2}'`
+
+				# Strip Only _Preceding_ White Space from Value...!
+				# (some options could be Character Strings now...! ;-D)
+				config_value=`echo "$config_value" | sed "s/^[ ]*//"`
+
+				# echo -n "Config File Option "
+				# echo "${_optId}:${_opt_label} = ${config_value}."
+
+				_found=$(( _found + 1 ))
+
+			fi
+
+		# SMS or Source Line
+		else
+
+			# echo "id_type=${_id_type} opt_id_type=$opt_id_type"
+			# echo "id_num=${_id_num} opt_id_num=$opt_id_num"
+
+			# Mark End of Previous Section, If It's What We Want...
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
+				#echo -n "Marking End of Requested Section "
+				#echo "at Line $last_blank_line_num."
+				# Use "Last Blank Line" Number,
+				# as Section may be Preceded by Comment lines...
+				end_of_section_line_num="$last_blank_line_num"
+			fi
+
+			# Set Up for New Section...
+			_id_type=`echo "${_line_id}" | awk '{print $1}'`
+			if [ "${_id_type}" == "source" ]; then
+				local _source_name=`echo "${_line_id}" \
+					| sed "s/^source //"`
+				_source_cnt=$(( _source_cnt + 1 ))
+				_id_num="$_source_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(${_source_name})"
+					id_name_indent="   "
+				fi
+				# echo "Source #${_source_cnt}: ${_source_name} Section."
+			elif [ "${_id_type}" == "monitor" ]; then
+				local _monitor_id=`echo "${_line_id}" \
+					| sed "s/^monitor //"`
+				_monitor_cnt=$(( _monitor_cnt + 1 ))
+				_id_num="$_monitor_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(Monitor${_monitor_id})"
+					id_name_indent="   "
+				fi
+				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect"
+				# Special Case: Monitor Id Stored in Section Id...!
+				if [[ "${_option}" == "id"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: Monitor Id in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_monitor_id}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "bankset" ]; then
+				local _bankset_name=`echo "${_line_id}" \
+					| sed "s/^bankset //"`
+				_bankset_cnt=$(( _bankset_cnt + 1 ))
+				_id_num="$_bankset_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(BankSet ${_bankset_name})"
+					id_name_indent="   "
+				fi
+				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_name}"
+				# Special Case: BankSet Name Stored in Section Id...!
+				if [[ "${_option}" == "name"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: BankSet Name in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_bankset_name}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "sms" ]; then
+				_id_num="-1"
+				# echo "SMS Section."
+			elif [ "${_id_type}" == "storage" ]; then
+				_id_num="-1"
+				# echo "Storage Section."
+			elif [ "${_id_type}" == "livestream" ]; then
+				_id_num="-1"
+				# echo "Live Streaming Section."
+			elif [ "${_id_type}" == "stsclient" ]; then
+				# Abbreviate STS Client Id Type...
+				_id_type="sts"
+				_id_num="-1"
+				# echo "STS Client Section."
+			fi
+		fi
+
+	done
+
+	opt_str="${_optId}:${_opt_label}"
+
+	config_end_of_section=0
+	config_use_comment=0
+
+	if [[ ${_found} == 0 ]]; then
+		echo -e -n "\nWARNING: Active \"${_option}\" Option "
+		echo "Setting Not Found!"
+		if [[ "#$last_comment_line_num#" != '##' ]]; then
+			echo -n "   Using Last Comment: (line $last_comment_line_num) "
+			echo "[$last_comment_line]"
+			config_value="$COMMENTED_VALUE"
+			config_use_comment=1
+		elif [[ "#$end_of_section_line_num#" != '##' ]]; then
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="(not found)"
+			config_end_of_section=1
+		elif [[ "${_id_type}" == "$opt_id_type" \
+				&& "${_id_num}" == "$opt_id_num" ]]; then
+			echo "   End of File at Last Section... ;-)"
+			end_of_section_line_num=`wc $SMSD_CONFIG | awk '{print $1}'`
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="(not found)"
+			config_end_of_section=1
+		else
+			echo "Cannot Automatically Update Configuration File... ;-Q"
+			echo "   ${opt_str}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${_opt_config_str}"
+			do_config=0
+			do_git_config=0
+		fi
+	elif [[ ${_found} > 1 ]]; then
+		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
+		echo "\"${_option}\" Option Settings!"
+		echo "Cannot Automatically Update Configuration File... ;-Q"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${_opt_config_str}"
+		do_config=0
+		do_git_config=0
+	fi
+
+	if [ "$do_config" == 1 ]; then
+		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "   ${_option} = ${config_value}"
 	fi
 }
 
@@ -1062,11 +1418,8 @@ GET_OPTION_INFO()
 	do_live=1
 
 	if [ $skiplive == 0 ]; then
-		echo "Getting Current Live SMS Daemon Setting (PV) for:"
-		echo -e "   ${optId}:${opt_label}\n"
-		live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
+		GET_LIVE_SETTING
 		if [ $? != 0 ]; then
-			echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
 			echo "Proceed with Live Config of:"
 			echo -n "   ${optId}:${opt_label} (yes/No)? "
 			read ckcont
@@ -1081,338 +1434,13 @@ GET_OPTION_INFO()
 			echo
 			# Continue, But Skip Live Option Setting...
 			do_live=0
-		else
-			live_value=`echo $live_current | awk '{print $2}'`
-			echo "   $live_current ($live_value)"
 		fi
+
 	else
 		echo "Skipping Live Configuration as Requested for:"
 		echo -e "   ${optId}:${opt_label}\n"
 		do_live=0
 	fi
-
-#
-# Get Current SMS Daemon Config File Setting
-#
-# Uses:
-#    $SMSD_CONFIG
-#    $opt_id_type $opt_id_num
-#
-# Sets:
-#    $WS
-#    $end_of_section_line_num
-#    $last_comment_line_num $last_comment_line
-#    $last_blank_line_num
-#    $config_line_num $config_value
-#    $opt_id_name
-#    $opt_str
-#    $config_end_of_section $config_use_comment
-#
-
-opt_id_name=""
-id_name_indent=""
-
-GET_CONFIG_SETTING()
-{
-	local _optId="$1"
-	local _opt_label="$2"
-	local _option="$3"
-	local _opt_config_str="$4"
-
-	echo "Getting Current SMS Daemon Config File Setting for:"
-	echo "   ${_optId}:${_opt_label}"
-	echo "   (in $SMSD_CONFIG)"
-
-	WS="^[[:space:]]*$"
-
-	local _config_list=""
-	local _config_size=""
-
-	_config_list=`grep -n -e '^\[' -e "${_option}" -e "$WS" $SMSD_CONFIG`
-	_config_size=`echo "${_config_list}" | wc | awk '{print $1}'`
-
-	end_of_section_line_num=""
-
-	last_comment_line_num=""
-	last_comment_line=""
-
-	last_blank_line_num=""
-
-	config_line_num=""
-	config_value=""
-
-	local _source_cnt=0
-
-	local _monitor_cnt=0
-
-	local _bankset_cnt=0
-
-	opt_id_name=""
-	id_name_indent=""
-
-	local _id_type=""
-	local _id_num=0
-
-	local _found=0
-
-	local _n=0
-
-	for (( _n=1 ; _n <= _config_size ; _n++ )); do
-
-		local _line=""
-		local _line_num=""
-		local _line_rest=""
-		local _line_type=""
-		local _line_id=""
-
-		local _is_comment=0
-		local _is_blank=0
-		local _nbytes=0
-
-		# Note: Just strip off _First_ ':' from Line Number -> '|'...
-		# (This preserves the ':' in URI values: "ip_addr:port".)
-		_line=`echo "${_config_list}" | sed -n "${_n}p" | sed "s/:/|/"`
-		# echo "config line ${_n} = [${_line}]"
-
-		_line_num=`echo "${_line}" | awk -F '|' '{print $1}'`
-		# echo "line_num=${_line_num}"
-
-		# Make Sure We Don't Interpret Any _Subsequent '|'s in Line...!
-		#_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
-		_line_rest="${_line:$(expr index "${_line}" "|")}"
-		# echo "line_rest=${_line_rest}"
-
-		# Authoritatively Determine "Line Type" Prior to
-		# Deducing Other Schtuff, like:
-		#    - "${_line_id}" which is only for Section Headings
-		#    - "${_is_comment}" which should only be for _Leading_ ';'s
-		_line_type=`echo "${_line_rest}" | sed "s/^[ \t]//"`
-
-		# Section Heading...
-		if [ "${_line_type:0:1}" == "[" ]; then
-			# echo "SECTION"
-			_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
-			# echo "line_id=${_line_id}"
-			_is_comment=0
-		# Comment...
-		elif [ "${_line_type:0:1}" == ";" ]; then
-			# echo "COMMENT"
-			_line_id=""
-			_is_comment=`echo "${_line_rest}" | grep ';' | wc \
-				| awk '{print $1}'`
-		# Config or Blank Line... (i.e. Everything Else... :-)
-		else
-			# echo "CONFIG or BLANK"
-			_line_id=""
-			_is_comment=0
-		fi
-
-		_nbytes=`echo "${_line_rest}" | awk '{print $1}' | wc \
-			| awk '{print $2}'`
-		if [ ${_nbytes} == 0 ]; then
-			_is_blank=1
-		else
-			_is_blank=0
-		fi
-
-		# Option Line
-		if [ "${_line_id}" == "" ]; then
-
-			# echo "Config Option Line..."
-			# echo "   id_type=${_id_type} id_num=${_id_num}"
-
-			if [ "#${_is_blank}#" == '#1#' ]; then
-				# echo "Blank Line at line ${_line_num} [${_line_rest}]"
-				last_blank_line_num="${_line_num}"
-				continue;
-			fi
-
-			if [[ "${_id_type}" == "$opt_id_type" \
-					&& "${_id_num}" == "$opt_id_num" ]]; then
-
-				if [ "#${_is_comment}#" == '#1#' ]; then
-					# echo "Comment: (line ${_line_num}) [${_line_rest}]"
-					last_comment_line="${_line_rest}"
-					last_comment_line_num="${_line_num}"
-					continue;
-				fi
-
-				# echo "Match!"
-
-				config_current_line="${_line_rest}"
-				# echo "Config File Line = ${config_current_line}."
-
-				config_line_num="${_line_num}"
-				# echo "Config File Line Number = ${config_line_num}."
-
-				config_value=`echo "${_line_rest}" \
-					| awk -F '=' '{print $2}'`
-
-				# Strip Only _Preceding_ White Space from Value...!
-				# (some options could be Character Strings now...! ;-D)
-				config_value=`echo "$config_value" | sed "s/^[ ]*//"`
-
-				# echo -n "Config File Option "
-				# echo "${_optId}:${_opt_label} = ${config_value}."
-
-				_found=$(( _found + 1 ))
-
-			fi
-
-		# SMS or Source Line
-		else
-
-			# echo "id_type=${_id_type} opt_id_type=$opt_id_type"
-			# echo "id_num=${_id_num} opt_id_num=$opt_id_num"
-
-			# Mark End of Previous Section, If It's What We Want...
-			if [[ "${_id_type}" == "$opt_id_type" \
-					&& "${_id_num}" == "$opt_id_num" ]]; then
-				#echo -n "Marking End of Requested Section "
-				#echo "at Line $last_blank_line_num."
-				# Use "Last Blank Line" Number,
-				# as Section may be Preceded by Comment lines...
-				end_of_section_line_num="$last_blank_line_num"
-			fi
-
-			# Set Up for New Section...
-			_id_type=`echo "${_line_id}" | awk '{print $1}'`
-			if [ "${_id_type}" == "source" ]; then
-				local _source_name=`echo "${_line_id}" \
-					| sed "s/^source //"`
-				_source_cnt=$(( _source_cnt + 1 ))
-				_id_num="$_source_cnt"
-				if [[ "${_id_type}" == "$opt_id_type" \
-						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name="(${_source_name})"
-					id_name_indent="   "
-				fi
-				# echo "Source #${_source_cnt}: ${_source_name} Section."
-			elif [ "${_id_type}" == "monitor" ]; then
-				local _monitor_id=`echo "${_line_id}" \
-					| sed "s/^monitor //"`
-				_monitor_cnt=$(( _monitor_cnt + 1 ))
-				_id_num="$_monitor_cnt"
-				if [[ "${_id_type}" == "$opt_id_type" \
-						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name="(Monitor${_monitor_id})"
-					id_name_indent="   "
-				fi
-				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect"
-				# Special Case: Monitor Id Stored in Section Id...!
-				if [[ "${_option}" == "id"
-						&& "${_id_num}" == "$opt_id_num" ]]; then
-					# echo "Special Case: Monitor Id in Section Id!"
-					config_current_line=`echo "${_line_rest}" \
-						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
-					# echo "Config File Line = ${config_current_line}."
-					config_line_num="${_line_num}"
-					# echo "Config File Line Number = ${config_line_num}."
-					config_value="${_monitor_id}"
-					# echo -n "Config File Option "
-					# echo "${_optId}:${_opt_label} = ${config_value}."
-					_found=$(( _found + 1 ))
-				fi
-			elif [ "${_id_type}" == "bankset" ]; then
-				local _bankset_name=`echo "${_line_id}" \
-					| sed "s/^bankset //"`
-				_bankset_cnt=$(( _bankset_cnt + 1 ))
-				_id_num="$_bankset_cnt"
-				if [[ "${_id_type}" == "$opt_id_type" \
-						&& "${_id_num}" == "$opt_id_num" ]]; then
-					opt_id_name="(BankSet ${_bankset_name})"
-					id_name_indent="   "
-				fi
-				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_name}"
-				# Special Case: BankSet Name Stored in Section Id...!
-				if [[ "${_option}" == "name"
-						&& "${_id_num}" == "$opt_id_num" ]]; then
-					# echo "Special Case: BankSet Name in Section Id!"
-					config_current_line=`echo "${_line_rest}" \
-						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
-					# echo "Config File Line = ${config_current_line}."
-					config_line_num="${_line_num}"
-					# echo "Config File Line Number = ${config_line_num}."
-					config_value="${_bankset_name}"
-					# echo -n "Config File Option "
-					# echo "${_optId}:${_opt_label} = ${config_value}."
-					_found=$(( _found + 1 ))
-				fi
-			elif [ "${_id_type}" == "sms" ]; then
-				_id_num="-1"
-				# echo "SMS Section."
-			elif [ "${_id_type}" == "storage" ]; then
-				_id_num="-1"
-				# echo "Storage Section."
-			elif [ "${_id_type}" == "livestream" ]; then
-				_id_num="-1"
-				# echo "Live Streaming Section."
-			elif [ "${_id_type}" == "stsclient" ]; then
-				# Abbreviate STS Client Id Type...
-				_id_type="sts"
-				_id_num="-1"
-				# echo "STS Client Section."
-			fi
-		fi
-
-	done
-
-	opt_str="${_optId}:${_opt_label}"
-
-	config_end_of_section=0
-	config_use_comment=0
-
-	if [[ ${_found} == 0 ]]; then
-		echo -e -n "\nWARNING: Active \"${_option}\" Option "
-		echo "Setting Not Found!"
-		if [[ "#$last_comment_line_num#" != '##' ]]; then
-			echo -n "   Using Last Comment: (line $last_comment_line_num) "
-			echo "[$last_comment_line]"
-			config_value="(commented out)"
-			config_use_comment=1
-		elif [[ "#$end_of_section_line_num#" != '##' ]]; then
-			echo "   End of Section at line $end_of_section_line_num."
-			config_value="(not found)"
-			config_end_of_section=1
-		elif [[ "${_id_type}" == "$opt_id_type" \
-				&& "${_id_num}" == "$opt_id_num" ]]; then
-			echo "   End of File at Last Section... ;-)"
-			end_of_section_line_num=`wc $SMSD_CONFIG | awk '{print $1}'`
-			echo "   End of Section at line $end_of_section_line_num."
-			config_value="(not found)"
-			config_end_of_section=1
-		else
-			echo "Cannot Automatically Update Configuration File... ;-Q"
-			echo "   ${opt_str}"
-			if [[ ${opt_id_name} != "" ]]; then
-				echo "      ${opt_id_name}"
-			fi
-			echo "      ${id_name_indent}to ${_opt_config_str}"
-			do_config=0
-			do_git_config=0
-		fi
-	elif [[ ${_found} > 1 ]]; then
-		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
-		echo "\"${_option}\" Option Settings!"
-		echo "Cannot Automatically Update Configuration File... ;-Q"
-		echo "   ${opt_str}"
-		if [[ ${opt_id_name} != "" ]]; then
-			echo "      ${opt_id_name}"
-		fi
-		echo "      ${id_name_indent}to ${_opt_config_str}"
-		do_config=0
-		do_git_config=0
-	fi
-
-	if [ "$do_config" == 1 ]; then
-		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
-		echo "   ${opt_str}"
-		if [[ ${opt_id_name} != "" ]]; then
-			echo "      ${opt_id_name}"
-		fi
-		echo "   ${_option} = ${config_value}"
-	fi
-}
 
 	#
 	# Get Current SMS Daemon Config File Setting
@@ -2073,6 +2101,119 @@ OPEN_CONFIG_REPO()
 	echo 
 
 	/bin/rm $LOG
+
+# Check/Compare SMS Live Configuration Settings vs. Config File Settings!
+elif [[ "$command" == "confck" ]]; then
+
+	echo -e "ADARA SMS LiveConf Configuration Check - Live vs. File:\n"
+
+	num_mismatch=0
+
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+
+		echo "${option_label[$i]}:"
+		echo "   ${option_value_type[$i]}"
+		echo "   [${option_id_type[$i]}/${option_name[$i]}]"
+
+		if [[ ${option_no_config[$i]} == 1 ]]; then
+			echo -e "\nNo Config for Option - Skipping...\n"
+			continue
+		fi
+
+		opt_id_type="${option_id_type[$i]}"
+
+		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+			echo "   Indexed Option."
+			opt_id_num="1"
+			optId="${idName[$opt_id_type]}${opt_id_num}"
+		else
+			opt_id_num="-1"
+			optId="${idName[$opt_id_type]}"
+		fi
+
+		option="${option_name[$i]}"
+
+		# Handle Indexed PV's, Substitute Option Id Number...
+		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+			PV=`echo ${option_pv[$i]} \
+				| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
+		else
+			PV="${option_pv[$i]}"
+		fi
+
+		opt_pv_opt="${option_pv_opt[$i]}"
+
+		opt_label="${option_label[$i]}"
+
+		# Map "Control" Options to "SMS" for rest of handling...
+		# (There's no separate "SMSControl" config section.)
+		if [ "$opt_id_type" == "ctrl" ]; then
+			echo "Mapping Control Options to SMS for Config File Handling."
+			opt_id_type="sms"
+		fi
+
+		if [ "$option" == "enabled" ]; then
+			echo "Enabled Option Special Handling..."
+			option="disabled"
+			opt_config_value="true"
+			opt_config_str="[Disabled: $option = $opt_config_value]"
+		fi
+
+		echo
+
+		GET_LIVE_SETTING
+		if [ $? != 0 ]; then
+			echo -n "Proceed with Live vs. File Config Check (yes/No)? "
+			read ckcont
+			ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckcont" == "" || "$ckcont" == "n" \
+					|| "$ckcont" == "no" ]]; then
+				echo -e "\nExiting LiveConf ConfCk at User's Request.\n"
+				exit -3
+			fi
+			echo
+		fi
+
+		echo -e "\nlive_value = [$live_value]\n"
+
+		GET_CONFIG_SETTING "$optId" "$opt_label" \
+			"$option" "$opt_config_str"
+
+		echo -e "\nconfig_value = [$config_value]\n"
+
+		if [[ $config_value == $COMMENTED_VALUE ]]; then
+
+			echo "*** Warning: Option Value Commented Out in Config File!"
+			echo "XXX TODO: Use Default Value for SMS...! ;-Q"
+			echo
+
+			# for now...
+			config_value="$live_value"
+			num_mismatch=$(( num_mismatch + 1 ))
+
+		fi
+
+		if [[ $live_value != $config_value ]]; then
+
+			echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+			num_mismatch=$(( num_mismatch + 1 ))
+
+		else
+			echo "Live Config Matches File Config."
+		fi
+
+		echo
+
+	done
+
+	if [[ $num_mismatch != 0 ]]; then
+		echo -e "*** ERROR: $num_mismatch Mismatches Found...!\n"
+	else
+		echo -e "Config OK - All Options Matched Between Live and File.\n"
+	fi
+
+	exit $num_mismatch
 
 # Done
 fi
