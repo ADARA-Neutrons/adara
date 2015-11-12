@@ -624,7 +624,7 @@ OutputAdapter::socketListenThread()
             // Send source information packet first
             sendSourceInfo( info.socket );
 
-            // need to send it all currently active devies (if any)
+            // need to send it all currently active devices (if any)
             sendCurrentData( info.socket );
         }
     }
