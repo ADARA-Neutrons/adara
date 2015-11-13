@@ -15,39 +15,51 @@ WAIT="-w 9"
 # Option Types/Indexing...
 
 declare -A is_indexed
+declare -A index_pv
 declare -A idName
 
 is_indexed["sms"]=0
+index_pv["sms"]=""
 idName["sms"]="SMS"
 
 is_indexed["runinfo"]=0
+index_pv["runinfo"]=""
 idName["runinfo"]="RunInfo"
 
 is_indexed["marker"]=0
+index_pv["marker"]=""
 idName["marker"]="Marker"
 
 is_indexed["source"]=1
+index_pv["source"]="SMS:Control:NumDataSources"
 idName["source"]="Source"
 
 is_indexed["ctrl"]=0
+index_pv["ctrl"]=""
 idName["ctrl"]="Control"
 
 is_indexed["monitor"]=1
+index_pv["monitor"]="SMS:Control:NumBeamMonitors"
 idName["monitor"]="BeamMonitor"
 
 is_indexed["bankset"]=1
+index_pv["bankset"]="SMS:Control:NumDetBankSets"
 idName["bankset"]="DetectorBankSet"
 
 is_indexed["combus"]=0
+index_pv["combus"]=""
 idName["combus"]="ComBus"
 
 is_indexed["storage"]=0
+index_pv["storage"]=""
 idName["storage"]="Storage"
 
 is_indexed["sts"]=0
+index_pv["sts"]=""
 idName["sts"]="STS"
 
 is_indexed["livestream"]=0
+index_pv["livestream"]=""
 idName["livestream"]="LiveServer"
 
 
@@ -1081,6 +1093,14 @@ if [[ "$command" == "status" \
 
 				numHWSources=`caget $WAIT $nhwsvar | grep $nhwsvar \
 					| awk '{print $2}'`
+
+				# Make Sure We Got Something...
+				if [ $numHWSources == "" ]; then
+					echo -e -n "\nWarning: Unable to Obtain"
+					echo " Number of HWSources Instances!"
+					echo "Setting numHWSources to 1 for Default Check."
+					numHWSources=1
+				fi
 
 				# Count from 1...!
 				for (( hws=1 ; hws <= numHWSources ; hws++ )); do
@@ -2122,88 +2142,118 @@ elif [[ "$command" == "confck" ]]; then
 
 		opt_id_type="${option_id_type[$i]}"
 
-		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
-			echo "   Indexed Option."
-			opt_id_num="1"
-			optId="${idName[$opt_id_type]}${opt_id_num}"
-		else
-			opt_id_num="-1"
-			optId="${idName[$opt_id_type]}"
-		fi
-
-		option="${option_name[$i]}"
-
-		# Handle Indexed PV's, Substitute Option Id Number...
-		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
-			PV=`echo ${option_pv[$i]} \
-				| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
-		else
-			PV="${option_pv[$i]}"
-		fi
-
 		opt_pv_opt="${option_pv_opt[$i]}"
 
 		opt_label="${option_label[$i]}"
 
-		# Map "Control" Options to "SMS" for rest of handling...
-		# (There's no separate "SMSControl" config section.)
-		if [ "$opt_id_type" == "ctrl" ]; then
-			echo "Mapping Control Options to SMS for Config File Handling."
-			opt_id_type="sms"
-		fi
+		option="${option_name[$i]}"
 
-		if [ "$option" == "enabled" ]; then
-			echo "Enabled Option Special Handling..."
-			option="disabled"
-			opt_config_value="true"
-			opt_config_str="[Disabled: $option = $opt_config_value]"
-		fi
-
-		echo
-
-		GET_LIVE_SETTING
-		if [ $? != 0 ]; then
-			echo -n "Proceed with Live vs. File Config Check (yes/No)? "
-			read ckcont
-			ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
-			if [[ "$ckcont" == "" || "$ckcont" == "n" \
-					|| "$ckcont" == "no" ]]; then
-				echo -e "\nExiting LiveConf ConfCk at User's Request.\n"
-				exit -3
+		# Get Number of Instances for Indexed Option
+		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+			echo "   Indexed Option."
+			numVarsPV="${PRE}:${index_pv[$opt_id_type]}"
+			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV \
+				| awk '{print $2}'`
+			# Make Sure We Got Something...
+			if [[ $numIndexedVars == "" ]]; then
+				echo -e -n "\nWarning: Unable to Obtain"
+				echo -e " Number of $option Instances!\n"
+				echo "Setting numIndexedVars to 1 for Default Check."
+				numIndexedVars=1
+				# Count This Error as a Mismatch...!
+				num_mismatch=$(( num_mismatch + 1 ))
 			fi
-			echo
-		fi
-
-		echo -e "\nlive_value = [$live_value]\n"
-
-		GET_CONFIG_SETTING "$optId" "$opt_label" \
-			"$option" "$opt_config_str"
-
-		echo -e "\nconfig_value = [$config_value]\n"
-
-		if [[ $config_value == $COMMENTED_VALUE ]]; then
-
-			echo "*** Warning: Option Value Commented Out in Config File!"
-			echo "XXX TODO: Use Default Value for SMS...! ;-Q"
-			echo
-
-			# for now...
-			config_value="$live_value"
-			num_mismatch=$(( num_mismatch + 1 ))
-
-		fi
-
-		if [[ $live_value != $config_value ]]; then
-
-			echo "*** ERROR! Mismatch in Live vs. File Config! ***"
-
-			num_mismatch=$(( num_mismatch + 1 ))
-
+			echo "      -> Comparing $numIndexedVars Instances."
 		else
-			echo "Live Config Matches File Config."
+			numIndexedVars=1
 		fi
 
-		echo
+		for (( id=1 ; id <= numIndexedVars ; id++ )); do
+
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				opt_id_num="$id"
+				optId="${idName[$opt_id_type]}${opt_id_num}"
+			else
+				opt_id_num="-1"
+				optId="${idName[$opt_id_type]}"
+			fi
+
+			# Handle Indexed PV's, Substitute Option Id Number...
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				PV=`echo ${option_pv[$i]} \
+					| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
+			else
+				PV="${option_pv[$i]}"
+			fi
+
+			# Map "Control" Options to "SMS" for rest of handling...
+			# (There's no separate "SMSControl" config section.)
+			save_opt_id_type="$opt_id_type"
+			if [ "$opt_id_type" == "ctrl" ]; then
+				echo -n "Mapping Control Options to SMS"
+				echo " for Config File Handling."
+				opt_id_type="sms"
+			fi
+
+			if [ "$option" == "enabled" ]; then
+				echo "Enabled Option Special Handling..."
+				option="disabled"
+				opt_config_value="true"
+				opt_config_str="[Disabled: $option = $opt_config_value]"
+			fi
+
+			echo
+
+			GET_LIVE_SETTING
+			if [ $? != 0 ]; then
+				echo -n \
+					"Proceed with Live vs. File Config Check (yes/No)? "
+				read ckcont
+				ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckcont" == "" || "$ckcont" == "n" \
+						|| "$ckcont" == "no" ]]; then
+					echo -e "\nExiting LiveConf at User's Request.\n"
+					exit -3
+				fi
+				echo
+			fi
+
+			echo -e "\nlive_value = [$live_value]\n"
+
+			GET_CONFIG_SETTING "$optId" "$opt_label" \
+				"$option" "$opt_config_str"
+
+			echo -e "\nconfig_value = [$config_value]\n"
+
+			if [[ $config_value == $COMMENTED_VALUE ]]; then
+
+				echo -n "*** Warning: Option Value Commented Out"
+				echo " in Config File!"
+				echo "XXX TODO: Use Default Value for SMS...! ;-Q"
+				echo
+
+				# for now...
+				config_value="$live_value"
+				num_mismatch=$(( num_mismatch + 1 ))
+
+			fi
+
+			if [[ $live_value != $config_value ]]; then
+
+				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+				num_mismatch=$(( num_mismatch + 1 ))
+
+			else
+				echo "Live Config Matches File Config."
+			fi
+
+			# Restore Any Option ID Type Mapping...
+			opt_id_type="$save_opt_id_type"
+
+			echo
+
+		done
 
 	done
 
