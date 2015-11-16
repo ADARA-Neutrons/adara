@@ -95,9 +95,9 @@ static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
 	case ADARA::PulseFlavor::NO_BEAM:
 		return "No Beam";
 	case ADARA::PulseFlavor::NORMAL_TGT_1:
-		return "Target 1 Normal";
+		return "Target Station 1 Normal";
 	case ADARA::PulseFlavor::NORMAL_TGT_2:
-		return "Target 2 Normal";
+		return "Target Station 2 Normal";
 	case ADARA::PulseFlavor::DIAG_10us:
 		return "10us Diagnostic";
 	case ADARA::PulseFlavor::DIAG_50us:
@@ -714,10 +714,10 @@ bool Parser::rxPacket(const ADARA::BeamlineInfoPkt &pkt)
 {
 	if ( !m_terse ) {
 		printf("%u.%09u BEAMLINE INFO (0x%x,v%u)\n"
-			"    target '%u' id '%s' short '%s' long '%s'\n",
+			"    target_station '%u' id '%s' short '%s' long '%s'\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(),
-			pkt.targetNumber(),
+			pkt.targetStationNumber(),
 			pkt.id().c_str(),
 			pkt.shortName().c_str(),
 			pkt.longName().c_str());
