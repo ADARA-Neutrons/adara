@@ -5,7 +5,7 @@
 #include "BeamlineInfo.h"
 #include "StorageManager.h"
 
-BeamlineInfo::BeamlineInfo(const uint32_t targetNumber,
+BeamlineInfo::BeamlineInfo(const uint32_t targetStationNumber,
 		const std::string &id,
 		const std::string &shortName,
 		const std::string &longName)
@@ -22,8 +22,11 @@ BeamlineInfo::BeamlineInfo(const uint32_t targetNumber,
 	if (!longName.length())
 		throw std::runtime_error("Beamline long name has no content");
 
-	if (targetNumber > 255)
-		throw std::runtime_error("Target Number is too large (>255)");
+	if (targetStationNumber > 255)
+	{
+		throw std::runtime_error(
+			"Target Station Number is too large (>255)");
+	}
 	if (id.length() > 255)
 		throw std::runtime_error("Beamline id is too long");
 	if (shortName.length() > 255)
@@ -55,7 +58,7 @@ BeamlineInfo::BeamlineInfo(const uint32_t targetNumber,
 	fields[4] = longName.length();
 	fields[4] |= shortName.length() << 8;
 	fields[4] |= id.length() << 16;
-	fields[4] |= targetNumber << 24;
+	fields[4] |= targetStationNumber << 24;
 	memcpy(fields + 5, data.data(), data.size());
 
 	m_connection = StorageManager::onPrologue(

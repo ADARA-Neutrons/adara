@@ -8,7 +8,7 @@
 
 class BeamlineInfo : boost::noncopyable {
 public:
-	BeamlineInfo(uint32_t targetNumber,
+	BeamlineInfo(uint32_t targetStationNumber,
 			const std::string &id,
 			const std::string &shortName,
 			const std::string &longName);

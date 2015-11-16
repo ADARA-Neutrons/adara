@@ -43,7 +43,7 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_PULSE_PCHG_BUFFER_EMPTY      7
 #define RLL_NO_RTDL_FOR_PULSE            8
 
-uint32_t SMSControl::m_targetNumber;
+uint32_t SMSControl::m_targetStationNumber;
 
 std::string SMSControl::m_version;
 std::string SMSControl::m_beamlineId;
@@ -132,8 +132,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	if (!m_pixelMapPath.length())
 		m_pixelMapPath = base + "/pixelmap";
 
-	m_targetNumber = conf.get<uint32_t>("sms.target", 1);
-	INFO("Operating on Neutron Facility Target " << m_targetNumber << ".");
+	m_targetStationNumber = conf.get<uint32_t>("sms.target_station", 1);
+	INFO("Operating on Neutron Facility Target Station "
+		<< m_targetStationNumber << ".");
 
 	m_beamlineId = conf.get<std::string>("sms.beamline_id", "");
 	m_beamlineShortName =
@@ -406,7 +407,7 @@ SMSControl::SMSControl() :
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to get next run number");
 
-	m_beamlineInfo.reset(new BeamlineInfo(m_targetNumber,
+	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_beamlineId, this));
 	m_geometry.reset(new Geometry(m_geometryPath));
@@ -1777,12 +1778,12 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		// (Don't Worry, This Just Sets an "Aggregation" Veto Bit;
 		//    the Full Veto Flags are _Also_ Included Now...! ;-D)
 		bool is_veto = false;
-		if ( m_targetNumber == 1 ) {
+		if ( m_targetStationNumber == 1 ) {
 			if ( pulse->m_vetoFlags & TARGET_1_VETO_MASK ) {
 				is_veto = true;
 			}
 		}
-		else if ( m_targetNumber == 2 ) {
+		else if ( m_targetStationNumber == 2 ) {
 			if ( pulse->m_vetoFlags & TARGET_2_VETO_MASK ) {
 				is_veto = true;
 			}
