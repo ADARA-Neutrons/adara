@@ -334,8 +334,8 @@ Pixel ID is the physical pixel associated with this neutron event.
 	Bit Value & Constant & Description \\
 	\hline
 	0x000001 & VETO\_NO\_BEAM & No beam delivered ``this'' (last) pulse \\
-	0x000002 & VETO\_NOT\_TARGET\_1 & Beam was not for target 1 \\
-	0x000004 & VETO\_NOT\_TARGET\_2 & Beam was not for target 2 \\
+	0x000002 & VETO\_NOT\_TARGET\_1 & Beam was Not for Target Station 1 \\
+	0x000004 & VETO\_NOT\_TARGET\_2 & Beam was Not for Target Station 2 \\
 	0x000008 & VETO\_DIAGNOSTIC\_PULSE & Limited-Duty diagnostic beam \\
 	0x000010 & VETO\_PHYSICS\_PULSE\_1 & Special physics pulse \\
 	0x000020 & VETO\_PHYSICS\_PULSE\_2 & Special physics pulse \\
@@ -1980,7 +1980,7 @@ intervening NULLs. This field must be padded to a multiple of 4 bytes.
     \wordbox{1}{Timestamp (nanoseconds)} \\
 
     \bitheader{31,24,23,16,15,8,7,0} \\
-    \bitbox{8}{Target Number} &
+    \bitbox{8}{Target Stn Num} &
     \bitbox{8}{Id Len} &
     \bitbox{8}{Short Len} &
     \bitbox{8}{Long Len} \\
@@ -1996,12 +1996,12 @@ Note that this version of the Beamline Info packet is wire-compatible
 with the original ``Version 0'' packet type
 (Section~\ref{section:protocol_beamline_info_v0}),
 as the ``Unused'' field is simply replaced with ``real information,''
-namely the ``Target Number'' (see below).
+namely the ``Target Station Number'' (see below).
 It shall be that any ADARA components supporting the new Version 1
 structure of the Beamline Info packet are made
 backwards compatible to components that might
 deliver the Version 0 packet structure,
-by ensuring that the Target Number simply defaults to ``1''
+by ensuring that the Target Station Number simply defaults to ``1''
 if not specified (i.e. left as ``0'' in the ``Unused'' field).
 
 \begin{itemize}
@@ -2009,8 +2009,8 @@ if not specified (i.e. left as ``0'' in the ``Unused'' field).
 \item{\bf Timestamp} does not carry significant information and may be the
 startup time of the SMS, or the time the packet was send, if not another value
 altogether.
-\item{\bf Target Number} specifies the Neutron Target Station Number
-for the given Neutron Facility,
+\item{\bf Target Stn Num} specifies the Neutron
+Target Station Number for the given Neutron Facility,
 e.g. in the case of the Spallation Neutron Source (SNS) there are
 two potential Target Stations, Target Station 1 and Target Station 2;
 this distinction is already relevant based on Timing information
