@@ -1443,7 +1443,7 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    m_run_info.target_number = a_pkt.targetNumber();
+    m_run_info.target_station_number = a_pkt.targetStationNumber();
 
     m_run_info.instr_id = a_pkt.id();
     m_run_info.instr_shortname = a_pkt.shortName();
@@ -2638,8 +2638,9 @@ StreamParser::receivedInfo( InfoBit a_bit )
         m_info_rcvd |= INFO_SENT;
 
         syslog( LOG_INFO,
-            "[%i] target: %u, beam: %s:%s, prop: %s, run: %lu", g_pid,
-            m_run_info.target_number,
+            "[%i] target_station: %u, beam: %s:%s, prop: %s, run: %lu",
+            g_pid,
+            m_run_info.target_station_number,
             m_run_info.facility_name.c_str(),
             m_run_info.instr_shortname.c_str(),
             m_run_info.proposal_id.c_str(),

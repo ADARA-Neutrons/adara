@@ -721,8 +721,8 @@ NxGen::processRunInfo
 
     try
     {
-        writeScalar( m_instrument_path, "target_number",
-            a_run_info.target_number, "" );
+        writeScalar( m_instrument_path, "target_station_number",
+            a_run_info.target_station_number, "" );
 
         writeString( m_instrument_path, "beamline", a_run_info.instr_id );
 
