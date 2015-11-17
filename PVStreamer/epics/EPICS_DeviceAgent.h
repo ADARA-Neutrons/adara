@@ -25,13 +25,16 @@ namespace EPICS {
 
 /** \brief EPICS DeviceAgent class
   *
-  * The EPICS::DeviceAgent class manages the EPICS channel access connections
-  * for a given device.
+  * The EPICS::DeviceAgent class manages the EPICS channel access
+  * connections for a given device.
   */
 class DeviceAgent
 {
 public:
-    DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context );
+    DeviceAgent( IInputAdapterAPI &a_stream_api,
+        DeviceDescriptor *a_device,
+        struct ca_client_context *a_epics_context,
+        time_t a_device_init_timeout );
     ~DeviceAgent();
 
     void    update( DeviceDescriptor *a_device );
@@ -50,7 +53,9 @@ private:
 
     struct ChanInfo
     {
-        ChanInfo() : m_pv(0), m_chid(0), m_evid(0), m_chan_state(UNINITIALIZED), m_connected(false), m_subscribed(false)
+        ChanInfo() : m_pv(0), m_chid(0), m_evid(0),
+            m_chan_state(UNINITIALIZED), m_connected(false),
+            m_subscribed(false)
         {}
 
         DeviceRecordPtr                 m_device;
@@ -74,7 +79,8 @@ private:
     void        controlThread();
     void        monitorThread();
     void        sendCurrentValues();
-    void        epicsConnectionHandler( struct connection_handler_args a_args );
+    void        epicsConnectionHandler(
+                    struct connection_handler_args a_args );
     void        epicsEventHandler( struct event_handler_args a_args );
     PVType      epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count );
     int32_t     epicsToTimeRecordType( uint32_t a_rec_type );
@@ -84,7 +90,8 @@ private:
     template<typename T>
     void        updateState( const void *a_src, PVState &a_state );
 
-    static void epicsConnectionCallback( struct connection_handler_args a_args );
+    static void epicsConnectionCallback(
+                    struct connection_handler_args a_args );
     static void epicsEventCallback( struct event_handler_args a_args );
 
     IInputAdapterAPI           &m_stream_api;       ///< Streaming API provided by StreamService
@@ -99,6 +106,7 @@ private:
     bool                        m_state_changed;
     bool                        m_active;
     struct ca_client_context   *m_epics_context;
+	time_t                      m_device_init_timeout;
     boost::thread              *m_monitor_thread;
 };
 

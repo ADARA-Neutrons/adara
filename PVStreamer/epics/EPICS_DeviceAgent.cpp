@@ -19,8 +19,6 @@ using namespace std;
 namespace PVS {
 namespace EPICS {
 
-#define DEVICE_START_TIMEOUT 30
-
 //-------------------------------------------------------------------------------------------------
 // PUBLIC DeviceAgent Methods
 //-------------------------------------------------------------------------------------------------
@@ -34,12 +32,19 @@ namespace EPICS {
  * Calling this constructor will cause the new DeviceAgent to immediately begin activities
  * for connecting to and streaming data for the specified device (from a private thread).
  */
-DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api, DeviceDescriptor *a_device, struct ca_client_context *a_epics_context )
-    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false), m_state_changed(false), m_active(true),
-      m_epics_context(a_epics_context)
+DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
+        DeviceDescriptor *a_device,
+        struct ca_client_context *a_epics_context,
+        time_t a_device_init_timeout )
+    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false),
+      m_state_changed(false), m_active(true),
+      m_epics_context(a_epics_context),
+      m_device_init_timeout(a_device_init_timeout)
 {
-    m_monitor_thread = new boost::thread( boost::bind( &DeviceAgent::monitorThread, this ));
-    m_ctrl_thread = new boost::thread( boost::bind( &DeviceAgent::controlThread, this ));
+    m_monitor_thread = new boost::thread(
+        boost::bind( &DeviceAgent::monitorThread, this ));
+    m_ctrl_thread = new boost::thread(
+        boost::bind( &DeviceAgent::controlThread, this ));
 
     update(a_device);
 }
@@ -752,7 +757,7 @@ DeviceAgent::monitorThread()
                 {
                     // Start timer
                     memset( &timeout, 0, sizeof(struct itimerspec));
-                    timeout.it_value.tv_sec = DEVICE_START_TIMEOUT;
+                    timeout.it_value.tv_sec = m_device_init_timeout;
                     timer_settime( tid, 0, &timeout, 0 );
 
                     // Change state to INIT
