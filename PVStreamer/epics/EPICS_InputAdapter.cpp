@@ -28,9 +28,13 @@ namespace EPICS {
   * \param a_stream_serv - Parent StreamService instance
   * \param a_config_file - EPICS configuration file
   */
-InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged )
-  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_track_logged(a_track_logged),
-    m_cfg_mon_thread(0), m_source("epics"), m_gc_thread(0)
+InputAdapter::InputAdapter( StreamService &a_stream_serv,
+        const std::string &a_config_file, bool a_track_logged,
+        time_t a_device_init_timeout )
+    : IInputAdapter(a_stream_serv), m_active(true),
+      m_config_file(a_config_file), m_track_logged(a_track_logged),
+      m_cfg_mon_thread(0), m_source("epics"), m_gc_thread(0),
+      m_device_init_timeout(a_device_init_timeout)
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
@@ -86,7 +90,8 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
             a_device->m_name.c_str() );
 
         m_dev_agents[a_device->m_name] =
-            new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
+            new DeviceAgent( *m_srteam_api, a_device, m_epics_context,
+                m_device_init_timeout );
     }
 }
 
