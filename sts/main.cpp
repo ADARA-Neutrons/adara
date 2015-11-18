@@ -361,11 +361,25 @@ int main( int argc, char** argv )
         syslog( LOG_INFO, "[%i] STS failed: Unknown exception.", g_pid );
     }
 
+    string run_desc = "";
+    if ( nxgen != 0 )
+    {
+        run_desc = " of " + nxgen->getFacilityName() + " "
+            + nxgen->getBeamShortName() + "_"
+            + boost::lexical_cast<string>(nxgen->getRunNumber())
+            + " (" + nxgen->getProposalID() + ")";
+    }
+
     if ( sms_code != STS::TS_SUCCESS )
-        syslog( LOG_INFO, "[%i] STS failed: Translation failed. code: %u",
-            g_pid, (unsigned int)sms_code );
+    {
+        syslog( LOG_INFO, "[%i] STS failed: Translation%s failed. code: %u",
+            g_pid, run_desc.c_str(), (unsigned int)sms_code );
+    }
     else
-        syslog( LOG_INFO, "[%i] Translation succeeded", g_pid );
+    {
+        syslog( LOG_INFO, "[%i] Translation%s succeeded",
+            g_pid, run_desc.c_str() );
+    }
 
     if ( !interact )
     {
