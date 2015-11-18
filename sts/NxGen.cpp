@@ -127,10 +127,10 @@ NxGen::makePVInfo
         {
             if ( name_ver > 0 )
             {
-                syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Name Clash %s -> %s",
-                    g_pid, a_device_name.c_str(),
-                    a_name.c_str(), internal_name.c_str() );
+                syslog( LOG_ERR,
+                    "[%i] %s Device %s: %s Clash %s -> %s",
+                    g_pid, "STS Error:", a_device_name.c_str(),
+                    "PV Name", a_name.c_str(), internal_name.c_str() );
             }
             m_pv_name_history.insert( internal_name );
             break;
@@ -173,10 +173,10 @@ NxGen::makePVInfo
             {
                 if ( connection_ver > 0 )
                 {
-                    syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Connection String Clash %s -> %s",
-                        g_pid, a_device_name.c_str(),
-                        a_connection.c_str(),
+                    syslog( LOG_ERR,
+                        "[%i] %s Device %s: %s Clash %s -> %s",
+                        g_pid, "STS Error:", a_device_name.c_str(),
+                        "PV Connection String", a_connection.c_str(),
                         internal_connection.c_str() );
                 }
                 m_pv_name_history.insert( internal_connection );
@@ -1514,8 +1514,8 @@ NxGen::writeDeviceEnums
                         << ", Bumping Count to " << count
                         << " - Next Enum Name to Try: "
                         << ienum->name << "_" << count;
-                    syslog( LOG_INFO, "[%i] %s", g_pid,
-                        ss.str().c_str() );
+                    syslog( LOG_ERR, "[%i] %s %s",
+                        g_pid, "STS Error:", ss.str().c_str() );
 
                     stringstream ss_new;
                     ss_new << ienum->name << "_" << count;
