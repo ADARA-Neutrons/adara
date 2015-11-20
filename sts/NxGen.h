@@ -6,6 +6,7 @@
 #include <set>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -421,6 +422,7 @@ private:
                                 "[%i] Linking Enum Group %s to %s",
                                 g_pid, ss_src.str().c_str(),
                                 ss_dst.str().c_str() );
+                            usleep(30000); // give syslog a chance...
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
@@ -433,6 +435,7 @@ private:
                                 "[%i] Linking PV Channel %s to Alias %s",
                                 g_pid, m_log_path.c_str(),
                                 m_link_path.c_str() );
+                            usleep(30000); // give syslog a chance...
 
                             // Manually Create "Target" String for Linking
                             // (as per makeGroupLink usage...)
