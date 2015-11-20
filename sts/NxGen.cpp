@@ -96,7 +96,9 @@ NxGen::makePVInfo
     STS::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
     STS::Identifier         a_pv_id,        ///< [in] ID of the PV
     STS::PVType             a_type,         ///< [in] Type of PV
-    STS::PVEnumeratedType  *a_enum,         ///< [in] Enumerated Type of PV
+    std::vector<STS::PVEnumeratedType>
+                           *a_enum_vector,  ///< [in] Enumerated Type Vector for PV
+    uint32_t                a_enum_index,   ///< [in] Enumerated Type Index for PV
     const string           &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
@@ -192,16 +194,19 @@ NxGen::makePVInfo
     case STS::PVT_UINT:
         return new NxPVInfo<uint32_t>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     case STS::PVT_STRING:
         return new NxPVInfo<string>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
@@ -1480,8 +1485,8 @@ NxGen::flushCommentData()
 void
 NxGen::writeDeviceEnums
 (
-    STS::Identifier a_devId,                ///< [in] DeviceId
-    vector<STS::PVEnumeratedType> a_enumVec ///< [in] Vector of Enumerated Type Structs
+    STS::Identifier a_devId,                 ///< [in] DeviceId
+    vector<STS::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
 )
 {
     for ( vector<STS::PVEnumeratedType>::iterator ienum =
