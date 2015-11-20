@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string.h>
 #include <boost/algorithm/string.hpp>
+#include <unistd.h>
 #include <syslog.h>
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -610,6 +611,7 @@ StreamParser::rxOversizePkt
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), ADARA_IN_BUF_SIZE,
             chunk_offset, chunk_len);
+        usleep(30000); // give syslog a chance...
 
         // Handle pulse sequence flag for this Oversized Packet
         // (so we don't get "out of sync" when we throw it away... :-)
@@ -668,6 +670,7 @@ StreamParser::rxOversizePkt
         syslog( LOG_WARNING,
             "[%i] OversizePkt: next chunk max=%u offset=%u len=%u",
             g_pid, ADARA_IN_BUF_SIZE, chunk_offset, chunk_len);
+        usleep(30000); // give syslog a chance...
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -1491,6 +1494,7 @@ StreamParser::rxPacket
             "[%i] Beam Monitor %u: distance=%lf histo=(%u to %u by %u).",
             g_pid, config.id, config.distance,
             config.tofOffset, config.tofMax, config.tofBin );
+        usleep(30000); // give syslog a chance...
 
         // Basic Sanity Check...
         if ( config.tofOffset >= config.tofMax )
@@ -1644,6 +1648,7 @@ StreamParser::rxPacket
             "flags", set->flags, format.c_str(),
             "histo", set->tofOffset, set->tofMax, set->tofBin,
             "throttle", set->throttle, set->suffix.c_str() );
+        usleep(30000); // give syslog a chance...
 
         // Basic Sanity Check...
         if ( set->tofOffset >= set->tofMax )
@@ -1716,6 +1721,7 @@ StreamParser::getDetectorBankSets
                     "[%i] %s: Bank Id %d Found in \"%s\" Bank Set.",
                     g_pid, "StreamParser::getDetectorBankSets()",
                     a_bank_id, (*dbs)->name.c_str() );
+                usleep(30000); // give syslog a chance...
 
                 bank_sets.push_back(*dbs);
             }
@@ -1755,6 +1761,7 @@ StreamParser::associateDetectorBankSet
                     "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
                     g_pid, "StreamParser::associateDetectorBankSet()",
                     a_bank_set->name.c_str(), (*ibi)->m_id );
+                usleep(30000); // give syslog a chance...
 
                 (*ibi)->m_bank_sets.push_back(a_bank_set);
             }
@@ -1965,6 +1972,8 @@ StreamParser::rxPacket
                                             syslog( LOG_ERR,
                                                 "[%i] %s", g_pid,
                                                 ss.str().c_str() );
+                                            // give syslog a chance...
+                                            usleep(30000);
                                         }
                                     }
                                 }
@@ -2100,6 +2109,25 @@ StreamParser::rxPacket
                                                 // PVSD restarts during
                                                 // a recording.
 
+                                                stringstream ss;
+                                                ss << "STS Error:"
+                                                    << " PV ID Re-Numbered"
+                                                    << " (" << dev_name
+                                                    << ":" << pv_name
+                                                    << ":" << pv_connection
+                                                    << ")"
+                                                    << " - Re-Use Existing"
+                                                    << " Definition"
+                                                    << " With New"
+                                                    << " devId="
+                                                    << a_pkt.devId()
+                                                    << " pvId=" << pv_id;
+                                                syslog( LOG_ERR, "[%i] %s",
+                                                    g_pid,
+                                                    ss.str().c_str() );
+                                                // give syslog a chance...
+                                                usleep(30000);
+
                                                 // Re-use this entry
                                                 create = false;
 
@@ -2121,6 +2149,32 @@ StreamParser::rxPacket
                                                 // PVSD is reconfigured
                                                 // and restarted during
                                                 // a recording.
+
+                                                stringstream ss;
+                                                ss << "STS Error:"
+                                                    << " PV ID Re-Defined"
+                                                    << " - Flush Values"
+                                                    << " for Former"
+                                                    << " Definition"
+                                                    << " ("
+                                            << ipv->second->m_device_name
+                                                    << ":"
+                                                    << ipv->second->m_name
+                                                    << ":"
+                                            << ipv->second->m_connection
+                                                    << "),"
+                                                    << " Define New "
+                                                    << dev_name
+                                                    << ":" << pv_name
+                                                    << ":" << pv_connection
+                                                    << " devId="
+                                                    << a_pkt.devId()
+                                                    << " pvId=" << pv_id;
+                                                syslog( LOG_ERR, "[%i] %s",
+                                                    g_pid,
+                                                    ss.str().c_str() );
+                                                // give syslog a chance...
+                                                usleep(30000);
 
                                                 // Existing entry differs,
                                                 // flush and delete
@@ -2144,6 +2198,26 @@ StreamParser::rxPacket
                                             // shouldn't be an xref entry
                                             // without a corresponding
                                             // PVInfo entry.
+
+                                            stringstream ss;
+                                            ss << "STS Error:"
+                                                << " Internal Error -"
+                                                << " Dangling PV"
+                                                << " Xref Entry"
+                                                << " (" << dev_name
+                                                << ":" << pv_name
+                                                << ":" << pv_connection
+                                                << ")"
+                                                << " Without Corresponding"
+                                                << " PVInfo Entry"
+                                                << " devId="
+                                                << a_pkt.devId()
+                                                << " pvId=" << pv_id;
+                                            syslog( LOG_ERR, "[%i] %s",
+                                                g_pid, ss.str().c_str() );
+                                            // give syslog a chance...
+                                            usleep(30000);
+
                                             // Delete bad xref entry
                                             m_pv_name_xref.erase( xref );
                                         }
@@ -2199,6 +2273,38 @@ StreamParser::rxPacket
                                             pv_enum_index,
                                             pv_units ) )
                                     {
+                                        stringstream ss;
+                                        ss << "STS Error:"
+                                            << " PV Dev/ID Key Re-Used!"
+                                            << " Flush Values for"
+                                            << " Previous Definition"
+                                            << " ("
+                                            << ipv->second->m_device_name
+                                            << ":"
+                                            << ipv->second->m_name
+                                            << ":"
+                                            << ipv->second->m_connection
+                                            << ":"
+                                            << ipv->second->m_type
+                                            << ":"
+                                            << ipv->second->m_units
+                                            << ")"
+                                            << " Define New PV"
+                                            << " (" << dev_name
+                                            << ":" << pv_name
+                                            << ":" << pv_connection
+                                            << ":" << pv_type
+                                            << ":" << pv_units
+                                            << ")"
+                                            << " devId="
+                                            << a_pkt.devId()
+                                            << " pvId=" << pv_id;
+                                        syslog( LOG_ERR, "[%i] %s",
+                                            g_pid,
+                                            ss.str().c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+
                                         // Did the name change?
                                         if ( dev_name !=
                                                 ipv->second->m_device_name
@@ -2267,11 +2373,15 @@ StreamParser::rxPacket
                             {
                                 stringstream ss;
                                 ss << "STS Error:"
-                                    << " Skipping PV "
+                                    << " Skipping PV - Missing Fields!"
                                     << " devId=" << a_pkt.devId()
-                                    << " pvId=" << pv_id;
+                                    << " pvId=" << pv_id
+                                    << " found=0x"
+                                    << std::hex << found << std::dec;
                                 syslog( LOG_ERR, "[%i] %s", g_pid,
                                     ss.str().c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
                             }
 
                             // Reset PV Name and Connection String...!
@@ -2366,6 +2476,8 @@ StreamParser::rxPacket
                                             << " elemValue=" << elem_value;
                                         syslog( LOG_ERR, "[%i] %s", g_pid,
                                             ss.str().c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
                                     }
                                 }
                             }
@@ -2386,6 +2498,8 @@ StreamParser::rxPacket
                                         << " First Enum " << devEnum.name;
                                     syslog( LOG_INFO, "[%i] %s", g_pid,
                                         ss.str().c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
 
                                     std::vector<PVEnumeratedType> enumVec;
                                     enumVec.push_back( devEnum );
@@ -2420,6 +2534,8 @@ StreamParser::rxPacket
                                             // syslog( LOG_ERR,
                                                 // "[%i] %s", g_pid,
                                                 // ss.str().c_str() );
+                                            // give syslog a chance...
+                                            // usleep(30000);
                                             addEnum = false;
                                         }
                                         else if ( !ienum->second[i].name
@@ -2435,7 +2551,9 @@ StreamParser::rxPacket
                                             syslog( LOG_ERR,
                                                 "[%i] %s", g_pid,
                                                 ss.str().c_str() );
-                                            // Still Include Enum in File?
+                                            // give syslog a chance...
+                                            usleep(30000);
+                                            // Still Include Enum in File.
                                         }
                                     }
 
@@ -2448,6 +2566,8 @@ StreamParser::rxPacket
                                             << devEnum.name;
                                         syslog( LOG_INFO, "[%i] %s", g_pid,
                                             ss.str().c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
 
                                         ienum->second.push_back( devEnum );
                                     }
@@ -2462,6 +2582,8 @@ StreamParser::rxPacket
                                     << " enumName=" << devEnum.name;
                                 syslog( LOG_ERR, "[%i] %s", g_pid,
                                     ss.str().c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
                             }
                         }
                     }
