@@ -1966,7 +1966,7 @@ StreamParser::rxPacket
                                                         << pv_connection
                                                         << ")"
                                                         << " index="
-                                                        << index;
+                                                        << i;
                                                     syslog( LOG_ERR,
                                                         "[%i] %s", g_pid,
                                                         ss.str().c_str() );
