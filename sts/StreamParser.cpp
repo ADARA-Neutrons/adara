@@ -1954,6 +1954,10 @@ StreamParser::rxPacket
                                                     !ienum->second[i].name.
                                                         compare( value ) )
                                                 {
+                                                    /*
+                                                     * Commemorative
+                                                     * "Lucky Day" Log! :-D
+                                                     * 11/20/2015 - Jeeem
                                                     stringstream ss;
                                                     ss << "STS Error: "
                                                         << "Device "
@@ -1972,6 +1976,7 @@ StreamParser::rxPacket
                                                         ss.str().c_str() );
                                                     // give syslog a chance
                                                     usleep(30000);
+                                                    */
 
                                                     pv_enum_vector =
                                                        &(ienum->second);
