@@ -1852,7 +1852,8 @@ StreamParser::rxPacket
         string              pv_connection;
         string              pv_units;
         PVType              pv_type = PVT_INT;
-        PVEnumeratedType   *pv_enum = NULL;
+        std::vector<PVEnumeratedType> *pv_enum_vector = NULL;
+        uint32_t            pv_enum_index = (uint32_t) -1;
         short               found;
         string              tag;
         string              value;
@@ -1880,6 +1881,8 @@ StreamParser::rxPacket
                         if ( xmlStrcmp( pvsnode->name,
                                 (const xmlChar*)"process_variable" ) == 0 )
                         {
+                            pv_enum_vector = NULL;
+                            pv_enum_index = (uint32_t) -1;
                             pv_units = "";
                             found = 0;
 
@@ -1920,7 +1923,6 @@ StreamParser::rxPacket
                                     pv_type = toPVType( value.c_str() );
 
                                     // Match Up Any Enumerated Types!
-                                    pv_enum = NULL;
                                     if ( pv_type == PVT_ENUM )
                                     {
                                         map<Identifier,
@@ -1939,14 +1941,15 @@ StreamParser::rxPacket
                                                     !ienum->second[i].name.
                                                         compare( value ) )
                                                 {
-                                                    pv_enum =
-                                                       &(ienum->second[i]);
+                                                    pv_enum_vector =
+                                                       &(ienum->second);
+                                                    pv_enum_index = i;
                                                 }
                                             }
                                         }
 
                                         // We Didn't Find the Enum Type!
-                                        if ( pv_enum == NULL )
+                                        if ( pv_enum_vector == NULL )
                                         {
                                             stringstream ss;
                                             ss << "STS Error: "
@@ -2082,8 +2085,11 @@ StreamParser::rxPacket
                                         {
                                             if ( ipv->second->
                                                 sameDefinition( dev_name,
-                                                    pv_name, pv_connection,
-                                                    pv_type, pv_enum,
+                                                    pv_name,
+                                                    pv_connection,
+                                                    pv_type,
+                                                    pv_enum_vector,
+                                                    pv_enum_index,
                                                     pv_units ) )
                                             {
                                                 // There is an existing
@@ -2151,9 +2157,13 @@ StreamParser::rxPacket
                                         // PV type, makePVInfo will
                                         // return NULL
                                         info = makePVInfo( dev_name,
-                                                pv_name, pv_connection,
-                                                a_pkt.devId(), pv_id,
-                                                pv_type, pv_enum,
+                                                pv_name,
+                                                pv_connection,
+                                                a_pkt.devId(),
+                                                pv_id,
+                                                pv_type,
+                                                pv_enum_vector,
+                                                pv_enum_index,
                                                 pv_units );
                                         if ( info )
                                         {
@@ -2181,9 +2191,12 @@ StreamParser::rxPacket
                                     // not always be able to.
 
                                     if ( !ipv->second->sameDefinition(
-                                            dev_name, pv_name,
+                                            dev_name,
+                                            pv_name,
                                             pv_connection,
-                                            pv_type, pv_enum,
+                                            pv_type,
+                                            pv_enum_vector,
+                                            pv_enum_index,
                                             pv_units ) )
                                     {
                                         // Did the name change?
@@ -2227,9 +2240,13 @@ StreamParser::rxPacket
                                         // If PV type not supported,
                                         // makePVInfo will return NULL
                                         info = makePVInfo( dev_name,
-                                            pv_name, pv_connection,
-                                            a_pkt.devId(), pv_id,
-                                            pv_type, pv_enum,
+                                            pv_name,
+                                            pv_connection,
+                                            a_pkt.devId(),
+                                            pv_id,
+                                            pv_type,
+                                            pv_enum_vector,
+                                            pv_enum_index,
                                             pv_units );
                                         if ( info )
                                         {
