@@ -2,6 +2,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
@@ -1538,6 +1539,7 @@ NxGen::writeDeviceEnums
         ss << "Creating Enum Log Group for Device " << a_devId
             << " enum_name=" << enum_name;
         syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+        usleep(30000); // give syslog a chance...
 
         // Save "New Name" for Enum, For Subsequent Comparisons...!
         ienum->name = enum_name;
