@@ -1944,13 +1944,40 @@ StreamParser::rxPacket
                                                 i < ienum->second.size() ;
                                                 i++ )
                                             {
+                                                // Capture LAST Enum Match!
+                                                // (in case of Name Clash,
+                                                // the *Last* One will have
+                                                // _Just_ been added for
+                                                // the Device we're just
+                                                // now parsing... "Lucky"!
                                                 if (
                                                     !ienum->second[i].name.
                                                         compare( value ) )
                                                 {
+                                                    stringstream ss;
+                                                    ss << "STS Error: "
+                                                        << "Device "
+                                                        << a_pkt.devId()
+                                                        << " Enum "
+                                                        << value
+                                                        << " Found for PV "
+                                                        << pv_name
+                                                        << "("
+                                                        << pv_connection
+                                                        << ")"
+                                                        << " index="
+                                                        << index;
+                                                    syslog( LOG_ERR,
+                                                        "[%i] %s", g_pid,
+                                                        ss.str().c_str() );
+                                                    // give syslog a chance
+                                                    usleep(30000);
+
                                                     pv_enum_vector =
                                                        &(ienum->second);
                                                     pv_enum_index = i;
+                                                    // *Don't* Stop Search,
+                                                    // Want *Last* Match!
                                                 }
                                             }
                                         }
