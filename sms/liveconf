@@ -2218,9 +2218,11 @@ elif [[ "$command" == "confck" ]]; then
 			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
 				opt_id_num="$id"
 				optId="${idName[$opt_id_type]}${opt_id_num}"
+				subscript="[$id]"
 			else
 				opt_id_num="-1"
 				optId="${idName[$opt_id_type]}"
+				subscript=""
 			fi
 
 			# Handle Indexed PV's, Substitute Option Id Number...
@@ -2311,14 +2313,15 @@ elif [[ "$command" == "confck" ]]; then
 
 				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
 
-				echo "   ${option_label[$i]}:"
+				echo "   ${option_label[$i]}${subscript}:"
 				echo "      Config:[$config_value]"
 				echo "         != Live:[$live_value]"
 
 				num_mismatch=$(( num_mismatch + 1 ))
 
 			else
-				echo "Live Config Matches File Config."
+				echo "Live Config Matches File Config:"
+				echo "   ${option_label[$i]}${subscript}."
 			fi
 
 			# Restore Any Option ID Type Mapping...
