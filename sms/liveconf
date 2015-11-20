@@ -2235,16 +2235,14 @@ elif [[ "$command" == "confck" ]]; then
 			# (There's no separate "SMSControl" config section.)
 			save_opt_id_type="$opt_id_type"
 			if [ "$opt_id_type" == "ctrl" ]; then
-				echo -n "Mapping Control Options to SMS"
+				echo -n "   Mapping Control Options to SMS"
 				echo " for Config File Handling."
 				opt_id_type="sms"
 			fi
 
 			if [ "$option" == "enabled" ]; then
-				echo "Enabled Option Special Handling..."
+				echo "   Special Handling for 'Enabled' Option..."
 				option="disabled"
-				opt_config_value="true"
-				opt_config_str="[Disabled: $option = $opt_config_value]"
 			fi
 
 			echo
@@ -2274,25 +2272,48 @@ elif [[ "$command" == "confck" ]]; then
 			if [[ $config_value == $COMMENTED_VALUE \
 					|| $config_value == $VALUE_NOT_FOUND ]]; then
 
-				echo -n "Warning: Config File Option Value"
-				echo " Not Found or Commented Out..."
+				if [ "$option" == "disabled" ]; then
 
-				if [[ ${option_default[$i]} != "" ]]; then
-					echo -n "   -> Using Default SMS Value: "
-					echo "${option_default[$i]}"
-					config_value="${option_default[$i]}"
+					echo "'Disabled' Option Commented/Not Found -> Enabled"
+					echo
+
+					config_value="Enabled"
+
 				else
-					echo "   -> *** No Default SMS Value Specified...!"
-					config_value="XXX_NO_VALUE_SPECIFIED_XXX"
+
+					echo -n "Warning: Config File Option Value"
+					echo " Not Found or Commented Out..."
+
+					if [[ ${option_default[$i]} != "" ]]; then
+						echo -n "   -> Using Default SMS Value: "
+						echo "${option_default[$i]}"
+						config_value="${option_default[$i]}"
+					else
+						echo "   -> *** No Default SMS Value Specified...!"
+						config_value="XXX_NO_VALUE_SPECIFIED_XXX"
+					fi
+
+					echo
+
 				fi
 
+			elif [[ "$option" == "disabled" \
+					&& $config_value="true" ]]; then
+
+				echo "'Disabled' Option Set to True -> Disabled"
 				echo
+
+				config_value="Disabled"
 
 			fi
 
 			if [[ $live_value != $config_value ]]; then
 
 				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+				echo "   ${option_label[$i]}:"
+				echo "      Config:[$config_value]"
+				echo "         != Live:[$live_value]"
 
 				num_mismatch=$(( num_mismatch + 1 ))
 
@@ -2303,9 +2324,9 @@ elif [[ "$command" == "confck" ]]; then
 			# Restore Any Option ID Type Mapping...
 			opt_id_type="$save_opt_id_type"
 
-			echo
-
 		done
+
+		echo
 
 	done
 
