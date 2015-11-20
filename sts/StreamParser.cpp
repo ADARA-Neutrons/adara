@@ -2112,10 +2112,12 @@ StreamParser::rxPacket
                                                 stringstream ss;
                                                 ss << "STS Error:"
                                                     << " PV ID Re-Numbered"
-                                                    << " (" << dev_name
-                                                    << ":" << pv_name
-                                                    << ":" << pv_connection
-                                                    << ")"
+                                                    << " [Device "
+                                                    << dev_name
+                                                    << ": " << pv_name
+                                                    << " ("
+                                                    << pv_connection
+                                                    << ")]"
                                                     << " - Re-Use Existing"
                                                     << " Definition"
                                                     << " With New"
@@ -2156,17 +2158,20 @@ StreamParser::rxPacket
                                                     << " - Flush Values"
                                                     << " for Former"
                                                     << " Definition"
-                                                    << " ("
+                                                    << " [Device "
                                             << ipv->second->m_device_name
-                                                    << ":"
+                                                    << ": "
                                                     << ipv->second->m_name
-                                                    << ":"
+                                                    << " ("
                                             << ipv->second->m_connection
-                                                    << "),"
+                                                    << ")],"
                                                     << " Define New "
+                                                    << " [Device "
                                                     << dev_name
-                                                    << ":" << pv_name
-                                                    << ":" << pv_connection
+                                                    << ": " << pv_name
+                                                    << " ("
+                                                    << pv_connection
+                                                    << ")]"
                                                     << " devId="
                                                     << a_pkt.devId()
                                                     << " pvId=" << pv_id;
@@ -2204,10 +2209,10 @@ StreamParser::rxPacket
                                                 << " Internal Error -"
                                                 << " Dangling PV"
                                                 << " Xref Entry"
-                                                << " (" << dev_name
-                                                << ":" << pv_name
-                                                << ":" << pv_connection
-                                                << ")"
+                                                << " [Device " << dev_name
+                                                << ": " << pv_name
+                                                << " (" << pv_connection
+                                                << ")]"
                                                 << " Without Corresponding"
                                                 << " PVInfo Entry"
                                                 << " devId="
@@ -2278,24 +2283,26 @@ StreamParser::rxPacket
                                             << " PV Dev/ID Key Re-Used!"
                                             << " Flush Values for"
                                             << " Previous Definition"
-                                            << " ("
+                                            << " [Device "
                                             << ipv->second->m_device_name
-                                            << ":"
+                                            << ": "
                                             << ipv->second->m_name
-                                            << ":"
+                                            << " ("
                                             << ipv->second->m_connection
-                                            << ":"
+                                            << ")"
+                                            << " type="
                                             << ipv->second->m_type
-                                            << ":"
+                                            << " units="
                                             << ipv->second->m_units
-                                            << ")"
+                                            << "]"
                                             << " Define New PV"
-                                            << " (" << dev_name
-                                            << ":" << pv_name
-                                            << ":" << pv_connection
-                                            << ":" << pv_type
-                                            << ":" << pv_units
+                                            << " [Device " << dev_name
+                                            << ": " << pv_name
+                                            << " (" << pv_connection
                                             << ")"
+                                            << " type=" << pv_type
+                                            << " units=" << pv_units
+                                            << "]"
                                             << " devId="
                                             << a_pkt.devId()
                                             << " pvId=" << pv_id;
