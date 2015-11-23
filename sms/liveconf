@@ -683,7 +683,10 @@ GET_LIVE_SETTING()
 	if [ ${_live_ok} != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
 	else
-		live_value=`echo ${_live_current} | awk '{print $2}'`
+		live_value=`echo ${_live_current} \
+			| awk '{ $1=""; print substr($0,2) }'`
+			# wipe out 1st word (PV connection string),
+			# and intervening space... ;-b
 		echo "   ${_live_current} ($live_value)"
 	fi
 	return ${_live_ok}
@@ -2269,6 +2272,13 @@ elif [[ "$command" == "confck" ]]; then
 			GET_CONFIG_SETTING "$optId" "$opt_label" \
 				"$option" "$opt_config_str"
 
+			config_value_strip=`echo "$config_value" \
+				| sed -e 's/^"//' -e 's/"$//' -e 's/\.0$//'`
+			if [[ "$config_value_strip" != "$config_value" ]]; then
+				echo "Stripped Quotes/Trailing Decimal from Config Value."
+				config_value="$config_value_strip"
+			fi
+
 			echo -e "\nconfig_value = [$config_value]\n"
 
 			if [[ $config_value == $COMMENTED_VALUE \
@@ -2309,7 +2319,7 @@ elif [[ "$command" == "confck" ]]; then
 
 			fi
 
-			if [[ $live_value != $config_value ]]; then
+			if [[ "$live_value" != "$config_value" ]]; then
 
 				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
 
