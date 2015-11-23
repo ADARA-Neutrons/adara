@@ -71,7 +71,7 @@ private:
     boost::thread                      *m_gc_thread;        ///< Garbage collection thread handle
     boost::recursive_mutex              m_mutex;            ///< Synch mutex
     struct ca_client_context           *m_epics_context;    ///< Current EPICS thread context
-	time_t                              m_device_init_timeout; ///< Device Initialization Timeout (seconds)
+    time_t                              m_device_init_timeout; ///< Device Initialization Timeout (seconds)
 
 };
 

@@ -106,7 +106,7 @@ private:
     bool                        m_state_changed;
     bool                        m_active;
     struct ca_client_context   *m_epics_context;
-	time_t                      m_device_init_timeout;
+    time_t                      m_device_init_timeout;
     boost::thread              *m_monitor_thread;
 };
 
