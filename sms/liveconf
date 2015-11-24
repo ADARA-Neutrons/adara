@@ -72,7 +72,6 @@ option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(data)"
-option_default[$num_options]=""
 option_label[$num_options]="[Data Source URI]"
 num_options=$(( num_options + 1 ))
 
@@ -80,7 +79,6 @@ option_id_type[$num_options]="source"
 option_name[$num_options]="enabled"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
 option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
-option_default[$num_options]=""
 option_label[$num_options]="[Enable/Disable Data Source]"
 num_options=$(( num_options + 1 ))
 
@@ -154,7 +152,6 @@ option_name[$num_options]="pop_pulse_buffer"
 option_no_config[$num_options]=1
 option_pv[$num_options]="SMS:Control:PopPulseBuffer"
 option_value_type[$num_options]="INT32_VALUE(pulse_index)"
-option_default[$num_options]=""
 option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
 num_options=$(( num_options + 1 ))
 
@@ -178,7 +175,6 @@ option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
 option_value_type[$num_options]="UINT32_VALUE(Never Use This :-)"
-option_default[$num_options]=""
 option_label[$num_options]="[Manually Override Beam Monitor Id in Config]"
 num_options=$(( num_options + 1 ))
 
@@ -294,7 +290,6 @@ option_name[$num_options]="restart"
 option_no_config[$num_options]=1
 option_pv[$num_options]="SMS:Combus:Restart"
 option_value_type[$num_options]="BOOL_VALUE(Trigger ComBus Restart)"
-option_default[$num_options]=""
 option_label[$num_options]="[Trigger ComBus Restart & Reconnect]"
 num_options=$(( num_options + 1 ))
 
@@ -303,7 +298,8 @@ option_name[$num_options]="domain"
 option_pv[$num_options]="SMS:Combus:Domain"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(ComBus Domain Name.)"
-option_default[$num_options]="SNS.TEST"
+option_default[$num_options]="SNS.TEST."
+option_default_suffix[$num_options]="\."
 option_label[$num_options]="[ComBus Domain]"
 num_options=$(( num_options + 1 ))
 
@@ -313,6 +309,7 @@ option_pv[$num_options]="SMS:Combus:BrokerURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(ComBus Broker URI tcp://host:port)"
 option_default[$num_options]="localhost"
+option_default_suffix[$num_options]=":61616"
 option_label[$num_options]="[ComBus Broker URI]"
 num_options=$(( num_options + 1 ))
 
@@ -340,7 +337,6 @@ option_pv[$num_options]="SMS:StorageManager:Poolsize"
 option_pv_opt[$num_options]="-S"
 option_config_supercede[$num_options]="max_blocks_allowed"
 option_value_type[$num_options]="UINT32_VALUE+[G|M]"
-option_default[$num_options]=""
 option_label[$num_options]="[Storage Poolsize (Max Blocks Allowed)]"
 num_options=$(( num_options + 1 ))
 
@@ -2194,6 +2190,10 @@ elif [[ "$command" == "confck" ]]; then
 
 		opt_label="${option_label[$i]}"
 
+		opt_default="${option_default[$i]}"
+
+		opt_default_suffix="${option_default_suffix[$i]}"
+
 		option="${option_name[$i]}"
 
 		# Get Number of Instances for Indexed Option
@@ -2279,6 +2279,18 @@ elif [[ "$command" == "confck" ]]; then
 				config_value="$config_value_strip"
 			fi
 
+			if [[ "$opt_default_suffix" != "" ]]; then
+				cksuffix=`echo "$config_value" \
+					| grep "${opt_default_suffix}\$" \
+					| wc | awk '{print $1}'`
+				if [[ $cksuffix == 0 ]]; then
+					# Strip Off Any Regex Escapes for Append...
+					sfx=`echo "$opt_default_suffix" | sed -e 's/\\\\//g'`
+					echo "Appending Default Config Suffix \"${sfx}\"."
+					config_value="$config_value$sfx"
+				fi
+			fi
+
 			echo -e "\nconfig_value = [$config_value]\n"
 
 			if [[ $config_value == $COMMENTED_VALUE \
@@ -2296,10 +2308,10 @@ elif [[ "$command" == "confck" ]]; then
 					echo -n "Warning: Config File Option Value"
 					echo " Not Found or Commented Out..."
 
-					if [[ ${option_default[$i]} != "" ]]; then
+					if [[ "$opt_default" != "" ]]; then
 						echo -n "   -> Using Default SMS Value: "
-						echo "${option_default[$i]}"
-						config_value="${option_default[$i]}"
+						echo "$opt_default"
+						config_value="$opt_default"
 					else
 						echo "   -> *** No Default SMS Value Specified...!"
 						config_value="XXX_NO_VALUE_SPECIFIED_XXX"
