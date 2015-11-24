@@ -446,7 +446,7 @@ USAGE()
 	echo "            [bmon_status] [detset_status] [combus_status] \\"
 	echo "            [live_status] [bandwidth] [confck] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
-	echo "            [--skiplive] [--testonly] [--help]"
+	echo "            [--skiplive] [--testonly] [--terse] [--help]"
 	echo
 
 	echo "where:"
@@ -457,6 +457,7 @@ USAGE()
 	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
 	echo "   --skiplive            = *don't* set live config option"
 	echo "   --testonly            = *don't* actually change anything!"
+	echo "   --terse               = display minimal output details"
 	echo "   --help                = display this help/usage information"
 	echo
 
@@ -516,6 +517,7 @@ fi
 # Check for settings customization...
 skiplive=0
 testonly=0
+terse=0
 PRE="[NotSet]"
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -542,6 +544,9 @@ for arg in "$@" ; do
 	elif [ "#$key#" == '#--testonly#' ]; then
 		testonly=1
 		echo -e "*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
+	elif [ "#$key#" == '#--terse#' ]; then
+		terse=1
+		echo -e "Setting for Terse Operation.\n"
 	elif [ "#$key#" == '#--help#' ]; then
 		USAGE
 		exit -1
@@ -668,10 +673,12 @@ Dump_Non_Zero_PV()
 
 GET_LIVE_SETTING()
 {
-	echo "Getting Current Live SMS Daemon Setting (PV) for:"
-	echo "   ${optId}:${opt_label}"
-	echo "   ${PRE}:${PV}"
-	echo
+	if [[ $terse == 0 ]]; then
+		echo "Getting Current Live SMS Daemon Setting (PV) for:"
+		echo "   ${optId}:${opt_label}"
+		echo "   ${PRE}:${PV}"
+		echo
+	fi
 	local _live_current=""
 	local _live_ok=""
 	_live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
@@ -683,7 +690,9 @@ GET_LIVE_SETTING()
 			| awk '{ $1=""; print substr($0,2) }'`
 			# wipe out 1st word (PV connection string),
 			# and intervening space... ;-b
-		echo "   ${_live_current} ($live_value)"
+		if [[ $terse == 0 ]]; then
+			echo "   ${_live_current} ($live_value)"
+		fi
 	fi
 	return ${_live_ok}
 }
@@ -719,9 +728,11 @@ GET_CONFIG_SETTING()
 	local _option="$3"
 	local _opt_config_str="$4"
 
-	echo "Getting Current SMS Daemon Config File Setting for:"
-	echo "   ${_optId}:${_opt_label}"
-	echo "   (in $SMSD_CONFIG)"
+	if [[ $terse == 0 ]]; then
+		echo "Getting Current SMS Daemon Config File Setting for:"
+		echo "   ${_optId}:${_opt_label}"
+		echo "   (in $SMSD_CONFIG)"
+	fi
 
 	WS="^[[:space:]]*$"
 
@@ -963,7 +974,8 @@ GET_CONFIG_SETTING()
 	config_use_comment=0
 
 	if [[ ${_found} == 0 ]]; then
-		echo -e -n "\nWARNING: Active \"${_option}\" Option "
+		if [[ $terse == 0 ]]; then echo; fi
+		echo -e -n "WARNING: Active \"${_option}\" Option "
 		echo "Setting Not Found!"
 		if [[ "#$last_comment_line_num#" != '##' ]]; then
 			echo -n "   Using Last Comment: (line $last_comment_line_num) "
@@ -992,7 +1004,8 @@ GET_CONFIG_SETTING()
 			do_git_config=0
 		fi
 	elif [[ ${_found} > 1 ]]; then
-		echo -e -n "\nWARNING: *Multiple* Active Non-Source "
+		if [[ $terse == 0 ]]; then echo; fi
+		echo -e -n "WARNING: *Multiple* Active Non-Source "
 		echo "\"${_option}\" Option Settings!"
 		echo "Cannot Automatically Update Configuration File... ;-Q"
 		echo "   ${opt_str}"
@@ -1004,7 +1017,7 @@ GET_CONFIG_SETTING()
 		do_git_config=0
 	fi
 
-	if [ "$do_config" == 1 ]; then
+	if [[ "$do_config" == 1 && $terse == 0 ]]; then
 		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
 		echo "   ${opt_str}"
 		if [[ ${opt_id_name} != "" ]]; then
@@ -2176,11 +2189,14 @@ elif [[ "$command" == "confck" ]]; then
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
 
 		echo "${option_label[$i]}:"
-		echo "   ${option_value_type[$i]}"
-		echo "   [${option_id_type[$i]}/${option_name[$i]}]"
+		if [[ $terse == 0 ]]; then
+			echo "   ${option_value_type[$i]}"
+			echo "   [${option_id_type[$i]}/${option_name[$i]}]"
+		fi
 
 		if [[ ${option_no_config[$i]} == 1 ]]; then
-			echo -e "\nNo Config for Option - Skipping...\n"
+			if [[ $terse == 0 ]]; then echo; fi
+			echo -e "No Config for Option - Skipping...\n"
 			continue
 		fi
 
@@ -2240,13 +2256,17 @@ elif [[ "$command" == "confck" ]]; then
 			# (There's no separate "SMSControl" config section.)
 			save_opt_id_type="$opt_id_type"
 			if [ "$opt_id_type" == "ctrl" ]; then
-				echo -n "   Mapping Control Options to SMS"
-				echo " for Config File Handling."
+				if [[ $terse == 0 ]]; then
+					echo -n "   Mapping Control Options to SMS"
+					echo " for Config File Handling."
+				fi
 				opt_id_type="sms"
 			fi
 
 			if [ "$option" == "enabled" ]; then
-				echo "   Special Handling for 'Enabled' Option..."
+				if [[ $terse == 0 ]]; then
+					echo "   Special Handling for 'Enabled' Option..."
+				fi
 				option="disabled"
 			fi
 
@@ -2267,7 +2287,9 @@ elif [[ "$command" == "confck" ]]; then
 				echo
 			fi
 
-			echo -e "\nlive_value = [$live_value]\n"
+			if [[ $terse == 0 ]]; then echo; fi
+			echo "live_value = [$live_value]"
+			if [[ $terse == 0 ]]; then echo; fi
 
 			GET_CONFIG_SETTING "$optId" "$opt_label" \
 				"$option" "$opt_config_str"
@@ -2275,7 +2297,10 @@ elif [[ "$command" == "confck" ]]; then
 			config_value_strip=`echo "$config_value" \
 				| sed -e 's/^"//' -e 's/"$//' -e 's/\.0$//'`
 			if [[ "$config_value_strip" != "$config_value" ]]; then
-				echo "Stripped Quotes/Trailing Decimal from Config Value."
+				if [[ $terse == 0 ]]; then
+					echo -e -n "\nStripped Quotes/Trailing Decimal"
+					echo "from Config Value."
+				fi
 				config_value="$config_value_strip"
 			fi
 
@@ -2286,24 +2311,32 @@ elif [[ "$command" == "confck" ]]; then
 				if [[ $cksuffix == 0 ]]; then
 					# Strip Off Any Regex Escapes for Append...
 					sfx=`echo "$opt_default_suffix" | sed -e 's/\\\\//g'`
-					echo "Appending Default Config Suffix \"${sfx}\"."
+					if [[ $terse == 0 ]]; then
+						echo -e -n "\nAppending Default Config Suffix"
+						echo -e "\"${sfx}\"."
+					fi
 					config_value="$config_value$sfx"
 				fi
 			fi
-
-			echo -e "\nconfig_value = [$config_value]\n"
 
 			if [[ $config_value == $COMMENTED_VALUE \
 					|| $config_value == $VALUE_NOT_FOUND ]]; then
 
 				if [ "$option" == "disabled" ]; then
 
-					echo "'Disabled' Option Commented/Not Found -> Enabled"
-					echo
+					if [[ $terse == 0 ]]; then
+						echo -e -n \
+							"\n'Disabled' Option Commented/Not Found"
+						echo " -> Enabled"
+					fi
 
 					config_value="Enabled"
 
 				else
+
+					if [[ $terse == 0 ]]; then
+						echo -e "\nconfig_value = [$config_value]\n"
+					fi
 
 					echo -n "Warning: Config File Option Value"
 					echo " Not Found or Commented Out..."
@@ -2317,19 +2350,22 @@ elif [[ "$command" == "confck" ]]; then
 						config_value="XXX_NO_VALUE_SPECIFIED_XXX"
 					fi
 
-					echo
-
 				fi
 
 			elif [[ "$option" == "disabled" \
 					&& $config_value="true" ]]; then
 
-				echo "'Disabled' Option Set to True -> Disabled"
-				echo
+				if [[ $terse == 0 ]]; then
+					echo -e "\n'Disabled' Option Set to True -> Disabled"
+				fi
 
 				config_value="Disabled"
 
 			fi
+
+			if [[ $terse == 0 ]]; then echo; fi
+			echo "config_value = [$config_value]"
+			if [[ $terse == 0 ]]; then echo; fi
 
 			if [[ "$live_value" != "$config_value" ]]; then
 
