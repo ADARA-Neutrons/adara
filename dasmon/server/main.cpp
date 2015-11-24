@@ -49,7 +49,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.4.2"
+#define DASMON_VERSION "1.4.3"
 
 
 bool g_child_signal = false;
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
     // Initialize SysLog
 
     openlog( "dasmond", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "Dasmon started." );
+    syslog( LOG_INFO, "Dasmon Daemon %s Started.", DASMON_VERSION );
 
     if ( !opt_map.count( "domain" ))
     {
