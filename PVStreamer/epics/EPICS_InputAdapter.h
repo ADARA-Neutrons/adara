@@ -38,7 +38,9 @@ class DeviceAgent;
 class InputAdapter : public IInputAdapter
 {
 public:
-    InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged = false );
+    InputAdapter( StreamService &a_stream_serv,
+        const std::string &a_config_file, bool a_track_logged = false,
+        time_t a_device_init_timeout = 60 );
     ~InputAdapter();
 
 private:
@@ -47,10 +49,15 @@ private:
     void            stopDevice( const std::string &a_dev_name );
     void            stopAllDevices();
     void            gcThread();
-    bool            parseConfigBuffer( const char* a_buffer, int a_buffer_size, std::vector<DeviceDescriptor*> &a_devices );
-    xmlNode*        xmlFind( const char *a_tag, xmlNode *a_parent_node ) const;
-    void            xmlGetValue( xmlNode *a_node, std::string &a_value ) const;
-    bool            xmlGetAttribute( xmlNode *a_node, const char *a_attrib, std::string &a_value ) const;
+    bool            parseConfigBuffer( const char* a_buffer,
+                        int a_buffer_size,
+                        std::vector<DeviceDescriptor*> &a_devices );
+    xmlNode*        xmlFind( const char *a_tag,
+                        xmlNode *a_parent_node ) const;
+    void            xmlGetValue( xmlNode *a_node,
+                        std::string &a_value ) const;
+    bool            xmlGetAttribute( xmlNode *a_node,
+                        const char *a_attrib, std::string &a_value ) const;
 
     bool                                m_active;           ///< Instance active flag (reset on destruction)
     std::string                         m_config_file;      ///< Configuration file to read/monitor
@@ -64,6 +71,7 @@ private:
     boost::thread                      *m_gc_thread;        ///< Garbage collection thread handle
     boost::recursive_mutex              m_mutex;            ///< Synch mutex
     struct ca_client_context           *m_epics_context;    ///< Current EPICS thread context
+    time_t                              m_device_init_timeout; ///< Device Initialization Timeout (seconds)
 
 };
 

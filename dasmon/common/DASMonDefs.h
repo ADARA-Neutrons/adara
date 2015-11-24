@@ -42,7 +42,7 @@ public:
     {
         m_facility.clear();
 
-        m_target_number = 1;
+        m_target_station_number = 1;
 
         m_beam_id.clear();
         m_beam_sname.clear();
@@ -51,7 +51,7 @@ public:
 
     std::string             m_facility;
 
-    uint32_t                m_target_number;
+    uint32_t                m_target_station_number;
 
     std::string             m_beam_id;
     std::string             m_beam_sname;

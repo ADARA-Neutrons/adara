@@ -50,7 +50,7 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
-	uint32_t getTargetNumber(void) { return m_targetNumber; }
+	uint32_t getTargetStationNumber(void) { return m_targetStationNumber; }
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
@@ -211,7 +211,7 @@ private:
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
 
-	static uint32_t m_targetNumber;
+	static uint32_t m_targetStationNumber;
 
 	static std::string m_version;
 	static std::string m_beamlineId;

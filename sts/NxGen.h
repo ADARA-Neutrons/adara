@@ -6,6 +6,7 @@
 #include <set>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 #include "h5nx.hpp"
 #include "stsdefs.h"
 #include "StreamParser.h"
@@ -99,7 +100,7 @@ private:
         bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
         uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
-        NxGen&                  m_nxgen;            ///< NxGen parent class
+        NxGen                  &m_nxgen;            ///< NxGen parent class
     };
 
     /// MonitorInfo subclass that adds Nexus-required attributes
@@ -166,7 +167,7 @@ private:
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bins dataset
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         uint64_t                m_event_cur_size;   ///< Running size of TOF dataset
-        NxGen&                  m_nxgen;            ///< NxGen parent class
+        NxGen                  &m_nxgen;            ///< NxGen parent class
     };
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
@@ -185,13 +186,16 @@ private:
             STS::Identifier        a_device_id,    ///< [in] ID of device that owns the PV
             STS::Identifier        a_pv_id,        ///< [in] ID of the PV
             STS::PVType            a_type,         ///< [in] Type of PV
-            STS::PVEnumeratedType *a_enum,         ///< [in] Enumerated Type
+            std::vector<STS::PVEnumeratedType>
+                                  *a_enum_vector,  ///< [in] Enumerated Type Vector
+            uint32_t               a_enum_index,   ///< [in] Enumerated Type Index
             const std::string     &a_units,        ///< [in] Units of PV (empty if not needed)
             NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_device_name, a_name, a_connection,
-                a_device_id, a_pv_id, a_type, a_enum, a_units ),
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
@@ -250,7 +254,7 @@ private:
         /// Writes Buffered Uint32 PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<uint32_t> & value_buffer ///< Uint32 Buffer to Write
+            std::vector<uint32_t> &value_buffer ///< Uint32 Buffer to Write
         )
         {
             // TODO - This code may need to be optimized
@@ -262,7 +266,7 @@ private:
         /// Writes Buffered Double PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<double> & value_buffer ///< Double Buffer to Write
+            std::vector<double> &value_buffer ///< Double Buffer to Write
         )
         {
             // TODO - This code may need to be optimized
@@ -274,7 +278,7 @@ private:
         /// Writes Buffered String PV Values to Nexus File 
         void flushValueBuffers
         (
-            std::vector<std::string> & value_buffer ///< String Buffer to Write
+            std::vector<std::string> &value_buffer ///< String Buffer to Write
         )
         {
             // Create String Meta-data in log,
@@ -398,13 +402,18 @@ private:
                         }
 
                         // Last Pass, Create Any Enumerated Type Link Now!
-                        if ( this->m_enum != NULL )
+                        if ( this->m_enum_vector != NULL
+                                && this->m_enum_index != (uint32_t) -1 )
                         {
+                            STS::PVEnumeratedType *pv_enum =
+                                &((*(this->m_enum_vector))[
+                                    this->m_enum_index ]);
+
                             std::stringstream ss_src;
                             ss_src << m_nxgen.m_daslogs_path << "/"
                                 << "Device" << this->m_device_id
                                 << ":" << "Enum"
-                                << ":" << this->m_enum->name;
+                                << ":" << pv_enum->name;
 
                             std::stringstream ss_dst;
                             ss_dst << m_log_path << "/" << "enum";
@@ -413,6 +422,7 @@ private:
                                 "[%i] Linking Enum Group %s to %s",
                                 g_pid, ss_src.str().c_str(),
                                 ss_dst.str().c_str() );
+                            usleep(30000); // give syslog a chance...
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
@@ -425,6 +435,7 @@ private:
                                 "[%i] Linking PV Channel %s to Alias %s",
                                 g_pid, m_log_path.c_str(),
                                 m_link_path.c_str() );
+                            usleep(30000); // give syslog a chance...
 
                             // Manually Create "Target" String for Linking
                             // (as per makeGroupLink usage...)
@@ -448,7 +459,7 @@ private:
             this->m_time_buffer.clear();
         }
 
-        NxGen&          m_nxgen;        ///< NxGen instance used for Nexus ouput
+        NxGen          &m_nxgen;        ///< NxGen instance used for Nexus ouput
         std::string     m_internal_name;///< Internal Nexus name of variable
         std::string     m_internal_connection;///< Internal Nexus connection string of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
@@ -473,8 +484,8 @@ public:
 
     NxGen(
         int a_fd_in,
-        std::string & a_adara_out_file,
-        std::string & a_nexus_out_file,
+        std::string &a_adara_out_file,
+        std::string &a_nexus_out_file,
         bool a_strict,
         bool a_gather_stats,
         unsigned long a_chunk_size = 2048,
@@ -490,14 +501,16 @@ protected:
 
     void                initialize();
     void                finalize( const STS::RunMetrics &a_run_metrics );
-    STS::PVInfoBase*    makePVInfo( const std::string & a_device_name,
-                            const std::string & a_name,
-                            const std::string & a_connection,
+    STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
+                            const std::string &a_name,
+                            const std::string &a_connection,
                             STS::Identifier a_device_id,
                             STS::Identifier a_pv_id,
                             STS::PVType a_type,
-                            STS::PVEnumeratedType *a_enum,
-                            const std::string & a_units );
+                            std::vector<STS::PVEnumeratedType>
+                                *a_enum_vector,
+                            uint32_t a_enum_index,
+                            const std::string &a_units );
     STS::BankInfo*      makeBankInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
@@ -508,8 +521,8 @@ protected:
                             uint32_t a_idx_buf_reserve,
                             STS::BeamMonitorConfig *a_config,
                             bool a_known_monitor );
-    void                processRunInfo( const STS::RunInfo & a_run_info );
-    void                processGeometry( const std::string & a_xml );
+    void                processRunInfo( const STS::RunInfo &a_run_info );
+    void                processGeometry( const std::string &a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankBuffersReady( STS::BankInfo &a_bank );
     void                bankPulseGap( STS::BankInfo &a_bank,
@@ -534,7 +547,7 @@ protected:
     void                markerComment( double a_time,
                             const std::string &a_comment );
     void                writeDeviceEnums( STS::Identifier a_devId,
-                            std::vector<STS::PVEnumeratedType> a_enumVec );
+                            std::vector<STS::PVEnumeratedType> &a_enumVec );
 
 private:
     void                flushPauseData();
@@ -568,9 +581,9 @@ private:
     template<class T>
     void                writeSlab
                         (
-                            const std::string & a_path, ///< [in] Nexus path to dataset
-                            std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
+                            const std::string &a_path, ///< [in] Nexus path to dataset
+                            std::vector<T> &a_buffer,  ///< [in] Vector of data to write
+                            uint64_t a_cur_size        ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
                             writeSlab( a_path,
@@ -579,10 +592,10 @@ private:
     template<class T>
     void                writeSlab
                         (
-                            const std::string & a_path, ///< [in] Nexus path to dataset
-                            std::vector<T> & a_buffer,  ///< [in] Vector of data to write
-                            uint64_t a_buffer_size,     ///< [in] Size of Vector of data to write
-                            uint64_t a_cur_size         ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
+                            const std::string &a_path, ///< [in] Nexus path to dataset
+                            std::vector<T> &a_buffer,  ///< [in] Vector of data to write
+                            uint64_t a_buffer_size,    ///< [in] Size of Vector of data to write
+                            uint64_t a_cur_size        ///< [in] Current dataset size (counts not bytes) [Actually "offset"...! Jeeem]
                         )
                         {
                             if ( a_buffer_size )
@@ -606,10 +619,10 @@ private:
     template<class T>
     void                fillSlab
                         (
-                            const std::string & a_path, ///< [in] Nexus path to dataset
-                            T & a_value,                ///< [in] Value to fill (append) dataset with
-                            uint64_t a_count,           ///< [in] Number of values to append
-                            uint64_t a_cur_size         ///< Current dataset size (counts not bytes)
+                            const std::string &a_path, ///< [in] Nexus path to dataset
+                            T &a_value,                ///< [in] Value to fill (append) dataset with
+                            uint64_t a_count,          ///< [in] Number of values to append
+                            uint64_t a_cur_size        ///< Current dataset size (counts not bytes)
                         )
                         {
                             if ( a_count )
@@ -639,12 +652,12 @@ private:
                         }
 
     template<typename T>
-    void                writeScalar( const std::string & a_path,
-                            const std::string & a_name, T a_value,
-                            const std::string & a_units );
+    void                writeScalar( const std::string &a_path,
+                            const std::string &a_name, T a_value,
+                            const std::string &a_units );
     template<typename T>
-    void                writeScalarAttribute( const std::string & a_path,
-                            const std::string & a_attribute, T a_value );
+    void                writeScalarAttribute( const std::string &a_path,
+                            const std::string &a_attribute, T a_value );
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file

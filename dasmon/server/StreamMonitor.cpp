@@ -1104,7 +1104,7 @@ StreamMonitor::rxPacket( const ADARA::BeamlineInfoPkt &a_pkt )
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    m_beam_info.m_target_number = a_pkt.targetNumber();
+    m_beam_info.m_target_station_number = a_pkt.targetStationNumber();
 
     m_beam_info.m_beam_id = a_pkt.id();
     m_beam_info.m_beam_sname = a_pkt.shortName();

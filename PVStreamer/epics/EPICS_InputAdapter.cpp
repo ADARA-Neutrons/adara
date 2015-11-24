@@ -28,9 +28,13 @@ namespace EPICS {
   * \param a_stream_serv - Parent StreamService instance
   * \param a_config_file - EPICS configuration file
   */
-InputAdapter::InputAdapter( StreamService &a_stream_serv, const std::string &a_config_file, bool a_track_logged )
-  : IInputAdapter(a_stream_serv), m_active(true), m_config_file(a_config_file), m_track_logged(a_track_logged),
-    m_cfg_mon_thread(0), m_source("epics"), m_gc_thread(0)
+InputAdapter::InputAdapter( StreamService &a_stream_serv,
+        const std::string &a_config_file, bool a_track_logged,
+        time_t a_device_init_timeout )
+    : IInputAdapter(a_stream_serv), m_active(true),
+      m_config_file(a_config_file), m_track_logged(a_track_logged),
+      m_cfg_mon_thread(0), m_source("epics"), m_gc_thread(0),
+      m_device_init_timeout(a_device_init_timeout)
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
@@ -86,7 +90,8 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
             a_device->m_name.c_str() );
 
         m_dev_agents[a_device->m_name] =
-            new DeviceAgent( *m_srteam_api, a_device, m_epics_context );
+            new DeviceAgent( *m_srteam_api, a_device, m_epics_context,
+                m_device_init_timeout );
     }
 }
 
@@ -193,7 +198,6 @@ void
 InputAdapter::configFileMonitorThread()
 {
     vector<DeviceDescriptor*>::iterator idev;
-    vector<PVDescriptor*>::iterator ipv;
     set<string>::iterator icur;
     boost::filesystem::path cfg_path( m_config_file );
     bool            changed;
@@ -349,14 +353,14 @@ InputAdapter::configFileMonitorThread()
   * \param a_buffer - [in] Buffer containing file contents
   * \param a_buffer_size - [in] Size of file buffer
   * \param a_devices - [out] Extracted DeviceDescriptor payload
-  * \return True if buffered parsed succeddfully; false otherwise
+  * \return True if buffered parsed successfully; false otherwise
   *
-  * This method tries to parse the xml configuration data stored in the provided
-  * buffer and outputs a vector of device descriptors in the a_devices
-  * paramter. The process variables associated with the output devices have
-  * unknown type and unit information as a CA connection is needed to
-  * determine these values. Only devices and PVs that are configured for logging
-  * will be returned.
+  * This method tries to parse the xml configuration data stored in the
+  * provided buffer and outputs a vector of device descriptors in the
+  * a_devices parameter. The process variables associated with the output
+  * devices have unknown type and unit information as a CA connection is
+  * needed to determine these values. Only devices and PVs that are
+  * configured for logging will be returned, unless m_track_logged is false.
   */
 bool
 InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector<DeviceDescriptor*> &a_devices )
@@ -377,6 +381,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
     </beamline>
     */
 
+    vector<pair<string,string> >::iterator ipv;
     bool res = false;
     stringstream sstr;
 
@@ -397,38 +402,52 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
             // Skip to beamline section
             beam_node = xmlDocGetRootElement(doc);
 
-            if ( xmlStrcmp( beam_node->name, (const xmlChar*)"beamline" ) == 0 )
+            if ( xmlStrcmp( beam_node->name,
+                (const xmlChar*)"beamline" ) == 0 )
             {
                 if (( devices_node = xmlFind( "devices", beam_node )))
                 {
-                    for ( xmlNode *node = devices_node->children; node; node = node->next )
+                    for ( xmlNode *node = devices_node->children;
+                        node; node = node->next )
                     {
                         res = true;
 
-                        if ( xmlStrcmp( node->name, (const xmlChar*)"device" ) == 0 )
+                        if ( xmlStrcmp( node->name,
+                            (const xmlChar*)"device" ) == 0 )
                         {
+                            bool is_active = false;
+
                             if ( xmlGetAttribute( node, "active", value ))
                             {
+                                // Active Device
                                 if ( value == "true" )
                                 {
+                                    is_active = true;
+
                                     dev_name.clear();
                                     pvs.clear();
 
-                                    for ( xmlNode *cnode = node->children; cnode; cnode = cnode->next )
+                                    for ( xmlNode *cnode = node->children;
+                                        cnode; cnode = cnode->next )
                                     {
-                                        if ( xmlStrcmp( cnode->name, (const xmlChar*)"name" ) == 0 )
+                                        if ( xmlStrcmp( cnode->name,
+                                            (const xmlChar*)"name" ) == 0 )
                                         {
                                             xmlGetValue( cnode, dev_name );
                                         }
-                                        else if ( xmlStrcmp( cnode->name, (const xmlChar*)"pv" ) == 0 )
+                                        else if ( xmlStrcmp( cnode->name,
+                                            (const xmlChar*)"pv" ) == 0 )
                                         {
-                                            // If track logged only, then make sure log tag is present
-                                            if ( !m_track_logged || xmlFind( "log", cnode ))
+                                            // If track logged only, then
+                                            // make sure log tag is present
+                                            if ( !m_track_logged
+                                                || xmlFind( "log", cnode ) )
                                             {
                                                 pv_name.clear();
                                                 pv_conn.clear();
 
-                                                tmp_node = xmlFind( "name", cnode );
+                                                tmp_node = xmlFind( "name",
+                                                    cnode );
                                                 if ( !tmp_node )
                                                 {
                                                     syslog( LOG_ERR,
@@ -436,36 +455,115 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                     throw -1;
                                                 }
 
-                                                xmlGetValue( tmp_node, pv_conn ); // 'name' field is connection in xml
+                                                // 'name' field is
+                                                // connection in xml
+                                                xmlGetValue( tmp_node,
+                                                    pv_conn );
 
-                                                tmp_node = xmlFind( "alias", cnode ); // 'alias' is name
+                                                // 'alias' is name
+                                                tmp_node = xmlFind( "alias",
+                                                    cnode );
                                                 if ( tmp_node )
-                                                    xmlGetValue( tmp_node, pv_name );
+                                                {
+                                                    xmlGetValue( tmp_node,
+                                                        pv_name );
+                                                }
                                                 else
                                                     pv_name = pv_conn;
 
-                                                pvs.push_back( make_pair( pv_name, pv_conn ));
+                                                pvs.push_back( make_pair(
+                                                    pv_name, pv_conn ));
+                                            }
+                                            // If Not Logging PV, Log It...
+                                            // Lol...! :-D
+                                            else
+                                            {
+                                                pv_name.clear();
+                                                pv_conn.clear();
+
+                                                tmp_node = xmlFind( "name",
+                                                    cnode );
+                                                if ( tmp_node )
+                                                {
+                                                    // 'name' field is
+                                                    // connection in xml
+                                                    xmlGetValue( tmp_node,
+                                                        pv_conn );
+
+                                                    // 'alias' is name
+                                                    tmp_node = xmlFind(
+                                                        "alias", cnode );
+                                                    if ( tmp_node )
+                                                    {
+                                                        xmlGetValue(
+                                                            tmp_node,
+                                                            pv_name );
+                                                    }
+                                                    else
+                                                        pv_name = pv_conn;
+
+                                                    syslog( LOG_WARNING,
+                                                        "Device %s: Ignoring Non-Logged PV %s (%s)",
+                                                        dev_name.c_str(),
+                                                        pv_conn.c_str(),
+                                                        pv_name.c_str() );
+                                                }
                                             }
                                         }
                                     }
 
                                     if ( dev_name.empty())
                                     {
-                                        // It's an error to omit the device name
+                                        // It's an error to omit the
+                                        // device name
                                         syslog( LOG_ERR,
                                             "PVSD ERROR: Device name is missing or empty" );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
                                     {
-                                        DeviceDescriptor *dev = new DeviceDescriptor( dev_name, m_source, EPICS_PROTOCOL );
-                                        for ( vector<pair<string,string> >::iterator ipv = pvs.begin(); ipv != pvs.end(); ++ipv )
+                                        DeviceDescriptor *dev =
+                                            new DeviceDescriptor( dev_name,
+                                                m_source, EPICS_PROTOCOL );
+                                        for ( ipv = pvs.begin();
+                                            ipv != pvs.end(); ++ipv )
                                         {
-                                            // Don't know type or units yet - just use any value
-                                            dev->definePV( ipv->first, ipv->second, PV_INT, 0, "" );
+                                            // Don't know type or units yet
+                                            // - just use any value
+                                            dev->definePV(
+                                                ipv->first, ipv->second,
+                                                PV_INT, 0, "" );
                                         }
                                         a_devices.push_back( dev );
                                     }
+                                }
+                            }
+
+                            // Inactive Device - Parse Enough to Log...
+                            if ( !is_active )
+                            {
+                                dev_name.clear();
+
+                                for ( xmlNode *cnode = node->children;
+                                    cnode; cnode = cnode->next )
+                                {
+                                    if ( xmlStrcmp( cnode->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                    {
+                                        xmlGetValue( cnode, dev_name );
+                                    }
+                                }
+
+                                if ( !dev_name.empty())
+                                {
+                                    syslog( LOG_WARNING,
+                                        "Ignoring Inactive Device %s",
+                                        dev_name.c_str() );
+                                }
+                                else
+                                {
+                                    syslog( LOG_WARNING,
+                                      "Ignoring Unnamed Inactive Device!" );
                                 }
                             }
                         }
@@ -485,8 +583,11 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
     // If parse failed, clean-up
     if ( !res )
     {
-        for ( vector<DeviceDescriptor*>::iterator idev = a_devices.begin(); idev != a_devices.end(); ++idev )
+        for ( vector<DeviceDescriptor*>::iterator idev = a_devices.begin();
+            idev != a_devices.end(); ++idev )
+        {
             delete *idev;
+        }
 
         a_devices.clear();
     }

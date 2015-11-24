@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.4.3"
+#define STS_VERSION "1.4.4"
 extern pid_t g_pid;
 
 namespace STS {
@@ -487,10 +487,10 @@ struct UserInfo
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : target_number(1), run_number(0)
+    RunInfo() : target_station_number(1), run_number(0)
     {}
 
-    uint32_t                target_number;
+    uint32_t                target_station_number;
     std::string             instr_id;
     std::string             instr_shortname;
     std::string             instr_longname;
@@ -605,7 +605,9 @@ public:
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
-        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
+        std::vector<PVEnumeratedType>
+                           *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
+        uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
     :
@@ -615,7 +617,8 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
-        m_enum(a_enum),
+        m_enum_vector(a_enum_vector),
+        m_enum_index(a_enum_index),
         m_units(a_units),
         m_last_time(0)
     {}
@@ -643,12 +646,22 @@ public:
             const std::string &a_device_name,
             const std::string &a_name,
             const std::string &a_connection,
-            PVType a_type, PVEnumeratedType *a_enum,
+            PVType a_type,
+            std::vector<PVEnumeratedType> *a_enum_vector,
+            uint32_t a_enum_index,
             const std::string &a_units )
     {
+        PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
+
+        if ( m_enum_vector != NULL && m_enum_index != (uint32_t) -1 )
+            enum1 = &((*m_enum_vector)[ m_enum_index ]);
+
+        if ( a_enum_vector != NULL && a_enum_index != (uint32_t) -1 )
+            enum2 = &((*a_enum_vector)[ a_enum_index ]);
+
         if ( m_device_name == a_device_name
                 && m_name == a_name && m_connection == a_connection
-                && m_type == a_type && !diffEnum( m_enum, a_enum )
+                && m_type == a_type && !diffEnum( enum1, enum2 )
                 && m_units == a_units ) {
             return true;
         }
@@ -660,10 +673,21 @@ public:
     /// Determine if PVs have equivalent definitions
     bool sameDefinition( const PVInfoBase &a_pv )
     {
+        PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
+
+        if ( m_enum_vector != NULL && m_enum_index != (uint32_t) -1 )
+            enum1 = &((*m_enum_vector)[ m_enum_index ]);
+
+        if ( a_pv.m_enum_vector != NULL
+                && a_pv.m_enum_index != (uint32_t) -1 )
+        {
+            enum2 = &((*(a_pv.m_enum_vector))[ a_pv.m_enum_index ]);
+        }
+
         if ( m_device_name == a_pv.m_device_name
                 && m_name == a_pv.m_name
                 && m_connection == a_pv.m_connection
-                && m_type == a_pv.m_type && !diffEnum( m_enum, a_pv.m_enum )
+                && m_type == a_pv.m_type && !diffEnum( enum1, enum2 )
                 && m_units == a_pv.m_units ) {
             return true;
         }
@@ -681,7 +705,9 @@ public:
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
     PVType              m_type;         ///< Type of PV
-    PVEnumeratedType   *m_enum;         ///< Enumerated Type of PV
+    std::vector<PVEnumeratedType>
+                       *m_enum_vector;  ///< Enumerated Type Vector of PV
+    uint32_t            m_enum_index;   ///< Enumerated Type Index of PV
     std::string         m_units;        ///< Units of PV
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
@@ -702,11 +728,13 @@ public:
         Identifier          a_device_id,    ///< [in] ID of device that owns the PV
         Identifier          a_pv_id,        ///< [in] ID of the PV
         PVType              a_type,         ///< [in] Type of PV
-        PVEnumeratedType   *a_enum,         ///< [in] Enumerated Type of PV
+        std::vector<PVEnumeratedType>
+                           *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
+        uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
         const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
     )
     : PVInfoBase( a_device_name, a_name, a_connection,
-        a_device_id, a_pv_id, a_type, a_enum, a_units )
+        a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index, a_units )
     {}
 
     /// PVInfo destructor
@@ -730,14 +758,16 @@ public:
     virtual void            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;
-    virtual PVInfoBase*     makePVInfo( const std::string & a_device_name,
-                                const std::string & a_name,
-                                const std::string & a_connection,
+    virtual PVInfoBase*     makePVInfo( const std::string &a_device_name,
+                                const std::string &a_name,
+                                const std::string &a_connection,
                                 Identifier a_device_id,
                                 Identifier a_pv_id,
                                 PVType a_type,
-                                PVEnumeratedType *a_enum,
-                                const std::string & a_units ) = 0;
+                                std::vector<PVEnumeratedType>
+                                    *a_enum_vector,
+                                uint32_t a_enum_index,
+                                const std::string &a_units ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve ) = 0;
@@ -747,9 +777,9 @@ public:
                                 STS::BeamMonitorConfig *a_config,
                                 bool a_known_monitor ) = 0;
     virtual void            processRunInfo(
-                                const RunInfo & a_run_info ) = 0;
+                                const RunInfo &a_run_info ) = 0;
     virtual void            processGeometry(
-                                const std::string & a_xml ) = 0;
+                                const std::string &a_xml ) = 0;
     virtual void            pulseBuffersReady(
                                 STS::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
@@ -777,7 +807,7 @@ public:
                                 const std::string &a_comment ) = 0;
     virtual void            writeDeviceEnums( Identifier a_devId,
                                 std::vector<STS::PVEnumeratedType>
-                                    a_enumVec ) = 0;
+                                    &a_enumVec ) = 0;
 };
 
 

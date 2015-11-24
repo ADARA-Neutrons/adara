@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.4.2"
+#define PVSD_VERSION "1.4.3"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -223,6 +223,7 @@ int main(int argc, char *argv[])
     string          domain;
     string          epics_cfg;
     uint32_t        offset;
+    time_t          timeout;
     uint32_t        pid;
     bool            track_logged = false;
     bool            daemon = false;
@@ -244,6 +245,7 @@ int main(int argc, char *argv[])
             ("broker_pw,w", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("config,c", po::value<string>( &epics_cfg )->default_value( "beamline.xml" ), "set path to epics configuration file")
             ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
+            ("timeout,t", po::value<time_t>( &timeout )->default_value( 60 ), "set device Init timeout (seconds)")
             ("track_log", "track logged PVs only (default is all)")
             ("daemon", "Run as background daemon")
             ;
@@ -294,7 +296,8 @@ int main(int argc, char *argv[])
         new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
 
         // Create and attach EPICS input adapter
-        new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged );
+        new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged,
+            timeout );
 
         // If we mad it here as a daemon, signal parent that all is well
         if ( daemon )

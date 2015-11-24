@@ -2,6 +2,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <unistd.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
@@ -96,7 +97,9 @@ NxGen::makePVInfo
     STS::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
     STS::Identifier         a_pv_id,        ///< [in] ID of the PV
     STS::PVType             a_type,         ///< [in] Type of PV
-    STS::PVEnumeratedType  *a_enum,         ///< [in] Enumerated Type of PV
+    std::vector<STS::PVEnumeratedType>
+                           *a_enum_vector,  ///< [in] Enumerated Type Vector for PV
+    uint32_t                a_enum_index,   ///< [in] Enumerated Type Index for PV
     const string           &a_units         ///< [in] Units of PV (empty if not needed)
 )
 {
@@ -127,10 +130,10 @@ NxGen::makePVInfo
         {
             if ( name_ver > 0 )
             {
-                syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Name Clash %s -> %s",
-                    g_pid, a_device_name.c_str(),
-                    a_name.c_str(), internal_name.c_str() );
+                syslog( LOG_ERR,
+                    "[%i] %s Device %s: %s Clash %s -> %s",
+                    g_pid, "STS Error:", a_device_name.c_str(),
+                    "PV Name", a_name.c_str(), internal_name.c_str() );
             }
             m_pv_name_history.insert( internal_name );
             break;
@@ -173,10 +176,10 @@ NxGen::makePVInfo
             {
                 if ( connection_ver > 0 )
                 {
-                    syslog( LOG_WARNING,
-                    "[%i] Device %s: PV Connection String Clash %s -> %s",
-                        g_pid, a_device_name.c_str(),
-                        a_connection.c_str(),
+                    syslog( LOG_ERR,
+                        "[%i] %s Device %s: %s Clash %s -> %s",
+                        g_pid, "STS Error:", a_device_name.c_str(),
+                        "PV Connection String", a_connection.c_str(),
                         internal_connection.c_str() );
                 }
                 m_pv_name_history.insert( internal_connection );
@@ -192,16 +195,19 @@ NxGen::makePVInfo
     case STS::PVT_UINT:
         return new NxPVInfo<uint32_t>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     case STS::PVT_STRING:
         return new NxPVInfo<string>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum, a_units, *this );
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
@@ -721,8 +727,8 @@ NxGen::processRunInfo
 
     try
     {
-        writeScalar( m_instrument_path, "target_number",
-            a_run_info.target_number, "" );
+        writeScalar( m_instrument_path, "target_station_number",
+            a_run_info.target_station_number, "" );
 
         writeString( m_instrument_path, "beamline", a_run_info.instr_id );
 
@@ -1480,8 +1486,8 @@ NxGen::flushCommentData()
 void
 NxGen::writeDeviceEnums
 (
-    STS::Identifier a_devId,                ///< [in] DeviceId
-    vector<STS::PVEnumeratedType> a_enumVec ///< [in] Vector of Enumerated Type Structs
+    STS::Identifier a_devId,                 ///< [in] DeviceId
+    vector<STS::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
 )
 {
     for ( vector<STS::PVEnumeratedType>::iterator ienum =
@@ -1514,8 +1520,8 @@ NxGen::writeDeviceEnums
                         << ", Bumping Count to " << count
                         << " - Next Enum Name to Try: "
                         << ienum->name << "_" << count;
-                    syslog( LOG_INFO, "[%i] %s", g_pid,
-                        ss.str().c_str() );
+                    syslog( LOG_ERR, "[%i] %s %s",
+                        g_pid, "STS Error:", ss.str().c_str() );
 
                     stringstream ss_new;
                     ss_new << ienum->name << "_" << count;
@@ -1533,6 +1539,7 @@ NxGen::writeDeviceEnums
         ss << "Creating Enum Log Group for Device " << a_devId
             << " enum_name=" << enum_name;
         syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+        usleep(30000); // give syslog a chance...
 
         // Save "New Name" for Enum, For Subsequent Comparisons...!
         ienum->name = enum_name;
