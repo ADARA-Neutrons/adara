@@ -705,6 +705,9 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
             rpos++;
 
             // Save bank ID
+			// (Can be Overwritten in the case of
+			// Multiple Pixel Map Section sub-headers for a given Bank,
+			// but this is O.K., as BankInfo() is Just for Bookkeeping. :-)
             m_bank_info[bank_id] = BankInfo(bank_id);
 
             epos2 = rpos + pix_count;
