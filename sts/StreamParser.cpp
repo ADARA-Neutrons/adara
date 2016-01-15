@@ -2956,7 +2956,7 @@ StreamParser::getPktName(
         case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             ss << "Beam Monitor Event"; break;
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
-            ss << "Pix Map"; break;
+            ss << "Pixel Map"; break;
         case ADARA::PacketType::RUN_STATUS_TYPE:
             ss << "Run Stat"; break;
         case ADARA::PacketType::RUN_INFO_TYPE:
