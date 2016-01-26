@@ -230,8 +230,8 @@ private:
 
 	boost::shared_ptr<smsBooleanPV> m_pvDoPulsePchgCorrect;
 	boost::shared_ptr<smsBooleanPV> m_pvDoPulseVetoCorrect;
-	static uint32_t m_interPulseTimeMin;
-	static uint32_t m_interPulseTimeMax;
+	static uint64_t m_interPulseTimeMin;
+	static uint64_t m_interPulseTimeMax;
 	static bool m_doPulsePchgCorrect;
 	static bool m_doPulseVetoCorrect;
 
