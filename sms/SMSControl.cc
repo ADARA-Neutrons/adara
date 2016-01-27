@@ -185,16 +185,16 @@ void SMSControl::init(void)
 
 void SMSControl::late_config(const boost::property_tree::ptree &conf)
 {
-	SMSControl *sms = getInstance();
-	if (!sms)
+	SMSControl *ctrl = getInstance();
+	if (!ctrl)
 		throw std::logic_error("late_config on uninitialized obj");
 
-	sms->m_bmonConfig.reset(new BeamMonitorConfig(conf));
+	ctrl->m_bmonConfig.reset(new BeamMonitorConfig(conf));
 
-	sms->m_detBankSets.reset(new DetectorBankSet(conf));
+	ctrl->m_detBankSets.reset(new DetectorBankSet(conf));
 
-	sms->addSources(conf);
-	sms->m_fastmeta->addDevices(conf);
+	ctrl->addSources(conf);
+	ctrl->m_fastmeta->addDevices(conf);
 }
 
 void SMSControl::addSources(const boost::property_tree::ptree &conf)
@@ -520,12 +520,14 @@ bool SMSControl::setRecording(bool v)
 			StorageManager::startRecording(m_currentRunNumber);
 		} catch (std::runtime_error e) {
 			ERROR("Unable to start recording: " << e.what());
+			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
 			return false;
 		} catch (...) {
 			ERROR("Unable to start recording, unknown exception");
+			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
@@ -537,6 +539,7 @@ bool SMSControl::setRecording(bool v)
 	} else {
 		/* Stop the current recording */
 		INFO("Stopping run " << m_currentRunNumber);
+		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
 
@@ -564,6 +567,26 @@ bool SMSControl::setRecording(bool v)
 bool SMSControl::getRecording(void)
 {
 	return m_recording;
+}
+
+void SMSControl::pauseRecording(void)
+{
+	if ( m_currentRunNumber )
+		INFO("Pausing run " << m_currentRunNumber);
+	else
+		INFO("Pausing data collection (not currently recording)");
+
+	StorageManager::pauseRecording();
+}
+
+void SMSControl::resumeRecording(void)
+{
+	if ( m_currentRunNumber )
+		INFO("Resuming run " << m_currentRunNumber);
+	else
+		INFO("Resuming data collection (not currently recording)");
+
+	StorageManager::resumeRecording();
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)

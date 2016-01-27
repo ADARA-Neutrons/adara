@@ -776,6 +776,26 @@ void StorageManager::stopRecording(void)
 	startContainer();
 }
 
+void StorageManager::pauseRecording(void)
+{
+	m_cur_container->pause();
+
+	if (m_cur_container->runNumber()) {
+		m_combus->sendUpdate(m_cur_container->runNumber(),
+			std::string("SMS run paused"));
+	}
+}
+
+void StorageManager::resumeRecording(void)
+{
+	m_cur_container->resume();
+
+	if (m_cur_container->runNumber()) {
+		m_combus->sendUpdate(m_cur_container->runNumber(),
+			std::string("SMS run resumed"));
+	}
+}
+
 void StorageManager::notify(void)
 {
 	m_cur_container->notify();

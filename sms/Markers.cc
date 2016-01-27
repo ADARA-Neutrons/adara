@@ -38,37 +38,37 @@ private:
 	void triggered(void) { m_cb(); }
 };
 
-Markers::Markers(SMSControl *sms) :
-	m_scanIndex(0)
+Markers::Markers(SMSControl *ctrl) :
+	m_ctrl(ctrl), m_scanIndex(0)
 {
-	std::string prefix(sms->getBeamlineId());
+	std::string prefix(ctrl->getBeamlineId());
 	prefix += ":SMS:";
 
 	m_pausedPV.reset(new MarkerPausedPV(prefix + "Paused", this));
-	sms->addPV(m_pausedPV);
+	ctrl->addPV(m_pausedPV);
 
 	prefix += "Marker:";
 	m_commentPV.reset(new smsStringPV(prefix + "Comment"));
-	sms->addPV(m_commentPV);
+	ctrl->addPV(m_commentPV);
 
 	m_indexPV.reset(new smsUint32PV(prefix + "ScanIndex"));
-	sms->addPV(m_indexPV);
+	ctrl->addPV(m_indexPV);
 
 	m_scanStartPV.reset(new MarkerTriggerPV(prefix + "StartScan",
 			    boost::bind(&Markers::startScan, this)));
-	sms->addPV(m_scanStartPV);
+	ctrl->addPV(m_scanStartPV);
 
 	m_scanStopPV.reset(new MarkerTriggerPV(prefix + "StopScan",
 			    boost::bind(&Markers::stopScan, this)));
-	sms->addPV(m_scanStopPV);
+	ctrl->addPV(m_scanStopPV);
 
 	m_annotatePV.reset(new MarkerTriggerPV(prefix + "Annotate",
 			    boost::bind(&Markers::annotate, this)));
-	sms->addPV(m_annotatePV);
+	ctrl->addPV(m_annotatePV);
 
 	m_runCommentPV.reset(new MarkerTriggerPV(prefix + "RunComment",
 			    boost::bind(&Markers::addRunComment, this)));
-	sms->addPV(m_runCommentPV);
+	ctrl->addPV(m_runCommentPV);
 
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&Markers::onPrologue, this));
@@ -130,10 +130,12 @@ void Markers::runStop(void)
 void Markers::pause(void)
 {
 	emitPacket(ADARA::MarkerType::PAUSE);
+	m_ctrl->pauseRecording();
 }
 
 void Markers::resume(void)
 {
+	m_ctrl->resumeRecording();
 	emitPacket(ADARA::MarkerType::RESUME);
 }
 

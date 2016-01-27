@@ -92,6 +92,24 @@ void StorageContainer::notify(void)
 		m_cur_file->notify();
 }
 
+void StorageContainer::pause(void)
+{
+	DEBUG("Pausing StorageContainer"
+		<< " m_active=" << m_active
+		<< " m_runNumber=" << m_runNumber
+		<< " m_cur_file="
+			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
+}
+
+void StorageContainer::resume(void)
+{
+	DEBUG("Resuming StorageContainer"
+		<< " m_active=" << m_active
+		<< " m_runNumber=" << m_runNumber
+		<< " m_cur_file="
+			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
+}
+
 void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
 {
 	if (m_active || !m_files.empty()) {

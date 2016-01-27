@@ -45,6 +45,9 @@ public:
 	void terminate(void);
 	void notify(void);
 
+	void pause(void);
+	void resume(void);
+
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);

@@ -40,6 +40,9 @@ public:
 	static void startRecording(uint32_t run);
 	static void stopRecording(void);
 
+	static void pauseRecording(void);
+	static void resumeRecording(void);
+
 	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
 	static void addPacket(IoVector &iovec, bool notify = true);
