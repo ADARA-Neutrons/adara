@@ -217,7 +217,7 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 	}
 }
 
-RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
+RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	m_beamline(beamline), m_runNumber(0), m_packetValid(false),
 	m_packet(NULL), m_packetSize(0)
 {
@@ -225,25 +225,25 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *sms) :
 	prefix += ":SMS:RunInfo:";
 
 	m_resetPV.reset(new RunInfoResetPV(prefix, this));
-	sms->addPV(m_resetPV);
+	ctrl->addPV(m_resetPV);
 
 	m_userPV.reset(new RunUserInfoPV(prefix, this));
-	sms->addPV(m_userPV);
+	ctrl->addPV(m_userPV);
 
 	/* These fields are required */
-	addPV(prefix, "ProposalId", "proposal_id", m_required, sms);
+	addPV(prefix, "ProposalId", "proposal_id", m_required, ctrl);
 
 	/* These fields are optional */
-	addPV(prefix, "ProposalTitle", "proposal_title", m_optional, sms);
-	addPV(prefix, "RunTitle", "run_title", m_optional, sms);
+	addPV(prefix, "ProposalTitle", "proposal_title", m_optional, ctrl);
+	addPV(prefix, "RunTitle", "run_title", m_optional, ctrl);
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
-	addPV(prefix, "Id", "id", m_sample, sms);
-	addPV(prefix, "Name", "name", m_sample, sms);
-	addPV(prefix, "Nature", "nature", m_sample, sms);
-	addPV(prefix, "Formula", "chemical_formula", m_sample, sms);
-	addPV(prefix, "Environment", "environment", m_sample, sms);
+	addPV(prefix, "Id", "id", m_sample, ctrl);
+	addPV(prefix, "Name", "name", m_sample, ctrl);
+	addPV(prefix, "Nature", "nature", m_sample, ctrl);
+	addPV(prefix, "Formula", "chemical_formula", m_sample, ctrl);
+	addPV(prefix, "Environment", "environment", m_sample, ctrl);
 
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
@@ -259,11 +259,11 @@ RunInfo::~RunInfo()
 }
 
 void RunInfo::addPV(const std::string &prefix, const char *pv_name,
-		    const char *xml_name, RunInfoMap &map, SMSControl *sms)
+		    const char *xml_name, RunInfoMap &map, SMSControl *ctrl)
 {
 	std::string pvName = prefix + pv_name;
 	map[xml_name].reset(new RunInfoPV(pvName, this));
-	sms->addPV(map[xml_name]);
+	ctrl->addPV(map[xml_name]);
 }
 
 void RunInfo::lock(void)

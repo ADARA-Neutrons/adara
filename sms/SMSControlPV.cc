@@ -355,8 +355,9 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 
 /* ----------------------------------------------------------------------- */
 
-smsRecordingPV::smsRecordingPV(const std::string &prefix, SMSControl *sms) :
-		m_sms(sms)
+smsRecordingPV::smsRecordingPV(const std::string &prefix,
+	SMSControl *ctrl) :
+		m_ctrl(ctrl)
 {
 	struct timespec ts;
 
@@ -425,7 +426,7 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
-	if (m_sms->setRecording(v))
+	if (m_ctrl->setRecording(v))
 		return S_casApp_success;
 
 	/* don't cause disruption at the CA level just because the run 
