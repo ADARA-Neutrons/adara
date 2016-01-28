@@ -399,11 +399,11 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	if (sscanf(p.filename().c_str(), "f%05u-p%05u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3) {
-		INFO("Ignoring ADARA Paused file: " << p);
+		DEBUG("Ignoring ADARA Paused file: " << p);
 		return StorageFile::SharedPtr();
 	}
 	else if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
-				&fileNumber, &runNumber) != 2 || !fileNumber) {
+				&fileNumber, &runNumber) == 0 || !fileNumber) {
 		WARN("Improperly named ADARA file: " << p);
 		return StorageFile::SharedPtr();
 	}
