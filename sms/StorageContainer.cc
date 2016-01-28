@@ -53,7 +53,14 @@ void StorageContainer::newFile(void)
 			status = ADARA::RunStatus::RUN_BOF;
 	}
 
-	m_cur_file = StorageFile::newFile(m_weakThis, ++m_numFiles, status);
+	if (m_paused) {
+		m_cur_file = StorageFile::newFile(m_weakThis,
+				m_numFiles, ++m_numPauseFiles, status);
+	}
+	else {
+		m_cur_file = StorageFile::newFile(m_weakThis,
+				++m_numFiles, 0, status);
+	}
 	m_files.push_back(m_cur_file);
 
 	/* Tell the storage manager about the new file so we can
@@ -99,6 +106,8 @@ void StorageContainer::pause(void)
 		<< " m_runNumber=" << m_runNumber
 		<< " m_cur_file="
 			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
+
+	m_paused = true;
 }
 
 void StorageContainer::resume(void)
@@ -108,6 +117,10 @@ void StorageContainer::resume(void)
 		<< " m_runNumber=" << m_runNumber
 		<< " m_cur_file="
 			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
+
+	m_numPauseFiles = 0;
+
+	m_paused = false;
 }
 
 void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
@@ -167,13 +180,15 @@ void StorageContainer::markManual(void)
 
 StorageContainer::StorageContainer(const struct timespec &start,
 				   uint32_t run) :
-	m_startTime(start), m_runNumber(run), m_numFiles(0), m_active(true),
+	m_startTime(start), m_runNumber(run), m_numFiles(0), m_numPauseFiles(0),
+	m_active(true), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
-	m_runNumber(0), m_numFiles(0), m_name(name), m_active(false),
+	m_runNumber(0), m_numFiles(0), m_numPauseFiles(0),
+	m_name(name), m_active(false), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }

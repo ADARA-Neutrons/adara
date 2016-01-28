@@ -100,14 +100,20 @@ void StorageFile::put_fd(void)
 void StorageFile::makePath(void)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
-	char name[16];
+	char name[32];
 
 	if (!c)
 		throw std::logic_error("StorageFile owner is empty!");
 
 	m_path = c->name();
 
-	snprintf(name, sizeof(name), "/f%05u", m_fileNumber);
+	if ( m_paused ) {
+		snprintf(name, sizeof(name), "/f%05u-p%05u",
+			m_fileNumber, m_pauseFileNumber);
+	}
+	else {
+		snprintf(name, sizeof(name), "/f%05u", m_fileNumber);
+	}
 	m_path += name;
 
 	if (m_runNumber) {
@@ -196,8 +202,13 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	spkt.hdr.ts_nsec = now.tv_nsec;
 
 	spkt.run_number = m_runNumber;
+
 	if (m_runNumber)
 		spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+
+	// Ignore Paused File Number in RunStatus Packet...
+	// (TODO Figure out how to munge this field if we ever need
+	// to _Recover_ any Paused Files into a given run...! ;-)
 	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
 
 	IoVector iovec(1);
@@ -304,23 +315,28 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
-StorageFile::StorageFile(OwnerPtr &owner, uint32_t fileNumber) :
-	m_owner(owner), m_runNumber(0), m_fileNumber(fileNumber),
-	m_startTime(0), m_persist(true), m_oversize(false), m_active(false),
+StorageFile::StorageFile(OwnerPtr &owner,
+		uint32_t fileNumber, uint32_t pauseFileNumber) :
+	m_owner(owner), m_runNumber(0),
+	m_fileNumber(fileNumber), m_pauseFileNumber(pauseFileNumber),
+	m_startTime(0), m_persist(true), m_oversize(false),
+	m_active(false), m_paused(false),
 	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	if (c) {
 		m_runNumber = c->runNumber();
 		m_startTime = c->startTime().tv_sec;
+		m_paused = c->paused();
 	}
 }
 
 StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
-					    uint32_t fileNumber,
+					    uint32_t fileNumber, uint32_t pauseFileNumber,
 					    ADARA::RunStatus::Enum status)
 {
-	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
+	StorageFile::SharedPtr f(
+		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_active = true;
 	f->makePath();
 	f->open(O_CREAT|O_EXCL|O_RDWR);
@@ -332,7 +348,7 @@ StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
 StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 					      const std::string &basePath)
 {
-	StorageFile::SharedPtr f(new StorageFile(runInfo, 0));
+	StorageFile::SharedPtr f(new StorageFile(runInfo, 0, 0));
 	f->m_path = basePath + "/SMS-State-XXXXXX";
 
 	/* We don't assume C++11 compliance, so we cannot rely on
@@ -379,10 +395,15 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 					       const std::string &path)
 {
 	fs::path p(path);
-	uint32_t fileNumber, runNumber = 0;
+	uint32_t fileNumber, pauseFileNumber, runNumber = 0;
 
-	if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
-				&fileNumber, &runNumber) == 0 || !fileNumber) {
+	if (sscanf(p.filename().c_str(), "f%05u-p%05u-run-%u.adara",
+			&fileNumber, &pauseFileNumber, &runNumber) == 3) {
+		INFO("Ignoring ADARA Paused file: " << p);
+		return StorageFile::SharedPtr();
+	}
+	else if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
+				&fileNumber, &runNumber) != 2 || !fileNumber) {
 		WARN("Improperly named ADARA file: " << p);
 		return StorageFile::SharedPtr();
 	}
@@ -393,7 +414,8 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		return StorageFile::SharedPtr();
 	}
 
-	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber));
+	// Don't Import Paused Run Files -> Always Set pauseFileNumber=0...
+	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber, 0));
 	f->m_path = path;
 	f->open(O_RDONLY);
 
@@ -412,3 +434,4 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	f->m_size = statbuf.st_size;
 	return f;
 }
+
