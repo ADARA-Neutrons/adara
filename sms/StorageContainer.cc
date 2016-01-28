@@ -368,7 +368,8 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 
 	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
-	bool had_errors = false;;
+	bool had_errors = false;
+	bool paused_file = false;
 
 	for (; it != end; ++it) {
 		fs::path file(it->path().filename());
@@ -409,10 +410,10 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		rel_path /= *rit++;
 		rel_path /= *rit;
 
-		f = StorageFile::importFile(c, rel_path.string());
+		f = StorageFile::importFile(c, rel_path.string(), paused_file);
 		if (f)
 			c->m_files.push_back(f);
-		else
+		else if (!paused_file)
 			had_errors = true;
 	}
 

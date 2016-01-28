@@ -392,14 +392,16 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 }
 
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-					       const std::string &path)
+		const std::string &path, bool &paused_file)
 {
 	fs::path p(path);
 	uint32_t fileNumber, pauseFileNumber, runNumber = 0;
 
+	paused_file = false;
 	if (sscanf(p.filename().c_str(), "f%05u-p%05u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3) {
 		DEBUG("Ignoring ADARA Paused file: " << p);
+		paused_file = true;
 		return StorageFile::SharedPtr();
 	}
 	else if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
