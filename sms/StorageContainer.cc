@@ -67,7 +67,15 @@ void StorageContainer::newFile(void)
 	 * add the prologue before anyone else sees it.
 	 */
 	StorageManager::fileCreated(m_cur_file);
-	m_newFile(m_cur_file);
+
+	/* Notify Any Subscribers that we have a New File to process...
+	 * (_Unless_ of course we're in Paused mode, in which case pretend
+	 * that "nothing happened"...! ;-)
+	 *    -> better to nip it in the bud at "FileAdded", and then just
+	 *    let all the "FileUpdated" notifications fall on deaf ears... :-D
+	 */
+	if (!m_paused)
+		m_newFile(m_cur_file);
 }
 
 off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
@@ -108,6 +116,14 @@ void StorageContainer::pause(void)
 			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
 
 	m_paused = true;
+
+	// Close Any Non-Paused Run File...
+	if (m_cur_file && !m_cur_file->paused())
+		terminateFile();
+
+	// Create New Paused Run File...
+	if (!m_cur_file)
+		newFile();
 }
 
 void StorageContainer::resume(void)
@@ -121,6 +137,14 @@ void StorageContainer::resume(void)
 	m_numPauseFiles = 0;
 
 	m_paused = false;
+
+	// Close Any Paused Run File...
+	if (m_cur_file && m_cur_file->paused())
+		terminateFile();
+
+	// Create New Non-Paused Run File to Resume Normal Data Collection
+	if (!m_cur_file)
+		newFile();
 }
 
 void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
