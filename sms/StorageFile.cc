@@ -421,7 +421,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	// Verify Valid File Number...
 	if ( !fileNumber ) {
-		WARN("Improperly named ADARA file: " << p);
+		WARN("Improperly named ADARA file (Zero File Number): " << p);
 		return StorageFile::SharedPtr();
 	}
 
