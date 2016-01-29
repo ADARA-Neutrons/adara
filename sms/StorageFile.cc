@@ -108,11 +108,11 @@ void StorageFile::makePath(void)
 	m_path = c->name();
 
 	if ( m_paused ) {
-		snprintf(name, sizeof(name), "/f%05u-p%05u",
+		snprintf(name, sizeof(name), "/f%08u-p%08u",
 			m_fileNumber, m_pauseFileNumber);
 	}
 	else {
-		snprintf(name, sizeof(name), "/f%05u", m_fileNumber);
+		snprintf(name, sizeof(name), "/f%08u", m_fileNumber);
 	}
 	m_path += name;
 
@@ -397,19 +397,35 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	fs::path p(path);
 	uint32_t fileNumber, pauseFileNumber, runNumber = 0;
 
+	// Explicitly Parse All Known File Name Types...
 	paused_file = false;
-	if (sscanf(p.filename().c_str(), "f%05u-p%05u-run-%u.adara",
-			&fileNumber, &pauseFileNumber, &runNumber) == 3) {
-		DEBUG("Ignoring ADARA Paused file: " << p);
+	if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
+			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
+		DEBUG("Ignoring ADARA Paused Run file: " << p);
 		paused_file = true;
 		return StorageFile::SharedPtr();
 	}
-	else if (sscanf(p.filename().c_str(), "f%05u-run-%u.adara",
-				&fileNumber, &runNumber) == 0 || !fileNumber) {
+	else if ( sscanf(p.filename().c_str(), "f%u-p%u.adara",
+			&fileNumber, &pauseFileNumber) == 2 ) {
+		DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
+		paused_file = true;
+		return StorageFile::SharedPtr();
+	}
+	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
+				&fileNumber, &runNumber) != 2
+			&& sscanf(p.filename().c_str(), "f%u.adara",
+				&fileNumber) != 1 ) {
 		WARN("Improperly named ADARA file: " << p);
 		return StorageFile::SharedPtr();
 	}
 
+	// Verify Valid File Number...
+	if ( !fileNumber ) {
+		WARN("Improperly named ADARA file: " << p);
+		return StorageFile::SharedPtr();
+	}
+
+	// Validate Any Run Number in File Name vs. Enclosing Container...
 	StorageContainer::SharedPtr o = owner.lock();
 	if (runNumber != o->runNumber()) {
 		WARN("ADARA run doesn't match container for file " << p);
