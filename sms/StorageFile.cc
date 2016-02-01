@@ -329,12 +329,16 @@ StorageFile::StorageFile(OwnerPtr &owner,
 		m_startTime = c->startTime().tv_sec;
 		m_paused = c->paused();
 	}
+	// Even if Container isn't Paused, this Run file could be (a la import)
+	if (pauseFileNumber)
+		m_paused = true;
 }
 
 StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
 					    uint32_t fileNumber, uint32_t pauseFileNumber,
 					    ADARA::RunStatus::Enum status)
 {
+	// (Fyi, Non-Zero Paused File Number Forces File to Paused State...!)
 	StorageFile::SharedPtr f(
 		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_active = true;
@@ -392,24 +396,22 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 }
 
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-		const std::string &path, bool &paused_file)
+		const std::string &path)
 {
 	fs::path p(path);
-	uint32_t fileNumber, pauseFileNumber, runNumber = 0;
+	uint32_t fileNumber = 0, pauseFileNumber = 0, runNumber = 0;
 
 	// Explicitly Parse All Known File Name Types...
-	paused_file = false;
+	bool paused_file = false;
 	if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
-		DEBUG("Ignoring ADARA Paused Run file: " << p);
+		// DEBUG("Ignoring ADARA Paused Run file: " << p);
 		paused_file = true;
-		return StorageFile::SharedPtr();
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-p%u.adara",
 			&fileNumber, &pauseFileNumber) == 2 ) {
-		DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
+		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
-		return StorageFile::SharedPtr();
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
 				&fileNumber, &runNumber) != 2
@@ -425,6 +427,12 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		return StorageFile::SharedPtr();
 	}
 
+	// Verify Valid Paused File Number... (used to set Paused State!)
+	if ( paused_file && !pauseFileNumber ) {
+		WARN("Improperly named ADARA file (Zero Pause File Number): " << p);
+		return StorageFile::SharedPtr();
+	}
+
 	// Validate Any Run Number in File Name vs. Enclosing Container...
 	StorageContainer::SharedPtr o = owner.lock();
 	if (runNumber != o->runNumber()) {
@@ -432,8 +440,9 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		return StorageFile::SharedPtr();
 	}
 
-	// Don't Import Paused Run Files -> Always Set pauseFileNumber=0...
-	StorageFile::SharedPtr f(new StorageFile(owner, fileNumber, 0));
+	// (Fyi, Non-Zero Paused File Number Forces File to Paused State...!)
+	StorageFile::SharedPtr f(
+		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_path = path;
 	f->open(O_RDONLY);
 
