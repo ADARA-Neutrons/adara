@@ -61,6 +61,7 @@ double STSClientMgr::m_connect_retry = 15.0;
 double STSClientMgr::m_transient_timeout = 60.0;
 unsigned int STSClientMgr::m_max_connections = 3;
 uint32_t STSClientMgr::m_max_requeue_count = 5;
+bool STSClientMgr::m_send_paused_data = false;
 
 STSClientMgr *STSClientMgr::m_singleton;
 
@@ -115,6 +116,9 @@ STSClientMgr::STSClientMgr() :
 	m_pvMaxRequeueCount = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":MaxRequeueCount"));
 
+	m_pvSendPausedData = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":SendPausedData"));
+
 	m_pvServiceURI = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":ServiceURI"));
 
@@ -123,6 +127,7 @@ STSClientMgr::STSClientMgr() :
 	ctrl->addPV(m_pvTransientTimeout);
 	ctrl->addPV(m_pvMaxConnections);
 	ctrl->addPV(m_pvMaxRequeueCount);
+	ctrl->addPV(m_pvSendPausedData);
 	ctrl->addPV(m_pvServiceURI);
 
 	// Initialize STS Client PVs...
@@ -133,6 +138,7 @@ STSClientMgr::STSClientMgr() :
 	m_pvTransientTimeout->update(m_transient_timeout, &now);
 	m_pvMaxConnections->update(m_max_connections, &now);
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
+	m_pvSendPausedData->update(m_send_paused_data, &now);
 	m_pvServiceURI->update(m_node + ":" + m_service, &now);
 
 	INFO("Remote is " << m_node << ":" << m_service);
@@ -430,6 +436,10 @@ void STSClientMgr::connectComplete(void)
 
 		StorageContainer::SharedPtr &run = nextRun();
 
+		// Update Send Paused Data Option from PV...
+		// (STSClient reads _Once_ on init...)
+		m_send_paused_data = m_pvSendPausedData->value();
+
 		try {
 			new STSClient(m_fd, run, *this);
 			m_connections++;
@@ -628,6 +638,8 @@ void STSClientMgr::config(const boost::property_tree::ptree &conf)
 			conf.get<unsigned int>("stsclient.max_connections", 3);
 	m_max_requeue_count =
 			conf.get<uint32_t>("stsclient.max_requeue_count", 5);
+	m_send_paused_data =
+			conf.get<bool>("stsclient.send_paused_data", false);
 
 	std::string uri = conf.get<std::string>("stsclient.uri", "localhost");
 	const char *default_service = "31417";

@@ -15,6 +15,7 @@ class STSClient;
 class smsFloat64PV;
 class MaxConnectionsPV;
 class smsUint32PV;
+class smsBooleanPV;
 class smsStringPV;
 
 class STSClientMgr {
@@ -64,6 +65,7 @@ private:
 	static double m_transient_timeout;
 	static unsigned int m_max_connections;
 	static uint32_t m_max_requeue_count;
+	static bool m_send_paused_data;
 
 	static STSClientMgr *m_singleton;
 
@@ -88,6 +90,7 @@ private:
 	boost::shared_ptr<smsFloat64PV> m_pvTransientTimeout;
 	boost::shared_ptr<MaxConnectionsPV> m_pvMaxConnections;
 	boost::shared_ptr<smsUint32PV> m_pvMaxRequeueCount;
+	boost::shared_ptr<smsBooleanPV> m_pvSendPausedData;
 	boost::shared_ptr<smsStringPV> m_pvServiceURI;
 
 	friend class STSClient;
