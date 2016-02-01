@@ -398,6 +398,14 @@ option_label[$num_options]="[Max STS Client Error Re-Queue Attempts]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="SMS:STSClient:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send STS Client Paused Mode Data (Or Not)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
 option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:STSClient:ServiceURI"
 option_pv_opt[$num_options]="-S"
@@ -1212,6 +1220,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
 		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
+		caget $WAIT ${PRE}:SMS:STSClient:SendPausedData
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
