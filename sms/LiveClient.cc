@@ -197,8 +197,11 @@ void LiveClient::writable(void)
 				else
 					cname = "(unknown)";
 
-				ERROR(m_clientName << ": Unable to open file "
-				      << f->fileNumber() << " for container "
+				ERROR(m_clientName << ": Unable to open file number "
+				      << f->fileNumber()
+					  << " (pause file number "
+					  << f->pauseFileNumber() << ")"
+					  << " for container "
 				      << cname << ": " << re.what());
 				delete this;
 				return;
