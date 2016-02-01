@@ -41,6 +41,7 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 		     STSClientMgr &mgr) :
 	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
 	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
+	m_send_paused_data(m_mgr.m_send_paused_data),
 	m_read(new ReadyAdapter(fd, fdrRead,
 				boost::bind(&STSClient::readable, this))),
 	m_write(new ReadyAdapter(fd, fdrWrite,
@@ -48,6 +49,8 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	m_timer(new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat)),
 	m_disp(STSClientMgr::CONNECTION_LOSS)
 {
+	INFO("Initiating Translation of " << m_run->runNumber()
+		<< " SendPausedData=" << m_send_paused_data);
 	run->getFiles(m_files);
 	if (run->active()) {
 		m_contConnection = run->connect(
@@ -94,8 +97,8 @@ void STSClient::writable(void)
 
 		StorageFile::SharedPtr &f = *it;
 
-		// Ignore Paused Run Files (for now...)
-		if (f->paused()) {
+		// Ignore Paused Run Files, as Optionally Configured... :-D
+		if (f->paused() && !m_send_paused_data) {
 			it = m_files.erase(it);
 			continue;
 		}
