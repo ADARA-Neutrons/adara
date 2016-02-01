@@ -2964,7 +2964,7 @@ StreamParser::getPktName(
         case ADARA::PacketType::TRANS_COMPLETE_TYPE:
             ss << "Tran Comp"; break;
         case ADARA::PacketType::CLIENT_HELLO_TYPE:
-            ss << "Cli Hello"; break;
+            ss << "Client Hello"; break;
         case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             ss << "Annotation"; break;
         case ADARA::PacketType::SYNC_TYPE:
