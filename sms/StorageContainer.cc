@@ -69,13 +69,10 @@ void StorageContainer::newFile(void)
 	StorageManager::fileCreated(m_cur_file);
 
 	/* Notify Any Subscribers that we have a New File to process...
-	 * (_Unless_ of course we're in Paused mode, in which case pretend
-	 * that "nothing happened"...! ;-)
-	 *    -> better to nip it in the bud at "FileAdded", and then just
-	 *    let all the "FileUpdated" notifications fall on deaf ears... :-D
+	 * (_Even_ in Paused mode, subscribers can use StorageFile::paused()
+	 * to selectively ignore any Paused run files... :-)
 	 */
-	if (!m_paused)
-		m_newFile(m_cur_file);
+	m_newFile(m_cur_file);
 }
 
 off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
@@ -290,14 +287,48 @@ bool StorageContainer::validate(void)
 		return true;
 	}
 
-	std::list<StorageFile::SharedPtr>::iterator it, end;
-	it = m_files.begin();
-	end = m_files.end();
-	for (uint32_t expected = 1; it != end; ++expected, ++it) {
-		if ((*it)->fileNumber() != expected) {
-			WARN("Container " << m_name << " missing file number "
-			     << expected);
-			return true;
+	std::list<StorageFile::SharedPtr>::iterator it, end = m_files.end();
+
+	uint32_t pauseExpected = 0;
+	uint32_t expected = 0;
+
+	bool last_paused = true;   // funny logic...! ;-D
+
+	for (it = m_files.begin(); it != end; ++it) {
+
+		// Paused Run File...
+		if ( (*it)->paused() ) {
+			if (!last_paused)
+				expected--;
+			if ( (*it)->fileNumber() != expected
+					|| (*it)->pauseFileNumber() != ++pauseExpected ) {
+				WARN("Container " << m_name
+					<< " missing Paused Run File number " << pauseExpected
+					<< " (expected Run File number " << expected
+					<< ", got " << (*it)->fileNumber() << ")"
+					<< " [" << (*it)->path() << "]");
+				return true;
+			}
+			last_paused = true;
+		}
+
+		// Non-Paused Run File...
+		else {
+			// Reset Expected Paused File Number for Any Non-Pause File...
+			pauseExpected = 0;
+			if (last_paused)
+				expected++;
+			if ( (*it)->fileNumber() != expected
+					|| (*it)->pauseFileNumber() != pauseExpected ) {
+				WARN("Container " << m_name
+					<< " missing Run File number " << expected
+					<< " (expected Pause Run File number " << pauseExpected
+					<< ", got " << (*it)->pauseFileNumber() << ")"
+					<< " [" << (*it)->path() << "]");
+				return true;
+			}
+			last_paused = false;
+			expected++;
 		}
 	}
 
@@ -308,7 +339,9 @@ bool StorageContainer::validate(void)
 static bool order_by_filenumber(StorageFile::SharedPtr &a,
 				StorageFile::SharedPtr &b)
 {
-	return a->fileNumber() < b->fileNumber();
+	return ( a->fileNumber() == b->fileNumber() ) ?
+		( a->pauseFileNumber() < b->pauseFileNumber() )
+		: ( a->fileNumber() < b->fileNumber() );
 }
 
 bool StorageContainer::validatePath(const std::string &in_path,
@@ -393,7 +426,6 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
 	bool had_errors = false;
-	bool paused_file = false;
 
 	for (; it != end; ++it) {
 		fs::path file(it->path().filename());
@@ -434,10 +466,10 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		rel_path /= *rit++;
 		rel_path /= *rit;
 
-		f = StorageFile::importFile(c, rel_path.string(), paused_file);
+		f = StorageFile::importFile(c, rel_path.string());
 		if (f)
 			c->m_files.push_back(f);
-		else if (!paused_file)
+		else
 			had_errors = true;
 	}
 
