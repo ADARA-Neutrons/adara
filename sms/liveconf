@@ -440,6 +440,14 @@ option_default[$num_options]="31415"
 option_label[$num_options]="[Live Server Listener Service Port]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="SMS:LiveServer:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send Live Client Paused Mode Data (Or Not)]"
+num_options=$(( num_options + 1 ))
+
 #
 # Dump Usage
 #
@@ -1297,6 +1305,7 @@ if [[ "$command" == "status" \
 
 		caget $WAIT -a ${PRE}:SMS:LiveServer:ListenStatus
 		caget $WAIT ${PRE}:SMS:LiveServer:ListenRetryTimeout
+		caget $WAIT ${PRE}:SMS:LiveServer:SendPausedData
 		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerURI
 		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerService
 
