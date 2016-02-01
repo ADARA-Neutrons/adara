@@ -10,11 +10,12 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
+#include "LiveServer.h"
 #include "LiveClient.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 #include "Logging.h"
 #include "utils.h"
 
@@ -48,9 +49,9 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 	}
 }
 
-LiveClient::LiveClient(int fd) : 
+LiveClient::LiveClient(LiveServer *server, int fd) : 
 	ADARA::POSIXParser(MAX_PKT_SIZE, MAX_PKT_SIZE),
-	m_read(NULL), m_write(NULL), m_hello_received(false),
+	m_server(server), m_read(NULL), m_write(NULL), m_hello_received(false),
 	m_client_fd(fd), m_file_fd(-1)
 {
 	char hostname[1024], service[256];
@@ -96,10 +97,13 @@ LiveClient::LiveClient(int fd) :
 	m_pvCurrentFilePath->update("(none)", &now);
 	m_pvStatus->waiting_for_connect_ack();
 
+	m_send_paused_data = m_server->getSendPausedData();
+
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
-	INFO("client " << m_clientName << " ready to connect");
+	INFO("client " << m_clientName << " ready to connect"
+		<< " SendPausedData=" << m_send_paused_data);
 
 	try {
 		m_timer = new TimerAdapter<LiveClient>(this);
@@ -174,7 +178,8 @@ void LiveClient::writable(void)
 		StorageFile::SharedPtr &f = it->first;
 
 		// Ignore Paused Run Files (for now...)
-		if (f->paused()) {
+		m_send_paused_data = m_server->getSendPausedData();
+		if (f->paused() && !m_send_paused_data) {
 			it = m_files.erase(it);
 			continue;
 		}
