@@ -170,7 +170,15 @@ void LiveClient::writable(void)
 	ssize_t len, rc;
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
+
 		StorageFile::SharedPtr &f = it->first;
+
+		// Ignore Paused Run Files (for now...)
+		if (f->paused()) {
+			it = m_files.erase(it);
+			continue;
+		}
+
 		if (m_file_fd == -1) {
 			try {
 				m_file_fd = f->get_fd();
