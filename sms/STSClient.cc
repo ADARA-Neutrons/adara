@@ -98,7 +98,9 @@ void STSClient::writable(void)
 		StorageFile::SharedPtr &f = *it;
 
 		// Ignore Paused Run Files, as Optionally Configured... :-D
-		if (f->paused() && !m_send_paused_data) {
+		if ( f->paused() && !m_cur_offset // don't trash a file midstream!
+				&& !m_send_paused_data ) // tho shouldn't change during run
+		{
 			it = m_files.erase(it);
 			continue;
 		}
@@ -138,7 +140,11 @@ void STSClient::writable(void)
 				int e = errno;
 				ERROR("Run " << m_run->runNumber()
 					<< " had fatal sendfile error error: "
-					<< strerror(e));
+					<< strerror(e)
+					<< "[m_sts_fd=" << m_sts_fd
+					<< " m_file_fd=" << m_file_fd
+					<< " m_cur_offset=" << m_cur_offset
+					<< " len=" << len << "]");
 			}
 
 			delete this;
@@ -363,12 +369,12 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 		m_disp = STSClientMgr::PERMAMENT_FAIL;
 		if (pkt.reason().length()) {
 			ERROR("Run " << m_run->runNumber() << " had a "
-				"permament failure, status 0x" << std::hex
+				"permanent failure, status 0x" << std::hex
 				<< pkt.status() << std::dec << ", message \'"
 				<< pkt.reason() << "'");
 		} else {
 			ERROR("Run " << m_run->runNumber() << " had a "
-				"permament failure, status 0x" << std::hex
+				"permanent failure, status 0x" << std::hex
 				<< pkt.status() << std::dec);
 		}
 	}
