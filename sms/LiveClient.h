@@ -40,6 +40,7 @@ private:
 	int m_client_fd;
 	int m_file_fd;
 	bool m_send_paused_data;
+	uint32_t m_client_flags;
 
 	TimerAdapter<LiveClient> *m_timer;
 	connection m_mgrConnection;
