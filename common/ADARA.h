@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.4.1";
+const std::string VERSION = "1.5.0";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 namespace PacketType {
@@ -93,7 +93,7 @@ namespace PacketType {
 		RUN_STATUS_VERSION			=	0x00,
 		RUN_INFO_VERSION			=	0x00,
 		TRANS_COMPLETE_VERSION		=	0x00,
-		CLIENT_HELLO_VERSION		=	0x00,
+		CLIENT_HELLO_VERSION		=	0x01,
 		STREAM_ANNOTATION_VERSION	=	0x00,
 		SYNC_VERSION				=	0x00,
 		HEARTBEAT_VERSION			=	0x00,

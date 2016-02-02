@@ -320,10 +320,18 @@ class ClientHelloPkt : public Packet {
 public:
 	ClientHelloPkt(const ClientHelloPkt &pkt);
 
+	enum Flags {
+		PAUSE_AGNOSTIC    = 0x0000,
+		NO_PAUSE_DATA     = 0x0001,
+		SEND_PAUSE_DATA   = 0x0002,
+	};
+
 	uint32_t requestedStartTime(void) const { return m_reqStart; }
+	uint32_t clientFlags(void) const { return m_clientFlags; }
 
 private:
 	uint32_t m_reqStart;
+	uint32_t m_clientFlags;
 
 	ClientHelloPkt(const uint8_t *data, uint32_t len);
 

@@ -238,14 +238,19 @@ TransCompletePkt::TransCompletePkt(const TransCompletePkt &pkt) :
 ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
-	if (m_payload_len != sizeof(uint32_t))
-		throw invalid_packet("ClientHello packet is incorrect size");
+	if (m_payload_len < sizeof(uint32_t))
+		throw invalid_packet("ClientHello packet is too short");
 
-	m_reqStart = *(const uint32_t *) payload();
+	const uint32_t *fields = (const uint32_t *) payload();
+
+	m_reqStart = fields[0];
+
+	m_clientFlags = ( m_version > 0 ) ? fields[1] : 0;
 }
 
 ClientHelloPkt::ClientHelloPkt(const ClientHelloPkt &pkt) :
-	Packet(pkt), m_reqStart(pkt.m_reqStart)
+	Packet(pkt), m_reqStart(pkt.m_reqStart),
+	m_clientFlags(pkt.m_clientFlags)
 {}
 
 /* ------------------------------------------------------------------------ */
