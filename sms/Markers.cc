@@ -8,6 +8,10 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
+
 class MarkerPausedPV : public smsBooleanPV {
 public:
 	MarkerPausedPV(const std::string &name, Markers *m) :
@@ -90,12 +94,17 @@ void Markers::newRun(void)
 	 */
 	if (m_scanIndex) {
 		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
 
 	if (m_pausedPV->value()) {
+		// Clean Up Container before Full Stop!
+		m_ctrl->resumeRecording();
+		// Spew "We've Resumed" Packet
 		emitPacket(now, ADARA::MarkerType::RESUME, false);
+		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
 	}
 
@@ -114,12 +123,17 @@ void Markers::runStop(void)
 	 * Resume the pause _before_ stopping the scan, if that makes sense. :)
 	 */
 	if (m_pausedPV->value()) {
+		// Clean Up Container before Full Stop!
+		m_ctrl->resumeRecording();
+		// Spew "We've Resumed" Packet
 		emitPacket(now, ADARA::MarkerType::RESUME, false);
+		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
 	}
 
 	if (m_scanIndex) {
 		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
@@ -129,12 +143,14 @@ void Markers::runStop(void)
 
 void Markers::pause(void)
 {
+	DEBUG("Paused!");
 	emitPacket(ADARA::MarkerType::PAUSE);
 	m_ctrl->pauseRecording();
 }
 
 void Markers::resume(void)
 {
+	DEBUG("Resumed!");
 	m_ctrl->resumeRecording();
 	emitPacket(ADARA::MarkerType::RESUME);
 }
@@ -142,11 +158,13 @@ void Markers::resume(void)
 void Markers::startScan(void)
 {
 	m_scanIndex = m_indexPV->value();
+	DEBUG("Start Scan " << m_scanIndex);
 	emitPacket(ADARA::MarkerType::SCAN_START);
 }
 
 void Markers::stopScan(void)
 {
+	DEBUG("Stop Scan " << m_scanIndex);
 	emitPacket(ADARA::MarkerType::SCAN_STOP);
 	m_scanIndex = 0;
 }
