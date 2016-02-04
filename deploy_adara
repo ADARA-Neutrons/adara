@@ -1290,7 +1290,7 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 #
 
 # System Init Services...
-if [[ $PROG == "PVSD" || $PROG == "SMS" ]]; then
+if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 
 	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 
