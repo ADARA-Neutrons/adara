@@ -357,6 +357,14 @@ option_default[$num_options]="0"
 option_label[$num_options]="[Max Blocks of Storage Allowed]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="storage"
+option_name[$num_options]="rescan_run_dir"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:StorageManager:RescanRunDir"
+option_value_type[$num_options]="STRING(Full Path to Run Directory)"
+option_label[$num_options]="[Rescan Given Run Directory for Processing]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="sts"
 option_name[$num_options]="connect_timeout"
 option_pv[$num_options]="SMS:STSClient:ConnectTimeout"
@@ -1220,6 +1228,7 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
 
 		echo
 
