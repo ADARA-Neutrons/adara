@@ -8,6 +8,10 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
+
 class MarkerPausedPV : public smsBooleanPV {
 public:
 	MarkerPausedPV(const std::string &name, Markers *m) :
@@ -38,37 +42,37 @@ private:
 	void triggered(void) { m_cb(); }
 };
 
-Markers::Markers(SMSControl *sms) :
-	m_scanIndex(0)
+Markers::Markers(SMSControl *ctrl) :
+	m_ctrl(ctrl), m_scanIndex(0)
 {
-	std::string prefix(sms->getBeamlineId());
+	std::string prefix(ctrl->getBeamlineId());
 	prefix += ":SMS:";
 
 	m_pausedPV.reset(new MarkerPausedPV(prefix + "Paused", this));
-	sms->addPV(m_pausedPV);
+	ctrl->addPV(m_pausedPV);
 
 	prefix += "Marker:";
 	m_commentPV.reset(new smsStringPV(prefix + "Comment"));
-	sms->addPV(m_commentPV);
+	ctrl->addPV(m_commentPV);
 
 	m_indexPV.reset(new smsUint32PV(prefix + "ScanIndex"));
-	sms->addPV(m_indexPV);
+	ctrl->addPV(m_indexPV);
 
 	m_scanStartPV.reset(new MarkerTriggerPV(prefix + "StartScan",
 			    boost::bind(&Markers::startScan, this)));
-	sms->addPV(m_scanStartPV);
+	ctrl->addPV(m_scanStartPV);
 
 	m_scanStopPV.reset(new MarkerTriggerPV(prefix + "StopScan",
 			    boost::bind(&Markers::stopScan, this)));
-	sms->addPV(m_scanStopPV);
+	ctrl->addPV(m_scanStopPV);
 
 	m_annotatePV.reset(new MarkerTriggerPV(prefix + "Annotate",
 			    boost::bind(&Markers::annotate, this)));
-	sms->addPV(m_annotatePV);
+	ctrl->addPV(m_annotatePV);
 
 	m_runCommentPV.reset(new MarkerTriggerPV(prefix + "RunComment",
 			    boost::bind(&Markers::addRunComment, this)));
-	sms->addPV(m_runCommentPV);
+	ctrl->addPV(m_runCommentPV);
 
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&Markers::onPrologue, this));
@@ -90,12 +94,17 @@ void Markers::newRun(void)
 	 */
 	if (m_scanIndex) {
 		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
 
 	if (m_pausedPV->value()) {
+		// Clean Up Container before Full Stop!
+		m_ctrl->resumeRecording();
+		// Spew "We've Resumed" Packet
 		emitPacket(now, ADARA::MarkerType::RESUME, false);
+		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
 	}
 
@@ -114,12 +123,17 @@ void Markers::runStop(void)
 	 * Resume the pause _before_ stopping the scan, if that makes sense. :)
 	 */
 	if (m_pausedPV->value()) {
+		// Clean Up Container before Full Stop!
+		m_ctrl->resumeRecording();
+		// Spew "We've Resumed" Packet
 		emitPacket(now, ADARA::MarkerType::RESUME, false);
+		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
 	}
 
 	if (m_scanIndex) {
 		emitPacket(now, ADARA::MarkerType::SCAN_STOP, false);
+		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
@@ -129,22 +143,28 @@ void Markers::runStop(void)
 
 void Markers::pause(void)
 {
+	DEBUG("Paused!");
 	emitPacket(ADARA::MarkerType::PAUSE);
+	m_ctrl->pauseRecording();
 }
 
 void Markers::resume(void)
 {
+	DEBUG("Resumed!");
+	m_ctrl->resumeRecording();
 	emitPacket(ADARA::MarkerType::RESUME);
 }
 
 void Markers::startScan(void)
 {
 	m_scanIndex = m_indexPV->value();
+	DEBUG("Start Scan " << m_scanIndex);
 	emitPacket(ADARA::MarkerType::SCAN_START);
 }
 
 void Markers::stopScan(void)
 {
+	DEBUG("Stop Scan " << m_scanIndex);
 	emitPacket(ADARA::MarkerType::SCAN_STOP);
 	m_scanIndex = 0;
 }

@@ -16,7 +16,7 @@ class smsUint32PV;
 
 class Markers : boost::noncopyable {
 public:
-	Markers(SMSControl *sms);
+	Markers(SMSControl *ctrl);
 	~Markers();
 
 	void newRun(void);
@@ -34,6 +34,8 @@ private:
 	boost::shared_ptr<MarkerTriggerPV> m_runCommentPV;
 
 	boost::signals2::connection m_connection;
+
+	SMSControl *m_ctrl;
 
 	uint32_t m_scanIndex;
 

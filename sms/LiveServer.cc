@@ -40,6 +40,8 @@ std::string LiveServer::m_host;
 
 double LiveServer::m_listen_retry;
 
+bool LiveServer::m_send_paused_data = false;
+
 void LiveServer::config(const boost::property_tree::ptree &conf)
 {
 	m_service = conf.get<std::string>("livestream.service", "31415");
@@ -47,6 +49,9 @@ void LiveServer::config(const boost::property_tree::ptree &conf)
 	m_host = conf.get<std::string>("livestream.uri", "ANY");
 
 	m_listen_retry = conf.get<double>("livestream.listen_retry", 5.0);
+
+	m_send_paused_data =
+		conf.get<bool>("livestream.send_paused_data", false);
 
 	LiveClient::config(conf);
 }
@@ -84,10 +89,14 @@ LiveServer::LiveServer() :
 	m_pvListenerService = boost::shared_ptr<ListenStringPV>(new
 		ListenStringPV(prefix + ":ListenerService", this));
 
+	m_pvSendPausedData = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":SendPausedData"));
+
 	ctrl->addPV(m_pvListenStatus);
 	ctrl->addPV(m_pvListenRetryTimeout);
 	ctrl->addPV(m_pvListenerURI);
 	ctrl->addPV(m_pvListenerService);
+	ctrl->addPV(m_pvSendPausedData);
 
 	// Initialize LiveServer PVs...
 
@@ -98,6 +107,8 @@ LiveServer::LiveServer() :
 
 	m_pvListenerURI->update(m_host, &now);
 	m_pvListenerService->update(m_service, &now);
+
+	m_pvSendPausedData->update(m_send_paused_data, &now);
 
 	// Initialize Listener...
 
@@ -320,7 +331,7 @@ void LiveServer::newConnection(void)
 	try {
 		// TODO may want to put LiveClient on list
 		// to cleanup during shutdown
-		new LiveClient( rc );
+		new LiveClient( this, rc );
 	}
 	catch (std::exception &e) {
 		ERROR("newConnection(): LiveClient() Exception - " << e.what());
@@ -340,5 +351,12 @@ bool LiveServer::listenRetry(void)
 {
 	setupListener();
 	return false;
+}
+
+bool LiveServer::getSendPausedData(void)
+{
+	// Update Send Paused Data Option from PV...
+	m_send_paused_data = m_pvSendPausedData->value();
+	return( m_send_paused_data );
 }
 

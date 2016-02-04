@@ -352,15 +352,16 @@ StreamMonitor::connect()
         if ( ::connect( sms_socket, (struct sockaddr*) &server_addr, sizeof(server_addr)) == 0 )
         {
             // Send client hello to begin stream processing
-            uint32_t data[5];
+            uint32_t data[6];
 
-            data[0] = 4;
+            data[0] = 8;
             data[1] = ADARA_PKT_TYPE(
                 ADARA::PacketType::CLIENT_HELLO_TYPE,
                 ADARA::PacketType::CLIENT_HELLO_VERSION );
             data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
             data[3] = 0;
             data[4] = 0;
+            data[5] = 0; // Version 1 ClientHelloPkt includes Paused/Flags
 
             if ( write( sms_socket, data, sizeof(data)) == sizeof( data ))
             {
@@ -705,6 +706,9 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
             rpos++;
 
             // Save bank ID
+            // (Can be Overwritten in the case of
+            // Multiple Pixel Map Section sub-headers for a given Bank,
+            // but this is O.K., as BankInfo() is Just for Bookkeeping. :-)
             m_bank_info[bank_id] = BankInfo(bank_id);
 
             epos2 = rpos + pix_count;

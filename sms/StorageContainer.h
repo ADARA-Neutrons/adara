@@ -21,6 +21,7 @@ public:
 	const struct timespec &startTime(void) const { return m_startTime; }
 	uint32_t runNumber(void) const { return m_runNumber; }
 	uint32_t numFiles(void) const { return m_numFiles; }
+	uint32_t numPauseFiles(void) const { return m_numPauseFiles; }
 	const std::string &name(void) const { return m_name; }
 	bool isTranslated(void) const { return m_translated; }
 	bool isManual(void) const { return m_manual; }
@@ -30,6 +31,7 @@ public:
 	uint32_t incrRequeueCount(void) { return( ++m_requeueCount ); }
 
 	bool active(void) const { return m_active; }
+	bool paused(void) const { return m_paused; }
 
 	boost::signals2::connection connect(const onNewFile::slot_type &slot) {
 		return m_newFile.connect(slot);
@@ -45,6 +47,9 @@ public:
 	void terminate(void);
 	void notify(void);
 
+	void pause(void);
+	void resume(void);
+
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
@@ -57,10 +62,12 @@ private:
 	struct timespec m_startTime;
 	uint32_t m_runNumber;
 	uint32_t m_numFiles;
+	uint32_t m_numPauseFiles;
 	std::string m_name;
 	StorageFile::SharedPtr m_cur_file;
 	onNewFile m_newFile;
 	bool m_active;
+	bool m_paused;
 	bool m_translated;
 	bool m_manual;
 	uint32_t m_requeueCount;

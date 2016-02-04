@@ -55,8 +55,8 @@ std::string SMSControl::m_pixelMapPath;
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
 
-uint32_t SMSControl::m_interPulseTimeMin;
-uint32_t SMSControl::m_interPulseTimeMax;
+uint64_t SMSControl::m_interPulseTimeMin;
+uint64_t SMSControl::m_interPulseTimeMax;
 bool SMSControl::m_doPulsePchgCorrect;
 bool SMSControl::m_doPulseVetoCorrect;
 
@@ -185,16 +185,16 @@ void SMSControl::init(void)
 
 void SMSControl::late_config(const boost::property_tree::ptree &conf)
 {
-	SMSControl *sms = getInstance();
-	if (!sms)
+	SMSControl *ctrl = getInstance();
+	if (!ctrl)
 		throw std::logic_error("late_config on uninitialized obj");
 
-	sms->m_bmonConfig.reset(new BeamMonitorConfig(conf));
+	ctrl->m_bmonConfig.reset(new BeamMonitorConfig(conf));
 
-	sms->m_detBankSets.reset(new DetectorBankSet(conf));
+	ctrl->m_detBankSets.reset(new DetectorBankSet(conf));
 
-	sms->addSources(conf);
-	sms->m_fastmeta->addDevices(conf);
+	ctrl->addSources(conf);
+	ctrl->m_fastmeta->addDevices(conf);
 }
 
 void SMSControl::addSources(const boost::property_tree::ptree &conf)
@@ -394,9 +394,9 @@ SMSControl::SMSControl() :
 	m_pvPopPulseBuffer->update(0, &now);
 
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
-	uint32_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
-	m_interPulseTimeMin = 0.77 * baseInterPulseTime;
-	m_interPulseTimeMax = 1.23 * baseInterPulseTime;
+	uint64_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
+	m_interPulseTimeMin = 77 * baseInterPulseTime / 100;
+	m_interPulseTimeMax = 123 * baseInterPulseTime / 100;
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
 	m_pvDoPulseVetoCorrect->update(m_doPulseVetoCorrect, &now);
 
@@ -520,12 +520,14 @@ bool SMSControl::setRecording(bool v)
 			StorageManager::startRecording(m_currentRunNumber);
 		} catch (std::runtime_error e) {
 			ERROR("Unable to start recording: " << e.what());
+			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
 			return false;
 		} catch (...) {
 			ERROR("Unable to start recording, unknown exception");
+			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
@@ -537,6 +539,7 @@ bool SMSControl::setRecording(bool v)
 	} else {
 		/* Stop the current recording */
 		INFO("Stopping run " << m_currentRunNumber);
+		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
 
@@ -564,6 +567,26 @@ bool SMSControl::setRecording(bool v)
 bool SMSControl::getRecording(void)
 {
 	return m_recording;
+}
+
+void SMSControl::pauseRecording(void)
+{
+	if ( m_currentRunNumber )
+		INFO("Pausing run " << m_currentRunNumber);
+	else
+		INFO("Pausing data collection (not currently recording)");
+
+	StorageManager::pauseRecording();
+}
+
+void SMSControl::resumeRecording(void)
+{
+	if ( m_currentRunNumber )
+		INFO("Resuming run " << m_currentRunNumber);
+	else
+		INFO("Resuming data collection (not currently recording)");
+
+	StorageManager::resumeRecording();
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
@@ -1661,14 +1684,14 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 	// Check if Next Pulse is About "Pulse Frequency" Away from This Pulse
 
 	uint64_t pulse_id = pulse->m_id.first;
-	uint32_t pulse_sec = pulse_id >> 32;
-	uint32_t pulse_nsec = pulse_id & 0xffffffff;
+	uint64_t pulse_sec = pulse_id >> 32;
+	uint64_t pulse_nsec = pulse_id & 0xffffffff;
 
 	uint64_t next_pulse_id = next_pulse->m_id.first;
-	uint32_t next_pulse_sec = next_pulse_id >> 32;
-	uint32_t next_pulse_nsec = next_pulse_id & 0xffffffff;
+	uint64_t next_pulse_sec = next_pulse_id >> 32;
+	uint64_t next_pulse_nsec = next_pulse_id & 0xffffffff;
 
-	uint32_t interPulseTime =
+	uint64_t interPulseTime =
 		( ( next_pulse_sec - pulse_sec ) * 1000000000 )
 			+ ( next_pulse_nsec - pulse_nsec );
 

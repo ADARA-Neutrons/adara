@@ -645,7 +645,16 @@ bool Parser::rxPacket(const ADARA::ClientHelloPkt &pkt)
 				printf("    Request data from timestamp %u\n",
 					pkt.requestedStartTime());
 		} else
-			printf("     Request data from current position\n");
+			printf("    Request data from current position\n");
+		uint32_t clientFlags = pkt.clientFlags();
+		printf("    Client Flags 0x%x [", clientFlags);
+		if ( clientFlags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA )
+			printf("SEND_PAUSE_DATA");
+		else if ( clientFlags & ADARA::ClientHelloPkt::NO_PAUSE_DATA )
+			printf("NO_PAUSE_DATA");
+		else
+			printf("PAUSE_AGNOSTIC");
+		printf("]\n");
 	}
 
 	return false;

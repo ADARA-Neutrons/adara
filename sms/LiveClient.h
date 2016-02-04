@@ -9,6 +9,7 @@
 
 #include "ADARAPackets.h"
 #include "POSIXParser.h"
+#include "LiveServer.h"
 #include "StorageContainer.h"
 #include "StorageFile.h"
 #include "ReadyAdapter.h"
@@ -20,7 +21,7 @@ class smsConnectedPV;
 
 class LiveClient : public ADARA::POSIXParser {
 public:
-	LiveClient(int fd);
+	LiveClient(LiveServer *server, int fd);
 	~LiveClient();
 
 	static void config(const boost::property_tree::ptree &conf);
@@ -30,12 +31,17 @@ private:
 	typedef std::pair<StorageFile::SharedPtr, off_t> FileEntry;
 	typedef std::list<FileEntry> FileList;
 
+	LiveServer *m_server;
+
 	FileList m_files;
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
 	bool m_hello_received;
 	int m_client_fd;
 	int m_file_fd;
+	bool m_send_paused_data;
+	uint32_t m_client_flags;
+
 	TimerAdapter<LiveClient> *m_timer;
 	connection m_mgrConnection;
 	connection m_contConnection;

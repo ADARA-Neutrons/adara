@@ -101,7 +101,7 @@ private:
 
 class smsRecordingPV : public smsPV {
 public:
-	smsRecordingPV(const std::string &prefix, SMSControl *sms);
+	smsRecordingPV(const std::string &prefix, SMSControl *ctrl);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -111,7 +111,7 @@ public:
 	virtual aitEnum bestExternalType(void) const;
 
 private:
-	SMSControl *m_sms;
+	SMSControl *m_ctrl;
 
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);

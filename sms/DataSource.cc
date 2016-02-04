@@ -187,8 +187,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
-					<< std::hex << " m_lastPulse=" << m_lastPulse
-					<< " m_activePulse=" << m_activePulse << std::dec
+					<< std::hex << " m_lastPulse=0x" << m_lastPulse
+					<< " m_activePulse=0x" << m_activePulse << std::dec
 					<< " cycle=" << pkt.cycle()
 					<< " vetoFlags=" << pkt.vetoFlags());
 			}

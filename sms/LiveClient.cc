@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <stdint.h>
+#include <sstream>
 #include <string>
 
 #include <boost/bind.hpp>
@@ -10,11 +11,12 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "SMSControl.h"
+#include "SMSControlPV.h"
+#include "LiveServer.h"
 #include "LiveClient.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
-#include "SMSControl.h"
-#include "SMSControlPV.h"
 #include "Logging.h"
 #include "utils.h"
 
@@ -48,10 +50,10 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 	}
 }
 
-LiveClient::LiveClient(int fd) : 
+LiveClient::LiveClient(LiveServer *server, int fd) : 
 	ADARA::POSIXParser(MAX_PKT_SIZE, MAX_PKT_SIZE),
-	m_read(NULL), m_write(NULL), m_hello_received(false),
-	m_client_fd(fd), m_file_fd(-1)
+	m_server(server), m_read(NULL), m_write(NULL), m_hello_received(false),
+	m_client_fd(fd), m_file_fd(-1), m_client_flags(0)
 {
 	char hostname[1024], service[256];
 	struct sockaddr_in6 sa;
@@ -96,10 +98,13 @@ LiveClient::LiveClient(int fd) :
 	m_pvCurrentFilePath->update("(none)", &now);
 	m_pvStatus->waiting_for_connect_ack();
 
+	m_send_paused_data = m_server->getSendPausedData();
+
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
-	INFO("client " << m_clientName << " ready to connect");
+	INFO("client " << m_clientName << " ready to connect"
+		<< " SendPausedData=" << m_send_paused_data);
 
 	try {
 		m_timer = new TimerAdapter<LiveClient>(this);
@@ -170,7 +175,24 @@ void LiveClient::writable(void)
 	ssize_t len, rc;
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
+
 		StorageFile::SharedPtr &f = it->first;
+
+		off_t &cur_offset = it->second;
+
+		// Allow Client Override to Force Inclusion of Paused Data...
+		if ( !(m_client_flags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA) ) {
+			// Ignore Paused Run Files as Configured (by SMS or Client)...
+			m_send_paused_data = m_server->getSendPausedData();
+			if ( f->paused() && !cur_offset // don't trash a file midstream!
+					&& ( !m_send_paused_data
+						|| m_client_flags
+							& ADARA::ClientHelloPkt::NO_PAUSE_DATA ) ) {
+				it = m_files.erase(it);
+				continue;
+			}
+		}
+
 		if (m_file_fd == -1) {
 			try {
 				m_file_fd = f->get_fd();
@@ -184,15 +206,17 @@ void LiveClient::writable(void)
 				else
 					cname = "(unknown)";
 
-				ERROR(m_clientName << ": Unable to open file "
-				      << f->fileNumber() << " for container "
+				ERROR(m_clientName << ": Unable to open file number "
+				      << f->fileNumber()
+					  << " (pause file number "
+					  << f->pauseFileNumber() << ")"
+					  << " for container "
 				      << cname << ": " << re.what());
 				delete this;
 				return;
 			}
 		}
 
-		off_t &cur_offset = it->second;
 		len = f->size() - cur_offset;
 		if (len > m_max_send_chunk)
 			len = m_max_send_chunk;
@@ -403,8 +427,23 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	m_timer->cancel();
 	m_hello_received = true;
 
-	INFO("LiveClient Hello Received from " << m_clientName
-		<< ", Requested Start Time " << pkt.requestedStartTime());
+	m_client_flags = pkt.clientFlags();  // Available in Version 1, else 0.
+
+	std::stringstream ss;
+	ss << "[";
+	if ( m_client_flags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA )
+		ss << "SEND_PAUSE_DATA";
+	else if ( m_client_flags & ADARA::ClientHelloPkt::NO_PAUSE_DATA )
+		ss << "NO_PAUSE_DATA";
+	else
+		ss << "PAUSE_AGNOSTIC";
+	ss << "]";
+
+	INFO("LiveClient Hello V" << pkt.version()
+		<< " Received from " << m_clientName
+		<< ", Requested Start Time = " << pkt.requestedStartTime()
+		<< ", Client Flags = 0x" << std::hex << m_client_flags << std::dec
+		<< " " << ss.str() );
 
 	if ( m_clientId >= 0 ) {
 		struct timespec now;

@@ -31,9 +31,11 @@ public:
 	void put_fd(void);
 	std::string path(void) const { return m_path; }
 	bool active(void) const { return m_active; }
+	bool paused(void) const { return m_paused; }
 	bool oversize(void) const { return m_oversize; }
 	off_t size(void) const { return m_size; }
 	uint32_t fileNumber(void) const { return m_fileNumber; }
+	uint32_t pauseFileNumber(void) const { return m_pauseFileNumber; }
 	bool willPersist(void) const { return m_persist; }
 	void persist(bool p = true) { m_persist = p; }
 	OwnerPtr owner(void) const { return m_owner; }
@@ -43,16 +45,16 @@ public:
 	}
 
 	/* Create a new file within a container to store data */
-	static SharedPtr newFile(OwnerPtr owner, uint32_t fileNumber,
-				 ADARA::RunStatus::Enum status);
+	static SharedPtr newFile(OwnerPtr owner,
+			uint32_t fileNumber, uint32_t pauseFileNumber,
+			ADARA::RunStatus::Enum status);
 
 	/* Create a file to persist experiment state information */
 	static SharedPtr stateFile(OwnerPtr runInfo,
-				   const std::string &basePath);
+			const std::string &basePath);
 
 	/* Create an object to manage an existing file */
-	static SharedPtr importFile(OwnerPtr owner,
-				    const std::string &path);
+	static SharedPtr importFile(OwnerPtr owner, const std::string &path);
 
 	off_t write(IoVector &iovec, uint32_t len, bool do_notify = true);
 	void terminate(ADARA::RunStatus::Enum status);
@@ -67,10 +69,12 @@ private:
 	std::string m_path;
 	uint32_t m_runNumber;
 	uint32_t m_fileNumber;
+	uint32_t m_pauseFileNumber;
 	uint32_t m_startTime;
 	bool m_persist;
 	bool m_oversize;
 	bool m_active;
+	bool m_paused;
 	off_t m_size;
 	off_t m_sizeLastUpdate;
 	off_t m_syncDistance;
@@ -86,7 +90,8 @@ private:
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
 
-	StorageFile(OwnerPtr &owner, uint32_t fileNumber);
+	StorageFile(OwnerPtr &owner,
+		uint32_t fileNumber, uint32_t pauseFileNumber);
 };
 
 #endif /* __STORAGE_FILE */

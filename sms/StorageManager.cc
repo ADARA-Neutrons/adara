@@ -149,6 +149,68 @@ private:
 	}
 };
 
+class RescanRunDirPV : public smsStringPV {
+public:
+	RescanRunDirPV(const std::string &name) :
+		smsStringPV(name) {}
+private:
+
+	void changed(void)
+	{
+		std::string rescanRunDir = value();
+
+		if ( !rescanRunDir.length() ) {
+			DEBUG("RescanRunDirPV changed():"
+				<< " Ignoring Empty Run Directory Path Value");
+			return;
+		}
+
+		DEBUG("RescanRunDirPV: " << m_pv_name
+			<< " Rescanning [" << rescanRunDir << "]");
+
+		StorageContainer::SharedPtr c =
+			StorageContainer::scan( rescanRunDir );
+
+		if (c) {
+
+			// XXX Deal With Scanned Blocks & Background I/O Thread
+			// m_scannedBlocks += c->blocks();
+
+			if (c->runNumber()) {
+				ComBusSMSMon *combus = StorageManager::combus();
+				if (c->isTranslated()) {
+					/* Send STS Succeeded Message */
+					combus->sendOriginal(c->runNumber(),
+							std::string("Rescan STS Send Succeeded"),
+							c->startTime());
+				} else if (c->isManual()) {
+					/* Send STS Failed Message */
+					combus->sendOriginal(c->runNumber(),
+							std::string("Rescan Needs Manual Translation"),
+							c->startTime());
+				} else {
+					/* Queue for Re-Translation */
+					STSClientMgr *sts = STSClientMgr::getInstance();
+					INFO("Rescan Queuing Run " << c->runNumber());
+					sts->queueRun(c);
+					/* Tell the STS client to start processing the runs we
+					 * just queued. */
+					sts->startConnect();
+					/* Send Run Queued Message */
+					combus->sendOriginal(c->runNumber(),
+							std::string("Rescan STS Send Pending"),
+							c->startTime());
+				}
+			}
+		}
+
+		// Done, Reset Rescan Run Directory PV...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		update("", &now);
+	}
+};
+
 std::string StorageManager::m_baseDir;
 int StorageManager::m_base_fd = -1;
 
@@ -168,6 +230,7 @@ uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
 boost::shared_ptr<PoolsizePV> StorageManager::m_pvPoolsize;
 boost::shared_ptr<PercentPV> StorageManager::m_pvPercent;
 boost::shared_ptr<MaxBlocksPV> StorageManager::m_pvMaxBlocksAllowed;
+boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
 struct timespec StorageManager::m_scanStart;
 uint64_t StorageManager::m_scannedBlocks;
@@ -415,10 +478,13 @@ void StorageManager::lateInit(void)
 	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
 		MaxBlocksPV(prefix + ":MaxBlocksAllowed"));
 
+	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
+		RescanRunDirPV(prefix + ":RescanRunDir"));
+
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
-
+	ctrl->addPV(m_pvRescanRunDir);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -432,6 +498,9 @@ void StorageManager::lateInit(void)
 		m_poolsize.length() ? m_poolsize : "(unset)", &m_scanStart);
 	m_pvPercent->update(m_percent, &m_scanStart);
 	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &m_scanStart);
+
+	/* Initialize Rescan Run Directory PV... */
+	m_pvRescanRunDir->update("", &m_scanStart);
 
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
@@ -776,6 +845,26 @@ void StorageManager::stopRecording(void)
 	startContainer();
 }
 
+void StorageManager::pauseRecording(void)
+{
+	m_cur_container->pause();
+
+	if (m_cur_container->runNumber()) {
+		m_combus->sendUpdate(m_cur_container->runNumber(),
+			std::string("SMS run paused"));
+	}
+}
+
+void StorageManager::resumeRecording(void)
+{
+	m_cur_container->resume();
+
+	if (m_cur_container->runNumber()) {
+		m_combus->sendUpdate(m_cur_container->runNumber(),
+			std::string("SMS run resumed"));
+	}
+}
+
 void StorageManager::notify(void)
 {
 	m_cur_container->notify();
@@ -959,30 +1048,31 @@ void StorageManager::scanDaily(const std::string &dir)
 		}
 
 		c = StorageContainer::scan(it->path().string());
+
 		if (c) {
+
 			m_scannedBlocks += c->blocks();
 
 			if (c->runNumber()) {
 				if (c->isTranslated()) {
-					/* send sts succeeded message */
+					/* Send STS Succeeded Message */
 					m_combus->sendOriginal(c->runNumber(),
-							std::string("STS send succeeded"),
+							std::string("STS Send Succeeded"),
 							c->startTime());
 				} else if (c->isManual()) {
-					/* send sts failed message */
+					/* Send STS Failed Message */
 					m_combus->sendOriginal(c->runNumber(),
 							std::string("Needs Manual Translation"),
 							c->startTime());
 				} else {
-					/* note pending for later translation */
+					/* Note Pending for Later Translation */
 					m_pendingRuns.push_back(c);
-					/* send run stopped message */
+					/* Send Run Queued Message */
 					m_combus->sendOriginal(c->runNumber(),
-							std::string("STS send pending"),
+							std::string("STS Send Pending"),
 							c->startTime());
 				}
 			}
-
 		}
 	}
 }

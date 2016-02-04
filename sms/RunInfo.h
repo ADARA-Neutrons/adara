@@ -23,7 +23,7 @@ public:
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
-	RunInfo(const std::string &beamline, SMSControl *sms);
+	RunInfo(const std::string &beamline, SMSControl *ctrl);
 	~RunInfo();
 
 	void lock(void);
@@ -55,7 +55,7 @@ private:
 	boost::signals2::connection m_connection;
 
 	void addPV(const std::string &prefix, const char *pv_name,
-		   const char *xml_name, RunInfoMap &map, SMSControl *sms);
+		   const char *xml_name, RunInfoMap &map, SMSControl *ctrl);
 	void generatePacket(void);
 	void onPrologue(void);
 };

@@ -1423,9 +1423,9 @@ NxGen::flushPauseData()
 }
 
 
-/*! \brief Writes buffered pause data into Nexus file
+/*! \brief Writes buffered scan data into Nexus file
  *
- * This method flushes buffered pause data to the logs of the Nexus file.
+ * This method flushes buffered scan data to the logs of the Nexus file.
  */
 void
 NxGen::flushScanData()

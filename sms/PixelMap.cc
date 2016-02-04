@@ -129,6 +129,7 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 	struct timespec now;
 	uint32_t *u32;
 	uint16_t i, entries, bank;
+	uint16_t max_count = 0xffff;
 
 	/* A physical->logical map is better for parsing and for building
 	 * the lookup table used for normal operations, but going logical
@@ -153,9 +154,12 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 
 	for (++it, end = inverted.end(); it != end; ++it) {
 		/* If we've found a discontinuity in the logical pixels,
-		 * or we changed banks, then we have to start a new section.
+		 * or we changed banks, OR we have _Filled Up_ this section
+		 * with the Max PixelId Count (16 bits, 0xffff = 65535),
+		 * then we have to start a new section.
 		 */
-		if (it->first != expected || it->second.second != bank) {
+		if (it->first != expected || it->second.second != bank
+				|| entries >= max_count) {
 			sections.push(entries);
 			entries = 0;
 			bank = it->second.second;

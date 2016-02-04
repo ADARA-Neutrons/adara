@@ -101,9 +101,16 @@ int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 
 		PacketHeader hdr(p);
 
-		if (hdr.payload_length() % 4)
-			throw invalid_packet("Payload length not "
-					     "multiple of 4");
+		if (hdr.payload_length() % 4) {
+			std::stringstream ss;
+			ss << "Payload length ";
+			ss << hdr.payload_length();
+			ss << " not multiple of 4";
+			ss << " (Packet Type 0x";
+			ss << std::hex << hdr.type() << std::dec;
+			ss << ")";
+			throw invalid_packet( ss.str() );
+		}
 
 		if (m_max_size < hdr.packet_length()) {
 			/* This packet is over the maximum limit; we'll

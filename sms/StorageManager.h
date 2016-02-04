@@ -24,6 +24,7 @@ class EventFd;
 class PoolsizePV;
 class PercentPV;
 class MaxBlocksPV;
+class RescanRunDirPV;
 
 class StorageManager {
 public:
@@ -39,6 +40,9 @@ public:
 
 	static void startRecording(uint32_t run);
 	static void stopRecording(void);
+
+	static void pauseRecording(void);
+	static void resumeRecording(void);
 
 	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
@@ -94,6 +98,8 @@ public:
 
 	static void update_max_blocks_allowed_pv(void);
 
+	static ComBusSMSMon *combus(void) { return m_combus; }
+
 	static void sendComBus(uint32_t a_run_num,
 		std::string a_run_state,
 		const struct timespec & a_start_time = combuszerotime);
@@ -128,6 +134,7 @@ private:
 	static boost::shared_ptr<PoolsizePV> m_pvPoolsize;
 	static boost::shared_ptr<PercentPV> m_pvPercent;
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowed;
+	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
 
 	static struct timespec m_scanStart;
 	static uint64_t m_scannedBlocks;

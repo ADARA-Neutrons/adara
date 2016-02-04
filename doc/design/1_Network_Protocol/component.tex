@@ -165,8 +165,10 @@ system.
 		\ref{section:protocol_run_information} \\
 	0x4005.0 & Translation Complete &
 		\ref{section:protocol_translation_complete} \\
-	0x4006.0 & Client Hello &
-		\ref{section:protocol_client_hello} \\
+	0x4006.0 & Client Hello V0 &
+		\ref{section:protocol_client_hello_v0} \\
+	0x4006.1 & Client Hello V1 &
+		\ref{section:protocol_client_hello_v1} \\
 	0x4007.0 & Stream Annotation &
 		\ref{section:protocol_stream_annotation} \\
 	0x4008.0 & Synchronization (File) &
@@ -867,7 +869,8 @@ Translation Service, the SMS will terminate its connection.
 {\large \bf Communication with the Live Event Clients}
 
 Upon connection to the SMS, the client shall send a Client Hello
-(Section~\ref{section:protocol_client_hello}) to initiate communication
+(Sections~\ref{section:protocol_client_hello_v0}
+and~\ref{section:protocol_client_hello_v1}) to initiate communication
 and provide client requests to the SMS. Once the SMS has received the Client
 Hello, it will send the following prologue:
 \begin{itemize}
@@ -903,7 +906,7 @@ the prologue as defined for communication with the Translation Service, and all
 subsequent data will be associated with that experimental recording until it
 receives another Run Status Packet indicating the completion of the that run.
 
-A live event client may recieve a Stream Annotation Packet
+A live event client may receive a Stream Annotation Packet
 (Section~\ref{section:protocol_stream_annotation}) at any time. It is
 recommended that the client handle the packet appropriately for the type of
 annotation received.
@@ -1436,14 +1439,11 @@ for the same experiment recording.
     \bitheader{31,16,15,0} \\
     \bitbox{32}{Base Logical ID (u32)} \\
     \bitbox{16}{Bank ID (u16)} & 
-    \bitbox{16}{Count (``$N$'', u16)} \\
-    %\wordbox{1}{Map Entry 0} \\
-    \wordbox{1}{Physical ID 0 (u32)} \\
-    \wordbox[lrt]{1}{Physical ID 1 (u32)} \\
-    %\wordbox[lrt]{1}{Map Entry 1} \\
-    \wordbox[lr]{1}{$\cdots$} \\
-    \wordbox[lrb]{1}{Physical ID $N$ (u32)} \\
-    %\wordbox[lrb]{1}{Map Entry $N$} \\
+    \bitbox{16}{Count (``$P$'', u16)} \\
+    \wordbox{1}{Physical ID 1 (u32)} \\
+    \wordbox{1}{Physical ID 2 (u32)} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{1}{Physical ID $P$ (u32)} \\
   \end{bytefield}
   \caption{Pixel Map Section}
   \label{fig:protocol_packet_pixel_map_section}
@@ -1463,7 +1463,7 @@ The logical pixel ID space may not be compactly populated. It often
 contains sequential clusters of IDs with large gaps between the clusters.
 To reduce the size of the mapping table, it is described using sections as
 defined in Figure~\ref{fig:protocol_packet_pixel_map_section}.
-{\bf Base Logical ID} defines be offset into the logical ID space for
+{\bf Base Logical ID} defines the offset into the logical ID space for
 which this section defines mappings. {\bf Count} gives the number of
 mapping entries in this section, and {\bf Bank ID} describes the bank
 containing these pixels.
@@ -1471,13 +1471,16 @@ containing these pixels.
 Each entry in the section describes a physical to logical (and bank) mapping.
 Each entry gives the physical ID for the mapping, and the logical ID is
 determined by adding the entry's zero-based index (from the section header) to
-the {\bf Base Logical ID}. For example, the pixel in {\bf Physical ID 0} maps
-to logical pixel {\bf Base Logical ID}. {\bf Physical ID 1} maps to logical
+the {\bf Base Logical ID}. For example, the pixel in {\bf Physical ID 1} maps
+to logical pixel {\bf Base Logical ID}. {\bf Physical ID 2} maps to logical
 pixel ${\bf Base Logical ID} + 1$, and so on.  The bank ID for each mapping is
 given by the section header.
 
-Note that a single bank may be described my multiple sections if the logical
-ID space is not contiguous.
+Note that a {\it Single Bank} may be described by {\bf multiple sections}
+if the logical ID space is not contiguous,
+{\bf OR} if the total number of pixel IDs in the bank is ``too large,''
+i.e. specifically more than 65535
+(the capacity of the 16-bit section {\bf Count}).
 
 
 \newpage
@@ -1645,8 +1648,8 @@ experiment.
 
 
 \newpage
-\subsubsection{Client Hello Packet}
-\label{section:protocol_client_hello}
+\subsubsection{Client Hello Packet - Version 0 (Original)}
+\label{section:protocol_client_hello_v0}
 
 \begin{figure}[h]
   \centering
@@ -1660,44 +1663,124 @@ experiment.
     \bitheader{31,0} \\
     \wordbox{1}{Requested Start Timestamp (seconds, u32)} \\
   \end{bytefield}
-  \caption{Packet Type 0x4006.0: Client Hello Packet}
-  \label{fig:protocol_client_hello}
+  \caption{Packet Type 0x4006.0: Client Hello Packet V0}
+  \label{fig:protocol_client_hello_v0}
 \end{figure}
 
-After first connecting to the Stream Management Service (SMS), a client will send
-a ``Client Hello'' packet to indicate from where in the stream it would like
-begin receiving event data. No data will be sent to the client prior to
-receiving this packet.
+After first connecting to the Stream Management Service (SMS),
+a client will send a ``Client Hello'' packet to indicate
+from where in the stream it would like to begin receiving event data.
+No data will be sent to the client prior to receiving this packet.
 
 \begin{itemize}
 \item{\bf Length} is 4 bytes.
 \item{\bf Timestamp} is the current system time when the packet is created.
-\item{\bf Requested Start Timestamp} suggests to the server where in the live
-stream to start sending events to this client, as defined below.
+\item{\bf Requested Start Timestamp} suggests to the server where in the
+live stream to start sending events to this client, as defined below.
 \end{itemize}
 
 The value given in {\bf Requested Start Timestamp} is a suggestion to the
-server and may be ignored. The client may receive events preceeding its
-requested timestamp, or may only receive live data if historical data is not
-available.
+server and may be ignored. The client may receive events preceding its
+requested timestamp, or may only receive live data if historical data
+is not available.
 
 The requested value is bounded by run state transitions. If the client
 requests data from before the current run started, the server will start
-sending events from the beginning of the run. If there is no current run and
-the requested timestamp is before the end of the previous run, the server will
-begin sending events from immediately after the previous run ended.
+sending events from the beginning of the run. If there is no current run
+and the requested timestamp is before the end of the previous run,
+the server will begin sending events from immediately after
+the previous run ended.
 
-The requested timestamp may be rounded to the granularity of the event indexing
-used by the Stream Management Service. In this case, the timestamp will be
-rounded towards the historical data, and the client may receive events that
-preceed the requested point in time. The client is responsible for filtering
-the undesired requests from the the stream.
+The requested timestamp may be rounded to the granularity of the
+event indexing used by the Stream Management Service. In this case,
+the timestamp will be rounded towards the historical data, and the
+client may receive events that precede the requested point in time.
+The client is responsible for filtering the undesired requests from
+the stream.
 
 If the {\bf Requested Start Timestamp} is zero, the server will not send
-historical data and will begin sending events with the next pulse.
+historical data and will begin sending events with the next live pulse.
 Note, therefore, that to request a replay of all historical data for
 a currently active run, the {\bf Requested Start Timestamp} could simply
 be set to ``1'' to indicate the oldest possible timestamp greater than 0.
+
+\newpage
+\subsubsection{Client Hello Packet - Version 1}
+\label{section:protocol_client_hello_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{8} \\
+    \wordbox{1}{0x00400600} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Requested Start Timestamp (seconds, u32)} \\
+    \wordbox{1}{Client Flags (u32)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x4006.1: Client Hello Packet V1}
+  \label{fig:protocol_client_hello_v1}
+\end{figure}
+
+A new variant of the original Client Hello Packet, Version 1,
+has been created to extend the capabilities of a given Live Client
+in requesting data from ADARA, specifically from the
+Stream Management Service (SMS).
+This new V1 packet includes one additional ``Client Flags'' bit-field
+that can be applied to determine further details on precisely
+which data should be sent to the client.
+Specifically, the currently supported flags control whether
+any experiment data should be sent during ``Paused Mode'' operations
+on a given beamline.
+
+Aside from this additional ``Client Flags'' bit-field,
+all other features and functionality of the Client Hello Packet
+are preserved and identical to the original Version 0 packet type,
+as shown above in Section~\ref{section:protocol_client_hello_v0}.
+
+\begin{itemize}
+\item{\bf Length} of the payload is now 8 bytes,
+with the one additional 32-bit ``Client Flags'' bit-field.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Requested Start Timestamp} suggests to the server where in the
+live stream to start sending events to this client, as defined below.
+\item{\bf Client Flags} is a 32-bit bit-field that indicates specific
+client data request options (see below).
+\end{itemize}
+
+The new ``Client Flags'' bit-field allows the client to tell
+the SMS whether it cares about receiving ``Paused Mode'' data or not.
+As per the bits specified in Table~\ref{table:client_hello_flags},
+the client can be
+``Agnostic'' (0x0000) about whether it receives Paused Data or not,
+relying solely on any global options as specified in the
+beamline's SMS configuration,
+or a client can graciously ``Forbid'' the sending of such Paused Data
+(``No Pause Data'', 0x0001),
+or the client can unilaterally request that {\it All} data be sent,
+regardless of whether it occurred during ``Paused Mode'' operations or not
+(``Send Pause Data'', 0x0002).
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{l | l}
+	Name & Bit-Field Value \\
+	\hline
+	{\bf PAUSE\_AGNOSTIC} & 0x0000 \\
+	{\bf NO\_PAUSE\_DATA} & 0x0001 \\
+	{\bf SEND\_PAUSE\_DATA} & 0x0002 \\
+    \end{tabular}
+  \end{center}
+  \caption {Client Flags Bit-Field Definitions}
+  \label{table:client_hello_flags}
+\end{table}
+
+Otherwise, all parameters and associated behavior with the
+Client Hello Packet V1 are the same as for the original V0 packet type
+(see Section~\ref{section:protocol_client_hello_v0}).
 
 \newpage
 \subsubsection{Stream Annotation Packet}

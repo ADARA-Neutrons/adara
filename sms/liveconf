@@ -357,6 +357,14 @@ option_default[$num_options]="0"
 option_label[$num_options]="[Max Blocks of Storage Allowed]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="storage"
+option_name[$num_options]="rescan_run_dir"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:StorageManager:RescanRunDir"
+option_value_type[$num_options]="STRING(Full Path to Run Directory)"
+option_label[$num_options]="[Rescan Given Run Directory for Processing]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="sts"
 option_name[$num_options]="connect_timeout"
 option_pv[$num_options]="SMS:STSClient:ConnectTimeout"
@@ -398,6 +406,14 @@ option_label[$num_options]="[Max STS Client Error Re-Queue Attempts]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="sts"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="SMS:STSClient:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send STS Client Paused Mode Data (Or Not)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="sts"
 option_name[$num_options]="uri"
 option_pv[$num_options]="SMS:STSClient:ServiceURI"
 option_pv_opt[$num_options]="-S"
@@ -430,6 +446,14 @@ option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_PORT(service)"
 option_default[$num_options]="31415"
 option_label[$num_options]="[Live Server Listener Service Port]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="SMS:LiveServer:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send Live Client Paused Mode Data (Or Not)]"
 num_options=$(( num_options + 1 ))
 
 #
@@ -1204,6 +1228,7 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
 
 		echo
 
@@ -1212,6 +1237,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
 		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
 		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
+		caget $WAIT ${PRE}:SMS:STSClient:SendPausedData
 		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
 
 		echo
@@ -1288,6 +1314,7 @@ if [[ "$command" == "status" \
 
 		caget $WAIT -a ${PRE}:SMS:LiveServer:ListenStatus
 		caget $WAIT ${PRE}:SMS:LiveServer:ListenRetryTimeout
+		caget $WAIT ${PRE}:SMS:LiveServer:SendPausedData
 		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerURI
 		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerService
 

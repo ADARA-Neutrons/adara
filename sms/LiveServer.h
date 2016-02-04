@@ -13,6 +13,7 @@ struct addrinfo;
 class smsErrorPV;
 class smsFloat64PV;
 class ListenStringPV;
+class smsBooleanPV;
 
 class LiveServer {
 public:
@@ -24,6 +25,8 @@ public:
 
 	void setupListener(void);
 
+	bool getSendPausedData(void);
+
 private:
 	static LiveServer *m_singleton;
 
@@ -33,6 +36,8 @@ private:
 	std::auto_ptr<TimerAdapter<LiveServer> > m_listen_timer;
 
 	static double m_listen_retry;
+
+	static bool m_send_paused_data;
 
 	ReadyAdapter *m_fdreg;
 	struct addrinfo *m_addrinfo;
@@ -48,6 +53,8 @@ private:
 
 	boost::shared_ptr<ListenStringPV> m_pvListenerURI;
 	boost::shared_ptr<ListenStringPV> m_pvListenerService;
+
+	boost::shared_ptr<smsBooleanPV> m_pvSendPausedData;
 
 	friend class TimerAdapter<LiveServer>;
 };

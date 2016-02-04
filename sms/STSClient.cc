@@ -41,6 +41,7 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 		     STSClientMgr &mgr) :
 	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
 	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
+	m_send_paused_data(m_mgr.m_send_paused_data),
 	m_read(new ReadyAdapter(fd, fdrRead,
 				boost::bind(&STSClient::readable, this))),
 	m_write(new ReadyAdapter(fd, fdrWrite,
@@ -48,6 +49,8 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	m_timer(new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat)),
 	m_disp(STSClientMgr::CONNECTION_LOSS)
 {
+	INFO("Initiating Translation of " << m_run->runNumber()
+		<< " SendPausedData=" << m_send_paused_data);
 	run->getFiles(m_files);
 	if (run->active()) {
 		m_contConnection = run->connect(
@@ -91,12 +94,23 @@ void STSClient::writable(void)
 	m_timer->cancel();
 
 	for (it = m_files.begin(); it != m_files.end(); ) {
+
 		StorageFile::SharedPtr &f = *it;
+
+		// Ignore Paused Run Files, as Optionally Configured... :-D
+		if ( f->paused() && !m_cur_offset // don't trash a file midstream!
+				&& !m_send_paused_data ) // tho shouldn't change during run
+		{
+			it = m_files.erase(it);
+			continue;
+		}
+
 		if (m_file_fd == -1) {
 			try {
 				m_file_fd = f->get_fd();
 			} catch (std::runtime_error re) {
-				ERROR("Unable to open file " << f->fileNumber()
+				ERROR("Unable to open file number " << f->fileNumber()
+					<< " (pause file number " << f->pauseFileNumber() << ")"
 					<< " for run " << m_run->runNumber()
 					<< ": " << re.what());
 				m_disp = STSClientMgr::PERMAMENT_FAIL;
@@ -126,7 +140,11 @@ void STSClient::writable(void)
 				int e = errno;
 				ERROR("Run " << m_run->runNumber()
 					<< " had fatal sendfile error error: "
-					<< strerror(e));
+					<< strerror(e)
+					<< "[m_sts_fd=" << m_sts_fd
+					<< " m_file_fd=" << m_file_fd
+					<< " m_cur_offset=" << m_cur_offset
+					<< " len=" << len << "]");
 			}
 
 			delete this;
@@ -351,12 +369,12 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 		m_disp = STSClientMgr::PERMAMENT_FAIL;
 		if (pkt.reason().length()) {
 			ERROR("Run " << m_run->runNumber() << " had a "
-				"permament failure, status 0x" << std::hex
+				"permanent failure, status 0x" << std::hex
 				<< pkt.status() << std::dec << ", message \'"
 				<< pkt.reason() << "'");
 		} else {
 			ERROR("Run " << m_run->runNumber() << " had a "
-				"permament failure, status 0x" << std::hex
+				"permanent failure, status 0x" << std::hex
 				<< pkt.status() << std::dec);
 		}
 	}
