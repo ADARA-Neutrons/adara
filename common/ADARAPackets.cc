@@ -176,8 +176,8 @@ PixelMappingPkt::PixelMappingPkt(const PixelMappingPkt &pkt) :
 RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
-	if (m_payload_len != (3 * sizeof(uint32_t)))
-		throw invalid_packet("RunStatus packet is incorrect size");
+	if (m_payload_len < (3 * sizeof(uint32_t)))
+		throw invalid_packet("RunStatus packet is too short");
 }
 
 RunStatusPkt::RunStatusPkt(const RunStatusPkt &pkt) :
