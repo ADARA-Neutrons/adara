@@ -1286,11 +1286,27 @@ echo "/bin/rm -rf $TMP_DIR/ADARA" |& tee -a $LOG
 /bin/rm -rf "$TMP_DIR/ADARA" |& tee -a $LOG
 
 #
+# Perform a LiveConf "ConfCk" Analysis Before Restarting SMS Daemon...!
+#
+
+if [[ $PROG == "SMS_Daemon" ]]; then
+	liveconf confck
+fi
+
+#
+# Check the Run/Recording Status of the SMS Daemon Before Restarting...
+#
+
+if [[ $PROG == "SMS_Daemon" ]]; then
+	liveconf run_status
+fi
+
+#
 # Optionally restart the SMS Daemon Service...? (Or PVSD Service...)
 #
 
 # System Init Services...
-if [[ $PROG == "PVSD" || $PROG == "SMS" ]]; then
+if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 
 	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 

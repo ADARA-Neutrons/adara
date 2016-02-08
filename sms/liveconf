@@ -2211,6 +2211,14 @@ elif [[ "$command" == "confck" ]]; then
 
 	echo -e "ADARA SMS LiveConf Configuration Check - Live vs. File:\n"
 
+	addToErrSummary()
+	{
+		for arg in "$@" ; do
+			error_summary="${error_summary}$arg";
+		done
+	}
+	error_summary=""
+
 	num_mismatch=0
 
 	for i in $( seq 0 $(( num_options - 1 )) ) ; do
@@ -2250,6 +2258,9 @@ elif [[ "$command" == "confck" ]]; then
 				echo -e -n "\nWarning: Unable to Obtain"
 				echo -e " Number of $option Instances!\n"
 				echo "Setting numIndexedVars to 1 for Default Check."
+				addToErrSummary "\nWarning: Unable to Obtain" \
+					" Number of $option Instances!\n" \
+					"Setting numIndexedVars to 1 for Default Check.\n"
 				numIndexedVars=1
 				# Count This Error as a Mismatch...!
 				num_mismatch=$(( num_mismatch + 1 ))
@@ -2402,6 +2413,12 @@ elif [[ "$command" == "confck" ]]; then
 				echo "      Config:[$config_value]"
 				echo "         != Live:[$live_value]"
 
+				addToErrSummary "\n" \
+					"*** ERROR! Mismatch in Live vs. File Config! ***\n" \
+					"   ${option_label[$i]}${subscript}:\n" \
+					"      Config:[$config_value]\n" \
+					"         != Live:[$live_value]\n"
+
 				num_mismatch=$(( num_mismatch + 1 ))
 
 			else
@@ -2419,7 +2436,26 @@ elif [[ "$command" == "confck" ]]; then
 	done
 
 	if [[ $num_mismatch != 0 ]]; then
-		echo -e "*** ERROR: $num_mismatch Mismatches Found...!\n"
+
+		echo -e "********* ERROR SUMMARY *********"
+
+		# Don't Resolve All the '*'s as Full Local File Listings! ;-Q
+		set -o noglob
+
+		# Preserve Whitespace! Munge Field Separator!
+		saveIFS="$IFS"
+		IFS="%"
+
+		echo -e $error_summary
+
+		# Restore Whitespace Field Separator...
+		IFS="$saveIFS"
+
+		# Restore Globbing...
+		set +o noglob
+
+		echo -e "*** ERROR: $num_mismatch Total Mismatches Found...!\n"
+
 	else
 		echo -e "Config OK - All Options Matched Between Live and File.\n"
 	fi
