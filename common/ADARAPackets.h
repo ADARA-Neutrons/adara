@@ -277,6 +277,10 @@ public:
 	RunStatus::Enum status(void) const {
 		return static_cast<RunStatus::Enum>(m_fields[2] >> 24);
 	}
+#if 0
+	uint32_t pauseFileNumber(void) const { return m_fields[3] & 0xffffff; }
+	uint32_t paused(void) const { return m_fields[3] >> 24; }
+#endif
 
 private:
 	const uint32_t *m_fields;

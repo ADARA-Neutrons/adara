@@ -35,6 +35,9 @@ struct run_status_packet {
 	uint32_t	run_number;
 	uint32_t	run_start;
 	uint32_t	status_number;
+#if 0
+	uint32_t	paused_number;
+#endif
 } __attribute__((packed));
 
 off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
@@ -189,7 +192,11 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 {
 	struct run_status_packet spkt = {
 		hdr : {
+#if 0
+			payload_len : 16,
+#else
 			payload_len : 12,
+#endif
 			pkt_format : ADARA_PKT_TYPE(
 				ADARA::PacketType::RUN_STATUS_TYPE,
 				ADARA::PacketType::RUN_STATUS_VERSION ),
@@ -210,6 +217,10 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
 	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
+
+#if 0
+	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
+#endif
 
 	IoVector iovec(1);
 	iovec[0].iov_base = &spkt;

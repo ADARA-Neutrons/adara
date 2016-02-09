@@ -197,6 +197,10 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 {
 	if (m_version == 0x00 && m_payload_len != (3 * sizeof(uint32_t)))
 		throw invalid_packet("RunStatus V0 packet is incorrect length");
+#if 0
+	else if (m_version == 0x01 && m_payload_len != (4 * sizeof(uint32_t)))
+		throw invalid_packet("RunStatus V1 packet is incorrect length");
+#endif
 	else if (m_version > ADARA::PacketType::RUN_STATUS_VERSION
 			&& m_payload_len < (3 * sizeof(uint32_t)))
 		throw invalid_packet("Newer RunStatus packet is too short");

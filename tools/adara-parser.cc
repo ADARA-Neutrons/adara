@@ -589,6 +589,11 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 				pkt.runNumber(), pkt.runStart());
 			if (pkt.status() != ADARA::RunStatus::STATE)
 				printf("    File index %u\n", pkt.fileNumber());
+#if 0
+			if (pkt.version() == 0x01)
+				printf("    Paused 0x%x Pause File index %u\n",
+					pkt.paused(), pkt.pauseFileNumber());
+#endif
 		}
 	}
 
