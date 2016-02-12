@@ -252,6 +252,7 @@ void SMSControl::addSource(const std::string &name,
 	unsigned int chunk_size;
 	bool ignore_eop;
 	uint32_t rtdlNoDataThresh;
+	uint32_t save_input_stream;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
@@ -277,12 +278,21 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
+	save_input_stream = info.get<bool>("save_input_stream", false);
 
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Probably should also log if we're Saving All the Input Stream
+	// from this particular Data Source... (not something you'd really
+	// wanna do all the time in production... :-)
+	if (save_input_stream) {
+		DEBUG("Save Input Stream Set to True for Data Source "
+			<< name << "!");
 	}
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
@@ -294,7 +304,8 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout,
 							 ignore_eop,
 							 chunk_size,
-							 rtdlNoDataThresh));
+							 rtdlNoDataThresh,
+							 save_input_stream));
 	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
