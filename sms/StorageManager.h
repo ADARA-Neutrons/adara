@@ -55,6 +55,16 @@ public:
 		addPacket(iovec, notify);
 	}
 
+	static void savePacket(IoVector &iovec, uint32_t dataSourceId);
+	static void savePacket(const void *pkt, uint32_t len,
+			uint32_t dataSourceId)
+	{
+		IoVector iovec(1);
+		iovec[0].iov_base = (void *) pkt;
+		iovec[0].iov_len = len;
+		savePacket(iovec, dataSourceId);
+	}
+
 	static void notify(void);
 
 	static void addPrologue(IoVector &iovec);

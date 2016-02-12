@@ -999,6 +999,35 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	// DEBUG("addPacket() exit len=" << len);
 }
 
+void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
+{
+	uint32_t len = validatePacket(iovec);
+	off_t size, blocks;
+
+	if (!m_cur_container)
+		throw std::logic_error("No container!");
+
+	size = m_cur_container->save(iovec, len, dataSourceId);
+
+	/* Is it time to initiate a purge of old data?
+	 *
+	 * m_blocks_used contains the size of all of our closed files,
+	 * and we don't add the current file until we're done with it.
+	 */
+	blocks = size + m_block_size - 1;
+	blocks /= m_block_size;
+	/* Update Max Blocks Allowed from PV... */
+	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
+		uint64_t goal = m_blocks_used + blocks;
+		goal -= m_max_blocks_allowed;
+		SMSControl *ctrl = SMSControl::getInstance();
+		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "savePacket() requestPurge! goal=" << goal);
+		requestPurge(goal);
+	}
+}
+
 void StorageManager::addPrologue(IoVector &iovec)
 {
 	/* We're writing a prologue before putting event data or slow control
