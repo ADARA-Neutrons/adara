@@ -326,6 +326,71 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
+off_t StorageFile::save(IoVector &iovec, uint32_t len)
+{
+	// DEBUG("StorageFile::save() entry len=" << len
+		// << " nvecs=" << iovec.size());
+
+	struct iovec *vec = &iovec.front();
+	int nvecs = iovec.size();
+	int iovcnt;
+	ssize_t rc;
+
+	while (len) {
+		iovcnt = nvecs;
+		if (iovcnt > IOV_MAX)
+			iovcnt = IOV_MAX;
+
+		rc = writev(m_fd, vec, iovcnt);
+		if (rc <= 0) {
+			if (errno == EINTR)
+				continue;
+
+			int err = errno;
+			std::string msg("StorageFile::writev() save error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
+
+		m_size += rc;
+
+		if (rc == len)
+			break;
+
+		len -= rc;
+		while (rc) {
+			if (vec->iov_len <= (size_t) rc) {
+				rc -= vec->iov_len;
+				vec++;
+				nvecs--;
+			} else {
+				uint8_t *p = (uint8_t *) vec->iov_len;
+				p += rc;
+				vec->iov_base = p;
+				vec->iov_len -= rc;
+				break;
+			}
+		}
+	}
+
+	if (m_size >= m_max_file_size)
+		m_oversize = true;
+
+	// DEBUG("StorageFile::save() exit");
+
+	return m_size;
+}
+
+void StorageFile::terminateSave(void)
+{
+	/* Disable the generation of a sync packet as we're closing out
+	 * the file and want the run status to be the last packet.
+	 */
+	m_active = false;
+
+	put_fd();
+}
+
 StorageFile::StorageFile(OwnerPtr &owner,
 		uint32_t fileNumber, uint32_t pauseFileNumber) :
 	m_owner(owner), m_runNumber(0),
@@ -406,11 +471,48 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 	return f;
 }
 
+StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
+		uint32_t dataSourceId, uint32_t saveFileNumber)
+{
+	StorageFile::SharedPtr f( new StorageFile(owner, saveFileNumber, 0) );
+
+	f->m_active = true;
+
+	StorageContainer::SharedPtr c = f->m_owner.lock();
+	char name[32];
+
+	if (!c)
+		throw std::logic_error("StorageFile save owner is empty!");
+
+	f->m_path = c->name();
+
+	snprintf(name, sizeof(name), "/ds%08u-s%08u",
+		dataSourceId, saveFileNumber);
+
+	f->m_path += name;
+
+	if (f->m_runNumber) {
+		char postfix[32];
+
+		/* 25 chars max */
+		snprintf(postfix, sizeof(postfix), "-run-%u", f->m_runNumber);
+		f->m_path += postfix;
+	}
+
+	/* +6 chars, maximum size is 38 incl NULL */
+	f->m_path += ".adara";
+
+	f->open(O_CREAT|O_EXCL|O_RDWR);
+
+	return f;
+}
+
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-		const std::string &path)
+		const std::string &path, bool &saved_file)
 {
 	fs::path p(path);
 	uint32_t fileNumber = 0, pauseFileNumber = 0, runNumber = 0;
+	uint32_t sourceId = 0, saveFileNumber = 0;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
@@ -423,6 +525,20 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 			&fileNumber, &pauseFileNumber) == 2 ) {
 		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
+	}
+	else if ( sscanf(p.filename().c_str(), "ds%u-s%u-run-%u.adara",
+			&sourceId, &saveFileNumber, &runNumber) == 3 ) {
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream Run file: " << p);
+		saved_file = true;
+		return StorageFile::SharedPtr();
+	}
+	else if ( sscanf(p.filename().c_str(), "ds%u-s%u.adara",
+			&sourceId, &saveFileNumber) == 2 ) {
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream Non-Run file: " << p);
+		saved_file = true;
+		return StorageFile::SharedPtr();
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
 				&fileNumber, &runNumber) != 2

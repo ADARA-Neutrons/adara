@@ -53,12 +53,20 @@ public:
 	static SharedPtr stateFile(OwnerPtr runInfo,
 			const std::string &basePath);
 
+	/* Create a file to save the input stream for a given data source */
+	static SharedPtr saveFile(OwnerPtr runInfo, uint32_t dataSourceId,
+		uint32_t saveFileNumber);
+
 	/* Create an object to manage an existing file */
-	static SharedPtr importFile(OwnerPtr owner, const std::string &path);
+	static SharedPtr importFile(OwnerPtr owner, const std::string &path,
+			bool &saved_file);
 
 	off_t write(IoVector &iovec, uint32_t len, bool do_notify = true);
 	void terminate(ADARA::RunStatus::Enum status);
 	void notify(void);
+
+	off_t save(IoVector &iovec, uint32_t len);
+	void terminateSave(void);
 
 	~StorageFile();
 
