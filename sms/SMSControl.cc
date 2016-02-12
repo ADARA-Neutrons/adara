@@ -252,7 +252,7 @@ void SMSControl::addSource(const std::string &name,
 	unsigned int chunk_size;
 	bool ignore_eop;
 	uint32_t rtdlNoDataThresh;
-	uint32_t save_input_stream;
+	bool save_input_stream;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
