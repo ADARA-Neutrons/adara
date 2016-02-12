@@ -357,7 +357,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
 			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
-			uint32_t save_input_stream) :
+			bool save_input_stream) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),

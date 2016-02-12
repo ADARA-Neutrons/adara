@@ -30,7 +30,7 @@ public:
 		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, unsigned int read_chunk,
-		uint32_t rtdlNoDataThresh, uint32_t save_input_stream);
+		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
 
 	bool m_readDelay;
