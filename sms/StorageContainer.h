@@ -47,6 +47,8 @@ public:
 	void terminate(void);
 	void notify(void);
 
+	off_t save(IoVector &iovec, uint32_t len, uint32_t dataSourceId);
+
 	void pause(void);
 	void resume(void);
 
@@ -73,6 +75,9 @@ private:
 	uint32_t m_requeueCount;
 
 	std::list<StorageFile::SharedPtr> m_files;
+
+	std::vector<StorageFile::SharedPtr> m_ds_input_files;
+	std::vector<uint32_t> m_ds_input_num_files;
 
 	StorageContainer(const struct timespec &start, uint32_t run);
 	StorageContainer(const std::string &name);

@@ -104,6 +104,54 @@ void StorageContainer::notify(void)
 		m_cur_file->notify();
 }
 
+off_t StorageContainer::save(IoVector &iovec, uint32_t len,
+		uint32_t dataSourceId)
+{
+	// Verify the Saved Input Stream File for this Data Source,
+	// Create it as needed...
+	if ( dataSourceId >= m_ds_input_files.size() )
+	{
+		for ( uint32_t i = m_ds_input_files.size() ;
+				i <= dataSourceId ; i++ )
+		{
+			// Initialize the Saved Input Stream File Number
+			// for this Data Source...
+			m_ds_input_num_files.push_back( 0 );
+
+			// Create an Entry for the Saved Input Stream File
+			// for this Data Source...
+			m_ds_input_files.push_back( StorageFile::SharedPtr() );
+		}
+	}
+
+	/* We don't immediately close a file when we exceed the size limit
+	 * in order to avoid creating a new file just for the end-of-run
+	 * marker. Instead, we wait for the run to start or the next packet
+	 * to be written (and clients notified).
+	 */
+	if ( m_ds_input_files[dataSourceId]
+			&& m_ds_input_files[dataSourceId]->oversize() )
+	{
+		// Terminate Saved Input Stream File
+		// for this Data Source...
+		m_ds_input_files[dataSourceId]->terminateSave();
+		StorageManager::addBaseStorage(
+			m_ds_input_files[dataSourceId]->size());
+		m_ds_input_files[dataSourceId].reset();
+	}
+
+	if ( !m_ds_input_files[dataSourceId] )
+	{
+		// Create the Saved Input Stream File
+		// for this Data Source...
+		m_ds_input_files[dataSourceId] =
+			StorageFile::saveFile( m_weakThis, dataSourceId,
+					++(m_ds_input_num_files[dataSourceId]) );
+	}
+
+	return m_ds_input_files[dataSourceId]->save(iovec, len);
+}
+
 void StorageContainer::pause(void)
 {
 	DEBUG("Pausing StorageContainer"
@@ -466,10 +514,11 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		rel_path /= *rit++;
 		rel_path /= *rit;
 
-		f = StorageFile::importFile(c, rel_path.string());
+		bool saved_file = false;
+		f = StorageFile::importFile(c, rel_path.string(), saved_file);
 		if (f)
 			c->m_files.push_back(f);
-		else
+		else if (!saved_file)
 			had_errors = true;
 	}
 
