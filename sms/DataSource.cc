@@ -188,7 +188,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
-					<< std::hex << " m_lastPulse=0x" << m_lastPulse
+					<< std::hex << " src=0x" << m_hwId
+					<< " m_lastPulse=0x" << m_lastPulse
 					<< " m_activePulse=0x" << m_activePulse << std::dec
 					<< " cycle=" << pkt.cycle()
 					<< " vetoFlags=" << pkt.vetoFlags());
@@ -215,8 +216,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Past (Before Facility Start Time)!"
-					<< std::hex << " pulseId=0x"
-						<< m_activePulse << std::dec
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
 					<< " (" << sec << " < " << FACILITY_START_TIME << ")"
 					<< " (" << m_name << ")");
 			}
@@ -235,8 +236,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Future (Over One Week from Now)!"
-					<< std::hex << " pulseId=0x"
-						<< m_activePulse << std::dec
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
 					<< " (" << sec << " > " << future << ")"
 					<< " (" << m_name << ")");
 			}
@@ -274,7 +275,8 @@ public:
 
 	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
 		ERROR("dumpPulseInvariants():"
-			<< std::hex << " pulseId=0x" << pkt.pulseId()
+			<< std::hex << " src=0x" << m_hwId
+			<< " pulseId=0x" << pkt.pulseId()
 				<< "(0x" << m_activePulse << ")" << std::dec
 			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
 			<< " pulseCharge=" << pkt.pulseCharge()
@@ -301,7 +303,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "checkSeq() Local Packet Sequence Out-of-Order: "
 					<< pkt.pktSeq() << " != " << m_pktSeq
-					<< std::hex << " m_activePulse=0x" << m_activePulse
+					<< std::hex << " src=0x" << m_hwId
+					<< " m_activePulse=0x" << m_activePulse
 					<< " hwId=0x" << m_hwId << std::dec);
 			}
 		} */
