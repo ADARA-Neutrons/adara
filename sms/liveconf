@@ -1091,6 +1091,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:RunNumber
 
 		caget $WAIT ${PRE}:SMS:Summary
+		caget $WAIT -S ${PRE}:SMS:SummaryReason
 
 		echo
 
