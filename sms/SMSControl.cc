@@ -343,6 +343,9 @@ SMSControl::SMSControl() :
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
 
+	m_pvSummaryReason = boost::shared_ptr<smsStringPV>(new
+						smsStringPV(prefix + ":SummaryReason"));
+
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
@@ -379,6 +382,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
+	addPV(m_pvSummaryReason);
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
@@ -394,6 +398,10 @@ SMSControl::SMSControl() :
 
 	// Initialize Version PV to Usual SMS Daemon Version String...
 	m_pvVersion->update(m_version, &now);
+
+	// Initialize the System Summary Status/Reason...
+	m_pvSummary->update(1, &now);
+	m_pvSummaryReason->update("System Uninitialized", &now);
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
@@ -495,14 +503,19 @@ bool SMSControl::setRecording(bool v)
 	if (v) {
 		/* Starting a new recording */
 		if (!m_runInfo->valid()) {
-			ERROR("runInfo invalid, not starting");
+			std::string why = "RunInfo Invalid, Not Starting";
+			ERROR(why);
 			m_pvSummary->update(1, &now);
+			m_pvSummaryReason->update(why, &now);
 			return false;
 		}
 
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
-			ERROR("Unable to increment run number, not starting");
+			std::string why =
+				"Unable to Increment Run Number, Not Starting";
+			ERROR(why);
 			m_pvSummary->update(1, &now);
+			m_pvSummaryReason->update(why, &now);
 			return false;
 		}
 
@@ -530,18 +543,24 @@ bool SMSControl::setRecording(bool v)
 			m_markers->newRun();
 			StorageManager::startRecording(m_currentRunNumber);
 		} catch (std::runtime_error e) {
-			ERROR("Unable to start recording: " << e.what());
+			std::stringstream why;
+			why << "Unable to Start Recording: " << e.what();
+			ERROR(why.str());
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
+			m_pvSummaryReason->update(why.str(), &now);
 			return false;
 		} catch (...) {
-			ERROR("Unable to start recording, unknown exception");
+			std::string why =
+				"Unable to Start Recording, Unknown Exception";
+			ERROR(why);
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
 			m_pvSummary->update(1, &now);
+			m_pvSummaryReason->update(why, &now);
 			return false;
 		}
 
@@ -561,8 +580,11 @@ bool SMSControl::setRecording(bool v)
 			m_markers->runStop();
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
-			ERROR("Unable to stop recording: " << e.what());
+			std::stringstream why;
+			why << "Unable to stop recording: " << e.what();
+			ERROR(why.str());
 			m_pvSummary->update(1, &now);
+			m_pvSummaryReason->update(why.str(), &now);
 			return false;
 		}
 		m_pvRunNumber->update(0, &now);
@@ -571,6 +593,7 @@ bool SMSControl::setRecording(bool v)
 
 	m_recording = v;
 	m_pvSummary->update(0, &now);
+	m_pvSummaryReason->update("System Ready", &now);
 
 	return true;
 }
