@@ -94,6 +94,8 @@ public:
 	void pauseRecording(void);
 	void resumeRecording(void);
 
+	void updateValidRunInfo(bool isValid, std::string why);
+
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);
@@ -187,6 +189,9 @@ private:
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	boost::shared_ptr<smsStringPV> m_pvSummaryReason;
+	bool m_summaryIsError; // Reverse Logic... ;-Q
+	bool m_reasonIsRunInfo;
+	std::string m_reason, m_reasonLast;
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 	SourceSet m_activeSources;
 	SourceSet m_eventSources;
