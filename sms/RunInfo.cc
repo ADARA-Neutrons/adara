@@ -33,18 +33,26 @@ private:
 
 class RunInfoPV : public smsStringPV {
 public:
-	RunInfoPV(const std::string &name, RunInfo *ri) :
-		smsStringPV(name), m_runInfo(ri), m_unlocked(true) {}
+	RunInfoPV(const std::string &name, const std::string &label,
+			bool isRequired, RunInfo *ri) :
+		smsStringPV(name), m_label(label), m_isRequired(isRequired),
+		m_runInfo(ri), m_unlocked(true) {}
 
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
 
+	std::string label(void) { return m_label; }
+
+	bool isRequired(void) { return m_isRequired; }
+
 private:
+	std::string m_label;
+	bool m_isRequired;
 	RunInfo *m_runInfo;
 	bool m_unlocked;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
-	void changed(void) { m_runInfo->invalidateCache(); }
+	void changed(void) { m_runInfo->pvChanged(this); }
 };
 
 class RunUserInfoPV : public smsStringPV {
@@ -218,32 +226,33 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 }
 
 RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
-	m_beamline(beamline), m_runNumber(0), m_packetValid(false),
+	m_beamline(beamline), m_ctrl(ctrl),
+	m_runNumber(0), m_packetValid(false),
 	m_packet(NULL), m_packetSize(0)
 {
 	std::string prefix(beamline);
 	prefix += ":SMS:RunInfo:";
 
 	m_resetPV.reset(new RunInfoResetPV(prefix, this));
-	ctrl->addPV(m_resetPV);
+	m_ctrl->addPV(m_resetPV);
 
 	m_userPV.reset(new RunUserInfoPV(prefix, this));
-	ctrl->addPV(m_userPV);
+	m_ctrl->addPV(m_userPV);
 
 	/* These fields are required */
-	addPV(prefix, "ProposalId", "proposal_id", m_required, ctrl);
+	addPV(prefix, "ProposalId", "proposal_id", m_required);
 
 	/* These fields are optional */
-	addPV(prefix, "ProposalTitle", "proposal_title", m_optional, ctrl);
-	addPV(prefix, "RunTitle", "run_title", m_optional, ctrl);
+	addPV(prefix, "ProposalTitle", "proposal_title", m_optional);
+	addPV(prefix, "RunTitle", "run_title", m_optional);
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
-	addPV(prefix, "Id", "id", m_sample, ctrl);
-	addPV(prefix, "Name", "name", m_sample, ctrl);
-	addPV(prefix, "Nature", "nature", m_sample, ctrl);
-	addPV(prefix, "Formula", "chemical_formula", m_sample, ctrl);
-	addPV(prefix, "Environment", "environment", m_sample, ctrl);
+	addPV(prefix, "Id", "id", m_sample);
+	addPV(prefix, "Name", "name", m_sample);
+	addPV(prefix, "Nature", "nature", m_sample);
+	addPV(prefix, "Formula", "chemical_formula", m_sample);
+	addPV(prefix, "Environment", "environment", m_sample);
 
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
@@ -259,11 +268,12 @@ RunInfo::~RunInfo()
 }
 
 void RunInfo::addPV(const std::string &prefix, const char *pv_name,
-		    const char *xml_name, RunInfoMap &map, SMSControl *ctrl)
+		    const char *xml_name, RunInfoMap &map)
 {
 	std::string pvName = prefix + pv_name;
-	map[xml_name].reset(new RunInfoPV(pvName, this));
-	ctrl->addPV(map[xml_name]);
+	map[xml_name].reset(
+		new RunInfoPV(pvName, pv_name, (map == m_required), this));
+	m_ctrl->addPV(map[xml_name]);
 }
 
 void RunInfo::lock(void)
@@ -304,15 +314,60 @@ void RunInfo::reset(void)
 		it->second->unset();
 }
 
-bool RunInfo::valid(void)
+bool RunInfo::valid(std::string &reason)
 {
 	RunInfoMap::iterator it;
+	std::stringstream why;
+	bool isValid = true;
 
-	for (it = m_required.begin(); it != m_required.end(); it++)
-		if (!it->second->valid())
-			return false;
+	for (it = m_required.begin(); it != m_required.end(); it++) {
+		if (!it->second->valid()) {
+			if (isValid)
+				why << "RunInfo Invalid";
+			why << ", Missing Required ";
+			why << it->second->label();
+			isValid = false;
+		}
+	}
 
-	return true;
+	if (isValid)
+		why << "RunInfo Valid, All Required Values Set";
+
+	reason = why.str();
+
+	return isValid;
+}
+
+void RunInfo::pvChanged( RunInfoPV* pv )
+{
+	// Invalidate Cache...
+	invalidateCache();
+
+	// Check for Change in "Required" PV Status...
+	if ( pv->isRequired() )
+	{
+		RunInfoMap::iterator it;
+		std::stringstream why;
+		bool isValid = true;
+
+		for (it = m_required.begin(); it != m_required.end(); it++) {
+			if (!it->second->valid()) {
+				if (isValid)
+					why << "RunInfo Invalid";
+				why << ", Missing Required ";
+				why << pv->label();
+				isValid = false;
+			}
+		}
+
+		if (isValid) {
+			why << "RunInfo Valid, ";
+			why << pv->label();
+			why << " Value Set";
+		}
+
+		m_ctrl->updateValidRunInfo( isValid, why.str() );
+	}
 }
 
 void RunInfo::generatePacket(void)

@@ -29,7 +29,7 @@ public:
 	void lock(void);
 	void unlock(void);
 
-	bool valid(void);
+	bool valid(std::string &reason);
 	void reset(void);
 
 	void setRunNumber(uint32_t run) {
@@ -37,10 +37,13 @@ public:
 		m_runNumber = run;
 	}
 
+	void pvChanged(RunInfoPV* pv);
+
 	void invalidateCache(void) { m_packetValid = false; }
 
 private:
 	std::string m_beamline;
+	SMSControl *m_ctrl;
 	RunInfoMap m_required;
 	RunInfoMap m_optional;
 	RunInfoMap m_sample;
@@ -55,7 +58,7 @@ private:
 	boost::signals2::connection m_connection;
 
 	void addPV(const std::string &prefix, const char *pv_name,
-		   const char *xml_name, RunInfoMap &map, SMSControl *ctrl);
+		   const char *xml_name, RunInfoMap &map);
 	void generatePacket(void);
 	void onPrologue(void);
 };
