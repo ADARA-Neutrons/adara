@@ -556,7 +556,7 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
         {
             syslog( LOG_ERR,
             "%s %s: %s Device [%s] (device id=%d) PV <%s> (%s) (pv id=%d)",
-                "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+                "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
                 "Queue Deactivated, Ignore PV Undefine",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
                 a_pv_desc->m_name.c_str(),
