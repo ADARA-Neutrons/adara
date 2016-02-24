@@ -81,15 +81,18 @@ public:
     virtual StreamPacket   *getFreePacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual bool            getFreeQueueActive(void) = 0;
     virtual size_t          getFreeQueueSize(void) = 0;
+    virtual bool            getFilledQueueActive(void) = 0;
     virtual void            putFilledPacket( StreamPacket *a_pkt ) = 0;
+    virtual size_t          getFilledQueueSize(void) = 0;
 };
 
 
 /**
- * \class IOutputAdapter
+ * \class IOutputAdapterAPI
  *
- * The IOutputAdapter interface provides access to output-adapter-specific
- * services. Only one consumer may be attached to the streamer at a given time.
+ * The IOutputAdapterAPI interface provides access to output-adapter-
+ * specific services. Only one consumer may be attached to the streamer
+ * at a given time.
  */
 class IOutputAdapterAPI
 {
@@ -99,7 +102,9 @@ public:
     virtual StreamPacket   *getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual bool            getFilledQueueActive(void) = 0;
     virtual size_t          getFilledQueueSize(void) = 0;
+    virtual bool            getFreeQueueActive(void) = 0;
     virtual void            putFreePacket( StreamPacket *a_pkt ) = 0;
+    virtual size_t          getFreeQueueSize(void) = 0;
 };
 
 
