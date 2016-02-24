@@ -77,8 +77,8 @@ OutputAdapter::~OutputAdapter()
   *
   * This method runs a background thread that receives filled stream packets
   * from the internal data stream, translates them into ADARA protocol, then
-  * sends them to all connected ADARA clients. Whenever input packets are not
-  * received for a configured interval, ADARA heartbeat packets are
+  * sends them to all connected ADARA clients. Whenever input packets are
+  * not received for a configured interval, ADARA heartbeat packets are
   * transmitted as required by the ADARA protocol. When no clients are
   * connected, input packets are simply returned to the stream unused.
   */
@@ -99,7 +99,9 @@ OutputAdapter::streamProcessingThread()
 
     while ( 1 )
     {
-        pvs_pkt = m_srteam_api->getFilledPacket( m_heartbeat, timeout_flag );
+        pvs_pkt = m_srteam_api->getFilledPacket( m_heartbeat,
+            timeout_flag );
+
         if ( !pvs_pkt )
         {
             if ( timeout_flag )
@@ -107,13 +109,20 @@ OutputAdapter::streamProcessingThread()
                 // Send a heartbeat packet
                 if ( connected() )
                 {
-                    heartbeat_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+                    heartbeat_pkt.sec =
+                        (uint32_t)time(0) - EPICS_TIME_OFFSET;
                     sendPacket( heartbeat_pkt, 0 );
                 }
             }
             else
             {
-                // A null packet w/o timeout means queues have been deactivated and we should exit
+                // A null packet w/o timeout means queues have been
+                // deactivated and we should exit the thread.
+                syslog( LOG_ERR,
+                    "PVSD ERROR: %s: Null Packet/No Timeout - %s",
+                    "OutputAdapter::streamProcessingThread()",
+                    "Queues Deactivated, Exiting Thread" );
+                usleep(30000); // give syslog a chance...
                 break;
             }
         }
@@ -140,9 +149,9 @@ OutputAdapter::streamProcessingThread()
             }
 
             // If connected, translate and send packet(s)
-            if ( connected())
+            if ( connected() )
             {
-                if ( translate( *pvs_pkt, adara_pkt, payload ))
+                if ( translate( *pvs_pkt, adara_pkt, payload ) )
                 {
                     if ( payload.length() )
                     {
@@ -170,8 +179,9 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
 {
     // A Little Gratuitous Debug Logging... ;-b
     if ( a_pv_pkt.device == NULL ) {
-        syslog( LOG_ERR, "PVSD ERROR: %s() Null Device! type=%d",
-            "OutputAdapter::translate", a_pv_pkt.type );
+        syslog( LOG_ERR, "PVSD ERROR: %s: Null Device! type=%d",
+            "OutputAdapter::translate()", a_pv_pkt.type );
+        usleep(30000); // give syslog a chance...
     }
 
     switch ( a_pv_pkt.type )
@@ -190,14 +200,16 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
 
     case VariableUpdate:
         if ( a_pv_pkt.pv == NULL ) {
-            syslog( LOG_ERR, "PVSD ERROR: %s() Null PV! type=%d",
-                "OutputAdapter::translate", a_pv_pkt.type );
+            syslog( LOG_ERR, "PVSD ERROR: %s: Null PV! type=%d",
+                "OutputAdapter::translate()", a_pv_pkt.type );
+            usleep(30000); // give syslog a chance...
         }
         else if ( a_pv_pkt.pv->m_device == NULL ) {
             syslog( LOG_ERR,
-                "PVSD ERROR: %s() Null PV Device! type=%d varId=0x%x/%d",
-                "OutputAdapter::translate", a_pv_pkt.type,
+                "PVSD ERROR: %s: Null PV Device! type=%d varId=0x%x/%d",
+                "OutputAdapter::translate()", a_pv_pkt.type,
                 a_pv_pkt.pv->m_id, a_pv_pkt.pv->m_id );
+            usleep(30000); // give syslog a chance...
         }
 
         buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state, a_payload );
@@ -378,8 +390,6 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
         break;
     }
 }
-
-
 
 
 /** \brief Converts a PVType value into an ADARA DDP variable type (xml tag).
@@ -604,18 +614,40 @@ OutputAdapter::socketListenThread()
     socklen_t       client_addr_len = sizeof(struct sockaddr);
     ClientInfo      info;
 
-    while(1)
+    while ( 1 )
     {
-        info.socket = accept( m_listen_socket, &client_addr, &client_addr_len );
+        info.socket = accept( m_listen_socket,
+            &client_addr, &client_addr_len );
+
         if ( info.socket < 0 )
         {
+            int e = errno;
+            syslog( LOG_ERR,
+                "PVSD ERROR: %s: Socket Accept Returned Error (%d) - %s",
+                "OutputAdapter::socketListenThread()",
+                e, strerror(e) );
+            usleep(30000); // give syslog a chance...
+
             if ( !m_active )
+            {
+                syslog( LOG_ERR, "PVSD ERROR: %s: %s",
+                    "OutputAdapter::socketListenThread()",
+                    "Output Adapter No Longer Active, Exiting Thread" );
+                usleep(30000); // give syslog a chance...
                 break;
+            }
         }
         else
         {
             // New client - setup client info
-            info.addr = inet_ntoa( ((struct sockaddr_in &)client_addr).sin_addr );
+            info.addr = inet_ntoa(
+                ((struct sockaddr_in &)client_addr).sin_addr );
+
+            syslog( LOG_ERR,
+                "%s %s: Connected to ADARA SMS Client at %s (socket=%d)",
+                "PVSD ERROR:", "OutputAdapter::socketListenThread()",
+                info.addr.c_str(), info.socket );
+            usleep(30000); // give syslog a chance...
 
             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -626,6 +658,12 @@ OutputAdapter::socketListenThread()
 
             // need to send it all currently active devices (if any)
             sendCurrentData( info.socket );
+
+            syslog( LOG_ERR,
+                "%s %s: Initial Sends Complete to %s at %s (socket=%d)",
+                "PVSD ERROR:", "OutputAdapter::socketListenThread()",
+                "ADARA SMS Client", info.addr.c_str(), info.socket );
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -640,6 +678,11 @@ OutputAdapter::sendCurrentData( int a_socket )
     OutPacket   adara_pkt;
     string      payload;
 
+    syslog( LOG_INFO,
+        "%s: Sending Current Data to ADARA SMS Client (socket=%d)",
+        "OutputAdapter::sendCurrentData()", a_socket );
+    usleep(30000); // give syslog a chance...
+
     // Use current time for DDP packets
     adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
@@ -647,15 +690,30 @@ OutputAdapter::sendCurrentData( int a_socket )
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     // Send DDPs for real devices
-    for ( set<DeviceRecordPtr>::iterator idev = m_devices.begin(); idev != m_devices.end(); ++idev )
+    for ( set<DeviceRecordPtr>::iterator idev = m_devices.begin();
+            idev != m_devices.end(); ++idev )
     {
+        syslog( LOG_INFO,
+            "%s: Sending Device [%s] Descriptor to %s (socket=%d)",
+            "OutputAdapter::sendCurrentData()", (*idev)->m_name.c_str(),
+            "ADARA SMS Client", a_socket );
+        usleep(30000); // give syslog a chance...
+
         buildDDP( adara_pkt, payload, *idev );
         sendPacket( adara_pkt, &payload, a_socket );
     }
 
     // Send value updates for configured devices
-    for ( map<PVDescriptor*,PVState>::iterator ipv = m_pv_state.begin(); ipv != m_pv_state.end(); ++ipv )
+    for ( map<PVDescriptor*,PVState>::iterator ipv = m_pv_state.begin();
+            ipv != m_pv_state.end(); ++ipv )
     {
+        syslog( LOG_INFO,
+            "%s: Sending PV <%s> (%s) %s to %s (socket=%d)",
+            "OutputAdapter::sendCurrentData()",
+            ipv->first->m_name.c_str(), ipv->first->m_connection.c_str(),
+            "Variable Value Update", "ADARA SMS Client", a_socket );
+        usleep(30000); // give syslog a chance...
+
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
         if ( payload.size() )
             sendPacket( adara_pkt, &payload, a_socket );
@@ -665,13 +723,18 @@ OutputAdapter::sendCurrentData( int a_socket )
 }
 
 
-/** \brief Sends a source list packet to client socket (paket is empty for PVStreamer)
-  * \param a_socket Client socket to send paket over.
+/** \brief Sends a source list packet to client socket (packet is empty for PVStreamer)
+  * \param a_socket Client socket to send packet over.
   */
 void
 OutputAdapter::sendSourceInfo( int a_socket )
 {
     OutPacket adara_pkt;
+
+    syslog( LOG_INFO,
+        "%s: Sending Source List to ADARA SMS Client (socket=%d)",
+        "OutputAdapter::sendSourceInfo()", a_socket );
+    usleep(30000); // give syslog a chance...
 
     adara_pkt.payload_len = 0;
     adara_pkt.format = ADARA_PKT_TYPE(
@@ -685,7 +748,8 @@ OutputAdapter::sendSourceInfo( int a_socket )
 
 
 void
-OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload, int a_socket )
+OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload,
+        int a_socket )
 {
     bool res;
     uint32_t len = (int)a_adara_pkt.payload_len + 16;
@@ -699,19 +763,33 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload, int a
 
         // Send optional payload
         if ( a_payload && a_payload->length() && res )
-            res = send( a_socket, a_payload->c_str(), (int)a_payload->length() );
+        {
+            res = send( a_socket,
+                a_payload->c_str(), (int)a_payload->length() );
+        }
 
         if ( !res )
         {
+            syslog( LOG_ERR, "PVSD ERROR: %s: Send Failed! (socket=%d)",
+                "OutputAdapter::sendPacket()", a_socket );
+            usleep(30000); // give syslog a chance...
+
             // Disconnect from client
             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
             close( a_socket );
 
-            for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); ++ic )
+            for ( list<ClientInfo>::iterator ic = m_client_info.begin();
+                    ic != m_client_info.end(); ++ic )
             {
                 if ( ic->socket == a_socket )
                 {
+                    syslog( LOG_ERR, "PVSD ERROR: %s: %s at %s",
+                        "OutputAdapter::sendPacket()",
+                        "Disconnecting from ADARA SMS Client",
+                        ic->addr.c_str() );
+                    usleep(30000); // give syslog a chance...
+
                     //notifyDisconnect( ic->addr );
                     m_client_info.erase(ic);
                     break;
@@ -724,16 +802,27 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload, int a
         // Send to ALL clients
         boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-        for ( list<ClientInfo>::iterator ic = m_client_info.begin(); ic != m_client_info.end(); )
+        for ( list<ClientInfo>::iterator ic = m_client_info.begin();
+                ic != m_client_info.end(); )
         {
             res = send( ic->socket, (char*)&a_adara_pkt, len );
 
             // Send optional payload
             if ( a_payload && a_payload->length() && res )
-                res = send( ic->socket, a_payload->c_str(), (int)a_payload->length() );
+            {
+                res = send( ic->socket,
+                    a_payload->c_str(), (int)a_payload->length() );
+            }
 
             if ( !res )
             {
+                syslog( LOG_ERR,
+                    "PVSD ERROR: %s: Send Failed! (socket=%d) %s at %s",
+                    "OutputAdapter::sendPacket()", ic->socket,
+                    "Disconnecting from ADARA SMS Client",
+                    ic->addr.c_str() );
+                usleep(30000); // give syslog a chance...
+
                 // Disconnect from client
                 close( ic->socket );
                 //notifyDisconnect( ic->addr );
