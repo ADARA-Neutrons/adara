@@ -136,7 +136,7 @@ StreamService::getFreePacket()
 
 
 /**
- * \brief Gets a filled stream packet (blocks until available)
+ * \brief Gets a stream packet from the free queue (blocks until available)
  * \param a_timeout - Timeout period in msec
  * \param a_timeout_flag - (output) Indicates if a timeout occurred
  * \return PVStreamPacket pointer on success; null on failure
@@ -149,6 +149,17 @@ StreamService::getFreePacket( unsigned long a_timeout, bool & a_timeout_flag )
     m_free_que.getTimed( pkt, a_timeout, a_timeout_flag );
 
     return pkt;
+}
+
+
+/**
+ * \brief Gets the active status of the free stream packet queue
+ * \return active status of the free stream packet queue
+ */
+bool
+StreamService::getFreeQueueActive(void)
+{
+    return m_free_que.active();
 }
 
 
@@ -194,6 +205,17 @@ StreamService::getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag )
     m_fill_que.getTimed( pkt, a_timeout, a_timeout_flag );
 
     return pkt;
+}
+
+
+/**
+ * \brief Gets the active status of the free stream packet queue
+ * \return active status of the free stream packet queue
+ */
+bool
+StreamService::getFilledQueueActive(void)
+{
+    return m_fill_que.active();
 }
 
 
