@@ -79,14 +79,16 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
 
     if ( idev != m_dev_agents.end())
     {
-        syslog( LOG_DEBUG, "Updating Device Agent for: %s",
+        syslog( LOG_DEBUG, "%s: Updating Device Agent for [%s]",
+            "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
 
         idev->second->update( a_device );
     }
     else
     {
-        syslog( LOG_DEBUG, "Starting New Device Agent for: %s",
+        syslog( LOG_DEBUG, "%s: Starting New Device Agent for [%s]",
+            "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
 
         m_dev_agents[a_device->m_name] =
@@ -111,8 +113,8 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
 
     if ( idev != m_dev_agents.end())
     {
-        syslog( LOG_DEBUG,
-            "Stopping old device agent (device no longer defined) for: %s",
+        syslog( LOG_DEBUG, "%s: Stopping old device agent (%s) for [%s]",
+            "InputAdapter::stopDevice()", "device no longer defined",
             a_dev_name.c_str() );
 
         idev->second->stop();
@@ -121,8 +123,10 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
     }
     else
     {
-        syslog( LOG_ERR, "%s Error Stopping Device Agent: %s Not Found!",
-            "PVSD ERROR:", a_dev_name.c_str() );
+        syslog( LOG_ERR,
+            "%s %s: Error Stopping Device Agent: [%s] Not Found!",
+            "PVSD ERROR:", "InputAdapter::stopDevice()",
+            a_dev_name.c_str() );
     }
 }
 
@@ -256,7 +260,10 @@ InputAdapter::configFileMonitorThread()
 
                     if ( changed )
                     {
-                        syslog( LOG_INFO, "EPICS beam config file %s has changed", m_config_file.c_str() );
+                        syslog( LOG_INFO,
+                            "%s: EPICS beam config file %s has changed",
+                            "InputAdapter::configFileMonitorThread():",
+                            m_config_file.c_str() );
 
                         boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -268,7 +275,9 @@ InputAdapter::configFileMonitorThread()
                         if ( parseConfigBuffer( buffer.data(), buffer.size(), devices ))
                         {
                             // Parsed successfully
-                            syslog( LOG_INFO, "EPICS beam config file parse OK" );
+                            syslog( LOG_INFO,
+                                "%s: EPICS beam config file parse OK",
+                                "InputAdapter::configFileMonitorThread():");
 
                             // Keep track of new device names
                             set<string> new_devices;
@@ -301,6 +310,8 @@ InputAdapter::configFileMonitorThread()
                         {
                             stringstream ss;
                             ss << "PVSD ERROR:"
+                                << " InputAdapter::"
+                                << "configFileMonitorThread():"
                                 << " Failed to parse"
                                 << " EPICS beamline.xml config file!";
 
@@ -320,6 +331,7 @@ InputAdapter::configFileMonitorThread()
         {
             stringstream ss;
             ss << "PVSD ERROR:"
+                << " InputAdapter::configFileMonitorThread():"
                 << " Exception parsing"
                 << " EPICS beamline.xml config file!";
 
@@ -334,6 +346,7 @@ InputAdapter::configFileMonitorThread()
         {
             stringstream ss;
             ss << "PVSD ERROR:"
+                << " InputAdapter::configFileMonitorThread():"
                 << " Unexpected exception parsing"
                 << " EPICS beamline.xml config file!";
 
@@ -451,7 +464,9 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                 if ( !tmp_node )
                                                 {
                                                     syslog( LOG_ERR,
-                                                        "PVSD ERROR: PV Name is missing or empty" );
+                                                        "%s %s: PV Name is missing or empty",
+                                                        "PVSD ERROR:",
+                                                        "InputAdapter::parseConfigBuffer()" );
                                                     throw -1;
                                                 }
 
@@ -503,7 +518,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                         pv_name = pv_conn;
 
                                                     syslog( LOG_WARNING,
-                                                        "Device %s: Ignoring Non-Logged PV %s (%s)",
+                                                        "%s: Device [%s]: Ignoring Non-Logged PV <%s> (%s)",
+                                                        "InputAdapter::parseConfigBuffer()",
                                                         dev_name.c_str(),
                                                         pv_conn.c_str(),
                                                         pv_name.c_str() );
@@ -517,7 +533,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         // It's an error to omit the
                                         // device name
                                         syslog( LOG_ERR,
-                                            "PVSD ERROR: Device name is missing or empty" );
+                                            "PVSD ERROR: %s: Device name is missing or empty",
+                                            "InputAdapter::parseConfigBuffer()" );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
@@ -557,13 +574,15 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                 if ( !dev_name.empty())
                                 {
                                     syslog( LOG_WARNING,
-                                        "Ignoring Inactive Device %s",
+                                        "%s: Ignoring Inactive Device [%s]",
+                                        "InputAdapter::parseConfigBuffer()",
                                         dev_name.c_str() );
                                 }
                                 else
                                 {
                                     syslog( LOG_WARNING,
-                                      "Ignoring Unnamed Inactive Device!" );
+                                    "%s: Ignoring Unnamed Inactive Device!",
+                                      "InputAdapter::parseConfigBuffer()" );
                                 }
                             }
                         }
@@ -574,8 +593,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
         catch(...)
         {
             syslog( LOG_ERR,
-                "%s Exception while parsing EPICS beamline XML",
-                "PVSD ERROR:" );
+                "%s %s: Exception while parsing EPICS beamline XML",
+                "PVSD ERROR:", "InputAdapter::parseConfigBuffer()" );
             res = false;
         }
     }
@@ -666,4 +685,6 @@ InputAdapter::xmlGetAttribute( xmlNode *a_node, const char *a_attrib, string &a_
 }
 
 }}
+
+// vim: expandtab
 

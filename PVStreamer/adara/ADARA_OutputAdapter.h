@@ -108,3 +108,6 @@ private:
 }}
 
 #endif // ADARA_OUTPUTADAPTER_H
+
+// vim: expandtab
+

@@ -28,3 +28,6 @@ protected:
 }
 
 #endif // IOUTPUTADAPTER_H
+
+// vim: expandtab
+

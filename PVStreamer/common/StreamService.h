@@ -148,3 +148,6 @@ private:
 }
 
 #endif // STREAMSERVICE_H
+
+// vim: expandtab
+

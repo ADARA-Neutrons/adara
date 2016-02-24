@@ -98,3 +98,6 @@ private:
 };
 
 #endif
+
+// vim: expandtab
+

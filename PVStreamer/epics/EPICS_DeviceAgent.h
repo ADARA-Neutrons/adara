@@ -113,3 +113,6 @@ private:
 }}
 
 #endif // EPICS_DEVICEAGENT_H
+
+// vim: expandtab
+

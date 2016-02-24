@@ -90,3 +90,6 @@ public:
 }
 
 #endif // DEVICEDESCRIPTOR_H
+
+// vim: expandtab
+

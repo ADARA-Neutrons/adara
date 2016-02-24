@@ -773,3 +773,6 @@ OutputAdapter::send( int a_socket, const char *a_data, uint32_t a_len )
 }
 
 }}
+
+// vim: expandtab
+
