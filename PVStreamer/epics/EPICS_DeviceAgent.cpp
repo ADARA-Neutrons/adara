@@ -946,12 +946,24 @@ DeviceAgent::epicsConnectionHandler(
                 }
                 else
                 {
-                    syslog( LOG_ERR, "%s %s: %s %s%s%s",
-                        "PVSD ERROR:",
-                        "DeviceAgent::epicsConnectionHandler()",
-                        "No Free Packets!", "VariableUpdate Lost",
-                        deviceStr.c_str(), pvStr.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    if ( m_stream_api.getFreeQueueActive() )
+                    {
+                        syslog( LOG_ERR, "%s %s: %s %s%s%s",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsConnectionHandler()",
+                            "No Free Packets!", "VariableUpdate Lost",
+                            deviceStr.c_str(), pvStr.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+                    else
+                    {
+                        syslog( LOG_ERR, "%s %s: %s %s%s%s",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsConnectionHandler()",
+                            "Queue Deactivated,", "Ignore VariableUpdate",
+                            deviceStr.c_str(), pvStr.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
                 }
             }
         }
@@ -1126,12 +1138,24 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                                 + ich->second.m_pv->m_connection + ")";
                         }
 
-                        syslog( LOG_ERR, "%s %s: %s %s%s",
-                            "PVSD ERROR:",
-                            "DeviceAgent::epicsEventHandler()",
-                            "No Free Packets! VariableUpdate Lost",
-                            deviceStr.c_str(), pvStr.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        if ( m_stream_api.getFreeQueueActive() )
+                        {
+                            syslog( LOG_ERR, "%s %s: %s %s%s",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsEventHandler()",
+                                "No Free Packets! VariableUpdate Lost",
+                                deviceStr.c_str(), pvStr.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+                        else
+                        {
+                            syslog( LOG_ERR, "%s %s: %s %s%s",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsEventHandler()",
+                                "Queue Deactivated, Ignore VariableUpdate",
+                                deviceStr.c_str(), pvStr.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
                     }
                 }
             }
@@ -1248,11 +1272,22 @@ DeviceAgent::sendCurrentValues()
                     + ich->second.m_pv->m_connection + ")";
             }
 
-            syslog( LOG_ERR, "%s %s: %s %s%s",
-                "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
-                "No Free Packets! VariableUpdate Lost for",
-                deviceStr.c_str(), pvStr.c_str() );
-            usleep(30000); // give syslog a chance...
+            if ( m_stream_api.getFreeQueueActive() )
+            {
+                syslog( LOG_ERR, "%s %s: %s %s%s",
+                    "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
+                    "No Free Packets! VariableUpdate Lost for",
+                    deviceStr.c_str(), pvStr.c_str() );
+                usleep(30000); // give syslog a chance...
+            }
+            else
+            {
+                syslog( LOG_ERR, "%s %s: %s %s%s",
+                    "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
+                    "Queue Deactivated, Ignore VariableUpdate for",
+                    deviceStr.c_str(), pvStr.c_str() );
+                usleep(30000); // give syslog a chance...
+            }
         }
     }
 }
