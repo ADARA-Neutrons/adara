@@ -428,10 +428,13 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
         if ( m_stream_api->getFreeQueueActive() )
         {
             syslog( LOG_ERR,
-                "%s %s: No Free Packets! Device [%s] (device id=%d) %s!",
+                "%s %s: %s! Device [%s] (device id=%d) %s! [%s = %lu]",
                 "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+                "No Free Packets",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
-                "Descriptor Lost" );
+                "Descriptor Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
             usleep(30000); // give syslog a chance...
         }
         else
@@ -464,10 +467,13 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
         if ( m_stream_api->getFreeQueueActive() )
         {
             syslog( LOG_ERR,
-                "%s %s: No Free Packets! Device [%s] (device id=%d) %s!",
+                "%s %s: %s! Device [%s] (device id=%d) %s! [%s = %lu]",
                 "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
+                "No Free Packets",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
-                "Undefined Lost" );
+                "Undefined Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
             usleep(30000); // give syslog a chance...
         }
         else
@@ -502,11 +508,13 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
         if ( m_stream_api->getFreeQueueActive() )
         {
             syslog( LOG_ERR,
-                "%s %s: %s! Device [%s] (Old [%s]) (device id=%d) %s!",
+                "%s %s: %s! %s [%s] (%s [%s]) (%s=%d) %s! [%s = %lu]",
                 "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
-                "No Free Packets",
-                a_dev_desc->m_name.c_str(), a_old_dev_desc->m_name.c_str(),
-                a_dev_desc->m_id, "Descriptor Update Lost" );
+                "No Free Packets", "Device", a_dev_desc->m_name.c_str(),
+                "Old", a_old_dev_desc->m_name.c_str(),
+                "device id", a_dev_desc->m_id, "Descriptor Update Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
             usleep(30000); // give syslog a chance...
         }
         else
@@ -543,13 +551,15 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
         if ( m_stream_api->getFreeQueueActive() )
         {
             syslog( LOG_ERR,
-        "%s %s: %s! Device [%s] (device id=%d) PV <%s> (%s) (pv id=%d) %s!",
+        "%s %s: %s! %s [%s] (%s=%d) PV <%s> (%s) (pv id=%d) %s! [%s = %lu]",
                 "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
-                "No Free Packets",
-                a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
+                "No Free Packets", "Device", a_dev_desc->m_name.c_str(),
+                "device id", a_dev_desc->m_id,
                 a_pv_desc->m_name.c_str(),
                 a_pv_desc->m_connection.c_str(),
-                a_pv_desc->m_id, "Undefined Lost" );
+                a_pv_desc->m_id, "Undefined Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
             usleep(30000); // give syslog a chance...
         }
         else

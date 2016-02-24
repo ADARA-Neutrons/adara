@@ -948,11 +948,14 @@ DeviceAgent::epicsConnectionHandler(
                 {
                     if ( m_stream_api.getFreeQueueActive() )
                     {
-                        syslog( LOG_ERR, "%s %s: %s %s%s%s",
+                        syslog( LOG_ERR, "%s %s: %s %s%s%s [%s = %lu]",
                             "PVSD ERROR:",
                             "DeviceAgent::epicsConnectionHandler()",
                             "No Free Packets!", "VariableUpdate Lost",
-                            deviceStr.c_str(), pvStr.c_str() );
+                            deviceStr.c_str(), pvStr.c_str(),
+                            "Filled Queue Size",
+                            (unsigned long)
+                                m_stream_api.getFilledQueueSize() );
                         usleep(30000); // give syslog a chance...
                     }
                     else
@@ -1140,11 +1143,14 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 
                         if ( m_stream_api.getFreeQueueActive() )
                         {
-                            syslog( LOG_ERR, "%s %s: %s %s%s",
+                            syslog( LOG_ERR, "%s %s: %s %s%s [%s = %lu]",
                                 "PVSD ERROR:",
                                 "DeviceAgent::epicsEventHandler()",
                                 "No Free Packets! VariableUpdate Lost",
-                                deviceStr.c_str(), pvStr.c_str() );
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "Filled Queue Size",
+                                (unsigned long)
+                                    m_stream_api.getFilledQueueSize() );
                             usleep(30000); // give syslog a chance...
                         }
                         else
@@ -1274,10 +1280,12 @@ DeviceAgent::sendCurrentValues()
 
             if ( m_stream_api.getFreeQueueActive() )
             {
-                syslog( LOG_ERR, "%s %s: %s %s%s",
+                syslog( LOG_ERR, "%s %s: %s %s%s [%s = %lu]",
                     "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
                     "No Free Packets! VariableUpdate Lost for",
-                    deviceStr.c_str(), pvStr.c_str() );
+                    deviceStr.c_str(), pvStr.c_str(),
+                    "Filled Queue Size",
+                    (unsigned long) m_stream_api.getFilledQueueSize() );
                 usleep(30000); // give syslog a chance...
             }
             else
