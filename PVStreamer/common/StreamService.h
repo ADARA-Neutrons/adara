@@ -80,6 +80,7 @@ public:
     virtual StreamPacket   *getFreePacket() = 0;
     virtual StreamPacket   *getFreePacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual bool            getFreeQueueActive(void) = 0;
+    virtual size_t          getFreeQueueSize(void) = 0;
     virtual void            putFilledPacket( StreamPacket *a_pkt ) = 0;
 };
 
@@ -97,6 +98,7 @@ public:
     virtual StreamPacket   *getFilledPacket() = 0;
     virtual StreamPacket   *getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag ) = 0;
     virtual bool            getFilledQueueActive(void) = 0;
+    virtual size_t          getFilledQueueSize(void) = 0;
     virtual void            putFreePacket( StreamPacket *a_pkt ) = 0;
 };
 
@@ -131,6 +133,7 @@ private:
     StreamPacket   *getFreePacket();
     StreamPacket   *getFreePacket( unsigned long a_timeout, bool & a_timeout_flag );
     bool            getFreeQueueActive(void);
+    size_t          getFreeQueueSize(void);
     void            putFilledPacket( StreamPacket *a_pkt );
 
     // ---------- IStreamConsumer methods ----------
@@ -138,6 +141,7 @@ private:
     StreamPacket   *getFilledPacket();
     StreamPacket   *getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag );
     bool            getFilledQueueActive(void);
+    size_t          getFilledQueueSize(void);
     void            putFreePacket( StreamPacket *a_pkt );
 
     ConfigManager               m_cfg_mgr;

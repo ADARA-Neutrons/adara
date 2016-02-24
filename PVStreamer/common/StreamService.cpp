@@ -164,6 +164,17 @@ StreamService::getFreeQueueActive(void)
 
 
 /**
+ * \brief Gets the current size of the free stream packet queue
+ * \return current size of the free stream packet queue
+ */
+size_t
+StreamService::getFreeQueueSize(void)
+{
+    return m_free_que.size();
+}
+
+
+/**
  * \brief Puts a stream packet on the filled queue
  * \param a_pkt - PVStreamPacket object to put on queue
  */
@@ -209,13 +220,24 @@ StreamService::getFilledPacket( unsigned long a_timeout, bool & a_timeout_flag )
 
 
 /**
- * \brief Gets the active status of the free stream packet queue
- * \return active status of the free stream packet queue
+ * \brief Gets the active status of the filled stream packet queue
+ * \return active status of the filled stream packet queue
  */
 bool
 StreamService::getFilledQueueActive(void)
 {
     return m_fill_que.active();
+}
+
+
+/**
+ * \brief Gets the current size of the filled stream packet queue
+ * \return current size of the filled stream packet queue
+ */
+size_t
+StreamService::getFilledQueueSize(void)
+{
+    return m_fill_que.size();
 }
 
 
