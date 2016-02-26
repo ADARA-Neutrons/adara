@@ -1086,7 +1086,7 @@ if [[ "$command" == "status" \
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:Recording
+		caget $WAIT -a ${PRE}:SMS:Recording
 
 		caget $WAIT ${PRE}:SMS:RunNumber
 
