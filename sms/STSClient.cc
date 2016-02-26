@@ -111,6 +111,8 @@ void STSClient::writable(void)
 			} catch (std::runtime_error re) {
 				ERROR("Unable to open file number " << f->fileNumber()
 					<< " (pause file number " << f->pauseFileNumber() << ")"
+					<< " (addendum file number "
+						<< f->addendumFileNumber() << ")"
 					<< " for run " << m_run->runNumber()
 					<< ": " << re.what());
 				m_disp = STSClientMgr::PERMAMENT_FAIL;
