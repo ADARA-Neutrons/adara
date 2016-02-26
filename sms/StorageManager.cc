@@ -179,15 +179,11 @@ private:
 			if (c->runNumber()) {
 				ComBusSMSMon *combus = StorageManager::combus();
 				if (c->isTranslated()) {
-					/* Send STS Succeeded Message */
-					combus->sendOriginal(c->runNumber(),
-							std::string("Rescan STS Send Succeeded"),
-							c->startTime());
+					ERROR("Rescan Run Directory Already Translated?!"
+						<< " Please Reset and Try Again...");
 				} else if (c->isManual()) {
-					/* Send STS Failed Message */
-					combus->sendOriginal(c->runNumber(),
-							std::string("Rescan Needs Manual Translation"),
-							c->startTime());
+					ERROR("Rescan Marked for Manual Processing!"
+						<< " Please Check Run Directory for Errors...");
 				} else {
 					/* Queue for Re-Translation */
 					STSClientMgr *sts = STSClientMgr::getInstance();
