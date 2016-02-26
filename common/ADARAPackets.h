@@ -280,6 +280,9 @@ public:
 #if 0
 	uint32_t pauseFileNumber(void) const { return m_fields[3] & 0xffffff; }
 	uint32_t paused(void) const { return m_fields[3] >> 24; }
+	uint32_t addendumFileNumber(void) const
+		{ return m_fields[4] & 0xffffff; }
+	uint32_t addendum(void) const { return m_fields[4] >> 24; }
 #endif
 
 private:
