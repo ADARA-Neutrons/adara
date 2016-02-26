@@ -37,6 +37,7 @@ struct run_status_packet {
 	uint32_t	status_number;
 #if 0
 	uint32_t	paused_number;
+	uint32_t	addendum_number;
 #endif
 } __attribute__((packed));
 
@@ -193,7 +194,7 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	struct run_status_packet spkt = {
 		hdr : {
 #if 0
-			payload_len : 16,
+			payload_len : 20,
 #else
 			payload_len : 12,
 #endif
@@ -216,10 +217,13 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	// Ignore Paused File Number in RunStatus Packet...
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
+	// [Solved in V1 Packet Type, See Below... Yet To Be Activated... ;-]
 	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
 
 #if 0
 	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
+	spkt.addendum_number = m_addendumFileNumber
+		| ((uint32_t) m_addendum << 24);
 #endif
 
 	IoVector iovec(1);
@@ -395,8 +399,9 @@ StorageFile::StorageFile(OwnerPtr &owner,
 		uint32_t fileNumber, uint32_t pauseFileNumber) :
 	m_owner(owner), m_runNumber(0),
 	m_fileNumber(fileNumber), m_pauseFileNumber(pauseFileNumber),
+	m_addendumFileNumber(0),
 	m_startTime(0), m_persist(true), m_oversize(false),
-	m_active(false), m_paused(false),
+	m_active(false), m_paused(false), m_addendum(false),
 	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
@@ -511,11 +516,13 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		const std::string &path, bool &saved_file)
 {
 	fs::path p(path);
-	uint32_t fileNumber = 0, pauseFileNumber = 0, runNumber = 0;
-	uint32_t sourceId = 0, saveFileNumber = 0;
+	uint32_t fileNumber = 0, saveFileNumber = 0, runNumber = 0;
+	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
+	uint32_t sourceId = 0;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
+	bool addendum_file = false;
 	if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
 		// DEBUG("Ignoring ADARA Paused Run file: " << p);
@@ -539,6 +546,19 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 			<< " Saved Input Stream Non-Run file: " << p);
 		saved_file = true;
 		return StorageFile::SharedPtr();
+	}
+	// *Only* Support Addendums to Run Containers, Not Between Runs...
+	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
+			&fileNumber, &addendumFileNumber, &runNumber) == 3 ) {
+		// Verify Valid Addendum File Number...
+		if ( !addendumFileNumber ) {
+			WARN("Improperly named ADARA file (Zero Addendum File Number): "
+				<< p);
+			return StorageFile::SharedPtr();
+		}
+		// Log in StorageContainer::validate(), for Sorted Ordering... :-D
+		// DEBUG("Including ADARA Run Addendum file: " << p);
+		addendum_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
 				&fileNumber, &runNumber) != 2
@@ -572,6 +592,9 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_path = path;
 	f->open(O_RDONLY);
+
+	f->m_addendum = addendum_file;
+	f->m_addendumFileNumber = addendumFileNumber;
 
 	struct stat statbuf;
 	int err = fstat(f->m_fd, &statbuf);

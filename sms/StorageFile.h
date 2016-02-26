@@ -32,10 +32,12 @@ public:
 	std::string path(void) const { return m_path; }
 	bool active(void) const { return m_active; }
 	bool paused(void) const { return m_paused; }
+	bool addendum(void) const { return m_addendum; }
 	bool oversize(void) const { return m_oversize; }
 	off_t size(void) const { return m_size; }
 	uint32_t fileNumber(void) const { return m_fileNumber; }
 	uint32_t pauseFileNumber(void) const { return m_pauseFileNumber; }
+	uint32_t addendumFileNumber(void) const { return m_addendumFileNumber; }
 	bool willPersist(void) const { return m_persist; }
 	void persist(bool p = true) { m_persist = p; }
 	OwnerPtr owner(void) const { return m_owner; }
@@ -78,11 +80,13 @@ private:
 	uint32_t m_runNumber;
 	uint32_t m_fileNumber;
 	uint32_t m_pauseFileNumber;
+	uint32_t m_addendumFileNumber;
 	uint32_t m_startTime;
 	bool m_persist;
 	bool m_oversize;
 	bool m_active;
 	bool m_paused;
+	bool m_addendum;
 	off_t m_size;
 	off_t m_sizeLastUpdate;
 	off_t m_syncDistance;
