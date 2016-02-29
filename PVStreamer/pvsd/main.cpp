@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.4.3"
+#define PVSD_VERSION "1.4.4"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -106,7 +106,8 @@ daemonize()
     if ( pid < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "PVSD ERROR: Unable to fork: %s", strerror(e) );
+        syslog( LOG_ERR, "PVSD ERROR: %s: Unable to fork: %s",
+            "daemonize()", strerror(e) );
         exit(1);
     }
 
@@ -125,7 +126,8 @@ daemonize()
     if ( setsid() < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "PVSD ERROR: Unable to setsid: %s", strerror(e) );
+        syslog( LOG_ERR, "PVSD ERROR: %s: Unable to setsid: %s",
+            "daemonize()", strerror(e) );
         exit(1);
     }
 
@@ -133,8 +135,8 @@ daemonize()
     if ( pid < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "PVSD ERROR: Second fork failed: %s",
-            strerror(e) );
+        syslog( LOG_ERR, "PVSD ERROR: %s: Second fork failed: %s",
+            "daemonize()", strerror(e) );
         exit(1);
     }
     else if ( pid )
@@ -164,7 +166,8 @@ daemonize()
     if ( chdir("/") < 0 )
     {
         int e = errno;
-        syslog( LOG_ERR, "PVSD ERROR: Chdir failed: %s", strerror(e) );
+        syslog( LOG_ERR, "PVSD ERROR: %s: Chdir failed: %s",
+            "daemonize()", strerror(e) );
         exit(1);
     }
 }
@@ -276,8 +279,8 @@ int main(int argc, char *argv[])
     if ( !opt_map.count( "domain" ))
     {
         syslog( LOG_WARNING,
-            "%s No communication domain specified - probably an error.",
-            "PVSD ERROR:" );
+            "%s %s: No communication domain specified - probably an error.",
+            "PVSD ERROR:", "main()" );
     }
 
     // Parent process will exit in this call
@@ -316,17 +319,19 @@ int main(int argc, char *argv[])
     }
     catch( TraceException &e )
     {
-        syslog( LOG_ERR, "PVSD ERROR: %s", e.toString().c_str() );
+        syslog( LOG_ERR, "PVSD ERROR: %s: %s",
+            "main()", e.toString().c_str() );
         ret_code = 1;
     }
     catch( exception &e )
     {
-        syslog( LOG_ERR, "PVSD ERROR: Unhandled exception: %s", e.what());
+        syslog( LOG_ERR, "PVSD ERROR: %s: Unhandled exception: %s",
+            "main()", e.what());
         ret_code = 1;
     }
     catch( ... )
     {
-        syslog( LOG_ERR, "PVSD ERROR: Unknown exception" );
+        syslog( LOG_ERR, "PVSD ERROR: main(): Unknown exception" );
         ret_code = 1;
     }
 
@@ -342,3 +347,6 @@ int main(int argc, char *argv[])
 
     return ret_code;
 }
+
+// vim: expandtab
+

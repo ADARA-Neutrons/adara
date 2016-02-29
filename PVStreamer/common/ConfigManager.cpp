@@ -59,7 +59,7 @@ ConfigManager::getDeviceConfig( const string &a_device_name, const string &a_sou
 DeviceRecordPtr
 ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 {
-    // syslog( LOG_DEBUG, "ConfigMgr::defineDevice: %s, %s, %lu",
+    // syslog( LOG_DEBUG, "ConfigMgr::defineDevice(): [%s] %s/%lu",
         // a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
         // (unsigned long)a_descriptor.m_protocol );
 
@@ -67,7 +67,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     DeviceRecordPtr record;
 
     // Compare to the latest configuration records
-    string key = makeDeviceKey( a_descriptor.m_name, a_descriptor.m_source, a_descriptor.m_protocol );
+    string key = makeDeviceKey( a_descriptor.m_name, a_descriptor.m_source,
+        a_descriptor.m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
 
@@ -76,8 +77,9 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     {
         if ( a_descriptor == *idev->second )
         {
-            syslog( LOG_INFO,
-                "Device Definition Unchanged: %s:%s:%lu (device id=%d)",
+            syslog( LOG_INFO, "%s(): %s: [%s] %s/%lu (device id=%d)",
+                "ConfigManager::defineDevice()",
+                "Device Definition Unchanged",
                 a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
                 (unsigned long) a_descriptor.m_protocol,
                 idev->second->m_id );
@@ -91,7 +93,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             // analyze differences
 
             syslog( LOG_INFO,
-                "Re-defining device: %s:%s:%lu (device id=%d)",
+                "%s: Re-defining device: [%s] %s/%lu (device id=%d)",
+                "ConfigManager::defineDevice()",
                 a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
                 (unsigned long) a_descriptor.m_protocol,
                 idev->second->m_id );
@@ -105,14 +108,14 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             // Now assign/reassign IDs
             new_desc->m_id = idev->second->m_id;
 
-			// Create PV IDs Set: Sorted Unique Element List
-			// - Use for Guaranteed-Unique New PV Ids...! ;-D
+            // Create PV IDs Set: Sorted Unique Element List
+            // - Use for Guaranteed-Unique New PV Ids...! ;-D
             vector<PVDescriptor*>::const_iterator ipv2;
-			std::set<Identifier> pv_ids;
+            std::set<Identifier> pv_ids;
             for ( ipv2 = idev->second->m_pvs.begin();
                     ipv2 != idev->second->m_pvs.end(); ++ipv2 )
             {
-				pv_ids.insert( (*ipv2)->m_id );
+                pv_ids.insert( (*ipv2)->m_id );
             }
 
             const PVDescriptor *old_pv;
@@ -131,7 +134,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     (*ipv)->m_id = old_pv->m_id;
 
                     syslog( LOG_INFO,
-                        "Device %s (device id=%d) %s %s: %s - %s pv id=%d",
+                    "%s: %s [%s] (device id=%d) %s <%s> (%s) - %s pv id=%d",
+                        "ConfigManager::defineDevice()", "Device",
                         new_desc->m_name.c_str(), new_desc->m_id,
                         "PV Persists",
                         (*ipv)->m_name.c_str(),
@@ -142,17 +146,18 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 else
                 {
                     // New PV, find a free ID (not in old IDs or recent new)
-			        std::set<Identifier>::iterator idi;
-					while ( (idi = pv_ids.find( next_id )) != pv_ids.end() )
-						next_id++;
+                    std::set<Identifier>::iterator idi;
+                    while ( (idi = pv_ids.find( next_id )) != pv_ids.end() )
+                        next_id++;
 
                     (*ipv)->m_id = next_id++;
 
-					// Mark this PV ID, to be sure for the next guy... ;-D
-					pv_ids.insert( (*ipv)->m_id );
+                    // Mark this PV ID, to be sure for the next guy... ;-D
+                    pv_ids.insert( (*ipv)->m_id );
 
                     syslog( LOG_INFO,
-                        "Device %s (device id=%d) %s %s: %s - %s pv id=%d",
+                    "%s: %s [%s] (device id=%d) %s <%s> (%s) - %s pv id=%d",
+                        "ConfigManager::defineDevice()", "Device",
                         new_desc->m_name.c_str(), new_desc->m_id,
                         "Found New PV",
                         (*ipv)->m_name.c_str(),
@@ -170,7 +175,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 if ( !new_desc->getPvByName( (*ipv)->m_name ))
                 {
                     syslog( LOG_INFO,
-                        "Device %s (device id=%d) %s %s: %s (pv id=%d)",
+                    "%s: %s [%s] (device id=%d) %s <%s> (%s) (pv id=%d)",
+                        "ConfigManager::defineDevice()", "Device",
                         new_desc->m_name.c_str(), new_desc->m_id,
                         "Undefining Old PV",
                         (*ipv)->m_name.c_str(),
@@ -204,7 +210,9 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         // Assign an ID to the device and PVs
         new_desc->m_id = getNextDeviceID();
 
-        syslog( LOG_INFO, "Defining new device: %s:%s:%lu (device id=%d)",
+        syslog( LOG_INFO,
+            "%s: Defining new device: [%s] %s/%lu (device id=%d)",
+            "ConfigManager::defineDevice()",
             a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
             (unsigned long) a_descriptor.m_protocol,
             new_desc->m_id );
@@ -217,7 +225,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             (*ipv)->m_id = id++;
 
             syslog( LOG_INFO,
-                "Device %s (device id=%d) New PV %s: %s - assign pv id=%d",
+            "%s: %s [%s] (device id=%d) New PV <%s> (%s) - assign pv id=%d",
+                "ConfigManager::defineDevice()", "Device",
                 new_desc->m_name.c_str(), new_desc->m_id,
                 (*ipv)->m_name.c_str(),
                 (*ipv)->m_connection.c_str(),
@@ -251,7 +260,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 void
 ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
 {
-    syslog( LOG_INFO, "Un-defining device: %s:%s:%lu (device id=%d)",
+    syslog( LOG_INFO, "%s: Un-defining device: [%s] %s/%lu (device id=%d)",
+        "ConfigManager::undefineDevice()",
         a_record->m_name.c_str(), a_record->m_source.c_str(),
         (unsigned long)a_record->m_protocol, a_record->m_id );
 
@@ -386,8 +396,9 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         if ( count )
         {
             syslog( LOG_ERR,
-                "%s Device %s (device id=%d): %s from %s to %s (pv id=%d)!",
+          "%s %s: %s [%s] (device id=%d): %s from <%s> to <%s> (pv id=%d)!",
                 "PVSD ERROR:",
+                "ConfigManager::makePvNamesUnique()", "Device",
                 a_descriptor.m_name.c_str(), a_descriptor.m_id,
                 "Renaming Name-Clash PV",
                 (*ipv)->m_name.c_str(), new_name.c_str(),
@@ -412,13 +423,29 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
-    else {
-        syslog( LOG_ERR,
-            "%s No Free Packets! %s Device %s (device id=%d) %s!",
-            "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
-            a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
-            "Descriptor Lost" );
-        usleep(30000); // give syslog a chance...
+    else
+    {
+        if ( m_stream_api->getFreeQueueActive() )
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s! Device [%s] (device id=%d) %s! [%s = %lu]",
+                "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+                "No Free Packets",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
+                "Descriptor Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s, Ignore Define Device [%s] (device id=%d)",
+                "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
+                "Queue Deactivated",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
+            usleep(30000); // give syslog a chance...
+        }
     }
 }
 
@@ -435,13 +462,29 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
 
         m_stream_api->putFilledPacket( pkt );
     }
-    else {
-        syslog( LOG_ERR,
-            "%s No Free Packets! %s Device %s (device id=%d) %s!",
-            "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
-            a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
-            "Undefined Lost" );
-        usleep(30000); // give syslog a chance...
+    else
+    {
+        if ( m_stream_api->getFreeQueueActive() )
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s! Device [%s] (device id=%d) %s! [%s = %lu]",
+                "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
+                "No Free Packets",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
+                "Undefined Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s, Ignore Undefine Device [%s] (device id=%d)",
+                "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
+                "Queue Deactivated",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
+            usleep(30000); // give syslog a chance...
+        }
     }
 }
 
@@ -460,13 +503,29 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
 
         m_stream_api->putFilledPacket( pkt );
     }
-    else {
-        syslog( LOG_ERR,
-            "%s No Free Packets! %s Device %s (Old %s) (device id=%d) %s!",
-            "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
-            a_dev_desc->m_name.c_str(), a_old_dev_desc->m_name.c_str(),
-            a_dev_desc->m_id, "Descriptor Update Lost" );
-        usleep(30000); // give syslog a chance...
+    else
+    {
+        if ( m_stream_api->getFreeQueueActive() )
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s! %s [%s] (%s [%s]) (%s=%d) %s! [%s = %lu]",
+                "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
+                "No Free Packets", "Device", a_dev_desc->m_name.c_str(),
+                "Old", a_old_dev_desc->m_name.c_str(),
+                "device id", a_dev_desc->m_id, "Descriptor Update Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "%s %s: %s, Ignore Redefine Device [%s] (device id=%d)",
+                "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
+                "Queue Deactivated",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
+            usleep(30000); // give syslog a chance...
+        }
     }
 }
 
@@ -487,18 +546,38 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
 
         m_stream_api->putFilledPacket( pkt );
     }
-    else {
-        syslog( LOG_ERR,
-            "%s %s! %s Device %s (device id=%d) PV %s (%s) (pv id=%d) %s!",
-            "PVSD ERROR:", "No Free Packets",
-            "ConfigManager::sendPvUndefined()",
-            a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
-            a_pv_desc->m_name.c_str(),
-            a_pv_desc->m_connection.c_str(),
-            a_pv_desc->m_id, "Undefined Lost" );
-        usleep(30000); // give syslog a chance...
+    else
+    {
+        if ( m_stream_api->getFreeQueueActive() )
+        {
+            syslog( LOG_ERR,
+        "%s %s: %s! %s [%s] (%s=%d) PV <%s> (%s) (pv id=%d) %s! [%s = %lu]",
+                "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
+                "No Free Packets", "Device", a_dev_desc->m_name.c_str(),
+                "device id", a_dev_desc->m_id,
+                a_pv_desc->m_name.c_str(),
+                a_pv_desc->m_connection.c_str(),
+                a_pv_desc->m_id, "Undefined Lost",
+                "Filled Queue Size",
+                (unsigned long) m_stream_api->getFilledQueueSize() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+            "%s %s: %s Device [%s] (device id=%d) PV <%s> (%s) (pv id=%d)",
+                "PVSD ERROR:", "ConfigManager::sendPvUndefined()",
+                "Queue Deactivated, Ignore PV Undefine",
+                a_dev_desc->m_name.c_str(), a_dev_desc->m_id,
+                a_pv_desc->m_name.c_str(),
+                a_pv_desc->m_connection.c_str(),
+                a_pv_desc->m_id );
+            usleep(30000); // give syslog a chance...
+        }
     }
 }
 
 }
+
+// vim: expandtab
 

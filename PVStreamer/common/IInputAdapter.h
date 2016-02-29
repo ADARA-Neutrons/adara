@@ -29,3 +29,6 @@ protected:
 }
 
 #endif // IINPUTADAPTER_H
+
+// vim: expandtab
+

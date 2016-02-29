@@ -589,6 +589,14 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 				pkt.runNumber(), pkt.runStart());
 			if (pkt.status() != ADARA::RunStatus::STATE)
 				printf("    File index %u\n", pkt.fileNumber());
+#if 0
+			if (pkt.version() == 0x01) {
+				printf("    Paused 0x%x Pause File index %u\n",
+					pkt.paused(), pkt.pauseFileNumber());
+				printf("    Addendum 0x%x Addendum File index %u\n",
+					pkt.addendum(), pkt.addendumFileNumber());
+			}
+#endif
 		}
 	}
 
@@ -818,7 +826,7 @@ bool Parser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 
 bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
-	if ( !m_terse || m_showVars ) {
+	if ( !m_terse && m_showVars ) {
 		printf("%u.%09u U32 VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
@@ -834,7 +842,7 @@ bool Parser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 
 bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
-	if ( !m_terse || m_showVars ) {
+	if ( !m_terse && m_showVars ) {
 		printf("%u.%09u DOUBLE VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
@@ -850,7 +858,7 @@ bool Parser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 
 bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
-	if ( !m_terse || m_showVars ) {
+	if ( !m_terse && m_showVars ) {
 		printf("%u.%09u String VARIABLE (0x%x,v%u)\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"

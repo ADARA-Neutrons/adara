@@ -359,4 +359,5 @@ EnumDescriptor::print( ostream &a_out ) const
 
 }
 
+// vim: expandtab
 

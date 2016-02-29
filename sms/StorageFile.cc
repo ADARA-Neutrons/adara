@@ -35,6 +35,10 @@ struct run_status_packet {
 	uint32_t	run_number;
 	uint32_t	run_start;
 	uint32_t	status_number;
+#if 0
+	uint32_t	paused_number;
+	uint32_t	addendum_number;
+#endif
 } __attribute__((packed));
 
 off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
@@ -189,7 +193,11 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 {
 	struct run_status_packet spkt = {
 		hdr : {
+#if 0
+			payload_len : 20,
+#else
 			payload_len : 12,
+#endif
 			pkt_format : ADARA_PKT_TYPE(
 				ADARA::PacketType::RUN_STATUS_TYPE,
 				ADARA::PacketType::RUN_STATUS_VERSION ),
@@ -209,7 +217,14 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	// Ignore Paused File Number in RunStatus Packet...
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
+	// [Solved in V1 Packet Type, See Below... Yet To Be Activated... ;-]
 	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
+
+#if 0
+	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
+	spkt.addendum_number = m_addendumFileNumber
+		| ((uint32_t) m_addendum << 24);
+#endif
 
 	IoVector iovec(1);
 	iovec[0].iov_base = &spkt;
@@ -315,12 +330,78 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
+off_t StorageFile::save(IoVector &iovec, uint32_t len)
+{
+	// DEBUG("StorageFile::save() entry len=" << len
+		// << " nvecs=" << iovec.size());
+
+	struct iovec *vec = &iovec.front();
+	int nvecs = iovec.size();
+	int iovcnt;
+	ssize_t rc;
+
+	while (len) {
+		iovcnt = nvecs;
+		if (iovcnt > IOV_MAX)
+			iovcnt = IOV_MAX;
+
+		rc = writev(m_fd, vec, iovcnt);
+		if (rc <= 0) {
+			if (errno == EINTR)
+				continue;
+
+			int err = errno;
+			std::string msg("StorageFile::writev() save error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
+
+		m_size += rc;
+
+		if (rc == len)
+			break;
+
+		len -= rc;
+		while (rc) {
+			if (vec->iov_len <= (size_t) rc) {
+				rc -= vec->iov_len;
+				vec++;
+				nvecs--;
+			} else {
+				uint8_t *p = (uint8_t *) vec->iov_len;
+				p += rc;
+				vec->iov_base = p;
+				vec->iov_len -= rc;
+				break;
+			}
+		}
+	}
+
+	if (m_size >= m_max_file_size)
+		m_oversize = true;
+
+	// DEBUG("StorageFile::save() exit");
+
+	return m_size;
+}
+
+void StorageFile::terminateSave(void)
+{
+	/* Disable the generation of a sync packet as we're closing out
+	 * the file and want the run status to be the last packet.
+	 */
+	m_active = false;
+
+	put_fd();
+}
+
 StorageFile::StorageFile(OwnerPtr &owner,
 		uint32_t fileNumber, uint32_t pauseFileNumber) :
 	m_owner(owner), m_runNumber(0),
 	m_fileNumber(fileNumber), m_pauseFileNumber(pauseFileNumber),
+	m_addendumFileNumber(0),
 	m_startTime(0), m_persist(true), m_oversize(false),
-	m_active(false), m_paused(false),
+	m_active(false), m_paused(false), m_addendum(false),
 	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
@@ -395,14 +476,53 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 	return f;
 }
 
+StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
+		uint32_t dataSourceId, uint32_t saveFileNumber)
+{
+	StorageFile::SharedPtr f( new StorageFile(owner, saveFileNumber, 0) );
+
+	f->m_active = true;
+
+	StorageContainer::SharedPtr c = f->m_owner.lock();
+	char name[32];
+
+	if (!c)
+		throw std::logic_error("StorageFile save owner is empty!");
+
+	f->m_path = c->name();
+
+	snprintf(name, sizeof(name), "/ds%08u-s%08u",
+		dataSourceId, saveFileNumber);
+
+	f->m_path += name;
+
+	if (f->m_runNumber) {
+		char postfix[32];
+
+		/* 25 chars max */
+		snprintf(postfix, sizeof(postfix), "-run-%u", f->m_runNumber);
+		f->m_path += postfix;
+	}
+
+	/* +6 chars, maximum size is 38 incl NULL */
+	f->m_path += ".adara";
+
+	f->open(O_CREAT|O_EXCL|O_RDWR);
+
+	return f;
+}
+
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-		const std::string &path)
+		const std::string &path, bool &saved_file)
 {
 	fs::path p(path);
-	uint32_t fileNumber = 0, pauseFileNumber = 0, runNumber = 0;
+	uint32_t fileNumber = 0, saveFileNumber = 0, runNumber = 0;
+	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
+	uint32_t sourceId = 0;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
+	bool addendum_file = false;
 	if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
 		// DEBUG("Ignoring ADARA Paused Run file: " << p);
@@ -412,6 +532,33 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 			&fileNumber, &pauseFileNumber) == 2 ) {
 		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
+	}
+	else if ( sscanf(p.filename().c_str(), "ds%u-s%u-run-%u.adara",
+			&sourceId, &saveFileNumber, &runNumber) == 3 ) {
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream Run file: " << p);
+		saved_file = true;
+		return StorageFile::SharedPtr();
+	}
+	else if ( sscanf(p.filename().c_str(), "ds%u-s%u.adara",
+			&sourceId, &saveFileNumber) == 2 ) {
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream Non-Run file: " << p);
+		saved_file = true;
+		return StorageFile::SharedPtr();
+	}
+	// *Only* Support Addendums to Run Containers, Not Between Runs...
+	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
+			&fileNumber, &addendumFileNumber, &runNumber) == 3 ) {
+		// Verify Valid Addendum File Number...
+		if ( !addendumFileNumber ) {
+			WARN("Improperly named ADARA file (Zero Addendum File Number): "
+				<< p);
+			return StorageFile::SharedPtr();
+		}
+		// Log in StorageContainer::validate(), for Sorted Ordering... :-D
+		// DEBUG("Including ADARA Run Addendum file: " << p);
+		addendum_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
 				&fileNumber, &runNumber) != 2
@@ -445,6 +592,9 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_path = path;
 	f->open(O_RDONLY);
+
+	f->m_addendum = addendum_file;
+	f->m_addendumFileNumber = addendumFileNumber;
 
 	struct stat statbuf;
 	int err = fstat(f->m_fd, &statbuf);

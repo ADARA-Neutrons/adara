@@ -45,3 +45,6 @@ enum
 }
 
 #endif // COREDEFS_H
+
+// vim: expandtab
+

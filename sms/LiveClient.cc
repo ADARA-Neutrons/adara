@@ -210,6 +210,8 @@ void LiveClient::writable(void)
 				      << f->fileNumber()
 					  << " (pause file number "
 					  << f->pauseFileNumber() << ")"
+					  << " (addendum file number "
+					  << f->addendumFileNumber() << ")"
 					  << " for container "
 				      << cname << ": " << re.what());
 				delete this;

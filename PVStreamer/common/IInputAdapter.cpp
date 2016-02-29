@@ -12,7 +12,6 @@ IInputAdapter::IInputAdapter( StreamService &a_stream_serv )
     m_srteam_api = m_stream_serv.attach( *this );
 }
 
-
 /** \brief Destructor for IInputAdapter class.
   */
 IInputAdapter::~IInputAdapter()
@@ -20,5 +19,7 @@ IInputAdapter::~IInputAdapter()
     m_stream_serv.detach( *this );
 }
 
-
 }
+
+// vim: expandtab
+

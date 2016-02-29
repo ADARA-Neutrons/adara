@@ -104,6 +104,54 @@ void StorageContainer::notify(void)
 		m_cur_file->notify();
 }
 
+off_t StorageContainer::save(IoVector &iovec, uint32_t len,
+		uint32_t dataSourceId)
+{
+	// Verify the Saved Input Stream File for this Data Source,
+	// Create it as needed...
+	if ( dataSourceId >= m_ds_input_files.size() )
+	{
+		for ( uint32_t i = m_ds_input_files.size() ;
+				i <= dataSourceId ; i++ )
+		{
+			// Initialize the Saved Input Stream File Number
+			// for this Data Source...
+			m_ds_input_num_files.push_back( 0 );
+
+			// Create an Entry for the Saved Input Stream File
+			// for this Data Source...
+			m_ds_input_files.push_back( StorageFile::SharedPtr() );
+		}
+	}
+
+	/* We don't immediately close a file when we exceed the size limit
+	 * in order to avoid creating a new file just for the end-of-run
+	 * marker. Instead, we wait for the run to start or the next packet
+	 * to be written (and clients notified).
+	 */
+	if ( m_ds_input_files[dataSourceId]
+			&& m_ds_input_files[dataSourceId]->oversize() )
+	{
+		// Terminate Saved Input Stream File
+		// for this Data Source...
+		m_ds_input_files[dataSourceId]->terminateSave();
+		StorageManager::addBaseStorage(
+			m_ds_input_files[dataSourceId]->size());
+		m_ds_input_files[dataSourceId].reset();
+	}
+
+	if ( !m_ds_input_files[dataSourceId] )
+	{
+		// Create the Saved Input Stream File
+		// for this Data Source...
+		m_ds_input_files[dataSourceId] =
+			StorageFile::saveFile( m_weakThis, dataSourceId,
+					++(m_ds_input_num_files[dataSourceId]) );
+	}
+
+	return m_ds_input_files[dataSourceId]->save(iovec, len);
+}
+
 void StorageContainer::pause(void)
 {
 	DEBUG("Pausing StorageContainer"
@@ -183,6 +231,7 @@ void StorageContainer::markTranslated(void)
 	/* Mark this container as completed so that we don't resend it to
 	 * STS if we restart before it is purged.
 	 */
+	INFO("Marking Run " << m_runNumber << " as Successfully Translated");
 	if (createMarker(m_completed_marker))
 		ERROR("Run " << m_runNumber << " will be resent if SMS "
 		      "restarts. ");
@@ -193,6 +242,8 @@ void StorageContainer::markManual(void)
 {
 	/* Mark this container as needing manual processing.
 	 */
+	ERROR("Marking Run " << m_runNumber
+		<< " as Requiring Manual Processing!");
 	if (createMarker(m_manual_marker))
 		ERROR("Run " << m_runNumber << " will be resent if SMS "
 		      "restarts. ");
@@ -289,6 +340,7 @@ bool StorageContainer::validate(void)
 
 	std::list<StorageFile::SharedPtr>::iterator it, end = m_files.end();
 
+	uint32_t addendumExpected = 0;
 	uint32_t pauseExpected = 0;
 	uint32_t expected = 0;
 
@@ -296,16 +348,24 @@ bool StorageContainer::validate(void)
 
 	for (it = m_files.begin(); it != end; ++it) {
 
+		// DEBUG("validate(): " << (*it)->path());
+
 		// Paused Run File...
 		if ( (*it)->paused() ) {
+			// Reset Expected Addendum File Number for Any Paused File...
+			addendumExpected = 0;
 			if (!last_paused)
 				expected--;
 			if ( (*it)->fileNumber() != expected
+					|| (*it)->addendumFileNumber() != addendumExpected
 					|| (*it)->pauseFileNumber() != ++pauseExpected ) {
 				WARN("Container " << m_name
 					<< " missing Paused Run File number " << pauseExpected
 					<< " (expected Run File number " << expected
 					<< ", got " << (*it)->fileNumber() << ")"
+					<< " (expected Addendum Run File number "
+						<< addendumExpected
+					<< ", got " << (*it)->addendumFileNumber() << ")"
 					<< " [" << (*it)->path() << "]");
 				return true;
 			}
@@ -318,12 +378,25 @@ bool StorageContainer::validate(void)
 			pauseExpected = 0;
 			if (last_paused)
 				expected++;
+			if ( (*it)->addendum() ) {
+				// Log Here, In Sorted Order, Rather than in importFile()...
+				DEBUG("Including ADARA Run Addendum file: "
+					<< (*it)->path());
+				addendumExpected++;
+				expected--;
+			} else {
+				addendumExpected = 0;
+			}
 			if ( (*it)->fileNumber() != expected
+					|| (*it)->addendumFileNumber() != addendumExpected
 					|| (*it)->pauseFileNumber() != pauseExpected ) {
 				WARN("Container " << m_name
 					<< " missing Run File number " << expected
 					<< " (expected Pause Run File number " << pauseExpected
 					<< ", got " << (*it)->pauseFileNumber() << ")"
+					<< " (expected Addendum Run File number "
+						<< addendumExpected
+					<< ", got " << (*it)->addendumFileNumber() << ")"
 					<< " [" << (*it)->path() << "]");
 				return true;
 			}
@@ -339,8 +412,23 @@ bool StorageContainer::validate(void)
 static bool order_by_filenumber(StorageFile::SharedPtr &a,
 				StorageFile::SharedPtr &b)
 {
+	// O.K., Sort First by File Number...
+	// - then Any Paused Files, by Pause File Number...
+	// - then Any Addendum Files by Addendum File Number...
+	// (so the Addendum Files can "Resume" Any Preceding Paused State...!)
+
+	// Note: These 3 File Groups are _Not_ Hierarchical,
+	// the Paused and Addendum Files are *Siblings*...! ;-D
+	// So, when Pause File Numbers are changing, All Addendum Files are 0
+	// (and vice versa). Therefore, to get Paused Files listed *First*,
+	// we need to give First Priority to the Addendum Files...! :-o
+	// (which will All be 0 for the full Paused File sequence... ;-D)
+	// Whew! Clear as mud... ;-Q
+
 	return ( a->fileNumber() == b->fileNumber() ) ?
-		( a->pauseFileNumber() < b->pauseFileNumber() )
+		( ( a->addendumFileNumber() || b->addendumFileNumber() ) ?
+			( a->addendumFileNumber() < b->addendumFileNumber() )
+			: ( a->pauseFileNumber() < b->pauseFileNumber() ) )
 		: ( a->fileNumber() < b->fileNumber() );
 }
 
@@ -466,10 +554,11 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		rel_path /= *rit++;
 		rel_path /= *rit;
 
-		f = StorageFile::importFile(c, rel_path.string());
+		bool saved_file = false;
+		f = StorageFile::importFile(c, rel_path.string(), saved_file);
 		if (f)
 			c->m_files.push_back(f);
-		else
+		else if (!saved_file)
 			had_errors = true;
 	}
 
@@ -484,8 +573,11 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	/* We only need to mark this container for manual processing if
 	 * it is an untranslated run.
 	 */
-	if (had_errors && c->m_runNumber && !c->m_translated && !c->m_manual)
+	if (had_errors && c->m_runNumber && !c->m_translated && !c->m_manual) {
+		StorageManager::sendComBus(c->m_runNumber,
+			std::string("Needs Manual Translation"));
 		c->markManual();
+	}
 
 	return c;
 }

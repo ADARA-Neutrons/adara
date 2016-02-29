@@ -78,3 +78,6 @@ private:
 }}
 
 #endif // EPICS_INPUTADAPTER_H
+
+// vim: expandtab
+

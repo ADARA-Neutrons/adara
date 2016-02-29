@@ -179,15 +179,11 @@ private:
 			if (c->runNumber()) {
 				ComBusSMSMon *combus = StorageManager::combus();
 				if (c->isTranslated()) {
-					/* Send STS Succeeded Message */
-					combus->sendOriginal(c->runNumber(),
-							std::string("Rescan STS Send Succeeded"),
-							c->startTime());
+					ERROR("Rescan Run Directory Already Translated?!"
+						<< " Please Reset and Try Again...");
 				} else if (c->isManual()) {
-					/* Send STS Failed Message */
-					combus->sendOriginal(c->runNumber(),
-							std::string("Rescan Needs Manual Translation"),
-							c->startTime());
+					ERROR("Rescan Marked for Manual Processing!"
+						<< " Please Check Run Directory for Errors...");
 				} else {
 					/* Queue for Re-Translation */
 					STSClientMgr *sts = STSClientMgr::getInstance();
@@ -997,6 +993,35 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	}
 
 	// DEBUG("addPacket() exit len=" << len);
+}
+
+void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
+{
+	uint32_t len = validatePacket(iovec);
+	off_t size, blocks;
+
+	if (!m_cur_container)
+		throw std::logic_error("No container!");
+
+	size = m_cur_container->save(iovec, len, dataSourceId);
+
+	/* Is it time to initiate a purge of old data?
+	 *
+	 * m_blocks_used contains the size of all of our closed files,
+	 * and we don't add the current file until we're done with it.
+	 */
+	blocks = size + m_block_size - 1;
+	blocks /= m_block_size;
+	/* Update Max Blocks Allowed from PV... */
+	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
+		uint64_t goal = m_blocks_used + blocks;
+		goal -= m_max_blocks_allowed;
+		SMSControl *ctrl = SMSControl::getInstance();
+		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "savePacket() requestPurge! goal=" << goal);
+		requestPurge(goal);
+	}
 }
 
 void StorageManager::addPrologue(IoVector &iovec)

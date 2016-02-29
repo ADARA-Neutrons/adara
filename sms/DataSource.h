@@ -30,7 +30,7 @@ public:
 		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, unsigned int read_chunk,
-		uint32_t rtdlNoDataThresh);
+		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
 
 	bool m_readDelay;
@@ -64,6 +64,7 @@ private:
 	bool m_ignore_eop;
 	unsigned int m_max_read_chunk;
 	uint32_t m_rtdlNoDataThresh;
+	bool m_save_input_stream;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
 	boost::shared_ptr<smsStringPV> m_pvDataURI;
@@ -75,6 +76,7 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;
 	boost::shared_ptr<smsUint32PV> m_pvRTDLNoDataThresh;
+	boost::shared_ptr<smsBooleanPV> m_pvSaveInputStream;
 
 	boost::shared_ptr<smsUint32PV> m_pvPulseBandwidthSecond;
 	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthSecond;

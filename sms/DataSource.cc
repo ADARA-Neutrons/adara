@@ -14,6 +14,7 @@
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "StorageManager.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -187,7 +188,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
-					<< std::hex << " m_lastPulse=0x" << m_lastPulse
+					<< std::hex << " src=0x" << m_hwId
+					<< " m_lastPulse=0x" << m_lastPulse
 					<< " m_activePulse=0x" << m_activePulse << std::dec
 					<< " cycle=" << pkt.cycle()
 					<< " vetoFlags=" << pkt.vetoFlags());
@@ -214,8 +216,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Past (Before Facility Start Time)!"
-					<< std::hex << " pulseId=0x"
-						<< m_activePulse << std::dec
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
 					<< " (" << sec << " < " << FACILITY_START_TIME << ")"
 					<< " (" << m_name << ")");
 			}
@@ -234,8 +236,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Future (Over One Week from Now)!"
-					<< std::hex << " pulseId=0x"
-						<< m_activePulse << std::dec
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
 					<< " (" << sec << " > " << future << ")"
 					<< " (" << m_name << ")");
 			}
@@ -273,7 +275,8 @@ public:
 
 	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
 		ERROR("dumpPulseInvariants():"
-			<< std::hex << " pulseId=0x" << pkt.pulseId()
+			<< std::hex << " src=0x" << m_hwId
+			<< " pulseId=0x" << pkt.pulseId()
 				<< "(0x" << m_activePulse << ")" << std::dec
 			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
 			<< " pulseCharge=" << pkt.pulseCharge()
@@ -300,7 +303,8 @@ public:
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "checkSeq() Local Packet Sequence Out-of-Order: "
 					<< pkt.pktSeq() << " != " << m_pktSeq
-					<< std::hex << " m_activePulse=0x" << m_activePulse
+					<< std::hex << " src=0x" << m_hwId
+					<< " m_activePulse=0x" << m_activePulse
 					<< " hwId=0x" << m_hwId << std::dec);
 			}
 		} */
@@ -355,13 +359,15 @@ DataSource::DataSource(const std::string &name, bool enabled,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop,
-			unsigned int read_chunk, uint32_t rtdlNoDataThresh) :
+			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
+			bool save_input_stream) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
-	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh)
+	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
+	m_save_input_stream(save_input_stream)
 {
 	// Parse Basic Data Source Info...
 
@@ -419,6 +425,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvRTDLNoDataThresh = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":RTDLNoDataThresh"));
 
+	m_pvSaveInputStream = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":SaveInputStream"));
+
 	m_pvPulseBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthSecond"));
 
@@ -450,6 +459,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvIgnoreEoP);
 	ctrl->addPV(m_pvMaxReadChunk);
 	ctrl->addPV(m_pvRTDLNoDataThresh);
+	ctrl->addPV(m_pvSaveInputStream);
 
 	ctrl->addPV(m_pvPulseBandwidthSecond);
 	ctrl->addPV(m_pvEventBandwidthSecond);
@@ -474,6 +484,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
+	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
 	m_pvPulseBandwidthSecond->update(m_pulse_count_second, &now);
 	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
@@ -1144,6 +1155,13 @@ void DataSource::disabled(void)
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Optionally Save Input Stream to Storage Container File...
+	m_save_input_stream = m_pvSaveInputStream->value();
+	if (m_save_input_stream) {
+		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
+			m_smsSourceId);
+	}
+
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
 	static uint64_t dump_count = 0;
 	if ( !( ++dump_count % 1000000 ) ) {

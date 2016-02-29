@@ -131,6 +131,14 @@ option_default[$num_options]="100"
 option_label[$num_options]="[RTDL No Data Threshold]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="source"
+option_name[$num_options]="save_input_stream"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:SaveInputStream"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Save Input Stream]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_eop_pulse_buffer_size"
 option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
@@ -1078,11 +1086,12 @@ if [[ "$command" == "status" \
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:Recording
+		caget $WAIT -a ${PRE}:SMS:Recording
 
 		caget $WAIT ${PRE}:SMS:RunNumber
 
 		caget $WAIT ${PRE}:SMS:Summary
+		caget $WAIT -S ${PRE}:SMS:SummaryReason
 
 		echo
 
@@ -1147,6 +1156,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:IgnoreEoP
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
+					caget $WAIT ${dsprefix}:SaveInputStream
 
 				fi
 

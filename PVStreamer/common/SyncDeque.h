@@ -21,6 +21,7 @@ public:
 
     inline size_t size() const { return m_que.size(); }
 
+    bool active(void) const { return m_active; }
 
     bool get( T& a_item )
     {
@@ -98,3 +99,6 @@ private:
 };
 
 #endif
+
+// vim: expandtab
+

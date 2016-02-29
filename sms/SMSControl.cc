@@ -252,6 +252,7 @@ void SMSControl::addSource(const std::string &name,
 	unsigned int chunk_size;
 	bool ignore_eop;
 	uint32_t rtdlNoDataThresh;
+	bool save_input_stream;
 
 	uri = info.find("uri");
 	if (uri == info.not_found()) {
@@ -277,12 +278,21 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
+	save_input_stream = info.get<bool>("save_input_stream", false);
 
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Probably should also log if we're Saving All the Input Stream
+	// from this particular Data Source... (not something you'd really
+	// wanna do all the time in production... :-)
+	if (save_input_stream) {
+		DEBUG("Save Input Stream Set to True for Data Source "
+			<< name << "!");
 	}
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
@@ -294,7 +304,8 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout,
 							 ignore_eop,
 							 chunk_size,
-							 rtdlNoDataThresh));
+							 rtdlNoDataThresh,
+							 save_input_stream));
 	m_dataSources.push_back(src);
 
 	// Update Number of Data Sources PV...
@@ -332,6 +343,9 @@ SMSControl::SMSControl() :
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
 
+	m_pvSummaryReason = boost::shared_ptr<smsStringPV>(new
+						smsStringPV(prefix + ":SummaryReason"));
+
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NoEoPPulseBufferSize"));
@@ -368,6 +382,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
+	addPV(m_pvSummaryReason);
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
@@ -383,6 +398,14 @@ SMSControl::SMSControl() :
 
 	// Initialize Version PV to Usual SMS Daemon Version String...
 	m_pvVersion->update(m_version, &now);
+
+	// Initialize the System Summary Status/Reason...
+	m_summaryIsError = true;
+	m_reasonIsRunInfo = true; // Let RunInfo OverWrite Summary Reason...
+	m_reason = "System Uninitialized";
+	m_reasonLast = m_reason;
+	m_pvSummary->update(m_summaryIsError, &now);
+	m_pvSummaryReason->update(m_reason, &now);
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
@@ -483,15 +506,26 @@ bool SMSControl::setRecording(bool v)
 	clock_gettime(CLOCK_REALTIME, &now);
 	if (v) {
 		/* Starting a new recording */
-		if (!m_runInfo->valid()) {
-			ERROR("runInfo invalid, not starting");
-			m_pvSummary->update(1, &now);
+		std::string why;
+		if (!m_runInfo->valid(why)) {
+			m_summaryIsError = true;
+			m_reasonIsRunInfo = true;
+			m_reason = "Not Starting, " + why;
+			m_reasonLast = m_reason;
+			ERROR(m_reason);
+			m_pvSummary->update(m_summaryIsError, &now);
+			m_pvSummaryReason->update(m_reason, &now);
 			return false;
 		}
 
 		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
-			ERROR("Unable to increment run number, not starting");
-			m_pvSummary->update(1, &now);
+			m_summaryIsError = true;
+			m_reasonIsRunInfo = false;
+			m_reason = "Unable to Increment Run Number, Not Starting";
+			m_reasonLast = m_reason;
+			ERROR(m_reason);
+			m_pvSummary->update(m_summaryIsError, &now);
+			m_pvSummaryReason->update(m_reason, &now);
 			return false;
 		}
 
@@ -519,18 +553,30 @@ bool SMSControl::setRecording(bool v)
 			m_markers->newRun();
 			StorageManager::startRecording(m_currentRunNumber);
 		} catch (std::runtime_error e) {
-			ERROR("Unable to start recording: " << e.what());
+			m_summaryIsError = true;
+			m_reasonIsRunInfo = false;
+			std::stringstream why;
+			why << "Unable to Start Recording: " << e.what();
+			m_reason = why.str();
+			m_reasonLast = m_reason;
+			ERROR(m_reason);
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
-			m_pvSummary->update(1, &now);
+			m_pvSummary->update(m_summaryIsError, &now);
+			m_pvSummaryReason->update(m_reason, &now);
 			return false;
 		} catch (...) {
-			ERROR("Unable to start recording, unknown exception");
+			m_summaryIsError = true;
+			m_reasonIsRunInfo = false;
+			m_reason = "Unable to Start Recording, Unknown Exception";
+			m_reasonLast = m_reason;
+			ERROR(m_reason);
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
-			m_pvSummary->update(1, &now);
+			m_pvSummary->update(m_summaryIsError, &now);
+			m_pvSummaryReason->update(m_reason, &now);
 			return false;
 		}
 
@@ -550,16 +596,28 @@ bool SMSControl::setRecording(bool v)
 			m_markers->runStop();
 			StorageManager::stopRecording();
 		} catch (std::runtime_error e) {
-			ERROR("Unable to stop recording: " << e.what());
-			m_pvSummary->update(1, &now);
+			m_summaryIsError = true;
+			m_reasonIsRunInfo = false;
+			std::stringstream why;
+			why << "Unable to stop recording: " << e.what();
+			m_reason = why.str();
+			m_reasonLast = m_reason;
+			ERROR(m_reason);
+			m_pvSummary->update(m_summaryIsError, &now);
+			m_pvSummaryReason->update(m_reason, &now);
 			return false;
 		}
 		m_pvRunNumber->update(0, &now);
 		m_pvRecording->update(v, &now);
 	}
 
+	m_summaryIsError = false;
+	m_reasonIsRunInfo = true; // Let RunInfo OverWrite Summary Reason...
+	m_reason = "System Ready";
+	m_reasonLast = m_reason;
 	m_recording = v;
-	m_pvSummary->update(0, &now);
+	m_pvSummary->update(m_summaryIsError, &now);
+	m_pvSummaryReason->update(m_reason, &now);
 
 	return true;
 }
@@ -587,6 +645,34 @@ void SMSControl::resumeRecording(void)
 		INFO("Resuming data collection (not currently recording)");
 
 	StorageManager::resumeRecording();
+}
+
+void SMSControl::updateValidRunInfo(bool isValid, std::string why)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	// Set New Summary Status/Reason, Last Error was Due to RunInfo...
+	if (m_reasonIsRunInfo) {
+		if (isValid) {
+			m_reason = "System Ready, " + why;
+			m_summaryIsError = false;
+		}
+		else {
+			m_reason = "System NOT Ready, " + why;
+			m_summaryIsError = true;
+		}
+	}
+
+	// Leave Summary Status "As Is", Update Reason with Latest "Why"...
+	else {
+		m_reason = m_reasonLast + " (" + why + ")";
+	}
+
+	// Log Reason and Update Summary/Reason PVs...
+	ERROR(m_reason);
+	m_pvSummary->update(m_summaryIsError, &now);
+	m_pvSummaryReason->update(m_reason, &now);
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
