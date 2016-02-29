@@ -29,11 +29,13 @@ RateLimitedLogging::History RLLHistory_STSClientMgr;
 // Rate-Limited Logging IDs...
 #define RLL_STS_CLIENT_LOOKUP_FAILED   0
 #define RLL_STS_CONNECTION_REFUSED     1
-#define RLL_STS_UNEXPECTED_CONN_ERROR  2
-#define RLL_STS_FAILED_TO_CONNECT      3
-#define RLL_STS_CONNECTION_FAILED      4
-#define RLL_STS_CONNECTION_TIMED_OUT   5
-#define RLL_STS_BOGUS_LOOKUP_SIGNAL    6
+#define RLL_STS_CONNECTION_INTR        2
+#define RLL_STS_CONNECTION_INPROGRESS  3
+#define RLL_STS_UNEXPECTED_CONN_ERROR  4
+#define RLL_STS_FAILED_TO_CONNECT      5
+#define RLL_STS_CONNECTION_FAILED      6
+#define RLL_STS_CONNECTION_TIMED_OUT   7
+#define RLL_STS_BOGUS_LOOKUP_SIGNAL    8
 
 class MaxConnectionsPV : public smsUint32PV {
 public:
@@ -277,6 +279,20 @@ void STSClientMgr::startConnect(void)
 	m_gai.ar_request = &m_gai_hints;
 	m_gai.ar_result = NULL;
 
+	// I'm only paranoid if they're not actually out to get me... ;-D
+	DEBUG("startConnect():"
+		<< " Requesting STS Network Address and Service Translation"
+		<< " Name=" << m_node
+		<< " Service=" << m_service
+		<< " Hints: Family=" << m_gai_hints.ai_family
+			<< " (" << ( AF_INET6 ) << ")"
+		<< " Socktype=" << m_gai_hints.ai_socktype
+			<< " (" << ( SOCK_STREAM ) << ")"
+		<< " Protocol=" << m_gai_hints.ai_protocol
+			<< " (" << ( IPPROTO_TCP ) << ")"
+		<< " Flags=" << m_gai_hints.ai_flags
+			<< " (" << ( AI_CANONNAME | AI_V4MAPPED ) << ")");
+
 	rc = getaddrinfo_a(GAI_NOWAIT, &gai, 1, &m_sigevent);
 	if (rc) {
 		// *Don't* Throw Exception, But Log Potentially Non-Transient Error!
@@ -287,7 +303,8 @@ void STSClientMgr::startConnect(void)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Asynchronous Lookup Failed to Enqueue for "
+			ERROR(log_info
+				<< "Asynchronous Lookup Failed to Enqueue for STS at "
 				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
 		}
 		return;
@@ -310,7 +327,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				RLL_STS_BOGUS_LOOKUP_SIGNAL, "none",
 				600, 3, 10, log_info ) ) {
 			ERROR(log_info
-				<< "Unexpected Asynchronous Lookup Complete Signal?"
+				<< "Unexpected Asynchronous Lookup Complete Signal for STS?"
 				<< " Ignoring."
 				<< " m_connecting=" << m_connecting
 				<< " info.ssi_pid=" << info.ssi_pid
@@ -331,7 +348,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Asynchronous Lookup Failed for "
+			ERROR(log_info << "Asynchronous Lookup Failed for STS at "
 				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
 		}
 		connectFailed();
@@ -346,7 +363,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 					host, sizeof(host),
 					service, sizeof(service),
 					NI_NUMERICHOST | NI_NUMERICSERV)) {
-			DEBUG("Connecting to " << host << ":" << service);
+			DEBUG("Connecting to STS at " << host << ":" << service);
 		} else {
 			DEBUG("Connecting to STS, getnameinfo failed");
 		}
@@ -374,12 +391,27 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CONNECTION_REFUSED, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Connection refused for " << m_node
-				<< ":" << m_service);
+			ERROR(log_info << "Connection Refused for STS at "
+				<< m_node << ":" << m_service);
 		}
 		goto error;
 	case EINTR:
+		/* [PARANOID] Rate-limited logging of interrupted connection */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CONNECTION_INTR, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Connection Interrupted for STS at "
+				<< m_node << ":" << m_service << " - Ignoring...");
+		}
+		break;
 	case EINPROGRESS:
+		/* [PARANOID] Rate-limited logging of already-in-progress connect */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CONNECTION_INPROGRESS, m_node + ":" + m_service,
+				600, 3, 10, log_info ) ) {
+			ERROR(log_info << "Connection In Progress for STS at "
+				<< m_node << ":" << m_service << " - Ignoring...");
+		}
 		break;
 	case 0:
 		connectComplete();
@@ -390,8 +422,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_UNEXPECTED_CONN_ERROR, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Unexpected error from connect - "
-				<< strerror(rc));
+			ERROR(log_info << "Unexpected Error from Connect to STS at "
+				<< m_node << ":" << m_service << " - " << strerror(rc));
 		}
 		goto error;
 	}
@@ -406,6 +438,9 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	// Update Connect Timeout from PV...
 	m_connect_timeout = m_pvConnectTimeout->value();
 	m_connect_timer->start(m_connect_timeout);
+	DEBUG("Waiting for Connect to STS at "
+		<< m_node << ":" << m_service
+		<< " - Timeout " << m_connect_timeout << " Seconds");
 	return;
 
 error:
@@ -413,7 +448,8 @@ error:
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_FAILED_TO_CONNECT, m_node + ":" + m_service,
 			600, 3, 10, log_info ) ) {
-		ERROR(log_info << "Failed to initiate connection");
+		ERROR(log_info << "Failed to Initiate Connection to STS at "
+			<< m_node << ":" << m_service);
 	}
 	connectFailed();
 }
@@ -429,7 +465,7 @@ void STSClientMgr::connectComplete(void)
 
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
 	if (!rc && !err) {
-		DEBUG("Connected to STS");
+		DEBUG("Connected to STS at " << m_node << ":" << m_service);
 
 		m_fdreg.reset();
 		m_connect_timer->cancel();
@@ -450,7 +486,8 @@ void STSClientMgr::connectComplete(void)
 			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
 					600, 3, 10, log_info ) ) {
-				ERROR(log_info << "Connection to STS failed: "
+				ERROR(log_info << "Connection Failed to STS at "
+					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
 					<< " Re-Queueing run " << run->runNumber() << "... "
 					<< e.what());
@@ -466,7 +503,8 @@ void STSClientMgr::connectComplete(void)
 			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
 					600, 3, 10, log_info ) ) {
-				ERROR(log_info << "Connection to STS failed: "
+				ERROR(log_info << "Connection Failed to STS at "
+					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
 					<< " Re-Queueing run " << run->runNumber() << "... "
 					<< "Unknown Exception.");
@@ -477,7 +515,8 @@ void STSClientMgr::connectComplete(void)
 			return;
 		}
 
-		INFO("Sending run " << run->runNumber());
+		INFO("Sending run " << run->runNumber() << " to STS at "
+			<< m_node << ":" << m_service);
 		m_connecting = false;
 		startConnect();
 		return;
@@ -488,7 +527,9 @@ void STSClientMgr::connectComplete(void)
 
 	if (err == EINTR || err == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
-		DEBUG("connectComplete() odd-but-harmless exit");
+		DEBUG("connectComplete() Odd-But-Harmless Connection Failure"
+			<< " to STS at " << m_node << ":" << m_service << " - "
+			<< strerror(err) << " (" << err << ")");
 		return;
 	}
 
@@ -496,7 +537,9 @@ void STSClientMgr::connectComplete(void)
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
 			600, 3, 10, log_info ) ) {
-		ERROR(log_info << "Connection to STS failed: " << strerror(err));
+		ERROR(log_info << "Connection Failed to STS at "
+			<< m_node << ":" << m_service << " - "
+			<< strerror(err) << " (" << err << ")");
 	}
 	connectFailed();
 
@@ -522,7 +565,8 @@ bool STSClientMgr::connectTimeout(void)
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_CONNECTION_TIMED_OUT, m_node + ":" + m_service,
 			600, 3, 10, log_info ) ) {
-		ERROR(log_info << "Timed Out Connecting to STS");
+		ERROR(log_info << "Timed Out Connecting to STS at "
+			<< m_node << ":" << m_service);
 	}
 	connectFailed();
 	return false;
