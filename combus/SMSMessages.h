@@ -26,9 +26,9 @@ public:
 
     std::string         m_facility;
     std::string         m_beam_sname;
-    struct timespec	m_start_time;
+    struct timespec     m_start_time;
     unsigned long       m_run_num;
-    std::string		m_reason;
+    std::string         m_reason;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
