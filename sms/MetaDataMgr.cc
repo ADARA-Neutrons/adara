@@ -458,6 +458,74 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
 	updateVariable(mapped_dev, in.varId(), pkt, tag);
 }
 
+void MetaDataMgr::updateValue(const ADARA::VariableU32ArrayPkt &in,
+		uint32_t tag)
+{
+	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+
+	if (!mapped_dev) {
+		/* Rate-limited logging of variable device lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << in.devId() << "/" << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(U32 Array):"
+				<< " Device Lookup Failed for Variable!"
+				<< " devId=" << in.devId()
+				<< " tag=" << tag
+				<< " varId=" << in.varId());
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::VariableU32ArrayPkt> vup;
+	vup.reset(new ADARA::VariableU32ArrayPkt(in));
+	vup->remapDeviceId(mapped_dev);
+	PacketSharedPtr pkt(vup);
+
+	updateVariable(mapped_dev, in.varId(), pkt, tag);
+}
+
+void MetaDataMgr::updateValue(const ADARA::VariableDoubleArrayPkt &in,
+		uint32_t tag)
+{
+	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+
+	if (!mapped_dev) {
+		/* Rate-limited logging of unable to remap variable? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << in.devId() << "/" << tag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Double Array):"
+				<< " Device Lookup Failed for Variable!"
+				<< " devId=" << in.devId()
+				<< " tag=" << tag
+				<< " varId=" << in.varId());
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vup;
+	vup.reset(new ADARA::VariableDoubleArrayPkt(in));
+	vup->remapDeviceId(mapped_dev);
+	PacketSharedPtr pkt(vup);
+
+	updateVariable(mapped_dev, in.varId(), pkt, tag);
+}
+
 void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t var,
 				       const uint8_t *data, uint32_t size)
 {

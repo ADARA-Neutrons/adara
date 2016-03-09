@@ -26,6 +26,8 @@ public:
 	void updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag);
 	void updateValue(const ADARA::VariableDoublePkt &in, uint32_t tag);
 	void updateValue(const ADARA::VariableStringPkt &in, uint32_t tag);
+	void updateValue(const ADARA::VariableU32ArrayPkt &in, uint32_t tag);
+	void updateValue(const ADARA::VariableDoubleArrayPkt &in, uint32_t tag);
 
 	/* addFastMetaDDP() and updateMappedVariable() require the use of
 	 * the remapped device identifier from allocDev() -- they do not
