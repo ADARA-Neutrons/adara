@@ -550,7 +550,9 @@ enum PVType
     PVT_FLOAT,
     PVT_DOUBLE,
     PVT_ENUM,
-    PVT_STRING
+    PVT_STRING,
+    PVT_UINT_ARRAY,
+    PVT_DOUBLE_ARRAY
 };
 
 /// Enumerated Type structure (for PVs of type PVT_ENUM)
