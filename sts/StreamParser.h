@@ -90,6 +90,8 @@ private:
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::VariableStringPkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableU32ArrayPkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableDoubleArrayPkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
     bool        rxOversizePkt( const ADARA::PacketHeader *hdr,
@@ -190,21 +192,31 @@ StreamParser::pvValueUpdate
 
     std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find(key);
     if ( ipv == m_pvs_by_key.end() )
-        THROW_TRACE( ERR_PV_NOT_DEFINED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not defined." )
+    {
+        THROW_TRACE( ERR_PV_NOT_DEFINED,
+            "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id
+                << " not defined." )
+    }
 
     PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );
     if ( !pvinfo )
-        THROW_TRACE( ERR_CAST_FAILED, "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id << " not of correct type." )
+    {
+        THROW_TRACE( ERR_CAST_FAILED,
+            "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id
+                << " not of correct type." )
+    }
 
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
-    // Only process this update if the timestamp is newer than the last time. (m_last_time
-    // is initialized to 0, so first real update will succeed.) This will reject PV updates
-    // that are at negative time displacements and filter-out duplicate updates caused by
+    // Only process this update if the timestamp is newer than the
+    // last time. (m_last_time is initialized to 0, so first real update
+    // will succeed.) This will reject PV updates that are at negative time
+    // displacements and filter-out duplicate updates caused by
     // SMS file boundary crossings.
     if ( ts_nano > pvinfo->m_last_time )
     {
-        double t = 0; // Relative time of update in seconds from first pulse of run
+        // Relative time of update in seconds from first pulse of run
+        double t = 0;
 
         // Note: if first pulse has not arrived, truncate all PV times to 0
         if ( m_pulse_info.start_time )
@@ -216,8 +228,8 @@ StreamParser::pvValueUpdate
             }
             else if ( pvinfo->m_value_buffer.size() )
             {
-                // Because the time value is 0, erase any values recvd before now
-                // to avoid duplicate time entries.
+                // Because the time value is 0, erase any values recvd
+                // before now to avoid duplicate time entries.
                 pvinfo->m_value_buffer.clear();
                 pvinfo->m_time_buffer.clear();
                 pvinfo->m_stats.reset();
@@ -225,7 +237,8 @@ StreamParser::pvValueUpdate
         }
         else if ( pvinfo->m_value_buffer.size() )
         {
-            // If we recv multiple value updates before first pulse, keep only latest
+            // If we recv multiple value updates before first pulse,
+            // keep only latest
             pvinfo->m_value_buffer.clear();
             pvinfo->m_time_buffer.clear();
             pvinfo->m_stats.reset();
@@ -241,6 +254,19 @@ StreamParser::pvValueUpdate
             pvinfo->flushBuffers(0);
     }
 }
+
+template void StreamParser::pvValueUpdate<uint32_t>(
+    Identifier a_device_id, Identifier a_pv_id,
+    uint32_t a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate<double>(
+    Identifier a_device_id, Identifier a_pv_id,
+    double a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate< std::vector<uint32_t> >(
+    Identifier a_device_id, Identifier a_pv_id,
+    std::vector<uint32_t> a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate< std::vector<double> >(
+    Identifier a_device_id, Identifier a_pv_id,
+    std::vector<double> a_value, const timespec &a_timestamp );
 
 /*! \brief Resets "In Use" Portion of Critical Path Data Buffer Vectors.
  *  \param a_buffer - Data buffer vector

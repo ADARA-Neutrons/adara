@@ -311,6 +311,8 @@ StreamParser::rxPacket
         case ADARA::PacketType::VAR_VALUE_U32_TYPE:
         case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
         case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+        case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
+        case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
         case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
@@ -2663,8 +2665,9 @@ StreamParser::rxPacket
 /*! \brief This method processes unsigned integer Variable Update ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA unsigned integer Variable Update packets. See the pvValueUpdate() template
- * method in StreamParser.h for more details.
+ * This method processes ADARA unsigned integer Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
  */
 bool
 StreamParser::rxPacket
@@ -2672,10 +2675,12 @@ StreamParser::rxPacket
     const ADARA::VariableU32Pkt &a_pkt  ///< [in] The ADARA Variable Update packet to process
 )
 {
-    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
+
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Variable (double) packet processing
@@ -2685,8 +2690,10 @@ StreamParser::rxPacket
 /*! \brief This method processes double-prec floating point Variable Update ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA double-precision floating point Variable Update packets. See the pvValueUpdate() template
- * method in StreamParser.h for more details.
+ * This method processes ADARA double-precision floating point Variable
+ * Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
  */
 bool
 StreamParser::rxPacket
@@ -2694,10 +2701,12 @@ StreamParser::rxPacket
     const ADARA::VariableDoublePkt &a_pkt ///< [in] The ADARA Variable Update packet to process
 )
 {
-    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
+
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Variable (string) packet processing
@@ -2707,8 +2716,9 @@ StreamParser::rxPacket
 /*! \brief This method processes character string Variable Update ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA character string Variable Update packets. See the pvValueUpdate() template
- * method in StreamParser.h for more details.
+ * This method processes ADARA character string Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
  */
 bool
 StreamParser::rxPacket
@@ -2716,10 +2726,64 @@ StreamParser::rxPacket
     const ADARA::VariableStringPkt &a_pkt ///< [in] The ADARA Variable Update packet to process
 )
 {
-    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp() );
+    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp() );
 
     return false;
 }
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Variable (uint32 array) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes unsigned integer array Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA unsigned integer array Variable Update
+ * packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::VariableU32ArrayPkt &a_pkt  ///< [in] The ADARA Variable Update packet to process
+)
+{
+    pvValueUpdate< vector<uint32_t> >( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp() );
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Variable (double array) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes double-prec floating point array Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA double-precision floating point array
+ * Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::VariableDoubleArrayPkt &a_pkt ///< [in] The ADARA Variable Update packet to process
+)
+{
+    pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp() );
+
+    return false;
+}
+
 
 //---------------------------------------------------------------------------------------------------------------------
 // ADARA Stream Annotation packet processing
@@ -2989,6 +3053,10 @@ StreamParser::getPktName(
             ss << "VVP DBL"; break;
         case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
             ss << "VVP STR"; break;
+        case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
+            ss << "VVP U32 ARRAY"; break;
+        case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+            ss << "VVP DBL ARRAY"; break;
         default:
             ss << "Unknown (0x" << hex << type << dec << ")";
             break;
@@ -3025,6 +3093,10 @@ StreamParser::toPVType
         return PVT_FLOAT;
     else if ( boost::iequals( a_source, "string" ))
         return PVT_STRING;
+    else if ( boost::iequals( a_source, "integer array" ))
+        return PVT_UINT_ARRAY;
+    else if ( boost::iequals( a_source, "double array" ))
+        return PVT_DOUBLE_ARRAY;
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 
