@@ -1205,6 +1205,8 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::VAR_VALUE_U32_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
+		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
 			 */
@@ -1870,6 +1872,18 @@ bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 }
 
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
+{
+	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
+{
+	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 {
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;

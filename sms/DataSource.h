@@ -137,6 +137,8 @@ private:
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
+	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
+	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 
 	void resetBandwidthStatistics(void);
