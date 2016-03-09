@@ -83,11 +83,17 @@ public:
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
-	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
+
+	void updateValue(const ADARA::VariableU32Pkt &pkt,
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoublePkt &pkt,
-			 uint32_t sourceId);
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableStringPkt &pkt,
-			 uint32_t sourceId);
+			uint32_t sourceId);
+	void updateValue(const ADARA::VariableU32ArrayPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
+			uint32_t sourceId);
 
 	bool getRecording(void);
 

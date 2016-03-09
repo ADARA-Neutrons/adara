@@ -2150,3 +2150,15 @@ void SMSControl::updateValue(const ADARA::VariableStringPkt &pkt,
 	m_meta->updateValue(pkt, sourceId);
 }
 
+void SMSControl::updateValue(const ADARA::VariableU32ArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
