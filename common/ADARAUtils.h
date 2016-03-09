@@ -19,6 +19,7 @@
 #include <string.h>
 #include <iostream>
 #include <iomanip>
+#include <string>
 #include <sstream>
 #include <errno.h>
 
@@ -201,6 +202,152 @@ public:
 		}
 
 		return( changed );
+	}
+
+	/**
+	 * @brief Parses String List [1,2,3] into Vector of Numbers.
+	 * @param a_str - string to parse
+	 * @param a_array - vector in which to place numbers
+	 **/
+	static void parseArrayString( std::string & arrayStr,
+			std::vector<uint32_t> & arrayVec )
+	{
+		// Inspired by Jilles De Wit on StackOverflow... ;-D
+
+		std::string sep = "[, ]";
+
+		uint32_t value;
+
+		size_t b, e;
+
+		arrayVec.clear();
+
+		b = 0;
+
+		while ( b < arrayStr.length() )
+		{
+			e = arrayStr.find_first_of( sep, b );
+
+			if ( e == std::string::npos )
+				e = arrayStr.length();
+
+			// Discard Empty Tokens...
+			if ( b != e )
+			{
+				std::istringstream buffer( arrayStr.substr(b, e - b) );
+				buffer >> value;
+
+				arrayVec.push_back( value );
+
+				b = e + 1;
+			}
+
+			else b++;
+		}
+	}
+
+	/**
+	 * @brief Parses String List [1,2,3] into Vector of Numbers.
+	 * @param a_str - string to parse
+	 * @param a_array - vector in which to place numbers
+	 **/
+	static void parseArrayString( std::string & arrayStr,
+			std::vector<double> & arrayVec )
+	{
+		// Inspired by Jilles De Wit on StackOverflow... ;-D
+
+		std::string sep = "[, ]";
+
+		double value;
+
+		size_t b, e;
+
+		arrayVec.clear();
+
+		b = 0;
+
+		while ( b < arrayStr.length() )
+		{
+			e = arrayStr.find_first_of( sep, b );
+
+			if ( e == std::string::npos )
+				e = arrayStr.length();
+
+			// Discard Empty Tokens...
+			if ( b != e )
+			{
+				std::istringstream buffer( arrayStr.substr(b, e - b) );
+				buffer >> value;
+
+				arrayVec.push_back( value );
+
+				b = e + 1;
+			}
+
+			else b++;
+		}
+	}
+
+	/**
+	 * @brief Creates String List [1,2,3] from Vector of Numbers.
+	 * @param a_array - vector of numbers
+	 * @param a_str - string to create
+	 **/
+	static void printArrayString( std::vector<uint32_t> arrayVec,
+			std::string & arrayStr )
+	{
+		std::stringstream ss;
+
+		ss << "[";
+
+		std::vector<uint32_t>::iterator v;
+
+		bool first = true;
+
+		for ( v=arrayVec.begin(); v != arrayVec.end(); ++v )
+		{
+			if ( first )
+				first = false;
+			else
+				ss << ", ";
+
+			ss << *v;
+		}
+
+		ss << "]";
+
+		arrayStr = ss.str();
+	}
+
+	/**
+	 * @brief Creates String List [1,2,3] from Vector of Numbers.
+	 * @param a_array - vector of numbers
+	 * @param a_str - string to create
+	 **/
+	static void printArrayString( std::vector<double> arrayVec,
+			std::string & arrayStr )
+	{
+		std::stringstream ss;
+
+		ss << "[";
+
+		std::vector<double>::iterator v;
+
+		bool first = true;
+
+		for ( v=arrayVec.begin(); v != arrayVec.end(); ++v )
+		{
+			if ( first )
+				first = false;
+			else
+				ss << ", ";
+
+			ss << *v;
+		}
+
+		ss << "]";
+
+		arrayStr = ss.str();
 	}
 };
 
