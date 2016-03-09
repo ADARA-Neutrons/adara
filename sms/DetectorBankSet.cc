@@ -59,14 +59,14 @@ public:
 		{
 			std::string rawBanklist = value();
 
-			std::vector<uint32_t> banklist =
-				m_config->extractBankList( rawBanklist );
+			std::vector<uint32_t> banklist;
+			Utils::parseArrayString( rawBanklist, banklist );
 
-			std::string oldBanklist =
-				m_config->getBanklistStr( m_info->getBanklist() );
+			std::string oldBanklist;
+			Utils::printArrayString( m_info->getBanklist(), oldBanklist );
 
-			std::string newBanklist =
-				m_config->getBanklistStr( banklist );
+			std::string newBanklist;
+			Utils::printArrayString( banklist, newBanklist );
 
 			INFO("DetBankSetBanklistPV: Changing Detector Bank Set "
 				<< m_info->getName() << " Banks List for "
@@ -399,7 +399,9 @@ public:
 
 		m_pvName->update(m_name, &ts);
 
-		m_pvBanks->update(m_config->getBanklistStr( m_banklist ), &ts);
+		std::string banklistStr;
+		Utils::printArrayString( m_banklist, banklistStr );
+		m_pvBanks->update(banklistStr, &ts);
 
 		m_pvFormat->update(m_flags, &ts);
 
@@ -702,9 +704,11 @@ DetectorBankSet::DetectorBankSet(
 		std::string banklistStr =
 			it->second.get<std::string>("banklist", "none");
 
-		std::vector<uint32_t> banklist = extractBankList(banklistStr);
+		std::vector<uint32_t> banklist;
+		Utils::parseArrayString( banklistStr, banklist );
 
-		std::string newBanklist = getBanklistStr( banklist );
+		std::string newBanklist;
+		Utils::printArrayString( banklist, newBanklist );
 
 		tofOffset = it->second.get<uint32_t>("offset", 0);
 		tofMax = it->second.get<uint32_t>("max", -1);
@@ -799,68 +803,6 @@ DetectorBankSet::~DetectorBankSet()
 	detBankSetInfos.clear();
 
 	m_connection.disconnect();
-}
-
-// Inspired by Jilles De Wit on StackOverflow... ;-D
-std::vector<uint32_t> DetectorBankSet::extractBankList(
-		std::string banklistStr )
-{
-	std::vector<uint32_t> banklist;
-
-	std::string sep = "[, ]";
-
-	uint32_t bank;
-
-	size_t b, e;
-
-	b = 0;
-
-	while ( b < banklistStr.length() )
-	{
-		e = banklistStr.find_first_of( sep, b );
-
-		if ( e == std::string::npos )
-			e = banklistStr.length();
-
-		// Discard Empty Tokens...
-		if ( b != e )
-		{
-			std::istringstream buffer( banklistStr.substr(b, e - b) );
-			buffer >> bank;
-
-			banklist.push_back(bank);
-
-			b = e + 1;
-		}
-
-		else b++;
-	}
-
-	return banklist;
-}
-
-std::string DetectorBankSet::getBanklistStr(
-		std::vector<uint32_t> banklist )
-{
-	std::stringstream ss;
-
-	ss << "[";
-
-	bool first = true;
-	for (std::vector<uint32_t>::iterator b=banklist.begin();
-			b != banklist.end(); ++b)
-	{
-		if ( first )
-			first = false;
-		else
-			ss << ", ";
-
-		ss << *b;
-	}
-
-	ss << "]";
-
-	return ss.str();
 }
 
 bool DetectorBankSet::truncateString( std::string & str, size_t sz,
