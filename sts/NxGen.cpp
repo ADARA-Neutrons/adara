@@ -208,6 +208,16 @@ NxGen::makePVInfo
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
             a_units, *this );
+    case STS::PVT_UINT_ARRAY:
+        return new NxPVInfo< vector<uint32_t> >( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
+    case STS::PVT_DOUBLE_ARRAY:
+        return new NxPVInfo< vector<double> >( a_device_name,
+            a_name, internal_name, a_connection, internal_connection,
+            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+            a_units, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
@@ -1644,7 +1654,8 @@ NxGen::writeDeviceEnums
 /*! \brief Converts a PVType to a Nexus NXnumtype
  *  \return The most appropriate Nxnumtype for the provided PVType
  *
- * This method converts the provided PVType to a Nexus NXnumtype. Throws an exception for unkown / unsupported inputs.
+ * This method converts the provided PVType to a Nexus NXnumtype.
+ * Throws an exception for unknown / unsupported inputs.
  */
 NeXus::NXnumtype
 NxGen::toNxType
@@ -1665,6 +1676,10 @@ NxGen::toNxType
         return NeXus::FLOAT64;
     case STS::PVT_STRING:
         return NeXus::CHAR;
+    case STS::PVT_UINT_ARRAY:
+        return NeXus::UINT32;
+    case STS::PVT_DOUBLE_ARRAY:
+        return NeXus::FLOAT64;
         break;
     }
 
