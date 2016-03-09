@@ -183,6 +183,8 @@ public:
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
+	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
+	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
 
 	using ADARA::POSIXParser::rxPacket;
 
@@ -867,6 +869,50 @@ bool Parser::rxPacket(const ADARA::VariableStringPkt &pkt)
 			pkt.base_type(), pkt.version(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value().c_str());
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
+{
+	uint32_t i;
+
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u U32 ARRAY VARIABLE (0x%x,v%u)\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    Count %u Values",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.elemCount());
+		for (i = 0; i < pkt.elemCount(); i++) {
+			printf(" %u", pkt.value()[i]);
+		}
+		printf("\n");
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
+{
+	uint32_t i;
+
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u DOUBLE ARRAY VARIABLE (0x%x,v%u)\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    Count %u Values",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.elemCount());
+		for (i = 0; i < pkt.elemCount(); i++) {
+			printf(" %lf", pkt.value()[i]);
+		}
+		printf("\n");
 	}
 
 	return false;
