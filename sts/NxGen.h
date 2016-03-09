@@ -200,7 +200,9 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_string_data_cur_size(0)
+            m_string_data_cur_size(0),
+            m_uint_array_data_cur_size(0),
+            m_double_array_data_cur_size(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -249,6 +251,26 @@ private:
             std::string UNUSED(a_value) ///< String Value to Ignore
         )
         {
+        }
+
+        /// Push Uint32 Array PV Values onto Statistics...
+        void addToStats
+        (
+            std::vector<uint32_t> a_values  ///< Uint32 Array Values to Push
+        )
+        {
+            for ( uint32_t i=0 ; i < a_values.size() ; i++ )
+                this->m_stats.push(a_values[i]);
+        }
+
+        /// Push Double Array PV Values onto Statistics...
+        void addToStats
+        (
+            std::vector<double> a_values    ///< Double Array Values to Push
+        )
+        {
+            for ( uint32_t i=0 ; i < a_values.size() ; i++ )
+                this->m_stats.push(a_values[i]);
         }
 
         /// Writes Buffered Uint32 PV Values to Nexus File 
@@ -314,6 +336,90 @@ private:
                 m_nxgen.writeSlab( m_log_path + "/value",
                     data, m_string_data_cur_size );
                 m_string_data_cur_size += data.size();
+            }
+        }
+
+        /// Writes Buffered Uint32 Array PV Values to Nexus File 
+        void flushValueBuffers
+        (
+            std::vector< std::vector<uint32_t> > &value_buffer ///< Uint32 Array Buffer to Write
+        )
+        {
+            // Create Uint32 Array Meta-data in log,
+            // if no data has been written yet...
+            if ( !m_cur_size )
+            {
+                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
+                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
+            }
+
+            // Create Uint32 Array Offset, Count and Data Fields...
+            std::vector<uint32_t> offset;
+            std::vector<uint32_t> count;
+            std::vector<uint32_t> data;
+            unsigned long last_offset = m_uint_array_data_cur_size;
+            for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+            {
+                offset.push_back( last_offset );
+                last_offset += value_buffer[i].size();
+                count.push_back( value_buffer[i].size() );
+                data.reserve( data.size() + value_buffer[i].size() );
+                data.insert( data.end(),
+                    value_buffer[i].begin(), value_buffer[i].end()) ;
+            }
+
+            // Write Uint32 Array Fields to NeXus File...
+            m_nxgen.writeSlab( m_log_path + "/offset",
+                offset, m_cur_size );
+            m_nxgen.writeSlab( m_log_path + "/count",
+                count, m_cur_size );
+            if ( data.size() )
+            {
+                m_nxgen.writeSlab( m_log_path + "/value",
+                    data, m_uint_array_data_cur_size );
+                m_uint_array_data_cur_size += data.size();
+            }
+        }
+
+        /// Writes Buffered Double Array PV Values to Nexus File 
+        void flushValueBuffers
+        (
+            std::vector< std::vector<double> > &value_buffer ///< Double Array Buffer to Write
+        )
+        {
+            // Create Double Array Meta-data in log,
+            // if no data has been written yet...
+            if ( !m_cur_size )
+            {
+                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
+                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
+            }
+
+            // Create Double Array Offset, Count and Data Fields...
+            std::vector<uint32_t> offset;
+            std::vector<uint32_t> count;
+            std::vector<double> data;
+            unsigned long last_offset = m_double_array_data_cur_size;
+            for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+            {
+                offset.push_back( last_offset );
+                last_offset += value_buffer[i].size();
+                count.push_back( value_buffer[i].size() );
+                data.reserve( data.size() + value_buffer[i].size() );
+                data.insert( data.end(),
+                    value_buffer[i].begin(), value_buffer[i].end()) ;
+            }
+
+            // Write Double Array Fields to NeXus File...
+            m_nxgen.writeSlab( m_log_path + "/offset",
+                offset, m_cur_size );
+            m_nxgen.writeSlab( m_log_path + "/count",
+                count, m_cur_size );
+            if ( data.size() )
+            {
+                m_nxgen.writeSlab( m_log_path + "/value",
+                    data, m_double_array_data_cur_size );
+                m_double_array_data_cur_size += data.size();
             }
         }
 
@@ -466,6 +572,8 @@ private:
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
         uint64_t        m_string_data_cur_size;   ///< Running size of character string data value dataset
+        uint64_t        m_uint_array_data_cur_size;   ///< Running size of uint32 array data value dataset
+        uint64_t        m_double_array_data_cur_size;   ///< Running size of double array data value dataset
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
