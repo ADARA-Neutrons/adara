@@ -195,6 +195,36 @@ int main( int argc, char* argv[])
                 cout << ", alarm: " << ( fields[2] >> 16 )
                      << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
             }
+            else if ( base_type
+                    == ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE )
+            {
+                cout << "VVP: ";
+                cout << " id: " << fields[0] << "." << fields[1];
+                cout << ", count: " << fields[3];
+                cout << ", value: ";
+                for ( int i = 1; i < fields[3]; ++i )
+                {
+                    if ( i ) cout << ", ";
+                    cout << ((uint32_t*)&fields[4])[i];
+                }
+                cout << ", alarm: " << ( fields[2] >> 16 )
+                     << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+            }
+            else if ( base_type
+                    == ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE )
+            {
+                cout << "VVP: ";
+                cout << " id: " << fields[0] << "." << fields[1];
+                cout << ", count: " << fields[3];
+                cout << ", value: ";
+                for ( int i = 1; i < fields[3]; ++i )
+                {
+                    if ( i ) cout << ", ";
+                    cout << ((double*)&fields[4])[i];
+                }
+                cout << ", alarm: " << ( fields[2] >> 16 )
+                     << " [" << ( fields[2] & 0xFFFF ) << "]" << endl;
+            }
             //else if ( hdr.format == 0x400900 )
                 //cout << "  heartbeat." << endl;
             //else if ( hdr.format == 0x200 )
