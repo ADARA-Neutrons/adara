@@ -549,7 +549,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                             // - just use any value
                                             dev->definePV(
                                                 ipv->first, ipv->second,
-                                                PV_INT, 0, "" );
+                                                PV_INT, 1, 0, "" );
                                         }
                                         a_devices.push_back( dev );
                                     }
