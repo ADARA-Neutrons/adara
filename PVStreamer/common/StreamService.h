@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <string.h>
 
 #include "CoreDefs.h"
 #include "ConfigManager.h"
@@ -36,20 +37,76 @@ struct Timestamp
 struct PVState
 {
     PVState()
-        : m_uint_val(0), m_status(0), m_severity(0)
+        : m_uint_val(0),
+        m_short_array(NULL), m_long_array(NULL),
+        m_float_array(NULL), m_double_array(NULL),
+        m_elem_count(0),
+        m_status(0), m_severity(0)
     {}
 
     PVState( int16_t a_status, int16_t a_severity )
-        : m_uint_val(0), m_status(a_status), m_severity(a_severity)
+        : m_uint_val(0),
+        m_short_array(NULL), m_long_array(NULL),
+        m_float_array(NULL), m_double_array(NULL),
+        m_elem_count(0),
+        m_status(a_status), m_severity(a_severity)
     {}
+
+    PVState( const PVState & a_state )
+        : m_uint_val(a_state.m_uint_val),
+        m_short_array(NULL), m_long_array(NULL),
+        m_float_array(NULL), m_double_array(NULL),
+        m_elem_count(a_state.m_elem_count),
+        m_status(a_state.m_status), m_severity(a_state.m_severity)
+    {
+        if ( a_state.m_short_array != NULL )
+        {
+            m_short_array = new int16_t[m_elem_count];
+            memcpy( m_short_array,
+                a_state.m_short_array, m_elem_count * sizeof(int16_t) );
+        }
+        if ( a_state.m_long_array != NULL )
+        {
+            m_long_array = new int32_t[m_elem_count];
+            memcpy( m_long_array,
+                a_state.m_long_array, m_elem_count * sizeof(int32_t) );
+        }
+        if ( a_state.m_float_array != NULL )
+        {
+            m_float_array = new float[m_elem_count];
+            memcpy( m_float_array,
+                a_state.m_float_array, m_elem_count * sizeof(float) );
+        }
+        if ( a_state.m_double_array != NULL )
+        {
+            m_double_array = new double[m_elem_count];
+            memcpy( m_double_array,
+                a_state.m_double_array, m_elem_count * sizeof(double) );
+        }
+    }
+
+    ~PVState()
+    {
+        delete[] m_short_array;
+        delete[] m_long_array;
+        delete[] m_float_array;
+        delete[] m_double_array;
+    }
 
     union
     {
-        int32_t         m_int_val;    ///< Used for both int and enum type
-        uint32_t        m_uint_val;
-        double          m_real_val;
+        uint32_t        m_uint_val;   ///< Used for both uint and enum types
+        int32_t         m_int_val;
+        double          m_double_val;
     };
     std::string         m_str_val;
+
+    int16_t            *m_short_array;
+    int32_t            *m_long_array;
+    float              *m_float_array;
+    double             *m_double_array;
+
+    uint32_t            m_elem_count;
     Timestamp           m_time;
     int16_t             m_status;       ///< EPICS alarm code
     int16_t             m_severity;     ///< EPICS severity code
