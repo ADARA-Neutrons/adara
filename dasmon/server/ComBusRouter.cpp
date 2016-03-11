@@ -471,15 +471,19 @@ ComBusRouter::pvUndefined( const std::string &a_name )
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
   *
-  * This method is a callback from the StreamMonitor to indicate changes in the
-  * value or status of an unsigned integer process variable in the data stream.
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of an unsigned integer process variable in the
+  * data stream.
   * The ComBusRouter caches this information for subsequent client requests.
   */
 void
-ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name,
+        uint32_t a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( (double)a_value, a_status, a_timestamp );
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp );
 }
 
 
@@ -488,15 +492,19 @@ ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStat
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
   *
-  * This method is a callback from the StreamMonitor to indicate changes in the
-  * value or status of a double precision process variable in the data stream.
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a double precision process variable in the
+  * data stream.
   * The ComBusRouter caches this information for subsequent client requests.
   */
 void
-ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name,
+        double a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp );
 }
 
 
@@ -505,15 +513,60 @@ ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
   *
-  * This method is a callback from the StreamMonitor to indicate changes in the
-  * value or status of a string process variable in the data stream.
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a string process variable in the data stream.
   * The ComBusRouter caches this information for subsequent client requests.
   */
 void
-ComBusRouter::pvValue( const std::string &a_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name,
+        string &a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp );
+}
+
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of an unsigned integer process variable in the
+  * data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
+void
+ComBusRouter::pvValue( const std::string &a_name,
+        vector<uint32_t> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp );
+}
+
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a double precision process variable in the
+  * data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
+void
+ComBusRouter::pvValue( const std::string &a_name,
+        vector<double> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp );
 }
 
 
@@ -702,3 +755,6 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 }
 
 }}
+
+// vim: expandtab
+
