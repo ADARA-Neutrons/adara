@@ -355,7 +355,7 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 				if (isValid)
 					why << "RunInfo Invalid";
 				why << ", Missing Required ";
-				why << pv->label();
+				why << it->second->label();
 				isValid = false;
 			}
 		}
