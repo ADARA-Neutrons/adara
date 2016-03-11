@@ -36,7 +36,7 @@ public:
 	RunInfoPV(const std::string &name, const std::string &label,
 			bool isRequired, RunInfo *ri) :
 		smsStringPV(name), m_label(label), m_isRequired(isRequired),
-		m_runInfo(ri), m_unlocked(true) {}
+		m_runInfo(ri), m_unlocked(true), m_lastValid(false) {}
 
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
@@ -45,14 +45,21 @@ public:
 
 	bool isRequired(void) { return m_isRequired; }
 
+	bool lastValid(void) { return m_lastValid; }
+
 private:
 	std::string m_label;
 	bool m_isRequired;
 	RunInfo *m_runInfo;
 	bool m_unlocked;
+	bool m_lastValid;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
-	void changed(void) { m_runInfo->pvChanged(this); }
+	void changed(void)
+	{
+		m_runInfo->pvChanged(this);
+		m_lastValid = this->valid();
+	}
 };
 
 class RunUserInfoPV : public smsStringPV {
@@ -348,10 +355,14 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 	{
 		RunInfoMap::iterator it;
 		std::stringstream why;
+		bool changedValid = false;
 		bool isValid = true;
 
-		for (it = m_required.begin(); it != m_required.end(); it++) {
-			if (!it->second->valid()) {
+		for ( it = m_required.begin(); it != m_required.end(); it++ ) {
+			bool valid = it->second->valid();
+			if ( valid != it->second->lastValid() )
+				changedValid = true;
+			if (!valid) {
 				if (isValid)
 					why << "RunInfo Invalid";
 				why << ", Missing Required ";
@@ -366,7 +377,7 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 			why << " Value Set";
 		}
 
-		m_ctrl->updateValidRunInfo( isValid, why.str() );
+		m_ctrl->updateValidRunInfo( isValid, why.str(), changedValid );
 	}
 }
 
