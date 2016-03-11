@@ -409,7 +409,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CONNECTION_INPROGRESS, m_node + ":" + m_service,
 				600, 3, 10, log_info ) ) {
-			ERROR(log_info << "Connection In Progress for STS at "
+			// Apparently, This Happens A Lot... ;-Q  Make it just "Info"!
+			INFO(log_info << "Connection In Progress for STS at "
 				<< m_node << ":" << m_service << " - Ignoring...");
 		}
 		break;
