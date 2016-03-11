@@ -411,13 +411,13 @@ MainWindow::onTableTimer()
 
         ui->logTable->setRowCount( m_log_entries.size());
         row = 0;
-        for ( deque<QString>::iterator l = m_log_entries.begin(); l != m_log_entries.end(); ++l, ++row )
+        for ( deque<QString>::iterator l = m_log_entries.begin();
+                l != m_log_entries.end(); ++l, ++row )
         {
             ui->logTable->setItem( row, 0, new QTableWidgetItem( *l ) );
         }
         ui->logTable->scrollToBottom();
     }
-
 
     QMutexLocker lock( &m_mutex );
 
@@ -427,7 +427,8 @@ MainWindow::onTableTimer()
 
         ui->procStatusTable->setRowCount( m_proc_status.size());
         row = 0;
-        for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); ++p, ++row )
+        for ( map<string, ProcInfo>::iterator p = m_proc_status.begin();
+                p != m_proc_status.end(); ++p, ++row )
         {
             item[0] = new QTableWidgetItem( p->second.name );
             item[1] = new QTableWidgetItem( p->second.label );
@@ -441,7 +442,8 @@ MainWindow::onTableTimer()
     else
     {
         row = 0;
-        for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); ++p, ++row )
+        for ( map<string, ProcInfo>::iterator p = m_proc_status.begin();
+                p != m_proc_status.end(); ++p, ++row )
         {
             if ( p->second.hl_count )
             {
@@ -459,12 +461,14 @@ MainWindow::onTableTimer()
 
         ui->alertTable->setRowCount( m_alerts.size());
         int row = 0;
-        for ( map<string,AlertInfo>::iterator ia = m_alerts.begin(); ia != m_alerts.end(); ++ia, ++row )
+        for ( map<string, AlertInfo>::iterator ia = m_alerts.begin();
+                ia != m_alerts.end(); ++ia, ++row )
         {
-            item[0] = new QTableWidgetItem( ia->second.name.c_str());
-            item[1] = new QTableWidgetItem( ia->second.source.c_str());
-            item[2] = new QTableWidgetItem( ADARA::ComBus::ComBusHelper::toText( ia->second.level ));
-            item[3] = new QTableWidgetItem(ia->second.msg.c_str());
+            item[0] = new QTableWidgetItem( ia->second.name.c_str() );
+            item[1] = new QTableWidgetItem( ia->second.source.c_str() );
+            item[2] = new QTableWidgetItem(
+                ADARA::ComBus::ComBusHelper::toText( ia->second.level ) );
+            item[3] = new QTableWidgetItem(ia->second.msg.c_str() );
 
             ui->alertTable->setItem( row, 0, item[0] );
             ui->alertTable->setItem( row, 1, item[1] );
@@ -477,7 +481,8 @@ MainWindow::onTableTimer()
     else
     {
         row = 0;
-        for ( map<string,AlertInfo>::iterator ia = m_alerts.begin(); ia != m_alerts.end(); ++ia, ++row )
+        for ( map<string, AlertInfo>::iterator ia = m_alerts.begin();
+                ia != m_alerts.end(); ++ia, ++row )
         {
             if ( ia->second.hl_count )
             {
@@ -499,20 +504,28 @@ MainWindow::onTableTimer()
     }
 
     row = 0;
-    for ( map<uint32_t,MonitorInfo>::iterator im = m_monitor_rate.begin(); im != m_monitor_rate.end(); )
+    for ( map<uint32_t, MonitorInfo>::iterator im = m_monitor_rate.begin();
+            im != m_monitor_rate.end(); )
     {
-        if (( im->second.last_updated + MONITOR_ID_INACTIVE_TIMEOUT ) < now ) // After timeout, remove monitor ID entry
+        if ( ( im->second.last_updated + MONITOR_ID_INACTIVE_TIMEOUT )
+                < now ) // After timeout, remove monitor ID entry
         {
             m_monitor_rate.erase( im++ );
             ui->monitorTable->removeRow( row );
         }
         else
         {
-            if (( im->second.last_updated + MONITOR_ID_DATA_TIMEOUT ) < now ) // After no data timeout, zero rate
+            if ( ( im->second.last_updated + MONITOR_ID_DATA_TIMEOUT )
+                    < now ) // After no data timeout, zero rate
+            {
                 im->second.rate = 0;
+            }
 
-            ui->monitorTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( im->first )));
-            ui->monitorTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( im->second.rate )));
+            ui->monitorTable->setItem( row, 0,
+                new QTableWidgetItem( QString("%1").arg( im->first ) ) );
+            ui->monitorTable->setItem( row, 1,
+                new QTableWidgetItem(
+                    QString("%1").arg( im->second.rate ) ) );
             ++row;
             ++im;
         }
@@ -521,28 +534,77 @@ MainWindow::onTableTimer()
     if ( m_refresh_pv_table )
     {
         if ( ui->pvTable->rowCount() != (int)m_pvs.size() )
-            ui->pvTable->setRowCount( m_pvs.size());
+            ui->pvTable->setRowCount( m_pvs.size() );
 
-        map<string,ADARA::ComBus::DASMON::ProcessVariables::PVData>::const_iterator ipv = m_pvs.begin();
+        map<string, ADARA::ComBus::DASMON::ProcessVariables::PVData>
+            ::const_iterator ipv = m_pvs.begin();
         int i = 0;
         for ( ; ipv != m_pvs.end(); ++ipv, ++i )
         {
-            ui->pvTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( ipv->first.c_str() )));
-            if ( ipv->second.is_str )
-                ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.str_val.c_str() )));
-            else
-                ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.dbl_val )));
-            ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
-            ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
-            ui->pvTable->setItem( i, 3, new QTableWidgetItem( QDateTime::fromTime_t(ipv->second.timestamp).toString() ));
+            ui->pvTable->setItem( i, 0,
+                new QTableWidgetItem(
+                    QString("%1").arg( ipv->first.c_str() ) ) );
+
+            std::string array_str;
+
+            switch ( ipv->second.pv_type )
+            {
+                case ADARA::ComBus::DASMON::PVDT_UINT:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.uint_val ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_DOUBLE:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.dbl_val ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_STRING:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.str_val.c_str() ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_UINT_ARRAY:
+                    Utils::printArrayString( ipv->second.uint_array,
+                        array_str );
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            array_str.c_str() ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_DOUBLE_ARRAY:
+                    Utils::printArrayString( ipv->second.dbl_array,
+                        array_str );
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            array_str.c_str() ) ) );
+                    break;
+                // Unknown Data Type, Dang...
+                // - Just Default to Ugly Double... ;-b
+                default:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            (double) -999.999999 ) ) );
+                    break;
+            }
+
+            ui->pvTable->setItem( i, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    getStatusText(ipv->second.status) ) ) );
+            ui->pvTable->setItem( i, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    getStatusText(ipv->second.status) ) ) );
+            ui->pvTable->setItem( i, 3,
+                new QTableWidgetItem( QDateTime::fromTime_t(
+                    ipv->second.timestamp).toString() ) );
         }
 
         m_refresh_pv_table = false;
     }
 
-
     // Examine translation status for unresponsive or stale information
-    for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end();  )
+    for ( map<unsigned long, TransStatus>::iterator ts
+                = m_trans_status.begin();
+            ts != m_trans_status.end();  )
     {
         // Maybe leave finished info up for a diff time than unresponsive?
         if ( ts->second.last_updated + TIMEOUT_STS_INACTIVE < now )
@@ -564,41 +626,71 @@ MainWindow::onTableTimer()
         m_refresh_trans_table = false;
 
         if ( ui->transTable->rowCount() != (int)m_trans_status.size() )
-            ui->transTable->setRowCount( m_trans_status.size());
+            ui->transTable->setRowCount( m_trans_status.size() );
 
-        map<unsigned long,TransStatus>::reverse_iterator ts = m_trans_status.rbegin();
+        map<unsigned long, TransStatus>::reverse_iterator ts =
+            m_trans_status.rbegin();
         row = 0;
         for ( ; ts != m_trans_status.rend(); ++ts, ++row )
         {
-            ui->transTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( ts->first )));
-            ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1 (%2)").arg( ts->second.sts_pid.c_str() ).arg(ts->second.sts_host.c_str())));
+            ui->transTable->setItem( row, 0,
+                new QTableWidgetItem( QString("%1").arg( ts->first ) ) );
+            ui->transTable->setItem( row, 1,
+                new QTableWidgetItem( QString("%1 (%2)").arg(
+                    ts->second.sts_pid.c_str() ).arg(
+                        ts->second.sts_host.c_str() ) ) );
 
             if ( ts->second.running )
             {
-                if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
-                    ui->transTable->setItem( row, 2, new QTableWidgetItem( "Unresponsive" ));
+                if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE
+                        < now )
+                {
+                    ui->transTable->setItem( row, 2,
+                        new QTableWidgetItem( "Unresponsive" ) );
+                }
                 else
-                    ui->transTable->setItem( row, 2, new QTableWidgetItem( QString("Running - %1").arg( getStatusText( ts->second.run_status ))));
+                {
+                    ui->transTable->setItem( row, 2,
+                        new QTableWidgetItem( QString("Running - %1").arg(
+                            getStatusText( ts->second.run_status ) ) ) );
+                }
             }
             else
-                ui->transTable->setItem( row, 2, new QTableWidgetItem(QString("%1").arg( getTransStatusText( ts->second.trans_status ))));
+            {
+                ui->transTable->setItem( row, 2,
+                    new QTableWidgetItem( QString("%1").arg(
+                        getTransStatusText(
+                            ts->second.trans_status ) ) ) );
+            }
         }
     }
 
 #if 0
         m_monitor->getStatistics( m_stats );
-        ui->statisticsTable->setRowCount( m_stats.size());
+        ui->statisticsTable->setRowCount( m_stats.size() );
         row = 0;
-        for ( map<uint32_t,PktStats>::iterator p = m_stats.begin(); p != m_stats.end(); ++p, ++row )
+        for ( map<uint32_t, PktStats>::iterator p = m_stats.begin();
+                p != m_stats.end(); ++p, ++row )
         {
-            ui->statisticsTable->setItem( row, 0, new QTableWidgetItem(QString("0x%1").arg( p->first >> 8, 0, 16 )));
-            ui->statisticsTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( m_monitor->getPktName( p->first ))));
-            ui->statisticsTable->setItem( row, 2, new QTableWidgetItem(QString("%1").arg( p->second.count )));
-            ui->statisticsTable->setItem( row, 3, new QTableWidgetItem(QString("%1").arg( p->second.min_pkt_size )));
-            ui->statisticsTable->setItem( row, 4, new QTableWidgetItem(QString("%1").arg( p->second.max_pkt_size )));
-            ui->statisticsTable->setItem( row, 5, new QTableWidgetItem(QString("%1").arg( p->second.total_size )));
+            ui->statisticsTable->setItem( row, 0,
+                new QTableWidgetItem( QString("0x%1").arg(
+                    p->first >> 8, 0, 16 ) ) );
+            ui->statisticsTable->setItem( row, 1,
+                new QTableWidgetItem( QString("%1").arg(
+                    m_monitor->getPktName( p->first ) ) ) );
+            ui->statisticsTable->setItem( row, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.count ) ) );
+            ui->statisticsTable->setItem( row, 3,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.min_pkt_size ) ) );
+            ui->statisticsTable->setItem( row, 4,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.max_pkt_size ) ) );
+            ui->statisticsTable->setItem( row, 5,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.total_size ) ) );
         }
-
 #endif
 }
 
@@ -1430,9 +1522,10 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
 
-    // See if this message belogs to a sub client (by correlation id)
+    // See if this message belongs to a sub client (by correlation id)
 
-    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.getCorrelationID() );
+    map<string, SubClient*>::iterator iRoute =
+        m_client_cids.find( a_msg.getCorrelationID() );
     if ( iRoute != m_client_cids.end() )
     {
         if ( !iRoute->second->comBusControlMessage( a_msg ))
@@ -1447,7 +1540,8 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     // Process main thread commands here
     if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_PVS )
     {
-        m_pvs = ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
+        m_pvs =
+            ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
         m_refresh_pv_table = true;
     }
 }
@@ -1535,4 +1629,6 @@ MainWindow::getTransStatusText( STS::TranslationStatusCode &a_status )
     default: return "ERROR";
     }
 }
+
+// vim: expandtab
 
