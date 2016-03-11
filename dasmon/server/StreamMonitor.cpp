@@ -561,6 +561,8 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             case ADARA::PacketType::VAR_VALUE_U32_TYPE:
             case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
             case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+            case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
+            case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
             case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             case ADARA::PacketType::BANKED_EVENT_TYPE:
@@ -1149,6 +1151,10 @@ StreamMonitor::toPVType
         return PVT_STRING;
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
+    else if ( boost::iequals( a_source, "integer array" ))
+        return PVT_UINT_ARRAY;
+    else if ( boost::iequals( a_source, "double array" ))
+        return PVT_DOUBLE_ARRAY;
 
     return PVT_INT;
 }
@@ -1231,19 +1237,40 @@ StreamMonitor::rxPacket( const ADARA::DeviceDescriptorPkt &a_pkt )
                                     m_pvs.erase( ipv );
                                 }
 
+                                vector<uint32_t> uint_nada;
+                                vector<double> dbl_nada;
+
                                 switch ( pv_type )
                                 {
                                 case PVT_INT:
                                 case PVT_UINT:
                                 case PVT_ENUM:
-                                    m_pvs[key] = new PVInfo<uint32_t>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                    m_pvs[key] = new PVInfo<uint32_t>(
+                                        pv_name, a_pkt.devId(), pv_id,
+                                        pv_type, 0 );
                                     break;
                                 case PVT_FLOAT:
                                 case PVT_DOUBLE:
-                                    m_pvs[key] = new PVInfo<double>( pv_name, a_pkt.devId(), pv_id, pv_type, 0 );
+                                    m_pvs[key] = new PVInfo<double>(
+                                        pv_name, a_pkt.devId(), pv_id,
+                                        pv_type, 0 );
                                     break;
                                 case PVT_STRING:
-                                    m_pvs[key] = new PVInfo<string>( pv_name, a_pkt.devId(), pv_id, pv_type, "" );
+                                    m_pvs[key] = new PVInfo<string>(
+                                        pv_name, a_pkt.devId(), pv_id,
+                                        pv_type, "" );
+                                    break;
+                                case PVT_UINT_ARRAY:
+                                    m_pvs[key] =
+                                        new PVInfo< vector<uint32_t> >(
+                                            pv_name, a_pkt.devId(), pv_id,
+                                            pv_type, uint_nada );
+                                    break;
+                                case PVT_DOUBLE_ARRAY:
+                                    m_pvs[key] =
+                                        new PVInfo< vector<double> >(
+                                            pv_name, a_pkt.devId(), pv_id,
+                                            pv_type, dbl_nada );
                                     break;
                                 }
 
@@ -1279,7 +1306,8 @@ StreamMonitor::rxPacket( const ADARA::VariableU32Pkt &a_pkt )
 {
     m_proc_state = TS_PKT_VAR_VALUE_U32;
 
-    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+    pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -1293,7 +1321,8 @@ StreamMonitor::rxPacket( const ADARA::VariableDoublePkt &a_pkt )
 {
     m_proc_state = TS_PKT_VAR_VALUE_DOUBLE;
 
-    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+    pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -1307,7 +1336,38 @@ StreamMonitor::rxPacket( const ADARA::VariableStringPkt &a_pkt )
 {
     m_proc_state = TS_PKT_VAR_VALUE_STRING;
 
-    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(), a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+    pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA variable update packet (uint32 array)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::VariableU32ArrayPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_U32_ARRAY;
+
+    pvValueUpdate< vector<uint32_t> >( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA variable update packet (double array)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::VariableDoubleArrayPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_DOUBLE_ARRAY;
+
+    pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
+        a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
 
     return false;
 }
@@ -1316,9 +1376,9 @@ StreamMonitor::rxPacket( const ADARA::VariableStringPkt &a_pkt )
 /**
  * \brief Process variable update method.
  *
- * This is a template method that handles PV updates. Updates are rate-limited and
- * listeners are notified as appropriate. Updates received before first pulse are
- * set to t-zero.
+ * This is a template method that handles PV updates. Updates are
+ * rate-limited and listeners are notified as appropriate.
+ * Updates received before first pulse are set to t-zero.
  */
 template<class T>
 void
@@ -1341,26 +1401,181 @@ StreamMonitor::pvValueUpdate
     if ( ipv == m_pvs.end() )
         return;
 
-    // TODO This is a rate-limit HACK, needs to be MUCH more sophistacated!
+    // TODO This is a rate-limit HACK, needs to be MUCH more sophisticated!
     // Don't rate limit status changes
-    if (( a_timestamp.tv_sec - ipv->second->m_time >= 1 ) || ( ipv->second->m_status != a_status ))
+    if ( ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
+            || ( ipv->second->m_status != a_status ) )
     {
         PVInfo<T> *pv = dynamic_cast<PVInfo<T> *>(ipv->second);
-        if ( pv && (( pv->m_time == 0 ) || ( pv->m_value != a_value ) || ( pv->m_status != a_status )))
+        if ( pv )
         {
-            pv->m_value = a_value;
-            pv->m_time = a_timestamp.tv_sec;
-            pv->m_status = a_status;
-            pv->m_updated = true;
-            m_notify.pvValue( pv->m_name, a_value, a_status, pv->m_time );
+            bool changed = false;
+
+            if ( ( pv->m_time == 0 ) || ( pv->m_status != a_status ) )
+                changed = true;
+
+            else if ( pv->m_value != a_value )
+                changed = true;
+
+            if ( changed )
+            {
+                pv->m_value = a_value;
+                pv->m_time = a_timestamp.tv_sec;
+                pv->m_status = a_status;
+                pv->m_updated = true;
+                m_notify.pvValue( pv->m_name, a_value, a_status,
+                    pv->m_time );
+            }
         }
     }
 }
 
-template void StreamMonitor::pvValueUpdate<uint32_t>( Identifier a_device_id, Identifier a_pv_id, uint32_t a_value,
-    const timespec &a_timestamp, VariableStatus::Enum a_status);
-template void StreamMonitor::pvValueUpdate<double>( Identifier a_device_id, Identifier a_pv_id, double a_value,
-    const timespec &a_timestamp, VariableStatus::Enum a_status);
+
+/**
+ * \brief Process variable update method.
+ *
+ * This is a template method that handles PV updates. Updates are
+ * rate-limited and listeners are notified as appropriate.
+ * Updates received before first pulse are set to t-zero.
+ */
+void
+StreamMonitor::pvValueUpdate
+(
+    Identifier      a_device_id,
+    Identifier      a_pv_id,
+    vector<uint32_t> a_value,
+    const timespec &a_timestamp,
+    VariableStatus::Enum a_status
+)
+{
+    PVKey   key(a_device_id,a_pv_id);
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
+
+    // TODO Alert - bad stream packet (got value w/o ddp)
+    if ( ipv == m_pvs.end() )
+        return;
+
+    // TODO This is a rate-limit HACK, needs to be MUCH more sophisticated!
+    // Don't rate limit status changes
+    if ( ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
+            || ( ipv->second->m_status != a_status ) )
+    {
+        PVInfo< vector<uint32_t> > *pv =
+            dynamic_cast<PVInfo< vector<uint32_t> > *>(ipv->second);
+
+        if ( pv )
+        {
+            bool changed = false;
+
+            if ( ( pv->m_time == 0 ) || ( pv->m_status != a_status ) )
+                changed = true;
+
+            else if ( pv->m_value.size() != a_value.size() )
+                changed = true;
+
+            else
+            {
+                for ( uint32_t i=0 ; i < pv->m_value.size() ; ++i )
+                {
+                    if ( pv->m_value[i] != a_value[i] )
+                        changed = true;
+                }
+            }
+
+            if ( changed )
+            {
+                pv->m_value = a_value;
+                pv->m_time = a_timestamp.tv_sec;
+                pv->m_status = a_status;
+                pv->m_updated = true;
+                m_notify.pvValue( pv->m_name, a_value, a_status,
+                    pv->m_time );
+            }
+        }
+    }
+}
+
+
+/**
+ * \brief Process variable update method.
+ *
+ * This is a template method that handles PV updates. Updates are
+ * rate-limited and listeners are notified as appropriate.
+ * Updates received before first pulse are set to t-zero.
+ */
+void
+StreamMonitor::pvValueUpdate
+(
+    Identifier      a_device_id,
+    Identifier      a_pv_id,
+    vector<double>  a_value,
+    const timespec &a_timestamp,
+    VariableStatus::Enum a_status
+)
+{
+    PVKey   key(a_device_id,a_pv_id);
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs.find(key);
+
+    // TODO Alert - bad stream packet (got value w/o ddp)
+    if ( ipv == m_pvs.end() )
+        return;
+
+    // TODO This is a rate-limit HACK, needs to be MUCH more sophisticated!
+    // Don't rate limit status changes
+    if ( ( a_timestamp.tv_sec - ipv->second->m_time >= 1 )
+            || ( ipv->second->m_status != a_status ) )
+    {
+        PVInfo< vector<double> > *pv =
+            dynamic_cast<PVInfo< vector<double> > *>(ipv->second);
+
+        if ( pv )
+        {
+            bool changed = false;
+
+            if ( ( pv->m_time == 0 ) || ( pv->m_status != a_status ) )
+                changed = true;
+
+            else if ( pv->m_value.size() != a_value.size() )
+                changed = true;
+
+            else
+            {
+                for ( uint32_t i=0 ; i < pv->m_value.size() ; ++i )
+                {
+                    if ( pv->m_value[i] != a_value[i] )
+                        changed = true;
+                }
+            }
+
+            if ( changed )
+            {
+                pv->m_value = a_value;
+                pv->m_time = a_timestamp.tv_sec;
+                pv->m_status = a_status;
+                pv->m_updated = true;
+                m_notify.pvValue( pv->m_name, a_value, a_status,
+                    pv->m_time );
+            }
+        }
+    }
+}
+
+
+template void StreamMonitor::pvValueUpdate<uint32_t>(
+    Identifier a_device_id, Identifier a_pv_id, uint32_t a_value,
+    const timespec &a_timestamp, VariableStatus::Enum a_status );
+template void StreamMonitor::pvValueUpdate<double>(
+    Identifier a_device_id, Identifier a_pv_id, double a_value,
+    const timespec &a_timestamp, VariableStatus::Enum a_status );
+template void StreamMonitor::pvValueUpdate<string>(
+    Identifier a_device_id, Identifier a_pv_id, string a_value,
+    const timespec &a_timestamp, VariableStatus::Enum a_status );
 
 
 /**
@@ -1479,8 +1694,12 @@ StreamMonitor::dbThread()
                         case PVT_ENUM:
                             int_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<uint32_t>*)(ipvm->second))->m_value ));
                             break;
+                        case PVT_DOUBLE_ARRAY:
+                        case PVT_UINT_ARRAY:
                         case PVT_STRING:
-                            continue; // Web monitor db does not support strings yet
+                            // Web monitor db does not support strings yet
+                            // Nor Integer or Double Arrays...!
+                            continue;
                         }
                     }
                 }
@@ -1620,33 +1839,44 @@ StreamMonitor::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
         a_value = "";
 }
 
-//////////////////////////////////////////////////////////////////////////////
-// Notifier Class Imple
+///////////////////////////////////////////////////////////////////////////
+// Notifier Class Implementation
 
 void
 StreamMonitor::Notifier::addListener( IStreamListener &a_listener )
 {
-    //TODO These calls are not thread safe, but not a problame based on current usage
-    if ( find( m_listeners.begin(), m_listeners.end(), &a_listener ) == m_listeners.end())
+    //TODO These calls are not thread safe,
+    //but not a problame based on current usage
+    if ( find( m_listeners.begin(), m_listeners.end(), &a_listener )
+            == m_listeners.end() )
+    {
         m_listeners.push_back( &a_listener );
+    }
 }
 
 void
 StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 {
-    //TODO These calls are not thread safe, but not a problame based on current usage
-    vector<IStreamListener*>::iterator l = find( m_listeners.begin(), m_listeners.end(), &a_listener );
+    //TODO These calls are not thread safe,
+    //but not a problame based on current usage
+    vector<IStreamListener*>::iterator l =
+        find( m_listeners.begin(), m_listeners.end(), &a_listener );
     if ( l != m_listeners.end())
         m_listeners.erase(l);
 }
 
 void
-StreamMonitor::Notifier::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
+StreamMonitor::Notifier::runStatus( bool a_recording,
+        uint32_t a_run_number, uint32_t a_timestamp )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_RUN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->runStatus( a_recording, a_run_number, a_timestamp );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1656,8 +1886,12 @@ StreamMonitor::Notifier::beginProlog()
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_BEGIN_PROLOG;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->beginProlog();
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1667,8 +1901,12 @@ StreamMonitor::Notifier::endProlog()
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_END_PROLOG;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->endProlog();
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1678,19 +1916,28 @@ StreamMonitor::Notifier::pauseStatus( bool a_paused )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PAUSE_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pauseStatus( a_paused );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
-StreamMonitor::Notifier::scanStatus( bool a_scanning, uint32_t a_scan_number )
+StreamMonitor::Notifier::scanStatus( bool a_scanning,
+        uint32_t a_scan_number )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_SCAN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->scanStatus( a_scanning, a_scan_number );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1700,8 +1947,12 @@ StreamMonitor::Notifier::beamInfo( const BeamInfo &a_info )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_BEAM_INFO;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->beamInfo( a_info );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1711,8 +1962,12 @@ StreamMonitor::Notifier::runInfo( const RunInfo &a_info )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_RUN_INFO;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->runInfo( a_info );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1723,8 +1978,12 @@ StreamMonitor::Notifier::beamMetrics( const BeamMetrics &a_metrics )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_BEAM_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->beamMetrics( a_metrics );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1734,8 +1993,12 @@ StreamMonitor::Notifier::runMetrics( const RunMetrics &a_metrics )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_RUN_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->runMetrics( a_metrics );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1745,8 +2008,12 @@ StreamMonitor::Notifier::streamMetrics( const StreamMetrics &a_metrics )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_STREAM_METRICS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->streamMetrics( a_metrics );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1756,8 +2023,12 @@ StreamMonitor::Notifier::pvDefined( const std::string &a_name )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_DEF;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pvDefined( a_name );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
@@ -1767,55 +2038,118 @@ StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_UNDEF;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pvUndefined( a_name );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamMonitor::Notifier::pvValue( const std::string &a_name,
+        uint32_t a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_UINT;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamMonitor::Notifier::pvValue( const std::string &a_name,
+        double a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_DBL;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
-StreamMonitor::Notifier::pvValue( const std::string &a_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamMonitor::Notifier::pvValue( const std::string &a_name,
+        string &a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_STR;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 void
-StreamMonitor::Notifier::connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port )
+StreamMonitor::Notifier::pvValue( const std::string &a_name,
+        vector<uint32_t> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_UINT_ARRAY;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
+        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+    }
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
+}
+
+void
+StreamMonitor::Notifier::pvValue( const std::string &a_name,
+        vector<double> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_DBL_ARRAY;
+
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
+        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+    }
+
+    StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
+}
+
+void
+StreamMonitor::Notifier::connectionStatus( bool a_connected,
+        const std::string &a_host, unsigned short a_port )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_CONN_STATUS;
 
-    for ( vector<IStreamListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l, StreamMonitor::m_notify_state += 1000 )
+    for ( vector<IStreamListener*>::iterator l = m_listeners.begin();
+            l != m_listeners.end();
+            ++l, StreamMonitor::m_notify_state += 1000 )
+    {
         (*l)->connectionStatus( a_connected, a_host, a_port );
+    }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
 }
 
 }}
+
+// vim: expandtab
 
