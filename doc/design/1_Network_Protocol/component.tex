@@ -2794,9 +2794,9 @@ unsigned 32 bit integer (u32) values for this variable.
     \bitbox{16}{Status} &
     \bitbox{16}{Severity} \\
 	\wordbox{1}{Element Count (``$N$'', u32)} \\
-    \wordbox{1}{Variable Value - Array Element 1 (IEEE 754 double)} \\
-    \wordbox{1}{. . .} \\
-    \wordbox{1}{Variable Value - Array Element ``$N$'' (IEEE 754 double)} \\
+    \wordbox{2}{Variable Value - Array Element 1 (IEEE 754 double)} \\
+    \wordbox{2}{. . .} \\
+    \wordbox{2}{Variable Value - Array Element ``$N$'' (IEEE 754 double)} \\
   \end{bytefield}
   \caption{Packet Type 0x8005.0: Variable Value (Double Array) Packet}
   \label{fig:protocol_packet_value_double_array}
