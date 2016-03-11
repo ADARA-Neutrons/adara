@@ -1076,22 +1076,30 @@ StreamAnalyzer::pvUndefined( const std::string &a_pv_name )
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
   *
-  * This method is called when a PV value or status changes. If status is
-  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
-  * with associated value. Status is processed by a call to porcessPVStatus().
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
   */
 void
-StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_name,
+        uint32_t a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    {
         m_engine->retract( m_pv_prefix + pv_name );
+    }
     else
+    {
         m_engine->assert( m_pv_prefix + pv_name, a_value );
+    }
 
     processPvStatus( pv_name, a_status, false );
 }
@@ -1103,22 +1111,30 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
   *
-  * This method is called when a PV value or status changes. If status is
-  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
-  * with associated value. Status is processed by a call to porcessPVStatus().
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
   */
 void
-StreamAnalyzer::pvValue( const std::string &a_pv_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        double a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
         m_engine->retract( m_pv_prefix + pv_name );
+    }
     else
+    {
         m_engine->assert( m_pv_prefix + pv_name, a_value );
+    }
 
     processPvStatus( pv_name, a_status, false );
 }
@@ -1134,18 +1150,109 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name, double a_value, VariableS
   * are converted to "booleans" - true if not empty, false otherwise
   */
 void
-StreamAnalyzer::pvValue( const std::string &a_pv_name, string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        string &a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
 {
     (void)a_timestamp;
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
         m_engine->retract( m_pv_prefix + pv_name );
+    }
     else
-        m_engine->assert( m_pv_prefix + pv_name, a_value.empty()?0.0:1.0 );
+    {
+        m_engine->assert( m_pv_prefix + pv_name,
+            a_value.empty() ? 0.0 : 1.0 );
+    }
 
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a integer PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
+  *
+  * Numerical array values are collapsed to scalars, using only
+  * the *First Array Element* for Rule-based usage. Anything more
+  * sophisticated will have to be implemented in "Version 2.0", lol... :-D
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_name,
+        vector<uint32_t> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    (void)a_timestamp;
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_name );
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    {
+        m_engine->retract( m_pv_prefix + pv_name );
+    }
+    else
+    {
+        uint32_t scalar_value = -1;
+        if ( a_value.size() > 0 )
+            scalar_value = a_value[0];
+        m_engine->assert( m_pv_prefix + pv_name, scalar_value );
+    }
+
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a double PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
+  *
+  * Numerical array values are collapsed to scalars, using only
+  * the *First Array Element* for Rule-based usage. Anything more
+  * sophisticated will have to be implemented in "Version 2.0", lol... :-D
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        vector<double> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp )
+{
+    (void)a_timestamp;
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_pv_name );
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
+        m_engine->retract( m_pv_prefix + pv_name );
+    }
+    else
+    {
+        double scalar_value = -1.0;
+        if ( a_value.size() > 0 )
+            scalar_value = a_value[0];
+        m_engine->assert( m_pv_prefix + pv_name, scalar_value );
+    }
 
     processPvStatus( pv_name, a_status, false );
 }
@@ -1283,3 +1390,6 @@ StreamAnalyzer::onRetract( const std::string &a_fact )
 }
 
 }}
+
+// vim: expandtab
+

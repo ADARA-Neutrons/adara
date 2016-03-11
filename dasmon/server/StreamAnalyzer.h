@@ -17,7 +17,8 @@ namespace ADARA {
 namespace DASMON {
 
 
-class StreamAnalyzer: public IStreamListener, public RuleEngine::IFactListener
+class StreamAnalyzer
+    : public IStreamListener, public RuleEngine::IFactListener
 {
 public:
     class ISignalListener
@@ -27,7 +28,8 @@ public:
         virtual void    signalRetract( const std::string &a_name ) = 0;
     };
 
-    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_file );
+    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor,
+        const std::string &a_cfg_file );
     virtual ~StreamAnalyzer();
 
     void    setConfigSource( const std::string &a_file );
@@ -38,8 +40,13 @@ public:
     void    attach( ISignalListener &a_listener );
     void    detach( ISignalListener &a_listener );
     void    resendState();
-    void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
-    bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals, std::map<std::string,std::string> &a_errors );
+    void    getDefinitions(
+                std::vector<RuleEngine::RuleInfo> &a_rules,
+                std::vector<SignalInfo> &a_signals );
+    bool    setDefinitions(
+                const std::vector<RuleEngine::RuleInfo> &a_rules,
+                const std::vector<SignalInfo> &a_signals,
+                std::map<std::string,std::string> &a_errors );
     void    getInputFacts( std::set<std::string> &a_facts ) const;
     void    assertFact( const std::string &a_fact );
     template<class T>
@@ -47,7 +54,10 @@ public:
     void    retractFact( const std::string &a_fact );
 
 private:
-    std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );
+    std::map<std::string,SignalInfo>::iterator
+            findByName(
+                std::map<std::string,SignalInfo> &a_map,
+                std::string a_name );
 
     enum BIF
     {
@@ -88,7 +98,8 @@ private:
     };
 
     // IStreamListener Interface
-    void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
+    void runStatus( bool a_recording,
+             uint32_t a_run_number, uint32_t a_timestamp );
     void beginProlog();
     void endProlog();
     void pauseStatus( bool a_paused );
@@ -100,16 +111,30 @@ private:
     void streamMetrics( const StreamMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvUndefined( const std::string &a_name );
-    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
+    void pvValue( const std::string &a_name,
+             uint32_t a_value,
+             VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name,
+             double a_value,
+             VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name,
+             std::string &a_value,
+             VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name,
+             std::vector<uint32_t> a_value,
+             VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void pvValue( const std::string &a_name,
+             std::vector<double> a_value,
+             VariableStatus::Enum a_status, uint32_t a_timestamp );
+    void connectionStatus( bool a_connected,
+             const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface
     void onAssert( const std::string &a_fact );
     void onRetract( const std::string &a_fact );
 
-    void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
+    void processPvStatus( const std::string &pv_name,
+             VariableStatus::Enum a_status, bool a_retracted );
     void beginBatch( uint32_t a_mask );
     void endBatch( uint32_t a_mask );
 
@@ -135,3 +160,6 @@ private:
 }}
 
 #endif // RULEENGINE_H
+
+// vim: expandtab
+
