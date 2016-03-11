@@ -647,7 +647,8 @@ void SMSControl::resumeRecording(void)
 	StorageManager::resumeRecording();
 }
 
-void SMSControl::updateValidRunInfo(bool isValid, std::string why)
+void SMSControl::updateValidRunInfo(bool isValid, std::string why,
+		bool changedValid)
 {
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -669,8 +670,13 @@ void SMSControl::updateValidRunInfo(bool isValid, std::string why)
 		m_reason = m_reasonLast + " (" + why + ")";
 	}
 
-	// Log Reason and Update Summary/Reason PVs...
-	ERROR(m_reason);
+	// Log Reason, Hard if the Valid Status Changed, else just "Info"...
+	if (changedValid)
+		ERROR(m_reason);
+	else
+		INFO(m_reason);
+
+	// Update Summary/Reason PVs...
 	m_pvSummary->update(m_summaryIsError, &now);
 	m_pvSummaryReason->update(m_reason, &now);
 }

@@ -100,7 +100,8 @@ public:
 	void pauseRecording(void);
 	void resumeRecording(void);
 
-	void updateValidRunInfo(bool isValid, std::string why);
+	void updateValidRunInfo(bool isValid, std::string why,
+			bool changedValid);
 
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
