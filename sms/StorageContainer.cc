@@ -93,9 +93,22 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 
 void StorageContainer::terminate(void)
 {
+	// Clean Up & Close Latest Data File
 	m_active = false;
 	if (m_cur_file)
 		terminateFile();
+	
+	// Clean Up & Close DataSource Saved Input Stream Files, Too!
+	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+	{
+		// Terminate Saved Input Stream File for this Data Source...
+		if ( m_ds_input_files[i] )
+		{
+			m_ds_input_files[i]->terminateSave();
+			StorageManager::addBaseStorage( m_ds_input_files[i]->size() );
+			m_ds_input_files[i].reset();
+		}
+	}
 }
 
 void StorageContainer::notify(void)
