@@ -1,4 +1,4 @@
-#!/bin/bash
+bin/bash
 #
 # Deploy ADARA Programs
 #
@@ -1102,6 +1102,8 @@ ls -l | tee -a $LOG
 
 # Update the Deployment History File with a Proper Log!
 
+need_sms_subdir=0
+
 if [ $IS_STS == 1 ]; then
 	deploy_history_base="sts.deployment.history.txt"
 elif [ $IS_PVSD == 1 ]; then
@@ -1110,9 +1112,70 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	deploy_history_base="dasmon.deployment.history.txt"
 else
 	deploy_history_base="sms/deployment.history.txt"
+	need_sms_subdir=1
 fi
 
 deploy_history="$INSTALL_BASE/$CONFIG/$deploy_history_base"
+
+# Make sure SMS Sub-Directory exists for Deployment History, as needed...
+
+if [ $need_sms_subdir == 1 ]; then
+
+	if [ ! -d "sms" ]; then
+
+		echo -e "\nSMS Config Sub-Directory Not Found.\n" | tee -a $LOG
+
+		echo -e "Creating SMS Config Sub-Directory:\n" \
+			| tee -a $LOG
+		echo "   $adara_config/sms" | tee -a $LOG
+
+		mkdir -p "$adara_config/sms" |& tee -a $LOG
+
+		mkdir_ok=$?
+
+		if [ $mkdir_ok != 0 ]; then
+			echo -e \
+				"\nError Making SMS Config Sub-Directory! ($mkdir_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -17
+		fi
+
+		echo -e "\nNew SMS Config Sub-Directory to Commit:\n" | tee -a $LOG
+
+		ls -ld "$adara_config/sms" |& tee -a $LOG
+		echo | tee -a $LOG
+
+		echo "git add sms" | tee -a $LOG
+		git add sms |& tee -a $LOG
+
+		add_ok=$?
+
+		if [ $add_ok != 0 ]; then
+			echo -e \
+		"\nError Adding New SMS Config Sub-Directory to Git! ($add_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -18
+		fi
+
+		echo -e "\nCommitting New SMS Config Sub-Directory\n" | tee -a $LOG
+		echo "git commit -F - sms" | tee -a $LOG
+
+		echo -e "New SMS Config Sub-Directory" \
+			| git commit -F - sms |& tee -a $LOG
+
+		commit_ok=$?
+
+		if [ $commit_ok != 0 ]; then
+			echo -e \
+		"\nError Committing New SMS Config Sub-Directory! ($commit_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -185
+		fi
+	fi
+fi
 
 # Create the History file, if it doesn't exist...
 
