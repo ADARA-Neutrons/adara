@@ -374,8 +374,9 @@ elif [[ -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ]]; then
 		"\nDo you want to Re-Build the Installation...? (yes/No/quit) "
 
 	read rebuild_ck
+	rebuild_ck=`echo "$rebuild_ck" | tr '[:upper:]' '[:lower:]'`
 
-	if [ "#$rebuild_ck#" == '#yes#' ]; then
+	if [[ "#$rebuild_ck#" == '#y#' || "#$rebuild_ck#" == '#yes#' ]]; then
 
 		echo -e \
 			"\nRe-Building Release Tag $release_tag at User's Request." \
@@ -804,8 +805,9 @@ if [ $tag_ok != 0 ]; then
 	echo -n "(yes/No/quit)? "
 
 	read mkbranch_ck
+	mkbranch_ck=`echo "$mkbranch_ck" | tr '[:upper:]' '[:lower:]'`
 
-	if [ "#$mkbranch_ck#" == '#yes#' ]; then
+	if [[ "#$mkbranch_ck#" == '#y#' || "#$mkbranch_ck#" == '#yes#' ]]; then
 
 		echo -e "\nCreating New Git $HOST_TYPE Install Branch:" \
 			| tee -a $LOG
@@ -870,8 +872,10 @@ if [ $tag_ok != 0 ]; then
 		echo -e -n "\nOk to Proceed (yes/No/quit) "
 
 		read proceed_ck
+		proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
 
-		if [ "#$proceed_ck#" != '#yes#' ]; then
+		if [[ "#$proceed_ck#" == '#y#'
+				|| "#$proceed_ck#" == '#yes#' ]]; then
 			echo -e "\nExiting Deploy Script at User's Request." \
 				| tee -a $LOG
 			exit 0
@@ -1380,8 +1384,9 @@ if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 		"\nDo You want to Restart the $PROG service now [yes/No]? "
 
 	read restart_ck
+	restart_ck=`echo "$restart_ck" | tr '[:upper:]' '[:lower:]'`
 
-	if [ "#$restart_ck#" == '#yes#' ]; then
+	if [[ "#$restart_ck#" == '#y#' || "#$restart_ck#" == '#yes#' ]]; then
 
 		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
@@ -1413,8 +1418,9 @@ elif [[ $PROG == "DASMON_Server" || $PROG == "DASMON_Client" ]]; then
 		"\nDo You want to Restart the $PROG service now [yes/No]? "
 
 	read restart_ck
+	restart_ck=`echo "$restart_ck" | tr '[:upper:]' '[:lower:]'`
 
-	if [ "#$restart_ck#" == '#yes#' ]; then
+	if [[ "#$restart_ck#" == '#y#' || "#$restart_ck#" == '#yes#' ]]; then
 
 		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
