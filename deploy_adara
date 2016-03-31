@@ -874,8 +874,8 @@ if [ $tag_ok != 0 ]; then
 		read proceed_ck
 		proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
 
-		if [[ "#$proceed_ck#" == '#y#'
-				|| "#$proceed_ck#" == '#yes#' ]]; then
+		if [[ "$proceed_ck" == "" || "$proceed_ck" == "n"
+				|| "$proceed_ck" == "no" ]]; then
 			echo -e "\nExiting Deploy Script at User's Request." \
 				| tee -a $LOG
 			exit 0
