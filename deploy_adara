@@ -1163,21 +1163,9 @@ if [ $need_sms_subdir == 1 ]; then
 			exit -18
 		fi
 
-		echo -e "\nCommitting New SMS Config Sub-Directory\n" | tee -a $LOG
-		echo "git commit -F - sms" | tee -a $LOG
-
-		echo -e "New SMS Config Sub-Directory" \
-			| git commit -F - sms |& tee -a $LOG
-
-		commit_ok=$?
-
-		if [ $commit_ok != 0 ]; then
-			echo -e \
-		"\nError Committing New SMS Config Sub-Directory! ($commit_ok)\n" \
-				| tee -a $LOG
-			echo "Bailing Out..." | tee -a $LOG
-			exit -185
-		fi
+		echo -e \
+			"\nNew SMS Config Sub-Directory Added - No Commit Needed\n" \
+			| tee -a $LOG
 	fi
 fi
 
