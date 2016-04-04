@@ -436,7 +436,7 @@ SMSControl::SMSControl() :
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
 
-	m_maxBanks = m_pixelMap->numBanks() + Pulse::REAL_BANK_OFFSET;
+	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 }
 
 SMSControl::~SMSControl()
@@ -1497,7 +1497,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 						pulse->m_flags |=
 							ADARA::BankedEventPkt::MAPPING_ERROR;
 					}
-					bank += Pulse::REAL_BANK_OFFSET;
+					bank += PixelMap::REAL_BANK_OFFSET;
 				}
 				// Not Yet Mapped...
 				// Map Physical PixelId to Logical PixelId
@@ -1507,7 +1507,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 						pulse->m_flags |=
 							ADARA::BankedEventPkt::MAPPING_ERROR;
 					}
-					bank += Pulse::REAL_BANK_OFFSET;
+					bank += PixelMap::REAL_BANK_OFFSET;
 				}
 				break;
 
@@ -1534,7 +1534,9 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 				 * error bank
 				 */
 				logical = phys;
-				bank = 0;
+				bank = (uint16_t)
+					( PixelMap::ERROR_BANK + PixelMap::REAL_BANK_OFFSET );
+						// Bank Index = 0...! :-D
 
 				pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
 
@@ -2055,13 +2057,13 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 			iov.iov_len = 2 * sizeof(uint32_t);
 			m_iovec.push_back(iov);
 
-			/* Because we're using unsigned integers,
-			 * we'll translate the error pixels to bank
-			 * -2 (0xfffffffe), and the unmapped pixels
-			 * to bank -1 (0xffffffff). All other bank
-			 * ids will get their real number.
-			 */
-			m_hdrs.push_back(i - Pulse::REAL_BANK_OFFSET);
+			// Because we're using Unsigned Integers, we'll translate:
+			//    - Error Pixels to Bank -2
+			//       (PixelMap::ERROR_BANK = 0xfffe -> 0xfffffffe)
+			//    - Unmapped Pixels to Bank -1
+			//       (PixelMap::UNMAPPED_BANK = 0xffff -> 0xffffffff)
+			// All other bank ids will get their real number.
+			m_hdrs.push_back(i - PixelMap::REAL_BANK_OFFSET);
 			m_hdrs.push_back(src.m_banks[i].size());
 
 			iov.iov_base = &src.m_banks[i].front();
