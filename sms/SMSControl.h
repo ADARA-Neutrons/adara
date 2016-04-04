@@ -274,7 +274,6 @@ private:
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse);
 	void recordPulse(PulsePtr &pulse);
-	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				uint32_t id, uint32_t tof);
 	void addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
