@@ -28,7 +28,7 @@ static std::auto_ptr<TempMap> readMap(const std::string &path)
 	size_t pos;
 
 	if (f.fail()) {
-		std::string msg("Unable to open pixel map file ");
+		std::string msg("Unable to Open Pixel Map File ");
 		msg += path;
 		throw std::runtime_error(msg);
 	}
@@ -49,53 +49,56 @@ static std::auto_ptr<TempMap> readMap(const std::string &path)
 		if (pos == std::string::npos)
 			continue;
 
-		if (sscanf(line.c_str(), "%u %u %u %1s\n", &phys, &logical,
-							&bank, trash) != 3) {
-			std::string msg("Bad entry in pixel map, line ");
+		if (sscanf(line.c_str(), "%u %u %u %1s\n",
+				&phys, &logical, &bank, trash) != 3) {
+			std::string msg("Bad Entry in Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
 		if (phys & 0x80000000) {
-			std::string msg("Physical pixel has error bit set "
-					"in pixel map, line ");
+			std::string msg("Physical PixelId has Error Bit Set "
+				"in Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
 		if (map->count(phys)) {
-			std::string msg("Duplicate physical pixel ");
+			std::string msg("Duplicate Physical PixelId ");
 			msg += boost::lexical_cast<std::string>(phys);
-			msg += " in pixel map, line ";
+			msg += " in Pixel Map File, line ";
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
 		if (output_pixels.count(logical)) {
-			std::string msg("Duplicate logical pixel ");
+			std::string msg("Duplicate Logical PixelId ");
 			msg += boost::lexical_cast<std::string>(logical);
-			msg += " in pixel map, line ";
+			msg += " in Pixel Map File, line ";
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
-		if (bank >= 0x10000) {
-			std::string msg("Out-of-range bank in pixel map, "
-					"line ");
+		if (bank == PixelMap::UNMAPPED_BANK) {
+			std::string msg("Reserved Bank Id (Unmapped Bank) in "
+				"Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
-		if (bank == 0xffff) {
-			std::string msg("Reserved bank id (unmapped) in "
-					"pixel map, line ");
+		if (bank == PixelMap::ERROR_BANK) {
+			std::string msg("Reserved Bank Id (Error Bank) in "
+				"Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
-		if (bank == 0xfffe) {
-			std::string msg("Reserved bank id (error bank) in "
-					"pixel map, line ");
+		// Unused "Gap" in PixelId Space, Mark as Being "Unmapped" Bank...
+		if (bank == ((uint32_t) -1))
+			bank = PixelMap::UNMAPPED_BANK;
+
+		else if (bank >= 0x10000) {
+			std::string msg("Out-of-Range Bank in Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
@@ -105,13 +108,13 @@ static std::auto_ptr<TempMap> readMap(const std::string &path)
 	}
 
 	if (!f.eof()) {
-		std::string msg("Read error in pixel map file ");
+		std::string msg("Read Error in Pixel Map File ");
 		msg += path;
 		throw std::runtime_error(msg);
 	}
 
 	if (!map->size()) {
-		std::string msg("No mapping in pixel map file ");
+		std::string msg("No Mapping in Pixel Map File ");
 		msg += path;
 		throw std::runtime_error(msg);
 	}
@@ -129,7 +132,7 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 	struct timespec now;
 	uint32_t *u32;
 	uint16_t i, entries, bank;
-	uint16_t max_count = 0xffff;
+	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
 
 	/* A physical->logical map is better for parsing and for building
 	 * the lookup table used for normal operations, but going logical
@@ -155,11 +158,11 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 	for (++it, end = inverted.end(); it != end; ++it) {
 		/* If we've found a discontinuity in the logical pixels,
 		 * or we changed banks, OR we have _Filled Up_ this section
-		 * with the Max PixelId Count (16 bits, 0xffff = 65535),
+		 * with the Max Section PixelId Count (16 bits, 0xffff = 65535),
 		 * then we have to start a new section.
 		 */
 		if (it->first != expected || it->second.second != bank
-				|| entries >= max_count) {
+				|| entries >= max_section_pixelid_count) {
 			sections.push(entries);
 			entries = 0;
 			bank = it->second.second;
