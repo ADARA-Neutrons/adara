@@ -172,12 +172,6 @@ private:
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
 		uint32_t				m_flags;
-
-		/* We use bank 0 and 1 to store the error bank (-2) and
-		 * unknown mapping bank (-1) respectively, so account
-		 * for where the real detector banks start in m_banks
-		 */
-		enum { REAL_BANK_OFFSET = 2 };
 	};
 
 	MonitorMap				m_allMonitors;
