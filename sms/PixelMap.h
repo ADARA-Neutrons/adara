@@ -21,28 +21,38 @@ public:
 
 	uint32_t numBanks(void) const { return m_numBanks; }
 
+	// "Special" Bank Indices...
+	enum { UNMAPPED_BANK = 0xffff, ERROR_BANK = 0xfffe };
+
+	// In Transit, We Use Bank Indices 0 and 1 to Store, Respectively:
+	//    - Error Bank (-2 = 0xfffe)
+	//    - Unknown Mapping Bank (-1 = 0xffff)
+	// So account for the Bank Index where the Real Detector Banks start...
+	// (This better equal the number of "Special" Bank Indices...!)
+	enum { REAL_BANK_OFFSET = 2 };
+
 	bool mapEvent(uint32_t phys, uint32_t &logical, uint16_t &bank) {
 		if (phys < m_table.size()) {
 			logical = m_table[phys].first;
 			bank = m_table[phys].second;
 		} else {
 			logical = phys | 0x80000000;
-			bank = 0xffff;
+			bank = UNMAPPED_BANK;
 		}
 
 		/* Return true if this pixel wasn't mapped */
-		return bank == 0xffff;
+		return( bank == UNMAPPED_BANK );
 	}
 
 	bool mapEventBank(uint32_t logical, uint16_t &bank) {
 		if (logical < m_banks.size()) {
 			bank = m_banks[logical];
 		} else {
-			bank = 0xffff;
+			bank = UNMAPPED_BANK;
 		}
 
 		/* Return true if this pixel wasn't mapped */
-		return bank == 0xffff;
+		return( bank == UNMAPPED_BANK );
 	}
 
 private:
