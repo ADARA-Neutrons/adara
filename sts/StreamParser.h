@@ -98,7 +98,15 @@ private:
                     const uint8_t *chunk, unsigned int chunk_offset,
                     unsigned int chunk_len );
 
-    using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
+    using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors
+                                        // to base class implementations
+
+    /// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
+    enum SpecialBank
+    {
+        UNMAPPED_BANK   = 0xffffffff,
+        ERROR_BANK      = 0xfffffffe
+    };
 
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
     void        processBankEvents( uint32_t a_bank_id,
