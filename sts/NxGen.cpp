@@ -579,8 +579,14 @@ NxGen::finalize
 
         writeScalar( m_entry_path, "total_counts",
             a_run_metrics.events_counted, "" );
+
         writeScalar( m_entry_path, "total_uncounted_counts",
             a_run_metrics.events_uncounted, "" );
+        writeScalarAttribute( m_entry_path + "/total_uncounted_counts",
+            "ERROR_bit_or_unknown_other", a_run_metrics.events_error );
+        writeScalarAttribute( m_entry_path + "/total_uncounted_counts",
+            "events_have_no_bank", a_run_metrics.events_unmapped );
+
         writeScalar( m_entry_path, "total_other_counts",
             a_run_metrics.non_events_counted, "" );
         writeScalar( m_entry_path, "proton_charge",
