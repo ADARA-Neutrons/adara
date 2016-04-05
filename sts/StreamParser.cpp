@@ -969,7 +969,16 @@ StreamParser::processBankEvents
 
     // Not a Valid Detector Bank ID...
     else
+    {
+        // Add to Uncounted Events Count...
         m_run_metrics.events_uncounted += a_event_count;
+
+        // Also Add to Special Bank Ids Counts...
+        if ( a_bank_id == UNMAPPED_BANK )
+            m_run_metrics.events_unmapped += a_event_count;
+        else if ( a_bank_id == ERROR_BANK )
+            m_run_metrics.events_error += a_event_count;
+    }
 }
 
 /*! \brief This method handles pulse gaps for a specified detector bank
