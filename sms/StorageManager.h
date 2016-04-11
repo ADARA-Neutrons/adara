@@ -38,7 +38,7 @@ public:
 	static void lateInit(void);
 	static void stop(void);
 
-	static void startRecording(uint32_t run);
+	static void startRecording(uint32_t run, std::string propId);
 	static void stopRecording(void);
 
 	static void pauseRecording(void);
@@ -110,7 +110,7 @@ public:
 
 	static ComBusSMSMon *combus(void) { return m_combus; }
 
-	static void sendComBus(uint32_t a_run_num,
+	static void sendComBus(uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state,
 		const struct timespec & a_start_time = combuszerotime);
 
@@ -199,7 +199,8 @@ private:
 	static void populateDailyCache(void);
 
 	static void addBaseStorage(off_t size);
-	static void startContainer(uint32_t run = 0);
+	static void startContainer(uint32_t run = 0,
+				std::string propId = std::string("UNKNOWN"));
 	static void endCurrentContainer(void);
 	static void fileCreated(StorageFile::SharedPtr &f);
 	static uint32_t validatePacket(const IoVector &iovec);
