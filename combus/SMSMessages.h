@@ -16,18 +16,22 @@ public:
         : m_run_num(0)
     {}
 
-    StatusUpdateMsg( const std::string &a_facility, const std::string &a_beam_sname,
-                            struct timespec a_start_time, 
-                            unsigned long a_run_num,
-                            const std::string &a_reason) 
+    StatusUpdateMsg( const std::string &a_facility,
+            const std::string &a_beam_sname,
+            struct timespec a_start_time, 
+            unsigned long a_run_num,
+            const std::string &a_proposal_id,
+            const std::string &a_reason) 
         : m_facility(a_facility), m_beam_sname(a_beam_sname), 
-          m_start_time(a_start_time), m_run_num(a_run_num), m_reason(a_reason) 
+          m_start_time(a_start_time), m_run_num(a_run_num),
+          m_proposal_id(a_proposal_id), m_reason(a_reason) 
     {}
 
     std::string         m_facility;
     std::string         m_beam_sname;
     struct timespec     m_start_time;
     unsigned long       m_run_num;
+    std::string         m_proposal_id;
     std::string         m_reason;
 
 protected:
@@ -44,6 +48,7 @@ protected:
         m_start_time.tv_sec = a_prop_tree.get( "start_sec", 0 );
         m_start_time.tv_nsec = a_prop_tree.get( "start_nsec", 0 );
         m_run_num = a_prop_tree.get( "run_number", 0 );
+        m_proposal_id = a_prop_tree.get( "ipts", "" );
         m_reason = a_prop_tree.get( "reason", "" );
     }
 
@@ -56,6 +61,7 @@ protected:
         a_prop_tree.put( "start_nsec", m_start_time.tv_nsec );
         a_prop_tree.put( "start_sec", m_start_time.tv_sec );
         a_prop_tree.put( "run_number", m_run_num );
+        a_prop_tree.put( "ipts", m_proposal_id );
         a_prop_tree.put( "reason", m_reason );
     }
 };
