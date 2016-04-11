@@ -12,15 +12,18 @@
 
 static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
 
-SMSRunStatus::SMSRunStatus( unsigned long a_run_num, std::string &a_reason,
-		struct timespec a_start_time ) :
-	m_run_num(a_run_num), m_reason(a_reason),
-	m_start_time(a_start_time)
+SMSRunStatus::SMSRunStatus(
+		unsigned long a_run_num, std::string &a_proposal_id,
+		std::string &a_reason, struct timespec a_start_time ) :
+	m_run_num(a_run_num), m_proposal_id(a_proposal_id),
+	m_reason(a_reason), m_start_time(a_start_time)
 {}
 
-SMSRunStatus::SMSRunStatus( unsigned long a_run_num,
+SMSRunStatus::SMSRunStatus(
+		unsigned long a_run_num, std::string &a_proposal_id,
 		std::string &a_reason ) :
-	m_run_num(a_run_num), m_reason(a_reason)
+	m_run_num(a_run_num), m_proposal_id(a_proposal_id),
+	m_reason(a_reason)
 {
 	m_start_time.tv_sec = 0;
 	m_start_time.tv_nsec = 0;
@@ -72,21 +75,24 @@ void ComBusSMSMon::config(const boost::property_tree::ptree &conf)
 	m_domain = ADARA::ComBus::Connection::checkDomain( m_domain );
 }
 
-void ComBusSMSMon::sendOriginal( uint32_t a_run_num,
+void ComBusSMSMon::sendOriginal(
+		uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state,
 		const struct timespec &a_start_time )
 {
-	SMSRunStatus *outp =
-		new SMSRunStatus( a_run_num, a_run_state, a_start_time );
+	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
+		a_run_state, a_start_time );
 
 	if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
 		ERROR("ComBusSMSMon::SendOriginal() failed");
 }
 
-void ComBusSMSMon::sendUpdate( uint32_t a_run_num,
+void ComBusSMSMon::sendUpdate(
+		uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state )
 {
-	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_run_state );
+	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
+		a_run_state );
 
 	if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
 		ERROR("ComBusSMSMon::SendUpdate() failed");
@@ -313,6 +319,7 @@ void ComBusSMSMon::commThread()
 
 		if ( m_run_dict.count( inpu->m_run_num ) ) {
 			lookup = m_run_dict[ inpu->m_run_num ];
+			lookup->m_proposal_id = inpu->m_proposal_id;
 			lookup->m_reason = inpu->m_reason;
 			if ( inpu->hasTime() ) {
 				lookup->m_start_time = inpu->m_start_time;
@@ -328,11 +335,13 @@ void ComBusSMSMon::commThread()
 			m_beam_sname,
 			lookup->m_start_time,
 			lookup->m_run_num,
+			lookup->m_proposal_id,
 			lookup->m_reason );
 
 		if ( !m_combus->broadcast( newmsg ) )
 		{
 			WARN("SMS ComBus run " << lookup->m_run_num
+				<< " proposal " << lookup->m_proposal_id
 				<< " status <" << lookup->m_reason
 				<< "> send failed"
 				<< " for Domain " << m_domain
@@ -342,6 +351,7 @@ void ComBusSMSMon::commThread()
 		else
 		{
 			INFO("SMS ComBus run " << lookup->m_run_num
+				<< " proposal " << lookup->m_proposal_id
 				<< " status <" << lookup->m_reason << "> sent"
 				<< " for Domain " << m_domain
 				<< " to URI " << m_broker_uri
