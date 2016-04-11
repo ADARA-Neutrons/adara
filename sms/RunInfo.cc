@@ -247,7 +247,7 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	m_ctrl->addPV(m_userPV);
 
 	/* These fields are required */
-	addPV(prefix, "ProposalId", "proposal_id", m_required);
+	m_propId = addPV(prefix, "ProposalId", "proposal_id", m_required);
 
 	/* These fields are optional */
 	addPV(prefix, "ProposalTitle", "proposal_title", m_optional);
@@ -274,13 +274,20 @@ RunInfo::~RunInfo()
 	delete [] m_packet;
 }
 
-void RunInfo::addPV(const std::string &prefix, const char *pv_name,
-		    const char *xml_name, RunInfoMap &map)
+RunInfo::RunInfoPVSharedPtr RunInfo::addPV(
+		const std::string &prefix, const char *pv_name,
+		const char *xml_name, RunInfoMap &map)
 {
 	std::string pvName = prefix + pv_name;
 	map[xml_name].reset(
 		new RunInfoPV(pvName, pv_name, (map == m_required), this));
 	m_ctrl->addPV(map[xml_name]);
+	return(map[xml_name]);
+}
+
+std::string RunInfo::getPropId(void)
+{
+	return m_propId->value();
 }
 
 void RunInfo::lock(void)

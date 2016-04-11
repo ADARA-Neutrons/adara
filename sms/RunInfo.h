@@ -37,6 +37,8 @@ public:
 		m_runNumber = run;
 	}
 
+	std::string getPropId(void);
+
 	void pvChanged(RunInfoPV* pv);
 
 	void invalidateCache(void) { m_packetValid = false; }
@@ -44,6 +46,7 @@ public:
 private:
 	std::string m_beamline;
 	SMSControl *m_ctrl;
+	RunInfoPVSharedPtr m_propId;
 	RunInfoMap m_required;
 	RunInfoMap m_optional;
 	RunInfoMap m_sample;
@@ -57,7 +60,7 @@ private:
 
 	boost::signals2::connection m_connection;
 
-	void addPV(const std::string &prefix, const char *pv_name,
+	RunInfoPVSharedPtr addPV(const std::string &prefix, const char *pv_name,
 		   const char *xml_name, RunInfoMap &map);
 	void generatePacket(void);
 	void onPrologue(void);
