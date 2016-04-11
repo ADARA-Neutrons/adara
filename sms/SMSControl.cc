@@ -551,7 +551,8 @@ bool SMSControl::setRecording(bool v)
 			 * in a new container.
 			 */
 			m_markers->newRun();
-			StorageManager::startRecording(m_currentRunNumber);
+			StorageManager::startRecording(m_currentRunNumber,
+				m_runInfo->getPropId());
 		} catch (std::runtime_error e) {
 			m_summaryIsError = true;
 			m_reasonIsRunInfo = false;
