@@ -264,22 +264,22 @@ void StorageContainer::markManual(void)
 }
 
 StorageContainer::StorageContainer(const struct timespec &start,
-				   uint32_t run) :
-	m_startTime(start), m_runNumber(run), m_numFiles(0), m_numPauseFiles(0),
-	m_active(true), m_paused(false),
+		uint32_t run, std::string &propId) :
+	m_startTime(start), m_runNumber(run), m_propId(propId),
+	m_numFiles(0), m_numPauseFiles(0), m_active(true), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
-	m_runNumber(0), m_numFiles(0), m_numPauseFiles(0),
+	m_runNumber(0), m_propId("UNKNOWN"), m_numFiles(0), m_numPauseFiles(0),
 	m_name(name), m_active(false), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0)
 {
 }
 
 StorageContainer::SharedPtr StorageContainer::create(
-				const struct timespec &start, uint32_t run)
+		const struct timespec &start, uint32_t run, std::string &propId)
 {
 	char path[64];
 	struct tm tm;
@@ -305,7 +305,7 @@ StorageContainer::SharedPtr StorageContainer::create(
 		throw std::runtime_error("StorageContainer::StorageContainer()"
 					 " path strftime failed");
 
-	StorageContainer::SharedPtr c(new StorageContainer(start, run));
+	StorageContainer::SharedPtr c(new StorageContainer(start, run, propId));
 	c->m_weakThis = c;
 	c->m_name = path;
 
@@ -587,7 +587,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	 * it is an untranslated run.
 	 */
 	if (had_errors && c->m_runNumber && !c->m_translated && !c->m_manual) {
-		StorageManager::sendComBus(c->m_runNumber,
+		StorageManager::sendComBus(c->m_runNumber, c->propId(),
 			std::string("Needs Manual Translation"));
 		c->markManual();
 	}
