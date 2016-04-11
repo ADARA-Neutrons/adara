@@ -32,7 +32,7 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 		StorageManager::addPacket(pkt, sizeof(pkt), false);
 	}
 
-	StorageManager::startRecording(12345);
+	StorageManager::startRecording(12345, "IPTS-0000");
 
 	for (i = 0; i < 10240; i++) {
 		clock_gettime(CLOCK_REALTIME, &ts);
