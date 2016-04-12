@@ -89,7 +89,7 @@ OutputAdapter::streamProcessingThread()
     OutPacket       adara_pkt;
     OutPacket       heartbeat_pkt;
     bool            timeout_flag = false;
-    string          payload;
+    vector<uint8_t> payload;
 
     heartbeat_pkt.payload_len = 0;
     heartbeat_pkt.format = ADARA_PKT_TYPE(
@@ -111,7 +111,8 @@ OutputAdapter::streamProcessingThread()
                 {
                     heartbeat_pkt.sec =
                         (uint32_t)time(0) - EPICS_TIME_OFFSET;
-                    sendPacket( heartbeat_pkt, 0 );
+                    payload.clear();
+                    sendPacket( heartbeat_pkt, payload );
                 }
             }
             else
@@ -151,16 +152,9 @@ OutputAdapter::streamProcessingThread()
             // If connected, translate and send packet(s)
             if ( connected() )
             {
+                payload.clear();
                 if ( translate( *pvs_pkt, adara_pkt, payload ) )
-                {
-                    if ( payload.length() )
-                    {
-                        sendPacket( adara_pkt, &payload );
-                        payload.clear();
-                    }
-                    else
-                        sendPacket( adara_pkt, 0 );
-                }
+                    sendPacket( adara_pkt, payload );
             }
 
             m_srteam_api->putFreePacket( pvs_pkt );
@@ -175,7 +169,7 @@ OutputAdapter::streamProcessingThread()
   */
 bool
 OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
-        string &a_payload )
+        vector<uint8_t> &a_payload )
 {
     // A Little Gratuitous Debug Logging... ;-b
     if ( a_pv_pkt.device == NULL ) {
@@ -225,7 +219,9 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
  * \param a_adara_pkt - ADARA packet to receive DDP data.
  */
 void
-OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecordPtr a_device )
+OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
+        vector<uint8_t> &a_payload,
+        DeviceRecordPtr a_device )
 {
     stringstream sstr;
 
@@ -235,10 +231,6 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
     a_adara_pkt.sec     = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
     a_adara_pkt.nsec    = 0;
     a_adara_pkt.dev_id  = a_device->m_id;
-
-    // Reset payload stringstream
-
-    a_payload.clear();
 
     // Encode XML
 
@@ -295,7 +287,11 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
     sstr << "</device>" << endl;
 
     // Save payload
-    a_payload = sstr.str();
+    a_payload = vector<uint8_t>( sstr.str().size() );
+    uint8_t *bytes = a_payload.data();
+    memcpy( bytes,
+        (uint8_t *)sstr.str().c_str(), sstr.str().size() );
+
     a_adara_pkt.ddp.xml_len = (unsigned long) a_payload.size();
     a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len;
 
@@ -305,7 +301,7 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
     {
         // Pad buffer with nulls
         for ( int i = 0; i < (4-rem); ++i )
-            a_payload.push_back('\0');
+            a_payload.push_back((uint8_t)'\0');
 
         // Adjust payload len field
         a_adara_pkt.payload_len += (4 - rem);
@@ -322,9 +318,16 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt, string &a_payload, DeviceRecord
   * This method build a VVP packet for the PV specified by the parameters.
   */
 void
-OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_state, string &a_payload )
+OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
+        PVDescriptor *a_pv, PVState &a_state, vector<uint8_t> &a_payload )
 {
-    a_payload.clear();
+    vector<uint32_t> uint_array;
+    vector<double> double_array;
+    uint8_t *bytes;
+
+    uint32_t elemCount;
+    uint32_t i;
+    int rem;
 
     a_adara_pkt.dev_id          = a_pv->m_device->m_id;
     a_adara_pkt.vvp.var_id      = a_pv->m_id;
@@ -337,16 +340,6 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
     switch ( a_pv->m_type )
     {
     case PV_ENUM:
-    case PV_INT:
-        // TODO ADARA protocol doesn't support signed ints
-        a_adara_pkt.format          =
-            ADARA_PKT_TYPE(
-                ::ADARA::PacketType::VAR_VALUE_U32_TYPE,
-                ::ADARA::PacketType::VAR_VALUE_U32_VERSION );
-        a_adara_pkt.payload_len     = 16;
-        a_adara_pkt.vvp.uval        = a_state.m_int_val;
-        break;
-
     case PV_UINT:
         a_adara_pkt.format          =
             ADARA_PKT_TYPE(
@@ -356,13 +349,25 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
         a_adara_pkt.vvp.uval        = a_state.m_uint_val;
         break;
 
+    case PV_INT:
+        // Send All Integers as "Unsigned" in the ADARA Protocol
+        // - it all gets resolved in the STS/NeXus using the "pv_type"! :-D
+        a_adara_pkt.format          =
+            ADARA_PKT_TYPE(
+                ::ADARA::PacketType::VAR_VALUE_U32_TYPE,
+                ::ADARA::PacketType::VAR_VALUE_U32_VERSION );
+        a_adara_pkt.payload_len     = 16;
+        a_adara_pkt.vvp.uval        = (uint32_t) a_state.m_int_val;
+        break;
+
     case PV_REAL:
+        // Send All Floats as Doubles in the ADARA Protocol
         a_adara_pkt.format          =
             ADARA_PKT_TYPE(
                 ::ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE,
                 ::ADARA::PacketType::VAR_VALUE_DOUBLE_VERSION );
         a_adara_pkt.payload_len     = 20;
-        a_adara_pkt.vvp.dval        = a_state.m_real_val;
+        a_adara_pkt.vvp.dval        = a_state.m_double_val;
         break;
 
     case PV_STR:
@@ -374,20 +379,136 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_s
         a_adara_pkt.vvp_str.str_len = a_state.m_str_val.size();
 
         // Set payload
-        a_payload = a_state.m_str_val;
+        a_payload = vector<uint8_t>( a_state.m_str_val.size() );
+        bytes = a_payload.data();
+        memcpy( bytes,
+            (uint8_t *)a_state.m_str_val.c_str(),
+            a_state.m_str_val.size() );
 
         // Round payload length up to nearsest 4 bytes
-        int rem = a_adara_pkt.payload_len % 4;
+        rem = a_adara_pkt.payload_len % 4;
         if ( rem )
         {
             // Pad buffer with nulls
             for ( int i = 0; i < (4-rem); ++i )
-                a_payload.push_back('\0');
+                a_payload.push_back((uint8_t)'\0');
 
             // Adjust payload len field
             a_adara_pkt.payload_len += (4 - rem);
         }
         break;
+
+    case PV_INT_ARRAY:
+        // Send All Integers as "Unsigned" in the ADARA Protocol
+        // - it all gets resolved in the STS/NeXus using the "pv_type"! :-D
+        elemCount = a_state.m_elem_count;
+        a_adara_pkt.format          =
+            ADARA_PKT_TYPE(
+                ::ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE,
+                ::ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION );
+        a_adara_pkt.payload_len     = 16
+            + ( elemCount * sizeof(uint32_t) );
+
+        // Set payload
+        uint_array = vector<uint32_t>( elemCount );
+        if ( a_state.m_short_array != NULL )
+        {
+            for ( i=0 ; i < elemCount ; i++ )
+            {
+                uint_array[i] = (uint32_t) a_state.m_short_array[i];
+            }
+        }
+        else if ( a_state.m_long_array != NULL )
+        {
+            for ( i=0 ; i < elemCount ; i++ )
+            {
+                // (int32_t -> uint32_t...)
+                uint_array[i] = (uint32_t) a_state.m_long_array[i];
+            }
+        }
+        else
+        {
+            syslog( LOG_ERR,
+            "%s: %s: %s Device [%s] (%s id=%d) PV <%s> (%s) (pv id=%d) %s",
+                "PVSD ERROR", "OutputAdapter::buildVVP()",
+                "Missing Integer Array Data for",
+                a_pv->m_device->m_name.c_str(),
+                "device", a_pv->m_device->m_id,
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str(),
+                a_pv->m_id, " - Setting Payload Size to Zero" );
+            usleep(30000); // give syslog a chance...
+            elemCount = 0;
+        }
+
+        for ( i=0 ; i < elemCount ; i++ )
+        {
+            syslog( LOG_ERR, "%s: %s: uint_array[%u] = %u",
+                "PVSD ERROR", "OutputAdapter::buildVVP()",
+                i, uint_array[i] );
+            usleep(30000); // give syslog a chance...
+        }
+        a_adara_pkt.vvp_array.elemCount = elemCount;
+        a_payload = vector<uint8_t>( elemCount * sizeof(uint32_t) );
+        bytes = a_payload.data();
+        memcpy( bytes,
+            (uint8_t *)uint_array.data(), elemCount * sizeof(uint32_t) );
+
+        break;
+
+    case PV_REAL_ARRAY:
+        // Send All Floats as Doubles in the ADARA Protocol
+        elemCount = a_state.m_elem_count;
+        a_adara_pkt.format          =
+            ADARA_PKT_TYPE(
+                ::ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE,
+                ::ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION );
+        a_adara_pkt.payload_len     = 16 + ( elemCount * sizeof(double) );
+
+        // Set payload
+        double_array = vector<double>( elemCount );
+        if ( a_state.m_float_array != NULL )
+        {
+            for ( i=0 ; i < elemCount ; i++ )
+            {
+                double_array[i] = (double) a_state.m_float_array[i];
+            }
+        }
+        else if ( a_state.m_double_array != NULL )
+        {
+            for ( i=0 ; i < elemCount ; i++ )
+            {
+                double_array[i] = a_state.m_double_array[i];
+            }
+        }
+        else
+        {
+            syslog( LOG_ERR,
+            "%s: %s: %s Device [%s] (%s id=%d) PV <%s> (%s) (pv id=%d) %s",
+                "PVSD ERROR", "OutputAdapter::buildVVP()",
+                "Missing Double Array Data for",
+                a_pv->m_device->m_name.c_str(),
+                "device", a_pv->m_device->m_id,
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str(),
+                a_pv->m_id, " - Setting Payload Size to Zero" );
+            usleep(30000); // give syslog a chance...
+            elemCount = 0;
+        }
+
+        for ( i=0 ; i < elemCount ; i++ )
+        {
+            syslog( LOG_ERR, "%s: %s: double_array[%u] = %lf",
+                "PVSD ERROR", "OutputAdapter::buildVVP()",
+                i, double_array[i] );
+            usleep(30000); // give syslog a chance...
+        }
+        a_adara_pkt.vvp_array.elemCount = elemCount;
+        a_payload = vector<uint8_t>( elemCount * sizeof(double) );
+        bytes = a_payload.data();
+        memcpy( bytes,
+            (uint8_t *)double_array.data(), elemCount * sizeof(double) );
+
+        break;
+
     }
 }
 
@@ -401,14 +522,19 @@ OutputAdapter::getPVTypeXML( PVType a_type ) const
 {
     switch ( a_type )
     {
-    case PV_UINT:
-    case PV_INT:
     case PV_ENUM:
+    case PV_UINT:
+        return "unsigned integer";
+    case PV_INT:
         return "integer";
     case PV_REAL:
         return "double";
     case PV_STR:
         return "string";
+    case PV_INT_ARRAY:
+        return "integer array";
+    case PV_REAL_ARRAY:
+        return "double array";
     }
 
     return "unknown";
@@ -463,7 +589,7 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
         if ( old_pv )
         {
             old_state = m_pv_state.find( old_pv );
-            if ( old_state != m_pv_state.end())
+            if ( old_state != m_pv_state.end() )
             {
                 m_pv_state[*ipv] = old_state->second;
                 found = true;
@@ -488,10 +614,11 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
  * @param a_device - Reference to device being undefined
  * @param a_undefine_pvs - Flag indicating if member PVs should be placed in undef_pvs set
  *
- * This method updates internal state due to the removal of the specified device. This method does NOT
- * emit any ADARA packets, it only updates internal state. If the a_undefine_pvs flag is set, all PVs
- * of the device will be placed in a "garbage" container where they will be further processed and
- * eventually flushed.
+ * This method updates internal state due to the removal of the specified
+ * device. This method does NOT emit any ADARA packets, it only updates
+ * internal state. If the a_undefine_pvs flag is set, all PVs
+ * of the device will be placed in a "garbage" container where they will
+ * be further processed and eventually flushed.
  */
 void
 OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
@@ -501,15 +628,16 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
     // Remove all pv state entries associated with device
     map<PVDescriptor*,PVState>::iterator ipv_state;
 
-    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
     {
         ipv_state = m_pv_state.find( *ipv );
-        if ( ipv_state != m_pv_state.end())
+        if ( ipv_state != m_pv_state.end() )
             m_pv_state.erase( ipv_state );
     }
 
     set<DeviceRecordPtr>::iterator idev = m_devices.find( a_device );
-    if ( idev != m_devices.end())
+    if ( idev != m_devices.end() )
     {
         m_devices.erase( idev );
     }
@@ -517,12 +645,14 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
 
 
 void
-OutputAdapter::updatePV( PVDescriptor *a_pv, PVState a_state )
+OutputAdapter::updatePV( PVDescriptor *a_pv, PVState &a_state )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    map<PVDescriptor*,PVState>::iterator ipv_state = m_pv_state.find( a_pv );
-    if ( ipv_state != m_pv_state.end())
+    map<PVDescriptor*,PVState>::iterator ipv_state =
+        m_pv_state.find( a_pv );
+
+    if ( ipv_state != m_pv_state.end() )
     {
         ipv_state->second = a_state;
     }
@@ -675,8 +805,9 @@ OutputAdapter::socketListenThread()
 void
 OutputAdapter::sendCurrentData( int a_socket )
 {
-    OutPacket   adara_pkt;
-    string      payload;
+    OutPacket adara_pkt;
+
+    vector<uint8_t> payload;
 
     syslog( LOG_INFO,
         "%s: Sending Current Data to ADARA SMS Client (socket=%d)",
@@ -699,8 +830,9 @@ OutputAdapter::sendCurrentData( int a_socket )
             "ADARA SMS Client", a_socket );
         usleep(30000); // give syslog a chance...
 
+        payload.clear();
         buildDDP( adara_pkt, payload, *idev );
-        sendPacket( adara_pkt, &payload, a_socket );
+        sendPacket( adara_pkt, payload, a_socket );
     }
 
     // Send value updates for configured devices
@@ -714,11 +846,9 @@ OutputAdapter::sendCurrentData( int a_socket )
             "Variable Value Update", "ADARA SMS Client", a_socket );
         usleep(30000); // give syslog a chance...
 
+        payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
-        if ( payload.size() )
-            sendPacket( adara_pkt, &payload, a_socket );
-        else
-            sendPacket( adara_pkt, 0, a_socket );
+        sendPacket( adara_pkt, payload, a_socket );
     }
 }
 
@@ -730,6 +860,8 @@ void
 OutputAdapter::sendSourceInfo( int a_socket )
 {
     OutPacket adara_pkt;
+
+    vector<uint8_t> payload;
 
     syslog( LOG_INFO,
         "%s: Sending Source List to ADARA SMS Client (socket=%d)",
@@ -743,29 +875,29 @@ OutputAdapter::sendSourceInfo( int a_socket )
     adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
     adara_pkt.nsec = 0;
 
-    sendPacket( adara_pkt, 0, a_socket );
+    sendPacket( adara_pkt, payload, a_socket );
 }
 
 
 void
-OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload,
-        int a_socket )
+OutputAdapter::sendPacket( OutPacket &a_adara_pkt,
+        vector<uint8_t> &a_payload, int a_socket )
 {
     bool res;
     uint32_t len = (int)a_adara_pkt.payload_len + 16;
 
-    if ( a_payload )
-        len -= (int)a_payload->length();
+    if ( a_payload.size() )
+        len -= (int)a_payload.size();
 
     if ( a_socket > -1 ) // Send to a specific connection
     {
         res = send( a_socket, (char *)&a_adara_pkt, len );
 
         // Send optional payload
-        if ( a_payload && a_payload->length() && res )
+        if ( a_payload.size() && res )
         {
             res = send( a_socket,
-                a_payload->c_str(), (int)a_payload->length() );
+                (const char *)a_payload.data(), (int)a_payload.size() );
         }
 
         if ( !res )
@@ -808,10 +940,11 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt, std::string *a_payload,
             res = send( ic->socket, (char*)&a_adara_pkt, len );
 
             // Send optional payload
-            if ( a_payload && a_payload->length() && res )
+            if ( a_payload.size() && res )
             {
                 res = send( ic->socket,
-                    a_payload->c_str(), (int)a_payload->length() );
+                    (const char *)a_payload.data(),
+                    (int)a_payload.size() );
             }
 
             if ( !res )
@@ -852,6 +985,11 @@ OutputAdapter::send( int a_socket, const char *a_data, uint32_t a_len )
                 continue;
 
             // Serious error
+            syslog( LOG_ERR,
+                "%s: %s: Socket Write Failed! len=%u (socket=%d) - %s",
+                "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket,
+                strerror( errno ) );
+            usleep(30000); // give syslog a chance...
             return false;
         }
 

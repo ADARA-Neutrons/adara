@@ -20,6 +20,7 @@ public:
 
 	const struct timespec &startTime(void) const { return m_startTime; }
 	uint32_t runNumber(void) const { return m_runNumber; }
+	std::string propId(void) const { return m_propId; }
 	uint32_t numFiles(void) const { return m_numFiles; }
 	uint32_t numPauseFiles(void) const { return m_numPauseFiles; }
 	const std::string &name(void) const { return m_name; }
@@ -37,7 +38,8 @@ public:
 		return m_newFile.connect(slot);
 	}
 
-	static SharedPtr create(const struct timespec &start, uint32_t run);
+	static SharedPtr create(const struct timespec &start,
+		uint32_t run, std::string &propId);
 	static SharedPtr scan(const std::string &path);
 	static uint64_t purge(const std::string &path, uint64_t goal,
 				bool keep, bool &path_deleted);
@@ -63,6 +65,7 @@ private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;
 	uint32_t m_runNumber;
+	std::string m_propId;
 	uint32_t m_numFiles;
 	uint32_t m_numPauseFiles;
 	std::string m_name;
@@ -79,7 +82,8 @@ private:
 	std::vector<StorageFile::SharedPtr> m_ds_input_files;
 	std::vector<uint32_t> m_ds_input_num_files;
 
-	StorageContainer(const struct timespec &start, uint32_t run);
+	StorageContainer(const struct timespec &start,
+		uint32_t run, std::string &propId);
 	StorageContainer(const std::string &name);
 
 	void terminateFile(void);

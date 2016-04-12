@@ -9,6 +9,12 @@ QT       += core gui
 TARGET = dasmon
 TEMPLATE = app
 
+DEPENDPATH  +=  ../common \
+                ../../combus \
+                ../../sts \
+                ../server/engine \
+                ../../common
+
 INCLUDEPATH +=  ../common \
                 ../../combus \
                 ../../sts \

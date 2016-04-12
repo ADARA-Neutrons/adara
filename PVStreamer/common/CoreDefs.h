@@ -17,7 +17,9 @@ enum PVType
     PV_UINT,
     PV_REAL,
     PV_ENUM,
-    PV_STR
+    PV_STR,
+    PV_INT_ARRAY,
+    PV_REAL_ARRAY
 };
 
 

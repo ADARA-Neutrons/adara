@@ -20,10 +20,6 @@ public:
 	DetectorBankSet(const boost::property_tree::ptree & conf);
 	~DetectorBankSet();
 
-	static std::vector<uint32_t> extractBankList( std::string banklistStr );
-
-	static std::string getBanklistStr( std::vector<uint32_t> banklist );
-
 	bool truncateString( std::string & str, size_t sz,
 		std::string caller, std::string desc, bool is_error );
 

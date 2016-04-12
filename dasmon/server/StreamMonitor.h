@@ -17,7 +17,8 @@ namespace DASMON {
 
 struct PktStats
 {
-    PktStats() : count(0), min_pkt_size(0), max_pkt_size(0), total_size(0) {}
+    PktStats()
+        : count(0), min_pkt_size(0), max_pkt_size(0), total_size(0) {}
 
     uint64_t    count;
     uint64_t    min_pkt_size;
@@ -29,8 +30,10 @@ struct PktStats
 class IStreamListener
 {
 public:
-    virtual void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port ) = 0;
-    virtual void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp ) = 0;
+    virtual void connectionStatus( bool a_connected,
+        const std::string &a_host, unsigned short a_port ) = 0;
+    virtual void runStatus( bool a_recording,
+        uint32_t a_run_number, uint32_t a_timestamp ) = 0;
     virtual void beginProlog() = 0;
     virtual void endProlog() = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
@@ -42,9 +45,21 @@ public:
     virtual void streamMetrics( const StreamMetrics &a_metrics ) = 0;
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvUndefined( const std::string &a_name ) = 0;
-    virtual void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
-    virtual void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
-    virtual void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name,
+        uint32_t a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name,
+        double a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name,
+        std::string &a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name,
+        std::vector<uint32_t> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+    virtual void pvValue( const std::string &a_name,
+        std::vector<double> a_value,
+        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -61,7 +76,9 @@ enum PVType
     PVT_FLOAT,
     PVT_DOUBLE,
     PVT_ENUM,
-    PVT_STRING
+    PVT_STRING,
+    PVT_UINT_ARRAY,
+    PVT_DOUBLE_ARRAY
 };
 
 /// Base class for all process variable (PV) types
@@ -123,7 +140,8 @@ class CountInfo
 {
 public:
     CountInfo( uint16_t a_window_size = 60 )
-        : m_average(0.0), m_cached(false), m_total(0), m_idx(0), m_win_sz(a_window_size)
+        : m_average(0.0), m_cached(false), m_total(0), m_idx(0),
+        m_win_sz(a_window_size)
     {
         m_samples = new T[m_win_sz]();
     }
@@ -199,8 +217,10 @@ public:
 
     double average()
     {
-        // Note: does not use running average due to numerical instability over very long time spans.
-        // If average() is called multiple times for same sample set, cached value is used.
+        // Note: does not use running average due to numerical instability
+        // over very long time spans.
+        // If average() is called multiple times for same sample set,
+        // cached value is used.
         if ( !m_cached )
         {
             m_average = 0.0;
@@ -253,6 +273,8 @@ enum ThreadState
     TS_PKT_VAR_VALUE_U32,
     TS_PKT_VAR_VALUE_DOUBLE,
     TS_PKT_VAR_VALUE_STRING,
+    TS_PKT_VAR_VALUE_U32_ARRAY,
+    TS_PKT_VAR_VALUE_DOUBLE_ARRAY,
     TS_PKT_STREAM_ANNOTATION,
     TS_PKT_BEAM_MONITOR_EVENT,
     TS_PKT_BANKED_EVENT,
@@ -273,6 +295,8 @@ enum ThreadState
     TS_NOTIFY_PV_VAL_UINT,
     TS_NOTIFY_PV_VAL_DBL,
     TS_NOTIFY_PV_VAL_STR,
+    TS_NOTIFY_PV_VAL_UINT_ARRAY,
+    TS_NOTIFY_PV_VAL_DBL_ARRAY,
     TS_DB_UPDATE                = 300,
     TS_DB_ERROR
 };
@@ -281,14 +305,19 @@ class StreamMonitor : public ADARA::POSIXParser
 {
 public:
 #ifndef NO_DB
-    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port, DBConnectInfo *a_db_info, uint32_t a_maxtof );
+    StreamMonitor( const std::string &a_sms_host,
+        unsigned short a_sms_port,
+        DBConnectInfo *a_db_info, uint32_t a_maxtof );
 #else
-    StreamMonitor( const std::string &a_sms_host, unsigned short a_sms_port = 31415 );
+    StreamMonitor( const std::string &a_sms_host,
+        unsigned short a_sms_port = 31415 );
 #endif
     virtual ~StreamMonitor();
 
-    void            getSMSHostInfo( std::string &a_hostname, unsigned short &a_port ) const;
-    void            setSMSHostInfo( std::string a_hostname, unsigned short a_port );
+    void            getSMSHostInfo( std::string &a_hostname,
+                        unsigned short &a_port ) const;
+    void            setSMSHostInfo( std::string a_hostname,
+                        unsigned short a_port );
     void            start();
     void            stop();
     void            addListener( IStreamListener &a_listener )
@@ -296,7 +325,8 @@ public:
     void            removeListener( IStreamListener &a_listener )
                     { m_notify.removeListener( a_listener ); }
     void            resendState( IStreamListener &a_listener ) const;
-    void            enableDiagnostics( bool a_diagnostics ) { m_diagnostics = a_diagnostics; }
+    void            enableDiagnostics( bool a_diagnostics )
+                    { m_diagnostics = a_diagnostics; }
 
 
     inline uint32_t getProcTicker() { return m_proc_ticker; }
@@ -316,7 +346,8 @@ private:
         void addListener( IStreamListener &a_listener );
         void removeListener( IStreamListener &a_listener );
 
-        void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp  );
+        void runStatus( bool a_recording,
+                 uint32_t a_run_number, uint32_t a_timestamp  );
         void beginProlog();
         void endProlog();
         void pauseStatus( bool a_paused );
@@ -328,10 +359,23 @@ private:
         void streamMetrics( const StreamMetrics &a_metrics );
         void pvDefined( const std::string &a_name );
         void pvUndefined( const std::string &a_name );
-        void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-        void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-        void pvValue( const std::string &a_name, std::string &a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-        void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
+        void pvValue( const std::string &a_name,
+                 uint32_t a_value,
+                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name,
+                 double a_value,
+                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name,
+                 std::string &a_value,
+                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name,
+                 std::vector<uint32_t> a_value,
+                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void pvValue( const std::string &a_name,
+                 std::vector<double> a_value,
+                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+        void connectionStatus( bool a_connected,
+                 const std::string &a_host, unsigned short a_port );
 
     private:
         std::vector<IStreamListener*>   m_listeners;
@@ -359,20 +403,36 @@ private:
     bool        rxPacket( const ADARA::VariableU32Pkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoublePkt &a_pkt );
     bool        rxPacket( const ADARA::VariableStringPkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableU32ArrayPkt &a_pkt );
+    bool        rxPacket( const ADARA::VariableDoubleArrayPkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
-    using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors to base class implementations
+    // Shunt remaining rxPacket flavors to base class implementations
+    using ADARA::POSIXParser::rxPacket;
 
-    void        getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
+    void        getXmlNodeValue( xmlNode *a_node,
+                    std::string & a_value ) const;
     template<class T>
-    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id, T a_value, const timespec &a_timestamp, VariableStatus::Enum a_status );
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
+                    T a_value,
+                    const timespec &a_timestamp,
+                    VariableStatus::Enum a_status );
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
+                    std::vector<uint32_t> a_value,
+                    const timespec &a_timestamp,
+                    VariableStatus::Enum a_status );
+    void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
+                    std::vector<double> a_value,
+                    const timespec &a_timestamp,
+                    VariableStatus::Enum a_status );
     PVType      toPVType( const char *a_source ) const;
     void        clearPVs();
 
     struct BankInfo
     {
         BankInfo() : m_bank_id(0), m_source_id(0), m_last_pulse_time(0) {}
-        BankInfo( uint16_t a_bank_id ) : m_bank_id(a_bank_id), m_source_id(0), m_last_pulse_time(0) {}
+        BankInfo( uint16_t a_bank_id )
+            : m_bank_id(a_bank_id), m_source_id(0), m_last_pulse_time(0) {}
 
         uint16_t    m_bank_id;
         uint32_t    m_source_id;
@@ -441,3 +501,6 @@ private:
 }}
 
 #endif // MONITORADAPTER_H
+
+// vim: expandtab
+

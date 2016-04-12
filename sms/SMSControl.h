@@ -83,11 +83,17 @@ public:
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
-	void updateValue(const ADARA::VariableU32Pkt &pkt, uint32_t sourceId);
+
+	void updateValue(const ADARA::VariableU32Pkt &pkt,
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoublePkt &pkt,
-			 uint32_t sourceId);
+			uint32_t sourceId);
 	void updateValue(const ADARA::VariableStringPkt &pkt,
-			 uint32_t sourceId);
+			uint32_t sourceId);
+	void updateValue(const ADARA::VariableU32ArrayPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
+			uint32_t sourceId);
 
 	bool getRecording(void);
 
@@ -166,12 +172,6 @@ private:
 		uint32_t				m_cycle;
 		uint32_t				m_ringPeriod;
 		uint32_t				m_flags;
-
-		/* We use bank 0 and 1 to store the error bank (-2) and
-		 * unknown mapping bank (-1) respectively, so account
-		 * for where the real detector banks start in m_banks
-		 */
-		enum { REAL_BANK_OFFSET = 2 };
 	};
 
 	MonitorMap				m_allMonitors;
@@ -268,7 +268,6 @@ private:
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse);
 	void recordPulse(PulsePtr &pulse);
-	bool mapEvent(uint32_t phys, uint32_t &logical, uint32_t &bank);
 	void addMonitorEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,
 				uint32_t id, uint32_t tof);
 	void addChopperEvent(const ADARA::RawDataPkt &pkt, PulsePtr &pulse,

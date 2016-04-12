@@ -52,7 +52,14 @@ private:
                     double      dval;   // double value
                 };
             } vvp;
-            struct
+            struct // Variable Value Packet (VVP) for Numerical Arrays
+            {
+                uint32_t        var_id;
+                uint16_t        severity;
+                uint16_t        status;
+                uint32_t        elemCount;
+            } vvp_array;
+            struct // Variable Value Packet (VVP) for Strings
             {
                 uint32_t        var_id;
                 uint16_t        severity;
@@ -66,23 +73,33 @@ private:
 
     bool            connected();
     void            streamProcessingThread();
-    void            buildDDP( OutPacket &a_adara_pkt, std::string &a_payload, DeviceRecordPtr a_device );
-    void            buildVVP( OutPacket &a_adara_pkt, PVDescriptor *a_pv, PVState a_state, std::string &a_payload );
-    bool            translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt, std::string &a_payload );
-    void            updatePV( PVDescriptor *a_pv, PVState a_state );
+    void            buildDDP( OutPacket &a_adara_pkt,
+                        std::vector<uint8_t> &a_payload,
+                        DeviceRecordPtr a_device );
+    void            buildVVP( OutPacket &a_adara_pkt,
+                        PVDescriptor *a_pv, PVState &a_state,
+                        std::vector<uint8_t> &a_payload );
+    bool            translate( StreamPacket &a_pv_pkt,
+                        OutPacket &a_adara_pkt,
+                        std::vector<uint8_t> &a_payload );
+    void            updatePV( PVDescriptor *a_pv, PVState &a_state );
     void            disconnectUndefinedPVs();
     void            defineDevice( DeviceRecordPtr a_device );
-    void            redefineDevice( DeviceRecordPtr a_device,  DeviceRecordPtr a_old_device );
+    void            redefineDevice( DeviceRecordPtr a_device,
+                        DeviceRecordPtr a_old_device );
     void            undefineDevice( DeviceRecordPtr a_device );
     const char *    getPVTypeXML( PVType a_type ) const;
 
     //----- Sockets-Related Methods -------------------------------------------
     void            initSockets();
     void            socketListenThread();
-    void            sendPacket( OutPacket & a_adara_pkt, std::string *a_payload, int a_socket = -1 );
+    void            sendPacket( OutPacket & a_adara_pkt,
+                        std::vector<uint8_t> &a_payload,
+                        int a_socket = -1 );
     void            sendSourceInfo( int a_socket );
     void            sendCurrentData( int a_socket );
-    bool            send( int a_socket, const char *a_data, uint32_t a_len );
+    bool            send( int a_socket,
+                        const char *a_data, uint32_t a_len );
 
     /// Structure containing ADARA client connection data
     struct ClientInfo

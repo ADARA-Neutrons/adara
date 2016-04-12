@@ -193,7 +193,7 @@ private:
 					 * just queued. */
 					sts->startConnect();
 					/* Send Run Queued Message */
-					combus->sendOriginal(c->runNumber(),
+					combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("Rescan STS Send Pending"),
 							c->startTime());
 				}
@@ -745,7 +745,7 @@ void StorageManager::addBaseStorage(off_t size)
 	m_blocks_used += blocks;
 }
 
-void StorageManager::startContainer(uint32_t run)
+void StorageManager::startContainer(uint32_t run, std::string propId)
 {
 	struct timespec now;
 
@@ -760,10 +760,12 @@ void StorageManager::startContainer(uint32_t run)
 	}
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_cur_container = StorageContainer::create(now, run);
+	m_cur_container = StorageContainer::create(now, run, propId);
 
-	if (run)
-		m_combus->sendOriginal(run, std::string("SMS run started"), now);
+	if (run) {
+		m_combus->sendOriginal(run, propId,
+			std::string("SMS run started"), now);
+	}
 
 	m_contChange(m_cur_container, true);
 
@@ -821,7 +823,7 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 	stateSnapshot(f);
 }
 
-void StorageManager::startRecording(uint32_t run)
+void StorageManager::startRecording(uint32_t run, std::string propId)
 {
 	if (!run)
 		throw std::logic_error("Invalid run number");
@@ -830,12 +832,13 @@ void StorageManager::startRecording(uint32_t run)
 		throw std::logic_error("Already recording");
 
 	endCurrentContainer();
-	startContainer(run);
+	startContainer(run, propId);
 }
 
 void StorageManager::stopRecording(void)
 {
-	m_combus->sendUpdate(m_cur_container->runNumber(),
+	m_combus->sendUpdate(
+		m_cur_container->runNumber(), m_cur_container->propId(),
 		std::string("SMS run stopped"));
 	endCurrentContainer();
 	startContainer();
@@ -846,7 +849,8 @@ void StorageManager::pauseRecording(void)
 	m_cur_container->pause();
 
 	if (m_cur_container->runNumber()) {
-		m_combus->sendUpdate(m_cur_container->runNumber(),
+		m_combus->sendUpdate(
+			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run paused"));
 	}
 }
@@ -856,7 +860,8 @@ void StorageManager::resumeRecording(void)
 	m_cur_container->resume();
 
 	if (m_cur_container->runNumber()) {
-		m_combus->sendUpdate(m_cur_container->runNumber(),
+		m_combus->sendUpdate(
+			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run resumed"));
 	}
 }
@@ -1081,19 +1086,19 @@ void StorageManager::scanDaily(const std::string &dir)
 			if (c->runNumber()) {
 				if (c->isTranslated()) {
 					/* Send STS Succeeded Message */
-					m_combus->sendOriginal(c->runNumber(),
+					m_combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("STS Send Succeeded"),
 							c->startTime());
 				} else if (c->isManual()) {
 					/* Send STS Failed Message */
-					m_combus->sendOriginal(c->runNumber(),
+					m_combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("Needs Manual Translation"),
 							c->startTime());
 				} else {
 					/* Note Pending for Later Translation */
 					m_pendingRuns.push_back(c);
 					/* Send Run Queued Message */
-					m_combus->sendOriginal(c->runNumber(),
+					m_combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("STS Send Pending"),
 							c->startTime());
 				}
@@ -1370,7 +1375,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 			// - who knows whether we've touched this run before...
 			struct timespec now;
 			clock_gettime(CLOCK_REALTIME, &now);
-			m_combus->sendOriginal(run, purgeMsg, now);
+			m_combus->sendOriginal(run, "UNKNOWN", purgeMsg, now);
 		}
 
 		// Accumulate Total Blocks Purged
@@ -1538,13 +1543,20 @@ bool StorageManager::cleanupIndexes(void)
 	return false;
 }
 
-void StorageManager::sendComBus(uint32_t a_run_num,
+void StorageManager::sendComBus(
+		uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state,
 		const struct timespec & a_start_time)
 {
 	if ( a_start_time.tv_sec == 0 && a_start_time.tv_nsec == 0 )
-		m_combus->sendUpdate(a_run_num, a_run_state);
+	{
+		m_combus->sendUpdate(a_run_num, a_proposal_id,
+			a_run_state);
+	}
 	else
-		m_combus->sendOriginal(a_run_num, a_run_state, a_start_time);
+	{
+		m_combus->sendOriginal(a_run_num, a_proposal_id,
+			a_run_state, a_start_time);
+	}
 }
 

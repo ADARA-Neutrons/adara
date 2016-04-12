@@ -148,6 +148,8 @@ protected:
 	virtual bool rxPacket(const VariableU32Pkt &pkt);
 	virtual bool rxPacket(const VariableDoublePkt &pkt);
 	virtual bool rxPacket(const VariableStringPkt &pkt);
+	virtual bool rxPacket(const VariableU32ArrayPkt &pkt);
+	virtual bool rxPacket(const VariableDoubleArrayPkt &pkt);
 
 	/* Collect a log string with statistics on "discarded" packet types,
 	 * i.e. packets that for one reason or another were _Not_ parsed

@@ -209,6 +209,7 @@ DeviceAgent::metadataUpdated()
             ich->second.m_pv->setMetadata(
                 epicsToPVType( ich->second.m_ca_type,
                     ich->second.m_ca_elem_count ),
+                ich->second.m_ca_elem_count,
                 ich->second.m_ca_units, ich->second.m_ca_enum_vals );
             ich->second.m_chan_state = READY;
         }
@@ -495,6 +496,7 @@ DeviceAgent::controlThread()
                         if ( !ich->second.m_pv->equalMetadata(
                                 epicsToPVType( ich->second.m_ca_type,
                                     ich->second.m_ca_elem_count ),
+                                ich->second.m_ca_elem_count,
                                 ich->second.m_ca_units,
                                 ich->second.m_ca_enum_vals ) )
                         {
@@ -516,6 +518,7 @@ DeviceAgent::controlThread()
                     ich->second.m_pv->setMetadata(
                         epicsToPVType( ich->second.m_ca_type,
                             ich->second.m_ca_elem_count ),
+                        ich->second.m_ca_elem_count,
                         ich->second.m_ca_units,
                         ich->second.m_ca_enum_vals );
                     ich->second.m_chan_state = READY;
@@ -1064,22 +1067,52 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         ((struct dbr_time_string *)a_args.dbr)->value;
                     updateState<struct dbr_time_string>(
                         a_args.dbr, state );
+                    state.m_elem_count = a_args.count;
                     break;
                 case DBR_TIME_SHORT:
-                    state.m_int_val =
+                    // Could be Scalar Numerical Value
+                    // -OR- Variable Length Numerical Array...!
+                    //    -> Therefore, Set *Both* Value Fields...! ;-D
+                    state.m_int_val = (int32_t)
                         ((struct dbr_time_short *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
+                    if ( a_args.count > 0 )
+                    {
+                        state.m_short_array = new int16_t[a_args.count];
+                        int16_t *values = (int16_t *)
+                            &((struct dbr_time_short *)a_args.dbr)->value;
+                        for ( uint32_t i=0 ; i < a_args.count ; i++ )
+                        {
+                            state.m_short_array[i] = values[i];
+                        }
+                    }
                     updateState<struct dbr_time_short>(
                         a_args.dbr, state );
                     break;
                 case DBR_TIME_FLOAT:
-                    state.m_real_val =
+                    // Could be Scalar Numerical Value
+                    // -OR- Variable Length Numerical Array...!
+                    //    -> Therefore, Set *Both* Value Fields...! ;-D
+                    state.m_double_val = (double)
                         ((struct dbr_time_float *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
+                    if ( a_args.count > 0 )
+                    {
+                        state.m_float_array = new float[a_args.count];
+                        float *values = (float *)
+                            &((struct dbr_time_float *)a_args.dbr)->value;
+                        for ( uint32_t i=0 ; i < a_args.count ; i++ )
+                        {
+                            state.m_float_array[i] = values[i];
+                        }
+                    }
                     updateState<struct dbr_time_float>(
                         a_args.dbr, state );
                     break;
                 case DBR_TIME_ENUM:
-                    state.m_int_val =
+                    state.m_uint_val = (uint32_t)
                         ((struct dbr_time_enum *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
                     updateState<struct dbr_time_enum>(
                         a_args.dbr, state );
                     break;
@@ -1087,21 +1120,50 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     // Could be (Scalar Numerical) Character
                     // -OR- Variable Length Character String...!
                     //    -> Therefore, Set *Both* Value Fields...! ;-D
-                    state.m_int_val =
+                    state.m_uint_val = (uint32_t)
                         ((struct dbr_time_char *)a_args.dbr)->value;
                     state.m_str_val = (char *)
                         &((struct dbr_time_char *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
                     updateState<struct dbr_time_char>( a_args.dbr, state );
                     break;
                 case DBR_TIME_LONG:
-                    state.m_int_val =
+                    // Could be Scalar Numerical Value
+                    // -OR- Variable Length Numerical Array...!
+                    //    -> Therefore, Set *Both* Value Fields...! ;-D
+                    state.m_int_val = (int32_t)
                         ((struct dbr_time_long *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
+                    if ( a_args.count > 0 )
+                    {
+                        state.m_long_array = new int32_t[a_args.count];
+                        int32_t *values = (int32_t *)
+                            &((struct dbr_time_long *)a_args.dbr)->value;
+                        for ( uint32_t i=0 ; i < a_args.count ; i++ )
+                        {
+                            state.m_long_array[i] = values[i];
+                        }
+                    }
                     updateState<struct dbr_time_long>(
                         a_args.dbr, state );
                     break;
                 case DBR_TIME_DOUBLE:
-                    state.m_real_val =
+                    // Could be Scalar Numerical Value
+                    // -OR- Variable Length Numerical Array...!
+                    //    -> Therefore, Set *Both* Value Fields...! ;-D
+                    state.m_double_val = (double)
                         ((struct dbr_time_double *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count;
+                    if ( a_args.count > 0 )
+                    {
+                        state.m_double_array = new double[a_args.count];
+                        double *values = (double *)
+                            &((struct dbr_time_double *)a_args.dbr)->value;
+                        for ( uint32_t i=0 ; i < a_args.count ; i++ )
+                        {
+                            state.m_double_array[i] = values[i];
+                        }
+                    }
                     updateState<struct dbr_time_double>(
                         a_args.dbr, state );
                     break;
@@ -1370,17 +1432,36 @@ DeviceAgent::epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count )
     switch ( a_rec_type )
     {
         case DBR_STRING:    return PV_STR;
-        case DBR_SHORT:     return PV_INT;
-        case DBR_FLOAT:     return PV_REAL;
+
         case DBR_ENUM:      return PV_ENUM;
-        case DBR_LONG:      return PV_INT;
-        case DBR_DOUBLE:    return PV_REAL;
+
+        case DBR_SHORT:
+        case DBR_LONG:
+        {
+            // Just a (Scalar) Integer...
+            if ( a_elem_count == 1 )
+                return PV_INT;
+            // Actually a Variable Length Integer Array...!
+            else 
+                return PV_INT_ARRAY;
+        }
+
+        case DBR_FLOAT:
+        case DBR_DOUBLE:
+        {
+            // Just a (Scalar) Float...
+            if ( a_elem_count == 1 )
+                return PV_REAL;
+            // Actually a Variable Length Float Array...!
+            else 
+                return PV_REAL_ARRAY;
+        }
 
         case DBR_CHAR:
         {
             // Just a (Scalar) Character...
             if ( a_elem_count == 1 )
-                return PV_INT;
+                return PV_UINT;
             // Actually a Variable Length Character String...!
             else 
                 return PV_STR;

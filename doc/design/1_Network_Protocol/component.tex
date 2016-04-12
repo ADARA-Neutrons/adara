@@ -189,12 +189,16 @@ system.
 		\ref{section:protocol_data_done} \\
 	0x8000.0 & Device Descriptor &
 		\ref{section:protocol_device_descriptor} \\
-	0x8001.0 & Variable Value (u32) &
+	0x8001.0 & Variable Value (U32) &
 		\ref{section:protocol_variable_value_u32} \\
-	0x8002.0 & Variable Value (double) &
+	0x8002.0 & Variable Value (Double) &
 		\ref{section:protocol_variable_value_double} \\
-	0x8003.0 & Variable Value (string) &
+	0x8003.0 & Variable Value (String) &
 		\ref{section:protocol_variable_value_string} \\
+	0x8004.0 & Variable Value (U32 Array) &
+		\ref{section:protocol_variable_value_u32_array} \\
+	0x8005.0 & Variable Value (Double Array) &
+		\ref{section:protocol_variable_value_double_array} \\
     \end{tabular}
   \end{center}
   \caption {Assigned Packet Formats}
@@ -2602,10 +2606,11 @@ The value in the {\bf Device ID} field is used to identify a device in the
 ADARA, and to provide separate variable namespaces for each one.
 
 \detail{Define Device Descriptor XML Schema}{%
-Jim and Marie will define the schema for the XML content of this packet.}
+Jim and Marie will someday in their free time define the schema
+for the XML content of this packet. :-)}
 
 \newpage
-\subsubsection{Variable Value (u32) Packet}
+\subsubsection{Variable Value (U32) Packet}
 \label{section:protocol_variable_value_u32}
 
 \begin{figure}[h]
@@ -2624,7 +2629,7 @@ Jim and Marie will define the schema for the XML content of this packet.}
     \bitbox{16}{Severity} \\
     \wordbox{1}{Variable Value (u32)}
   \end{bytefield}
-  \caption{Packet Type 0x8001.0: Variable Value (u32) Packet}
+  \caption{Packet Type 0x8001.0: Variable Value (U32) Packet}
   \label{fig:protocol_packet_value_u32}
 \end{figure}
 
@@ -2637,7 +2642,8 @@ Jim and Marie will define the schema for the XML content of this packet.}
 Table~\ref{table:protocol_variable_status_values}
 \item{\bf Severity} of this variable from
 Table~\ref{table:protocol_variable_severity_values}
-\item{\bf Variable Value} is an unsigned 32 bit value for this variable.
+\item{\bf Variable Value} is an unsigned 32 bit integer value (U32)
+for this variable.
 \end{itemize}
 
 Note that this packet type is also used to carry enumerated and boolean values.
@@ -2645,7 +2651,7 @@ The specific interpretation of the value is dictated by the Device Descriptor
 associated with the Device ID.
 
 \newpage
-\subsubsection{Variable Value (double) Packet}
+\subsubsection{Variable Value (Double) Packet}
 \label{section:protocol_variable_value_double}
 
 \begin{figure}[h]
@@ -2664,7 +2670,7 @@ associated with the Device ID.
     \bitbox{16}{Severity} \\
     \wordbox{2}{Variable Value (IEEE 754 double)}
   \end{bytefield}
-  \caption{Packet Type 0x8002.0: Variable Value (double) Packet}
+  \caption{Packet Type 0x8002.0: Variable Value (Double) Packet}
   \label{fig:protocol_packet_value_double}
 \end{figure}
 
@@ -2682,7 +2688,7 @@ variable.
 \end{itemize}
 
 \newpage
-\subsubsection{Variable Value (string) Packet}
+\subsubsection{Variable Value (String) Packet}
 \label{section:protocol_variable_value_string}
 
 \begin{figure}[h]
@@ -2699,15 +2705,16 @@ variable.
     \wordbox{1}{Variable ID (u32)} \\
     \bitbox{16}{Status} &
     \bitbox{16}{Severity} \\
-    \wordbox{1}{String Length (u32)} \\
-    \wordbox{2}{Variable Value ($N$ byte string data)} \\
+    \wordbox{1}{String Length (``$N$'', u32)} \\
+    \wordbox{2}{Variable Value (``roundup($N$, 4)'' bytes of string data, null padded)} \\
   \end{bytefield}
-  \caption{Packet Type 0x8003.0: Variable Value (string) Packet}
+  \caption{Packet Type 0x8003.0: Variable Value (String) Packet}
   \label{fig:protocol_packet_value_string}
 \end{figure}
 
 \begin{itemize}
-\item{\bf Length} is 16 bytes plus the length of the {\bf Variable Value} field
+\item{\bf Length} is 16 bytes plus the length
+of the {\bf Variable Value} field
 rounded up to the next multiple of four.
 \item{\bf Timestamp} indicates the time that the variable changed.
 \item{\bf Device ID} indicates the device this variable is from.
@@ -2718,8 +2725,99 @@ Table~\ref{table:protocol_variable_status_values}
 Table~\ref{table:protocol_variable_severity_values}
 \item{\bf String Length} is the length of the string that follows,
 not including padding.
-\item{\bf Variable Value} is a UTF-8 encoded string containing the new value
-for this variable. This field is padded by zeros to the nearest multiple of 4.
+\item{\bf Variable Value} is a UTF-8 encoded string containing
+the new value for this variable.
+This field is padded by zeros to the nearest multiple of 4 bytes.
 \end{itemize}
 
+\newpage
+\subsubsection{Variable Value (U32 Array) Packet}
+\label{section:protocol_variable_value_u32_array}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 4$N$} \\
+    \wordbox{1}{0x00800400} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Element Count (``$N$'', u32)} \\
+    \wordbox{1}{Variable Value - Array Element 1 (u32)} \\
+    \wordbox{1}{. . .} \\
+    \wordbox{1}{Variable Value - Array Element ``$N$'' (u32)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8004.0: Variable Value (U32 Array) Packet}
+  \label{fig:protocol_packet_value_u32_array}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the length
+of the {\bf Variable Value} field,
+which in this case is an array (vector) of ``$N$''
+unsigned 32 bit integer (u32) numerical values.
+\item{\bf Timestamp} indicates the time that the variable changed.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Element Count} is the number of elements ``$N$''
+in the unsigned 32 bit integer (u32) numerical array (vector) that follows.
+\item{\bf Variable Value} is an array (vector) of ``$N$''
+unsigned 32 bit integer (u32) values for this variable.
+\end{itemize}
+
+\newpage
+\subsubsection{Variable Value (Double Array) Packet}
+\label{section:protocol_variable_value_double_array}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 8$N$} \\
+    \wordbox{1}{0x00800500} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Element Count (``$N$'', u32)} \\
+    \wordbox{2}{Variable Value - Array Element 1 (IEEE 754 double)} \\
+    \wordbox{2}{. . .} \\
+    \wordbox{2}{Variable Value - Array Element ``$N$'' (IEEE 754 double)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8005.0: Variable Value (Double Array) Packet}
+  \label{fig:protocol_packet_value_double_array}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the length
+of the {\bf Variable Value} field,
+which in this case is an array (vector) of ``$N$''
+IEEE 754 double floating point numerical values.
+\item{\bf Timestamp} indicates the time that the variable changed.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Element Count} is the number of elements ``$N$''
+in the IEEE 754 double floating point numerical array (vector)
+that follows.
+\item{\bf Variable Value} is an array (vector) of ``$N$''
+IEEE 754 double floating point values for this variable.
+\end{itemize}
 

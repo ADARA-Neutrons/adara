@@ -275,6 +275,9 @@ bool Parser::rxPacket(const Packet &pkt)
 		MAP_TYPE(PacketType::VAR_VALUE_U32_TYPE, VariableU32Pkt);
 		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_TYPE, VariableDoublePkt);
 		MAP_TYPE(PacketType::VAR_VALUE_STRING_TYPE, VariableStringPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_U32_ARRAY_TYPE, VariableU32ArrayPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE,
+			VariableDoubleArrayPkt);
 
 		/* No default handler; we want the compiler to warn about
 		 * the unhandled PacketType values when we add new packets.
@@ -329,6 +332,8 @@ EXPAND_HANDLER(DeviceDescriptorPkt)
 EXPAND_HANDLER(VariableU32Pkt)
 EXPAND_HANDLER(VariableDoublePkt)
 EXPAND_HANDLER(VariableStringPkt)
+EXPAND_HANDLER(VariableU32ArrayPkt)
+EXPAND_HANDLER(VariableDoubleArrayPkt)
 
 void Parser::getDiscardedPacketsLogString(std::string & log_info)
 {

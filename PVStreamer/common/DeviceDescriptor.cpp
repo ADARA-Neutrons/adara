@@ -6,8 +6,10 @@ using namespace std;
 
 namespace PVS {
 
-//=============================================================================
-//===== EnumDescriptor Class ==================================================
+
+//==========================================================================
+//===== EnumDescriptor Class ===============================================
+
 
 /**
  * @brief Equality operator to determine if contents of two EnumDescriptors are identical
@@ -22,8 +24,9 @@ EnumDescriptor::operator==( const EnumDescriptor &a_desc ) const
     if ( m_values.size() == a_desc.m_values.size() )
     {
         res = true;
-        map<int32_t,string>::const_iterator b = a_desc.m_values.begin();
-        for ( map<int32_t,string>::const_iterator a = m_values.begin(); a != m_values.end(); ++a, ++b )
+        map<int32_t, string>::const_iterator b = a_desc.m_values.begin();
+        for ( map<int32_t, string>::const_iterator a = m_values.begin();
+                a != m_values.end(); ++a, ++b )
         {
             if ( a->first != b->first || a->second != b->second )
             {
@@ -45,15 +48,16 @@ EnumDescriptor::operator!=( const EnumDescriptor &a_desc ) const
 
 
 bool
-EnumDescriptor::operator==( const std::map<int32_t,std::string> &a_enum_vals ) const
+EnumDescriptor::operator==( const map<int32_t, string> &a_enum_vals ) const
 {
     bool res = false;
 
     if ( m_values.size() == a_enum_vals.size() )
     {
         res = true;
-        map<int32_t,string>::const_iterator b = a_enum_vals.begin();
-        for ( map<int32_t,string>::const_iterator a = m_values.begin(); a != m_values.end(); ++a, ++b )
+        map<int32_t, string>::const_iterator b = a_enum_vals.begin();
+        for ( map<int32_t, string>::const_iterator a = m_values.begin();
+                a != m_values.end(); ++a, ++b )
         {
             if ( a->first != b->first || a->second != b->second )
             {
@@ -66,23 +70,34 @@ EnumDescriptor::operator==( const std::map<int32_t,std::string> &a_enum_vals ) c
     return res;
 }
 
-//=============================================================================
-//===== PVDescriptor Class ====================================================
+
+//==========================================================================
+//===== PVDescriptor Class =================================================
 
 
-PVDescriptor::PVDescriptor( DeviceDescriptor *a_device, const std::string &a_name, const std::string &a_connection,
-                            PVType a_type, EnumDescriptor *a_enum, const std::string &a_units )
-    : m_device(a_device), m_id(0), m_name(a_name), m_connection(a_connection), m_type(a_type),
-      m_enum(a_enum), m_units(a_units)
+PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
+        const string &a_name, const string &a_connection,
+        PVType a_type, uint32_t a_elem_count,
+        EnumDescriptor *a_enum, const string &a_units )
+    : m_device(a_device), m_id(0),
+    m_name(a_name), m_connection(a_connection),
+    m_type(a_type), m_elem_count(a_elem_count),
+    m_enum(a_enum), m_units(a_units)
 {
     if ( m_type == PV_ENUM && !m_enum )
-        throw runtime_error("EnumDescriptor can not be null for PV of type PV_ENUM");
+    {
+        throw runtime_error(
+            "EnumDescriptor can not be null for PV of type PV_ENUM");
+    }
 }
 
 
-PVDescriptor::PVDescriptor( DeviceDescriptor *a_device, const PVDescriptor &a_source )
-    : m_device(a_device), m_id(0), m_name(a_source.m_name), m_connection(a_source.m_connection),
-      m_type(a_source.m_type), m_enum(0), m_units(a_source.m_units)
+PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
+        const PVDescriptor &a_source )
+    : m_device(a_device), m_id(0),
+    m_name(a_source.m_name), m_connection(a_source.m_connection),
+    m_type(a_source.m_type), m_elem_count(a_source.m_elem_count),
+    m_enum(0), m_units(a_source.m_units)
 {
     if ( m_type == PV_ENUM && a_source.m_enum )
         m_enum = a_device->m_enums[a_source.m_enum->m_id - 1];
@@ -94,7 +109,11 @@ PVDescriptor::operator==( const PVDescriptor &a_desc ) const
 {
     bool res = false;
 
-    if ( m_name == a_desc.m_name && m_connection == a_desc.m_connection && m_type == a_desc.m_type && m_units == a_desc.m_units )
+    if ( m_name == a_desc.m_name
+            && m_connection == a_desc.m_connection
+            && m_type == a_desc.m_type
+            && m_elem_count == a_desc.m_elem_count
+            && m_units == a_desc.m_units )
     {
         res = true;
 
@@ -114,11 +133,14 @@ PVDescriptor::operator!=( const PVDescriptor &a_desc ) const
 
 
 bool
-PVDescriptor::equalMetadata( PVType a_type, const std::string &a_units, const std::map<int32_t,std::string> &a_enum_vals ) const
+PVDescriptor::equalMetadata( PVType a_type, uint32_t a_elem_count,
+    const string &a_units, const map<int32_t, string> &a_enum_vals ) const
 {
     bool res = false;
 
-    if ( a_type == m_type && a_units == m_units )
+    if ( a_type == m_type
+            && a_elem_count == m_elem_count
+            && a_units == m_units )
     {
         if ( m_type == PV_ENUM )
         {
@@ -134,9 +156,11 @@ PVDescriptor::equalMetadata( PVType a_type, const std::string &a_units, const st
 
 
 void
-PVDescriptor::setMetadata( PVType a_type, const std::string &a_units, const std::map<int32_t,std::string> &a_enum_vals )
+PVDescriptor::setMetadata( PVType a_type, uint32_t a_elem_count,
+    const string &a_units, const map<int32_t, string> &a_enum_vals )
 {
     m_type = a_type;
+    m_elem_count = a_elem_count;
     m_units = a_units;
 
     if ( m_type == PV_ENUM )
@@ -146,12 +170,12 @@ PVDescriptor::setMetadata( PVType a_type, const std::string &a_units, const std:
 }
 
 
-//=============================================================================
-//===== DeviceDescriptor Class ================================================
+//==========================================================================
+//===== DeviceDescriptor Class =============================================
 
 
-DeviceDescriptor::DeviceDescriptor( const std::string &a_device_name,
-        const std::string &a_source, Protocol a_protocol )
+DeviceDescriptor::DeviceDescriptor( const string &a_device_name,
+        const string &a_source, Protocol a_protocol )
     : m_id(0), m_name(a_device_name), m_protocol(a_protocol),
     m_source(a_source), m_ready(0)
 {
@@ -168,28 +192,34 @@ DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
 
     for( vector<PVDescriptor*>::const_iterator p = a_source.m_pvs.begin();
             p != a_source.m_pvs.end(); ++p )
-        m_pvs.push_back( new PVDescriptor( this, **p ));
-
+        m_pvs.push_back( new PVDescriptor( this, **p ) );
 }
 
 
 DeviceDescriptor::~DeviceDescriptor()
 {
-    for( vector<PVDescriptor*>::iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
+    for ( vector<PVDescriptor*>::iterator p = m_pvs.begin();
+            p != m_pvs.end(); ++p )
+    {
         delete *p;
+    }
 
-    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
+    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin();
+            e != m_enums.end(); ++e )
+    {
         delete *e;
+    }
 }
 
 
 EnumDescriptor*
-DeviceDescriptor::defineEnumeration( const map<int32_t,std::string> &a_values )
+DeviceDescriptor::defineEnumeration( const map<int32_t, string> &a_values )
 {
     EnumDescriptor *new_enum = new EnumDescriptor( a_values );
     new_enum->m_id = m_enums.size() + 1;
 
-    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
+    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin();
+            e != m_enums.end(); ++e )
     {
         if ( **e == *new_enum )
         {
@@ -209,7 +239,8 @@ DeviceDescriptor::defineEnumeration( const EnumDescriptor &a_enum )
     EnumDescriptor *new_enum = new EnumDescriptor( a_enum );
     new_enum->m_id = m_enums.size() + 1;
 
-    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin(); e != m_enums.end(); ++e )
+    for ( vector<EnumDescriptor*>::iterator e = m_enums.begin();
+            e != m_enums.end(); ++e )
     {
         if ( **e == *new_enum )
         {
@@ -224,20 +255,24 @@ DeviceDescriptor::defineEnumeration( const EnumDescriptor &a_enum )
 
 
 void
-DeviceDescriptor::definePV( const std::string &a_name, const std::string &a_connection, PVType a_type,
-                          EnumDescriptor *a_enum, const std::string &a_units )
+DeviceDescriptor::definePV(
+        const string &a_name, const string &a_connection,
+        PVType a_type, uint32_t a_elem_count,
+        EnumDescriptor *a_enum, const string &a_units )
 {
     if ( getPvByName( a_name ))
         throw runtime_error("Can not define PV with duplicate name");
 
-    m_pvs.push_back( new PVDescriptor( this, a_name, a_connection, a_type, a_enum, a_units ));
+    m_pvs.push_back( new PVDescriptor( this, a_name, a_connection,
+        a_type, a_elem_count, a_enum, a_units ) );
 }
 
 
 PVDescriptor*
-DeviceDescriptor::getPvByName( const std::string &a_pv_name ) const
+DeviceDescriptor::getPvByName( const string &a_pv_name ) const
 {
-    for( vector<PVDescriptor*>::const_iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
+    for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin();
+            p != m_pvs.end(); ++p )
     {
         if ( (*p)->m_name == a_pv_name )
             return *p;
@@ -248,9 +283,10 @@ DeviceDescriptor::getPvByName( const std::string &a_pv_name ) const
 
 
 PVDescriptor*
-DeviceDescriptor::getPvByConnection( const std::string &a_pv_connection ) const
+DeviceDescriptor::getPvByConnection( const string &a_pv_connection ) const
 {
-    for( vector<PVDescriptor*>::const_iterator p = m_pvs.begin(); p != m_pvs.end(); ++p )
+    for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin();
+            p != m_pvs.end(); ++p )
     {
         if ( (*p)->m_connection == a_pv_connection )
             return *p;
@@ -325,10 +361,12 @@ DeviceDescriptor::print( ostream &a_out ) const
     return a_out;
 }
 
+
 ostream&
 PVDescriptor::print( ostream &a_out ) const
 {
-    a_out << "  " << m_id << "," << m_name << "," << m_connection << "," << m_type << "," << m_units << endl;
+    a_out << "  " << m_id << "," << m_name << "," << m_connection << ","
+        << m_type << "[" << m_elem_count << "]," << m_units << endl;
     if ( m_enum )
     {
         a_out << "    enum: ";
@@ -341,17 +379,24 @@ PVDescriptor::print( ostream &a_out ) const
     a_out << "  Name: " << m_name << endl;
     a_out << "  Conn: " << m_connection << endl;
     a_out << "  Type: " << m_type << endl;
-    a_out << "  Enum: "; m_enum?m_enum->print(a_out):a_out << "n/a"; a_out << endl;
+    a_out << "  ElemCount: " << m_elem_count << endl;
+    a_out << "  Enum: ";
+    m_enum ? m_enum->print(a_out) : a_out << "n/a";
+    a_out << endl;
     a_out << "  Unit: " << m_units << endl;
 */
     return a_out;
 }
 
+
 ostream&
 EnumDescriptor::print( ostream &a_out ) const
 {
-    for ( map<int32_t,std::string>::const_iterator v = m_values.begin(); v != m_values.end(); ++v )
+    for ( map<int32_t, string>::const_iterator v = m_values.begin();
+            v != m_values.end(); ++v )
+    {
         a_out << "[" << v->first << ":" << v->second << "]";
+    }
 
     return a_out;
 }

@@ -1,8 +1,10 @@
 #ifndef DASMONMESSAGES_H
 #define DASMONMESSAGES_H
 
+#include <iostream>
 #include <set>
 #include <boost/foreach.hpp>
+#include "ADARAUtils.h"
 #include "ComBusDefs.h"
 #include "RuleEngine.h"
 #include "DASMonDefs.h"
@@ -260,7 +262,18 @@ protected:
 
 // Note: The ProcessVariables message will be removed when direct output to db is available
 
-class ProcessVariables : public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PVS,ProcessVariables>
+/// Process variable types
+enum PVDataType
+{
+    PVDT_UINT,
+    PVDT_DOUBLE,
+    PVDT_STRING,
+    PVDT_UINT_ARRAY,
+    PVDT_DOUBLE_ARRAY
+};
+
+class ProcessVariables :
+    public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PVS, ProcessVariables>
 {
 public:
     ProcessVariables()
@@ -269,25 +282,56 @@ public:
     struct PVData
     {
         PVData()
-            : is_str(false), dbl_val(0.0), status(0), timestamp(0)
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(0.0),
+            status(0), timestamp(0)
+        {}
+
+        PVData( uint32_t a_value, int a_status, uint32_t a_timestamp )
+            : pv_type(PVDT_UINT), is_str(false),
+            uint_val(a_value), dbl_val(0.0),
+            status(a_status), timestamp(a_timestamp)
         {}
 
         PVData( double a_value, int a_status, uint32_t a_timestamp )
-            : is_str(false), dbl_val(a_value), status(a_status), timestamp(a_timestamp)
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(a_value),
+            status(a_status), timestamp(a_timestamp)
         {}
 
-        PVData( const std::string &a_value, int a_status, uint32_t a_timestamp )
-            : is_str(true), dbl_val(0.0), str_val(a_value), status(a_status), timestamp(a_timestamp)
+        PVData( const std::string &a_value,
+                int a_status, uint32_t a_timestamp )
+            : pv_type(PVDT_STRING), is_str(true),
+            uint_val(0), dbl_val(0.0),
+            str_val(a_value), status(a_status), timestamp(a_timestamp)
         {}
 
-        bool            is_str;
-        double          dbl_val;
-        std::string     str_val;
-        int             status;
-        uint32_t        timestamp;
+        PVData( std::vector<uint32_t> a_value,
+                int a_status, uint32_t a_timestamp )
+            : pv_type(PVDT_UINT_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), uint_array(a_value),
+            status(a_status), timestamp(a_timestamp)
+        {}
+
+        PVData( std::vector<double> a_value,
+                int a_status, uint32_t a_timestamp )
+            : pv_type(PVDT_DOUBLE_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), dbl_array(a_value),
+            status(a_status), timestamp(a_timestamp)
+        {}
+
+        PVDataType              pv_type;
+        bool                    is_str;
+        uint32_t                uint_val;
+        double                  dbl_val;
+        std::string             str_val;
+        std::vector<uint32_t>   uint_array;
+        std::vector<double>     dbl_array;
+        int                     status;
+        uint32_t                timestamp;
     };
 
-    std::map<std::string,PVData> m_pvs;
+    std::map<std::string, PVData> m_pvs;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -298,18 +342,65 @@ protected:
         m_pvs.clear();
         try
         {
-            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("pvs"))
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v,
+                    a_prop_tree.get_child("pvs") )
             {
-                data.is_str = v.second.get( "is_str", false );
-                data.status = v.second.get( "status", 0 );
-                if ( data.is_str )
-                    data.str_val = v.second.get( "str_val", "" );
+                int32_t type_ck = v.second.get( "pv_type", -1 );
+
+                // Old Style, No "pv_type", Only "is_str" (Assumes Double)
+                if ( type_ck == -1 )
+                {
+                    data.is_str = v.second.get( "is_str", false );
+                    data.pv_type = ( data.is_str )
+                        ? PVDT_STRING : PVDT_DOUBLE;
+                }
+
+                // New Style, Use "pv_type", But Still Set "is_str"... ;-D
                 else
-                    data.dbl_val = v.second.get( "dbl_val", 0.0 );
+                {
+                    data.pv_type = (PVDataType) type_ck;
+                    data.is_str = ( data.pv_type == PVDT_STRING );
+                }
+
+                data.status = v.second.get( "status", 0 );
+
+                std::string array_str;
+
+                switch ( data.pv_type )
+                {
+                    case PVDT_UINT:
+                        data.uint_val = v.second.get( "uint_val", 0 );
+                        break;
+                    case PVDT_DOUBLE:
+                        data.dbl_val = v.second.get( "dbl_val", 0.0 );
+                        break;
+                    case PVDT_STRING:
+                        data.str_val = v.second.get( "str_val", "" );
+                        break;
+                    case PVDT_UINT_ARRAY:
+                        array_str = v.second.get( "uint_array", "[]" );
+                        Utils::parseArrayString(
+                            array_str, data.uint_array );
+                        break;
+                    case PVDT_DOUBLE_ARRAY:
+                        array_str = v.second.get( "dbl_array", "[]" );
+                        Utils::parseArrayString(
+                            array_str, data.dbl_array );
+                        break;
+                    // Unknown Data Type, Dang... (No Way to Log from Here!)
+                    // - Just Default to a Double(0.0)... ;-b
+                    default:
+                        data.pv_type = PVDT_DOUBLE;
+                        data.dbl_val = 0.0;
+                        break;
+                }
+
                 data.timestamp = v.second.get( "timestamp", 0UL );
+
                 m_pvs[v.second.get( "name", "" )] = data;
             }
-        } catch(...) {}
+        }
+        catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -318,16 +409,63 @@ protected:
 
         boost::property_tree::ptree ppt;
 
-        for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+        for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin();
+                ipv != m_pvs.end(); ++ipv )
         {
             boost::property_tree::ptree pt;
             pt.put( "name", ipv->first );
-            pt.put( "is_str", ipv->second.is_str );
             pt.put( "status", ipv->second.status );
-            if ( ipv->second.is_str )
-                pt.put( "str_val", ipv->second.str_val );
-            else
-                pt.put( "dbl_val", ipv->second.dbl_val );
+
+            std::string array_str;
+
+            switch ( ipv->second.pv_type )
+            {
+                case PVDT_UINT:
+                    pt.put( "uint_val", ipv->second.uint_val );
+                    // For Backwards Compatibility, For Now... ;-D
+                    pt.put( "dbl_val", (double)ipv->second.uint_val );
+                    break;
+                case PVDT_DOUBLE:
+                    pt.put( "dbl_val", ipv->second.dbl_val );
+                    break;
+                case PVDT_STRING:
+                    pt.put( "str_val", ipv->second.str_val );
+                    break;
+                case PVDT_UINT_ARRAY:
+                    Utils::printArrayString( ipv->second.uint_array,
+                        array_str );
+                    pt.put( "uint_array", array_str );
+                    // For Backwards Compatibility, For Now... ;-D
+                    if ( ipv->second.uint_array.size() > 0 )
+                    {
+                        pt.put( "dbl_val",
+                            (double)ipv->second.uint_array[0] );
+                    }
+                    else
+                        pt.put( "dbl_val", 0.0 );
+                    break;
+                case PVDT_DOUBLE_ARRAY:
+                    Utils::printArrayString( ipv->second.dbl_array,
+                        array_str );
+                    pt.put( "dbl_array", array_str );
+                    // For Backwards Compatibility, For Now... ;-D
+                    if ( ipv->second.dbl_array.size() > 0 )
+                        pt.put( "dbl_val", ipv->second.dbl_array[0] );
+                    else
+                        pt.put( "dbl_val", 0.0 );
+                    break;
+                // Unknown Data Type, Dang... (No Way to Log from Here!)
+                // - Just Default to a Double(0.0)... ;-b
+                default:
+                    ipv->second.pv_type = PVDT_DOUBLE;
+                    ipv->second.is_str = false;
+                    pt.put( "dbl_val", 0.0 );
+                    break;
+            }
+
+            pt.put( "pv_type", ipv->second.pv_type );
+            pt.put( "is_str", ipv->second.is_str );
+
             pt.put( "timestamp", ipv->second.timestamp );
 
             ppt.push_back( std::make_pair( "", pt ));
@@ -496,7 +634,7 @@ protected:
         m_facility = a_prop_tree.get( "facility", "" );
 
         m_target_station_number = a_prop_tree.get(
-			"target_station_number", 1 );
+            "target_station_number", 1 );
 
         m_beam_id = a_prop_tree.get( "beam_id", "" );
         m_beam_sname = a_prop_tree.get( "beam_sname", "" );
@@ -758,3 +896,6 @@ protected:
 
 
 #endif // DASMONMESSAGES_H
+
+// vim: expandtab
+

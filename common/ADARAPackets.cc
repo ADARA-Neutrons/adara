@@ -768,14 +768,14 @@ VariableDoublePkt::VariableDoublePkt(const uint8_t *data, uint32_t len) :
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (double) packet has invalid "
+		std::string msg("VariableValue (Double) packet has invalid "
 				"status: ");
 		msg += boost::lexical_cast<std::string>(status());
 		throw invalid_packet(msg);
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (double) packet has invalid "
+		std::string msg("VariableValue (Double) packet has invalid "
 				"severity: ");
 		msg += boost::lexical_cast<std::string>(severity());
 		throw invalid_packet(msg);
@@ -811,7 +811,8 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
 			"VariableValue (String) V0 packet has oversize string: ");
-		msg += boost::lexical_cast<std::string>(size);
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
 		msg += boost::lexical_cast<std::string>(m_payload_len);
 		throw invalid_packet(msg);
@@ -820,7 +821,8 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
 			"Newer VariableValue (String) packet has oversize string: ");
-		msg += boost::lexical_cast<std::string>(size);
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
 		msg += boost::lexical_cast<std::string>(m_payload_len);
 		throw invalid_packet(msg);
@@ -849,3 +851,149 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 VariableStringPkt::VariableStringPkt(const VariableStringPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
 {}
+
+/* ------------------------------------------------------------------------ */
+
+VariableU32ArrayPkt::VariableU32ArrayPkt(
+		const uint8_t *data, uint32_t len ) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t count;
+	size_t size;
+
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::string msg(
+			"VariableValue (U32 Array) V0 packet is too short: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::string msg(
+			"Newer VariableValue (U32 Array) packet is too short: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+
+	count = m_fields[3];
+	size = count * sizeof(uint32_t);
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::string msg(
+			"VariableValue (U32 Array) V0 packet has oversize array: ");
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
+		msg += " vs payload ";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::string msg(
+			"Newer VariableValue (U32 Array) packet has oversize array: ");
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
+		msg += " vs payload ";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+
+	if (validate_status(status())) {
+		std::string msg("VariableValue (U32 Array) packet has invalid "
+				"status: ");
+		msg += boost::lexical_cast<std::string>(status());
+		throw invalid_packet(msg);
+	}
+
+	if (validate_severity(severity())) {
+		std::string msg("VariableValue (U32 Array) packet has invalid "
+				"severity: ");
+		msg += boost::lexical_cast<std::string>(severity());
+		throw invalid_packet(msg);
+	}
+
+	/* TODO it would be better to create the array on access
+	 * rather than object construction; the user may not care.
+	 */
+	m_val = std::vector<uint32_t>( count );
+	memcpy(const_cast<uint32_t *> (m_val.data()),
+		(const uint32_t *) &m_fields[4], count * sizeof(uint32_t));
+}
+
+VariableU32ArrayPkt::VariableU32ArrayPkt(const VariableU32ArrayPkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
+{}
+
+/* ------------------------------------------------------------------------ */
+
+VariableDoubleArrayPkt::VariableDoubleArrayPkt(
+		const uint8_t *data, uint32_t len ) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t count;
+	size_t size;
+
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::string msg(
+			"VariableValue (Double Array) V0 packet is too short: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::string msg(
+			"Newer VariableValue (Double Array) packet is too short: ");
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+
+	count = m_fields[3];
+	size = count * sizeof(double);
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::string msg(
+			"VariableValue (Double Array) V0 packet has oversize array: ");
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
+		msg += " vs payload ";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::string msg(
+		"Newer VariableValue (Double Array) packet has oversize array: ");
+		msg += boost::lexical_cast<std::string>(
+			size + (4 * sizeof(uint32_t)) );
+		msg += " vs payload ";
+		msg += boost::lexical_cast<std::string>(m_payload_len);
+		throw invalid_packet(msg);
+	}
+
+	if (validate_status(status())) {
+		std::string msg("VariableValue (Double Array) packet has invalid "
+				"status: ");
+		msg += boost::lexical_cast<std::string>(status());
+		throw invalid_packet(msg);
+	}
+
+	if (validate_severity(severity())) {
+		std::string msg("VariableValue (Double Array) packet has invalid "
+				"severity: ");
+		msg += boost::lexical_cast<std::string>(severity());
+		throw invalid_packet(msg);
+	}
+
+	/* TODO it would be better to create the array on access
+	 * rather than object construction; the user may not care.
+	 */
+	m_val = std::vector<double>( count );
+	memcpy(const_cast<double *> (m_val.data()),
+		(const double *) &m_fields[4], count * sizeof(double));
+}
+
+VariableDoubleArrayPkt::VariableDoubleArrayPkt(
+		const VariableDoubleArrayPkt &pkt ) :
+	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
+{}
+

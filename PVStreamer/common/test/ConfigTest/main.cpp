@@ -17,9 +17,9 @@ bool
 testRedundantConfig( ConfigManager &cfgmgr )
 {
     DeviceDescriptor dev1( "dev1", "host-a", 1 );
-    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 0, "m/s" );
-    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 0, "m/s" );
-    dev1.definePV( "d1p3", "conn_d1p3", PV_UINT, 0, "m/s" );
+    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 1, 0, "m/s" );
+    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
+    dev1.definePV( "d1p3", "conn_d1p3", PV_UINT, 1, 0, "m/s" );
 
     DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
     DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev1 );
@@ -37,15 +37,15 @@ bool
 testIDReuse( ConfigManager &cfgmgr )
 {
     DeviceDescriptor dev2( "dev2", "host-a", 1 );
-    dev2.definePV( "d2p1", "conn_d2p1", PV_INT, 0, "a" );
-    dev2.definePV( "d2p2", "conn_d2p2", PV_REAL, 0, "b" );
-    dev2.definePV( "d2p3", "conn_d2p3", PV_UINT, 0, "c" );
+    dev2.definePV( "d2p1", "conn_d2p1", PV_INT, 1, 0, "a" );
+    dev2.definePV( "d2p2", "conn_d2p2", PV_REAL, 1, 0, "b" );
+    dev2.definePV( "d2p3", "conn_d2p3", PV_UINT, 1, 0, "c" );
 
     DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev2 );
 
     DeviceDescriptor dev2a( "dev2", "host-a", 1 );
-    dev2a.definePV( "d2p1", "conn_d2p1", PV_INT, 0, "a" );
-    dev2a.definePV( "d2p3", "conn_d2p3", PV_UINT, 0, "c" );
+    dev2a.definePV( "d2p1", "conn_d2p1", PV_INT, 1, 0, "a" );
+    dev2a.definePV( "d2p3", "conn_d2p3", PV_UINT, 1, 0, "c" );
 
     DeviceRecordPtr rec2a = cfgmgr.defineDevice( dev2a );
 
@@ -70,8 +70,8 @@ bool
 testDeviceUndefine( ConfigManager &cfgmgr )
 {
     DeviceDescriptor dev1( "dev1", "host-a", 1 );
-    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 0, "m/s" );
-    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 0, "m/s" );
+    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 1, 0, "m/s" );
+    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
 
     DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
 
@@ -95,9 +95,9 @@ testEnums( ConfigManager &cfgmgr )
 
     EnumDescriptor *e = dev1.defineEnumeration( vals );
 
-    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 0, "m/s" );
-    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 0, "m/s" );
-    dev1.definePV( "d1p3", "conn_d1p3", PV_ENUM, e, "" );
+    dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 1, 0, "m/s" );
+    dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
+    dev1.definePV( "d1p3", "conn_d1p3", PV_ENUM, 1, e, "" );
 
     DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
 
@@ -105,7 +105,7 @@ testEnums( ConfigManager &cfgmgr )
 
     e = dev1.defineEnumeration( vals );
 
-    dev1.definePV( "d1p4", "conn_d1p4", PV_ENUM, e, "" );
+    dev1.definePV( "d1p4", "conn_d1p4", PV_ENUM, 1, e, "" );
 
     rec1 = cfgmgr.defineDevice( dev1 );
 
