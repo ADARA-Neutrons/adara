@@ -1243,7 +1243,9 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 			<< "Unknown packet type " << pkt.type()
 			<< " from " << m_name);
 	}
-	return true;
+	// It's Ok If We Get Something We Don't Recognize, Probably "New"...
+	// - Don't Return "true" Here and Trigger a Disconnect, Just Log & Go!
+	return false;
 }
 
 bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr, 
