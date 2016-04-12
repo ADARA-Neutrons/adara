@@ -3109,7 +3109,10 @@ StreamParser::toPVType
     else if ( boost::istarts_with( a_source, "enum_" ))
         return PVT_ENUM;
 
-    THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid PV type." )
+    std::string err = "Invalid PV type [";
+    err += a_source;
+    err += "]";
+    THROW_TRACE( ERR_UNEXPECTED_INPUT, err )
 }
 
 /*! \brief Method to retrieve an XML node's value with whitespace trimmed
