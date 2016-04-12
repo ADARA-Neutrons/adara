@@ -282,37 +282,41 @@ public:
     struct PVData
     {
         PVData()
-            : pv_type(PVDT_DOUBLE), uint_val(0), dbl_val(0.0),
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(0.0),
             status(0), timestamp(0)
         {}
 
         PVData( uint32_t a_value, int a_status, uint32_t a_timestamp )
-            : pv_type(PVDT_UINT), uint_val(a_value), dbl_val(0.0),
+            : pv_type(PVDT_UINT), is_str(false),
+            uint_val(a_value), dbl_val(0.0),
             status(a_status), timestamp(a_timestamp)
         {}
 
         PVData( double a_value, int a_status, uint32_t a_timestamp )
-            : pv_type(PVDT_DOUBLE), uint_val(0), dbl_val(a_value),
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(a_value),
             status(a_status), timestamp(a_timestamp)
         {}
 
         PVData( const std::string &a_value,
                 int a_status, uint32_t a_timestamp )
-            : pv_type(PVDT_STRING), uint_val(0), dbl_val(0.0),
+            : pv_type(PVDT_STRING), is_str(true),
+            uint_val(0), dbl_val(0.0),
             str_val(a_value), status(a_status), timestamp(a_timestamp)
         {}
 
         PVData( std::vector<uint32_t> a_value,
                 int a_status, uint32_t a_timestamp )
-            : pv_type(PVDT_UINT_ARRAY), uint_val(0), dbl_val(0.0),
-            uint_array(a_value),
+            : pv_type(PVDT_UINT_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), uint_array(a_value),
             status(a_status), timestamp(a_timestamp)
         {}
 
         PVData( std::vector<double> a_value,
                 int a_status, uint32_t a_timestamp )
-            : pv_type(PVDT_DOUBLE_ARRAY), uint_val(0), dbl_val(0.0),
-            dbl_array(a_value),
+            : pv_type(PVDT_DOUBLE_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), dbl_array(a_value),
             status(a_status), timestamp(a_timestamp)
         {}
 
