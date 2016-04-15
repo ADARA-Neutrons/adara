@@ -199,6 +199,10 @@ private:
 				}
 			}
 		}
+		else {
+			DEBUG("RescanRunDirPV: " << m_pv_name
+				<< " Error Scanning [" << rescanRunDir << "]");
+		}
 
 		// Done, Reset Rescan Run Directory PV...
 		struct timespec now;

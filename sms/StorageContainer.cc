@@ -512,7 +512,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	uint32_t run;
 
 	if (!validatePath(path, cpath, ts, run)) {
-		WARN("Invalid storage container at '" << path << "'");
+		WARN("scan(): Invalid storage container at '" << path << "'");
 		return StorageContainer::SharedPtr();
 	}
 
@@ -522,8 +522,11 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	 */
 	const timespec &start = StorageManager::scanStart();
 	if (ts.tv_sec > start.tv_sec || (ts.tv_sec == start.tv_sec &&
-						ts.tv_nsec >= start.tv_nsec))
+						ts.tv_nsec >= start.tv_nsec)) {
+		INFO("scan(): Storage Container at '" << path << "'"
+			<< " Created After Scan Start - Ignore...");
 		return StorageContainer::SharedPtr();
+	}
 
 	StorageContainer::SharedPtr c(new StorageContainer(cpath));
 	c->m_weakThis = c;
@@ -539,7 +542,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		fs::file_status status = it->status();
 
 		if (status.type() != fs::regular_file) {
-			WARN("Ignoring non-file '" << it->path() << "'");
+			WARN("scan(): Ignoring non-file '" << it->path() << "'");
 			continue;
 		}
 
@@ -568,7 +571,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		}
 
 		if (file.extension() != ".adara") {
-			WARN("Ignoring non-ADARA file '" << it->path() << "'");
+			WARN("scan(): Ignoring non-ADARA file '" << it->path() << "'");
 			continue;
 		}
 
