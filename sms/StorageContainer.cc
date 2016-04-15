@@ -561,8 +561,9 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		if (prop_ck == 0) {
 			c->m_propId = file.string().substr(prop_ck
 				+ sizeof(m_proposal_id_marker_prefix) + 1);
-			DEBUG("scan(): Found ProposalId Marker, "
-				<< "Set ProposalId for Container to: " << c->m_propId);
+			DEBUG("scan(): Found ProposalId Marker"
+				<< " for Run " << c->m_runNumber << ","
+				<< " Set ProposalId for Container to: " << c->m_propId);
 			continue;
 		}
 
