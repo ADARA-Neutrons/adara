@@ -40,7 +40,7 @@ public:
 
 	static SharedPtr create(const struct timespec &start,
 		uint32_t run, std::string &propId);
-	static SharedPtr scan(const std::string &path);
+	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
 				bool keep, std::string &propId, bool &path_deleted);
 

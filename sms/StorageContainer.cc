@@ -505,7 +505,8 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	return p;
 }
 
-StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
+StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
+		bool force)
 {
 	std::string cpath;
 	struct timespec ts;
@@ -518,11 +519,14 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 
 	/* If this container was created after we started the scan, it
 	 * will be accounted for via normal operations and should be skipped
-	 * here.
+	 * here. Unless of course we're trying to Re-Scan a run directory,
+	 * in which case we should ignore this criteria...! ;-D
 	 */
 	const timespec &start = StorageManager::scanStart();
-	if (ts.tv_sec > start.tv_sec || (ts.tv_sec == start.tv_sec &&
-						ts.tv_nsec >= start.tv_nsec)) {
+	if ( !force
+			&& ( ts.tv_sec > start.tv_sec
+				|| ( ts.tv_sec == start.tv_sec
+					&& ts.tv_nsec >= start.tv_nsec ) ) ) {
 		INFO("scan(): Storage Container at '" << path << "'"
 			<< " Created After Scan Start - Ignore...");
 		return StorageContainer::SharedPtr();

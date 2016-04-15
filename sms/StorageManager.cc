@@ -169,7 +169,7 @@ private:
 			<< " Rescanning [" << rescanRunDir << "]");
 
 		StorageContainer::SharedPtr c =
-			StorageContainer::scan( rescanRunDir );
+			StorageContainer::scan( rescanRunDir, true );
 
 		if (c) {
 
