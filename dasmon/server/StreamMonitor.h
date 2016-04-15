@@ -32,8 +32,8 @@ class IStreamListener
 public:
     virtual void connectionStatus( bool a_connected,
         const std::string &a_host, unsigned short a_port ) = 0;
-    virtual void runStatus( bool a_recording,
-        uint32_t a_run_number, uint32_t a_timestamp ) = 0;
+    virtual void runStatus( bool a_recording, uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
     virtual void beginProlog() = 0;
     virtual void endProlog() = 0;
     virtual void pauseStatus( bool a_paused ) = 0;
@@ -46,20 +46,20 @@ public:
     virtual void pvDefined( const std::string &a_name ) = 0;
     virtual void pvUndefined( const std::string &a_name ) = 0;
     virtual void pvValue( const std::string &a_name,
-        uint32_t a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
     virtual void pvValue( const std::string &a_name,
-        double a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
     virtual void pvValue( const std::string &a_name,
-        std::string &a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+        std::string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
     virtual void pvValue( const std::string &a_name,
-        std::vector<uint32_t> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+        std::vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
     virtual void pvValue( const std::string &a_name,
-        std::vector<double> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp ) = 0;
+        std::vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec ) = 0;
 };
 
 /// Identifier type used for devices and process variables
@@ -98,7 +98,7 @@ public:
         m_device_id(a_device_id),
         m_pv_id(a_pv_id),
         m_type(a_type),
-        m_time(0),
+        m_time(0), m_time_nanosec(0),
         m_status(VariableStatus::OK),
         m_updated(false)
     {}
@@ -112,6 +112,7 @@ public:
     Identifier              m_pv_id;        ///< ID of the PV
     PVType                  m_type;         ///< Type of PV
     uint32_t                m_time;
+    uint32_t                m_time_nanosec;
     VariableStatus::Enum    m_status;
     bool                    m_updated;
 };
@@ -346,8 +347,8 @@ private:
         void addListener( IStreamListener &a_listener );
         void removeListener( IStreamListener &a_listener );
 
-        void runStatus( bool a_recording,
-                 uint32_t a_run_number, uint32_t a_timestamp  );
+        void runStatus( bool a_recording, uint32_t a_run_number,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec  );
         void beginProlog();
         void endProlog();
         void pauseStatus( bool a_paused );
@@ -360,20 +361,22 @@ private:
         void pvDefined( const std::string &a_name );
         void pvUndefined( const std::string &a_name );
         void pvValue( const std::string &a_name,
-                 uint32_t a_value,
-                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+                 uint32_t a_value, VariableStatus::Enum a_status,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
         void pvValue( const std::string &a_name,
-                 double a_value,
-                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+                 double a_value, VariableStatus::Enum a_status,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
         void pvValue( const std::string &a_name,
-                 std::string &a_value,
-                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+                 std::string &a_value, VariableStatus::Enum a_status,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
         void pvValue( const std::string &a_name,
                  std::vector<uint32_t> a_value,
-                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+                 VariableStatus::Enum a_status,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
         void pvValue( const std::string &a_name,
                  std::vector<double> a_value,
-                 VariableStatus::Enum a_status, uint32_t a_timestamp );
+                 VariableStatus::Enum a_status,
+                 uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
         void connectionStatus( bool a_connected,
                  const std::string &a_host, unsigned short a_port );
 
@@ -454,6 +457,7 @@ private:
     bool                            m_recording;
     uint32_t                        m_run_num;
     uint32_t                        m_run_timestamp;
+    uint32_t                        m_run_timestamp_nanosec;
     bool                            m_paused;
     short                           m_info_rcv;
     BeamInfo                        m_beam_info;
