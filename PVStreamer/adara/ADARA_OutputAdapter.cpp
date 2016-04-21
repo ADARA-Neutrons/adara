@@ -554,8 +554,11 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
     m_devices.insert( a_device );
 
     // Insert new PV state entries with disconnected status
-    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
+    {
         m_pv_state[*ipv] = PVState();
+    }
 }
 
 
@@ -571,7 +574,8 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
  * where they will be further processed and eventually flushed.
  */
 void
-OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_device )
+OutputAdapter::redefineDevice(
+        DeviceRecordPtr a_device, DeviceRecordPtr a_old_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -580,7 +584,8 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
     PVDescriptor *old_pv;
     bool found;
 
-    // Transfer last-known PVState to new state entries (keyed on new PVDescriptor instances)
+    // Transfer last-known PVState to new state entries
+    // (keyed on new PVDescriptor instances)
     vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
     for ( ; ipv != a_device->m_pvs.end(); ++ipv )
     {
@@ -596,9 +601,14 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
             }
         }
 
-        // If this is a brand new PV, set it's state to undefined/invalid (until we get the first value from it)
+        // If this is a brand new PV, set it's state to undefined/invalid
+        // (until we get the first value from it)
         if ( !found )
-            m_pv_state[*ipv] = PVState( ::ADARA::VariableStatus::NOT_REPORTED, ::ADARA::VariableSeverity::INVALID );
+        {
+            m_pv_state[*ipv] =
+                PVState( ::ADARA::VariableStatus::NOT_REPORTED,
+                    ::ADARA::VariableSeverity::INVALID );
+        }
     }
 
     // Add "new" device to configured device list
@@ -612,13 +622,10 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
 /**
  * @brief Process device undefined internal stream packet
  * @param a_device - Reference to device being undefined
- * @param a_undefine_pvs - Flag indicating if member PVs should be placed in undef_pvs set
  *
  * This method updates internal state due to the removal of the specified
  * device. This method does NOT emit any ADARA packets, it only updates
- * internal state. If the a_undefine_pvs flag is set, all PVs
- * of the device will be placed in a "garbage" container where they will
- * be further processed and eventually flushed.
+ * internal state.
  */
 void
 OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
@@ -633,7 +640,9 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
     {
         ipv_state = m_pv_state.find( *ipv );
         if ( ipv_state != m_pv_state.end() )
+        {
             m_pv_state.erase( ipv_state );
+        }
     }
 
     set<DeviceRecordPtr>::iterator idev = m_devices.find( a_device );
