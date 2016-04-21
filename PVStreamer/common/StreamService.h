@@ -62,31 +62,33 @@ struct PVState
         m_status(a_state.m_status), m_severity(a_state.m_severity)
     {
         // Don't Allocate Anything if there are No Elements...
-        if ( m_elem_count < 1 )
-            return;
-        if ( a_state.m_short_array != NULL )
+        // (Minimum Array Size is 2! :-)
+        if ( m_elem_count > 1 )
         {
-            m_short_array = new int16_t[m_elem_count];
-            memcpy( m_short_array,
-                a_state.m_short_array, m_elem_count * sizeof(int16_t) );
-        }
-        if ( a_state.m_long_array != NULL )
-        {
-            m_long_array = new int32_t[m_elem_count];
-            memcpy( m_long_array,
-                a_state.m_long_array, m_elem_count * sizeof(int32_t) );
-        }
-        if ( a_state.m_float_array != NULL )
-        {
-            m_float_array = new float[m_elem_count];
-            memcpy( m_float_array,
-                a_state.m_float_array, m_elem_count * sizeof(float) );
-        }
-        if ( a_state.m_double_array != NULL )
-        {
-            m_double_array = new double[m_elem_count];
-            memcpy( m_double_array,
-                a_state.m_double_array, m_elem_count * sizeof(double) );
+            if ( a_state.m_short_array != NULL )
+            {
+                m_short_array = new int16_t[m_elem_count];
+                memcpy( m_short_array,
+                    a_state.m_short_array, m_elem_count * sizeof(int16_t) );
+            }
+            if ( a_state.m_long_array != NULL )
+            {
+                m_long_array = new int32_t[m_elem_count];
+                memcpy( m_long_array,
+                    a_state.m_long_array, m_elem_count * sizeof(int32_t) );
+            }
+            if ( a_state.m_float_array != NULL )
+            {
+                m_float_array = new float[m_elem_count];
+                memcpy( m_float_array,
+                    a_state.m_float_array, m_elem_count * sizeof(float) );
+            }
+            if ( a_state.m_double_array != NULL )
+            {
+                m_double_array = new double[m_elem_count];
+                memcpy( m_double_array,
+                    a_state.m_double_array, m_elem_count * sizeof(double) );
+            }
         }
     }
 
@@ -119,7 +121,8 @@ struct PVState
         m_severity = a_state.m_severity;
 
         // Don't Allocate Anything if there are No Elements...
-        if ( m_elem_count >= 1 )
+        // (Minimum Array Size is 2! :-)
+        if ( m_elem_count > 1 )
         {
             if ( a_state.m_short_array != NULL )
             {

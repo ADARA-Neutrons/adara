@@ -409,7 +409,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
         a_adara_pkt.payload_len     = 16
             + ( elemCount * sizeof(uint32_t) );
 
-        // Set payload
+        // Set Payload (Minimum Array Size is 2... :-)
         uint_array = vector<uint32_t>( elemCount );
         if ( a_state.m_short_array != NULL )
         {
@@ -464,7 +464,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
                 ::ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION );
         a_adara_pkt.payload_len     = 16 + ( elemCount * sizeof(double) );
 
-        // Set payload
+        // Set Payload (Minimum Array Size is 2... :-)
         double_array = vector<double>( elemCount );
         if ( a_state.m_float_array != NULL )
         {
