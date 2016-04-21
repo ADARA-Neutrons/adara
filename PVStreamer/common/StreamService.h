@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <string.h>
+#include <syslog.h>
 
 #include "CoreDefs.h"
 #include "ConfigManager.h"
@@ -53,12 +54,16 @@ struct PVState
     {}
 
     PVState( const PVState & a_state )
-        : m_uint_val(a_state.m_uint_val),
+        : m_double_val(a_state.m_double_val), // Copy *Double*, Covers Union
+        m_str_val(a_state.m_str_val),
         m_short_array(NULL), m_long_array(NULL),
         m_float_array(NULL), m_double_array(NULL),
-        m_elem_count(a_state.m_elem_count),
+        m_elem_count(a_state.m_elem_count), m_time(a_state.m_time),
         m_status(a_state.m_status), m_severity(a_state.m_severity)
     {
+        // Don't Allocate Anything if there are No Elements...
+        if ( m_elem_count < 1 )
+            return;
         if ( a_state.m_short_array != NULL )
         {
             m_short_array = new int16_t[m_elem_count];
@@ -91,6 +96,57 @@ struct PVState
         delete[] m_long_array;
         delete[] m_float_array;
         delete[] m_double_array;
+    }
+
+    PVState& operator=( const PVState & a_state )
+    {
+        // Free & Null Out Any Existing Numerical Arrays...
+        delete[] m_short_array;
+        m_short_array = (int16_t *) NULL;
+        delete[] m_long_array;
+        m_long_array = (int32_t *) NULL;
+        delete[] m_float_array;
+        m_float_array = (float *) NULL;
+        delete[] m_double_array;
+        m_double_array = (double *) NULL;
+
+        // Copy Scalar Fields...
+        m_double_val = a_state.m_double_val; // Copy *Double*, Covers Union!
+        m_str_val = a_state.m_str_val;
+        m_elem_count = a_state.m_elem_count;
+        m_time = a_state.m_time;
+        m_status = a_state.m_status;
+        m_severity = a_state.m_severity;
+
+        // Don't Allocate Anything if there are No Elements...
+        if ( m_elem_count >= 1 )
+        {
+            if ( a_state.m_short_array != NULL )
+            {
+                m_short_array = new int16_t[m_elem_count];
+                memcpy( m_short_array,
+                    a_state.m_short_array, m_elem_count * sizeof(int16_t) );
+            }
+            if ( a_state.m_long_array != NULL )
+            {
+                m_long_array = new int32_t[m_elem_count];
+                memcpy( m_long_array,
+                    a_state.m_long_array, m_elem_count * sizeof(int32_t) );
+            }
+            if ( a_state.m_float_array != NULL )
+            {
+                m_float_array = new float[m_elem_count];
+                memcpy( m_float_array,
+                    a_state.m_float_array, m_elem_count * sizeof(float) );
+            }
+            if ( a_state.m_double_array != NULL )
+            {
+                m_double_array = new double[m_elem_count];
+                memcpy( m_double_array,
+                    a_state.m_double_array, m_elem_count * sizeof(double) );
+            }
+        }
+        return *this;
     }
 
     union
