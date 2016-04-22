@@ -712,7 +712,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
 	/* Walk the pending pulses and mark them incomplete if they are still
-	 * waiting for data form this source, as it's not going to come. Keep
+	 * waiting for data from this source, as it's not going to come. Keep
 	 * track of the last pulse that is completed, whether by this process
 	 * or via markCompleted() but left in queue due to No-EoP Buffering.
 	 */
@@ -849,28 +849,17 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// Log the Size of the Remaining Internal Pulse Buffer...
-		// (Count the Rest of the List We _Didn't_ Just Process...)
-		uint64_t queue_length = 0;
-		while ( it != m_pulses.end() ) {
-			queue_length++;
-			it++;
-		}
-		// Account for Last Pulse, If Recorded...
-		if (!m_noEoPPulseBufferSize || num_sources == 1) {
-			queue_length--;
-		}
-
 		// Erase Any Now-Recorded Pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
 		}
 
-		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		// Log the Size of the Remaining Internal Pulse Buffer...
+		// (Rest of the List We _Didn't_ Just Process...)
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
-			<< "Remaining Internal Pulse Buffer Length = " << queue_length
-			<< " recorded=" << recorded
-			<< " (size=" << m_pulses.size() << ")");
+			<< "Remaining Internal Pulse Buffer Length = "
+			<< m_pulses.size()
+			<< " (recorded=" << recorded << ")" );
 	}
 
 	/* Mark This Id for Re-Use. */
@@ -1040,7 +1029,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// (Give the "New Guy" a chance to exist before we dump it... ;-D)
 	if ( m_pulses.size() > m_maxPulseBufferSize ) {
 
-		// Record & Free as Many Pulses as Required to Stay Under Max...
+		// Record & Free Just Enough Pulses as Required to Stay Under Max!
 		// (Even after adding the next one, already in hand...!)
 		uint32_t num_to_record =
 			m_pulses.size() - m_maxPulseBufferSize + 1;
@@ -1085,29 +1074,21 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			recorded++;
 		}
 
-		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		// Log What Pulse Map Size Will Be _After_ Freeing Recorded Pulses
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_PULSE_BUFFER_OVERFLOW, "none",
 				2, 10, 100, log_info ) ) {
-			// Count the Rest of the List We _Didn't_ Just Purge...
-			uint64_t queue_length = 0;
-			while ( it != m_pulses.end() ) {
-				queue_length++;
-				it++;
-			}
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "*** Internal Pulse Buffer Overflow!"
-				<< " Length = " << queue_length
-				<< " recorded=" << recorded
-				<< " (size=" << m_pulses.size()
-				<< " not counting new pulse 0x"
-				<< std::hex << id << ")"
-				<< " - Recorded Pulses 0x"
-				<< m_pulses.begin()->first.first
-				<< " up to 0x"
-				<< last_recorded->first.first << std::dec);
+				<< " Length = " << ( m_pulses.size() - recorded )
+				<< " (recorded=" << recorded << ")"
+				<< std::hex
+				<< " (not counting new pulse 0x" << id << ")"
+				<< " - Recorded Pulses 0x" << m_pulses.begin()->first.first
+				<< " up to 0x" << last_recorded->first.first
+				<< std::dec);
 		}
 
 		// Erase Any Now-Recorded Pulses
@@ -1151,13 +1132,6 @@ void SMSControl::setSourcesReadDelay(void)
 	}
 
 	// Dump Internal Pulse Buffer Size/Info...
-	PulseMap::iterator it, next_to_last;
-	uint64_t queue_length = 0;
-	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-		queue_length++;
-		next_to_last = it;
-	}
-
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 			RLL_SET_SOURCES_READ_DELAY, "none",
@@ -1166,17 +1140,17 @@ void SMSControl::setSourcesReadDelay(void)
 			DEBUG(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer " << std::hex
-				<< " begin()=" << "0x" << m_pulses.begin()->first.first
-				<< " next_to_last=" << "0x" << next_to_last->first.first
+				<< " from 0x" << m_pulses.begin()->first.first
+				<< " to 0x" << m_pulses.rbegin()->first.first
 				<< std::dec
-				<< ", Internal Pulse Buffer Length = " << queue_length
-				<< " (size=" << m_pulses.size() << ")");
+				<< ", Internal Pulse Buffer Length = "
+				<< m_pulses.size() );
 		} else {
 			DEBUG(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer is Empty"
-				<< ", Internal Pulse Buffer Length = " << queue_length
-				<< " (size=" << m_pulses.size() << ")");
+				<< ", Internal Pulse Buffer Length = "
+				<< m_pulses.size() );
 		}
 	}
 }
@@ -1633,17 +1607,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	if (pulse->m_pending.any()) {
 		// Periodically Log the Size of the Internal Pulse Buffer...
 		if ( !(++queue_log_count % 5000) ) {
-			// Count the Full List...
-			uint64_t queue_length = 0;
-			it = m_pulses.begin();
-			while ( it != m_pulses.end() ) {
-				queue_length++;
-				it++;
-			}
 			DEBUG( ( m_recording ? "[RECORDING] " : "" )
 				<< "[Pending] Internal Pulse Buffer Length = "
-				<< queue_length
-				<< " (size=" << m_pulses.size() << ")");
+				<< m_pulses.size() );
 		}
 		return;
 	}
@@ -1744,33 +1710,16 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		recorded++;
 	}
 
-	// Periodically Log the Size of the Internal Pulse Buffer...
-	uint64_t queue_length = 0;
-	bool do_log = false;
-	if ( !(++queue_log_count % 5000) ) {
-		// Count the Rest of the List We _Didn't_ Just Process...
-		while ( it != m_pulses.end() ) {
-			queue_length++;
-			it++;
-		}
-		// Account for Last Pulse, If Recorded...
-		if (!m_noEoPPulseBufferSize) {
-			queue_length--;
-		}
-		do_log = true;
-	}
-
 	// Erase Any Now-Recorded Pulses
 	if (recorded) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
 	}
 
-	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
-	if ( do_log ) {
+	// Periodically Log the Resulting Size of the Internal Pulse Buffer...
+	if ( !(++queue_log_count % 5000) ) {
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
-			<< "Internal Pulse Buffer Length = " << queue_length
-			<< " recorded=" << recorded
-			<< " (size=" << m_pulses.size() << ")");
+			<< "Internal Pulse Buffer Length = " << m_pulses.size()
+			<< " (recorded=" << recorded << ")" );
 	}
 }
 
