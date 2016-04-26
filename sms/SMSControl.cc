@@ -1807,6 +1807,17 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 	// Log Pulse Proton Charge Correction Failure...!
 	else
 	{
+		// Generate Pulse/Next Pulse RTDL Logging String
+		std::stringstream ss_rtdl;
+		if ( pulse->m_rtdl ) {
+			ss_rtdl << " pulse->m_rtdl->pulseCharge()=";
+			ss_rtdl << pulse->m_rtdl->pulseCharge();
+		}
+		if ( next_pulse->m_rtdl ) {
+			ss_rtdl << " next_pulse->m_rtdl->pulseCharge()=";
+			ss_rtdl << next_pulse->m_rtdl->pulseCharge();
+		}
+
 		/* Rate-limited logging of global sawtooth pulse */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
@@ -1830,6 +1841,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 				<< " m_doPulsePchgCorrect=" << m_doPulsePchgCorrect
 				<< " pulse->m_charge=" << pulse->m_charge
 				<< " next_pulse->m_charge=" << next_pulse->m_charge
+				<< ss_rtdl.str()
 				<< " m_doPulseVetoCorrect=" << m_doPulseVetoCorrect
 				<< " pulse->m_vetoFlags=" << pulse->m_vetoFlags
 				<< " next_pulse->m_vetoFlags=" << next_pulse->m_vetoFlags);
