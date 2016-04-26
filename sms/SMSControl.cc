@@ -721,13 +721,13 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 	last = m_pulses.end();
 	for ( it = m_pulses.begin(); it != m_pulses.end(); it++ ) {
 		// Release Now-Partial Pulses...
-		if (it->second->m_pending[smsId]) {
+		if ( it->second->m_pending[smsId] ) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
 			marked_partial++;
 		}
 		// Note the Last Now-Completed (Partial or Not) Pulse for Handling
-		if (it->second->m_pending.none()) {
+		if ( it->second->m_pending.none() ) {
 			last = it;
 			now_complete++;
 		}
@@ -738,7 +738,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		<< " marked_partial=" << marked_partial
 		<< " now_complete=" << now_complete );
 
-	if (last != m_pulses.end()) {
+	if ( last != m_pulses.end() ) {
 
 		/* Ok, we had at least one pulse completed by the recently
 		 * departed source; all pulses previous to that one must be
@@ -775,7 +775,8 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 				<< " Buffering " << m_noEoPPulseBufferSize << " Pulses,"
 				<< " Last Pulse = 0x"
 				<< std::hex << last_minus_buffer->first.first << std::dec);
-			// Work Backward from *End of Buffer* (_Not_ the Current Last!)
+			// Work Backward from *End of Buffer*...
+			// (_Not_ the Last Complete Pulse!)
 			PulseMap::reverse_iterator rit = m_pulses.rbegin();
 			while ( cnt++ < m_noEoPPulseBufferSize ) {
 				// End of the Line, Not Enough Buffered Pulses to Proceed
@@ -819,7 +820,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		// Interlaced amidst the Pulses Being Released by the
 		// Now-Unregistered Data Source...
 		// But That is *OK*, Because Anything Older Than *This*
-		// "Current Complete Pulse" Probably _Should_ have Already
+		// "Last Completed Pulse" Probably _Should_ have Already
 		// been Marked Complete; the Pulses are Insertion-Sorted in
 		// Pulse Time Order, so if This Pulse is Complete, then
 		// All Preceding Pulses Should Also Be...!
@@ -1609,25 +1610,77 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 {
 	static uint32_t queue_log_count = 0;
 
+	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 	PulseMap::iterator current = getPulse(pulseId, dup);
-	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
-	if ( smsId != (uint32_t) -1 )
-		pulse->m_pending.reset(smsId);
+	// If this is a "Real" Event Source, then Check Whole Pulse Buffer
+	// (up to This Current Pulse :-) for Any "Now-Partial" Completions
+	// for This Source... ;-D
 
-	// Pulse Still Pending from Other Data Sources...
-	if ( pulse->m_pending.any() ) {
-		// Periodically Log the Size of the Internal Pulse Buffer...
-		if ( !(++queue_log_count % 5000) ) {
-			DEBUG( ( m_recording ? "[RECORDING] " : "" )
-				<< "[Pending] Internal Pulse Buffer Length = "
-				<< m_pulses.size() );
+	// This accounts for any Lack of Synchrony among Pulses from
+	// Different Data Sources, e.g. when running Sub-60Hz we can have
+	// Mutually Exclusive Pulse Sets being used for Different Event Types,
+	// So we have to handle such "Interleaving"...! ;-D
+
+	int marked_partial = 0;
+	int now_complete = 0;
+	last = m_pulses.end();
+
+	if ( smsId != (uint32_t) -1 ) {
+
+		// Just like unregisterEventSource() but different. :-D
+		// (Stop _Just Before_ Current Pulse - Only One Known "Complete")
+		for ( it = m_pulses.begin(); it != current; it++ ) {
+			// Release Now-Partial Pulses...
+			if ( it->second->m_pending[smsId] ) {
+				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+				it->second->m_pending.reset(smsId);
+				marked_partial++;
+			}
+			// Note Last Now-Completed (Partial or Not) Pulse for Handling
+			if ( it->second->m_pending.none() ) {
+				last = it;
+				now_complete++;
+			}
 		}
-		return;
+
+		// And, Of Course, Mark the Current Pulse Complete for This Source
+		pulse->m_pending.reset(smsId);
 	}
 
-	/* This pulse has now been marked complete by all active data sources.
+	// Is this Current Pulse Now Complete...?
+	if ( pulse->m_pending.none() ) {
+		last = current;
+		now_complete++;
+	}
+
+	// Pulse Still Pending from Other Data Sources...
+	else {
+		// If Nothing Anywhere in the Pulse Buffer is Complete Yet,
+		// then just return...
+		if ( !now_complete ) {
+			// Periodically Log the Size of the Internal Pulse Buffer...
+			if ( !(++queue_log_count % 5000) ) {
+				DEBUG( ( m_recording ? "[RECORDING] " : "" )
+					<< "markComplete():"
+					<< " [Pending] Internal Pulse Buffer Length = "
+					<< m_pulses.size() );
+			}
+			return;
+		}
+	}
+
+	// Periodically Log the Size/Status of the Internal Pulse Buffer...
+	if ( !(++queue_log_count % 5000) ) {
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "markComplete():"
+			<< " Internal Pulse Buffer Length = " << m_pulses.size()
+			<< " marked_partial=" << marked_partial
+			<< " now_complete=" << now_complete );
+	}
+
+	/* Some pulse has now been marked complete by all active data sources.
 	 * As we expect to get monotonically increasing pulse ids, all
 	 * previously incomplete pulses can be considered to be partial
 	 * pulses -- one or more data sources had a duplicated pulse or
@@ -1645,11 +1698,11 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
-	current_minus_buffer = current;
+	last_minus_buffer = last;
 	uint32_t recorded = 0;
 	uint32_t cnt = 0;
 
-	// Work Backward from *End of Buffer* (_Not_ the Current Pulse!)
+	// Work Backward from *End of Buffer* (_Not_ the Last Complete Pulse!)
 	PulseMap::reverse_iterator rit = m_pulses.rbegin();
 	while ( cnt++ < m_noEoPPulseBufferSize ) {
 		// End of the Line, Not Enough Buffered Pulses to Proceed
@@ -1657,9 +1710,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			// Skip Over Pulse to Satisfy Buffering Requirement
 			// (Slide "Current Pulse" Iterator with Reverse Iterator,
 			// *If* It Catches Up... ;-)
-			if ( current_minus_buffer->first == rit->first ) {
-				if ( current_minus_buffer != m_pulses.begin() )
-					current_minus_buffer--;
+			if ( last_minus_buffer->first == rit->first ) {
+				if ( last_minus_buffer != m_pulses.begin() )
+					last_minus_buffer--;
 				else {
 					// DEBUG("markComplete():"
 						// << " Ran Out of Pulses to Buffer - Done");
@@ -1682,22 +1735,20 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Pulses Here, if there are some Unresolved Pulses still
 	// Interlaced amidst the Pulses Before the Current Pulse.
 	// But That is *OK*, Because Anything Older Than *This*
-	// "Current Complete Pulse" Probably _Should_ have Already
+	// "Last Completed Pulse" Probably _Should_ have Already
 	// been Marked Complete; the Pulses are Insertion-Sorted in
 	// Pulse Time Order, so if This Pulse is Complete, then
 	// All Preceding Pulses Should Also Be...!
 	// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
 	// These should be Correctly Handled by Sufficient Buffer Size!)
 
-	// Include "Current Complete Pulse" (With Any Buffering Adjustments)
-	current_minus_buffer++;
+	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
+	last_minus_buffer++;
 
-	for ( it = m_pulses.begin(); it != current_minus_buffer; it++ ) {
+	for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
 
-		// Previous Pulses will Never be Made Complete, Mark as Partial
-		if ( it->second->m_pending.any() ) {
-			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-		}
+		// Previous Pulses will Never be Made Complete,
+		// Already Marked as Partial as Needed Above...
 
 		// Correct Proton Charge...
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
@@ -1737,6 +1788,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Periodically Log the Resulting Size of the Internal Pulse Buffer...
 	if ( !(++queue_log_count % 5000) ) {
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "markComplete():"
 			<< "Internal Pulse Buffer Length = " << m_pulses.size()
 			<< " (recorded=" << recorded << ")" );
 	}
