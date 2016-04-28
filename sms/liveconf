@@ -115,6 +115,14 @@ option_label[$num_options]="[Ignore End-of-Pulse]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="mixed_data_packets"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Mixed Data Packets (Neutron and Meta-Data)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="readsize"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxReadChunk"
 option_pv_opt[$num_options]="-S"
@@ -1154,6 +1162,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:ConnectRetryTimeout
 					caget $WAIT ${dsprefix}:DataTimeout
 					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
 					caget $WAIT ${dsprefix}:SaveInputStream
