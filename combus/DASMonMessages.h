@@ -867,6 +867,7 @@ protected:
         m_pulse_pcharge_uncorrected
                                 = a_prop_tree.get(
                                       "pulse_pcharge_uncorrected", 0UL );
+        m_no_neutrons_count     = a_prop_tree.get( "no_neutrons_count", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -883,6 +884,7 @@ protected:
         a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
         a_prop_tree.put( "pulse_pcharge_uncorrected",
             m_pulse_pcharge_uncorrected );
+        a_prop_tree.put( "no_neutrons_count", m_no_neutrons_count );
     }
 };
 
