@@ -1438,6 +1438,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	 *
 	 * Note: Nope, the charge in the RawDataPkt/MappedDataPkt is
 	 * "Off By One" too, for Previous Pulse, just like with the RTDL...
+	 * This is now corrected in correctPChargeVeto().
 	 *
 	 * Also Note: By capturing the charge from RawDataPkt/MappedDataPkt,
 	 * there is a subtle side benefit, which is that any Pulses with
@@ -1453,6 +1454,9 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	uint32_t phys, logical;
 	uint16_t bank = 0;
 
+	bool got_neutrons = false;
+	bool no_neutrons = false;
+
 	for (i=0; i < count; i++) {
 
 		phys = events[i].pixel;
@@ -1466,6 +1470,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 				 */
 				addMonitorEvent(pkt, pulse, phys, events[i].tof);
 				pulse->m_numMonEvents++;
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				continue;
 
 			case 7: // Chopper Event
@@ -1474,6 +1480,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 				 * event section.
 				 */
 				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				continue;
 
 			case 0: // Detector Event
@@ -1498,6 +1506,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
+				// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+				got_neutrons = true;
 				break;
 
 			case 5: case 6: // Fast-Metadata Variable Update
@@ -1512,10 +1522,14 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 					pulse->m_fastMetaEvents.push_back(events[i]);
 					continue;
 				}
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				/* FALLTHROUGH */
 
 			case 1: case 2: case 3: // Unused as yet...
 				/* Unused sources, let them drop into error handling */
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				/* FALLTHROUGH */
 
 			default: // Error Event
@@ -1548,6 +1562,13 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		src->second.m_banks[bank].push_back(translated);
 		pulse->m_numEvents++;
 	}
+
+	// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+	// (Or, we got nuthin', so count it just to be safe... ;-)
+	// TODO Create A More Authoritative Flag for This in the
+	//    RawDataPkt/MappedDataPkt Packets...!
+	if ( !got_neutrons && no_neutrons )
+		pulse->m_flags |= ADARA::BankedEventPkt::NO_NEUTRONS;
 }
 
 void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
@@ -1997,7 +2018,14 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first);
 
 	/* Beam monitor event header */
-	m_hdrs.push_back(pulse->m_charge);
+	if ( pulse->m_flags & ADARA::BankedEventPkt::NO_NEUTRONS ) {
+		// No Neutrons This Pulse, Don't Count This Pulse's Proton Charge
+		m_hdrs.push_back((uint32_t) 0);
+	} else {
+		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+		// (Or at least we could have gotten some... :-)
+		m_hdrs.push_back(pulse->m_charge);
+	}
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 
@@ -2062,7 +2090,14 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first);
 
 	/* Banked event header */
-	m_hdrs.push_back(pulse->m_charge);
+	if ( pulse->m_flags & ADARA::BankedEventPkt::NO_NEUTRONS ) {
+		// No Neutrons This Pulse, Don't Count This Pulse's Proton Charge
+		m_hdrs.push_back((uint32_t) 0);
+	} else {
+		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+		// (Or at least we could have gotten some... :-)
+		m_hdrs.push_back(pulse->m_charge);
+	}
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 
