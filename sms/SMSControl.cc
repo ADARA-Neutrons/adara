@@ -251,6 +251,7 @@ void SMSControl::addSource(const std::string &name,
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	bool mixed_data_packets;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
 
@@ -277,6 +278,7 @@ void SMSControl::addSource(const std::string &name,
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
 
@@ -285,6 +287,13 @@ void SMSControl::addSource(const std::string &name,
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Should probably let someone know if we're Mixing Data Packets
+	// with Both Neutron Events and Meta-Data Events... ;-D
+	if (mixed_data_packets) {
+		DEBUG("Mixed Data Packets Flag Set to True for " << name
+			<< " - No Auto-Deduce Sub-60Hz Pulse for Proton Charge Zero!");
 	}
 
 	// Probably should also log if we're Saving All the Input Stream
@@ -303,6 +312,7 @@ void SMSControl::addSource(const std::string &name,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
+							 mixed_data_packets,
 							 chunk_size,
 							 rtdlNoDataThresh,
 							 save_input_stream));
@@ -1033,6 +1043,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	new_pulse->m_flags |= ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
 	new_pulse->m_flags |= ADARA::BankedEventPkt::VETO_UNCORRECTED;
 
+	// By Default, All New Pulses Have Yet to Have Any Data Packets,
+	// And So Are Marked as "No Neutrons" for Sub-60Hz Operation,
+	// where we Zero Out the Proton Charge for Non-Data Pulses...
+	new_pulse->m_flags |= ADARA::BankedEventPkt::NO_NEUTRONS;
+
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
@@ -1403,8 +1418,9 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 	pulse->m_chopperEvents[cid].push_back(tof);
 }
 
-void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
-		uint32_t hwId, uint32_t dup, bool is_mapped)
+void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
+		uint32_t hwId, uint32_t dup,
+		bool is_mapped, bool mixed_data_packets )
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -1563,12 +1579,15 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		pulse->m_numEvents++;
 	}
 
-	// Count This Pulse's Proton Charge - We Got Neutrons! :-D
-	// (Or, we got nuthin', so count it just to be safe... ;-)
+	// If We Got Neutrons, Count This Pulse's Proton Charge! :-D
+	// Or, If We Got Nuthin' (Didn't Get Neutrons, but Also
+	//    Didn't Get Meta-Data Events), Count It Just to Be Safe... ;-b
+	// Or, If This Data Soure is Marked as having "Mixed Data Packets",
+	//    then All Bets are Off, Just Count the Dang Proton Charge... ;-o
 	// TODO Create A More Authoritative Flag for This in the
 	//    RawDataPkt/MappedDataPkt Packets...!
-	if ( !got_neutrons && no_neutrons )
-		pulse->m_flags |= ADARA::BankedEventPkt::NO_NEUTRONS;
+	if ( got_neutrons || !no_neutrons || mixed_data_packets )
+		pulse->m_flags &= ~ADARA::BankedEventPkt::NO_NEUTRONS;
 }
 
 void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)

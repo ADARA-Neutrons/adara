@@ -61,7 +61,9 @@ public:
 	void unregisterEventSource(uint32_t smsId);
 
 	void pulseEvents(const ADARA::RawDataPkt &pkt,
-			uint32_t hwId, uint32_t dup, bool is_mapped);
+			uint32_t hwId, uint32_t dup,
+			bool is_mapped, bool mixed_data_packets);
+
 	void pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup);
 
 	void markPartial(uint64_t pulseId, uint32_t dup);
