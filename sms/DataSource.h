@@ -29,7 +29,7 @@ public:
 	DataSource(const std::string &name, bool enabled,
 		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
-		bool ignore_eop, unsigned int read_chunk,
+		bool ignore_eop, bool mixed_data_packets, unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
 
@@ -62,6 +62,7 @@ private:
 	double m_connect_timeout;
 	double m_data_timeout;
 	bool m_ignore_eop;
+	bool m_mixed_data_packets;
 	unsigned int m_max_read_chunk;
 	uint32_t m_rtdlNoDataThresh;
 	bool m_save_input_stream;
@@ -74,6 +75,7 @@ private:
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
+	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;
 	boost::shared_ptr<smsUint32PV> m_pvRTDLNoDataThresh;
 	boost::shared_ptr<smsBooleanPV> m_pvSaveInputStream;
