@@ -840,6 +840,9 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
     }
 
+    if ( flags & BankedEventPkt::NO_NEUTRONS )
+         ++m_run_metrics.m_no_neutrons_count;
+
     uint32_t        source_id;
     uint32_t        bank_count;
     int16_t         bank_id;
