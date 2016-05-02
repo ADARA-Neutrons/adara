@@ -95,6 +95,7 @@ private:
         BIF_GENERAL_PV_ERROR,
         BIF_PULSE_PCHG_UNCOR,
         BIF_NO_NEUTRONS_COUNT,
+        BIF_TOTAL_PULSES_COUNT,
         BIF_COUNT
     };
 

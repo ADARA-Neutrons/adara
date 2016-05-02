@@ -80,6 +80,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
     m_fact_name[BIF_PULSE_PCHG_UNCOR]    = "RUN_PULSE_PCHG_UNCOR";
     m_fact_name[BIF_NO_NEUTRONS_COUNT]   = "RUN_NO_NEUTRONS_COUNT";
+    m_fact_name[BIF_TOTAL_PULSES_COUNT]  = "RUN_TOTAL_PULSES_COUNT";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
@@ -662,6 +663,7 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_GENERAL_PV_ERROR]);
     a_facts.insert(m_fact_name[BIF_PULSE_PCHG_UNCOR]);
     a_facts.insert(m_fact_name[BIF_NO_NEUTRONS_COUNT]);
+    a_facts.insert(m_fact_name[BIF_TOTAL_PULSES_COUNT]);
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -1037,6 +1039,7 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_PULSE_VETO_COUNT], a_metrics.m_pulse_veto_count );
     m_engine->assert( m_fact[BIF_PULSE_PCHG_UNCOR], a_metrics.m_pulse_pcharge_uncorrected );
     m_engine->assert( m_fact[BIF_NO_NEUTRONS_COUNT], a_metrics.m_no_neutrons_count );
+    m_engine->assert( m_fact[BIF_TOTAL_PULSES_COUNT], a_metrics.m_total_pulses_count );
 }
 
 
