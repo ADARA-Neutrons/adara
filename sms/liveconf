@@ -1088,11 +1088,17 @@ if [[ "$command" == "status" \
 	fi
 
 	if [[ "$command" == "status" \
-			|| "$command" == "run_status" ]]; then
+			|| "$command" == "run_status" \
+			|| "$command" == "sys_status" ]]; then
 
 		caget -S $WAIT ${PRE}:SMS:Version | sed "s/ (/\n   (/"
 
 		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" ]]; then
 
 		caget $WAIT -a ${PRE}:SMS:Recording
 
@@ -1126,6 +1132,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Paused
 
 		echo
+
 	fi
 
 	if [[ "$command" == "status" \
