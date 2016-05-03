@@ -61,6 +61,7 @@ public:
     uint32_t            m_elem_count;
     EnumDescriptor     *m_enum;
     string              m_units;
+    bool                m_ignore;
 
 private:
     PVDescriptor( DeviceDescriptor *a_device,
