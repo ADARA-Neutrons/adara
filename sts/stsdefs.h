@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.4.4"
+#define STS_VERSION "1.5.1"
 extern pid_t g_pid;
 
 namespace STS {
@@ -614,7 +614,8 @@ public:
         std::vector<PVEnumeratedType>
                            *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
         uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
-        const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
+        const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
+        bool                a_ignore        ///< [in] PV Ignore Flag
     )
     :
         m_device_name(a_device_name),
@@ -626,6 +627,7 @@ public:
         m_enum_vector(a_enum_vector),
         m_enum_index(a_enum_index),
         m_units(a_units),
+        m_ignore(a_ignore),
         m_last_time(0)
     {}
 
@@ -655,7 +657,8 @@ public:
             PVType a_type,
             std::vector<PVEnumeratedType> *a_enum_vector,
             uint32_t a_enum_index,
-            const std::string &a_units )
+            const std::string &a_units,
+            bool a_ignore )
     {
         PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
 
@@ -668,7 +671,7 @@ public:
         if ( m_device_name == a_device_name
                 && m_name == a_name && m_connection == a_connection
                 && m_type == a_type && !diffEnum( enum1, enum2 )
-                && m_units == a_units ) {
+                && m_units == a_units && m_ignore == a_ignore ) {
             return true;
         }
         else {
@@ -694,7 +697,7 @@ public:
                 && m_name == a_pv.m_name
                 && m_connection == a_pv.m_connection
                 && m_type == a_pv.m_type && !diffEnum( enum1, enum2 )
-                && m_units == a_pv.m_units ) {
+                && m_units == a_pv.m_units && m_ignore == a_pv.m_ignore ) {
             return true;
         }
         else {
@@ -715,6 +718,7 @@ public:
                        *m_enum_vector;  ///< Enumerated Type Vector of PV
     uint32_t            m_enum_index;   ///< Enumerated Type Index of PV
     std::string         m_units;        ///< Units of PV
+    bool                m_ignore;       ///< PV Ignore Flag
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
     std::vector<double> m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
@@ -737,10 +741,12 @@ public:
         std::vector<PVEnumeratedType>
                            *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
         uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
-        const std::string  &a_units         ///< [in] Units of PV (empty if not needed)
+        const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
+        bool                a_ignore        ///< [in] PV Ignore Flag
     )
     : PVInfoBase( a_device_name, a_name, a_connection,
-        a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index, a_units )
+        a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+        a_units, a_ignore )
     {}
 
     /// PVInfo destructor
@@ -773,7 +779,8 @@ public:
                                 std::vector<PVEnumeratedType>
                                     *a_enum_vector,
                                 uint32_t a_enum_index,
-                                const std::string &a_units ) = 0;
+                                const std::string &a_units,
+                                bool a_ignore ) = 0;
     virtual BankInfo*       makeBankInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve ) = 0;

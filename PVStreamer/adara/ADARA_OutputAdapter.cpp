@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <syslog.h>
+#include <time.h>
 #include <iomanip>
 #include <boost/lexical_cast.hpp>
 
@@ -36,6 +37,8 @@ OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_por
       m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
+
+    makeHeartbeatDevice();
 
     m_socket_listen_thread = new boost::thread( boost::bind( &OutputAdapter::socketListenThread, this ));
     m_stream_proc_thread = new boost::thread( boost::bind( &OutputAdapter::streamProcessingThread, this ));
@@ -106,13 +109,34 @@ OutputAdapter::streamProcessingThread()
         {
             if ( timeout_flag )
             {
-                // Send a heartbeat packet
+                // Send a Heartbeat Packet (and a Heartbeat PV Update! :-D)
                 if ( connected() )
                 {
+                    // Send Heartbeat Packet
                     heartbeat_pkt.sec =
                         (uint32_t)time(0) - EPICS_TIME_OFFSET;
                     payload.clear();
                     sendPacket( heartbeat_pkt, payload );
+
+                    // Send Heartbeat PV Update...
+
+                    m_heartbeat_pv_value++;
+
+                    PVState state = PVState(
+                        ::ADARA::VariableStatus::OK,
+                        ::ADARA::VariableSeverity::OK );
+
+                    state.m_uint_val = m_heartbeat_pv_value;
+                    state.m_elem_count = 1;
+                    state.m_time.sec =
+                        (uint32_t)time(0) - EPICS_TIME_OFFSET;
+                    state.m_time.nsec = 0;
+
+                    updatePV( m_heartbeat_pv, state );
+
+                    payload.clear();
+                    buildVVP( adara_pkt, m_heartbeat_pv, state, payload );
+                    sendPacket( adara_pkt, payload );
                 }
             }
             else
@@ -235,11 +259,17 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
     // Encode XML
 
     sstr << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl
-            << "  <device xmlns=\"http://public.sns.gov/schema/device.xsd\"" << endl
-            << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl
-            << "  xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd\">" << endl;
+         << "  <device xmlns=\"http://public.sns.gov/schema/device.xsd\""
+         << endl
+         << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+         << endl
+         << "  xsi:schemaLocation=\""
+         << "http://public.sns.gov/schema/device.xsd"
+         << " http://public.sns.gov/schema/device.xsd\">"
+         << endl;
 
-    sstr << "  <device_name>" << a_device->m_name << "</device_name>" << endl;
+    sstr << "  <device_name>" << a_device->m_name << "</device_name>"
+         << endl;
 
     // Generate enumeration definitions for enums used by this device only
 
@@ -247,15 +277,23 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
     {
         sstr << "  <enumerations>" << endl;
         unsigned short id = 1;
-        for ( vector<EnumDescriptor*>::const_iterator e = a_device->m_enums.begin(); e != a_device->m_enums.end(); ++e, ++id )
+        for ( vector<EnumDescriptor*>::const_iterator e =
+                    a_device->m_enums.begin();
+                e != a_device->m_enums.end(); ++e, ++id )
         {
             sstr << "    <enumeration>" << endl;
-            sstr << "      <enum_name>enum_" << setw(2) << setfill('0') << id << "</enum_name>" << endl;
-            for ( map<int32_t,std::string>::const_iterator iel = (*e)->m_values.begin(); iel != (*e)->m_values.end(); ++iel )
+            sstr << "      <enum_name>enum_"
+                 << setw(2) << setfill('0') << id << "</enum_name>"
+                 << endl;
+            for ( map<int32_t,std::string>::const_iterator iel =
+                        (*e)->m_values.begin();
+                    iel != (*e)->m_values.end(); ++iel )
             {
                 sstr << "        <enum_element>" << endl;
-                sstr << "          <enum_element_name>" << iel->second << "</enum_element_name>" << endl;
-                sstr << "          <enum_element_value>" << iel->first << "</enum_element_value>" << endl;
+                sstr << "          <enum_element_name>" << iel->second
+                     << "</enum_element_name>" << endl;
+                sstr << "          <enum_element_value>" << iel->first
+                     << "</enum_element_value>" << endl;
                 sstr << "        </enum_element>" << endl;
             }
             sstr << "    </enumeration>" << endl;
@@ -267,19 +305,37 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
 
     sstr << "  <process_variables>" << endl;
 
-    for ( vector<PVDescriptor*>::const_iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::const_iterator ipv =
+                a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
     {
         sstr << "    <process_variable>" << endl;
-        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
-        sstr << "      <pv_connection>" << (*ipv)->m_connection << "</pv_connection>" << endl;
+        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>"
+             << endl;
+        sstr << "      <pv_connection>" << (*ipv)->m_connection
+             << "</pv_connection>" << endl;
         sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
         if ( (*ipv)->m_type == PV_ENUM )
-            sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->m_id << "</pv_type>" << endl;
+        {
+            sstr << "      <pv_type>enum_"
+                 << setw(2) << setfill('0') << (*ipv)->m_enum->m_id
+                 << "</pv_type>" << endl;
+        }
         else
-            sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type) << "</pv_type>" << endl;
+        {
+            sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type)
+                 << "</pv_type>" << endl;
+        }
         if ( (*ipv)->m_units.size() )
-            sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
-
+        {
+            sstr << "      <pv_units>" << (*ipv)->m_units
+                 << "</pv_units>" << endl;
+        }
+        if ( (*ipv)->m_ignore )
+        {
+            sstr << "      <pv_ignore>" << (*ipv)->m_ignore
+                 << "</pv_ignore>" << endl;
+        }
         sstr << "    </process_variable>" << endl;
     }
 
@@ -409,7 +465,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
         a_adara_pkt.payload_len     = 16
             + ( elemCount * sizeof(uint32_t) );
 
-        // Set payload
+        // Set Payload (Minimum Array Size is 2... :-)
         uint_array = vector<uint32_t>( elemCount );
         if ( a_state.m_short_array != NULL )
         {
@@ -464,7 +520,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
                 ::ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION );
         a_adara_pkt.payload_len     = 16 + ( elemCount * sizeof(double) );
 
-        // Set payload
+        // Set Payload (Minimum Array Size is 2... :-)
         double_array = vector<double>( elemCount );
         if ( a_state.m_float_array != NULL )
         {
@@ -554,8 +610,11 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
     m_devices.insert( a_device );
 
     // Insert new PV state entries with disconnected status
-    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
+    {
         m_pv_state[*ipv] = PVState();
+    }
 }
 
 
@@ -571,7 +630,8 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
  * where they will be further processed and eventually flushed.
  */
 void
-OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_device )
+OutputAdapter::redefineDevice(
+        DeviceRecordPtr a_device, DeviceRecordPtr a_old_device )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -580,7 +640,8 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
     PVDescriptor *old_pv;
     bool found;
 
-    // Transfer last-known PVState to new state entries (keyed on new PVDescriptor instances)
+    // Transfer last-known PVState to new state entries
+    // (keyed on new PVDescriptor instances)
     vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
     for ( ; ipv != a_device->m_pvs.end(); ++ipv )
     {
@@ -596,9 +657,14 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
             }
         }
 
-        // If this is a brand new PV, set it's state to undefined/invalid (until we get the first value from it)
+        // If this is a brand new PV, set it's state to undefined/invalid
+        // (until we get the first value from it)
         if ( !found )
-            m_pv_state[*ipv] = PVState( ::ADARA::VariableStatus::NOT_REPORTED, ::ADARA::VariableSeverity::INVALID );
+        {
+            m_pv_state[*ipv] =
+                PVState( ::ADARA::VariableStatus::NOT_REPORTED,
+                    ::ADARA::VariableSeverity::INVALID );
+        }
     }
 
     // Add "new" device to configured device list
@@ -612,13 +678,10 @@ OutputAdapter::redefineDevice( DeviceRecordPtr a_device, DeviceRecordPtr a_old_d
 /**
  * @brief Process device undefined internal stream packet
  * @param a_device - Reference to device being undefined
- * @param a_undefine_pvs - Flag indicating if member PVs should be placed in undef_pvs set
  *
  * This method updates internal state due to the removal of the specified
  * device. This method does NOT emit any ADARA packets, it only updates
- * internal state. If the a_undefine_pvs flag is set, all PVs
- * of the device will be placed in a "garbage" container where they will
- * be further processed and eventually flushed.
+ * internal state.
  */
 void
 OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
@@ -633,7 +696,9 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
     {
         ipv_state = m_pv_state.find( *ipv );
         if ( ipv_state != m_pv_state.end() )
+        {
             m_pv_state.erase( ipv_state );
+        }
     }
 
     set<DeviceRecordPtr>::iterator idev = m_devices.find( a_device );
@@ -723,6 +788,44 @@ OutputAdapter::initSockets()
     {
         EXCEPT( EC_SOCKET_ERROR, "Unknown exception in initSockets()." );
     }
+}
+
+
+/** \brief Create Fake Heartbeat Device & PV for Keep-Alive Web Monitoring
+ */
+void
+OutputAdapter::makeHeartbeatDevice(void)
+{
+    // Create Heartbeat Device & PV...
+
+    m_heartbeat_device = DeviceRecordPtr( new DeviceDescriptor(
+        "HeartbeatDevice", "pvsd", PVSD_PROTOCOL ) );
+
+    m_heartbeat_device->m_id = -1;
+
+    m_heartbeat_device->definePV( "HeartbeatPVSD", "HeartbeatPVSD",
+        PV_UINT, 1, (EnumDescriptor *) NULL, "" );
+
+    m_heartbeat_pv = m_heartbeat_device->getPvByName( "HeartbeatPVSD" );
+
+    m_heartbeat_pv->m_id = -1;
+    m_heartbeat_pv->m_ignore = true;
+
+    defineDevice( m_heartbeat_device );
+
+    // Initialize Heartbeat PV & State...
+
+    m_heartbeat_pv_value = 0;
+
+    PVState state = PVState( ::ADARA::VariableStatus::OK,
+        ::ADARA::VariableSeverity::OK );
+
+    state.m_uint_val = m_heartbeat_pv_value;
+    state.m_elem_count = 1;
+    state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+    state.m_time.nsec = 0;
+
+    updatePV( m_heartbeat_pv, state );
 }
 
 

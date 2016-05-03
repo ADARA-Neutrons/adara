@@ -358,7 +358,7 @@ private:
 DataSource::DataSource(const std::string &name, bool enabled,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
-			double data_timeout, bool ignore_eop,
+			double data_timeout, bool ignore_eop, bool mixed_data_packets,
 			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
 			bool save_input_stream) :
 	m_name(uri), m_basename(name), m_uri(uri),
@@ -366,6 +366,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
+	m_mixed_data_packets(mixed_data_packets),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -419,6 +420,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
 
+	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":MixedDataPackets"));
+
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk"));
 
@@ -457,6 +461,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvDataTimeout);
 	ctrl->addPV(m_pvIgnoreEoP);
+	ctrl->addPV(m_pvMixedDataPackets);
 	ctrl->addPV(m_pvMaxReadChunk);
 	ctrl->addPV(m_pvRTDLNoDataThresh);
 	ctrl->addPV(m_pvSaveInputStream);
@@ -483,6 +488,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
@@ -1442,9 +1448,13 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	if ( good_pulse )
 	{
+		// Update "Mixed Data Packets" Option for This Data Source
+		// from Live Config...
+		m_mixed_data_packets = m_pvMixedDataPackets->value();
+
 		SMSControl *ctrl = SMSControl::getInstance();
 		ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
-			is_mapped);
+			is_mapped, m_mixed_data_packets);
 
 		if (hw_src.checkSeq(*pkt))
 			ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());

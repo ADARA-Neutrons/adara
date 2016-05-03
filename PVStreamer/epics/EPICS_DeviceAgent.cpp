@@ -1076,7 +1076,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     state.m_int_val = (int32_t)
                         ((struct dbr_time_short *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
-                    if ( a_args.count > 0 )
+                    if ( a_args.count > 1 ) // Minimum Array Size is 2...
                     {
                         state.m_short_array = new int16_t[a_args.count];
                         int16_t *values = (int16_t *)
@@ -1096,7 +1096,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     state.m_double_val = (double)
                         ((struct dbr_time_float *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
-                    if ( a_args.count > 0 )
+                    if ( a_args.count > 1 ) // Minimum Array Size is 2...
                     {
                         state.m_float_array = new float[a_args.count];
                         float *values = (float *)
@@ -1134,7 +1134,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     state.m_int_val = (int32_t)
                         ((struct dbr_time_long *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
-                    if ( a_args.count > 0 )
+                    if ( a_args.count > 1 ) // Minimum Array Size is 2...
                     {
                         state.m_long_array = new int32_t[a_args.count];
                         int32_t *values = (int32_t *)
@@ -1154,7 +1154,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     state.m_double_val = (double)
                         ((struct dbr_time_double *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
-                    if ( a_args.count > 0 )
+                    if ( a_args.count > 1 ) // Minimum Array Size is 2...
                     {
                         state.m_double_array = new double[a_args.count];
                         double *values = (double *)
@@ -1439,7 +1439,7 @@ DeviceAgent::epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count )
         case DBR_LONG:
         {
             // Just a (Scalar) Integer...
-            if ( a_elem_count == 1 )
+            if ( a_elem_count <= 1 )
                 return PV_INT;
             // Actually a Variable Length Integer Array...!
             else 
@@ -1450,7 +1450,7 @@ DeviceAgent::epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count )
         case DBR_DOUBLE:
         {
             // Just a (Scalar) Float...
-            if ( a_elem_count == 1 )
+            if ( a_elem_count <= 1 )
                 return PV_REAL;
             // Actually a Variable Length Float Array...!
             else 
@@ -1460,7 +1460,7 @@ DeviceAgent::epicsToPVType( uint32_t a_rec_type, uint32_t a_elem_count )
         case DBR_CHAR:
         {
             // Just a (Scalar) Character...
-            if ( a_elem_count == 1 )
+            if ( a_elem_count <= 1 )
                 return PV_UINT;
             // Actually a Variable Length Character String...!
             else 

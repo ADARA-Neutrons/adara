@@ -27,6 +27,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 const char *StorageContainer::m_completed_marker = "translation_completed";
 const char *StorageContainer::m_manual_marker = "manual_processing_needed";
 
+const char *StorageContainer::m_proposal_id_marker_prefix = "proposal-";
 
 void StorageContainer::terminateFile(void)
 {
@@ -326,6 +327,11 @@ StorageContainer::SharedPtr StorageContainer::create(
 		throw std::runtime_error(msg);
 	}
 
+	if ( !propId.empty() && propId != "UNKNOWN" ) {
+		std::string path = m_proposal_id_marker_prefix + propId;
+		c->createMarker(path.c_str());
+	}
+
 	return c;
 }
 
@@ -499,25 +505,32 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	return p;
 }
 
-StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
+StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
+		bool force)
 {
 	std::string cpath;
 	struct timespec ts;
 	uint32_t run;
 
 	if (!validatePath(path, cpath, ts, run)) {
-		WARN("Invalid storage container at '" << path << "'");
+		WARN("scan(): Invalid storage container at '" << path << "'");
 		return StorageContainer::SharedPtr();
 	}
 
 	/* If this container was created after we started the scan, it
 	 * will be accounted for via normal operations and should be skipped
-	 * here.
+	 * here. Unless of course we're trying to Re-Scan a run directory,
+	 * in which case we should ignore this criteria...! ;-D
 	 */
 	const timespec &start = StorageManager::scanStart();
-	if (ts.tv_sec > start.tv_sec || (ts.tv_sec == start.tv_sec &&
-						ts.tv_nsec >= start.tv_nsec))
+	if ( !force
+			&& ( ts.tv_sec > start.tv_sec
+				|| ( ts.tv_sec == start.tv_sec
+					&& ts.tv_nsec >= start.tv_nsec ) ) ) {
+		INFO("scan(): Storage Container at '" << path << "'"
+			<< " Created After Scan Start - Ignore...");
 		return StorageContainer::SharedPtr();
+	}
 
 	StorageContainer::SharedPtr c(new StorageContainer(cpath));
 	c->m_weakThis = c;
@@ -533,7 +546,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 		fs::file_status status = it->status();
 
 		if (status.type() != fs::regular_file) {
-			WARN("Ignoring non-file '" << it->path() << "'");
+			WARN("scan(): Ignoring non-file '" << it->path() << "'");
 			continue;
 		}
 
@@ -550,8 +563,19 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 			continue;
 		}
 
+		/* Check for ProposalId Marker File, Parse ProposalId if Found! */
+		size_t prop_ck = file.string().find(m_proposal_id_marker_prefix);
+		if (prop_ck == 0) {
+			c->m_propId = file.string().substr(prop_ck
+				+ sizeof(m_proposal_id_marker_prefix) + 1);
+			DEBUG("scan(): Found ProposalId Marker"
+				<< " for Run " << c->m_runNumber << ","
+				<< " Set ProposalId for Container to: " << c->m_propId);
+			continue;
+		}
+
 		if (file.extension() != ".adara") {
-			WARN("Ignoring non-ADARA file '" << it->path() << "'");
+			WARN("scan(): Ignoring non-ADARA file '" << it->path() << "'");
 			continue;
 		}
 
@@ -587,7 +611,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 	 * it is an untranslated run.
 	 */
 	if (had_errors && c->m_runNumber && !c->m_translated && !c->m_manual) {
-		StorageManager::sendComBus(c->m_runNumber, c->propId(),
+		StorageManager::sendComBus(c->m_runNumber, c->m_propId,
 			std::string("Needs Manual Translation"));
 		c->markManual();
 	}
@@ -596,7 +620,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path)
 }
 
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
-				 bool keep, bool &path_deleted )
+		bool keep, std::string &propId, bool &path_deleted )
 {
 	std::string cpath;
 	struct timespec ts;
@@ -613,6 +637,8 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	std::list<fs::path> files;
 	bool translated = false;
 	bool manual = false;
+
+	propId.clear();
 
 	for (; it != end; ++it) {
 		fs::path file(it->path().filename());
@@ -631,6 +657,16 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 		if (file == m_manual_marker) {
 			manual = true;
+			continue;
+		}
+
+		/* Check for ProposalId Marker File, Parse ProposalId if Found! */
+		size_t prop_ck = file.string().find(m_proposal_id_marker_prefix);
+		if (prop_ck == 0) {
+			propId = file.string().substr(prop_ck
+				+ sizeof(m_proposal_id_marker_prefix) + 1);
+			DEBUG("purge(): Found ProposalId Marker, "
+				<< "Set ProposalId for Container to: " << propId);
 			continue;
 		}
 
@@ -684,13 +720,17 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	 * and the container directory.
 	 */
 	if (!keep && files.empty()) {
-		fs::path base(path), completed(path);
+		fs::path base(path), completed(path), proposal_id(path);
 		completed /= m_completed_marker;
+		proposal_id /= m_proposal_id_marker_prefix + propId;
 
 		path_deleted = true;
 		try {
 			if (run)
 				remove(completed);
+			if (!propId.empty()) {
+				remove(proposal_id);
+			}
 			remove(base);
 
 			DEBUG("Removed container " << base);

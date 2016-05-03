@@ -190,12 +190,13 @@ private:
                                   *a_enum_vector,  ///< [in] Enumerated Type Vector
             uint32_t               a_enum_index,   ///< [in] Enumerated Type Index
             const std::string     &a_units,        ///< [in] Units of PV (empty if not needed)
+            bool                   a_ignore,       ///< [in] PV Ignore Flag
             NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_device_name, a_name, a_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units ),
+                a_units, a_ignore ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
@@ -431,7 +432,9 @@ private:
         {
             try
             {
-                if ( m_nxgen.m_gen_nexus )
+                // Write PV Values to NeXus File _If_ We're Writing to NeXus
+                // and _If_ We Care About This PV (_Not_ Ignored!) :-D
+                if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
                     // Create log if no data has been written yet
                     if ( !m_cur_size )
@@ -553,6 +556,14 @@ private:
                         }
                     }
                 }
+                else if ( this->m_ignore )
+                {
+                    syslog( LOG_INFO,
+                        "[%i] Device %s (id=%d) - Ignoring PV %s",
+                        g_pid, this->m_device_name.c_str(),
+                        this->m_device_id, this->m_name.c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
             }
             catch( TraceException &e )
             {
@@ -618,7 +629,8 @@ protected:
                             std::vector<STS::PVEnumeratedType>
                                 *a_enum_vector,
                             uint32_t a_enum_index,
-                            const std::string &a_units );
+                            const std::string &a_units,
+                            bool a_ignore );
     STS::BankInfo*      makeBankInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );

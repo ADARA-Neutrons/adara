@@ -79,6 +79,8 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_GENERAL_PV_LIMIT]    = "GENERAL_PV_LIMIT";
     m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
     m_fact_name[BIF_PULSE_PCHG_UNCOR]    = "RUN_PULSE_PCHG_UNCOR";
+    m_fact_name[BIF_NO_NEUTRONS_COUNT]   = "RUN_NO_NEUTRONS_COUNT";
+    m_fact_name[BIF_TOTAL_PULSES_COUNT]  = "RUN_TOTAL_PULSES_COUNT";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
@@ -660,6 +662,8 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_GENERAL_PV_LIMIT]);
     a_facts.insert(m_fact_name[BIF_GENERAL_PV_ERROR]);
     a_facts.insert(m_fact_name[BIF_PULSE_PCHG_UNCOR]);
+    a_facts.insert(m_fact_name[BIF_NO_NEUTRONS_COUNT]);
+    a_facts.insert(m_fact_name[BIF_TOTAL_PULSES_COUNT]);
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -798,6 +802,7 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
   * \param a_recording - When true, indicates system is recording
   * \param a_run_number - Run number of recording (0 when no recording)
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called by the StreamMonitor instance whenever the system
   * starts or stops recording a run. The recording state and run number are
@@ -806,9 +811,11 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
   * resends device descriptors after each transition.
   */
 void
-StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
+StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -1031,6 +1038,8 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_MISS_RTDL_COUNT], a_metrics.m_missing_rtdl_count );
     m_engine->assert( m_fact[BIF_PULSE_VETO_COUNT], a_metrics.m_pulse_veto_count );
     m_engine->assert( m_fact[BIF_PULSE_PCHG_UNCOR], a_metrics.m_pulse_pcharge_uncorrected );
+    m_engine->assert( m_fact[BIF_NO_NEUTRONS_COUNT], a_metrics.m_no_neutrons_count );
+    m_engine->assert( m_fact[BIF_TOTAL_PULSES_COUNT], a_metrics.m_total_pulses_count );
 }
 
 
@@ -1075,6 +1084,7 @@ StreamAnalyzer::pvUndefined( const std::string &a_pv_name )
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called when a PV value or status changes. If status
   * is disconnected, pv is retracted from rule engine; otherwise pv is
@@ -1083,10 +1093,11 @@ StreamAnalyzer::pvUndefined( const std::string &a_pv_name )
   */
 void
 StreamAnalyzer::pvValue( const std::string &a_name,
-        uint32_t a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
@@ -1110,6 +1121,7 @@ StreamAnalyzer::pvValue( const std::string &a_name,
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called when a PV value or status changes. If status
   * is disconnected, pv is retracted from rule engine; otherwise pv is
@@ -1118,10 +1130,11 @@ StreamAnalyzer::pvValue( const std::string &a_name,
   */
 void
 StreamAnalyzer::pvValue( const std::string &a_pv_name,
-        double a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
@@ -1145,16 +1158,18 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name,
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called when a PV value or status changes. String values
   * are converted to "booleans" - true if not empty, false otherwise
   */
 void
 StreamAnalyzer::pvValue( const std::string &a_pv_name,
-        string &a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
@@ -1179,6 +1194,7 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name,
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called when a PV value or status changes. If status
   * is disconnected, pv is retracted from rule engine; otherwise pv is
@@ -1191,10 +1207,11 @@ StreamAnalyzer::pvValue( const std::string &a_pv_name,
   */
 void
 StreamAnalyzer::pvValue( const std::string &a_name,
-        vector<uint32_t> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
@@ -1221,6 +1238,7 @@ StreamAnalyzer::pvValue( const std::string &a_name,
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called when a PV value or status changes. If status
   * is disconnected, pv is retracted from rule engine; otherwise pv is
@@ -1233,10 +1251,11 @@ StreamAnalyzer::pvValue( const std::string &a_name,
   */
 void
 StreamAnalyzer::pvValue( const std::string &a_pv_name,
-        vector<double> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );

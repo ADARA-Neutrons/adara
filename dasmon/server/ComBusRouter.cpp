@@ -301,13 +301,15 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
   * \param a_recording - When true, indicates system is recording
   * \param a_run_number - Run number of recording (0 when no recording)
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called by the StreamMonitor instance whenever the system
   * starts or stops recording a run. The received information is broadcast
   * in a RunStatusMessage on the APP.DASMON topic.
   */
 void
-ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
+ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     // Only respond if recording state has changed
     //if ( a_recording != m_recording )
@@ -316,7 +318,8 @@ ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_tim
         m_pvs.clear();
         lock.unlock();
 
-        ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
+        ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number,
+            a_timestamp, a_timestamp_nanosec );
         m_combus.broadcast( msg );
 
         m_recording = a_recording;
@@ -470,6 +473,7 @@ ComBusRouter::pvUndefined( const std::string &a_name )
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
   * This method is a callback from the StreamMonitor to indicate changes
   * in the value or status of an unsigned integer process variable in the
@@ -478,12 +482,12 @@ ComBusRouter::pvUndefined( const std::string &a_name )
   */
 void
 ComBusRouter::pvValue( const std::string &a_name,
-        uint32_t a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
-        a_value, a_status, a_timestamp );
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -491,6 +495,7 @@ ComBusRouter::pvValue( const std::string &a_name,
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
   * This method is a callback from the StreamMonitor to indicate changes
   * in the value or status of a double precision process variable in the
@@ -499,12 +504,12 @@ ComBusRouter::pvValue( const std::string &a_name,
   */
 void
 ComBusRouter::pvValue( const std::string &a_name,
-        double a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
-        a_value, a_status, a_timestamp );
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -512,6 +517,7 @@ ComBusRouter::pvValue( const std::string &a_name,
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
   * This method is a callback from the StreamMonitor to indicate changes
   * in the value or status of a string process variable in the data stream.
@@ -519,12 +525,12 @@ ComBusRouter::pvValue( const std::string &a_name,
   */
 void
 ComBusRouter::pvValue( const std::string &a_name,
-        string &a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
-        a_value, a_status, a_timestamp );
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -532,6 +538,7 @@ ComBusRouter::pvValue( const std::string &a_name,
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
   * This method is a callback from the StreamMonitor to indicate changes
   * in the value or status of an unsigned integer process variable in the
@@ -540,12 +547,12 @@ ComBusRouter::pvValue( const std::string &a_name,
   */
 void
 ComBusRouter::pvValue( const std::string &a_name,
-        vector<uint32_t> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
-        a_value, a_status, a_timestamp );
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -553,6 +560,7 @@ ComBusRouter::pvValue( const std::string &a_name,
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
   * This method is a callback from the StreamMonitor to indicate changes
   * in the value or status of a double precision process variable in the
@@ -561,12 +569,12 @@ ComBusRouter::pvValue( const std::string &a_name,
   */
 void
 ComBusRouter::pvValue( const std::string &a_name,
-        vector<double> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
     m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
-        a_value, a_status, a_timestamp );
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 

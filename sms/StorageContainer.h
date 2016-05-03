@@ -40,9 +40,9 @@ public:
 
 	static SharedPtr create(const struct timespec &start,
 		uint32_t run, std::string &propId);
-	static SharedPtr scan(const std::string &path);
+	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
-				bool keep, bool &path_deleted);
+				bool keep, std::string &propId, bool &path_deleted);
 
 	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
@@ -97,6 +97,8 @@ private:
 
 	static const char *m_completed_marker;
 	static const char *m_manual_marker;
+
+	static const char *m_proposal_id_marker_prefix;
 };
 
 #endif /* __STORAGE_CONTAINER_H */

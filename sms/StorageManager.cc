@@ -169,7 +169,7 @@ private:
 			<< " Rescanning [" << rescanRunDir << "]");
 
 		StorageContainer::SharedPtr c =
-			StorageContainer::scan( rescanRunDir );
+			StorageContainer::scan( rescanRunDir, true );
 
 		if (c) {
 
@@ -198,6 +198,10 @@ private:
 							c->startTime());
 				}
 			}
+		}
+		else {
+			DEBUG("RescanRunDirPV: " << m_pv_name
+				<< " Error Scanning [" << rescanRunDir << "]");
 		}
 
 		// Done, Reset Rescan Run Directory PV...
@@ -1358,11 +1362,16 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		++cit;
 
 		// Try to Purge this Container...
+		std::string propId;
 		bool path_deleted = false;
 		purged = StorageContainer::purge(cpath.string(),
 							goal - total_purged,
 							last && cit == cend,
-							path_deleted);
+							propId, path_deleted);
+
+		// If No ProposalId Found, Set to "UNKNOWN"...
+		if ( propId.empty() )
+			propId = "UNKNOWN";
 
 		// Send ComBus Message if Purged and Run Number Known...
 		if ( purged > 0 && numParsed == 4 ) {
@@ -1375,7 +1384,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 			// - who knows whether we've touched this run before...
 			struct timespec now;
 			clock_gettime(CLOCK_REALTIME, &now);
-			m_combus->sendOriginal(run, "UNKNOWN", purgeMsg, now);
+			m_combus->sendOriginal(run, propId, purgeMsg, now);
 		}
 
 		// Accumulate Total Blocks Purged

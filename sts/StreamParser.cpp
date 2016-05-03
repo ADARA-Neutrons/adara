@@ -1869,6 +1869,7 @@ StreamParser::rxPacket
         string              pv_name;
         string              pv_connection;
         string              pv_units;
+        bool                pv_ignore;
         PVType              pv_type = PVT_INT;
         std::vector<PVEnumeratedType> *pv_enum_vector = NULL;
         uint32_t            pv_enum_index = (uint32_t) -1;
@@ -1902,6 +1903,7 @@ StreamParser::rxPacket
                             pv_enum_vector = NULL;
                             pv_enum_index = (uint32_t) -1;
                             pv_units = "";
+                            pv_ignore = false;
                             found = 0;
 
                             for ( xmlNode *pvnode = pvsnode->children;
@@ -2026,6 +2028,14 @@ StreamParser::rxPacket
                                 {
                                     pv_units = value;
                                 }
+
+                                else if ( xmlStrcmp( pvnode->name,
+                                        (const xmlChar*)"pv_ignore" )
+                                            == 0 )
+                                {
+                                    pv_ignore =
+                                        boost::lexical_cast<bool>( value );
+                                }
                             }
 
                             if ( found == 7 )
@@ -2142,7 +2152,8 @@ StreamParser::rxPacket
                                                     pv_type,
                                                     pv_enum_vector,
                                                     pv_enum_index,
-                                                    pv_units ) )
+                                                    pv_units,
+                                                    pv_ignore ) )
                                             {
                                                 // There is an existing
                                                 // PVInfo instance with
@@ -2286,7 +2297,8 @@ StreamParser::rxPacket
                                                 pv_type,
                                                 pv_enum_vector,
                                                 pv_enum_index,
-                                                pv_units );
+                                                pv_units,
+                                                pv_ignore );
                                         if ( info )
                                         {
                                             m_pvs_by_key[key] = info;
@@ -2319,7 +2331,8 @@ StreamParser::rxPacket
                                             pv_type,
                                             pv_enum_vector,
                                             pv_enum_index,
-                                            pv_units ) )
+                                            pv_units,
+                                            pv_ignore ) )
                                     {
                                         stringstream ss;
                                         ss << "STS Error:"
@@ -2337,6 +2350,8 @@ StreamParser::rxPacket
                                             << ipv->second->m_type
                                             << " units="
                                             << ipv->second->m_units
+                                            << " ignore="
+                                            << ipv->second->m_ignore
                                             << "]"
                                             << " Define New PV"
                                             << " [Device " << dev_name
@@ -2345,6 +2360,7 @@ StreamParser::rxPacket
                                             << ")"
                                             << " type=" << pv_type
                                             << " units=" << pv_units
+                                            << " ignore=" << pv_ignore
                                             << "]"
                                             << " devId="
                                             << a_pkt.devId()
@@ -2403,7 +2419,8 @@ StreamParser::rxPacket
                                             pv_type,
                                             pv_enum_vector,
                                             pv_enum_index,
-                                            pv_units );
+                                            pv_units,
+                                            pv_ignore );
                                         if ( info )
                                         {
                                             m_pvs_by_key[key] = info;

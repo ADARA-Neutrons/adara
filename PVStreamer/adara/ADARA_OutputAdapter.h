@@ -13,6 +13,8 @@
 #include "StreamService.h"
 #include "ADARA.h"
 
+#define PVSD_PROTOCOL   0
+
 namespace PVS {
 namespace ADARA {
 
@@ -92,6 +94,7 @@ private:
 
     //----- Sockets-Related Methods -------------------------------------------
     void            initSockets();
+    void            makeHeartbeatDevice();
     void            socketListenThread();
     void            sendPacket( OutPacket & a_adara_pkt,
                         std::vector<uint8_t> &a_payload,
@@ -120,6 +123,9 @@ private:
     std::list<ClientInfo>               m_client_info;              ///< Container of active client connections
     std::set<DeviceRecordPtr>           m_devices;                  ///< Currently defined devices
     std::map<PVDescriptor*,PVState>     m_pv_state;                 ///< Currently defined PVs with last-known state
+    DeviceRecordPtr                     m_heartbeat_device;         ///< Heartbeat device descriptor
+    PVDescriptor                       *m_heartbeat_pv;             ///< Heartbeat PV descriptor
+    uint32_t                            m_heartbeat_pv_value;       ///< Heartbeat PV value
 };
 
 }}

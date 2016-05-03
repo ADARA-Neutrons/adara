@@ -46,26 +46,38 @@ uint32_t StreamMonitor::m_notify_state = TS_INIT;
  * performed until the start() method is called.
  */
 #ifndef NO_DB
-StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port, DBConnectInfo *a_db_info, uint32_t a_maxtof )
+StreamMonitor::StreamMonitor(
+        const std::string &a_sms_host, unsigned short a_port,
+        DBConnectInfo *a_db_info, uint32_t a_maxtof )
 #else
-StreamMonitor::StreamMonitor( const std::string &a_sms_host, unsigned short a_port )
+StreamMonitor::StreamMonitor(
+        const std::string &a_sms_host, unsigned short a_port )
 #endif
-    : POSIXParser(), m_fd_in(-1), m_sms_host(a_sms_host), m_sms_port(a_port), m_stream_thread(0), m_metrics_thread(0),
-      m_process_stream(true), m_mon_event_count(0), m_recording(false), m_run_num(0), m_run_timestamp(0),
-      m_paused(false), m_scanning(false), m_scan_index(0), m_first_pulse_time(0), m_last_pulse_time(0), m_stream_size(0),
-      m_stream_rate(0), m_diagnostics(true), m_last_cycle(0), m_last_time(0), m_this_time(0),
-      m_bnk_pkt_count(0), m_mon_pkt_count(0), m_maxtof(a_maxtof), m_pixmap_processed(false),
-      m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT), m_in_prolog(false)
-
+    : POSIXParser(), m_fd_in(-1),
+      m_sms_host(a_sms_host), m_sms_port(a_port),
+      m_stream_thread(0), m_metrics_thread(0), m_process_stream(true),
+      m_mon_event_count(0), m_recording(false), m_run_num(0),
+      m_run_timestamp(0), m_run_timestamp_nanosec(0),
+      m_paused(false), m_scanning(false), m_scan_index(0),
+      m_first_pulse_time(0), m_last_pulse_time(0),
+      m_stream_size(0), m_stream_rate(0), m_diagnostics(true),
+      m_last_cycle(0), m_last_time(0), m_this_time(0),
+      m_bnk_pkt_count(0), m_mon_pkt_count(0),
+      m_maxtof(a_maxtof), m_pixmap_processed(false),
+      m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT),
+      m_in_prolog(false)
 #ifndef NO_DB
-     ,m_db_info(a_db_info), m_db_ticker(0), m_db_state(TS_INIT)
+    , m_db_info(a_db_info), m_db_ticker(0), m_db_state(TS_INIT)
 #endif
 {
     m_maxtof *= 10; // Convert from usec to 100 nsec units
 
 #ifndef NO_DB
     if ( m_db_info )
-        m_db_thread = new boost::thread( boost::bind( &StreamMonitor::dbThread, this ));
+    {
+        m_db_thread = new boost::thread(
+            boost::bind( &StreamMonitor::dbThread, this ) );
+    }
 #endif
 }
 
@@ -167,7 +179,8 @@ StreamMonitor::resendState( IStreamListener &a_listener ) const
     if ( m_fd_in > -1 )
     {
         a_listener.connectionStatus( true, m_sms_host, m_sms_port );
-        a_listener.runStatus( m_recording, m_run_num, m_run_timestamp );
+        a_listener.runStatus( m_recording, m_run_num,
+            m_run_timestamp, m_run_timestamp_nanosec );
         a_listener.pauseStatus( m_paused );
         a_listener.scanStatus( m_scanning, m_scan_index );
 
@@ -579,6 +592,8 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             case ADARA::PacketType::SYNC_TYPE:
             case ADARA::PacketType::HEARTBEAT_TYPE:
             case ADARA::PacketType::DATA_DONE_TYPE:
+            case ADARA::PacketType::BEAM_MONITOR_CONFIG_TYPE:
+            case ADARA::PacketType::DETECTOR_BANK_SETS_TYPE:
                 break;
 
             default:
@@ -639,11 +654,13 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_recording = true;
         m_run_num = a_pkt.runNumber();
         m_run_timestamp = a_pkt.timestamp().tv_sec;
+        m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
         m_pixmap_processed = false;
         resetRunStats();
 
-        m_notify.runStatus( true, m_run_num, m_run_timestamp );
+        m_notify.runStatus( true, m_run_num,
+            m_run_timestamp, m_run_timestamp_nanosec );
 
         // Clear all PVs - SMS will send active after RunStatus packet
         clearPVs();
@@ -655,10 +672,12 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_recording = false;
         m_run_num = 0;
         m_run_timestamp = a_pkt.timestamp().tv_sec;
+        m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
         resetRunStats();
 
-        m_notify.runStatus( false, 0, m_run_timestamp );
+        m_notify.runStatus( false, 0,
+            m_run_timestamp, m_run_timestamp_nanosec );
 
         // Make sure scan is stopped
         if ( m_scanning )
@@ -786,6 +805,8 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
             ++m_stream_metrics.m_invalid_pkt_time;
         else if ( m_last_time == m_this_time )
             ++m_stream_metrics.m_duplicate_packet;
+        // TODO: This should depend on the Actual Facility Pulse Frequency!
+        // (and account for Sub-60Hz operation, and 2nd Target Station!)
         else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
             ++m_stream_metrics.m_pulse_freq_tol;
     }
@@ -822,6 +843,12 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     {
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
     }
+
+    if ( flags & BankedEventPkt::NO_NEUTRONS )
+         ++m_run_metrics.m_no_neutrons_count;
+
+    // Count Total Pulses (with Data... ;-D)
+    ++m_run_metrics.m_total_pulses_count;
 
     uint32_t        source_id;
     uint32_t        bank_count;
@@ -1421,10 +1448,11 @@ StreamMonitor::pvValueUpdate
             {
                 pv->m_value = a_value;
                 pv->m_time = a_timestamp.tv_sec;
+                pv->m_time_nanosec = a_timestamp.tv_nsec;
                 pv->m_status = a_status;
                 pv->m_updated = true;
                 m_notify.pvValue( pv->m_name, a_value, a_status,
-                    pv->m_time );
+                    pv->m_time, pv->m_time_nanosec );
             }
         }
     }
@@ -1489,10 +1517,11 @@ StreamMonitor::pvValueUpdate
             {
                 pv->m_value = a_value;
                 pv->m_time = a_timestamp.tv_sec;
+                pv->m_time_nanosec = a_timestamp.tv_nsec;
                 pv->m_status = a_status;
                 pv->m_updated = true;
                 m_notify.pvValue( pv->m_name, a_value, a_status,
-                    pv->m_time );
+                    pv->m_time, pv->m_time_nanosec );
             }
         }
     }
@@ -1557,10 +1586,11 @@ StreamMonitor::pvValueUpdate
             {
                 pv->m_value = a_value;
                 pv->m_time = a_timestamp.tv_sec;
+                pv->m_time_nanosec = a_timestamp.tv_nsec;
                 pv->m_status = a_status;
                 pv->m_updated = true;
                 m_notify.pvValue( pv->m_name, a_value, a_status,
-                    pv->m_time );
+                    pv->m_time, pv->m_time_nanosec );
             }
         }
     }
@@ -1867,7 +1897,8 @@ StreamMonitor::Notifier::removeListener( IStreamListener &a_listener )
 
 void
 StreamMonitor::Notifier::runStatus( bool a_recording,
-        uint32_t a_run_number, uint32_t a_timestamp )
+        uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_RUN_STATUS;
 
@@ -1875,7 +1906,8 @@ StreamMonitor::Notifier::runStatus( bool a_recording,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->runStatus( a_recording, a_run_number, a_timestamp );
+        (*l)->runStatus( a_recording, a_run_number,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
@@ -2050,8 +2082,8 @@ StreamMonitor::Notifier::pvUndefined( const std::string &a_name )
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name,
-        uint32_t a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_UINT;
 
@@ -2059,7 +2091,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+        (*l)->pvValue( a_name, a_value, a_status,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
@@ -2067,8 +2100,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name,
-        double a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_DBL;
 
@@ -2076,7 +2109,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+        (*l)->pvValue( a_name, a_value, a_status,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
@@ -2084,8 +2118,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name,
-        string &a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_STR;
 
@@ -2093,7 +2127,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+        (*l)->pvValue( a_name, a_value, a_status,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
@@ -2101,8 +2136,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name,
-        vector<uint32_t> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_UINT_ARRAY;
 
@@ -2110,7 +2145,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+        (*l)->pvValue( a_name, a_value, a_status,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;
@@ -2118,8 +2154,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
 
 void
 StreamMonitor::Notifier::pvValue( const std::string &a_name,
-        vector<double> a_value,
-        VariableStatus::Enum a_status, uint32_t a_timestamp )
+        vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     StreamMonitor::m_notify_state = TS_NOTIFY_PV_VAL_DBL_ARRAY;
 
@@ -2127,7 +2163,8 @@ StreamMonitor::Notifier::pvValue( const std::string &a_name,
             l != m_listeners.end();
             ++l, StreamMonitor::m_notify_state += 1000 )
     {
-        (*l)->pvValue( a_name, a_value, a_status, a_timestamp );
+        (*l)->pvValue( a_name, a_value, a_status,
+            a_timestamp, a_timestamp_nanosec );
     }
 
     StreamMonitor::m_notify_state = TS_NOTIFY_NONE;

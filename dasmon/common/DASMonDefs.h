@@ -137,6 +137,8 @@ public:
         m_mapping_error_count       = 0;
         m_missing_rtdl_count        = 0;
         m_pulse_pcharge_uncorrected = 0;
+        m_no_neutrons_count         = 0;
+        m_total_pulses_count        = 0;
     }
 
     double          m_time;                 ///< Run time (seconds)
@@ -148,6 +150,8 @@ public:
     uint32_t        m_mapping_error_count;
     uint32_t        m_missing_rtdl_count;
     uint32_t        m_pulse_pcharge_uncorrected;
+    uint32_t        m_no_neutrons_count;
+    uint32_t        m_total_pulses_count;
 };
 
 

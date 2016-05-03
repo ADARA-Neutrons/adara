@@ -251,6 +251,7 @@ void SMSControl::addSource(const std::string &name,
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	bool mixed_data_packets;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
 
@@ -277,6 +278,7 @@ void SMSControl::addSource(const std::string &name,
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
 
@@ -285,6 +287,13 @@ void SMSControl::addSource(const std::string &name,
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Should probably let someone know if we're Mixing Data Packets
+	// with Both Neutron Events and Meta-Data Events... ;-D
+	if (mixed_data_packets) {
+		DEBUG("Mixed Data Packets Flag Set to True for " << name
+			<< " - No Auto-Deduce Sub-60Hz Pulse for Proton Charge Zero!");
 	}
 
 	// Probably should also log if we're Saving All the Input Stream
@@ -303,6 +312,7 @@ void SMSControl::addSource(const std::string &name,
 							 connect_timeout,
 							 data_timeout,
 							 ignore_eop,
+							 mixed_data_packets,
 							 chunk_size,
 							 rtdlNoDataThresh,
 							 save_input_stream));
@@ -707,35 +717,38 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 void SMSControl::unregisterEventSource(uint32_t smsId)
 {
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "unregisterEventSource: smsId=" << smsId);
+		<< "unregisterEventSource(): smsId=" << smsId );
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
 	/* Walk the pending pulses and mark them incomplete if they are still
-	 * waiting for data form this source, as it's not going to come. Keep
+	 * waiting for data from this source, as it's not going to come. Keep
 	 * track of the last pulse that is completed, whether by this process
 	 * or via markCompleted() but left in queue due to No-EoP Buffering.
 	 */
 	int marked_partial = 0;
 	int now_complete = 0;
 	last = m_pulses.end();
-	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
+	for ( it = m_pulses.begin(); it != m_pulses.end(); it++ ) {
 		// Release Now-Partial Pulses...
-		if (it->second->m_pending[smsId]) {
+		if ( it->second->m_pending[smsId] ) {
 			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
 			marked_partial++;
 		}
 		// Note the Last Now-Completed (Partial or Not) Pulse for Handling
-		if (it->second->m_pending.none()) {
+		if ( it->second->m_pending.none() ) {
 			last = it;
 			now_complete++;
 		}
 	}
-	DEBUG("unregisterEventSource: marked_partial=" << marked_partial
-		<< " now_complete=" << now_complete);
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterEventSource():"
+		<< " Internal Pulse Buffer Length = " << m_pulses.size()
+		<< " marked_partial=" << marked_partial
+		<< " now_complete=" << now_complete );
 
-	if (last != m_pulses.end()) {
+	if ( last != m_pulses.end() ) {
 
 		/* Ok, we had at least one pulse completed by the recently
 		 * departed source; all pulses previous to that one must be
@@ -763,34 +776,76 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 		last_minus_buffer = last;
 		uint32_t recorded = 0;
-		uint32_t cnt = 1; // for last...
+		uint32_t cnt = 0;
 
 		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
-		// (Any Other Remaining Sources could Still Spew Out-of-Order...)
-		while (cnt++ < m_noEoPPulseBufferSize && num_sources > 1) {
-			// Skip Over Pulse to Satisfy Buffering Requirement
-			if (last_minus_buffer != m_pulses.begin()) {
-				last_minus_buffer--;
-			}
-			// No Pulses to Record Yet, Buffer Not "Full" Enough...
-			else {
-				/* D-Oh... Before Returning, Mark This Id for Re-Use... */
-				m_eventSources.reset(smsId);
-				return;
+		// (Any Other Remaining Sources Could Still Spew Out-of-Order...)
+		if ( num_sources > 1 ) {
+			DEBUG("unregisterEventSource():"
+				<< " Buffering " << m_noEoPPulseBufferSize << " Pulses,"
+				<< " Last Pulse = 0x"
+				<< std::hex << last_minus_buffer->first.first << std::dec);
+			// Work Backward from *End of Buffer*...
+			// (_Not_ the Last Complete Pulse!)
+			PulseMap::reverse_iterator rit = m_pulses.rbegin();
+			while ( cnt++ < m_noEoPPulseBufferSize ) {
+				// End of the Line, Not Enough Buffered Pulses to Proceed
+				if ( rit != m_pulses.rend() ) {
+					// Skip Over Pulse to Satisfy Buffering Requirement
+					// (Slide "Last Pulse" Iterator with Reverse Iterator,
+					// *If* It Catches Up... ;-)
+					if ( last_minus_buffer->first == rit->first ) {
+						if ( last_minus_buffer != m_pulses.begin() )
+							last_minus_buffer--;
+						else {
+							DEBUG("unregisterEventSource():"
+								<< " Ran Out of Pulses to Buffer - Done");
+							/* D-Oh Before Returning, Mark Id for Re-Use */
+							m_eventSources.reset(smsId);
+							return;
+						}
+					}
+				}
+				// No Pulses to Record Yet, Buffer Not "Full" Enough...
+				else {
+					DEBUG("unregisterEventSource():"
+						<< " No Pulses to Record, Buffer Not Full - Done");
+					/* D-Oh... Before Returning, Mark This Id for Re-Use */
+					m_eventSources.reset(smsId);
+					return;
+				}
+				// Keep Counting...
+				rit++;
 			}
 		}
+		else {
+			DEBUG("unregisterEventSource():"
+				<< " Skip Buffering (" << m_noEoPPulseBufferSize << "),"
+				<< " Last Event Source!");
+		}
 
-		// Record Complete/Partial Pulses Past the Buffering Threshold
-		// TODO Note: We _Might_ Be Recording Some As-Yet-Still-Pending
+		// Record Complete/Partial Pulses Past the Buffering Threshold.
+		// Note: We _Might_ Be Recording Some As-Yet-Still-Pending
 		// Pulses Here, if there are some Unresolved Pulses still
 		// Interlaced amidst the Pulses Being Released by the
-		// Now-Unregistered Data Source... ;-b
-		// (Creates a distinct mess out of the Erasing part, relative
-		// to the simple approach used here and in markComplete()... ;-)
-		DEBUG("unregisterEventSource: Recording Pulses"
+		// Now-Unregistered Data Source...
+		// But That is *OK*, Because Anything Older Than *This*
+		// "Last Completed Pulse" Probably _Should_ have Already
+		// been Marked Complete; the Pulses are Insertion-Sorted in
+		// Pulse Time Order, so if This Pulse is Complete, then
+		// All Preceding Pulses Should Also Be...!
+		// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+		// These should be Correctly Handled by Sufficient Buffer Size!)
+
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource(): Recording Pulses"
 			<< std::hex << " 0x" << m_pulses.begin()->first.first
-			<< " up to 0x" << last_minus_buffer->first.first << std::dec);
-		for (it = m_pulses.begin(); it != last_minus_buffer; it++) {
+			<< " up to 0x" << last_minus_buffer->first.first << std::dec );
+
+		// Include "Last Complete Pulse" (With Any Buffering Adjustments)
+		last_minus_buffer++;
+
+		for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
 			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
 			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
 			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
@@ -807,7 +862,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 						ERROR(log_info
 							<< ( m_recording ? "[RECORDING] " : "" )
 							<< "unregisterEventSource:"
-							<< " No More Pulses for "
+							<< " No More Pulses for"
 							<< " Proton Charge/Veto Flags Correction! 0x"
 							<< std::hex << it->first.first << std::dec);
 					}
@@ -818,59 +873,17 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recorded++;
 		}
 
-		// Always Record the Last Pulse from the Last Source to Unregister
-		if (!m_noEoPPulseBufferSize || num_sources == 1) {
-			DEBUG("unregisterEventSource Recording Last Pulse 0x"
-				<< std::hex << last->first.first << std::dec);
-			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
-			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
-				PulseMap::iterator next = last;
-				if (++next != m_pulses.end())
-					correctPChargeVeto(last->second, next->second);
-				else {
-					/* Rate-limited logging of global sawtooth pulse */
-					std::string log_info;
-					if ( RateLimitedLogging::checkLog(
-							RLLHistory_SMSControl,
-							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
-							2, 10, 100, log_info ) ) {
-						ERROR(log_info
-							<< ( m_recording ? "[RECORDING] " : "" )
-							<< "unregisterEventSource:"
-							<< " No More Pulses for"
-							<< " Proton Charge/Veto Flags Correction! 0x"
-							<< std::hex << last->first.first << std::dec);
-					}
-				}
-			}
-			recordPulse(last->second);
-			last_recorded = last;
-			recorded++;
-		}
-
-		// Log the Size of the Remaining Internal Pulse Buffer...
-		// (Count the Rest of the List We _Didn't_ Just Process...)
-		uint64_t queue_length = 0;
-		while ( it != m_pulses.end() ) {
-			queue_length++;
-			it++;
-		}
-		// Account for Last Pulse, If Recorded...
-		if (!m_noEoPPulseBufferSize || num_sources == 1) {
-			queue_length--;
-		}
-
 		// Erase Any Now-Recorded Pulses
 		if (recorded) {
 			m_pulses.erase(m_pulses.begin(), ++last_recorded);
 		}
 
-		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		// Log the Size of the Remaining Internal Pulse Buffer...
+		// (Rest of the List We _Didn't_ Just Process...)
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
-			<< "Remaining Internal Pulse Buffer Length = " << queue_length
-			<< " recorded=" << recorded
-			<< " (size=" << m_pulses.size() << ")");
+			<< "Remaining Internal Pulse Buffer Length = "
+			<< m_pulses.size()
+			<< " (recorded=" << recorded << ")" );
 	}
 
 	/* Mark This Id for Re-Use. */
@@ -1030,6 +1043,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	new_pulse->m_flags |= ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
 	new_pulse->m_flags |= ADARA::BankedEventPkt::VETO_UNCORRECTED;
 
+	// By Default, All New Pulses Have Yet to Have Any Data Packets,
+	// And So Are Marked as "No Neutrons" for Sub-60Hz Operation,
+	// where we Zero Out the Proton Charge for Non-Data Pulses...
+	new_pulse->m_flags |= ADARA::BankedEventPkt::NO_NEUTRONS;
+
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
@@ -1040,7 +1058,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// (Give the "New Guy" a chance to exist before we dump it... ;-D)
 	if ( m_pulses.size() > m_maxPulseBufferSize ) {
 
-		// Record & Free as Many Pulses as Required to Stay Under Max...
+		// Record & Free Just Enough Pulses as Required to Stay Under Max!
 		// (Even after adding the next one, already in hand...!)
 		uint32_t num_to_record =
 			m_pulses.size() - m_maxPulseBufferSize + 1;
@@ -1049,8 +1067,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		PulseMap::iterator last_recorded;
 		uint32_t recorded = 0;
 		it = m_pulses.begin();
-		for (uint32_t i=0 ;
-				i < num_to_record && it != m_pulses.end() ; i++) {
+		for ( uint32_t i=0 ;
+				i < num_to_record && it != m_pulses.end() ; i++ ) {
 			// Pulse will Never be Made Complete, Mark as Partial...
 			if (it->second->m_pending.any()) {
 				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
@@ -1085,29 +1103,21 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			recorded++;
 		}
 
-		// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
+		// Log What Pulse Map Size Will Be _After_ Freeing Recorded Pulses
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_PULSE_BUFFER_OVERFLOW, "none",
 				2, 10, 100, log_info ) ) {
-			// Count the Rest of the List We _Didn't_ Just Purge...
-			uint64_t queue_length = 0;
-			while ( it != m_pulses.end() ) {
-				queue_length++;
-				it++;
-			}
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "*** Internal Pulse Buffer Overflow!"
-				<< " Length = " << queue_length
-				<< " recorded=" << recorded
-				<< " (size=" << m_pulses.size()
-				<< " not counting new pulse 0x"
-				<< std::hex << id << ")"
-				<< " - Recorded Pulses 0x"
-				<< m_pulses.begin()->first.first
-				<< " up to 0x"
-				<< last_recorded->first.first << std::dec);
+				<< " Length = " << ( m_pulses.size() - recorded )
+				<< " (recorded=" << recorded << ")"
+				<< std::hex
+				<< " (not counting new pulse 0x" << id << ")"
+				<< " - Recorded Pulses 0x" << m_pulses.begin()->first.first
+				<< " up to 0x" << last_recorded->first.first
+				<< std::dec);
 		}
 
 		// Erase Any Now-Recorded Pulses
@@ -1151,13 +1161,6 @@ void SMSControl::setSourcesReadDelay(void)
 	}
 
 	// Dump Internal Pulse Buffer Size/Info...
-	PulseMap::iterator it, next_to_last;
-	uint64_t queue_length = 0;
-	for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-		queue_length++;
-		next_to_last = it;
-	}
-
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 			RLL_SET_SOURCES_READ_DELAY, "none",
@@ -1166,17 +1169,17 @@ void SMSControl::setSourcesReadDelay(void)
 			DEBUG(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer " << std::hex
-				<< " begin()=" << "0x" << m_pulses.begin()->first.first
-				<< " next_to_last=" << "0x" << next_to_last->first.first
+				<< " from 0x" << m_pulses.begin()->first.first
+				<< " to 0x" << m_pulses.rbegin()->first.first
 				<< std::dec
-				<< ", Internal Pulse Buffer Length = " << queue_length
-				<< " (size=" << m_pulses.size() << ")");
+				<< ", Internal Pulse Buffer Length = "
+				<< m_pulses.size() );
 		} else {
 			DEBUG(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "Internal Pulse Buffer is Empty"
-				<< ", Internal Pulse Buffer Length = " << queue_length
-				<< " (size=" << m_pulses.size() << ")");
+				<< ", Internal Pulse Buffer Length = "
+				<< m_pulses.size() );
 		}
 	}
 }
@@ -1415,8 +1418,9 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 	pulse->m_chopperEvents[cid].push_back(tof);
 }
 
-void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
-		uint32_t hwId, uint32_t dup, bool is_mapped)
+void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
+		uint32_t hwId, uint32_t dup,
+		bool is_mapped, bool mixed_data_packets )
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -1450,6 +1454,7 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	 *
 	 * Note: Nope, the charge in the RawDataPkt/MappedDataPkt is
 	 * "Off By One" too, for Previous Pulse, just like with the RTDL...
+	 * This is now corrected in correctPChargeVeto().
 	 *
 	 * Also Note: By capturing the charge from RawDataPkt/MappedDataPkt,
 	 * there is a subtle side benefit, which is that any Pulses with
@@ -1465,6 +1470,9 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 	uint32_t phys, logical;
 	uint16_t bank = 0;
 
+	bool got_neutrons = false;
+	bool no_neutrons = false;
+
 	for (i=0; i < count; i++) {
 
 		phys = events[i].pixel;
@@ -1478,6 +1486,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 				 */
 				addMonitorEvent(pkt, pulse, phys, events[i].tof);
 				pulse->m_numMonEvents++;
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				continue;
 
 			case 7: // Chopper Event
@@ -1486,6 +1496,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 				 * event section.
 				 */
 				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				continue;
 
 			case 0: // Detector Event
@@ -1510,6 +1522,8 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
+				// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+				got_neutrons = true;
 				break;
 
 			case 5: case 6: // Fast-Metadata Variable Update
@@ -1524,10 +1538,14 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 					pulse->m_fastMetaEvents.push_back(events[i]);
 					continue;
 				}
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				/* FALLTHROUGH */
 
 			case 1: case 2: case 3: // Unused as yet...
 				/* Unused sources, let them drop into error handling */
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				no_neutrons = true;
 				/* FALLTHROUGH */
 
 			default: // Error Event
@@ -1560,6 +1578,16 @@ void SMSControl::pulseEvents(const ADARA::RawDataPkt &pkt,
 		src->second.m_banks[bank].push_back(translated);
 		pulse->m_numEvents++;
 	}
+
+	// If We Got Neutrons, Count This Pulse's Proton Charge! :-D
+	// Or, If We Got Nuthin' (Didn't Get Neutrons, but Also
+	//    Didn't Get Meta-Data Events), Count It Just to Be Safe... ;-b
+	// Or, If This Data Soure is Marked as having "Mixed Data Packets",
+	//    then All Bets are Off, Just Count the Dang Proton Charge... ;-o
+	// TODO Create A More Authoritative Flag for This in the
+	//    RawDataPkt/MappedDataPkt Packets...!
+	if ( got_neutrons || !no_neutrons || mixed_data_packets )
+		pulse->m_flags &= ~ADARA::BankedEventPkt::NO_NEUTRONS;
 }
 
 void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
@@ -1622,33 +1650,77 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 {
 	static uint32_t queue_log_count = 0;
 
+	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 	PulseMap::iterator current = getPulse(pulseId, dup);
-	PulseMap::iterator it, current_minus_buffer, last_recorded;
 	PulsePtr &pulse = current->second;
 
-	if ( smsId != (uint32_t) -1 )
-		pulse->m_pending.reset(smsId);
+	// If this is a "Real" Event Source, then Check Whole Pulse Buffer
+	// (up to This Current Pulse :-) for Any "Now-Partial" Completions
+	// for This Source... ;-D
 
-	// Pulse Still Pending from Other Data Sources...
-	if (pulse->m_pending.any()) {
-		// Periodically Log the Size of the Internal Pulse Buffer...
-		if ( !(++queue_log_count % 5000) ) {
-			// Count the Full List...
-			uint64_t queue_length = 0;
-			it = m_pulses.begin();
-			while ( it != m_pulses.end() ) {
-				queue_length++;
-				it++;
+	// This accounts for any Lack of Synchrony among Pulses from
+	// Different Data Sources, e.g. when running Sub-60Hz we can have
+	// Mutually Exclusive Pulse Sets being used for Different Event Types,
+	// So we have to handle such "Interleaving"...! ;-D
+
+	int marked_partial = 0;
+	int now_complete = 0;
+	last = m_pulses.end();
+
+	if ( smsId != (uint32_t) -1 ) {
+
+		// Just like unregisterEventSource() but different. :-D
+		// (Stop _Just Before_ Current Pulse - Only One Known "Complete")
+		for ( it = m_pulses.begin(); it != current; it++ ) {
+			// Release Now-Partial Pulses...
+			if ( it->second->m_pending[smsId] ) {
+				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+				it->second->m_pending.reset(smsId);
+				marked_partial++;
 			}
-			DEBUG( ( m_recording ? "[RECORDING] " : "" )
-				<< "[Pending] Internal Pulse Buffer Length = "
-				<< queue_length
-				<< " (size=" << m_pulses.size() << ")");
+			// Note Last Now-Completed (Partial or Not) Pulse for Handling
+			if ( it->second->m_pending.none() ) {
+				last = it;
+				now_complete++;
+			}
 		}
-		return;
+
+		// And, Of Course, Mark the Current Pulse Complete for This Source
+		pulse->m_pending.reset(smsId);
 	}
 
-	/* This pulse has now been marked complete by all active data sources.
+	// Is this Current Pulse Now Complete...?
+	if ( pulse->m_pending.none() ) {
+		last = current;
+		now_complete++;
+	}
+
+	// Pulse Still Pending from Other Data Sources...
+	else {
+		// If Nothing Anywhere in the Pulse Buffer is Complete Yet,
+		// then just return...
+		if ( !now_complete ) {
+			// Periodically Log the Size of the Internal Pulse Buffer...
+			if ( !(++queue_log_count % 5000) ) {
+				DEBUG( ( m_recording ? "[RECORDING] " : "" )
+					<< "markComplete():"
+					<< " [Pending] Internal Pulse Buffer Length = "
+					<< m_pulses.size() );
+			}
+			return;
+		}
+	}
+
+	// Periodically Log the Size/Status of the Internal Pulse Buffer...
+	if ( !(++queue_log_count % 5000) ) {
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "markComplete():"
+			<< " Internal Pulse Buffer Length = " << m_pulses.size()
+			<< " marked_partial=" << marked_partial
+			<< " now_complete=" << now_complete );
+	}
+
+	/* Some pulse has now been marked complete by all active data sources.
 	 * As we expect to get monotonically increasing pulse ids, all
 	 * previously incomplete pulses can be considered to be partial
 	 * pulses -- one or more data sources had a duplicated pulse or
@@ -1666,27 +1738,58 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
-	current_minus_buffer = current;
+	last_minus_buffer = last;
 	uint32_t recorded = 0;
-	uint32_t cnt = 1; // for current...
+	uint32_t cnt = 0;
 
-	while (cnt++ < m_noEoPPulseBufferSize) {
-		// Skip Over Pulse to Satisfy Buffering Requirement
-		if (current_minus_buffer != m_pulses.begin()) {
-			current_minus_buffer--;
+	// Work Backward from *End of Buffer* (_Not_ the Last Complete Pulse!)
+	PulseMap::reverse_iterator rit = m_pulses.rbegin();
+	while ( cnt++ < m_noEoPPulseBufferSize ) {
+		// End of the Line, Not Enough Buffered Pulses to Proceed
+		if ( rit != m_pulses.rend() ) {
+			// Skip Over Pulse to Satisfy Buffering Requirement
+			// (Slide "Current Pulse" Iterator with Reverse Iterator,
+			// *If* It Catches Up... ;-)
+			if ( last_minus_buffer->first == rit->first ) {
+				if ( last_minus_buffer != m_pulses.begin() )
+					last_minus_buffer--;
+				else {
+					// DEBUG("markComplete():"
+						// << " Ran Out of Pulses to Buffer - Done");
+					return;
+				}
+			}
 		}
 		// No Pulses to Record Yet, Buffer Not "Full" Enough...
 		else {
+			// DEBUG("markComplete():"
+				// << " No Pulses to Record, Buffer Not Full - Done");
 			return;
 		}
+		// Keep Counting...
+		rit++;
 	}
 
-	// Record Complete/Partial Pulses Past the Buffering Threshold
-	for (it = m_pulses.begin(); it != current_minus_buffer; it++) {
-		// Previous Pulse will Never be Made Complete, Mark as Partial
-		if (it->second->m_pending.any()) {
-			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-		}
+	// Record Complete/Partial Pulses Past the Buffering Threshold.
+	// Note: We _Might_ Be Recording Some As-Yet-Still-Pending
+	// Pulses Here, if there are some Unresolved Pulses still
+	// Interlaced amidst the Pulses Before the Current Pulse.
+	// But That is *OK*, Because Anything Older Than *This*
+	// "Last Completed Pulse" Probably _Should_ have Already
+	// been Marked Complete; the Pulses are Insertion-Sorted in
+	// Pulse Time Order, so if This Pulse is Complete, then
+	// All Preceding Pulses Should Also Be...!
+	// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+	// These should be Correctly Handled by Sufficient Buffer Size!)
+
+	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
+	last_minus_buffer++;
+
+	for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
+
+		// Previous Pulses will Never be Made Complete,
+		// Already Marked as Partial as Needed Above...
+
 		// Correct Proton Charge...
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
 		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
@@ -1710,67 +1813,24 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				}
 			}
 		}
+
 		// Recording Previously Complete (Buffered) Pulse
 		recordPulse(it->second);
 		last_recorded = it;
 		recorded++;
 	}
 
-	// Record the Current Pulse for Sure, If Not Buffering...
-	if (!m_noEoPPulseBufferSize) {
-		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
-		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
-			PulseMap::iterator next = current;
-			if (++next != m_pulses.end())
-				correctPChargeVeto(current->second, next->second);
-			else {
-				/* Rate-limited logging of global sawtooth pulse */
-				std::string log_info;
-				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
-						2, 10, 100, log_info ) ) {
-					ERROR(log_info
-						<< ( m_recording ? "[RECORDING] " : "" )
-						<< "markComplete:"
-						<< " No More Pulses for"
-						<< " Proton Charge/Veto Flags Correction! 0x"
-						<< std::hex << current->first.first << std::dec);
-				}
-			}
-		}
-		recordPulse(current->second);
-		last_recorded = current;
-		recorded++;
-	}
-
-	// Periodically Log the Size of the Internal Pulse Buffer...
-	uint64_t queue_length = 0;
-	bool do_log = false;
-	if ( !(++queue_log_count % 5000) ) {
-		// Count the Rest of the List We _Didn't_ Just Process...
-		while ( it != m_pulses.end() ) {
-			queue_length++;
-			it++;
-		}
-		// Account for Last Pulse, If Recorded...
-		if (!m_noEoPPulseBufferSize) {
-			queue_length--;
-		}
-		do_log = true;
-	}
-
 	// Erase Any Now-Recorded Pulses
-	if (recorded) {
+	if ( recorded ) {
 		m_pulses.erase(m_pulses.begin(), ++last_recorded);
 	}
 
-	// Log Pulse Map Size _After_ Freeing Recorded Pulses... ;-b
-	if ( do_log ) {
+	// Periodically Log the Resulting Size of the Internal Pulse Buffer...
+	if ( !(++queue_log_count % 5000) ) {
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
-			<< "Internal Pulse Buffer Length = " << queue_length
-			<< " recorded=" << recorded
-			<< " (size=" << m_pulses.size() << ")");
+			<< "markComplete():"
+			<< "Internal Pulse Buffer Length = " << m_pulses.size()
+			<< " (recorded=" << recorded << ")" );
 	}
 }
 
@@ -1798,8 +1858,14 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 			// Reset the Pulse Proton Charge Uncorrected Flag
 			pulse->m_flags &= ~ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
 
-			// Set the Pulse Charge from the Next Pulse
-			pulse->m_charge = next_pulse->m_charge;
+			// Set the Pulse Charge from the Next Pulse...
+			// (Since We Don't Set a Pulse's Charge until pulseEvents(),
+			// with data from the RawDataPkt/MappedDataPkt packets,
+			// check RTDL as needed to ensure we get a Valid Pulse Charge!)
+			if ( next_pulse->m_charge == 0 && next_pulse->m_rtdl )
+				pulse->m_charge = next_pulse->m_rtdl->pulseCharge();
+			else
+				pulse->m_charge = next_pulse->m_charge;
 		}
 
 		if ( m_doPulseVetoCorrect )
@@ -1833,6 +1899,17 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 	// Log Pulse Proton Charge Correction Failure...!
 	else
 	{
+		// Generate Pulse/Next Pulse RTDL Logging String
+		std::stringstream ss_rtdl;
+		if ( pulse->m_rtdl ) {
+			ss_rtdl << " pulse->m_rtdl->pulseCharge()=";
+			ss_rtdl << pulse->m_rtdl->pulseCharge();
+		}
+		if ( next_pulse->m_rtdl ) {
+			ss_rtdl << " next_pulse->m_rtdl->pulseCharge()=";
+			ss_rtdl << next_pulse->m_rtdl->pulseCharge();
+		}
+
 		/* Rate-limited logging of global sawtooth pulse */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
@@ -1856,6 +1933,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 				<< " m_doPulsePchgCorrect=" << m_doPulsePchgCorrect
 				<< " pulse->m_charge=" << pulse->m_charge
 				<< " next_pulse->m_charge=" << next_pulse->m_charge
+				<< ss_rtdl.str()
 				<< " m_doPulseVetoCorrect=" << m_doPulseVetoCorrect
 				<< " pulse->m_vetoFlags=" << pulse->m_vetoFlags
 				<< " next_pulse->m_vetoFlags=" << next_pulse->m_vetoFlags);
@@ -1959,7 +2037,14 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first);
 
 	/* Beam monitor event header */
-	m_hdrs.push_back(pulse->m_charge);
+	if ( pulse->m_flags & ADARA::BankedEventPkt::NO_NEUTRONS ) {
+		// No Neutrons This Pulse, Don't Count This Pulse's Proton Charge
+		m_hdrs.push_back((uint32_t) 0);
+	} else {
+		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+		// (Or at least we could have gotten some... :-)
+		m_hdrs.push_back(pulse->m_charge);
+	}
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 
@@ -2024,7 +2109,14 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first);
 
 	/* Banked event header */
-	m_hdrs.push_back(pulse->m_charge);
+	if ( pulse->m_flags & ADARA::BankedEventPkt::NO_NEUTRONS ) {
+		// No Neutrons This Pulse, Don't Count This Pulse's Proton Charge
+		m_hdrs.push_back((uint32_t) 0);
+	} else {
+		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+		// (Or at least we could have gotten some... :-)
+		m_hdrs.push_back(pulse->m_charge);
+	}
 	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
 	m_hdrs.push_back(pulse->m_cycle);
 

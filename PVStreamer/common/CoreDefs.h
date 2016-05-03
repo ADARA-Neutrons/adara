@@ -22,17 +22,6 @@ enum PVType
     PV_REAL_ARRAY
 };
 
-
-enum PVStatus
-{
-    PV_OK = 0,
-    PV_DISCONNECTED,
-    PV_LOW_LIMIT,
-    PV_HIGH_LIMIT,
-    PV_ERR
-};
-
-
 enum
 {
     EC_INVALID_OPERATION = 1,

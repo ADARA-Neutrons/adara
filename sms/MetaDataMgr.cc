@@ -238,6 +238,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		if (it->second.m_tag != tag) {
 			/* Rate-limited log that we got a Descriptor from
 			 * an Incorrect Tag (i.e., wrong/unexpected Data Source)
+			 * [*** Can this ever actually happen? Lookup Key Includes Tag!]
 			 */
 			std::string log_info;
 			std::stringstream ss;

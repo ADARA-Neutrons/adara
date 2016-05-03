@@ -100,7 +100,8 @@ NxGen::makePVInfo
     std::vector<STS::PVEnumeratedType>
                            *a_enum_vector,  ///< [in] Enumerated Type Vector for PV
     uint32_t                a_enum_index,   ///< [in] Enumerated Type Index for PV
-    const string           &a_units         ///< [in] Units of PV (empty if not needed)
+    const string           &a_units,        ///< [in] Units of PV (empty if not needed)
+    bool                    a_ignore        ///< [in] PV Ignore Flag
 )
 {
     string internal_name = a_name;
@@ -196,28 +197,28 @@ NxGen::makePVInfo
         return new NxPVInfo<uint32_t>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, *this );
+            a_units, a_ignore, *this );
     case STS::PVT_FLOAT: // ADARA only supports double currently
     case STS::PVT_DOUBLE:
         return new NxPVInfo<double>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, *this );
+            a_units, a_ignore, *this );
     case STS::PVT_STRING:
         return new NxPVInfo<string>( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, *this );
+            a_units, a_ignore, *this );
     case STS::PVT_UINT_ARRAY:
         return new NxPVInfo< vector<uint32_t> >( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, *this );
+            a_units, a_ignore, *this );
     case STS::PVT_DOUBLE_ARRAY:
         return new NxPVInfo< vector<double> >( a_device_name,
             a_name, internal_name, a_connection, internal_connection,
             a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, *this );
+            a_units, a_ignore, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,

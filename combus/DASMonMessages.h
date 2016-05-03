@@ -284,40 +284,47 @@ public:
         PVData()
             : pv_type(PVDT_DOUBLE), is_str(false),
             uint_val(0), dbl_val(0.0),
-            status(0), timestamp(0)
+            status(0), timestamp(0), timestamp_nanosec(0)
         {}
 
-        PVData( uint32_t a_value, int a_status, uint32_t a_timestamp )
+        PVData( uint32_t a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
             : pv_type(PVDT_UINT), is_str(false),
             uint_val(a_value), dbl_val(0.0),
-            status(a_status), timestamp(a_timestamp)
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
-        PVData( double a_value, int a_status, uint32_t a_timestamp )
+        PVData( double a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
             : pv_type(PVDT_DOUBLE), is_str(false),
             uint_val(0), dbl_val(a_value),
-            status(a_status), timestamp(a_timestamp)
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
-        PVData( const std::string &a_value,
-                int a_status, uint32_t a_timestamp )
+        PVData( const std::string &a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
             : pv_type(PVDT_STRING), is_str(true),
-            uint_val(0), dbl_val(0.0),
-            str_val(a_value), status(a_status), timestamp(a_timestamp)
+            uint_val(0), dbl_val(0.0), str_val(a_value),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
-        PVData( std::vector<uint32_t> a_value,
-                int a_status, uint32_t a_timestamp )
+        PVData( std::vector<uint32_t> a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
             : pv_type(PVDT_UINT_ARRAY), is_str(false),
             uint_val(0), dbl_val(0.0), uint_array(a_value),
-            status(a_status), timestamp(a_timestamp)
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
-        PVData( std::vector<double> a_value,
-                int a_status, uint32_t a_timestamp )
+        PVData( std::vector<double> a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
             : pv_type(PVDT_DOUBLE_ARRAY), is_str(false),
             uint_val(0), dbl_val(0.0), dbl_array(a_value),
-            status(a_status), timestamp(a_timestamp)
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
         PVDataType              pv_type;
@@ -329,6 +336,7 @@ public:
         std::vector<double>     dbl_array;
         int                     status;
         uint32_t                timestamp;
+        uint32_t                timestamp_nanosec;
     };
 
     std::map<std::string, PVData> m_pvs;
@@ -396,6 +404,22 @@ protected:
                 }
 
                 data.timestamp = v.second.get( "timestamp", 0UL );
+
+                double timestamp_micro_ck =
+                    v.second.get( "timestamp_micro", -1.0 );
+
+                // Old Style, No Double Floating Point Timestamp w/Microsecs
+                if ( timestamp_micro_ck == -1.0 )
+                    data.timestamp_nanosec = 0;
+
+                // Extract Nanosecs (Approx) from Double Timestamp...
+                // Converting to Double _Only_ Retains Microsecond Precision
+                else
+                {
+                    data.timestamp_nanosec = (uint32_t)
+                        ( ( timestamp_micro_ck - ((double) data.timestamp) )
+                            * 1e9 );
+                }
 
                 m_pvs[v.second.get( "name", "" )] = data;
             }
@@ -468,6 +492,13 @@ protected:
 
             pt.put( "timestamp", ipv->second.timestamp );
 
+            // Assemble Double Timestamp with Microsecond Precision
+            // (Converting to Double _Only_ Retains Microsecond Precision
+            // from Nanosecond Value...)
+            double timestamp_micro = ((double) ipv->second.timestamp)
+                + ( ((double) ipv->second.timestamp_nanosec) / 1.0e9 );
+            pt.put( "timestamp_micro", timestamp_micro );
+
             ppt.push_back( std::make_pair( "", pt ));
         }
         a_prop_tree.add_child( "pvs", ppt );
@@ -522,12 +553,16 @@ public:
     RunStatusMessage()
     {}
 
-    RunStatusMessage( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
-        : m_recording(a_recording), m_run_number(a_run_number), m_timestamp(a_timestamp) {}
+    RunStatusMessage( bool a_recording, uint32_t a_run_number,
+            uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+        : m_recording(a_recording), m_run_number(a_run_number),
+        m_timestamp(a_timestamp), m_timestamp_nanosec(a_timestamp_nanosec)
+    {}
 
     bool        m_recording;
     uint32_t    m_run_number;
     uint32_t    m_timestamp;
+    uint32_t    m_timestamp_nanosec;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -537,6 +572,20 @@ protected:
         m_recording = a_prop_tree.get( "recording", false );
         m_run_number = a_prop_tree.get( "run_number", 0UL );
         m_timestamp = a_prop_tree.get( "timestamp", 0UL );
+
+        double timestamp_micro_ck =
+            a_prop_tree.get( "timestamp_micro", -1.0 );
+
+        // Old Style, No Double Floating Point Timestamp w/Microsecs
+        if ( timestamp_micro_ck == -1.0 )
+            m_timestamp_nanosec = 0;
+
+        // Extract Nanosecs (Approx) from Double Timestamp...
+        // Converting to Double _Only_ Retains Microsecond Precision
+        else {
+            m_timestamp_nanosec = (uint32_t)
+                ( ( timestamp_micro_ck - ((double) m_timestamp) ) * 1.0e9 );
+        }
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -546,6 +595,13 @@ protected:
         a_prop_tree.put( "recording", m_recording );
         a_prop_tree.put( "run_number", m_run_number );
         a_prop_tree.put( "timestamp", m_timestamp );
+
+        // Assemble Double Timestamp with Microsecond Precision
+        // (Converting to Double _Only_ Retains Microsecond Precision
+        // from Nanosecond Value...)
+        double timestamp_micro = ((double) m_timestamp)
+            + ( ((double) m_timestamp_nanosec) / 1.0e9 );
+        a_prop_tree.put( "timestamp_micro", timestamp_micro );
     }
 };
 
@@ -811,6 +867,8 @@ protected:
         m_pulse_pcharge_uncorrected
                                 = a_prop_tree.get(
                                       "pulse_pcharge_uncorrected", 0UL );
+        m_no_neutrons_count     = a_prop_tree.get( "no_neutrons_count", 0UL );
+        m_total_pulses_count    = a_prop_tree.get( "total_pulses_count", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -827,6 +885,8 @@ protected:
         a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
         a_prop_tree.put( "pulse_pcharge_uncorrected",
             m_pulse_pcharge_uncorrected );
+        a_prop_tree.put( "no_neutrons_count", m_no_neutrons_count );
+        a_prop_tree.put( "total_pulses_count", m_total_pulses_count );
     }
 };
 

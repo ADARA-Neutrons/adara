@@ -82,7 +82,7 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     : m_device(a_device), m_id(0),
     m_name(a_name), m_connection(a_connection),
     m_type(a_type), m_elem_count(a_elem_count),
-    m_enum(a_enum), m_units(a_units)
+    m_enum(a_enum), m_units(a_units), m_ignore(false)
 {
     if ( m_type == PV_ENUM && !m_enum )
     {
@@ -97,7 +97,7 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     : m_device(a_device), m_id(0),
     m_name(a_source.m_name), m_connection(a_source.m_connection),
     m_type(a_source.m_type), m_elem_count(a_source.m_elem_count),
-    m_enum(0), m_units(a_source.m_units)
+    m_enum(0), m_units(a_source.m_units), m_ignore(false)
 {
     if ( m_type == PV_ENUM && a_source.m_enum )
         m_enum = a_device->m_enums[a_source.m_enum->m_id - 1];
@@ -113,7 +113,8 @@ PVDescriptor::operator==( const PVDescriptor &a_desc ) const
             && m_connection == a_desc.m_connection
             && m_type == a_desc.m_type
             && m_elem_count == a_desc.m_elem_count
-            && m_units == a_desc.m_units )
+            && m_units == a_desc.m_units
+            && m_ignore == a_desc.m_ignore )
     {
         res = true;
 
@@ -366,7 +367,8 @@ ostream&
 PVDescriptor::print( ostream &a_out ) const
 {
     a_out << "  " << m_id << "," << m_name << "," << m_connection << ","
-        << m_type << "[" << m_elem_count << "]," << m_units << endl;
+        << m_type << "[" << m_elem_count << "]," << m_units << ","
+        << "ignore=" << m_ignore << endl;
     if ( m_enum )
     {
         a_out << "    enum: ";
