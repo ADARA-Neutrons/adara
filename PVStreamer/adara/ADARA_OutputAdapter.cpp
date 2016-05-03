@@ -259,11 +259,17 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
     // Encode XML
 
     sstr << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl
-            << "  <device xmlns=\"http://public.sns.gov/schema/device.xsd\"" << endl
-            << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl
-            << "  xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd http://public.sns.gov/schema/device.xsd\">" << endl;
+         << "  <device xmlns=\"http://public.sns.gov/schema/device.xsd\""
+         << endl
+         << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+         << endl
+         << "  xsi:schemaLocation=\""
+         << "http://public.sns.gov/schema/device.xsd"
+         << " http://public.sns.gov/schema/device.xsd\">"
+         << endl;
 
-    sstr << "  <device_name>" << a_device->m_name << "</device_name>" << endl;
+    sstr << "  <device_name>" << a_device->m_name << "</device_name>"
+         << endl;
 
     // Generate enumeration definitions for enums used by this device only
 
@@ -271,15 +277,23 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
     {
         sstr << "  <enumerations>" << endl;
         unsigned short id = 1;
-        for ( vector<EnumDescriptor*>::const_iterator e = a_device->m_enums.begin(); e != a_device->m_enums.end(); ++e, ++id )
+        for ( vector<EnumDescriptor*>::const_iterator e =
+                    a_device->m_enums.begin();
+                e != a_device->m_enums.end(); ++e, ++id )
         {
             sstr << "    <enumeration>" << endl;
-            sstr << "      <enum_name>enum_" << setw(2) << setfill('0') << id << "</enum_name>" << endl;
-            for ( map<int32_t,std::string>::const_iterator iel = (*e)->m_values.begin(); iel != (*e)->m_values.end(); ++iel )
+            sstr << "      <enum_name>enum_"
+                 << setw(2) << setfill('0') << id << "</enum_name>"
+                 << endl;
+            for ( map<int32_t,std::string>::const_iterator iel =
+                        (*e)->m_values.begin();
+                    iel != (*e)->m_values.end(); ++iel )
             {
                 sstr << "        <enum_element>" << endl;
-                sstr << "          <enum_element_name>" << iel->second << "</enum_element_name>" << endl;
-                sstr << "          <enum_element_value>" << iel->first << "</enum_element_value>" << endl;
+                sstr << "          <enum_element_name>" << iel->second
+                     << "</enum_element_name>" << endl;
+                sstr << "          <enum_element_value>" << iel->first
+                     << "</enum_element_value>" << endl;
                 sstr << "        </enum_element>" << endl;
             }
             sstr << "    </enumeration>" << endl;
@@ -291,19 +305,37 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
 
     sstr << "  <process_variables>" << endl;
 
-    for ( vector<PVDescriptor*>::const_iterator ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+    for ( vector<PVDescriptor*>::const_iterator ipv =
+                a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
     {
         sstr << "    <process_variable>" << endl;
-        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>" << endl;
-        sstr << "      <pv_connection>" << (*ipv)->m_connection << "</pv_connection>" << endl;
+        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>"
+             << endl;
+        sstr << "      <pv_connection>" << (*ipv)->m_connection
+             << "</pv_connection>" << endl;
         sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
         if ( (*ipv)->m_type == PV_ENUM )
-            sstr << "      <pv_type>enum_" << setw(2) << setfill('0') << (*ipv)->m_enum->m_id << "</pv_type>" << endl;
+        {
+            sstr << "      <pv_type>enum_"
+                 << setw(2) << setfill('0') << (*ipv)->m_enum->m_id
+                 << "</pv_type>" << endl;
+        }
         else
-            sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type) << "</pv_type>" << endl;
+        {
+            sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type)
+                 << "</pv_type>" << endl;
+        }
         if ( (*ipv)->m_units.size() )
-            sstr << "      <pv_units>" << (*ipv)->m_units << "</pv_units>" << endl;
-
+        {
+            sstr << "      <pv_units>" << (*ipv)->m_units
+                 << "</pv_units>" << endl;
+        }
+        if ( (*ipv)->m_ignore )
+        {
+            sstr << "      <pv_ignore>" << (*ipv)->m_ignore
+                 << "</pv_ignore>" << endl;
+        }
         sstr << "    </process_variable>" << endl;
     }
 
@@ -777,6 +809,7 @@ OutputAdapter::makeHeartbeatDevice(void)
     m_heartbeat_pv = m_heartbeat_device->getPvByName( "HeartbeatPVSD" );
 
     m_heartbeat_pv->m_id = -1;
+    m_heartbeat_pv->m_ignore = true;
 
     defineDevice( m_heartbeat_device );
 
