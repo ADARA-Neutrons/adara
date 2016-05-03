@@ -592,6 +592,8 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             case ADARA::PacketType::SYNC_TYPE:
             case ADARA::PacketType::HEARTBEAT_TYPE:
             case ADARA::PacketType::DATA_DONE_TYPE:
+            case ADARA::PacketType::BEAM_MONITOR_CONFIG_TYPE:
+            case ADARA::PacketType::DETECTOR_BANK_SETS_TYPE:
                 break;
 
             default:
@@ -803,6 +805,8 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
             ++m_stream_metrics.m_invalid_pkt_time;
         else if ( m_last_time == m_this_time )
             ++m_stream_metrics.m_duplicate_packet;
+        // TODO: This should depend on the Actual Facility Pulse Frequency!
+        // (and account for Sub-60Hz operation, and 2nd Target Station!)
         else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
             ++m_stream_metrics.m_pulse_freq_tol;
     }
