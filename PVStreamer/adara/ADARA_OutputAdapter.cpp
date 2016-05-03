@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <syslog.h>
+#include <time.h>
 #include <iomanip>
 #include <boost/lexical_cast.hpp>
 
@@ -36,6 +37,8 @@ OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_por
       m_heartbeat(a_heartbeat), m_listen_socket(-1)
 {
     initSockets();
+
+    makeHeartbeatDevice();
 
     m_socket_listen_thread = new boost::thread( boost::bind( &OutputAdapter::socketListenThread, this ));
     m_stream_proc_thread = new boost::thread( boost::bind( &OutputAdapter::streamProcessingThread, this ));
@@ -106,13 +109,34 @@ OutputAdapter::streamProcessingThread()
         {
             if ( timeout_flag )
             {
-                // Send a heartbeat packet
+                // Send a Heartbeat Packet (and a Heartbeat PV Update! :-D)
                 if ( connected() )
                 {
+                    // Send Heartbeat Packet
                     heartbeat_pkt.sec =
                         (uint32_t)time(0) - EPICS_TIME_OFFSET;
                     payload.clear();
                     sendPacket( heartbeat_pkt, payload );
+
+                    // Send Heartbeat PV Update...
+
+                    m_heartbeat_pv_value++;
+
+                    PVState state = PVState(
+                        ::ADARA::VariableStatus::OK,
+                        ::ADARA::VariableSeverity::OK );
+
+                    state.m_uint_val = m_heartbeat_pv_value;
+                    state.m_elem_count = 1;
+                    state.m_time.sec =
+                        (uint32_t)time(0) - EPICS_TIME_OFFSET;
+                    state.m_time.nsec = 0;
+
+                    updatePV( m_heartbeat_pv, state );
+
+                    payload.clear();
+                    buildVVP( adara_pkt, m_heartbeat_pv, state, payload );
+                    sendPacket( adara_pkt, payload );
                 }
             }
             else
@@ -732,6 +756,43 @@ OutputAdapter::initSockets()
     {
         EXCEPT( EC_SOCKET_ERROR, "Unknown exception in initSockets()." );
     }
+}
+
+
+/** \brief Create Fake Heartbeat Device & PV for Keep-Alive Web Monitoring
+ */
+void
+OutputAdapter::makeHeartbeatDevice(void)
+{
+    // Create Heartbeat Device & PV...
+
+    m_heartbeat_device = DeviceRecordPtr( new DeviceDescriptor(
+        "HeartbeatDevice", "pvsd", PVSD_PROTOCOL ) );
+
+    m_heartbeat_device->m_id = -1;
+
+    m_heartbeat_device->definePV( "HeartbeatPVSD", "HeartbeatPVSD",
+        PV_UINT, 1, (EnumDescriptor *) NULL, "" );
+
+    m_heartbeat_pv = m_heartbeat_device->getPvByName( "HeartbeatPVSD" );
+
+    m_heartbeat_pv->m_id = -1;
+
+    defineDevice( m_heartbeat_device );
+
+    // Initialize Heartbeat PV & State...
+
+    m_heartbeat_pv_value = 0;
+
+    PVState state = PVState( ::ADARA::VariableStatus::OK,
+        ::ADARA::VariableSeverity::OK );
+
+    state.m_uint_val = m_heartbeat_pv_value;
+    state.m_elem_count = 1;
+    state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+    state.m_time.nsec = 0;
+
+    updatePV( m_heartbeat_pv, state );
 }
 
 
