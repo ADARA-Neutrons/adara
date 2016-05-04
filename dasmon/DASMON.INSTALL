@@ -98,6 +98,7 @@ To deploy the Dasmon GUI and Dasmon Daemon startup files:
 		- substitute YYY for "blD+[ab]" SMS/DAQ1 Hostname Prefix!
 		- substitute XXX for SHORT Beamline Name!
 		- append "dev" to "amqbroker" for commissioning testing!
+	sudo chown dasmon /usr/local/bin/dasmond
 	sudo chmod og-x /usr/local/bin/dasmond
 	ls -l /usr/local/bin/dasmond
 
@@ -105,6 +106,27 @@ To deploy the Dasmon GUI and Dasmon Daemon startup files:
 
 	sudo ln -s /home/controls/config-dasmon/deploy/dasmond /usr/sbin/dasmond
 	ls -l /usr/sbin/dasmond
+
+	sudo vi /etc/rsyslog.conf
+		- add to #### RULES #### Section:
+			# dasmond log
+			if $programname == 'dasmond' then /var/log/dasmond.log
+			& ~
+	sudo touch /var/log/dasmond.log
+	sudo chown dasmon /var/log/dasmond.log
+	sudo chgrp users /var/log/dasmond.log
+	ls -l /var/log/dasmond.log
+	sudo /sbin/service rsyslog status
+	sudo /sbin/service rsyslog restart
+	sudo /sbin/service rsyslog status
+
+	crontab -l
+	crontab -e
+		- add:
+			#MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
+			MAILTO=kohlja@ornl.gov
+			0-59/5 * * * * /SNS/users/y8y/stuff/exec/dasmond_mon
+	crontab -l
 
 To deploy/restart dasmond and dasmon:
 
@@ -115,6 +137,8 @@ To deploy/restart dasmond and dasmon:
 	sudo /sbin/start dasmond
 	sudo /sbin/status dasmond
 	psg dasmond
+
+	tail -f /var/log/dasmond.log
 
 	psg dasmon | gv dasmond
 	sudo /sbin/status dasmongui
