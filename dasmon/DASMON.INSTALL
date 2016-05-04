@@ -1,0 +1,126 @@
+
+To make dasmon machines ADARA-buildable:
+
+	sudo mkdir /home/controls
+	(chown controls /home/controls)
+	sudo chgrp slowcontrols_developers /home/controls
+	sudo chmod g+ws /home/controls/
+	cd /home/controls/
+	mkdir share epics
+	cd share/
+	git clone git+ssh://trac.sns.gov/var/repos/share master
+	cd master/scripts/git/
+	git-branch.sh --epics base master
+	git-branch.sh --epics basev4 master
+	git-branch.sh --epics extensions master
+	cd /home/controls/epics/base/master/
+	peg EPICS
+	sc
+	peg EPICS
+	sudo yum install readline-devel.x86_64
+	make
+	make install
+	cd ../../extensions/master/
+	make
+	make install
+	cd ../../basev4/master/
+	./make_setup_release.sh `pwd`
+	sudo yum install python-devel.x86_64
+	make
+	cd /home/controls
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
+	cd ~/gitsrc/ADARA
+	make distclean
+	./bootstrap
+	sudo yum install hdf.x86_64 hdf-devel.x86_64
+	sudo yum install hdf5.x86_64 hdf5-devel.x86_64 hdf5-static.x86_64
+	sudo yum install nexus.x86_64 nexus-devel.x86_64
+	sudo yum install nexus-tools.x86_64 nexus-python.x86_64
+	sudo yum install log4cxx-devel.x86_64
+	doconf
+	make
+	cd dasmon/client/
+	ls -ld /usr/include/activemq-cpp*
+	sudo ln -s /usr/include/activemq-cpp-* /usr/include/activemq-cpp
+	ls -ld /usr/include/activemq-cpp*
+	make distclean
+	qmake
+	make
+
+Now Deploy the Dasmon GUI and Dasmon Daemon:
+
+	./deploy_adara dasmon
+		- *** First BEAMLINE Dasmon Deployment! ***
+		- Using Latest ADARA Version XXX Release.
+
+To create a "dasmon" group and user:
+
+	grep dasmon /etc/group
+	grep dasmon /etc/passwd
+	ls -l /home
+
+	sudo sh -c 'echo "NOLOGIN" >> /etc/shells'
+
+	sudo useradd -b /home -u 501 -m -U -s /sbin/nologin dasmon
+
+	grep dasmon /etc/group
+	grep dasmon /etc/passwd
+	ls -l /home
+
+	sudo chmod og+rx /home/dasmon
+
+	ls -l /home
+
+	sudo sh -c 'echo -e "[rules]\\n[signals]" > /home/dasmon/dasmond.cfg'
+
+	ls -l /home/dasmon
+	/bin/cat /home/dasmon/dasmond.cfg
+
+To deploy the Dasmon GUI and Dasmon Daemon startup files:
+
+	Dasmon GUI:
+
+	sudo cp dasmon/client/xinitrc.dasmon /etc/X11/xinit/
+	sudo vi /etc/X11/xinit/xinitrc.dasmon
+		- substitute XXX for SHORT Beamline Name!
+		- append "dev" to "amqbroker" for commissioning testing!
+	ls -l /etc/X11/xinit/xinitrc.dasmon
+
+	sudo cp dasmon/client/dasmongui.conf /etc/init/
+
+	sudo ln -s /home/controls/config-dasmon/deploy/dasmon /usr/sbin/dasmon
+	ls -l /usr/sbin/dasmon
+
+	Dasmon Daemon:
+
+	sudo cp dasmon/server/dasmond.wrapper /usr/local/bin/dasmond
+	sudo vi /usr/local/bin/dasmond
+		- substitute YYY for "blD+[ab]" SMS/DAQ1 Hostname Prefix!
+		- substitute XXX for SHORT Beamline Name!
+		- append "dev" to "amqbroker" for commissioning testing!
+	sudo chmod og-x /usr/local/bin/dasmond
+	ls -l /usr/local/bin/dasmond
+
+	sudo cp dasmon/server/dasmond.conf /etc/init/
+
+	sudo ln -s /home/controls/config-dasmon/deploy/dasmond /usr/sbin/dasmond
+	ls -l /usr/sbin/dasmond
+
+To deploy/restart dasmond and dasmon:
+
+	psg dasmond
+	sudo /sbin/status dasmond
+	sudo /sbin/stop dasmond
+	psg dasmond
+	sudo /sbin/start dasmond
+	sudo /sbin/status dasmond
+	psg dasmond
+
+	psg dasmon | gv dasmond
+	sudo /sbin/status dasmongui
+	sudo /sbin/stop dasmongui
+	psg dasmon | gv dasmond
+	sudo /sbin/start dasmongui
+	sudo /sbin/status dasmongui
+	psg dasmon | gv dasmond
+
