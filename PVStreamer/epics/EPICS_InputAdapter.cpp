@@ -205,9 +205,9 @@ InputAdapter::configFileMonitorThread()
     set<string>::iterator icur;
     boost::filesystem::path cfg_path( m_config_file );
     bool            changed;
-    unsigned short  count = 0;
     vector<char>    buffer;
-    int             poll_rate = 15;
+    unsigned short  poll_rate = 15;
+    unsigned short  count = poll_rate;  // Check "Right Away" on Startup!
 
     ca_attach_context( m_epics_context );
 
