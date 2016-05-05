@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
         // Create and start protocol streamer
         StreamService   streamer( 100, offset );
 
-        // Attach ADARA ouptut adapter
+        // Attach ADARA output adapter
         new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
 
         // Create and attach EPICS input adapter
