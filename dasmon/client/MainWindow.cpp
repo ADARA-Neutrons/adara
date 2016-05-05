@@ -774,16 +774,23 @@ MainWindow::updateMainWindowTitle()
     // Trim off any existing domain string
     int idx = windowTitle.lastIndexOf(" [");
     if ( idx >= 0 )
-        windowTitle = windowTitle.left(idx - 1);
+    {
+        windowTitle = windowTitle.left( idx );
+    }
 
     // Add back in any new domain string
     if ( !m_domain.empty() )
     {
         // If domain includes trailing ".", remove it for title display
-        if ( m_domain[m_domain.length()-1] == '.' )
-            windowTitle += QString::fromStdString( " [" + m_domain.substr(0, m_domain.length()-1) + "]" );
+        if ( m_domain[ m_domain.length() - 1 ] == '.' )
+        {
+            windowTitle += QString::fromStdString( " ["
+                + m_domain.substr( 0, m_domain.length() - 1 ) + "]" );
+        }
         else
+        {
             windowTitle += QString::fromStdString( " [" + m_domain + "]" );
+        }
     }
 
     // Set the new MainWindow Title
