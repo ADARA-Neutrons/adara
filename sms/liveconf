@@ -1366,7 +1366,7 @@ if [[ "$command" == "status" \
 	fi
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
-elif [ "$command" == "option" ]; then
+elif [[ "$command" == "option" ]]; then
 
 	#
 	# Parse Option Arg String into Pieces... ;-D
@@ -2380,6 +2380,28 @@ elif [[ "$command" == "confck" ]]; then
 						echo -e "\"${sfx}\"."
 					fi
 					config_value="$config_value$sfx"
+				fi
+			fi
+
+			# Check for Shorthand Numerical Suffixes...
+			chkKMG=`echo "$config_value" \
+				| grep -e "^[0-9]\+[KMG]$" | wc | awk '{print $1}'`
+			if [[ $chkKMG == 1 ]]; then
+				digits=`echo "$config_value" | sed 's/[KMG]//g'`
+				suffix=`echo "$config_value" | sed 's/[0-9]//g'`
+				if [[ $terse == 0 ]]; then
+					echo -n "Found Shorthand Numerical Suffix"
+					echo -n " in Config Value!"
+					echo " [$digits] [$suffix]"
+				fi
+				if [[ $suffix == "K" ]]; then
+					config_value=$(( digits * 1024 ))
+				elif [[ $suffix == "M" ]]; then
+					config_value=$(( digits * 1024 * 1024 ))
+				elif [[ $suffix == "G" ]]; then
+					config_value=$(( digits * 1024 * 1024 * 1024 ))
+				else
+					echo "***Unknown Numerical Shorthand Suffix... Ignore!"
 				fi
 			fi
 
