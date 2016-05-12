@@ -219,7 +219,8 @@ public:
 		DUPLICATE_PULSE     = 0x00020,
 		PCHARGE_UNCORRECTED = 0x00040,
 		VETO_UNCORRECTED    = 0x00080,
-		NO_NEUTRONS         = 0x00100,
+		GOT_METADATA        = 0x00100,
+		GOT_NEUTRONS        = 0x00200,
 	};
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
