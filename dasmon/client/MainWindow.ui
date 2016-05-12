@@ -790,7 +790,7 @@
               <item row="1" column="0">
                <widget class="QLabel" name="label_49">
                 <property name="text">
-                 <string>No-Neutron Pulses (run):</string>
+                 <string>Got Metadata Pulses (run):</string>
                 </property>
                </widget>
               </item>
@@ -804,7 +804,7 @@
               <item row="2" column="0">
                <widget class="QLabel" name="label_51">
                 <property name="text">
-                 <string>No-Neutron Pulses (run):</string>
+                 <string>Got Neutrons Pulses (run):</string>
                 </property>
                </widget>
               </item>
@@ -917,196 +917,196 @@
                 </property>
                </widget>
               </item>
-              <item row="0" column="2">
+              <item row="9" column="0">
                <widget class="QLabel" name="label_34">
                 <property name="text">
                  <string>Duplicate event packets:</string>
                 </property>
                </widget>
               </item>
-              <item row="0" column="3">
+              <item row="9" column="1">
                <widget class="QLineEdit" name="dupEventPktEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="1" column="2">
+              <item row="0" column="2">
                <widget class="QLabel" name="label_47">
                 <property name="text">
                  <string>Freq. tolerance errors:</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="3">
+              <item row="0" column="3">
                <widget class="QLineEdit" name="freqTolEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="2" column="2">
+              <item row="1" column="2">
                <widget class="QLabel" name="label_35">
                 <property name="text">
                  <string>Cycle errors:</string>
                 </property>
                </widget>
               </item>
-              <item row="2" column="3">
+              <item row="1" column="3">
                <widget class="QLineEdit" name="cycleErrEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="3" column="2">
+              <item row="2" column="2">
                <widget class="QLabel" name="label_36">
                 <property name="text">
                  <string>Invalid bank IDs:</string>
                 </property>
                </widget>
               </item>
-              <item row="3" column="3">
+              <item row="2" column="3">
                <widget class="QLineEdit" name="invBankEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="4" column="2">
+              <item row="3" column="2">
                <widget class="QLabel" name="label_37">
                 <property name="text">
                  <string>Bank-source mismatches:</string>
                 </property>
                </widget>
               </item>
-              <item row="4" column="3">
+              <item row="3" column="3">
                <widget class="QLineEdit" name="bankSrcMisEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="5" column="2">
+              <item row="4" column="2">
                <widget class="QLabel" name="label_38">
                 <property name="text">
                  <string>Duplicate sources in packets:</string>
                 </property>
                </widget>
               </item>
-              <item row="5" column="3">
+              <item row="4" column="3">
                <widget class="QLineEdit" name="dupSrcEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="6" column="2">
+              <item row="5" column="2">
                <widget class="QLabel" name="label_39">
                 <property name="text">
                  <string>Duplicate banks in packets:</string>
                 </property>
                </widget>
               </item>
-              <item row="6" column="3">
+              <item row="5" column="3">
                <widget class="QLineEdit" name="dupBankEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="7" column="2">
+              <item row="6" column="2">
                <widget class="QLabel" name="label_40">
                 <property name="text">
                  <string>Reported pixel ID errors:</string>
                 </property>
                </widget>
               </item>
-              <item row="7" column="3">
+              <item row="6" column="3">
                <widget class="QLineEdit" name="repPixMapEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="8" column="2">
+              <item row="7" column="2">
                <widget class="QLabel" name="label_41">
                 <property name="text">
                  <string>Reported pixel errors:</string>
                 </property>
                </widget>
               </item>
-              <item row="8" column="3">
+              <item row="7" column="3">
                <widget class="QLineEdit" name="repPixErrEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="0" column="4">
+              <item row="8" column="2">
                <widget class="QLabel" name="label_42">
                 <property name="text">
                  <string>Pixel-bank mismatches:</string>
                 </property>
                </widget>
               </item>
-              <item row="0" column="5">
+              <item row="8" column="3">
                <widget class="QLineEdit" name="pixBankMisEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="1" column="4">
+              <item row="9" column="2">
                <widget class="QLabel" name="label_43">
                 <property name="text">
                  <string>Invalid pixel TOF:</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="5">
+              <item row="9" column="3">
                <widget class="QLineEdit" name="invTofEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="2" column="4">
+              <item row="0" column="4">
                <widget class="QLabel" name="label_44">
                 <property name="text">
                  <string>Invalid pixel IDs:</string>
                 </property>
                </widget>
               </item>
-              <item row="2" column="5">
+              <item row="0" column="5">
                <widget class="QLineEdit" name="invPixEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="3" column="4">
+              <item row="1" column="4">
                <widget class="QLabel" name="label_45">
                 <property name="text">
                  <string>Invalid RunInfo XML:</string>
                 </property>
                </widget>
               </item>
-              <item row="3" column="5">
+              <item row="1" column="5">
                <widget class="QLineEdit" name="invRunXMLEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="4" column="4">
+              <item row="2" column="4">
                <widget class="QLabel" name="label_46">
                 <property name="text">
                  <string>Invalid DDP XML:</string>
                 </property>
                </widget>
               </item>
-              <item row="4" column="5">
+              <item row="2" column="5">
                <widget class="QLineEdit" name="invDDPXMLEdit">
                 <property name="readOnly">
                  <bool>true</bool>
