@@ -848,8 +848,11 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
     }
 
-    if ( flags & BankedEventPkt::NO_NEUTRONS )
-         ++m_run_metrics.m_no_neutrons_count;
+    if ( flags & BankedEventPkt::GOT_METADATA )
+         ++m_run_metrics.m_got_metadata_count;
+
+    if ( flags & BankedEventPkt::GOT_NEUTRONS )
+         ++m_run_metrics.m_got_neutrons_count;
 
     // Count Total Pulses (with Data... ;-D)
     ++m_run_metrics.m_total_pulses_count;
