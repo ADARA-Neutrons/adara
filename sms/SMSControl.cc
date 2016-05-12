@@ -1584,7 +1584,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	if ( got_neutrons || !got_metadata || mixed_data_packets )
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
 	// Also Note the Presence of Meta-Data Events, for Completeness
-	if ( got_metadata )
+	if ( got_metadata || mixed_data_packets )
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
 }
 
