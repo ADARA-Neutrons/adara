@@ -1084,7 +1084,8 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pulse_veto_count )));
     QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_missing_rtdl_count )));
     QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_pcharge_uncorrected )));
-    QMetaObject::invokeMethod( ui->noNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_no_neutrons_count )));
+    QMetaObject::invokeMethod( ui->gotMetadataEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_got_metadata_count )));
+    QMetaObject::invokeMethod( ui->gotNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_got_neutrons_count )));
     QMetaObject::invokeMethod( ui->totalPulsesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_pulses_count )));
 }
 
@@ -1160,7 +1161,8 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-        QMetaObject::invokeMethod( ui->noNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->gotMetadataEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->gotNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->totalPulsesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
     else
@@ -1181,7 +1183,8 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         setStaleText( ui->pulseVetoLabel );
         setStaleText( ui->missRTDLLabel );
         setStaleText( ui->pulsePchgUncorLabel );
-        setStaleText( ui->noNeutronsEdit );
+        setStaleText( ui->gotMetadataEdit );
+        setStaleText( ui->gotNeutronsEdit );
         setStaleText( ui->totalPulsesEdit );
     }
 }
