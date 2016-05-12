@@ -392,8 +392,10 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 				printf(" PCHG_UNCOR");
 			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::NO_NEUTRONS)
-				printf(" NO_NEUTRONS");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
 			printf("\n");
 		}
 	}
@@ -494,8 +496,10 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 				printf(" PCHG_UNCOR");
 			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::NO_NEUTRONS)
-				printf(" NO_NEUTRONS");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
 			printf("\n");
 		}
 	}
