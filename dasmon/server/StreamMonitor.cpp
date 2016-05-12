@@ -374,7 +374,11 @@ StreamMonitor::connect()
             data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
             data[3] = 0;
             data[4] = 0;
-            data[5] = 0; // Version 1 ClientHelloPkt includes Paused/Flags
+
+            // Version 1 ClientHelloPkt includes Paused/Flags
+            // We Want to See It All, Even When Paused (I think/hope... :-)
+            // So We Can Keep Updating the Web Monitor... ;-D
+            data[5] = ADARA::ClientHelloPkt::SEND_PAUSE_DATA;
 
             if ( write( sms_socket, data, sizeof(data)) == sizeof( data ))
             {
