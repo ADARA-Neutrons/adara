@@ -113,6 +113,25 @@ static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
 	return "UndefinedFlavor";
 }
 
+static const char *dataFlags(uint32_t flags)
+{
+	static std::string dataFlagsStr = "";
+	bool first = true;
+	if (flags & ADARA::DataFlags::GOT_NEUTRONS) {
+		if (!first) dataFlagsStr += " ";
+		else first = false;
+		dataFlagsStr += "GOT_NEUTRONS";
+	}
+	if (flags & ADARA::DataFlags::GOT_METADATA) {
+		if (!first) dataFlagsStr += " ";
+		else first = false;
+		dataFlagsStr += "GOT_METADATA";
+	}
+	if (first)
+		dataFlagsStr += "[DataFlags Not Set]";
+	return dataFlagsStr.c_str();
+}
+
 static const char *markerType(ADARA::MarkerType::Enum type)
 {
 	switch (type) {
@@ -280,7 +299,8 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 	if ( !m_terse || m_showEvents ) {
 		printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
 			"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
-			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
+			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
+			"    dataFlags=%s 0x%x (%s) flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
 			"    charge %lupC, %u events\n",
 			(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
@@ -290,8 +310,10 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 			pkt->endOfPulse() ? " EOP" : "",
 			pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
 			pkt->vetoFlags(), pkt->badVeto() ? " (BAD)" : "",
-			pkt->timingStatus(), (int) pkt->flavor(),
-			pulseFlavor(pkt->flavor()),
+			pkt->timingStatus(),
+			pkt->gotDataFlags() ? "true" : "false",
+			(int) pkt->dataFlags(), dataFlags(pkt->dataFlags()),
+			(int) pkt->flavor(), pulseFlavor(pkt->flavor()),
 			(uint64_t) pkt->intraPulseTime() * 100,
 			(uint64_t) pkt->tofOffset() * 100,
 			pkt->tofCorrected() ? "" : " (raw)",
@@ -337,15 +359,18 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
 	if ( !m_terse || m_showFrame ) {
 		printf("%u.%09u RTDL (0x%x,v%u)\n"
-			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x flavor %d (%s)\n"
+			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
+			"    dataFlags=%s 0x%x (%s) flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
 			"    charge %lupC period %ups\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(),
 			pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
 			pkt.vetoFlags(), pkt.badVeto() ? " (BAD)" : "",
-			pkt.timingStatus(), (int) pkt.flavor(),
-			pulseFlavor(pkt.flavor()),
+			pkt.timingStatus(),
+			pkt.gotDataFlags() ? "true" : "false",
+			(int) pkt.dataFlags(), dataFlags(pkt.dataFlags()),
+			(int) pkt.flavor(), pulseFlavor(pkt.flavor()),
 			(uint64_t) pkt.intraPulseTime() * 100,
 			(uint64_t) pkt.tofOffset() * 100,
 			pkt.tofCorrected() ? "" : " (raw)",
