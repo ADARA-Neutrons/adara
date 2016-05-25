@@ -87,11 +87,19 @@ public:
 	bool endOfPulse(void) const { return !!(m_fields[1] & 0x80000000); }
 	uint16_t pktSeq(void) const { return (m_fields[1] >> 16) & 0x7fff; }
 	uint16_t dspSeq(void) const { return m_fields[1] & 0x7fff; }
+
+	bool gotDataFlags(void) const { return m_version >= 0x01; }
+	uint32_t dataFlags(void) const {
+		if ( gotDataFlags() )
+			return (m_fields[2] >> 27) & 0x1f;
+		else return 0;
+	}
 	PulseFlavor::Enum flavor(void) const {
 		return static_cast<PulseFlavor::Enum>
 						((m_fields[2] >> 24) & 0x7);
 	}
 	uint32_t pulseCharge(void) const { return m_fields[2] & 0x00ffffff; }
+
 	bool badVeto(void) const { return !!(m_fields[3] & 0x80000000); }
 	bool badCycle(void) const { return !!(m_fields[3] & 0x40000000); }
 	uint8_t timingStatus(void) const {
@@ -99,7 +107,9 @@ public:
 	}
 	uint16_t vetoFlags(void) const { return (m_fields[3] >> 10) & 0xfff; }
 	uint16_t cycle(void) const { return m_fields[3] & 0x3ff; }
+
 	uint32_t intraPulseTime(void) const { return m_fields[4]; }
+
 	bool tofCorrected(void) const { return !!(m_fields[5] & 0x80000000); }
 	uint32_t tofOffset(void) const { return m_fields[5] & 0x7fffffff; }
 	uint32_t tofField(void) const { return m_fields[5]; }
@@ -130,6 +140,13 @@ private:
 class RTDLPkt : public Packet {
 public:
 	RTDLPkt(const RTDLPkt &pkt);
+
+	bool gotDataFlags(void) const { return m_version >= 0x01; }
+	uint32_t dataFlags(void) const {
+		if ( gotDataFlags() )
+			return (m_fields[0] >> 27) & 0x1f;
+		else return 0;
+	}
 
 	PulseFlavor::Enum flavor(void) const {
 		return static_cast<PulseFlavor::Enum>
