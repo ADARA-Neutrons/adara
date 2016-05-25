@@ -1579,13 +1579,19 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	//    Didn't Get Meta-Data Events), Count It Just to Be Safe... ;-b
 	// Or, If This Data Soure is Marked as having "Mixed Data Packets",
 	//    then All Bets are Off, Just Count the Dang Proton Charge... ;-o
-	// TODO Create A More Authoritative Flag for This in the
-	//    RawDataPkt/MappedDataPkt Packets...!
-	if ( got_neutrons || !got_metadata || mixed_data_packets )
+	// OR, Use Authoritative Data Flags for This in the New
+	//    Version 1+ RawDataPkt/MappedDataPkt Packets...!
+	if ( got_neutrons || !got_metadata || mixed_data_packets
+			|| ( pkt.gotDataFlags()
+				&& pkt.dataFlags() & ADARA::DataFlags::GOT_NEUTRONS ) ) {
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
+	}
 	// Also Note the Presence of Meta-Data Events, for Completeness
-	if ( got_metadata || mixed_data_packets )
+	if ( got_metadata || mixed_data_packets
+			|| ( pkt.gotDataFlags()
+				&& pkt.dataFlags() & ADARA::DataFlags::GOT_METADATA ) ) {
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
+	}
 }
 
 void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
@@ -1597,6 +1603,16 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	 */
 	if (pulse->m_rtdl)
 		return;
+
+	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
+	// Use Any Authoritative Data Flags for This in the New
+	//    Version 1+ RTDLPkt Packets...!
+	if ( pkt.gotDataFlags() ) {
+		if ( pkt.dataFlags() & ADARA::DataFlags::GOT_NEUTRONS )
+			pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
+		if ( pkt.dataFlags() & ADARA::DataFlags::GOT_METADATA )
+			pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
+	}
 
 	/* Save off information about this pulse for the incoming pulse.
 	 * We don't save the pulse charge here, as that is for the
