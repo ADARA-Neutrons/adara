@@ -115,8 +115,9 @@ static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
 
 static const char *dataFlags(uint32_t flags)
 {
-	static std::string dataFlagsStr = "";
+	static std::string dataFlagsStr;
 	bool first = true;
+	dataFlagsStr = "";
 	if (flags & ADARA::DataFlags::GOT_NEUTRONS) {
 		if (!first) dataFlagsStr += " ";
 		else first = false;
@@ -300,7 +301,8 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 		printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
 			"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
 			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
-			"    dataFlags=%s 0x%x (%s) flavor %d (%s)\n"
+			"    dataFlags=%s 0x%x (%s)\n"
+			"    flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
 			"    charge %lupC, %u events\n",
 			(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
@@ -360,7 +362,8 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 	if ( !m_terse || m_showFrame ) {
 		printf("%u.%09u RTDL (0x%x,v%u)\n"
 			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
-			"    dataFlags=%s 0x%x (%s) flavor %d (%s)\n"
+			"    dataFlags=%s 0x%x (%s)\n"
+			"    flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
 			"    charge %lupC period %ups\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
