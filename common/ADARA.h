@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.6.1";
+const std::string VERSION = "1.7.0";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 namespace PacketType {
@@ -85,10 +85,10 @@ namespace PacketType {
 	};
 
 	enum Version {
-		RAW_EVENT_VERSION				=	0x00,
-		RTDL_VERSION					=	0x00,
+		RAW_EVENT_VERSION				=	0x01,
+		RTDL_VERSION					=	0x01,
 		SOURCE_LIST_VERSION				=	0x00,
-		MAPPED_EVENT_VERSION			=	0x00,
+		MAPPED_EVENT_VERSION			=	0x01,
 		BANKED_EVENT_VERSION			=	0x01,
 		BEAM_MONITOR_EVENT_VERSION		=	0x01,
 		PIXEL_MAPPING_VERSION			=	0x00,
@@ -122,15 +122,22 @@ namespace PacketType {
  */
 namespace PulseFlavor {
 	enum Enum {
-		NO_BEAM		  = 0,
-		NORMAL		  = 1,
-		NORMAL_TGT_1	  = 1,
-		NORMAL_TGT_2	  = 2,
-		DIAG_10us	  = 3,
-		DIAG_50us	  = 4,
-		DIAG_100us	  = 5,
-		SPECIAL_PHYSICS_1 = 6,
-		SPECIAL_PHYSICS_2 = 7
+		NO_BEAM				= 0,
+		NORMAL				= 1,
+		NORMAL_TGT_1		= 1,
+		NORMAL_TGT_2		= 2,
+		DIAG_10us			= 3,
+		DIAG_50us			= 4,
+		DIAG_100us			= 5,
+		SPECIAL_PHYSICS_1	= 6,
+		SPECIAL_PHYSICS_2	= 7
+	};
+}
+
+namespace DataFlags {
+	enum Enum {
+		GOT_NEUTRONS	= 0x1,
+		GOT_METADATA	= 0x2
 	};
 }
 
