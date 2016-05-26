@@ -1577,17 +1577,21 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
 	// Or, If We Got Nuthin' (Didn't Get Neutrons, but Also
 	//    Didn't Get Meta-Data Events), Count It Just to Be Safe... ;-b
-	// Or, If This Data Soure is Marked as having "Mixed Data Packets",
+	// Or, If This Data Source is Marked as having "Mixed Data Packets",
 	//    then All Bets are Off, Just Count the Dang Proton Charge... ;-o
 	// OR, Use Authoritative Data Flags for This in the New
 	//    Version 1+ RawDataPkt/MappedDataPkt Packets...!
-	if ( got_neutrons || !got_metadata || mixed_data_packets
+	//       -> Data Flags Supersede Any Auto-Deduction Crapola... ;-D
+	if ( got_neutrons
+			|| ( !pkt.gotDataFlags()
+				&& ( !got_metadata || mixed_data_packets ) )
 			|| ( pkt.gotDataFlags()
 				&& pkt.dataFlags() & ADARA::DataFlags::GOT_NEUTRONS ) ) {
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
 	}
 	// Also Note the Presence of Meta-Data Events, for Completeness
-	if ( got_metadata || mixed_data_packets
+	if ( got_metadata
+			|| ( !pkt.gotDataFlags() && mixed_data_packets )
 			|| ( pkt.gotDataFlags()
 				&& pkt.dataFlags() & ADARA::DataFlags::GOT_METADATA ) ) {
 		pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
