@@ -129,7 +129,7 @@ public:
 	}
 
 	uint32_t *buildCommon(uint32_t *pkt, Pulse &p) {
-		/* pulse charge and beam flavor first */
+		/* pulse beam flavor */
 		if (p.cycle) {
 			*pkt = (uint32_t) ADARA::PulseFlavor::NORMAL << 24;
 
@@ -138,6 +138,15 @@ public:
 			*pkt = (uint32_t) ADARA::PulseFlavor::NO_BEAM << 24;
 		}
 
+		/* pulse data flags (Got Neutrons/Metadata) */
+		uint32_t dataFlags = 0;
+		if (p.nevents)
+			dataFlags |= ADARA::DataFlags::GOT_NEUTRONS;
+		if (p.cevents || p.mevents)
+			dataFlags |= ADARA::DataFlags::GOT_METADATA;
+		*pkt |= (uint32_t) dataFlags << 27;
+
+		/* pulse charge */
 		if (p.cycle != 1) {
 			/* 18.47e-6 C => 18.47 uC => 18470000 pC
 			 * charge is in units of 10 pC

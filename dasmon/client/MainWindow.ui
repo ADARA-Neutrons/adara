@@ -790,32 +790,46 @@
               <item row="1" column="0">
                <widget class="QLabel" name="label_49">
                 <property name="text">
-                 <string>No-Neutron Pulses (run):</string>
+                 <string>Got Metadata Pulses (run):</string>
                 </property>
                </widget>
               </item>
               <item row="1" column="1">
-               <widget class="QLineEdit" name="noNeutronsEdit">
+               <widget class="QLineEdit" name="gotMetadataEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
               <item row="2" column="0">
-               <widget class="QLabel" name="label_48">
+               <widget class="QLabel" name="label_51">
                 <property name="text">
-                 <string>Uncorrected Pulses (run):</string>
+                 <string>Got Neutrons Pulses (run):</string>
                 </property>
                </widget>
               </item>
               <item row="2" column="1">
-               <widget class="QLineEdit" name="pulsePchgUncorLabel">
+               <widget class="QLineEdit" name="gotNeutronsEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
               <item row="3" column="0">
+               <widget class="QLabel" name="label_48">
+                <property name="text">
+                 <string>Uncorrected Pulses (run):</string>
+                </property>
+               </widget>
+              </item>
+              <item row="3" column="1">
+               <widget class="QLineEdit" name="pulsePchgUncorLabel">
+                <property name="readOnly">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item row="4" column="0">
                <widget class="QLabel" name="label_16">
                 <property name="text">
                  <string>Missing RTDL (run):</string>
@@ -825,7 +839,7 @@
                 </property>
                </widget>
               </item>
-              <item row="3" column="1">
+              <item row="4" column="1">
                <widget class="QLineEdit" name="missRTDLLabel">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -838,7 +852,7 @@
                 </property>
                </widget>
               </item>
-              <item row="4" column="0">
+              <item row="5" column="0">
                <widget class="QLabel" name="label_15">
                 <property name="text">
                  <string>Map Errors (run):</string>
@@ -848,7 +862,7 @@
                 </property>
                </widget>
               </item>
-              <item row="4" column="1">
+              <item row="5" column="1">
                <widget class="QLineEdit" name="mapErrorLabel">
                 <property name="sizePolicy">
                  <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -861,56 +875,56 @@
                 </property>
                </widget>
               </item>
-              <item row="5" column="0">
+              <item row="6" column="0">
                <widget class="QLabel" name="label_20">
                 <property name="text">
                  <string>Invalid packets:</string>
                 </property>
                </widget>
               </item>
-              <item row="5" column="1">
+              <item row="6" column="1">
                <widget class="QLineEdit" name="invPktEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="6" column="0">
+              <item row="7" column="0">
                <widget class="QLabel" name="label_22">
                 <property name="text">
                  <string>Invalid packet types:</string>
                 </property>
                </widget>
               </item>
-              <item row="6" column="1">
+              <item row="7" column="1">
                <widget class="QLineEdit" name="invPktTypeEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="7" column="0">
+              <item row="8" column="0">
                <widget class="QLabel" name="label_33">
                 <property name="text">
                  <string>Invalid packet times:</string>
                 </property>
                </widget>
               </item>
-              <item row="7" column="1">
+              <item row="8" column="1">
                <widget class="QLineEdit" name="invPktTimeEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="8" column="0">
+              <item row="9" column="0">
                <widget class="QLabel" name="label_34">
                 <property name="text">
                  <string>Duplicate event packets:</string>
                 </property>
                </widget>
               </item>
-              <item row="8" column="1">
+              <item row="9" column="1">
                <widget class="QLineEdit" name="dupEventPktEdit">
                 <property name="readOnly">
                  <bool>true</bool>
@@ -1043,56 +1057,56 @@
                 </property>
                </widget>
               </item>
-              <item row="0" column="4">
+              <item row="9" column="2">
                <widget class="QLabel" name="label_43">
                 <property name="text">
                  <string>Invalid pixel TOF:</string>
                 </property>
                </widget>
               </item>
-              <item row="0" column="5">
+              <item row="9" column="3">
                <widget class="QLineEdit" name="invTofEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="1" column="4">
+              <item row="0" column="4">
                <widget class="QLabel" name="label_44">
                 <property name="text">
                  <string>Invalid pixel IDs:</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="5">
+              <item row="0" column="5">
                <widget class="QLineEdit" name="invPixEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="2" column="4">
+              <item row="1" column="4">
                <widget class="QLabel" name="label_45">
                 <property name="text">
                  <string>Invalid RunInfo XML:</string>
                 </property>
                </widget>
               </item>
-              <item row="2" column="5">
+              <item row="1" column="5">
                <widget class="QLineEdit" name="invRunXMLEdit">
                 <property name="readOnly">
                  <bool>true</bool>
                 </property>
                </widget>
               </item>
-              <item row="3" column="4">
+              <item row="2" column="4">
                <widget class="QLabel" name="label_46">
                 <property name="text">
                  <string>Invalid DDP XML:</string>
                 </property>
                </widget>
               </item>
-              <item row="3" column="5">
+              <item row="2" column="5">
                <widget class="QLineEdit" name="invDDPXMLEdit">
                 <property name="readOnly">
                  <bool>true</bool>

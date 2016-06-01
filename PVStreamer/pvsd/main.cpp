@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.5.1"
+#define PVSD_VERSION "1.5.2"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
         // Create and start protocol streamer
         StreamService   streamer( 100, offset );
 
-        // Attach ADARA ouptut adapter
+        // Attach ADARA output adapter
         new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
 
         // Create and attach EPICS input adapter

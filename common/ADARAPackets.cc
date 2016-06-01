@@ -88,6 +88,8 @@ RawDataPkt::RawDataPkt(const uint8_t *data, uint32_t len) :
 {
 	if (m_version == 0x00 && m_payload_len < (6 * sizeof(uint32_t)))
 		throw invalid_packet("RawDataPacket V0 is too short");
+	else if (m_version == 0x01 && m_payload_len < (6 * sizeof(uint32_t)))
+		throw invalid_packet("RawDataPacket V1 is too short");
 	else if (m_version > ADARA::PacketType::RAW_EVENT_VERSION
 			&& m_payload_len < (6 * sizeof(uint32_t)))
 		throw invalid_packet("Newer RawDataPacket is too short");
@@ -104,6 +106,8 @@ MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
 {
 	if (m_version == 0x00 && m_payload_len < (6 * sizeof(uint32_t)))
 		throw invalid_packet("MappedDataPacket V0 is too short");
+	else if (m_version == 0x01 && m_payload_len < (6 * sizeof(uint32_t)))
+		throw invalid_packet("MappedDataPacket V1 is too short");
 	else if (m_version > ADARA::PacketType::MAPPED_EVENT_VERSION
 			&& m_payload_len < (6 * sizeof(uint32_t)))
 		throw invalid_packet("Newer MappedDataPacket is too short");
@@ -121,6 +125,8 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 {
 	if (m_version == 0x00 && m_payload_len != 120)
 		throw invalid_packet("RTDL V0 Packet is incorrect length");
+	else if (m_version == 0x01 && m_payload_len != 120)
+		throw invalid_packet("RTDL V1 Packet is incorrect length");
 	else if (m_version > ADARA::PacketType::RTDL_VERSION
 			&& m_payload_len < 120)
 		throw invalid_packet("Newer RTDL Packet is too short");

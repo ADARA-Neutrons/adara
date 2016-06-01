@@ -374,7 +374,11 @@ StreamMonitor::connect()
             data[2] = time(0) - ADARA::EPICS_EPOCH_OFFSET;
             data[3] = 0;
             data[4] = 0;
-            data[5] = 0; // Version 1 ClientHelloPkt includes Paused/Flags
+
+            // Version 1 ClientHelloPkt includes Paused/Flags
+            // We Want to See It All, Even When Paused (I think/hope... :-)
+            // So We Can Keep Updating the Web Monitor... ;-D
+            data[5] = ADARA::ClientHelloPkt::SEND_PAUSE_DATA;
 
             if ( write( sms_socket, data, sizeof(data)) == sizeof( data ))
             {
@@ -844,8 +848,11 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
     }
 
-    if ( flags & BankedEventPkt::NO_NEUTRONS )
-         ++m_run_metrics.m_no_neutrons_count;
+    if ( flags & BankedEventPkt::GOT_METADATA )
+         ++m_run_metrics.m_got_metadata_count;
+
+    if ( flags & BankedEventPkt::GOT_NEUTRONS )
+         ++m_run_metrics.m_got_neutrons_count;
 
     // Count Total Pulses (with Data... ;-D)
     ++m_run_metrics.m_total_pulses_count;
