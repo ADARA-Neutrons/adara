@@ -661,7 +661,7 @@ NeXus::NXnumtype to_nx_type( float UNUSED(number) )
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( std::string UNUSED(str) )
+NeXus::NXnumtype to_nx_type( char UNUSED(str) )
 {
     return NeXus::CHAR;
 }
@@ -935,7 +935,7 @@ template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
 
 template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
-        const std::vector<std::string> &vec,
+        const std::vector<char> &vec,
         int rank,
         const std::vector<hsize_t> &dim_vec );
 
