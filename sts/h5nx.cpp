@@ -628,36 +628,42 @@ int H5nx::H5NXmake_dataset_string( const std::string &group_path,
 
 
 template <typename NumT>
-NeXus::NXnumtype to_nx_type(NumT number = NumT());
+NeXus::NXnumtype to_nx_type( NumT number = NumT() );
 
 template<>
-NeXus::NXnumtype to_nx_type( uint16_t UNUSED(number))
+NeXus::NXnumtype to_nx_type( uint16_t UNUSED(number) )
 {
     return NeXus::UINT16;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( double UNUSED(number))
+NeXus::NXnumtype to_nx_type( double UNUSED(number) )
 {
     return NeXus::FLOAT64;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( uint32_t  UNUSED(number))
+NeXus::NXnumtype to_nx_type( uint32_t UNUSED(number) )
 {
     return NeXus::UINT32;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( uint64_t  UNUSED(number))
+NeXus::NXnumtype to_nx_type( uint64_t UNUSED(number) )
 {
     return NeXus::UINT64;
 }
 
 template<>
-NeXus::NXnumtype to_nx_type( float  UNUSED(number))
+NeXus::NXnumtype to_nx_type( float UNUSED(number) )
 {
     return NeXus::FLOAT32;
+}
+
+template<>
+NeXus::NXnumtype to_nx_type( std::string UNUSED(str) )
+{
+    return NeXus::CHAR;
 }
 
 
@@ -907,32 +913,38 @@ template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<double> &vec,
         int rank,
-        const std::vector< hsize_t> &dim_vec );
+        const std::vector<hsize_t> &dim_vec );
 
 template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<uint32_t> &vec,
         int rank,
-        const std::vector< hsize_t> &dim_vec );
+        const std::vector<hsize_t> &dim_vec );
 
 template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<uint64_t> &vec,
         int rank,
-        const std::vector< hsize_t> &dim_vec );
+        const std::vector<hsize_t> &dim_vec );
 
 template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<float> &vec,
         int rank,
-        const std::vector< hsize_t> &dim_vec );
+        const std::vector<hsize_t> &dim_vec );
+
+template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
+        const std::string &dataset_name,
+        const std::vector<std::string> &vec,
+        int rank,
+        const std::vector<hsize_t> &dim_vec );
 
 template <typename NumT>
 int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<NumT> &vec,
         int rank,
-        const std::vector< hsize_t> &dim_vec )
+        const std::vector<hsize_t> &dim_vec )
 {
     hid_t did = -1;
     hid_t sid = -1;
