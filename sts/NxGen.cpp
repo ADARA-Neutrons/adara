@@ -1602,6 +1602,8 @@ NxGen::writeDeviceEnums
                 easy = false;
             }
 
+            uint32_t max_len = (uint32_t) -1;
+
             for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
             {
                 // Capture Offset and Length of Element Name in Data Str
@@ -1614,7 +1616,7 @@ NxGen::writeDeviceEnums
                     + ienum->element_names[i].size() );
                 names_data.insert( names_data.end(),
                     ienum->element_names[i].begin(),
-                    ienum->element_names[i].end()) ;
+                    ienum->element_names[i].end() );
 
                 // Also Stuff in "Easy-to-Read" Per-Element Scalar Strings!
                 if ( easy )
@@ -1623,6 +1625,13 @@ NxGen::writeDeviceEnums
                     ss_easy << "name_" << ienum->element_values[i];
                     writeString( ss.str(), ss_easy.str(),
                         ienum->element_names[i] );
+                }
+
+                // Determine Max Element Name String Length...
+                if ( max_len == (uint32_t) -1
+                        || ienum->element_names[i].size() > max_len )
+                {
+                    max_len = ienum->element_names[i].size();
                 }
             }
 
@@ -1633,6 +1642,23 @@ NxGen::writeDeviceEnums
             {
                 writeSlab( ss.str() + "/names_data", names_data, 0 );
             }
+
+            // Element Names as 2D String Dataset
+            syslog( LOG_ERR, "[%i] Enum %s max_len=%u", g_pid,
+                ss.str().c_str(), max_len );
+            vector<hsize_t> dims;
+            dims.push_back( ienum->element_names.size() );
+            dims.push_back( max_len );
+            // Pad the Strings with Spaces to Be of Uniform Length...
+            vector<string> names_vec;
+            for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
+            {
+                string str = ienum->element_names[i];
+                if ( str.size() < max_len )
+                    str.insert( str.end(), max_len - str.size(), ' ' );
+                names_vec.push_back( str );
+            }
+            writeMultidimDataset( ss.str(), "names", names_vec, dims );
 
             // Enum Element Values
 
@@ -1751,16 +1777,14 @@ NxGen::makeDataset
  *
  * This method Creates and Writes a Nexus Multi-dimensional Dataset
  * with the specified type and (optional) units in the output Nexus file.
- *
- * Note: We just need this for Histogram data, which is "UINT32",
- * so no need to template-ize this method "yet"... ;-D
  */
+template <typename TypeT>
 void
 NxGen::writeMultidimDataset
 (
     const std::string       &a_path,    ///< [in] Nexus path of new dataset
     const std::string       &a_name,    ///< [in] Name of new dataset
-    std::vector<uint32_t>   &a_data,    ///< [in] Multi-dim Data Array
+    std::vector<TypeT>      &a_data,    ///< [in] Multi-dim Data Array
     std::vector<hsize_t>    &a_dims,    ///< [in] Dimensions of Data
     const string            a_units     ///< [in] Optional units of dataset
 )

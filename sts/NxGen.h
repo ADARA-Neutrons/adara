@@ -680,12 +680,13 @@ private:
                             const std::string &dataset_name,
                             NeXus::NXnumtype nxdatatype,
                             const std::string units = "" );
+    template <typename TypeT>
     void                writeMultidimDataset(
-                            const std::string &dataset_path,
-                            const std::string &dataset_name,
-                            std::vector<uint32_t> &a_data,
+                            const std::string &a_path,
+                            const std::string &a_name,
+                            std::vector<TypeT> &a_data,
                             std::vector<hsize_t> &a_dims,
-                            const std::string units = "" );
+                            const std::string a_units = "" );
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
     void                makeGroupLink( const std::string &source_path,
