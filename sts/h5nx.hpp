@@ -76,9 +76,15 @@ public:
     //create/write a VECTOR NUMERICAL dataset
     template <typename NumT>
     int H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name, const std::vector<NumT> &vec, 
+        const std::string &dataset_name,
+		const std::vector<NumT> &vec, 
         int rank, 
         const std::vector< hsize_t> &dim_vec);
+	int H5NXmake_dataset_vector( const std::string &group_path,
+        const std::string &dataset_name,
+        const std::vector<std::string> &vec,
+        int rank,
+        const std::vector<hsize_t> &dim_vec );
 
     //create an extendable dataset
 

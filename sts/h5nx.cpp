@@ -660,12 +660,6 @@ NeXus::NXnumtype to_nx_type( float UNUSED(number) )
     return NeXus::FLOAT32;
 }
 
-template<>
-NeXus::NXnumtype to_nx_type( char UNUSED(str) )
-{
-    return NeXus::CHAR;
-}
-
 
 ///////////////////////////////////////////////////////////////////
 // H5NXmake_attribute_scalar
@@ -909,42 +903,36 @@ int H5nx::H5NXmake_dataset_scalar( const std::string &group_path,
 
 // Declare instantiations of the types of templated functions needed
 
-template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<double> &vec,
+template int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<double> &vec,
         int rank,
-        const std::vector<hsize_t> &dim_vec );
+        const vector<hsize_t> &dim_vec );
 
-template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<uint32_t> &vec,
+template int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<uint32_t> &vec,
         int rank,
-        const std::vector<hsize_t> &dim_vec );
+        const vector<hsize_t> &dim_vec );
 
-template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<uint64_t> &vec,
+template int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<uint64_t> &vec,
         int rank,
-        const std::vector<hsize_t> &dim_vec );
+        const vector<hsize_t> &dim_vec );
 
-template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<float> &vec,
+template int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<float> &vec,
         int rank,
-        const std::vector<hsize_t> &dim_vec );
-
-template int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<char> &vec,
-        int rank,
-        const std::vector<hsize_t> &dim_vec );
+        const vector<hsize_t> &dim_vec );
 
 template <typename NumT>
-int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
-        const std::string &dataset_name,
-        const std::vector<NumT> &vec,
+int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<NumT> &vec,
         int rank,
-        const std::vector<hsize_t> &dim_vec )
+        const vector<hsize_t> &dim_vec )
 {
     hid_t did = -1;
     hid_t sid = -1;
@@ -965,9 +953,6 @@ int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
     //get the HDF5 type from the NeXus type
     tid = nx_to_hdf5_type( nx_numtype );
 
-    //construct the dataset absolute path
-    std::string dataset_path = group_path + "/" + dataset_name;
-
     // create the data space for the dataset
     if ( (sid = H5Screate_simple(rank, dims, NULL)) < 0 )
     {
@@ -978,6 +963,9 @@ int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
             + std::string(" Create Dataspace"));
         return FAIL;
     }
+
+    //construct the dataset absolute path
+    std::string dataset_path = group_path + "/" + dataset_name;
 
     // create the dataset
     if ( (did = H5Dcreate2( this->m_fid, dataset_path.c_str(), tid, sid,
@@ -1026,6 +1014,140 @@ int H5nx::H5NXmake_dataset_vector( const std::string &group_path,
             "H5Sclose", "Close Dataspace" );
         H5NXdumperr(
             "H5nx::H5NXmake_dataset_vector(): H5Sclose() Close Dataspace");
+        return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+int H5nx::H5NXmake_dataset_vector( const string &group_path,
+        const string &dataset_name,
+        const vector<string> &vec,
+        int rank,
+        const vector<hsize_t> &dim_vec )
+{
+    hid_t did = -1;
+    hid_t sid = -1;
+    hid_t tid = -1;
+
+    assert ( (size_t)rank == dim_vec.size() );
+
+    hsize_t dims[H5S_MAX_RANK];     // dataset dimensions
+    
+    for ( int i = 0 ; i < rank ; i++ )
+    {
+        dims[ i ] = dim_vec.at( i );
+    }
+
+    // make a copy of H5T_C_S1
+    if ( (tid = H5Tcopy( H5T_C_S1 )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Tcopy", "Copy String Type" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Tcopy()"
+            + std::string(" Copy String Type"));
+        return FAIL;
+    }
+
+    // set size of string
+    if ( H5Tset_size( tid, dims[ rank - 1 ] ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Tset_size", "Set String Element Size" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Tset_size()"
+            + std::string(" Set String Element Size"));
+        return FAIL;
+    }
+
+    // now the last dimension collapses... ;-D
+    dims[ rank - 1 ] = 1;
+
+    if ( H5Tset_strpad( tid, H5T_STR_NULLTERM ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s()",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Tset_strpad" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Tset_strpad()");
+        return FAIL;
+    }
+
+    // create the data space for the dataset
+    if ( (sid = H5Screate_simple(rank, dims, NULL)) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Screate_simple", "Create Dataspace" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Screate_simple()"
+            + std::string(" Create Dataspace"));
+        return FAIL;
+    }
+
+    //construct the dataset absolute path
+    std::string dataset_path = group_path + "/" + dataset_name;
+
+    // create the dataset
+    if ( (did = H5Dcreate2( this->m_fid, dataset_path.c_str(), tid, sid,
+            H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT)) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Dcreate2", "dataset_path", dataset_path.c_str(),
+            "Create Dataset" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Dcreate2()"
+            + std::string(" Create Dataset"));
+        return FAIL;
+    }
+
+    // write the dataset only if there is data to write
+    if ( vec.size() )
+    {
+        std::string str_array;
+        for ( uint32_t i=0 ; i < vec.size() ; i++ )
+            str_array.append( vec[i] );
+
+        if ( H5Dwrite( did, tid,
+                H5S_ALL, H5S_ALL, H5P_DEFAULT, &(str_array[0]) ) < 0 )
+        {
+            syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+                g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+                "H5Dwrite", "Write Dataset" );
+            H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Dwrite()"
+                + std::string(" Write Dataset"));
+            return FAIL;
+        }
+    }
+
+    // end access to the dataset and release resources used by it
+    if ( H5Dclose( did ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Dclose", "Close Dataset" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_vector(): H5Dclose() Close Dataset");
+        return FAIL;
+    }
+
+    // terminate access to the data space
+    if ( H5Sclose( sid ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Sclose", "Close Dataspace" );
+        H5NXdumperr(
+            "H5nx::H5NXmake_dataset_vector(): H5Sclose() Close Dataspace");
+        return FAIL;
+    }
+
+    if ( H5Tclose( tid ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXmake_dataset_vector",
+            "H5Tclose", "Close String Type" );
+        H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Tclose()"
+            + std::string(" Close String Type"));
         return FAIL;
     }
 
