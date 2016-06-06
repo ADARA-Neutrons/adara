@@ -1407,8 +1407,12 @@ NxGen::markerComment
             m_comment_last_offset += a_comment.size();
             m_comment_length.push_back( a_comment.size() );
 
-            m_comment_data.reserve( m_comment_data.size() + a_comment.size() );
-            m_comment_data.insert( m_comment_data.end(), a_comment.begin(), a_comment.end()) ;
+            m_comment_data.reserve( m_comment_data.size()
+                + a_comment.size() );
+            m_comment_data.insert( m_comment_data.end(),
+                a_comment.begin(), a_comment.end()) ;
+
+            m_comment_vec.push_back( a_comment );
         }
     }
     catch( TraceException &e )
@@ -1482,6 +1486,36 @@ NxGen::flushCommentData()
             writeSlab( m_daslogs_path + "/comments/data",
                 m_comment_data, 0 );
         }
+
+        // Comment Strings as 2D String Dataset
+
+        // Determine Max Comment String Length...
+        uint32_t max_len = (uint32_t) -1;
+        for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+        {
+            if ( max_len == (uint32_t) -1
+                    || m_comment_vec[i].size() > max_len )
+            {
+                max_len = m_comment_vec[i].size();
+            }
+        }
+        syslog( LOG_ERR, "[%i] DASlogs Comments max_len=%u",
+            g_pid, max_len );
+        vector<hsize_t> dims;
+        dims.push_back( m_comment_vec.size() );
+        dims.push_back( max_len );
+
+        // Pad the Strings with Spaces to Be of Uniform Length...
+        vector<string> value_vec;
+        for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+        {
+            string str = m_comment_vec[i];
+            if ( str.size() < max_len )
+                str.insert( str.end(), max_len - str.size(), ' ' );
+            value_vec.push_back( str );
+        }
+        writeMultidimDataset( m_daslogs_path + "/comments",
+            "value", value_vec, dims );
 
         m_comment_time.clear();
         m_comment_offset.clear();
