@@ -477,11 +477,6 @@ NxGen::initialize()
         makeGroup( m_daslogs_path + "/comments", "NXcollection" );
         makeDataset( m_daslogs_path + "/comments", "time",
             NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/comments", "offset",
-            NeXus::UINT32 );
-        makeDataset( m_daslogs_path + "/comments", "length",
-            NeXus::UINT32 );
-        makeDataset( m_daslogs_path + "/comments", "data", NeXus::CHAR );
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -1476,16 +1471,6 @@ NxGen::flushCommentData()
     try
     {
         writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
-        writeSlab( m_daslogs_path + "/comments/offset",
-            m_comment_offset, 0 );
-        writeSlab( m_daslogs_path + "/comments/length",
-            m_comment_length, 0 );
-
-        if ( m_comment_data.size() )
-        {
-            writeSlab( m_daslogs_path + "/comments/data",
-                m_comment_data, 0 );
-        }
 
         // Comment Strings as 2D String Dataset
 
@@ -1499,28 +1484,41 @@ NxGen::flushCommentData()
                 max_len = m_comment_vec[i].size();
             }
         }
-        syslog( LOG_ERR, "[%i] DASlogs Comments max_len=%u",
-            g_pid, max_len );
-        vector<hsize_t> dims;
-        dims.push_back( m_comment_vec.size() );
-        dims.push_back( max_len );
+        // Make Sure We Don't Freak Out HDF5 No Matter What...
+        if ( max_len == (uint32_t) -1 || max_len == 0 )
+            max_len = 1;
 
-        // Pad the Strings with Spaces to Be of Uniform Length...
-        vector<string> value_vec;
-        for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+        syslog( LOG_INFO, "[%i] DASlogs Comments size=%lu max_len=%u",
+            g_pid, m_comment_vec.size(), max_len );
+
+        if ( m_comment_vec.size() )
         {
-            string str = m_comment_vec[i];
-            if ( str.size() < max_len )
-                str.insert( str.end(), max_len - str.size(), ' ' );
-            value_vec.push_back( str );
+            vector<hsize_t> dims;
+            dims.push_back( m_comment_vec.size() );
+            dims.push_back( max_len );
+
+            // Pad the Strings with Spaces to Be of Uniform Length...
+            vector<string> value_vec;
+            for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+            {
+                string str = m_comment_vec[i];
+                if ( str.size() < max_len )
+                    str.insert( str.end(), max_len - str.size(), ' ' );
+                value_vec.push_back( str );
+            }
+            writeMultidimDataset( m_daslogs_path + "/comments",
+                "value", value_vec, dims );
         }
-        writeMultidimDataset( m_daslogs_path + "/comments",
-            "value", value_vec, dims );
+        else
+        {
+            syslog( LOG_INFO, "[%i] %s", g_pid,
+                "No Comment Strings, Creating Empty Comments Value" );
+            makeDataset( m_daslogs_path + "/comments",
+                "value", NeXus::CHAR );
+        }
 
         m_comment_time.clear();
-        m_comment_offset.clear();
-        m_comment_length.clear();
-        m_comment_data.clear();
+        m_comment_vec.clear();
     }
     catch( TraceException &e )
     {
@@ -1605,19 +1603,7 @@ NxGen::writeDeviceEnums
 
             makeGroup( ss.str(), "NXcollection" );
 
-            makeDataset( ss.str(), "names_offset", NeXus::UINT32 );
-            makeDataset( ss.str(), "names_length", NeXus::UINT32 );
-            makeDataset( ss.str(), "names_data", NeXus::CHAR );
-
             makeDataset( ss.str(), "values", NeXus::UINT32 );
-
-            // Enum Element Names (concatenate like comment strings... ;-b)
-
-            vector<uint32_t> names_offset;
-            vector<uint32_t> names_length;
-            vector<char> names_data;
-
-            unsigned long names_last_offset = 0;
 
             // Does Everything "Match Up" for the "Easy" Enum Format...?
             bool easy = true;
@@ -1640,19 +1626,7 @@ NxGen::writeDeviceEnums
 
             for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
             {
-                // Capture Offset and Length of Element Name in Data Str
-
-                names_offset.push_back( names_last_offset );
-                names_last_offset += ienum->element_names[i].size();
-                names_length.push_back( ienum->element_names[i].size() );
-
-                names_data.reserve( names_data.size()
-                    + ienum->element_names[i].size() );
-                names_data.insert( names_data.end(),
-                    ienum->element_names[i].begin(),
-                    ienum->element_names[i].end() );
-
-                // Also Stuff in "Easy-to-Read" Per-Element Scalar Strings!
+                // Stuff in "Easy-to-Read" Per-Element Scalar Strings!
                 if ( easy )
                 {
                     stringstream ss_easy;
@@ -1669,30 +1643,40 @@ NxGen::writeDeviceEnums
                 }
             }
 
-            writeSlab( ss.str() + "/names_offset", names_offset, 0 );
-            writeSlab( ss.str() + "/names_length", names_length, 0 );
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
 
-            if ( names_data.size() )
-            {
-                writeSlab( ss.str() + "/names_data", names_data, 0 );
-            }
+            syslog( LOG_ERR, "[%i] Enum %s size=%lu max_len=%u", g_pid,
+                ss.str().c_str(), ienum->element_names.size(), max_len );
 
             // Element Names as 2D String Dataset
-            syslog( LOG_ERR, "[%i] Enum %s max_len=%u", g_pid,
-                ss.str().c_str(), max_len );
-            vector<hsize_t> dims;
-            dims.push_back( ienum->element_names.size() );
-            dims.push_back( max_len );
-            // Pad the Strings with Spaces to Be of Uniform Length...
-            vector<string> names_vec;
-            for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
+            if ( ienum->element_names.size() )
             {
-                string str = ienum->element_names[i];
-                if ( str.size() < max_len )
-                    str.insert( str.end(), max_len - str.size(), ' ' );
-                names_vec.push_back( str );
+                vector<hsize_t> dims;
+                dims.push_back( ienum->element_names.size() );
+                dims.push_back( max_len );
+
+                // Pad the Strings with Spaces to Be of Uniform Length...
+                vector<string> names_vec;
+                for ( uint32_t i=0 ;
+                        i < ienum->element_names.size() ; i++ )
+                {
+                    string str = ienum->element_names[i];
+                    if ( str.size() < max_len )
+                        str.insert( str.end(), max_len - str.size(), ' ' );
+                    names_vec.push_back( str );
+                }
+
+                writeMultidimDataset( ss.str(), "names", names_vec, dims );
             }
-            writeMultidimDataset( ss.str(), "names", names_vec, dims );
+            else
+            {
+                syslog( LOG_ERR, "[%i] %s! %s for %s", g_pid,
+                    "STS Error: Empty Enum Names",
+                    "Creating Dummy Names", ss.str().c_str() );
+                makeDataset( ss.str(), "names", NeXus::CHAR );
+            }
 
             // Enum Element Values
 
