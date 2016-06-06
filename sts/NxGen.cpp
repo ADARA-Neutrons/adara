@@ -56,7 +56,6 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_comment_last_offset(0),
     m_haveRunComment(false)
 {
     // Capture STS "Start of Processing Time"...
@@ -1394,18 +1393,9 @@ NxGen::markerComment
 {
     try
     {
-        if ( a_comment.size())
+        if ( a_comment.size() )
         {
             m_comment_time.push_back( a_time );
-
-            m_comment_offset.push_back( m_comment_last_offset );
-            m_comment_last_offset += a_comment.size();
-            m_comment_length.push_back( a_comment.size() );
-
-            m_comment_data.reserve( m_comment_data.size()
-                + a_comment.size() );
-            m_comment_data.insert( m_comment_data.end(),
-                a_comment.begin(), a_comment.end()) ;
 
             m_comment_vec.push_back( a_comment );
         }

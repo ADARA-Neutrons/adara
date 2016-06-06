@@ -809,11 +809,7 @@ private:
     std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
     std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
     std::vector<double>         m_comment_time;         /// Comment annotation timestamp buffer
-    std::vector<uint32_t>       m_comment_offset;       /// Comment data dataset offset buffer
-    std::vector<uint32_t>       m_comment_length;       /// Comment data length buffer
-    std::vector<char>           m_comment_data;         /// Comment data buffer
     std::vector<std::string>    m_comment_vec;          /// Comment string vector
-    unsigned long               m_comment_last_offset;  /// Last dataset offset written to Nexus
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
     float                       m_duration;             /// Save Total Run Duration (seconds)
