@@ -203,7 +203,8 @@ private:
             m_cur_size(0),
             m_string_data_cur_size(0),
             m_uint_array_data_cur_size(0),
-            m_double_array_data_cur_size(0)
+            m_double_array_data_cur_size(0),
+            m_full_buffer_count(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -310,6 +311,7 @@ private:
             {
                 m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
                 m_nxgen.makeDataset( m_log_path, "length", NeXus::UINT32 );
+                m_nxgen.makeDataset( m_log_path, "data", NeXus::CHAR );
             }
 
             // Create String Offset, Length and Data Fields...
@@ -317,6 +319,8 @@ private:
             std::vector<uint32_t> length;
             std::vector<char> data;
             unsigned long last_offset = m_string_data_cur_size;
+            // Determine Max Comment String Length...
+            uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
                 offset.push_back( last_offset );
@@ -325,7 +329,20 @@ private:
                 data.reserve( data.size() + value_buffer[i].size() );
                 data.insert( data.end(),
                     value_buffer[i].begin(), value_buffer[i].end()) ;
+                if ( max_len == (uint32_t) -1
+                        || value_buffer[i].size() > max_len )
+                {
+                    max_len = value_buffer[i].size();
+                }
             }
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
+
+            syslog( LOG_INFO,
+                "[%i] DASlogs String PV %s size=%lu max_len=%u",
+                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+            usleep(30000); // give syslog a chance...
 
             // Write String Fields to NeXus File...
             m_nxgen.writeSlab( m_log_path + "/offset",
@@ -334,9 +351,36 @@ private:
                 length, m_cur_size );
             if ( data.size() )
             {
-                m_nxgen.writeSlab( m_log_path + "/value",
+                m_nxgen.writeSlab( m_log_path + "/data",
                     data, m_string_data_cur_size );
                 m_string_data_cur_size += data.size();
+            }
+
+            if ( value_buffer.size() )
+            {
+                std::vector<hsize_t> dims;
+                dims.push_back( value_buffer.size() );
+                dims.push_back( max_len );
+
+                // Pad the Strings with Spaces to Be of Uniform Length...
+                std::vector<std::string> value_vec;
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    std::string str = value_buffer[i];
+                    if ( str.size() < max_len )
+                        str.insert( str.end(), max_len - str.size(), ' ' );
+                    value_vec.push_back( str );
+                }
+                m_nxgen.writeMultidimDataset( m_log_path,
+                    "value", value_vec, dims, this->m_units );
+            }
+            else
+            {
+                syslog( LOG_INFO, "[%i] %s", g_pid,
+                    "No PV Value Strings, Creating Empty String Value" );
+                usleep(30000); // give syslog a chance...
+                m_nxgen.makeDataset( m_log_path,
+                    "value", NeXus::CHAR, this->m_units );
             }
         }
 
@@ -436,6 +480,26 @@ private:
                 // and _If_ We Care About This PV (_Not_ Ignored!) :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
+                    // Wait for End of Run to Dump String PV Types...
+                    // (Need to Determine Max String Length for 2D Array)
+                    if ( this->m_type == STS::PVT_STRING
+                            && !a_run_metrics )
+                    {
+                        if ( !(this->m_full_buffer_count++ % 1000) )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s: %s %s (id=%d) - %s, %s: %s",
+                                g_pid, "STS Error",
+                                "Device", this->m_device_name.c_str(),
+                                this->m_device_id,
+                                "String PV Buffer Full",
+                                "Deferring to Run End",
+                                this->m_name.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+                        return;
+                    }
+
                     // Create log if no data has been written yet
                     if ( !m_cur_size )
                     {
@@ -448,9 +512,13 @@ private:
                             return;
 
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
-                        m_nxgen.makeDataset( m_log_path, "value",
-                            m_nxgen.toNxType( this->m_type ),
-                            this->m_units );
+                        // Let String PVs Create Their Own 2D String Arrays
+                        if ( this->m_type != STS::PVT_STRING )
+                        {
+                            m_nxgen.makeDataset( m_log_path, "value",
+                                m_nxgen.toNxType( this->m_type ),
+                                this->m_units );
+                        }
                         m_nxgen.makeDataset( m_log_path, "time",
                             NeXus::FLOAT64, TIME_SEC_UNITS );
 
@@ -585,6 +653,7 @@ private:
         uint64_t        m_string_data_cur_size;   ///< Running size of character string data value dataset
         uint64_t        m_uint_array_data_cur_size;   ///< Running size of uint32 array data value dataset
         uint64_t        m_double_array_data_cur_size;   ///< Running size of double array data value dataset
+        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
