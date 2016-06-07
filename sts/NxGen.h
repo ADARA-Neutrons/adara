@@ -201,8 +201,6 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_uint_array_data_cur_size(0),
-            m_double_array_data_cur_size(0),
             m_full_buffer_count(0)
         {
             // If the PV Name and Connection String are the Same,
@@ -359,31 +357,10 @@ private:
             std::vector< std::vector<uint32_t> > &value_buffer ///< Uint32 Array Buffer to Write
         )
         {
-            // Create Uint32 Array Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "data", NeXus::UINT32 );
-            }
-
-            // Create Uint32 Array Offset, Count and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> count;
-            std::vector<uint32_t> data;
-            unsigned long last_offset = m_uint_array_data_cur_size;
+            // Determine Max Array Length...
             uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                count.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
-
-                // Determine Max Array Length...
                 if ( max_len == (uint32_t) -1
                         || value_buffer[i].size() > max_len )
                 {
@@ -398,18 +375,6 @@ private:
                 "[%i] DASlogs Uint32 Array PV %s size=%lu max_len=%u",
                 g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
-
-            // Write Uint32 Array Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/count",
-                count, m_cur_size );
-            if ( data.size() )
-            {
-                m_nxgen.writeSlab( m_log_path + "/data",
-                    data, m_uint_array_data_cur_size );
-                m_uint_array_data_cur_size += data.size();
-            }
 
             // Write 2D Uint32 Array to NeXus File...
             if ( value_buffer.size() )
@@ -451,31 +416,10 @@ private:
             std::vector< std::vector<double> > &value_buffer ///< Double Array Buffer to Write
         )
         {
-            // Create Double Array Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "data", NeXus::FLOAT64 );
-            }
-
-            // Create Double Array Offset, Count and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> count;
-            std::vector<double> data;
-            unsigned long last_offset = m_double_array_data_cur_size;
+            // Determine Max Array Length...
             uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                count.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
-
-                // Determine Max Array Length...
                 if ( max_len == (uint32_t) -1
                         || value_buffer[i].size() > max_len )
                 {
@@ -490,18 +434,6 @@ private:
                 "[%i] DASlogs Double Array PV %s size=%lu max_len=%u",
                 g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
-
-            // Write Double Array Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/count",
-                count, m_cur_size );
-            if ( data.size() )
-            {
-                m_nxgen.writeSlab( m_log_path + "/data",
-                    data, m_double_array_data_cur_size );
-                m_double_array_data_cur_size += data.size();
-            }
 
             // Write 2D Double Array to NeXus File...
             if ( value_buffer.size() )
@@ -726,8 +658,6 @@ private:
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
-        uint64_t        m_uint_array_data_cur_size;   ///< Running size of uint32 array data value dataset
-        uint64_t        m_double_array_data_cur_size;   ///< Running size of double array data value dataset
         uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
     };
 
