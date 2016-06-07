@@ -134,6 +134,7 @@ NxGen::makePVInfo
                     "[%i] %s Device %s: %s Clash %s -> %s",
                     g_pid, "STS Error:", a_device_name.c_str(),
                     "PV Name", a_name.c_str(), internal_name.c_str() );
+                usleep(30000); // give syslog a chance...
             }
             m_pv_name_history.insert( internal_name );
             break;
@@ -181,6 +182,7 @@ NxGen::makePVInfo
                         g_pid, "STS Error:", a_device_name.c_str(),
                         "PV Connection String", a_connection.c_str(),
                         internal_connection.c_str() );
+                    usleep(30000); // give syslog a chance...
                 }
                 m_pv_name_history.insert( internal_connection );
                 break;
@@ -681,23 +683,28 @@ NxGen::dumpProcessingStatistics(void)
 
     syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
         g_pid, "Run Total Counts", total_counts, m_duration );
+    usleep(30000); // give syslog a chance...
 
     double run_bandwidth = (double) total_counts / (double) m_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
         g_pid, "Overall Run Bandwidth", run_bandwidth );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Counted(Det)", m_total_counts,
         (double) m_total_counts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Uncounted(Err)", m_total_uncounts,
         (double) m_total_uncounts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Non-Counts(Mon)", m_total_non_counts,
         (double) m_total_non_counts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     // STS Processing Statistics
 
@@ -709,17 +716,20 @@ NxGen::dumpProcessingStatistics(void)
 
     syslog( LOG_INFO, "[%i] %s = %f seconds",
         g_pid, "Total STS Processing Time", sts_duration );
+    usleep(30000); // give syslog a chance...
 
     double sts_bandwidth = (double) total_counts
         / (double) sts_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
         g_pid, "Overall STS Bandwidth", sts_bandwidth );
+    usleep(30000); // give syslog a chance...
 
     double overhead_ratio = run_bandwidth / sts_bandwidth;
 
     syslog( LOG_INFO, "[%i] %s = %lf",
         g_pid, "STS Overhead Ratio", overhead_ratio );
+    usleep(30000); // give syslog a chance...
 }
 
 
@@ -1051,6 +1061,7 @@ NxGen::bankFinalize
                 g_pid, "Creating Dummy Histogram",
                 bi->m_instr_path.c_str(),
                 num_pids, bi->m_num_tof_bins - 1 );
+            usleep(30000); // give syslog a chance...
             std::vector<uint32_t> dummy_histo;
             dummy_histo.reserve( num_pids
                 * ( bi->m_num_tof_bins - 1 ) );
@@ -1258,6 +1269,7 @@ NxGen::runComment
         syslog( LOG_WARNING,
         "[%i] %s Unexpected input: duplicate run comment specified: %s",
             g_pid, "STS Error:", a_comment.c_str() );
+        usleep(30000); // give syslog a chance...
         return;
     }
 
@@ -1480,6 +1492,7 @@ NxGen::flushCommentData()
 
         syslog( LOG_INFO, "[%i] DASlogs Comments size=%lu max_len=%u",
             g_pid, m_comment_vec.size(), max_len );
+        usleep(30000); // give syslog a chance...
 
         if ( m_comment_vec.size() )
         {
@@ -1503,6 +1516,7 @@ NxGen::flushCommentData()
         {
             syslog( LOG_INFO, "[%i] %s", g_pid,
                 "No Comment Strings, Creating Empty Comments Value" );
+            usleep(30000); // give syslog a chance...
             makeDataset( m_daslogs_path + "/comments",
                 "value", NeXus::CHAR );
         }
@@ -1561,6 +1575,7 @@ NxGen::writeDeviceEnums
                         << ienum->name << "_" << count;
                     syslog( LOG_ERR, "[%i] %s %s",
                         g_pid, "STS Error:", ss.str().c_str() );
+                    usleep(30000); // give syslog a chance...
 
                     stringstream ss_new;
                     ss_new << ienum->name << "_" << count;
@@ -1608,6 +1623,7 @@ NxGen::writeDeviceEnums
                     << " Enum " << enum_name
                     << " - No Easy Strings!";
                 syslog( LOG_ERR, "[%i] %s", g_pid, sss.str().c_str() );
+                usleep(30000); // give syslog a chance...
 
                 easy = false;
             }
@@ -1639,6 +1655,7 @@ NxGen::writeDeviceEnums
 
             syslog( LOG_ERR, "[%i] Enum %s size=%lu max_len=%u", g_pid,
                 ss.str().c_str(), ienum->element_names.size(), max_len );
+            usleep(30000); // give syslog a chance...
 
             // Element Names as 2D String Dataset
             if ( ienum->element_names.size() )
@@ -1665,6 +1682,7 @@ NxGen::writeDeviceEnums
                 syslog( LOG_ERR, "[%i] %s! %s for %s", g_pid,
                     "STS Error: Empty Enum Names",
                     "Creating Dummy Names", ss.str().c_str() );
+                usleep(30000); // give syslog a chance...
                 makeDataset( ss.str(), "names", NeXus::CHAR );
             }
 
@@ -1687,6 +1705,7 @@ NxGen::writeDeviceEnums
                 << " Enum " << enum_name
                 << " " << e.toString( true, true );
             syslog( LOG_ERR, "[%i] %s", g_pid, sse.str().c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 }

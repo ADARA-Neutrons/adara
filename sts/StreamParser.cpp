@@ -897,6 +897,7 @@ StreamParser::processBankEvents
                                     "Detector Bank", bi->m_id,
                                     "Histogram Error",
                                     tof, tofbin, bi->m_num_tof_bins - 1 );
+                                usleep(30000); // give syslog a chance...
                                 // Count Uncounted Detector Histo Events...
                                 (bi->m_histo_event_uncounted)++;
                                 continue;
@@ -921,6 +922,7 @@ StreamParser::processBankEvents
                                     bi->m_logical_pixelids.size()
                                         * ( bi->m_num_tof_bins - 1 )
                                     );
+                                usleep(30000); // give syslog a chance...
                                 // Count Uncounted Detector Histo Events...
                                 (bi->m_histo_event_uncounted)++;
                                 continue;
@@ -949,6 +951,7 @@ StreamParser::processBankEvents
                                     pid, bi->m_base_pid,
                                     bi->m_histo_pid_offset[
                                         pid - bi->m_base_pid ] );
+                                usleep(30000); // give syslog a chance...
                             }
 
                             (bi->m_histo_event_uncounted)++;
@@ -1166,6 +1169,7 @@ StreamParser::processMonitorEvents
                         g_pid, "STS Error:", "Beam Monitor",
                         imi->second->m_id, tof, tofbin,
                         imi->second->m_num_tof_bins - 1 );
+                    usleep(30000); // give syslog a chance...
                     // Count Uncounted Beam Monitor Events...
                     (imi->second->m_event_uncounted)++;
                     continue;
@@ -1490,6 +1494,7 @@ StreamParser::rxPacket
     syslog( LOG_INFO,
         "[%i] Beam Monitor Config Received: %u Histo Monitors",
         g_pid, a_pkt.beamMonCount() );
+    usleep(30000); // give syslog a chance...
 
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
 
@@ -1517,6 +1522,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR,
                 "[%i] %s Reverting to Beam Monitor Event Mode!",
                 g_pid, "STS Error:" );
+            usleep(30000); // give syslog a chance...
             m_monitor_config.clear();
             break;
         }
@@ -1528,6 +1534,7 @@ StreamParser::rxPacket
                 "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
                 g_pid, "STS Error:", "Beam Monitor", config.id,
                 config.tofBin );
+            usleep(30000); // give syslog a chance...
             config.tofBin = 1;
         }
 
@@ -1579,6 +1586,7 @@ StreamParser::getBeamMonitorConfig
             "[%i] %s %s %d Missing in Histogramming Config! %s",
             g_pid, "STS Error:", "Beam Monitor", a_monitor_id,
             "[Unknown Monitor]" );
+        usleep(30000); // give syslog a chance...
 
         // Now What?!
         // - flag this Beam Monitor as "Unknown"
@@ -1611,6 +1619,7 @@ StreamParser::rxPacket
     syslog( LOG_INFO,
         "[%i] Detector Bank Sets Packet Received: %u Detector Bank Sets",
         g_pid, a_pkt.detBankSetCount() );
+    usleep(30000); // give syslog a chance...
 
     std::vector<uint32_t> banklist;
 
@@ -1671,6 +1680,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR,
                 "[%i] %s Restricting Detector Bank Set to Event Mode!",
                 g_pid, "STS Error:" );
+            usleep(30000); // give syslog a chance...
             set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
         }
 
@@ -1681,6 +1691,7 @@ StreamParser::rxPacket
                 "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
                 g_pid, "STS Error:", "Detector Bank Set",
                 set->name.c_str(), set->tofBin );
+            usleep(30000); // give syslog a chance...
             set->tofBin = 1;
         }
 
@@ -1807,6 +1818,7 @@ StreamParser::rxPacket
     if ( m_processing_state == DONE_PROCESSING )
     {
         syslog( LOG_INFO, "[%i] Data Done Received.", g_pid );
+        usleep(30000); // give syslog a chance...
     }
 
     else if ( m_processing_state != DONE_PROCESSING )
@@ -1814,12 +1826,14 @@ StreamParser::rxPacket
         syslog( LOG_INFO,
             "[%i] STS failed: Data Done Received, Not Done Processing!",
             g_pid );
+        usleep(30000); // give syslog a chance...
 
         if ( m_processing_state == PROCESSING_EVENTS )
         {
             syslog( LOG_INFO,
                 "[%i] Data Done Received, Still Processing Events!",
                 g_pid );
+            usleep(30000); // give syslog a chance...
 
             // On fatal error, flush buffers to Nexus before terminating
             markerComment( m_pulse_info.last_time,
@@ -2913,6 +2927,7 @@ StreamParser::receivedInfo( InfoBit a_bit )
             m_run_info.instr_shortname.c_str(),
             m_run_info.proposal_id.c_str(),
             m_run_info.run_number );
+        usleep(30000); // give syslog a chance...
     }
 }
 

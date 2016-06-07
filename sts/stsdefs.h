@@ -104,6 +104,7 @@ public:
                         "Duplicate Histogram Request",
                         (*dbs)->name.c_str(), "Bank Set",
                         (*dbs)->tofOffset, (*dbs)->tofMax, (*dbs)->tofBin );
+                    usleep(30000); // give syslog a chance...
                 }
 
                 else
@@ -122,6 +123,7 @@ public:
                             (*dbs)->name.c_str(), "Bank Set",
                             (*dbs)->tofOffset, (*dbs)->tofMax,
                             (*dbs)->tofBin );
+                        usleep(30000); // give syslog a chance...
 
                         // Don't set "m_has_histo", just fall thru...
                         // (all subsequent Histo attempts will also fail)
@@ -144,6 +146,7 @@ public:
                             g_pid, "Detector Bank", m_id, "Empty Histogram",
                             "num_tof_bins", m_num_tof_bins,
                             "tof_bin_size", m_tof_bin_size);
+                        usleep(30000); // give syslog a chance...
                     }
 
                     else
@@ -169,6 +172,7 @@ public:
                                 "[%i] %s %s %u %s: num_tof_bins=%u < 2!",
                                 g_pid, "STS Error:", "Detector Bank", m_id,
                                 "Histogram Warning", m_num_tof_bins);
+                            usleep(30000); // give syslog a chance...
                             m_num_tof_bins = 2;
                         }
 
@@ -183,6 +187,7 @@ public:
                         // "tof_bin_size", m_tof_bin_size,
                         // "num_pids", num_pids,
                         // num_pids * ( m_num_tof_bins - 1 ) );
+                    // usleep(30000); // give syslog a chance...
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -196,6 +201,7 @@ public:
                         g_pid, "Detector Bank", m_id, m_num_tof_bins,
                         "Time Bin Values",
                         (*dbs)->tofOffset, (*dbs)->tofMax, m_tof_bin_size );
+                    usleep(30000); // give syslog a chance...
 
                     uint32_t tofbin = (*dbs)->tofOffset;
                     for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -221,6 +227,7 @@ public:
                             "Histogram", "Verifying",
                             "m_data_buffer", m_data_buffer.size(),
                             "expected", num_pids * ( m_num_tof_bins - 1 ) );
+                        usleep(30000); // give syslog a chance...
                     }
 
                     // Calculate Per-PixelId Offset Index
@@ -251,6 +258,7 @@ public:
                         "minPid", minPid, "maxPid", maxPid,
                         "offset_size", offset_size,
                         num_pids * ( m_num_tof_bins - 1 ) );
+                    usleep(30000); // give syslog a chance...
 
                     // Reserve Required Index Size & Initialize Vector...
                     // (I hope there aren't huge gaps in the PixelIds...!)
@@ -261,6 +269,7 @@ public:
                     // syslog( LOG_ERR,
                         // "[%i] %s %u Histogram: Filling in Offsets...",
                         // g_pid, "Detector Bank", m_id );
+                    // usleep(30000); // give syslog a chance...
 
                     // Fill In Offsets per PixelId...
                     size_t offset = 0;
@@ -292,6 +301,7 @@ public:
                                 g_pid, "STS Error", "Detector Bank", m_id,
                                 "Duplicate PixelId in Histo Offset Map",
                                 index );
+                            usleep(30000); // give syslog a chance...
 
                             // Still need to increment offset past PixelId!
                             offset++;
@@ -301,6 +311,7 @@ public:
                     syslog( LOG_ERR,
                         "[%i] %s %u Done with Histogram Init.",
                         g_pid, "Detector Bank", m_id );
+                    usleep(30000); // give syslog a chance...
 
                     // Got One, That's All We'll Ever Need... ;-D
                     m_has_histo = true;
@@ -420,6 +431,7 @@ public:
                     "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
                     g_pid, "STS Error:", "Beam Monitor", m_id,
                     m_num_tof_bins);
+                usleep(30000); // give syslog a chance...
                 m_num_tof_bins = 2;
             }
 
@@ -433,6 +445,7 @@ public:
                 "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
                 g_pid, m_id, m_num_tof_bins, "Time Bin Values",
                 m_config->tofOffset, m_config->tofMax, m_config->tofBin );
+            usleep(30000); // give syslog a chance...
 
             uint32_t tofbin = m_config->tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
