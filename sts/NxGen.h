@@ -201,7 +201,6 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_string_data_cur_size(0),
             m_uint_array_data_cur_size(0),
             m_double_array_data_cur_size(0),
             m_full_buffer_count(0)
@@ -305,30 +304,10 @@ private:
             std::vector<std::string> &value_buffer ///< String Buffer to Write
         )
         {
-            // Create String Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "length", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "data", NeXus::CHAR );
-            }
-
-            // Create String Offset, Length and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> length;
-            std::vector<char> data;
-            unsigned long last_offset = m_string_data_cur_size;
             // Determine Max Comment String Length...
             uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                length.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
                 if ( max_len == (uint32_t) -1
                         || value_buffer[i].size() > max_len )
                 {
@@ -345,17 +324,6 @@ private:
             usleep(30000); // give syslog a chance...
 
             // Write String Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/length",
-                length, m_cur_size );
-            if ( data.size() )
-            {
-                m_nxgen.writeSlab( m_log_path + "/data",
-                    data, m_string_data_cur_size );
-                m_string_data_cur_size += data.size();
-            }
-
             if ( value_buffer.size() )
             {
                 std::vector<hsize_t> dims;
@@ -482,8 +450,7 @@ private:
                 {
                     // Wait for End of Run to Dump String PV Types...
                     // (Need to Determine Max String Length for 2D Array)
-                    if ( this->m_type == STS::PVT_STRING
-                            && !a_run_metrics )
+                    if ( this->m_type == STS::PVT_STRING && !a_run_metrics )
                     {
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
@@ -512,6 +479,7 @@ private:
                             return;
 
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
+
                         // Let String PVs Create Their Own 2D String Arrays
                         if ( this->m_type != STS::PVT_STRING )
                         {
@@ -519,6 +487,7 @@ private:
                                 m_nxgen.toNxType( this->m_type ),
                                 this->m_units );
                         }
+
                         m_nxgen.makeDataset( m_log_path, "time",
                             NeXus::FLOAT64, TIME_SEC_UNITS );
 
@@ -650,7 +619,6 @@ private:
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
-        uint64_t        m_string_data_cur_size;   ///< Running size of character string data value dataset
         uint64_t        m_uint_array_data_cur_size;   ///< Running size of uint32 array data value dataset
         uint64_t        m_double_array_data_cur_size;   ///< Running size of double array data value dataset
         uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
