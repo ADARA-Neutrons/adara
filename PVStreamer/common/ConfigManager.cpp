@@ -77,7 +77,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     {
         if ( a_descriptor == *idev->second )
         {
-            syslog( LOG_INFO, "%s(): %s: [%s] %s/%lu (device id=%d)",
+            syslog( LOG_INFO, "%s: %s: [%s] %s/%lu (device id=%d)",
                 "ConfigManager::defineDevice()",
                 "Device Definition Unchanged",
                 a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
