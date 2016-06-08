@@ -42,9 +42,9 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
       m_device_init_timeout(a_device_init_timeout)
 {
     m_monitor_thread = new boost::thread(
-        boost::bind( &DeviceAgent::monitorThread, this ));
+        boost::bind( &DeviceAgent::monitorThread, this ) );
     m_ctrl_thread = new boost::thread(
-        boost::bind( &DeviceAgent::controlThread, this ));
+        boost::bind( &DeviceAgent::controlThread, this ) );
 
     update(a_device);
 }
@@ -83,9 +83,11 @@ DeviceAgent::~DeviceAgent()
  * @brief Handles new or updated device descriptors
  * @param a_device - DeviceDescriptor for new/updated device
  *
- * This method is used to establish or update EPICS connections when a new device is defined or the
- * current device is updated. If a current device is defined, the passed-in device descriptor is
- * compared to the existing descriptor and connections are updated based on any detected differences.
+ * This method is used to establish or update EPICS connections when a
+ * new device is defined or the current device is updated. If a current
+ * device is defined, the passed-in device descriptor is compared to the
+ * existing descriptor and connections are updated based on any detected
+ * differences.
  * This method does NOT inject any packets into the internal data stream.
  */
 void
@@ -98,8 +100,15 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     map<chid,ChanInfo>::iterator    ich;
     map<string,chid>::iterator      idx;
 
+    std::string deviceStr = "";
+    if ( !a_device->m_name.empty() )
+    {
+        deviceStr = "Device [" + a_device->m_name + "] - ";
+    }
+
     // Resetting m_defined will cause control thread to watch PVs and
-    // perform post-connection duties - including defining device with config manager
+    // perform post-connection duties - including defining device
+    // with config manager
     m_defined = false;
 
     // Use transient descriptor first, then configured device second
@@ -108,35 +117,67 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     if ( old_desc )
     {
         // Disconnect any existing connections that are no longer needed
-        for ( ipv = old_desc->m_pvs.begin(); ipv != old_desc->m_pvs.end(); ++ipv )
+
+        syslog( LOG_INFO, "%s: %sDisconnecting Old PV Channels...",
+            "DeviceAgent::update()", deviceStr.c_str() );
+        usleep(30000); // give syslog a chance...
+
+        for ( ipv = old_desc->m_pvs.begin();
+                ipv != old_desc->m_pvs.end(); ++ipv )
         {
-            if ( !a_device->getPvByConnection( (*ipv)->m_connection ))
+            if ( !a_device->getPvByConnection( (*ipv)->m_connection ) )
+            {
                 disconnectPV( *ipv );
+            }
         }
 
         // If a device is already defined, reuse any shared PV connections
         // Make connections for new PVs in updated device
-        for ( ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+
+        syslog( LOG_INFO, "%s: %sReuse/Create New PV Channels...",
+            "DeviceAgent::update()", deviceStr.c_str() );
+        usleep(30000); // give syslog a chance...
+
+        for ( ipv = a_device->m_pvs.begin();
+                ipv != a_device->m_pvs.end(); ++ipv )
         {
             old_pv = old_desc->getPvByConnection( (*ipv)->m_connection );
             if ( !old_pv )
+            {
                 connectPV( *ipv );
+            }
             else
             {
-                // PV channel is shared between old and new device, reuse connection
+                // PV channel is shared between old and new device,
+                // reuse connection
+
+                deviceStr = "";
+                if ( (*ipv)->m_device != NULL
+                        && !(*ipv)->m_device->m_name.empty() )
+                {
+                    deviceStr = "Device ["
+                        + (*ipv)->m_device->m_name + "] - ";
+                }
+
+                syslog( LOG_INFO, "%s: %sReusing channel for PV <%s> (%s)",
+                    "DeviceAgent::update()", deviceStr.c_str(),
+                    (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str() );
+                usleep(30000); // give syslog a chance...
+
                 // Update PV pointer on channel info
                 idx = m_pv_index.find( old_pv->m_connection );
-                if ( idx != m_pv_index.end())
+                if ( idx != m_pv_index.end() )
                 {
                     ich = m_chan_info.find( idx->second );
-                    if ( ich != m_chan_info.end())
+                    if ( ich != m_chan_info.end() )
                     {
                         // Update PV to new (temporary) PV
                         ich->second.m_pv = *ipv;
                         // Old device record is no longer valid - reset
                         ich->second.m_device.reset();
 
-                        // Re-aqcuire metadata just in case it changed (only if connected)
+                        // Re-aqcuire metadata just in case it changed
+                        // (only if connected)
                         if ( ich->second.m_chan_state != UNINITIALIZED )
                             ich->second.m_chan_state = INFO_NEEDED;
                     }
@@ -152,15 +193,24 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     }
     else
     {
-        for ( ipv = a_device->m_pvs.begin(); ipv != a_device->m_pvs.end(); ++ipv )
+        syslog( LOG_INFO, "%s: %sCreate New PV Channels...",
+            "DeviceAgent::update()", deviceStr.c_str() );
+        usleep(30000); // give syslog a chance...
+
+        for ( ipv = a_device->m_pvs.begin();
+                ipv != a_device->m_pvs.end(); ++ipv )
+        {
             connectPV( *ipv );
+        }
     }
 
     m_dev_desc = a_device;
     ca_flush_io();
 
-    // If no new PV channels were created, state machine will not progress on it's own
-    // Wake state machine in this case (doesn't matter if its notified more than once)
+    // If no new PV channels were created, state machine will not progress
+    // on it's own
+    // Wake state machine in this case (doesn't matter if its notified
+    // more than once)
     m_state_changed = true;
     m_state_cond.notify_one();
 }
@@ -245,7 +295,7 @@ DeviceAgent::stop()
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
     // If a device is currently configured, undefine it
-    if ( m_dev_record.get())
+    if ( m_dev_record.get() )
     {
         m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
         m_dev_record.reset();
@@ -352,7 +402,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
     map<std::string,chid>::iterator ipv =
         m_pv_index.find( a_pv->m_connection );
 
-    if ( ipv != m_pv_index.end())
+    if ( ipv != m_pv_index.end() )
     {
         syslog( LOG_INFO, "%s: %sDisconnecting channel for PV <%s> (%s)",
             "DeviceAgent::disconnectPV()", deviceStr.c_str(),
@@ -672,7 +722,7 @@ DeviceAgent::monitorThread()
     DeviceStartupState  state = DSS_READY;
 
     // Create but don't start timer
-    memset( &timer_cfg, 0, sizeof(struct sigevent));
+    memset( &timer_cfg, 0, sizeof(struct sigevent) );
     timer_cfg.sigev_notify = SIGEV_NONE;
     timer_create( CLOCK_REALTIME, &timer_cfg, &tid );
 
@@ -768,7 +818,7 @@ DeviceAgent::monitorThread()
                 if ( !m_defined )
                 {
                     // Start timer
-                    memset( &timeout, 0, sizeof(struct itimerspec));
+                    memset( &timeout, 0, sizeof(struct itimerspec) );
                     timeout.it_value.tv_sec = m_device_init_timeout;
                     timer_settime( tid, 0, &timeout, 0 );
 
@@ -820,7 +870,7 @@ DeviceAgent::epicsConnectionHandler(
 
                 chtype type = ca_field_type( a_args.chid );
                 unsigned long elem_count = ca_element_count( a_args.chid );
-                if ( VALID_DB_FIELD( type ))
+                if ( VALID_DB_FIELD( type ) )
                 {
                     // Save native type
                     ich->second.m_ca_type = type;
@@ -1018,8 +1068,9 @@ DeviceAgent::updateState( const void *a_src, PVState &a_state )
     else
     {
         // Make sure timestamp does not go backwards
-        if ( ((T*)a_src)->stamp.secPastEpoch > a_state.m_time.sec ||
-             (((T*)a_src)->stamp.secPastEpoch == a_state.m_time.sec && ((T*)a_src)->stamp.nsec > a_state.m_time.nsec ))
+        if ( ((T*)a_src)->stamp.secPastEpoch > a_state.m_time.sec
+                || ( ((T*)a_src)->stamp.secPastEpoch == a_state.m_time.sec
+                    && ((T*)a_src)->stamp.nsec > a_state.m_time.nsec ) )
         {
             a_state.m_time.sec = ((T*)a_src)->stamp.secPastEpoch;
             a_state.m_time.nsec = ((T*)a_src)->stamp.nsec;
@@ -1047,7 +1098,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             return;
 
         // Data event?
-        if ( epicsIsTimeRecordType( a_args.type ))
+        if ( epicsIsTimeRecordType( a_args.type ) )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -1055,7 +1106,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
 
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 // Extract PV state from type-specific data structure
                 PVState &state = ich->second.m_pv_state;
@@ -1229,13 +1280,13 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
             }
         }
         // Metadata event?
-        else if ( epicsIsCtrlRecordType( a_args.type ))
+        else if ( epicsIsCtrlRecordType( a_args.type ) )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             // Valid EPICS channel?
             map<chid,ChanInfo>::iterator ich = m_chan_info.find( a_args.chid );
-            if ( ich != m_chan_info.end())
+            if ( ich != m_chan_info.end() )
             {
                 // Note EPICS does not define ctrl structs (or units) for string types
                 // Extract units and/or enumeration values
