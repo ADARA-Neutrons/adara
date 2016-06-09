@@ -776,6 +776,8 @@ DeviceAgent::controlThread()
 void
 DeviceAgent::monitorThread()
 {
+    ca_attach_context( m_epics_context );
+
     enum DeviceStartupState
     {
         DSS_INITIALIZING,
