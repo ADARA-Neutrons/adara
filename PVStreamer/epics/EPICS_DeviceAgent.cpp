@@ -294,6 +294,10 @@ DeviceAgent::stop()
 {
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
+    std::string deviceStr = "";
+    if ( m_dev_desc != NULL && !m_dev_desc->m_name.empty() )
+        deviceStr = "Device [" + m_dev_desc->m_name + "] - ";
+
     // If a device is currently configured, undefine it
     if ( m_dev_record.get() )
     {
@@ -302,12 +306,44 @@ DeviceAgent::stop()
     }
 
     // Clear CA channels and unsubscribe
-    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin();
+            ich != m_chan_info.end(); ++ich )
     {
+        syslog( LOG_INFO,
+            "%s: %sStopping PV <%s> (%s)",
+            "DeviceAgent::stop()", deviceStr.c_str(),
+            ich->second.m_pv->m_name.c_str(),
+            ich->second.m_pv->m_connection.c_str() );
+        usleep(30000); // give syslog a chance...
+
         if ( ich->second.m_subscribed )
+        {
+            syslog( LOG_INFO,
+                "%s: %sUnsubscribing Channel for PV <%s> (%s)",
+                "DeviceAgent::stop()", deviceStr.c_str(),
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
             ca_clear_subscription( ich->second.m_evid );
+        }
+
+        syslog( LOG_INFO,
+            "%s: %sClearing Channel for PV <%s> (%s)",
+            "DeviceAgent::stop()", deviceStr.c_str(),
+            ich->second.m_pv->m_name.c_str(),
+            ich->second.m_pv->m_connection.c_str() );
+        usleep(30000); // give syslog a chance...
 
         ca_clear_channel( ich->second.m_chid );
+
+        syslog( LOG_INFO,
+            "%s: %sDone with PV <%s> (%s)",
+            "DeviceAgent::stop()", deviceStr.c_str(),
+            ich->second.m_pv->m_name.c_str(),
+            ich->second.m_pv->m_connection.c_str() );
+        usleep(30000); // give syslog a chance...
+
         ca_flush_io();
     }
 
@@ -413,13 +449,46 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
 
         if ( ich != m_chan_info.end() )
         {
+            syslog( LOG_INFO,
+                "%s: %sFound Existing Channel for PV <%s> (%s)",
+                "DeviceAgent::disconnectPV()", deviceStr.c_str(),
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
             if ( ich->second.m_subscribed )
+            {
+                syslog( LOG_INFO,
+                    "%s: %sClearing Subscription for PV <%s> (%s)",
+                    "DeviceAgent::disconnectPV()", deviceStr.c_str(),
+                    a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+                usleep(30000); // give syslog a chance...
+
                 ca_clear_subscription( ich->second.m_evid );
+            }
+
+            syslog( LOG_INFO,
+                "%s: %sClearing Channel for PV <%s> (%s)",
+                "DeviceAgent::disconnectPV()", deviceStr.c_str(),
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
 
             ca_clear_channel( ich->second.m_chid );
 
             // Update channel info index structures
+
+            syslog( LOG_INFO,
+                "%s: %sErasing Channel Info for PV <%s> (%s)",
+                "DeviceAgent::disconnectPV()", deviceStr.c_str(),
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
             m_chan_info.erase( ich );
+
+            syslog( LOG_INFO,
+                "%s: %sDone Disconnecting Channel Info for PV <%s> (%s)",
+                "DeviceAgent::disconnectPV()", deviceStr.c_str(),
+                a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
 
             // Don't flush I/O here - update() method will call it
         }
@@ -1419,7 +1488,8 @@ DeviceAgent::sendCurrentValues()
  * @param a_args - EPICS callback args
  */
 void
-DeviceAgent::epicsConnectionCallback( struct connection_handler_args a_args )
+DeviceAgent::epicsConnectionCallback(
+        struct connection_handler_args a_args )
 {
     DeviceAgent *agent = (DeviceAgent*)ca_puser( a_args.chid );
 
