@@ -127,7 +127,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         {
             if ( !a_device->getPvByConnection( (*ipv)->m_connection ) )
             {
-                disconnectPV( *ipv );
+                disconnectPV( *ipv, lock );
             }
         }
 
@@ -325,7 +325,10 @@ DeviceAgent::stop()
                 ich->second.m_pv->m_connection.c_str() );
             usleep(30000); // give syslog a chance...
 
+            // *** Prevent Deadlock with New EPICS Callback Guard...!!
+            lock.unlock();
             ca_clear_subscription( ich->second.m_evid );
+            lock.lock();
         }
 
         syslog( LOG_INFO,
@@ -335,7 +338,10 @@ DeviceAgent::stop()
             ich->second.m_pv->m_connection.c_str() );
         usleep(30000); // give syslog a chance...
 
+        // *** Prevent Deadlock with New EPICS Callback Guard...!!
+        lock.unlock();
         ca_clear_channel( ich->second.m_chid );
+        lock.lock();
 
         syslog( LOG_INFO,
             "%s: %sDone with PV <%s> (%s)",
@@ -429,7 +435,8 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
  * variable. This call is synchronous (for now).
  */
 void
-DeviceAgent::disconnectPV( PVDescriptor *a_pv )
+DeviceAgent::disconnectPV( PVDescriptor *a_pv,
+    boost::unique_lock<boost::mutex> & lock )
 {
     std::string deviceStr = "";
     if ( a_pv->m_device != NULL && !a_pv->m_device->m_name.empty() )
@@ -463,7 +470,10 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
                     a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
                 usleep(30000); // give syslog a chance...
 
+                // *** Prevent Deadlock with New EPICS Callback Guard...!!
+                lock.unlock();
                 ca_clear_subscription( ich->second.m_evid );
+                lock.lock();
             }
 
             syslog( LOG_INFO,
@@ -472,7 +482,10 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv )
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
             usleep(30000); // give syslog a chance...
 
+            // *** Prevent Deadlock with New EPICS Callback Guard...!!
+            lock.unlock();
             ca_clear_channel( ich->second.m_chid );
+            lock.lock();
 
             // Update channel info index structures
 
@@ -1010,7 +1023,7 @@ DeviceAgent::epicsConnectionHandler(
         // Connection lost?
         else if ( a_args.op == CA_OP_CONN_DOWN )
         {
-            boost::lock_guard<boost::mutex> lock(m_mutex);
+            boost::unique_lock<boost::mutex> lock(m_mutex);
 
             map<chid,ChanInfo>::iterator ich =
                 m_chan_info.find( a_args.chid );
@@ -1043,7 +1056,11 @@ DeviceAgent::epicsConnectionHandler(
                         deviceStr.c_str(), pvStr.c_str() );
                     usleep(30000); // give syslog a chance...
 
+                    // *** Prevent Deadlock with New EPICS Callback Guard!
+                    lock.unlock();
                     ca_clear_subscription( ich->second.m_evid );
+                    lock.lock();
+
                     ich->second.m_subscribed = false;
                 }
 

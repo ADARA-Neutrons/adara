@@ -75,7 +75,8 @@ private:
 
     void        metadataUpdated();
     void        connectPV( PVDescriptor *a_pv );
-    void        disconnectPV( PVDescriptor *a_pv );
+    void        disconnectPV( PVDescriptor *a_pv,
+                    boost::unique_lock<boost::mutex> & lock );
     void        controlThread();
     void        monitorThread();
     void        sendCurrentValues();
