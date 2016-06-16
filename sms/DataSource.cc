@@ -55,9 +55,35 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
 #define SECS_PER_WEEK 604800 // 60 * 60 * 24 * 7
 
+
+class DataSourceRequiredPV : public smsBooleanPV {
+public:
+	DataSourceRequiredPV( const std::string &name,
+			DataSource *dataSource ) :
+		smsBooleanPV(name), m_dataSource(dataSource) { }
+
+	void changed(void)
+	{
+		bool is_required = value();
+
+		std::string isRequired = ( is_required )
+			? "*Required*" : "*Not Required*";
+
+		ERROR("DataSourceRequiredPV: Data Source " << m_dataSource->name()
+			<< " is being Marked as " << isRequired
+			<< " for Data Collection!");
+
+		m_dataSource->setRequired( is_required );
+	}
+
+private:
+	DataSource *m_dataSource;
+};
+
+
 class HWSource {
 public:
-	HWSource(const std::string &name, int32_t hwIndex,
+	HWSource( const std::string &name, int32_t hwIndex,
 		uint32_t hwId, uint32_t smsId,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceHwId,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceSmsId,
@@ -355,12 +381,13 @@ private:
 };
 
 
-DataSource::DataSource(const std::string &name, bool enabled,
+DataSource::DataSource( const std::string &name,
+			bool enabled, bool is_required,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, bool ignore_eop, bool mixed_data_packets,
 			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
-			bool save_input_stream) :
+			bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
@@ -377,6 +404,8 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	m_name += ")";
 
 	m_enabled = enabled;
+
+	setRequired( is_required );
 
 	parseURI(uri);
 
@@ -404,6 +433,9 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
 		smsEnabledPV(prefix + ":Enabled", this));
+
+	m_pvRequired = boost::shared_ptr<DataSourceRequiredPV>(new
+		DataSourceRequiredPV(prefix + ":Required", this));
 
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
@@ -456,6 +488,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 	ctrl->addPV(m_pvName);
 	ctrl->addPV(m_pvDataURI);
 	ctrl->addPV(m_pvEnabled);
+	ctrl->addPV(m_pvRequired);
 	ctrl->addPV(m_pvConnected);
 	ctrl->addPV(m_pvConnectRetryTimeout);
 	ctrl->addPV(m_pvConnectTimeout);
@@ -483,6 +516,7 @@ DataSource::DataSource(const std::string &name, bool enabled,
 
 	m_pvName->update(m_name, &now);
 	m_pvDataURI->update(uri, &now);
+	m_pvRequired->update(m_required, &now);
 	m_pvConnected->disconnected();
 	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
@@ -612,7 +646,27 @@ void DataSource::parseURI(std::string uri)
 	}
 }
 
-void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
+void DataSource::setRequired(bool is_required)
+{
+	m_required = is_required;
+
+	if ( m_required && !m_enabled )
+	{
+		std::string isRequired = ( m_required )
+			? "*Required*" : "*Not Required*";
+
+		ERROR("*** Note: DISABLED Data Source " << m_name
+			<< " Marked as " << isRequired
+			<< " for Data Collection!");
+	}
+
+	// Tell Control We've Changed Our Required Status...
+	SMSControl *ctrl = SMSControl::getInstance();
+	ctrl->updateDataSourceConnectivity();
+}
+
+void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
+		std::string why)
 {
 	/* Complete any outstanding pulses, and inform the manager
 	 * of our change of status
@@ -642,7 +696,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, std::string why)
 	m_pvNumHWSources->update(0, &now);
 
 	if (isSourceDown)
-		ctrl->sourceDown(m_smsSourceId);
+		ctrl->sourceDown(m_smsSourceId, stateChanged);
 }
 
 void DataSource::dumpLastReadStats(std::string who)
@@ -716,12 +770,14 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		m_fd = -1;
 	}
 
+	bool stateChanged = ( m_state == ACTIVE );
+
 	m_state = new_state;
 
 	/* Complete any outstanding pulse, and inform the manager of our
 	 * failure
 	 */
-	unregisterHWSources(true, "Disconnected");
+	unregisterHWSources(true, stateChanged, "Disconnected");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
@@ -737,7 +793,7 @@ bool DataSource::timerExpired(void)
 {
 	// DEBUG("timerExpired() entry");
 
-	switch (m_state) {
+	switch ( m_state ) {
 
 		case DISABLED:
 		{
@@ -1931,7 +1987,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	/* Complete any outstanding pulses, and inform the manager of our
 	 * now-idle state (not down, just idle... :-)
 	 */
-	unregisterHWSources(false, "Now-Idle");
+	unregisterHWSources(false, false, "Now-Idle");
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;

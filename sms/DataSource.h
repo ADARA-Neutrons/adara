@@ -19,6 +19,7 @@ struct addrinfo;
 class HWSource;
 class smsStringPV;
 class smsEnabledPV;
+class DataSourceRequiredPV;
 class smsConnectedPV;
 class smsFloat64PV;
 class smsBooleanPV;
@@ -26,7 +27,7 @@ class smsUint32PV;
 
 class DataSource : public ADARA::POSIXParser {
 public:
-	DataSource(const std::string &name, bool enabled,
+	DataSource(const std::string &name, bool enabled, bool required,
 		const std::string &uri, uint32_t id,
 		double connect_retry, double connect_timeout, double data_timeout,
 		bool ignore_eop, bool mixed_data_packets, unsigned int read_chunk,
@@ -37,8 +38,16 @@ public:
 
 	void resetPacketStats(void);
 
+	std::string name(void) { return m_name; }
+
 	void enabled(void);
 	void disabled(void);
+
+	void setRequired( bool is_required );
+
+	bool isRequired(void) { return m_required; }
+
+	bool isConnected(void) { return ( m_state == ACTIVE ); }
 
 private:
 	typedef boost::shared_ptr<HWSource> HWSrcPtr;
@@ -51,6 +60,7 @@ private:
 	std::string m_basename;
 	std::string m_uri;
 	bool m_enabled;
+	bool m_required;
 	ReadyAdapter *m_fdreg;
 	TimerAdapter<DataSource> *m_timer;
 	struct addrinfo *m_addrinfo;
@@ -70,6 +80,7 @@ private:
 	boost::shared_ptr<smsStringPV> m_pvName;
 	boost::shared_ptr<smsStringPV> m_pvDataURI;
 	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
+	boost::shared_ptr<DataSourceRequiredPV> m_pvRequired;
 	boost::shared_ptr<smsConnectedPV> m_pvConnected;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectRetryTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
@@ -115,7 +126,8 @@ private:
 
 	void dumpLastReadStats(std::string who);
 
-	void unregisterHWSources(bool isSourceDown, std::string why);
+	void unregisterHWSources(bool isSourceDown, bool stateChanged,
+				std::string why);
 	void connectionFailed(bool dumpStats, bool dumpDiscarded,
 				State new_state);
 
