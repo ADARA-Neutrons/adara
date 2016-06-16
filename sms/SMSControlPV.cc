@@ -869,6 +869,11 @@ void smsErrorPV::reset() {
 
 void smsErrorPV::update(bool val, struct timespec *ts)
 {
+	update(val, ts, true);
+}
+
+void smsErrorPV::update(bool val, struct timespec *ts, bool major)
+{
 	aitUint16 uninitialized_var(v);
 	gdd *nval;
 
@@ -882,7 +887,10 @@ void smsErrorPV::update(bool val, struct timespec *ts)
 
 	if (val != 0) {
 		nval->setStat(epicsAlarmState);
-		nval->setSevr(epicsSevMajor);
+		if (major)
+			nval->setSevr(epicsSevMajor);
+		else
+			nval->setSevr(epicsSevMinor);
 	}
 
 	/* This does the unref/ref for us, so each event posted will

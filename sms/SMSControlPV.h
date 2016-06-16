@@ -186,6 +186,7 @@ public:
 	virtual aitEnum bestExternalType(void) const;
 
 	void update(bool val, struct timespec *ts);
+	void update(bool val, struct timespec *ts, bool major);
 	void set(void);
 	void reset(void);
 
