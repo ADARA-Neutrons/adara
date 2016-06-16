@@ -829,11 +829,20 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 
 void StorageManager::startRecording(uint32_t run, std::string propId)
 {
-	if (!run)
-		throw std::logic_error("Invalid run number");
+	if (!run) {
+		throw std::logic_error(
+			"Can't Start Recording - Invalid Run Number (0)!");
+	}
 
-	if (m_cur_container->runNumber())
-		throw std::logic_error("Already recording");
+	if (!m_cur_container) {
+		throw std::logic_error(
+			"Can't Start Recording - Invalid State, No Run Container!");
+	}
+
+	if (m_cur_container->runNumber()) {
+		throw std::logic_error(
+			"Can't Start Recording - Already Recording!");
+	}
 
 	endCurrentContainer();
 	startContainer(run, propId);
@@ -841,6 +850,11 @@ void StorageManager::startRecording(uint32_t run, std::string propId)
 
 void StorageManager::stopRecording(void)
 {
+	if (!m_cur_container) {
+		throw std::logic_error(
+			"Can't Stop Recording - Invalid State, No Run Container!");
+	}
+
 	m_combus->sendUpdate(
 		m_cur_container->runNumber(), m_cur_container->propId(),
 		std::string("SMS run stopped"));
