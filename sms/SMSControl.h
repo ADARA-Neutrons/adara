@@ -55,7 +55,7 @@ public:
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
 	void sourceUp(uint32_t smsId);
-	void sourceDown(uint32_t smsId);
+	void sourceDown(uint32_t smsId, bool stateChanged);
 
 	uint32_t registerEventSource(uint32_t hwId);
 	void unregisterEventSource(uint32_t smsId);
@@ -104,6 +104,8 @@ public:
 
 	void updateValidRunInfo(bool isValid, std::string why,
 			bool changedValid);
+
+	void updateDataSourceConnectivity(void);
 
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
@@ -187,18 +189,33 @@ private:
 	uint32_t m_currentRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
+
 	boost::shared_ptr<smsStringPV> m_pvVersion;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	boost::shared_ptr<smsStringPV> m_pvSummaryReason;
+
 	bool m_summaryIsError; // Reverse Logic... ;-Q
-	bool m_reasonIsRunInfo;
-	std::string m_reason, m_reasonLast;
+	bool m_summaryRunInfo;
+	bool m_summaryDataSources;
+	bool m_summaryOther;
+
+	std::string m_reason;
+	std::string m_reasonBase;
+	std::string m_reasonRunInfo;
+	std::string m_reasonDataSources;
+	std::string m_reasonOther;
+
+	bool checkRequiredDataSources( std::string & why );
+
+	void setSummaryReason(bool setBase, bool changedValid,
+			bool major = false);
+
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
-	SourceSet m_activeSources;
 	SourceSet m_eventSources;
 	SourceSet m_liveClients;
+
 	PulseMap m_pulses;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;

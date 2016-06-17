@@ -77,11 +77,12 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
     map<string,DeviceAgent*>::iterator idev =
         m_dev_agents.find( a_device->m_name );
 
-    if ( idev != m_dev_agents.end())
+    if ( idev != m_dev_agents.end() )
     {
         syslog( LOG_DEBUG, "%s: Updating Device Agent for [%s]",
             "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
+        usleep(30000); // give syslog a chance...
 
         idev->second->update( a_device );
     }
@@ -90,6 +91,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
         syslog( LOG_DEBUG, "%s: Starting New Device Agent for [%s]",
             "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
+        usleep(30000); // give syslog a chance...
 
         m_dev_agents[a_device->m_name] =
             new DeviceAgent( *m_srteam_api, a_device, m_epics_context,
@@ -116,6 +118,7 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
         syslog( LOG_DEBUG, "%s: Stopping old device agent (%s) for [%s]",
             "InputAdapter::stopDevice()", "device no longer defined",
             a_dev_name.c_str() );
+        usleep(30000); // give syslog a chance...
 
         idev->second->stop();
         m_garbage.push_back( idev->second );
@@ -127,6 +130,7 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
             "%s %s: Error Stopping Device Agent: [%s] Not Found!",
             "PVSD ERROR:", "InputAdapter::stopDevice()",
             a_dev_name.c_str() );
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -220,10 +224,11 @@ InputAdapter::configFileMonitorThread()
                 count = 0;
 
                 // Open, read, and compare contents of config file
-                // If contents differ (binary compare), then attempt to parse the buffer
+                // If contents differ (binary compare), then
+                // attempt to parse the buffer.
                 // If parsing succeeds, apply new configuration
                 ifstream inf( m_config_file.c_str() );
-                if ( inf.is_open())
+                if ( inf.is_open() )
                 {
                     // Calculate size of config file
                     filebuf *fbuf = inf.rdbuf();
@@ -241,7 +246,8 @@ InputAdapter::configFileMonitorThread()
                         buffer.resize( fsz );
                         fsz = fbuf->sgetn( buffer.data(), fsz );
 
-                        // If file was truncated while reading, adjust buffer size
+                        // If file was truncated while reading,
+                        // adjust buffer size
                         if ( fsz < buffer.size() )
                             buffer.resize( fsz );
                     }
@@ -251,11 +257,16 @@ InputAdapter::configFileMonitorThread()
                     // See if contents have actually change
                     changed = false;
                     if ( buffer.size() != m_config_buffer.size() )
+                    {
                         changed = true;
+                    }
                     else
                     {
-                        if ( memcmp( buffer.data(), m_config_buffer.data(), buffer.size() ) != 0 )
-                                changed = true;
+                        if ( memcmp( buffer.data(), m_config_buffer.data(),
+                                buffer.size() ) != 0 )
+                        {
+                            changed = true;
+                        }
                     }
 
                     if ( changed )
@@ -264,6 +275,7 @@ InputAdapter::configFileMonitorThread()
                             "%s: EPICS beam config file %s has changed",
                             "InputAdapter::configFileMonitorThread():",
                             m_config_file.c_str() );
+                        usleep(30000); // give syslog a chance...
 
                         boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -272,39 +284,53 @@ InputAdapter::configFileMonitorThread()
 
                         vector<DeviceDescriptor*> devices;
 
-                        if ( parseConfigBuffer( buffer.data(), buffer.size(), devices ))
+                        if ( parseConfigBuffer(
+                            buffer.data(), buffer.size(), devices ) )
                         {
                             // Parsed successfully
                             syslog( LOG_INFO,
                                 "%s: EPICS beam config file parse OK",
                                 "InputAdapter::configFileMonitorThread():");
+                            usleep(30000); // give syslog a chance...
 
                             // Keep track of new device names
                             set<string> new_devices;
-                            for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                            for ( idev = devices.begin();
+                                    idev != devices.end(); ++idev )
+                            {
                                 new_devices.insert( (*idev)->m_name );
+                            }
 
-                            // Start device agents for all configured devices
+                            // Start device agent for all configured devices
                             // It's OK if agents are already running
-                            // NOTE: The DeviceDescriptor ptrs in devices vector will be deleted by the startDevice call
-                            for ( idev = devices.begin(); idev != devices.end(); ++idev )
+                            // NOTE: The DeviceDescriptor ptrs in devices
+                            // vector will be deleted by startDevice call
+                            for ( idev = devices.begin();
+                                    idev != devices.end(); ++idev )
                             {
                                 startDevice( *idev );
                             }
 
-                            // Stop device agents that are no longer configured
-                            for ( icur = m_cur_devices.begin(); icur != m_cur_devices.end(); ++icur )
+                            // Stop device agents that are
+                            // no longer configured
+                            for ( icur = m_cur_devices.begin();
+                                    icur != m_cur_devices.end(); ++icur )
                             {
-                                if ( new_devices.find( *icur ) == new_devices.end())
+                                if ( new_devices.find( *icur )
+                                        == new_devices.end())
+                                {
                                     stopDevice( *icur );
+                                }
                             }
 
                             // Save new device names and new buffer
                             m_cur_devices = new_devices;
                             m_config_buffer = buffer;
 
-                            ADARA::ComBus::SignalRetractMessage msg( "SID_EPICS_CFG_ERROR" );
-                            ADARA::ComBus::Connection::getInst().broadcast( msg );
+                            ADARA::ComBus::SignalRetractMessage
+                                msg( "SID_EPICS_CFG_ERROR" );
+                            ADARA::ComBus::Connection::getInst().broadcast(
+                                msg );
                         }
                         else
                         {
@@ -316,6 +342,7 @@ InputAdapter::configFileMonitorThread()
                                 << " EPICS beamline.xml config file!";
 
                             syslog( LOG_ERR, "%s", ss.str().c_str() );
+                            usleep(30000); // give syslog a chance...
 
                             ADARA::ComBus::SignalAssertMessage msg(
                                 "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(),
@@ -523,6 +550,8 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                         dev_name.c_str(),
                                                         pv_conn.c_str(),
                                                         pv_name.c_str() );
+                                                    // give syslog a chance
+                                                    usleep(30000);
                                                 }
                                             }
                                         }
@@ -584,6 +613,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                     "%s: Ignoring Unnamed Inactive Device!",
                                       "InputAdapter::parseConfigBuffer()" );
                                 }
+                                usleep(30000); // give syslog a chance...
                             }
                         }
                     }

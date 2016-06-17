@@ -201,9 +201,7 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_string_data_cur_size(0),
-            m_uint_array_data_cur_size(0),
-            m_double_array_data_cur_size(0)
+            m_full_buffer_count(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -304,39 +302,52 @@ private:
             std::vector<std::string> &value_buffer ///< String Buffer to Write
         )
         {
-            // Create String Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "length", NeXus::UINT32 );
-            }
-
-            // Create String Offset, Length and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> length;
-            std::vector<char> data;
-            unsigned long last_offset = m_string_data_cur_size;
+            // Determine Max String Length...
+            uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                length.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
+                if ( max_len == (uint32_t) -1
+                        || value_buffer[i].size() > max_len )
+                {
+                    max_len = value_buffer[i].size();
+                }
             }
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
 
-            // Write String Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/length",
-                length, m_cur_size );
-            if ( data.size() )
+            syslog( LOG_INFO,
+                "[%i] DASlogs String PV %s size=%lu max_len=%u",
+                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+            usleep(30000); // give syslog a chance...
+
+            // Write 2D String Array to NeXus File...
+            if ( value_buffer.size() )
             {
-                m_nxgen.writeSlab( m_log_path + "/value",
-                    data, m_string_data_cur_size );
-                m_string_data_cur_size += data.size();
+                std::vector<hsize_t> dims;
+                dims.push_back( value_buffer.size() );
+                dims.push_back( max_len );
+
+                // Pad the Strings with Spaces to Be of Uniform Length...
+                std::vector<std::string> value_vec;
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    std::string str = value_buffer[i];
+                    if ( str.size() < max_len )
+                        str.insert( str.end(), max_len - str.size(), ' ' );
+                    value_vec.push_back( str );
+                }
+                m_nxgen.writeMultidimDataset( m_log_path,
+                    "value", value_vec, dims, this->m_units );
+            }
+            else
+            {
+                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                    "No String Array Values for", this->m_name.c_str(),
+                    "Creating Empty String Value" );
+                usleep(30000); // give syslog a chance...
+                m_nxgen.makeDataset( m_log_path,
+                    "value", NeXus::CHAR, this->m_units );
             }
         }
 
@@ -346,39 +357,56 @@ private:
             std::vector< std::vector<uint32_t> > &value_buffer ///< Uint32 Array Buffer to Write
         )
         {
-            // Create Uint32 Array Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
-            }
-
-            // Create Uint32 Array Offset, Count and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> count;
-            std::vector<uint32_t> data;
-            unsigned long last_offset = m_uint_array_data_cur_size;
+            // Determine Max Array Length...
+            uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                count.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
+                if ( max_len == (uint32_t) -1
+                        || value_buffer[i].size() > max_len )
+                {
+                    max_len = value_buffer[i].size();
+                }
             }
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
 
-            // Write Uint32 Array Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/count",
-                count, m_cur_size );
-            if ( data.size() )
+            syslog( LOG_INFO,
+                "[%i] DASlogs Uint32 Array PV %s size=%lu max_len=%u",
+                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+            usleep(30000); // give syslog a chance...
+
+            // Write 2D Uint32 Array to NeXus File...
+            if ( value_buffer.size() )
             {
-                m_nxgen.writeSlab( m_log_path + "/value",
-                    data, m_uint_array_data_cur_size );
-                m_uint_array_data_cur_size += data.size();
+                std::vector<hsize_t> dims;
+                dims.push_back( value_buffer.size() );
+                dims.push_back( max_len );
+
+                // Pad the Arrays with Zeros to Be of Uniform Length...
+                std::vector<uint32_t> value_vec;
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    value_vec.reserve( value_vec.size() + max_len );
+                    value_vec.insert( value_vec.end(),
+                        value_buffer[i].begin(), value_buffer[i].end() );
+                    if ( value_buffer[i].size() < max_len )
+                    {
+                        value_vec.insert( value_vec.end(),
+                            max_len - value_buffer[i].size(), 0 );
+                    }
+                }
+                m_nxgen.writeMultidimDataset( m_log_path,
+                    "value", value_vec, dims, this->m_units );
+            }
+            else
+            {
+                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                    "No Uint32 Array Values for", this->m_name.c_str(),
+                    "Creating Empty Value Array" );
+                usleep(30000); // give syslog a chance...
+                m_nxgen.makeDataset( m_log_path,
+                    "value", NeXus::UINT32, this->m_units );
             }
         }
 
@@ -388,39 +416,56 @@ private:
             std::vector< std::vector<double> > &value_buffer ///< Double Array Buffer to Write
         )
         {
-            // Create Double Array Meta-data in log,
-            // if no data has been written yet...
-            if ( !m_cur_size )
-            {
-                m_nxgen.makeDataset( m_log_path, "offset", NeXus::UINT32 );
-                m_nxgen.makeDataset( m_log_path, "count", NeXus::UINT32 );
-            }
-
-            // Create Double Array Offset, Count and Data Fields...
-            std::vector<uint32_t> offset;
-            std::vector<uint32_t> count;
-            std::vector<double> data;
-            unsigned long last_offset = m_double_array_data_cur_size;
+            // Determine Max Array Length...
+            uint32_t max_len = (uint32_t) -1;
             for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
             {
-                offset.push_back( last_offset );
-                last_offset += value_buffer[i].size();
-                count.push_back( value_buffer[i].size() );
-                data.reserve( data.size() + value_buffer[i].size() );
-                data.insert( data.end(),
-                    value_buffer[i].begin(), value_buffer[i].end()) ;
+                if ( max_len == (uint32_t) -1
+                        || value_buffer[i].size() > max_len )
+                {
+                    max_len = value_buffer[i].size();
+                }
             }
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
 
-            // Write Double Array Fields to NeXus File...
-            m_nxgen.writeSlab( m_log_path + "/offset",
-                offset, m_cur_size );
-            m_nxgen.writeSlab( m_log_path + "/count",
-                count, m_cur_size );
-            if ( data.size() )
+            syslog( LOG_INFO,
+                "[%i] DASlogs Double Array PV %s size=%lu max_len=%u",
+                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+            usleep(30000); // give syslog a chance...
+
+            // Write 2D Double Array to NeXus File...
+            if ( value_buffer.size() )
             {
-                m_nxgen.writeSlab( m_log_path + "/value",
-                    data, m_double_array_data_cur_size );
-                m_double_array_data_cur_size += data.size();
+                std::vector<hsize_t> dims;
+                dims.push_back( value_buffer.size() );
+                dims.push_back( max_len );
+
+                // Pad the Arrays with Zeros to Be of Uniform Length...
+                std::vector<double> value_vec;
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    value_vec.reserve( value_vec.size() + max_len );
+                    value_vec.insert( value_vec.end(),
+                        value_buffer[i].begin(), value_buffer[i].end() );
+                    if ( value_buffer[i].size() < max_len )
+                    {
+                        value_vec.insert( value_vec.end(),
+                            max_len - value_buffer[i].size(), 0.0 );
+                    }
+                }
+                m_nxgen.writeMultidimDataset( m_log_path,
+                    "value", value_vec, dims, this->m_units );
+            }
+            else
+            {
+                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                    "No Double Array Values for", this->m_name.c_str(),
+                    "Creating Empty Value Array" );
+                usleep(30000); // give syslog a chance...
+                m_nxgen.makeDataset( m_log_path,
+                    "value", NeXus::FLOAT64, this->m_units );
             }
         }
 
@@ -436,6 +481,28 @@ private:
                 // and _If_ We Care About This PV (_Not_ Ignored!) :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
+                    // Wait for End of Run to Dump String/Array PV Types...
+                    // (Need to Determine Max String Length for 2D Array)
+                    if ( !a_run_metrics &&
+                            ( this->m_type == STS::PVT_STRING
+                                || this->m_type == STS::PVT_UINT_ARRAY
+                                || this->m_type == STS::PVT_DOUBLE_ARRAY ) )
+                    {
+                        if ( !(this->m_full_buffer_count++ % 1000) )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s: %s %s (id=%d) - %s, %s: %s",
+                                g_pid, "STS Error",
+                                "Device", this->m_device_name.c_str(),
+                                this->m_device_id,
+                                "String/Array PV Buffer Full",
+                                "Deferring to Run End",
+                                this->m_name.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+                        return;
+                    }
+
                     // Create log if no data has been written yet
                     if ( !m_cur_size )
                     {
@@ -448,9 +515,18 @@ private:
                             return;
 
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
-                        m_nxgen.makeDataset( m_log_path, "value",
-                            m_nxgen.toNxType( this->m_type ),
-                            this->m_units );
+
+                        // Let String/Array PVs Create Their Own Values
+                        // (e.g. 2D String/Numerical Arrays)
+                        if ( this->m_type != STS::PVT_STRING
+                                && this->m_type != STS::PVT_UINT_ARRAY
+                                && this->m_type != STS::PVT_DOUBLE_ARRAY )
+                        {
+                            m_nxgen.makeDataset( m_log_path, "value",
+                                m_nxgen.toNxType( this->m_type ),
+                                this->m_units );
+                        }
+
                         m_nxgen.makeDataset( m_log_path, "time",
                             NeXus::FLOAT64, TIME_SEC_UNITS );
 
@@ -582,9 +658,7 @@ private:
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
-        uint64_t        m_string_data_cur_size;   ///< Running size of character string data value dataset
-        uint64_t        m_uint_array_data_cur_size;   ///< Running size of uint32 array data value dataset
-        uint64_t        m_double_array_data_cur_size;   ///< Running size of double array data value dataset
+        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
@@ -680,12 +754,13 @@ private:
                             const std::string &dataset_name,
                             NeXus::NXnumtype nxdatatype,
                             const std::string units = "" );
+    template <typename TypeT>
     void                writeMultidimDataset(
-                            const std::string &dataset_path,
-                            const std::string &dataset_name,
-                            std::vector<uint32_t> &a_data,
+                            const std::string &a_path,
+                            const std::string &a_name,
+                            std::vector<TypeT> &a_data,
                             std::vector<hsize_t> &a_dims,
-                            const std::string units = "" );
+                            const std::string a_units = "" );
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
     void                makeGroupLink( const std::string &source_path,
@@ -808,10 +883,7 @@ private:
     std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
     std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
     std::vector<double>         m_comment_time;         /// Comment annotation timestamp buffer
-    std::vector<uint32_t>       m_comment_offset;       /// Comment data dataset offset buffer
-    std::vector<uint32_t>       m_comment_length;       /// Comment data length buffer
-    std::vector<char>           m_comment_data;         /// Comment data buffer
-    unsigned long               m_comment_last_offset;  /// Last dataset offset written to Nexus
+    std::vector<std::string>    m_comment_vec;          /// Comment string vector
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
     float                       m_duration;             /// Save Total Run Duration (seconds)

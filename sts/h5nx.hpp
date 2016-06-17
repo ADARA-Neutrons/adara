@@ -18,8 +18,8 @@
 #include <nexus/NeXusFile.hpp>
 
 //HDF5 return codes
-#define SUCCEED		0
-#define FAIL		(-1)
+#define SUCCEED     0
+#define FAIL        (-1)
 
 
 struct H5NXwrite_context
@@ -52,27 +52,39 @@ public:
     int H5NXclose_file();
 
     //create a group
-    int H5NXmake_group( const std::string &group_name, const std::string &class_name );
+    int H5NXmake_group( const std::string &group_name,
+        const std::string &class_name );
 
     //create/write a STRING attribute
-    int H5NXmake_attribute_string( const std::string &dataset_path, const std::string &attr_name, const std::string &attr_value  );
+    int H5NXmake_attribute_string( const std::string &dataset_path,
+        const std::string &attr_name, const std::string &attr_value  );
 
     //create/write a STRING dataset
-    int H5NXmake_dataset_string(const std::string &group_path, const std::string &dataset_name, const std::string &data );
+    int H5NXmake_dataset_string(const std::string &group_path,
+        const std::string &dataset_name, const std::string &data );
 
     //create/write a SCALAR NUMERICAL attribute
     template <typename NumT>
-    int H5NXmake_attribute_scalar( const std::string &dataset_path, const std::string &attr_name, const NumT &value );
+    int H5NXmake_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const NumT &value );
 
     //create/write a SCALAR NUMERICAL dataset
     template <typename NumT>
-    int H5NXmake_dataset_scalar( const std::string &group_path, const std::string &dataset_name, const NumT &value );
+    int H5NXmake_dataset_scalar( const std::string &group_path,
+        const std::string &dataset_name, const NumT &value );
 
     //create/write a VECTOR NUMERICAL dataset
     template <typename NumT>
-    int H5NXmake_dataset_vector( const std::string &group_path, const std::string &dataset_name, const std::vector<NumT> &vec, 
+    int H5NXmake_dataset_vector( const std::string &group_path,
+        const std::string &dataset_name,
+		const std::vector<NumT> &vec, 
         int rank, 
         const std::vector< hsize_t> &dim_vec);
+	int H5NXmake_dataset_vector( const std::string &group_path,
+        const std::string &dataset_name,
+        const std::vector<std::string> &vec,
+        int rank,
+        const std::vector<hsize_t> &dim_vec );
 
     //create an extendable dataset
 
@@ -83,7 +95,7 @@ public:
     ////////////////////////////////////////////
 
     int H5NXcreate_dataset_extend( const std::string &group_path,
-								   const std::string &dataset_name,
+                                   const std::string &dataset_name,
                                    int nxdatatype,
                                    hsize_t chunk );
 
@@ -93,17 +105,17 @@ public:
     ////////////////////////////////////////////
     template <typename NumT>
     int H5NXwrite_slab( const std::string &dataset_path,
-		const std::vector<NumT> &slab, uint64_t slab_size,
-		uint64_t cur_size );
+        const std::vector<NumT> &slab, uint64_t slab_size,
+        uint64_t cur_size );
 
     ////////////////////////////////////////////
     int H5NXmake_link( const std::string &current_name,
-		const std::string &destination_name );
+        const std::string &destination_name );
     int H5NXmake_group_link( const std::string &current_name,
-		const std::string &destination_name );
+        const std::string &destination_name );
 
     //call H5Fflush: causes all buffers associated with a file
-	//to be immediately flushed to disk
+    //to be immediately flushed to disk
     int H5NXflush();
 
     //set cache size

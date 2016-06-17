@@ -224,6 +224,7 @@ ComBusTransMon::commThread()
                         g_pid, "Connected to ComBus", m_domain.c_str(),
                         m_broker_uri.c_str(), m_broker_user.c_str() );
                 }
+                usleep(30000); // give syslog a chance...
 
                 // Send Translation Started message
                 ADARA::ComBus::STS::TranslationStartedMsg msg(

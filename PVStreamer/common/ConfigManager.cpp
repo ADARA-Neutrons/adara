@@ -62,6 +62,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     // syslog( LOG_DEBUG, "ConfigMgr::defineDevice(): [%s] %s/%lu",
         // a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
         // (unsigned long)a_descriptor.m_protocol );
+    // usleep(30000); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     DeviceRecordPtr record;
@@ -77,12 +78,13 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     {
         if ( a_descriptor == *idev->second )
         {
-            syslog( LOG_INFO, "%s(): %s: [%s] %s/%lu (device id=%d)",
+            syslog( LOG_INFO, "%s: %s: [%s] %s/%lu (device id=%d)",
                 "ConfigManager::defineDevice()",
                 "Device Definition Unchanged",
                 a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
                 (unsigned long) a_descriptor.m_protocol,
                 idev->second->m_id );
+            usleep(30000); // give syslog a chance...
 
             // Descriptor has not changed, so just return existing record
             record = idev->second;
@@ -98,6 +100,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
                 (unsigned long) a_descriptor.m_protocol,
                 idev->second->m_id );
+            usleep(30000); // give syslog a chance...
 
             // Record is different, must make new record but
             // try to re-use identifiers
@@ -216,6 +219,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
             (unsigned long) a_descriptor.m_protocol,
             new_desc->m_id );
+        usleep(30000); // give syslog a chance...
 
         // PV IDs can be assigned arbitrarily for new devices
         Identifier id = 1;
@@ -264,6 +268,7 @@ ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
         "ConfigManager::undefineDevice()",
         a_record->m_name.c_str(), a_record->m_source.c_str(),
         (unsigned long)a_record->m_protocol, a_record->m_id );
+    usleep(30000); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 

@@ -56,7 +56,6 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_comment_last_offset(0),
     m_haveRunComment(false)
 {
     // Capture STS "Start of Processing Time"...
@@ -135,6 +134,7 @@ NxGen::makePVInfo
                     "[%i] %s Device %s: %s Clash %s -> %s",
                     g_pid, "STS Error:", a_device_name.c_str(),
                     "PV Name", a_name.c_str(), internal_name.c_str() );
+                usleep(30000); // give syslog a chance...
             }
             m_pv_name_history.insert( internal_name );
             break;
@@ -182,6 +182,7 @@ NxGen::makePVInfo
                         g_pid, "STS Error:", a_device_name.c_str(),
                         "PV Connection String", a_connection.c_str(),
                         internal_connection.c_str() );
+                    usleep(30000); // give syslog a chance...
                 }
                 m_pv_name_history.insert( internal_connection );
                 break;
@@ -477,11 +478,6 @@ NxGen::initialize()
         makeGroup( m_daslogs_path + "/comments", "NXcollection" );
         makeDataset( m_daslogs_path + "/comments", "time",
             NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/comments", "offset",
-            NeXus::UINT32 );
-        makeDataset( m_daslogs_path + "/comments", "length",
-            NeXus::UINT32 );
-        makeDataset( m_daslogs_path + "/comments", "data", NeXus::CHAR );
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -687,23 +683,28 @@ NxGen::dumpProcessingStatistics(void)
 
     syslog( LOG_INFO, "[%i] %s = %ld in %f seconds",
         g_pid, "Run Total Counts", total_counts, m_duration );
+    usleep(30000); // give syslog a chance...
 
     double run_bandwidth = (double) total_counts / (double) m_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
         g_pid, "Overall Run Bandwidth", run_bandwidth );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Counted(Det)", m_total_counts,
         (double) m_total_counts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Uncounted(Err)", m_total_uncounts,
         (double) m_total_uncounts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     syslog( LOG_INFO, "[%i] (%s = %ld, %lf events/sec)",
         g_pid, "Non-Counts(Mon)", m_total_non_counts,
         (double) m_total_non_counts / (double) m_duration );
+    usleep(30000); // give syslog a chance...
 
     // STS Processing Statistics
 
@@ -715,17 +716,20 @@ NxGen::dumpProcessingStatistics(void)
 
     syslog( LOG_INFO, "[%i] %s = %f seconds",
         g_pid, "Total STS Processing Time", sts_duration );
+    usleep(30000); // give syslog a chance...
 
     double sts_bandwidth = (double) total_counts
         / (double) sts_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
         g_pid, "Overall STS Bandwidth", sts_bandwidth );
+    usleep(30000); // give syslog a chance...
 
     double overhead_ratio = run_bandwidth / sts_bandwidth;
 
     syslog( LOG_INFO, "[%i] %s = %lf",
         g_pid, "STS Overhead Ratio", overhead_ratio );
+    usleep(30000); // give syslog a chance...
 }
 
 
@@ -1057,6 +1061,7 @@ NxGen::bankFinalize
                 g_pid, "Creating Dummy Histogram",
                 bi->m_instr_path.c_str(),
                 num_pids, bi->m_num_tof_bins - 1 );
+            usleep(30000); // give syslog a chance...
             std::vector<uint32_t> dummy_histo;
             dummy_histo.reserve( num_pids
                 * ( bi->m_num_tof_bins - 1 ) );
@@ -1264,6 +1269,7 @@ NxGen::runComment
         syslog( LOG_WARNING,
         "[%i] %s Unexpected input: duplicate run comment specified: %s",
             g_pid, "STS Error:", a_comment.c_str() );
+        usleep(30000); // give syslog a chance...
         return;
     }
 
@@ -1399,16 +1405,11 @@ NxGen::markerComment
 {
     try
     {
-        if ( a_comment.size())
+        if ( a_comment.size() )
         {
             m_comment_time.push_back( a_time );
 
-            m_comment_offset.push_back( m_comment_last_offset );
-            m_comment_last_offset += a_comment.size();
-            m_comment_length.push_back( a_comment.size() );
-
-            m_comment_data.reserve( m_comment_data.size() + a_comment.size() );
-            m_comment_data.insert( m_comment_data.end(), a_comment.begin(), a_comment.end()) ;
+            m_comment_vec.push_back( a_comment );
         }
     }
     catch( TraceException &e )
@@ -1472,21 +1473,56 @@ NxGen::flushCommentData()
     try
     {
         writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
-        writeSlab( m_daslogs_path + "/comments/offset",
-            m_comment_offset, 0 );
-        writeSlab( m_daslogs_path + "/comments/length",
-            m_comment_length, 0 );
 
-        if ( m_comment_data.size() )
+        // Comment Strings as 2D String Dataset
+
+        // Determine Max Comment String Length...
+        uint32_t max_len = (uint32_t) -1;
+        for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
         {
-            writeSlab( m_daslogs_path + "/comments/data",
-                m_comment_data, 0 );
+            if ( max_len == (uint32_t) -1
+                    || m_comment_vec[i].size() > max_len )
+            {
+                max_len = m_comment_vec[i].size();
+            }
+        }
+        // Make Sure We Don't Freak Out HDF5 No Matter What...
+        if ( max_len == (uint32_t) -1 || max_len == 0 )
+            max_len = 1;
+
+        syslog( LOG_INFO, "[%i] DASlogs Comments size=%lu max_len=%u",
+            g_pid, m_comment_vec.size(), max_len );
+        usleep(30000); // give syslog a chance...
+
+        if ( m_comment_vec.size() )
+        {
+            vector<hsize_t> dims;
+            dims.push_back( m_comment_vec.size() );
+            dims.push_back( max_len );
+
+            // Pad the Strings with Spaces to Be of Uniform Length...
+            vector<string> value_vec;
+            for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+            {
+                string str = m_comment_vec[i];
+                if ( str.size() < max_len )
+                    str.insert( str.end(), max_len - str.size(), ' ' );
+                value_vec.push_back( str );
+            }
+            writeMultidimDataset( m_daslogs_path + "/comments",
+                "value", value_vec, dims );
+        }
+        else
+        {
+            syslog( LOG_INFO, "[%i] %s", g_pid,
+                "No Comment Strings, Creating Empty Comments Value" );
+            usleep(30000); // give syslog a chance...
+            makeDataset( m_daslogs_path + "/comments",
+                "value", NeXus::CHAR );
         }
 
         m_comment_time.clear();
-        m_comment_offset.clear();
-        m_comment_length.clear();
-        m_comment_data.clear();
+        m_comment_vec.clear();
     }
     catch( TraceException &e )
     {
@@ -1539,6 +1575,7 @@ NxGen::writeDeviceEnums
                         << ienum->name << "_" << count;
                     syslog( LOG_ERR, "[%i] %s %s",
                         g_pid, "STS Error:", ss.str().c_str() );
+                    usleep(30000); // give syslog a chance...
 
                     stringstream ss_new;
                     ss_new << ienum->name << "_" << count;
@@ -1571,19 +1608,7 @@ NxGen::writeDeviceEnums
 
             makeGroup( ss.str(), "NXcollection" );
 
-            makeDataset( ss.str(), "names_offset", NeXus::UINT32 );
-            makeDataset( ss.str(), "names_length", NeXus::UINT32 );
-            makeDataset( ss.str(), "names_data", NeXus::CHAR );
-
             makeDataset( ss.str(), "values", NeXus::UINT32 );
-
-            // Enum Element Names (concatenate like comment strings... ;-b)
-
-            vector<uint32_t> names_offset;
-            vector<uint32_t> names_length;
-            vector<char> names_data;
-
-            unsigned long names_last_offset = 0;
 
             // Does Everything "Match Up" for the "Easy" Enum Format...?
             bool easy = true;
@@ -1598,25 +1623,16 @@ NxGen::writeDeviceEnums
                     << " Enum " << enum_name
                     << " - No Easy Strings!";
                 syslog( LOG_ERR, "[%i] %s", g_pid, sss.str().c_str() );
+                usleep(30000); // give syslog a chance...
 
                 easy = false;
             }
 
+            uint32_t max_len = (uint32_t) -1;
+
             for ( uint32_t i=0 ; i < ienum->element_names.size() ; i++ )
             {
-                // Capture Offset and Length of Element Name in Data Str
-
-                names_offset.push_back( names_last_offset );
-                names_last_offset += ienum->element_names[i].size();
-                names_length.push_back( ienum->element_names[i].size() );
-
-                names_data.reserve( names_data.size()
-                    + ienum->element_names[i].size() );
-                names_data.insert( names_data.end(),
-                    ienum->element_names[i].begin(),
-                    ienum->element_names[i].end()) ;
-
-                // Also Stuff in "Easy-to-Read" Per-Element Scalar Strings!
+                // Stuff in "Easy-to-Read" Per-Element Scalar Strings!
                 if ( easy )
                 {
                     stringstream ss_easy;
@@ -1624,14 +1640,50 @@ NxGen::writeDeviceEnums
                     writeString( ss.str(), ss_easy.str(),
                         ienum->element_names[i] );
                 }
+
+                // Determine Max Element Name String Length...
+                if ( max_len == (uint32_t) -1
+                        || ienum->element_names[i].size() > max_len )
+                {
+                    max_len = ienum->element_names[i].size();
+                }
             }
 
-            writeSlab( ss.str() + "/names_offset", names_offset, 0 );
-            writeSlab( ss.str() + "/names_length", names_length, 0 );
+            // Make Sure We Don't Freak Out HDF5 No Matter What...
+            if ( max_len == (uint32_t) -1 || max_len == 0 )
+                max_len = 1;
 
-            if ( names_data.size() )
+            syslog( LOG_ERR, "[%i] Enum %s size=%lu max_len=%u", g_pid,
+                ss.str().c_str(), ienum->element_names.size(), max_len );
+            usleep(30000); // give syslog a chance...
+
+            // Element Names as 2D String Dataset
+            if ( ienum->element_names.size() )
             {
-                writeSlab( ss.str() + "/names_data", names_data, 0 );
+                vector<hsize_t> dims;
+                dims.push_back( ienum->element_names.size() );
+                dims.push_back( max_len );
+
+                // Pad the Strings with Spaces to Be of Uniform Length...
+                vector<string> names_vec;
+                for ( uint32_t i=0 ;
+                        i < ienum->element_names.size() ; i++ )
+                {
+                    string str = ienum->element_names[i];
+                    if ( str.size() < max_len )
+                        str.insert( str.end(), max_len - str.size(), ' ' );
+                    names_vec.push_back( str );
+                }
+
+                writeMultidimDataset( ss.str(), "names", names_vec, dims );
+            }
+            else
+            {
+                syslog( LOG_ERR, "[%i] %s! %s for %s", g_pid,
+                    "STS Error: Empty Enum Names",
+                    "Creating Dummy Names", ss.str().c_str() );
+                usleep(30000); // give syslog a chance...
+                makeDataset( ss.str(), "names", NeXus::CHAR );
             }
 
             // Enum Element Values
@@ -1653,6 +1705,7 @@ NxGen::writeDeviceEnums
                 << " Enum " << enum_name
                 << " " << e.toString( true, true );
             syslog( LOG_ERR, "[%i] %s", g_pid, sse.str().c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -1751,16 +1804,14 @@ NxGen::makeDataset
  *
  * This method Creates and Writes a Nexus Multi-dimensional Dataset
  * with the specified type and (optional) units in the output Nexus file.
- *
- * Note: We just need this for Histogram data, which is "UINT32",
- * so no need to template-ize this method "yet"... ;-D
  */
+template <typename TypeT>
 void
 NxGen::writeMultidimDataset
 (
     const std::string       &a_path,    ///< [in] Nexus path of new dataset
     const std::string       &a_name,    ///< [in] Name of new dataset
-    std::vector<uint32_t>   &a_data,    ///< [in] Multi-dim Data Array
+    std::vector<TypeT>      &a_data,    ///< [in] Multi-dim Data Array
     std::vector<hsize_t>    &a_dims,    ///< [in] Dimensions of Data
     const string            a_units     ///< [in] Optional units of dataset
 )

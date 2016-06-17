@@ -248,6 +248,7 @@ void SMSControl::addSource(const std::string &name,
 			const boost::property_tree::ptree &info, bool enabled)
 {
 	boost::property_tree::ptree::const_assoc_iterator uri;
+	bool required;
 	double connect_retry, connect_timeout, data_timeout;
 	unsigned int chunk_size;
 	bool ignore_eop;
@@ -274,6 +275,7 @@ void SMSControl::addSource(const std::string &name,
 		throw std::runtime_error(msg);
 	}
 
+	required = info.get<bool>("required", false);
 	connect_retry = info.get<double>("connect_retry", 15.0);
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
 	data_timeout = info.get<double>("data_timeout", 5.0);
@@ -281,6 +283,13 @@ void SMSControl::addSource(const std::string &name,
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
+
+	// Should probably let someone know if we think _This_ Data Source
+	// is *Required* for Data Collection, since the SMS will Block Running!
+	if (required) {
+		ERROR("Data Source " << uri->second.data() << " (" << name << ")"
+			<< " Marked as *Required* for Data Collection!");
+	}
 
 	// Should probably let someone know if we're flying by the
 	// seat of our pants and "Self Synchronizing", Ignoring End-of-Pulse...
@@ -306,6 +315,7 @@ void SMSControl::addSource(const std::string &name,
 
 	boost::shared_ptr<DataSource> src(new DataSource(name,
 							 enabled,
+							 required,
 							 uri->second.data(),
 							 m_nextSrcId,
 							 connect_retry,
@@ -410,12 +420,23 @@ SMSControl::SMSControl() :
 	m_pvVersion->update(m_version, &now);
 
 	// Initialize the System Summary Status/Reason...
-	m_summaryIsError = true;
-	m_reasonIsRunInfo = true; // Let RunInfo OverWrite Summary Reason...
-	m_reason = "System Uninitialized";
-	m_reasonLast = m_reason;
-	m_pvSummary->update(m_summaryIsError, &now);
-	m_pvSummaryReason->update(m_reason, &now);
+
+	m_reasonBase = "System Uninitialized";
+
+	m_summaryRunInfo = false;
+	m_reasonRunInfo = "RunInfo Not Yet Set";
+
+	m_summaryDataSources = false;
+	m_reasonDataSources = "DataSources Not Yet Created";
+
+	m_summaryOther = true;
+	m_reasonOther = "";
+
+	// Update Overall Summary and Reason
+	// - "false": Don't Set Base Reason (we just set it :-)
+	// - "true": Do Log Status as Error
+	// - "true": Major Error
+	setSummaryReason( false, true, true );
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
@@ -498,137 +519,315 @@ void SMSControl::addPV(PVSharedPtr pv)
 	m_pv_map[pv->getName()] = pv;
 }
 
-bool SMSControl::setRecording(bool v)
+bool SMSControl::setRecording( bool v )
 {
-	struct timespec now;
-
 	/* We return true if we accepted the setting, and false if not.
 	 * It is not an error for a caller to try to stop recording if
 	 * we aren't actually recording (so return true), but it is an
 	 * error to try to start recording when we already are -- return
 	 * false for that case.
 	 */
-
-	if (v == m_recording) {
-		return !v;
+	if ( v == m_recording ) {
+		return( !v );
  	}
 
-	clock_gettime(CLOCK_REALTIME, &now);
-	if (v) {
-		/* Starting a new recording */
+	// Start a New Recording...
+	if ( v ) {
+
 		std::string why;
-		if (!m_runInfo->valid(why)) {
-			m_summaryIsError = true;
-			m_reasonIsRunInfo = true;
-			m_reason = "Not Starting, " + why;
-			m_reasonLast = m_reason;
-			ERROR(m_reason);
-			m_pvSummary->update(m_summaryIsError, &now);
-			m_pvSummaryReason->update(m_reason, &now);
+
+		// Is the RunInfo Valid...?
+		if ( !m_runInfo->valid( why ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - RunInfo Not Valid! (" << why << ")");
+			// RunInfo is NOT Valid...!
+			m_summaryRunInfo = false;
+			m_reasonBase = "Not Starting Run";
+			m_reasonRunInfo = why;
+			// Update Overall Summary and Reason
+			// - "false": Don't Set Base Reason (we just set it :-)
+			// - "true": Do Log Status as Error
+			// - "true": Major Error
+			setSummaryReason( false, true, true );
+			return false;
+		}
+		else {
+			// RunInfo is OK...! :-D
+			m_summaryRunInfo = true;
+			m_reasonRunInfo = why;
+		}
+
+		// Are All Required DataSources Connected...?
+		if ( !checkRequiredDataSources( why ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - Required DataSources Not Ready! (" << why << ")");
+			// Some Required DataSource(s) are NOT Connected...!
+			m_summaryDataSources = false;
+			m_reasonBase = "Not Starting Run";
+			m_reasonDataSources = why;
+			// Update Overall Summary and Reason
+			// - "false": Don't Set Base Reason (we just set it :-)
+			// - "true": Do Log Status as Error
+			// - "true": Major Error
+			setSummaryReason( false, true, true );
+			return false;
+		}
+		else {
+			// Required DataSources are OK...! :-D
+			m_summaryDataSources = true;
+			m_reasonDataSources = why;
+		}
+
+		// Update "Next Run Number"...
+		if ( StorageManager::updateNextRun( m_nextRunNumber + 1 ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - Couldn't Update Next Run on Disk...!");
+			// Failed to Update "Next Run Number" on Disk...!
+			m_summaryOther = false;
+			m_reasonBase = "Not Starting Run";
+			m_reasonOther = "Unable to Increment Run Number";
+			// Update Overall Summary and Reason
+			// - "false": Don't Set Base Reason (we just set it :-)
+			// - "true": Do Log Status as Error
+			// - "true": Major Error
+			setSummaryReason( false, true, true );
 			return false;
 		}
 
-		if (StorageManager::updateNextRun(m_nextRunNumber + 1)) {
-			m_summaryIsError = true;
-			m_reasonIsRunInfo = false;
-			m_reason = "Unable to Increment Run Number, Not Starting";
-			m_reasonLast = m_reason;
-			ERROR(m_reason);
-			m_pvSummary->update(m_summaryIsError, &now);
-			m_pvSummaryReason->update(m_reason, &now);
-			return false;
-		}
-
-		/* We've updated the run on disk, so if we fail now, we need
-		 * to fail big.
-		 */
+		// We've Updated the Run Number on disk,
+		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
 		INFO("Starting run " << m_currentRunNumber);
 		m_runInfo->lock();
-		m_runInfo->setRunNumber(m_currentRunNumber);
+		m_runInfo->setRunNumber( m_currentRunNumber );
 
-		/* Reset the Overall Monitor bookkeeping...
-		 */
+		// Reset the Overall Monitor bookkeeping...
 		m_allMonitors.clear();
 
-		/* Reset All DataSource Packet Statistics...
-		 */
+		// Reset All DataSource Packet Statistics...
 		resetPacketStats();
 
-		try {
-			/* Let our marker control code have a shot at
-			 * fixing up current state before we start recording
-			 * in a new container.
-			 */
-			m_markers->newRun();
-			StorageManager::startRecording(m_currentRunNumber,
-				m_runInfo->getPropId());
-		} catch (std::runtime_error e) {
-			m_summaryIsError = true;
-			m_reasonIsRunInfo = false;
-			std::stringstream why;
-			why << "Unable to Start Recording: " << e.what();
-			m_reason = why.str();
-			m_reasonLast = m_reason;
-			ERROR(m_reason);
+		// Retry *3* Times for Any Transient Failures...
+		// (Then "Fail Big" and Set Summary Alarm Severity...)
+
+		uint32_t try_count = 0;
+		bool runStarted = false;
+
+		while ( !runStarted && try_count++ < 3 ) {
+
+			try {
+				// Let our Marker Control code have a shot at
+				// fixing up current state before we start recording
+				// in a new container.
+				m_markers->newRun();
+
+				// Actually Start a New Recording...
+				StorageManager::startRecording( m_currentRunNumber,
+					m_runInfo->getPropId() );
+			}
+			// Logic Error...! ;-O
+			catch ( std::logic_error e ) {
+				ERROR("Failed to Start Run " << m_currentRunNumber
+					<< " - LOGIC Error! (" << e.what() << ")");
+				// Run Didn't Start, Clear Run Number
+				// and "Unlock" RunInfo for PV Updates...
+				m_currentRunNumber = 0;
+				m_runInfo->setRunNumber(0);
+				m_runInfo->unlock();
+				// LOGIC Exception Starting Run...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Start Recording";
+				m_reasonOther = "LOGIC Error: " + std::string( e.what() );
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - "true": Major Error
+				setSummaryReason( false, true, true );
+				// "Logic Error" Means Something Bad Happened, Just Bail...
+				return false;
+			}
+			// RunTime Error... ;-b
+			catch ( std::runtime_error e ) {
+				ERROR("Transient RunTime Error Trying to Start Run "
+					<< m_currentRunNumber
+					<< " - " << e.what() << ", retry_count=" << try_count);
+				// Run-Time Exception Starting Run...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Start Recording";
+				m_reasonOther = "RunTime Error: "
+					+ std::string( e.what() );
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - (false): Minor Error
+				setSummaryReason( false, true );
+				// Run Didn't Start, But Maybe Try Again... ;-b
+				sleep(3);
+				continue;
+			}
+			// Unknown Exception... ;-Q
+			catch ( ... ) {
+				ERROR("Transient Unknown Error Trying to Start Run "
+					<< m_currentRunNumber
+					<< " - retry_count=" << try_count);
+				// Unknown Exception Starting Run...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Start Recording";
+				m_reasonOther = "UNKNOWN Exception";
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - (false): Minor Error
+				setSummaryReason( false, true );
+				// Run Didn't Start, But Maybe Try Again... ;-Q
+				sleep(3);
+				continue;
+			}
+
+			// It Worked...! ;-D
+			runStarted = true;
+		}
+
+		// It Didn't Work... ;-Q
+		if ( !runStarted ) {
+			ERROR("Run " << m_currentRunNumber << " Failed to Start!"
+				<< " (retry_count=" << try_count << ")");
+			// Run Didn't Start, Clear Run Number
+			// and "Unlock" RunInfo for PV Updates...
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
 			m_runInfo->unlock();
-			m_pvSummary->update(m_summaryIsError, &now);
-			m_pvSummaryReason->update(m_reason, &now);
-			return false;
-		} catch (...) {
-			m_summaryIsError = true;
-			m_reasonIsRunInfo = false;
-			m_reason = "Unable to Start Recording, Unknown Exception";
-			m_reasonLast = m_reason;
-			ERROR(m_reason);
-			m_currentRunNumber = 0;
-			m_runInfo->setRunNumber(0);
-			m_runInfo->unlock();
-			m_pvSummary->update(m_summaryIsError, &now);
-			m_pvSummaryReason->update(m_reason, &now);
+			// Update Overall Summary and Reason [Set Severity/Alarm!]
+			// - "false": Don't Set Base Reason (we just set it :-)
+			// - "true": Do Log Status as Error
+			// - "true": Major Error
+			setSummaryReason( false, true, true );
 			return false;
 		}
 
+		// Run Started, Update Run Number and Recording PV Values...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
 		m_pvRunNumber->update(m_currentRunNumber, &now);
 		m_pvRecording->update(v, &now);
-	} else {
-		/* Stop the current recording */
+	}
+
+	// Stop the Current Recording...
+	else {
+
+		// Stopping Run, Clear Run Number
+		// and "Unlock" RunInfo for PV Updates...
 		INFO("Stopping run " << m_currentRunNumber);
+		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
 
-		try {
-			/* Let our marker control code have a shot at
-			 * fixing up current state before we stop recording.
-			 */
-			m_markers->runStop();
-			StorageManager::stopRecording();
-		} catch (std::runtime_error e) {
-			m_summaryIsError = true;
-			m_reasonIsRunInfo = false;
-			std::stringstream why;
-			why << "Unable to stop recording: " << e.what();
-			m_reason = why.str();
-			m_reasonLast = m_reason;
-			ERROR(m_reason);
-			m_pvSummary->update(m_summaryIsError, &now);
-			m_pvSummaryReason->update(m_reason, &now);
+		// Retry *3* Times for Any Transient Failures...
+		// (Then "Fail Big" and Set Summary Alarm Severity...)
+
+		uint32_t try_count = 0;
+		bool runStopped = false;
+
+		while ( !runStopped && try_count++ < 3 ) {
+
+			try {
+
+				// Let our Marker Control code have a shot at
+				// fixing up current state before we stop recording.
+				m_markers->runStop();
+
+				// Actually Stop Recording...
+				StorageManager::stopRecording();
+			}
+			// Logic Error...! ;-O
+			catch ( std::logic_error e ) {
+				ERROR("Failed to Stop Run " << save_current_run_number
+					<< " - LOGIC Error! (" << e.what() << ")");
+				// Run Failed to Stop...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Stop Recording";
+				m_reasonOther = "LOGIC Error: " + std::string( e.what() );
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - "true": Major Error
+				setSummaryReason( false, true, true );
+				// "Logic Error" Means Something Bad Happened, Just Bail...
+				return false;
+			}
+			// RunTime Error... ;-b
+			catch ( std::runtime_error e ) {
+				ERROR("Transient RunTime Error Trying to Stop Run "
+					<< save_current_run_number
+					<< " - " << e.what() << ", retry_count=" << try_count);
+				// Run Failed to Stop...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Stop Recording";
+				m_reasonOther = "RunTime Error: "
+					+ std::string( e.what() );
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - (false): Minor Error
+				setSummaryReason( false, true );
+				// Run Didn't Stop, But Maybe Try Again... ;-b
+				sleep(3);
+				continue;
+			}
+			// Unknown Exception... ;-Q
+			catch ( ... ) {
+				ERROR("Transient Unknown Error Trying to Start Run "
+					<< save_current_run_number
+					<< " - retry_count=" << try_count);
+				// Run Failed to Stop...!
+				m_summaryOther = false;
+				m_reasonBase = "Unable to Stop Recording";
+				m_reasonOther = "UNKNOWN Exception";
+				// Update Overall Summary and Reason
+				// - "false": Don't Set Base Reason (we just set it :-)
+				// - "true": Do Log Status as Error
+				// - (false): Minor Error
+				setSummaryReason( false, true );
+				// Run Didn't Start, But Maybe Try Again... ;-Q
+				sleep(3);
+				continue;
+			}
+
+			// It Worked...! ;-D
+			runStopped = true;
+		}
+
+		// It Didn't Work... ;-Q
+		if ( !runStopped ) {
+			ERROR("Run " << save_current_run_number << " Failed to Stop!"
+				<< " (retry_count=" << try_count << ")");
+			// Update Overall Summary and Reason [Set Severity/Alarm!]
+			// - "false": Don't Set Base Reason (we just set it :-)
+			// - "true": Do Log Status as Error
+			// - "true": Major Error
+			setSummaryReason( false, true, true );
 			return false;
 		}
+
+		// Run Stopped, Update Run Number and Recording PV Values...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
 		m_pvRunNumber->update(0, &now);
 		m_pvRecording->update(v, &now);
 	}
 
-	m_summaryIsError = false;
-	m_reasonIsRunInfo = true; // Let RunInfo OverWrite Summary Reason...
-	m_reason = "System Ready";
-	m_reasonLast = m_reason;
+	// Save Recording State
 	m_recording = v;
-	m_pvSummary->update(m_summaryIsError, &now);
-	m_pvSummaryReason->update(m_reason, &now);
+
+	// Clear "Other" System Status and Reason, "Everything Worked"...! ;-D
+	m_summaryOther = true;
+	m_reasonOther = "";
+
+	// Update Overall Summary and Reason
+	// - "true": Set Base Reason from Status
+	// - "false": Log Status as Info
+	setSummaryReason( true, false );
 
 	return true;
 }
@@ -658,38 +857,120 @@ void SMSControl::resumeRecording(void)
 	StorageManager::resumeRecording();
 }
 
-void SMSControl::updateValidRunInfo(bool isValid, std::string why,
-		bool changedValid)
+// Update RunInfo Validity for Run Control...
+// (Called by RunInfo class on PV Value Update...)
+void SMSControl::updateValidRunInfo( bool isValid, std::string why,
+		bool changedValid )
 {
+	m_summaryRunInfo = isValid;
+	m_reasonRunInfo = why;
+
+	// Update Summary/Reason...
+	// - "true": Do Set Base Reason
+	// - changedValid: Log Status as Error (true) or Info (false)
+	// - "true": Any Errors Major
+	setSummaryReason( true, changedValid, true );
+}
+
+// Update DataSource Connectivity for Run Control...
+// (Called by DataSource class on Connection Status Update...)
+void SMSControl::updateDataSourceConnectivity(void)
+{
+	std::string why;
+
+	m_summaryDataSources = checkRequiredDataSources( why );
+	m_reasonDataSources = why;
+
+	// Update Summary/Reason...
+	// - "true": Do Set Base Reason
+	// - "true": Do Log Status as Error
+	// - "true": Any Errors Major
+	setSummaryReason( true, true, true );
+}
+
+// Check the Connection Status of Required DataSources...
+bool SMSControl::checkRequiredDataSources( std::string & why )
+{
+	std::stringstream why_ss;
+
+	bool okToGo = true;
+
+	for ( uint32_t i=0 ; i < m_dataSources.size() ; i++ )
+	{
+		if ( m_dataSources[i]->isRequired() )
+		{
+			if ( !(m_dataSources[i]->isConnected()) )
+			{
+				if ( okToGo ) {
+					why_ss << "Required DataSources are Missing:";
+				}
+				else {
+					why_ss << ",";
+				}
+
+				why_ss << " " << m_dataSources[i]->name()
+					<< " is NOT Connected";
+
+				okToGo = false;
+			}
+		}
+	}
+
+	if ( okToGo )
+		why_ss << "All Required DataSources are Present";
+
+	why = why_ss.str();
+
+	return( okToGo );
+}
+
+void SMSControl::setSummaryReason( bool setBase, bool changedValid,
+		bool major )
+{
+	// Set Overall Summary Status ("Is Error", Negative Logic...!)
+	// from Individual System Component Status Values...
+
+	m_summaryIsError =
+		( !m_summaryRunInfo )
+			|| ( !m_summaryDataSources )
+			|| ( !m_summaryOther );
+
+	// Update the Base Reason String, As Desired...
+
+	if ( setBase ) {
+		if ( m_summaryIsError ) {
+			m_reasonBase = "System NOT Ready";
+		}
+		else {
+			m_reasonBase = "System Ready";
+		}
+	}
+
+	// Combine Individual System Component "Status Reason" Strings
+	// into One Overall Summary Status Reason...
+
+	m_reason = m_reasonBase + "; "
+		+ m_reasonRunInfo + "; "
+		+ m_reasonDataSources
+		+ ( ( m_reasonOther.empty() )
+			? "" : ( "; " + m_reasonOther ) );
+
+	// Log Reason, Hard if the Valid Status Changed, else just "Info"...
+
+	if ( changedValid ) {
+		ERROR( m_reason );
+	}
+	else {
+		INFO( m_reason );
+	}
+
+	// Update the Summary and Reason PV Values...
+
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	// Set New Summary Status/Reason, Last Error was Due to RunInfo...
-	if (m_reasonIsRunInfo) {
-		if (isValid) {
-			m_reason = "System Ready, " + why;
-			m_summaryIsError = false;
-		}
-		else {
-			m_reason = "System NOT Ready, " + why;
-			m_summaryIsError = true;
-		}
-	}
-
-	// Leave Summary Status "As Is", Update Reason with Latest "Why"...
-	else {
-		m_reason = m_reasonLast + " (" + why + ")";
-	}
-
-	// Log Reason, Hard if the Valid Status Changed, else just "Info"...
-	if (changedValid)
-		ERROR(m_reason);
-	else
-		INFO(m_reason);
-
-	// Update Summary/Reason PVs...
-	m_pvSummary->update(m_summaryIsError, &now);
-	m_pvSummaryReason->update(m_reason, &now);
+	m_pvSummary->update( m_summaryIsError, &now, major );
+	m_pvSummaryReason->update( m_reason, &now );
 }
 
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
@@ -1125,17 +1406,22 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	return m_pulses.insert(make_pair(pid, new_pulse)).first;
 }
 
-void SMSControl::sourceUp(uint32_t id)
+void SMSControl::sourceUp( uint32_t UNUSED(id) )
 {
-	// XXX still needed?
-	m_activeSources.set(id);
+	// New DataSource Connected!
+	// - Update the Status of Any Required DataSources...
+	updateDataSourceConnectivity();
 }
 
-void SMSControl::sourceDown(uint32_t id)
+void SMSControl::sourceDown( uint32_t id, bool stateChanged )
 {
-	// XXX only really needed to reset the metadata
-	m_activeSources.reset(id);
-	m_meta->dropTag(id);
+	// Reset the MetaData...
+	m_meta->dropTag( id );
+
+	// DataSource Disconnected...!
+	// - Update the Status of Any Required DataSources...
+	if ( stateChanged )
+		updateDataSourceConnectivity();
 }
 
 // Clear all the DataSource "Read Delay" flags...
