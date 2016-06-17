@@ -24,7 +24,7 @@ uint64_t parse_size(const std::string &val)
 	if (!tmp)
 		throw std::runtime_error("must be non-zero");
 	switch(*end) {
-	case 'p': case 'P': /* terabytes */
+	case 'p': case 'P': /* petabytes */
 		tmp = checked_multiply(tmp, 1024);
 	case 't': case 'T': /* terabytes */
 		tmp = checked_multiply(tmp, 1024);
