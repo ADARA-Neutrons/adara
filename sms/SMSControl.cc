@@ -538,6 +538,8 @@ bool SMSControl::setRecording( bool v )
 
 		// Is the RunInfo Valid...?
 		if ( !m_runInfo->valid( why ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - RunInfo Not Valid! (" << why << ")");
 			// RunInfo is NOT Valid...!
 			m_summaryRunInfo = false;
 			m_reasonBase = "Not Starting Run";
@@ -557,6 +559,8 @@ bool SMSControl::setRecording( bool v )
 
 		// Are All Required DataSources Connected...?
 		if ( !checkRequiredDataSources( why ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - Required DataSources Not Ready! (" << why << ")");
 			// Some Required DataSource(s) are NOT Connected...!
 			m_summaryDataSources = false;
 			m_reasonBase = "Not Starting Run";
@@ -576,6 +580,8 @@ bool SMSControl::setRecording( bool v )
 
 		// Update "Next Run Number"...
 		if ( StorageManager::updateNextRun( m_nextRunNumber + 1 ) ) {
+			ERROR("Failed to Start Run " << m_nextRunNumber
+				<< " - Couldn't Update Next Run on Disk...!");
 			// Failed to Update "Next Run Number" on Disk...!
 			m_summaryOther = false;
 			m_reasonBase = "Not Starting Run";
@@ -621,6 +627,8 @@ bool SMSControl::setRecording( bool v )
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
+				ERROR("Failed to Start Run " << m_currentRunNumber
+					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Didn't Start, Clear Run Number
 				// and "Unlock" RunInfo for PV Updates...
 				m_currentRunNumber = 0;
@@ -640,6 +648,9 @@ bool SMSControl::setRecording( bool v )
 			}
 			// RunTime Error... ;-b
 			catch ( std::runtime_error e ) {
+				ERROR("Transient RunTime Error Trying to Start Run "
+					<< m_currentRunNumber
+					<< " - " << e.what() << ", retry_count=" << try_count);
 				// Run-Time Exception Starting Run...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Start Recording";
@@ -656,6 +667,9 @@ bool SMSControl::setRecording( bool v )
 			}
 			// Unknown Exception... ;-Q
 			catch ( ... ) {
+				ERROR("Transient Unknown Error Trying to Start Run "
+					<< m_currentRunNumber
+					<< " - retry_count=" << try_count);
 				// Unknown Exception Starting Run...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Start Recording";
@@ -676,6 +690,8 @@ bool SMSControl::setRecording( bool v )
 
 		// It Didn't Work... ;-Q
 		if ( !runStarted ) {
+			ERROR("Run " << m_currentRunNumber << " Failed to Start!"
+				<< " (retry_count=" << try_count << ")");
 			// Run Didn't Start, Clear Run Number
 			// and "Unlock" RunInfo for PV Updates...
 			m_currentRunNumber = 0;
@@ -702,6 +718,7 @@ bool SMSControl::setRecording( bool v )
 		// Stopping Run, Clear Run Number
 		// and "Unlock" RunInfo for PV Updates...
 		INFO("Stopping run " << m_currentRunNumber);
+		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
 		m_runInfo->unlock();
@@ -725,6 +742,8 @@ bool SMSControl::setRecording( bool v )
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
+				ERROR("Failed to Stop Run " << save_current_run_number
+					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Failed to Stop...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Stop Recording";
@@ -739,6 +758,9 @@ bool SMSControl::setRecording( bool v )
 			}
 			// RunTime Error... ;-b
 			catch ( std::runtime_error e ) {
+				ERROR("Transient RunTime Error Trying to Stop Run "
+					<< save_current_run_number
+					<< " - " << e.what() << ", retry_count=" << try_count);
 				// Run Failed to Stop...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Stop Recording";
@@ -755,6 +777,9 @@ bool SMSControl::setRecording( bool v )
 			}
 			// Unknown Exception... ;-Q
 			catch ( ... ) {
+				ERROR("Transient Unknown Error Trying to Start Run "
+					<< save_current_run_number
+					<< " - retry_count=" << try_count);
 				// Run Failed to Stop...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Stop Recording";
@@ -775,6 +800,8 @@ bool SMSControl::setRecording( bool v )
 
 		// It Didn't Work... ;-Q
 		if ( !runStopped ) {
+			ERROR("Run " << save_current_run_number << " Failed to Stop!"
+				<< " (retry_count=" << try_count << ")");
 			// Update Overall Summary and Reason [Set Severity/Alarm!]
 			// - "false": Don't Set Base Reason (we just set it :-)
 			// - "true": Do Log Status as Error
