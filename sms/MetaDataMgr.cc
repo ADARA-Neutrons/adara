@@ -126,8 +126,8 @@ void MetaDataMgr::dropSourceTag(uint32_t srcTag)
 			SMSControl *ctrl = SMSControl::getInstance();
 			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "dropSourceTag(): Sending Upstream Disconnected for"
-				<< " devId=" << dev.m_devId
 				<< " srcTag=" << dev.m_srcTag
+				<< " devId=" << dev.m_devId
 				<< " mapped_dev=" << dit->first);
 			upstreamDisconnected(dev.m_variablePkts);
 			m_devices.erase(dit++);
@@ -161,8 +161,8 @@ void MetaDataMgr::dropSourceTag(uint32_t srcTag)
 			SMSControl *ctrl = SMSControl::getInstance();
 			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "dropSourceTag(): Removing Mapped Device"
-				<< " devId=" << ( it->first & 0xffff )
 				<< " srcTag=" << ( it->first >> 32 )
+				<< " devId=" << ( it->first & 0xffff )
 				<< " mapped_dev=" << it->second);
 			m_activeDevId.erase(it->second);
 			m_devIdMap.erase(it++);
@@ -202,7 +202,8 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t srcTag, bool do_log)
 
 	if ( do_log ) {
 		DEBUG("New Input Device"
-			<< " devId=" << dev << " srcTag=" << srcTag
+			<< " srcTag=" << srcTag
+			<< " devId=" << dev
 			<< " Mapped to SMS Output Device"
 			<< " mapped_dev=" << m_nextDevId);
 	}
@@ -224,8 +225,9 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &inPkt,
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Update Descriptor devId=" << inPkt.devId()
-			<< " srcTag=" << srcTag);
+			<< "Update Descriptor"
+			<< " srcTag=" << srcTag
+			<< " devId=" << inPkt.devId() );
 		do_log = true; // link this rate-limited log to other related logs
 	}
 
@@ -253,7 +255,8 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &inPkt,
 				DEBUG(log_info
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Got Descriptor from Incorrect Source Tag: "
-					<< it->second.m_srcTag << " != " << srcTag);
+					<< it->second.m_srcTag << " != " << srcTag
+					<< " (devId=" << inPkt.devId() << ")");
 			}
 			return;
 		}
@@ -306,7 +309,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 		DEBUG(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
-			<< " (devId=-1 srcTag=0)");
+			<< " (srcTag=0 devId=-1)");
 	}
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
@@ -381,8 +384,8 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &inPkt,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(U32): Device Lookup Failed for Variable!"
-				<< " devId=" << inPkt.devId()
 				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId());
 		}
 		return;
@@ -414,8 +417,8 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &inPkt,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(Double): Device Lookup Failed for Variable!"
-				<< " devId=" << inPkt.devId()
 				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId());
 		}
 		return;
@@ -447,8 +450,8 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &inPkt,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(String): Device Lookup Failed for Variable!"
-				<< " devId=" << inPkt.devId()
 				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId());
 		}
 		return;
@@ -481,8 +484,8 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32ArrayPkt &inPkt,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(U32 Array):"
 				<< " Device Lookup Failed for Variable!"
-				<< " devId=" << inPkt.devId()
 				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId());
 		}
 		return;
@@ -515,8 +518,8 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoubleArrayPkt &inPkt,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(Double Array):"
 				<< " Device Lookup Failed for Variable!"
-				<< " devId=" << inPkt.devId()
 				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId());
 		}
 		return;
@@ -561,8 +564,8 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t varId,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateVariable(): Got Variable Without a Descriptor!"
-				<< " devId=" << dev
 				<< " srcTag=" << srcTag
+				<< " devId=" << dev
 				<< " varId=" << varId);
 		}
 		return;
@@ -583,8 +586,8 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t varId,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateVariable():"
 				<< " Device Source Tag Mismatch for Variable!"
-				<< " devId=" << dev
 				<< " srcTag=" << srcTag
+				<< " devId=" << dev
 				<< " varId=" << varId
 				<< ", Expected srcTag=" << it->second.m_srcTag);
 		}
