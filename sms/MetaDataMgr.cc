@@ -179,11 +179,15 @@ uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t tag)
 	return val->second;
 }
 
-uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
+uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag, bool do_log)
 {
 	uint32_t mapped_dev;
-	if ( (mapped_dev = lookupMappedDeviceId( dev, tag )) )
+	if ( (mapped_dev = lookupMappedDeviceId( dev, tag )) ) {
+		if ( do_log ) {
+			DEBUG("Device Lookup returned mapped_dev=" << mapped_dev);
+		}
 		return mapped_dev;
+	}
 
 	while ( m_activeDevId.count( m_nextDevId ) )
 		m_nextDevId++;
@@ -192,6 +196,13 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
 
 	uint64_t key = ((uint64_t) tag << 32) | dev;
 	m_devIdMap[key] = m_nextDevId;
+
+	if ( do_log ) {
+		DEBUG("New Input Device"
+			<< " devId=" << dev << " tag=" << tag
+			<< " Mapped to SMS Output Device"
+			<< " mapped_dev=" << m_nextDevId);
+	}
 
 	return m_nextDevId++;
 }
@@ -214,20 +225,7 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		do_log = true; // link this rate-limited log to other related logs
 	}
 
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
-
-	if (!mapped_dev) {
-		mapped_dev = allocDev(in.devId(), tag);
-		if ( do_log ) {
-			DEBUG("New Input Device"
-				<< " devId=" << in.devId() << " tag=" << tag
-				<< " Mapped to SMS Output Device"
-				<< " mapped_dev=" << mapped_dev);
-		}
-	}
-	else if ( do_log ) {
-		DEBUG("Device Lookup returned mapped_dev=" << mapped_dev);
-	}
+	uint32_t mapped_dev = allocDev(in.devId(), tag, do_log);
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {

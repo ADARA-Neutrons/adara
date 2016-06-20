@@ -41,7 +41,7 @@ public:
 	/* Allocate a unique output device identifier for a given input
 	 * source's device.
 	 */
-	uint32_t allocDev(uint32_t dev, uint32_t tag);
+	uint32_t allocDev(uint32_t dev, uint32_t tag, bool do_log);
 
 private:
 	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
