@@ -168,32 +168,32 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	}
 }
 
-uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
-{
-	uint64_t key = ((uint64_t) tag << 32) | dev;
-	std::map<uint64_t, uint32_t>::iterator val;
-
-	val = m_devIdMap.find(key);
-	if (val != m_devIdMap.end())
-		return val->second;
-
-	while (m_activeDevId.count(m_nextDevId))
-		m_nextDevId++;
-
-	m_activeDevId.insert(m_nextDevId);
-	m_devIdMap[key] = m_nextDevId;
-	return m_nextDevId++;
-}
-
 uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t tag)
 {
 	uint64_t key = ((uint64_t) tag << 32) | dev;
 	std::map<uint64_t, uint32_t>::iterator val;
 
 	val = m_devIdMap.find(key);
-	if (val == m_devIdMap.end())
+	if ( val == m_devIdMap.end() )
 		return 0;
 	return val->second;
+}
+
+uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag)
+{
+	uint32_t mapped_dev;
+	if ( (mapped_dev = lookupMappedDeviceId( dev, tag )) )
+		return mapped_dev;
+
+	while ( m_activeDevId.count( m_nextDevId ) )
+		m_nextDevId++;
+
+	m_activeDevId.insert( m_nextDevId );
+
+	uint64_t key = ((uint64_t) tag << 32) | dev;
+	m_devIdMap[key] = m_nextDevId;
+
+	return m_nextDevId++;
 }
 
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
