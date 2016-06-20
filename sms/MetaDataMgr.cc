@@ -43,19 +43,20 @@ MetaDataMgr::~MetaDataMgr()
 	m_connection.disconnect();
 }
 
-void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
+void MetaDataMgr::upstreamDisconnected(
+		MetaDataMgr::VariablePktMap &varPkts)
 {
 	/* For each variable, modify the packet to indicate that we
 	 * lost the upstream connection and feed it into the stream.
 	 */
-	VariableMap::iterator vit, vend = vars.end();
+	VariablePktMap::iterator vit, vend = varPkts.end();
 	uint32_t len, pktSize = 0;
 	uint32_t *fields = NULL;
 	uint8_t *pkt = NULL;
 
 	std::stringstream var_log_ss;
 
-	for (vit = vars.begin(); vit != vend; vit++) {
+	for (vit = varPkts.begin(); vit != vend; vit++) {
 
 		PacketSharedPtr orig = vit->second;
 
@@ -97,21 +98,22 @@ void MetaDataMgr::upstreamDisconnected(MetaDataMgr::VariableMap &vars)
 	delete[] pkt;
 }
 
-void MetaDataMgr::dropTag(uint32_t tag)
+void MetaDataMgr::dropSourceTag(uint32_t srcTag)
 {
-	/* Rate-limited log that we got disconnected from a DataSource (tag)
+	/* Rate-limited log that we got disconnected from a DataSource (srcTag)
 	 * and are Dropping All Associated Devices...
 	 */
 	std::string log_info;
 	std::stringstream ss;
-	ss << tag;
+	ss << srcTag;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_DROP_DEVICES_FOR_TAG, ss.str(),
 			600, 3, 10, log_info ) ) {
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "dropTag(): Dropping Devices for Data Source, tag=" << tag);
+			<< "dropSourceTag():"
+			<< " Dropping Devices for Data Source, srcTag=" << srcTag);
 	}
 
 	DeviceMap::iterator dit, dend = m_devices.end();
@@ -120,14 +122,14 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	for (dit = m_devices.begin(); dit != dend; ) {
 		DeviceVariables &dev = dit->second;
 
-		if (dev.m_tag == tag) {
+		if (dev.m_srcTag == srcTag) {
 			SMSControl *ctrl = SMSControl::getInstance();
 			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "dropTag(): Sending Upstream Disconnected for"
+				<< "dropSourceTag(): Sending Upstream Disconnected for"
 				<< " devId=" << dev.m_devId
-				<< " tag=" << dev.m_tag
+				<< " srcTag=" << dev.m_srcTag
 				<< " mapped_dev=" << dit->first);
-			upstreamDisconnected(dev.m_variables);
+			upstreamDisconnected(dev.m_variablePkts);
 			m_devices.erase(dit++);
 			dropped = true;
 		} else
@@ -138,7 +140,7 @@ void MetaDataMgr::dropTag(uint32_t tag)
 		StorageManager::notify();
 	else {
 		/* Rate-limited log that there were No Associated Devices to Drop
-		 * from the disconnected DataSource (tag)...
+		 * from the disconnected DataSource (srcTag)...
 		 */
 		// re-use "ss" from above...
 		log_info.clear();
@@ -146,20 +148,21 @@ void MetaDataMgr::dropTag(uint32_t tag)
 				RLL_NO_DEVICES_TO_DROP, ss.str(),
 				600, 3, 10, log_info ) ) {
 			DEBUG(log_info
-				<< "dropTag(): Warning No Devices Found! tag=" << tag);
+				<< "dropSourceTag():"
+				<< " Warning No Devices Found! srcTag=" << srcTag);
 		}
 	}
 
-	/* Remove the mapped device ids for this tag */
+	/* Remove the mapped device ids for this srcTag */
 	std::map<uint64_t, uint32_t>::iterator it, end;
 	end = m_devIdMap.end();
 	for (it = m_devIdMap.begin(); it != end; ) {
-		if (it->first >> 32 == tag) {
+		if (it->first >> 32 == srcTag) {
 			SMSControl *ctrl = SMSControl::getInstance();
 			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "dropTag(): Removing Mapped Device"
+				<< "dropSourceTag(): Removing Mapped Device"
 				<< " devId=" << ( it->first & 0xffff )
-				<< " tag=" << ( it->first >> 32 )
+				<< " srcTag=" << ( it->first >> 32 )
 				<< " mapped_dev=" << it->second);
 			m_activeDevId.erase(it->second);
 			m_devIdMap.erase(it++);
@@ -168,9 +171,9 @@ void MetaDataMgr::dropTag(uint32_t tag)
 	}
 }
 
-uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t tag)
+uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t srcTag)
 {
-	uint64_t key = ((uint64_t) tag << 32) | dev;
+	uint64_t key = ((uint64_t) srcTag << 32) | dev;
 	std::map<uint64_t, uint32_t>::iterator val;
 
 	val = m_devIdMap.find(key);
@@ -179,10 +182,10 @@ uint32_t MetaDataMgr::lookupMappedDeviceId(uint32_t dev, uint32_t tag)
 	return val->second;
 }
 
-uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag, bool do_log)
+uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t srcTag, bool do_log)
 {
 	uint32_t mapped_dev;
-	if ( (mapped_dev = lookupMappedDeviceId( dev, tag )) ) {
+	if ( (mapped_dev = lookupMappedDeviceId( dev, srcTag )) ) {
 		if ( do_log ) {
 			DEBUG("Device Lookup returned mapped_dev=" << mapped_dev);
 		}
@@ -194,12 +197,12 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag, bool do_log)
 
 	m_activeDevId.insert( m_nextDevId );
 
-	uint64_t key = ((uint64_t) tag << 32) | dev;
+	uint64_t key = ((uint64_t) srcTag << 32) | dev;
 	m_devIdMap[key] = m_nextDevId;
 
 	if ( do_log ) {
 		DEBUG("New Input Device"
-			<< " devId=" << dev << " tag=" << tag
+			<< " devId=" << dev << " srcTag=" << srcTag
 			<< " Mapped to SMS Output Device"
 			<< " mapped_dev=" << m_nextDevId);
 	}
@@ -207,13 +210,13 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t tag, bool do_log)
 	return m_nextDevId++;
 }
 
-void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
-				   uint32_t tag)
+void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &inPkt,
+				   uint32_t srcTag)
 {
 	/* Rate-limited log that we received a DeviceDescriptorPkt. */
 	std::string log_info;
 	std::stringstream ss;
-	ss << in.devId() << "/" << tag;
+	ss << inPkt.devId() << "/" << srcTag;
 	bool do_log = false;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_UPDATE_DESCRIPTOR, ss.str(),
@@ -221,43 +224,45 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Update Descriptor devId=" << in.devId() << " tag=" << tag);
+			<< "Update Descriptor devId=" << inPkt.devId()
+			<< " srcTag=" << srcTag);
 		do_log = true; // link this rate-limited log to other related logs
 	}
 
-	uint32_t mapped_dev = allocDev(in.devId(), tag, do_log);
+	uint32_t mapped_dev = allocDev(inPkt.devId(), srcTag, do_log);
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
 	if (it != m_devices.end()) {
 		/* Device exists already, ignore it if it didn't change. */
 		DeviceVariables &dev = it->second;
-		ADARA::Packet *dev_pkt = dev.m_descriptor.get();
+		ADARA::Packet *dev_pkt = dev.m_descriptorPkt.get();
 
-		if (it->second.m_tag != tag) {
+		if (it->second.m_srcTag != srcTag) {
 			/* Rate-limited log that we got a Descriptor from
-			 * an Incorrect Tag (i.e., wrong/unexpected Data Source)
-			 * [*** Can this ever actually happen? Lookup Key Includes Tag!]
+			 * an Incorrect Source Tag (i.e., wrong/unexpected Data Source)
+			 * [*** Can this ever actually happen? The Lookup Key Includes
+			 * the Source Tag!]
 			 */
 			std::string log_info;
 			std::stringstream ss;
-			ss << tag;
+			ss << srcTag;
 			if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 					RLL_DESC_INCORRECT_TAG, ss.str(),
 					10, 3, 50, log_info ) ) {
 				SMSControl *ctrl = SMSControl::getInstance();
 				DEBUG(log_info
 					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "Got descriptor from incorrect tag "
-					<< it->second.m_tag << " != " << tag);
+					<< "Got Descriptor from Incorrect Source Tag: "
+					<< it->second.m_srcTag << " != " << srcTag);
 			}
 			return;
 		}
 
-		if (dev_pkt->packet_length() == in.packet_length() &&
-				!memcmp(dev_pkt->payload(), in.payload(),
+		if (dev_pkt->packet_length() == inPkt.packet_length() &&
+				!memcmp(dev_pkt->payload(), inPkt.payload(),
 					dev_pkt->payload_length())) {
 			if ( do_log ) {
-				DEBUG("Inbound descriptor was identical");
+				DEBUG("Inbound Descriptor is Identical");
 			}
 			return;
 		}
@@ -267,14 +272,14 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 		 * moment).
 		 */
 		if ( do_log ) {
-			DEBUG("Updating existing descriptor");
+			DEBUG("Updating Existing Descriptor");
 		}
 		m_devices.erase(it);
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
-	ddp.reset(new ADARA::DeviceDescriptorPkt(in));
+	ddp.reset(new ADARA::DeviceDescriptorPkt(inPkt));
 	ddp->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(ddp);
 
@@ -283,9 +288,9 @@ void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &in,
 	 * a new file with it.
 	 */
 	StorageManager::addPacket(pkt->packet(), pkt->packet_length());
-	m_devices[mapped_dev].m_descriptor = pkt;
-	m_devices[mapped_dev].m_devId = in.devId();
-	m_devices[mapped_dev].m_tag = tag;
+	m_devices[mapped_dev].m_descriptorPkt = pkt;
+	m_devices[mapped_dev].m_devId = inPkt.devId();
+	m_devices[mapped_dev].m_srcTag = srcTag;
 }
 
 void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
@@ -301,7 +306,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 		DEBUG(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "addFastMetaDDP(): Add New Device mapped_dev=" << mapped_dev
-			<< " (devId=-1 tag=0)");
+			<< " (devId=-1 srcTag=0)");
 	}
 
 	DeviceMap::iterator it = m_devices.find(mapped_dev);
@@ -316,7 +321,7 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "addFastMetaDDP(): tried to add existing (mapped) device"
+				<< "addFastMetaDDP(): Tried to Add Existing (Mapped) Device"
 				<< " mapped_dev=" << mapped_dev);
 		}
 		return;
@@ -354,20 +359,21 @@ void MetaDataMgr::addFastMetaDDP(const timespec &ts, uint32_t mapped_dev,
 	 */
 	if (StorageManager::streaming())
 		StorageManager::addPacket(pkt, size);
-	m_devices[mapped_dev].m_descriptor.reset(new ADARA::Packet(wrapped));
+	m_devices[mapped_dev].m_descriptorPkt.reset(new ADARA::Packet(wrapped));
 	m_devices[mapped_dev].m_devId = -1; // FastMetaDDP...!
-	m_devices[mapped_dev].m_tag = 0;
+	m_devices[mapped_dev].m_srcTag = 0;
 }
 
-void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
+void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &inPkt,
+		uint32_t srcTag)
 {
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+	uint32_t mapped_dev = lookupMappedDeviceId(inPkt.devId(), srcTag);
 
 	if (!mapped_dev) {
-		/* Rate-limited logging of variable device lookup failed...? */
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId() << "/" << tag;
+		ss << inPkt.devId() << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -375,32 +381,32 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32Pkt &in, uint32_t tag)
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(U32): Device Lookup Failed for Variable!"
-				<< " devId=" << in.devId()
-				<< " tag=" << tag
-				<< " varId=" << in.varId());
+				<< " devId=" << inPkt.devId()
+				<< " srcTag=" << srcTag
+				<< " varId=" << inPkt.varId());
 		}
 		return;
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableU32Pkt> vup;
-	vup.reset(new ADARA::VariableU32Pkt(in));
+	vup.reset(new ADARA::VariableU32Pkt(inPkt));
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
-	updateVariable(mapped_dev, in.varId(), pkt, tag);
+	updateVariable(mapped_dev, inPkt.varId(), pkt, srcTag);
 }
 
-void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in,
-		uint32_t tag)
+void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &inPkt,
+		uint32_t srcTag)
 {
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+	uint32_t mapped_dev = lookupMappedDeviceId(inPkt.devId(), srcTag);
 
 	if (!mapped_dev) {
-		/* Rate-limited logging of unable to remap variable? */
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId() << "/" << tag;
+		ss << inPkt.devId() << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -408,32 +414,32 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoublePkt &in,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(Double): Device Lookup Failed for Variable!"
-				<< " devId=" << in.devId()
-				<< " tag=" << tag
-				<< " varId=" << in.varId());
+				<< " devId=" << inPkt.devId()
+				<< " srcTag=" << srcTag
+				<< " varId=" << inPkt.varId());
 		}
 		return;
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableDoublePkt> vup;
-	vup.reset(new ADARA::VariableDoublePkt(in));
+	vup.reset(new ADARA::VariableDoublePkt(inPkt));
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
-	updateVariable(mapped_dev, in.varId(), pkt, tag);
+	updateVariable(mapped_dev, inPkt.varId(), pkt, srcTag);
 }
 
-void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
-		uint32_t tag)
+void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &inPkt,
+		uint32_t srcTag)
 {
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+	uint32_t mapped_dev = lookupMappedDeviceId(inPkt.devId(), srcTag);
 
 	if (!mapped_dev) {
-		/* Rate-limited logging of unable to remap variable? */
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId() << "/" << tag;
+		ss << inPkt.devId() << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_STR_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -441,32 +447,32 @@ void MetaDataMgr::updateValue(const ADARA::VariableStringPkt &in,
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(String): Device Lookup Failed for Variable!"
-				<< " devId=" << in.devId()
-				<< " tag=" << tag
-				<< " varId=" << in.varId());
+				<< " devId=" << inPkt.devId()
+				<< " srcTag=" << srcTag
+				<< " varId=" << inPkt.varId());
 		}
 		return;
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableStringPkt> vup;
-	vup.reset(new ADARA::VariableStringPkt(in));
+	vup.reset(new ADARA::VariableStringPkt(inPkt));
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
-	updateVariable(mapped_dev, in.varId(), pkt, tag);
+	updateVariable(mapped_dev, inPkt.varId(), pkt, srcTag);
 }
 
-void MetaDataMgr::updateValue(const ADARA::VariableU32ArrayPkt &in,
-		uint32_t tag)
+void MetaDataMgr::updateValue(const ADARA::VariableU32ArrayPkt &inPkt,
+		uint32_t srcTag)
 {
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+	uint32_t mapped_dev = lookupMappedDeviceId(inPkt.devId(), srcTag);
 
 	if (!mapped_dev) {
-		/* Rate-limited logging of variable device lookup failed...? */
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId() << "/" << tag;
+		ss << inPkt.devId() << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -475,32 +481,32 @@ void MetaDataMgr::updateValue(const ADARA::VariableU32ArrayPkt &in,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(U32 Array):"
 				<< " Device Lookup Failed for Variable!"
-				<< " devId=" << in.devId()
-				<< " tag=" << tag
-				<< " varId=" << in.varId());
+				<< " devId=" << inPkt.devId()
+				<< " srcTag=" << srcTag
+				<< " varId=" << inPkt.varId());
 		}
 		return;
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableU32ArrayPkt> vup;
-	vup.reset(new ADARA::VariableU32ArrayPkt(in));
+	vup.reset(new ADARA::VariableU32ArrayPkt(inPkt));
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
-	updateVariable(mapped_dev, in.varId(), pkt, tag);
+	updateVariable(mapped_dev, inPkt.varId(), pkt, srcTag);
 }
 
-void MetaDataMgr::updateValue(const ADARA::VariableDoubleArrayPkt &in,
-		uint32_t tag)
+void MetaDataMgr::updateValue(const ADARA::VariableDoubleArrayPkt &inPkt,
+		uint32_t srcTag)
 {
-	uint32_t mapped_dev = lookupMappedDeviceId(in.devId(), tag);
+	uint32_t mapped_dev = lookupMappedDeviceId(inPkt.devId(), srcTag);
 
 	if (!mapped_dev) {
-		/* Rate-limited logging of unable to remap variable? */
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
 		std::string log_info;
 		std::stringstream ss;
-		ss << in.devId() << "/" << tag;
+		ss << inPkt.devId() << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -509,23 +515,23 @@ void MetaDataMgr::updateValue(const ADARA::VariableDoubleArrayPkt &in,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateValue(Double Array):"
 				<< " Device Lookup Failed for Variable!"
-				<< " devId=" << in.devId()
-				<< " tag=" << tag
-				<< " varId=" << in.varId());
+				<< " devId=" << inPkt.devId()
+				<< " srcTag=" << srcTag
+				<< " varId=" << inPkt.varId());
 		}
 		return;
 	}
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vup;
-	vup.reset(new ADARA::VariableDoubleArrayPkt(in));
+	vup.reset(new ADARA::VariableDoubleArrayPkt(inPkt));
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
-	updateVariable(mapped_dev, in.varId(), pkt, tag);
+	updateVariable(mapped_dev, inPkt.varId(), pkt, srcTag);
 }
 
-void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t var,
+void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t varId,
 				       const uint8_t *data, uint32_t size)
 {
 	/* We need to make a copy of the packet, but can only copy from
@@ -533,11 +539,11 @@ void MetaDataMgr::updateMappedVariable(uint32_t mapped_dev, uint32_t var,
 	 */
 	ADARA::Packet pkt(data, sizeof(size));
 	PacketSharedPtr copy(new ADARA::Packet(pkt));
-	updateVariable(mapped_dev, var, copy, 0);
+	updateVariable(mapped_dev, varId, copy, 0);
 }
 
-void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
-				 PacketSharedPtr &in, uint32_t tag)
+void MetaDataMgr::updateVariable(uint32_t dev, uint32_t varId,
+				 PacketSharedPtr &inPkt, uint32_t srcTag)
 {
 	DeviceMap::iterator it = m_devices.find(dev);
 
@@ -547,7 +553,7 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 		 */
 		std::string log_info;
 		std::stringstream ss;
-		ss << dev << "/" << tag;
+		ss << dev << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_NO_DESC, ss.str(),
 				60, 3, 10, log_info ) ) {
@@ -556,30 +562,31 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "updateVariable(): Got Variable Without a Descriptor!"
 				<< " devId=" << dev
-				<< " tag=" << tag
-				<< " varId=" << var);
+				<< " srcTag=" << srcTag
+				<< " varId=" << varId);
 		}
 		return;
 	}
 
-	if (it->second.m_tag != tag) {
-		/* Rate-limited log that we got a variable update with
-		 * an incorrect tag (ie, wrong source)
+	if ( it->second.m_srcTag != srcTag ) {
+		/* Rate-limited log that we got a Variable Update with
+		 * an Incorrect srcTag (ie, Wrong Data Source)
 		 */
 		std::string log_info;
 		std::stringstream ss;
-		ss << dev << "/" << tag;
+		ss << dev << "/" << srcTag;
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_VAR_UPDATE_BAD_TAG, ss.str(),
 				60, 3, 10, log_info ) ) {
 			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR(log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "updateVariable(): Device Tag Mismatch for Variable!"
+				<< "updateVariable():"
+				<< " Device Source Tag Mismatch for Variable!"
 				<< " devId=" << dev
-				<< " tag=" << tag
-				<< " varId=" << var
-				<< ", Expected tag=" << it->second.m_tag);
+				<< " srcTag=" << srcTag
+				<< " varId=" << varId
+				<< ", Expected srcTag=" << it->second.m_srcTag);
 		}
 		return;
 	}
@@ -588,14 +595,14 @@ void MetaDataMgr::updateVariable(uint32_t dev, uint32_t var,
 	 * update to the stream; this keeps us from writing out the old
 	 * value in a prologue if we start a new file on this update.
 	 */
-	VariableMap &varmap = it->second.m_variables;
-	VariableMap::iterator vit = varmap.find(var);
+	VariablePktMap &varPktMap = it->second.m_variablePkts;
+	VariablePktMap::iterator vit = varPktMap.find(varId);
 
-	if (vit != varmap.end())
-		varmap.erase(vit);
+	if (vit != varPktMap.end())
+		varPktMap.erase(vit);
 
-	StorageManager::addPacket(in->packet(), in->packet_length());
-	varmap[var] = in;
+	StorageManager::addPacket(inPkt->packet(), inPkt->packet_length());
+	varPktMap[varId] = inPkt;
 }
 
 void MetaDataMgr::onPrologue(void)
@@ -603,15 +610,15 @@ void MetaDataMgr::onPrologue(void)
 	DeviceMap::iterator dit, dend = m_devices.end();
 	for (dit = m_devices.begin(); dit != dend; ++dit) {
 		DeviceVariables &dev = dit->second;
-		ADARA::Packet *dev_pkt = dev.m_descriptor.get();
+		ADARA::Packet *dev_pkt = dev.m_descriptorPkt.get();
 
 		/* Push out the device descriptor before the variable values */
 		StorageManager::addPrologue(dev_pkt->packet(),
 					    dev_pkt->packet_length());
 
-		VariableMap &vars = dev.m_variables;
-		VariableMap::iterator vit, vend = vars.end();
-		for (vit = vars.begin(); vit != vend; ++vit) {
+		VariablePktMap &varPkts = dev.m_variablePkts;
+		VariablePktMap::iterator vit, vend = varPkts.end();
+		for (vit = varPkts.begin(); vit != vend; ++vit) {
 			ADARA::Packet *var_pkt = vit->second.get();
 			StorageManager::addPrologue(var_pkt->packet(),
 						    var_pkt->packet_length());
