@@ -74,7 +74,7 @@ private:
 	uint32_t lookupMappedDeviceId(uint32_t dev, uint32_t srcTag);
 
 	void updateVariable(uint32_t dev, uint32_t varId,
-			    PacketSharedPtr &in, uint32_t srcTag);
+			    PacketSharedPtr &inPkt, uint32_t srcTag);
 
 	void onPrologue(void);
 };
