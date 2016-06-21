@@ -192,8 +192,11 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t srcTag, bool do_log)
 		return mapped_dev;
 	}
 
-	// Handle Wrap, Lol... ;-)
-	if ( !m_nextMappedDevId ) m_nextMappedDevId++;
+	// Handle Wrap (Lol... ;-) and SMS Internal (Mapped) Device IDs...
+	// (We Currently Reserve Device IDs 0x80000000 for SMS Internal Use,
+	// e.g. Chopper Ids...)
+	if ( !m_nextMappedDevId || m_nextMappedDevId >= 0x80000000 )
+		m_nextMappedDevId = 1;
 
 	while ( m_activeDevId.count( m_nextMappedDevId ) )
 		m_nextMappedDevId++;
