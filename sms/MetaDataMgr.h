@@ -67,7 +67,7 @@ private:
 	boost::signals2::connection m_connection;
 	std::map<uint64_t, uint32_t> m_devIdMap;
 	std::set<uint32_t> m_activeDevId;
-	uint32_t m_nextDevId;
+	uint32_t m_nextMappedDevId;
 
 	void upstreamDisconnected(VariablePktMap &varPkts);
 

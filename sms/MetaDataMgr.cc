@@ -32,7 +32,7 @@ RateLimitedLogging::History RLLHistory_MetaDataMgr;
 #define RLL_VAR_UPDATE_NO_DESC     9
 #define RLL_VAR_UPDATE_BAD_TAG    10
 
-MetaDataMgr::MetaDataMgr() : m_nextDevId(1)
+MetaDataMgr::MetaDataMgr() : m_nextMappedDevId(1)
 {
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&MetaDataMgr::onPrologue, this));
@@ -192,23 +192,26 @@ uint32_t MetaDataMgr::allocDev(uint32_t dev, uint32_t srcTag, bool do_log)
 		return mapped_dev;
 	}
 
-	while ( m_activeDevId.count( m_nextDevId ) )
-		m_nextDevId++;
+	// Handle Wrap, Lol... ;-)
+	if ( !m_nextMappedDevId ) m_nextMappedDevId++;
 
-	m_activeDevId.insert( m_nextDevId );
+	while ( m_activeDevId.count( m_nextMappedDevId ) )
+		m_nextMappedDevId++;
+
+	m_activeDevId.insert( m_nextMappedDevId );
 
 	uint64_t key = ((uint64_t) srcTag << 32) | dev;
-	m_devIdMap[key] = m_nextDevId;
+	m_devIdMap[key] = m_nextMappedDevId;
 
 	if ( do_log ) {
 		DEBUG("New Input Device"
 			<< " srcTag=" << srcTag
 			<< " devId=" << dev
 			<< " Mapped to SMS Output Device"
-			<< " mapped_dev=" << m_nextDevId);
+			<< " mapped_dev=" << m_nextMappedDevId);
 	}
 
-	return m_nextDevId++;
+	return m_nextMappedDevId++;
 }
 
 void MetaDataMgr::updateDescriptor(const ADARA::DeviceDescriptorPkt &inPkt,
