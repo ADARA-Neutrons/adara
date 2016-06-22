@@ -64,14 +64,17 @@ private:
 	typedef std::map<uint32_t, DeviceVariables> DeviceMap;
 
 	DeviceMap m_devices;
+	DeviceMap m_oldDevices;
 	boost::signals2::connection m_connection;
 	std::map<uint64_t, uint32_t> m_devIdMap;
+	std::map<uint64_t, uint32_t> m_oldDevIdMap;
 	std::set<uint32_t> m_activeDevId;
 	uint32_t m_nextMappedDevId;
 
 	void upstreamDisconnected(VariablePktMap &varPkts);
 
 	uint32_t lookupMappedDeviceId(uint32_t dev, uint32_t srcTag);
+	uint32_t lookupOldMappedDeviceId(uint32_t dev, uint32_t srcTag);
 
 	void updateVariable(uint32_t dev, uint32_t varId,
 			    PacketSharedPtr &inPkt, uint32_t srcTag);
