@@ -94,7 +94,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
         usleep(30000); // give syslog a chance...
 
         m_dev_agents[a_device->m_name] =
-            new DeviceAgent( *m_srteam_api, a_device, m_epics_context,
+            new DeviceAgent( *m_stream_api, a_device, m_epics_context,
                 m_device_init_timeout );
     }
 }

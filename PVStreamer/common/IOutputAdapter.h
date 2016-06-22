@@ -22,7 +22,7 @@ public:
 
 protected:
     StreamService      &m_stream_serv;  ///< StreamService instance that owns this reader
-    IOutputAdapterAPI  *m_srteam_api;   ///< Stream services interface acquired from owning StreamService
+    IOutputAdapterAPI  *m_stream_api;   ///< Stream services interface acquired from owning StreamService
 };
 
 }

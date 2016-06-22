@@ -102,7 +102,7 @@ OutputAdapter::streamProcessingThread()
 
     while ( 1 )
     {
-        pvs_pkt = m_srteam_api->getFilledPacket( m_heartbeat,
+        pvs_pkt = m_stream_api->getFilledPacket( m_heartbeat,
             timeout_flag );
 
         if ( !pvs_pkt )
@@ -181,7 +181,7 @@ OutputAdapter::streamProcessingThread()
                     sendPacket( adara_pkt, payload );
             }
 
-            m_srteam_api->putFreePacket( pvs_pkt );
+            m_stream_api->putFreePacket( pvs_pkt );
         }
     }
 }

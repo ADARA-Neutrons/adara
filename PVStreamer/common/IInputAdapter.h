@@ -23,7 +23,7 @@ public:
 
 protected:
     StreamService      &m_stream_serv;  ///< StreamService instance that owns this adapter
-    IInputAdapterAPI   *m_srteam_api;   ///< Stream services interface acquired from owning StreamService
+    IInputAdapterAPI   *m_stream_api;   ///< Stream services interface acquired from owning StreamService
 };
 
 }
