@@ -143,44 +143,75 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             DeviceDescriptor *new_desc = new DeviceDescriptor(
                 a_descriptor ); // Deep Copy, Keep ID!
 
-            // Create PV IDs Set: Sorted Unique Element List
-            // - Use for Guaranteed-Unique New PV Ids...! ;-D
-            vector<PVDescriptor*>::const_iterator ipv2;
-            std::set<Identifier> pv_ids;
-            for ( ipv2 = idev->second->m_pvs.begin();
-                    ipv2 != idev->second->m_pvs.end(); ++ipv2 )
-            {
-                pv_ids.insert( (*ipv2)->m_id );
-            }
-
-            const PVDescriptor *old_pv;
-            Identifier next_id = 1;
-
+            // Initialize New Descriptor PV IDs to Zero (just to be sure!)
             vector<PVDescriptor*>::iterator ipv;
             for ( ipv = new_desc->m_pvs.begin();
                     ipv != new_desc->m_pvs.end(); ++ipv )
             {
-                // See if new PV is in old PV list - by "friendly name"
-                old_pv = idev->second->getPvByName( (*ipv)->m_name );
+                (*ipv)->m_id = 0;
+            }
 
-                // If PV exists in both devices, reuse the old PV ID
-                if ( old_pv )
+            // Create PV IDs Set: Sorted Unique Element List
+            // - Use for Generating Guaranteed-Unique *New* PV Ids...! ;-D
+            std::set<Identifier> pv_ids;
+
+            // Check Old Descriptor PVs against New Descriptor's PVs...
+            // - If Found, Re-Use PV ID...
+            // - Else, Send PV Disconnected Packet...
+            for ( ipv = idev->second->m_pvs.begin();
+                    ipv != idev->second->m_pvs.end(); ++ipv )
+            {
+                PVDescriptor *new_pv;
+
+                // Send PV Disconnected Packet for Old PVs that are
+                // Not in New Descriptor
+                if ( !(new_pv = new_desc->getPvByName( (*ipv)->m_name )) )
                 {
-                    (*ipv)->m_id = old_pv->m_id;
+                    syslog( LOG_INFO,
+                    "%s %s: %s [%s] (Device ID=%d) %s <%s> (%s) (PV ID=%d)",
+                        "PVSD ERROR:", "ConfigManager::defineDevice()",
+                        "Device", new_desc->m_name.c_str(), new_desc->m_id,
+                        "Undefining Old PV",
+                        (*ipv)->m_name.c_str(),
+                        (*ipv)->m_connection.c_str(),
+                        (*ipv)->m_id );
+                    usleep(30000); // give syslog a chance...
+
+                    sendPvUndefined( idev->second, *ipv );
+                }
+
+                // Otherwise, Steal the PV ID from the Old Descriptor
+                // (for consistency, as amenable... :-)
+                else
+                {
+                    new_pv->m_id = (*ipv)->m_id;
+
+                    pv_ids.insert( new_pv->m_id );
 
                     syslog( LOG_INFO,
                     "%s: %s [%s] (Device ID=%d) %s <%s> (%s) - %s PV ID=%d",
                         "ConfigManager::defineDevice()", "Device",
                         new_desc->m_name.c_str(), new_desc->m_id,
                         "PV Persists",
-                        (*ipv)->m_name.c_str(),
-                        (*ipv)->m_connection.c_str(),
-                        "keep", (*ipv)->m_id );
+                        new_pv->m_name.c_str(),
+                        new_pv->m_connection.c_str(),
+                        "Keep", new_pv->m_id );
                     usleep(30000); // give syslog a chance...
                 }
-                else
+            }
+
+            // Now Generate Any (Guaranteed-Unique) *New* PV Ids...! ;-D
+
+            Identifier next_id = 1;
+
+            for ( ipv = new_desc->m_pvs.begin();
+                    ipv != new_desc->m_pvs.end(); ++ipv )
+            {
+                // Need a New PV Id...
+                if ( (*ipv)->m_id == 0 )
                 {
-                    // New PV, find a free ID (not in old IDs or recent new)
+                    // New PV, Find a Free ID
+                    // (Not Re-Used from Old IDs or a Recent New...)
                     std::set<Identifier>::iterator idi;
                     while ( (idi = pv_ids.find( next_id )) != pv_ids.end() )
                         next_id++;
@@ -191,39 +222,18 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     pv_ids.insert( (*ipv)->m_id );
 
                     syslog( LOG_INFO,
-                    "%s: %s [%s] (Device ID=%d) %s <%s> (%s) - %s PV ID=%d",
-                        "ConfigManager::defineDevice()", "Device",
-                        new_desc->m_name.c_str(), new_desc->m_id,
+                "%s %s: %s [%s] (Device ID=%d) %s <%s> (%s) - %s PV ID=%d",
+                        "PVSD ERROR:", "ConfigManager::defineDevice()",
+                        "Device", new_desc->m_name.c_str(), new_desc->m_id,
                         "Found New PV",
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str(),
-                        "assign", (*ipv)->m_id );
+                        "Assign", (*ipv)->m_id );
                     usleep(30000); // give syslog a chance...
                 }
             }
 
-            // Send PV disconnected packets for old PVs that are
-            // not in new descriptor
-            for ( ipv = idev->second->m_pvs.begin();
-                    ipv != idev->second->m_pvs.end(); ++ipv )
-            {
-                if ( !new_desc->getPvByName( (*ipv)->m_name ))
-                {
-                    syslog( LOG_INFO,
-                    "%s: %s [%s] (Device ID=%d) %s <%s> (%s) (PV ID=%d)",
-                        "ConfigManager::defineDevice()", "Device",
-                        new_desc->m_name.c_str(), new_desc->m_id,
-                        "Undefining Old PV",
-                        (*ipv)->m_name.c_str(),
-                        (*ipv)->m_connection.c_str(),
-                        (*ipv)->m_id );
-                    usleep(30000); // give syslog a chance...
-
-                    sendPvUndefined( idev->second, *ipv );
-                }
-            }
-
-            // Ensure all new PV names are unique
+            // Now Ensure All New PV Names are Unique
             makePvNamesUnique( key, *new_desc );
 
             // Move old record to trash, and save new record
@@ -258,9 +268,9 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             (*ipv)->m_id = id++;
 
             syslog( LOG_INFO,
-            "%s: %s [%s] (Device ID=%d) New PV <%s> (%s) - assign PV ID=%d",
-                "ConfigManager::defineDevice()", "Device",
-                new_desc->m_name.c_str(), new_desc->m_id,
+        "%s %s: %s [%s] (Device ID=%d) New PV <%s> (%s) - assign PV ID=%d",
+                "PVSD ERROR:", "ConfigManager::defineDevice()",
+                "Device", new_desc->m_name.c_str(), new_desc->m_id,
                 (*ipv)->m_name.c_str(),
                 (*ipv)->m_connection.c_str(),
                 (*ipv)->m_id );
