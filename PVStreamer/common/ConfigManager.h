@@ -34,10 +34,10 @@ public:
     DeviceRecordPtr defineDevice( DeviceDescriptor &a_descriptor );
     void            undefineDevice( DeviceRecordPtr &a_record );
     void            attach( IInputAdapterAPI *a_stream_api );
+    uint32_t        getOffset(void) { return m_offset; }
 
 private:
     std::string     makeDeviceKey( const std::string &a_name, const std::string &a_source, Protocol a_protocol ) const;
-    Identifier      getNextDeviceID() const;
     void            makePvNamesUnique(  const std::string &a_key, DeviceDescriptor &a_descriptor );
     void            sendDeviceDefined( DeviceRecordPtr a_dev_desc );
     void            sendDeviceUndefined( DeviceRecordPtr a_dev_desc );
