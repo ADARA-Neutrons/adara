@@ -38,12 +38,18 @@ InputAdapter::InputAdapter( StreamService &a_stream_serv,
 {
     // Enable pre-emptive callbacks from EPICS
     ca_context_create( ca_enable_preemptive_callback );
+
     // Save EPICS thread context so other thread can join
     m_epics_context = ca_current_context();
 
+    // Capture the StreamService's ConfigManager's Device ID Offset... ;-Q
+    m_offset = a_stream_serv.getCfgMgr().getOffset();
+
     // Start monitor and GC threads
-    m_cfg_mon_thread = new boost::thread( boost::bind( &InputAdapter::configFileMonitorThread, this ));
-    m_gc_thread = new boost::thread( boost::bind( &InputAdapter::gcThread, this ));
+    m_cfg_mon_thread = new boost::thread(
+        boost::bind( &InputAdapter::configFileMonitorThread, this ) );
+    m_gc_thread = new boost::thread(
+        boost::bind( &InputAdapter::gcThread, this ) );
 }
 
 
@@ -272,7 +278,7 @@ InputAdapter::configFileMonitorThread()
                     if ( changed )
                     {
                         syslog( LOG_INFO,
-                            "%s: EPICS beam config file %s has changed",
+                            "%s: EPICS Beam Config File %s has Changed",
                             "InputAdapter::configFileMonitorThread():",
                             m_config_file.c_str() );
                         usleep(30000); // give syslog a chance...
@@ -289,7 +295,7 @@ InputAdapter::configFileMonitorThread()
                         {
                             // Parsed successfully
                             syslog( LOG_INFO,
-                                "%s: EPICS beam config file parse OK",
+                                "%s: EPICS Beam Config File Parse OK",
                                 "InputAdapter::configFileMonitorThread():");
                             usleep(30000); // give syslog a chance...
 
@@ -338,8 +344,8 @@ InputAdapter::configFileMonitorThread()
                             ss << "PVSD ERROR:"
                                 << " InputAdapter::"
                                 << "configFileMonitorThread():"
-                                << " Failed to parse"
-                                << " EPICS beamline.xml config file!";
+                                << " Failed to Parse"
+                                << " EPICS beamline.xml Config File!";
 
                             syslog( LOG_ERR, "%s", ss.str().c_str() );
                             usleep(30000); // give syslog a chance...
@@ -359,8 +365,8 @@ InputAdapter::configFileMonitorThread()
             stringstream ss;
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
-                << " Exception parsing"
-                << " EPICS beamline.xml config file!";
+                << " Exception Parsing"
+                << " EPICS beamline.xml Config File!";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
             syslog( LOG_ERR, e.what() );
@@ -374,8 +380,8 @@ InputAdapter::configFileMonitorThread()
             stringstream ss;
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
-                << " Unexpected exception parsing"
-                << " EPICS beamline.xml config file!";
+                << " Unexpected Exception Parsing"
+                << " EPICS beamline.xml Config File!";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
@@ -425,6 +431,13 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
     bool res = false;
     stringstream sstr;
 
+    // Count Device IDs from Here (_Not_ in ConfigManager::defineDevice()!)
+    // -> Don't Wait for Devices to Go Active!
+    // This makes for a more consistent and dependable numbering scheme;
+    // be sure to count _Every_ Device, not just "Active" or Valid ones...!
+    // NOTE: 1st Device ID should be "1 + Offset", Pre-Increment Before Use!
+    Identifier id = m_offset;
+
     xmlDocPtr doc = xmlReadMemory( a_buffer, a_buffer_size, 0, 0, 0 );
     if ( doc )
     {
@@ -455,6 +468,15 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                         if ( xmlStrcmp( node->name,
                             (const xmlChar*)"device" ) == 0 )
                         {
+                            // Get Next Device ID...
+                            // Note: If we get to id == 4294967295
+                            // ( (uint32_t) -1 ) then, aside from being
+                            // totally screwed in general, we will also
+                            // overwrite the ADARA OutputAdapter's
+                            // Heartbeat Device... Lol... ;-D
+                            // (Probably not an issue, just saying... ;-)
+                            ++id;
+
                             bool is_active = false;
 
                             if ( xmlGetAttribute( node, "active", value ))
@@ -559,11 +581,14 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
 
                                     if ( dev_name.empty())
                                     {
-                                        // It's an error to omit the
-                                        // device name
+                                        // It's an Error to Omit the
+                                        // Device Name
                                         syslog( LOG_ERR,
-                                            "PVSD ERROR: %s: Device name is missing or empty",
-                                            "InputAdapter::parseConfigBuffer()" );
+                                            "%s: %s::%s(): %s -> %s = %d",
+                                            "PVSD ERROR", "InputAdapter",
+                                            "parseConfigBuffer",
+                                            "Device Name Missing or Empty",
+                                            "Device ID", id );
                                         throw -1;
                                     }
                                     else if ( pvs.size())
@@ -571,6 +596,19 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         DeviceDescriptor *dev =
                                             new DeviceDescriptor( dev_name,
                                                 m_source, EPICS_PROTOCOL );
+
+                                        dev->m_id = id;
+
+                                        syslog( LOG_ERR,
+                                            "%s::%s(): %s [%s] -> %s = %d",
+                                            "InputAdapter",
+                                            "parseConfigBuffer",
+                                            "Active Device",
+                                            dev_name.c_str(),
+                                            "Device ID", id );
+                                        // give syslog a chance...
+                                        usleep(30000);
+
                                         for ( ipv = pvs.begin();
                                             ipv != pvs.end(); ++ipv )
                                         {
@@ -580,6 +618,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                 ipv->first, ipv->second,
                                                 PV_INT, 1, 0, "" );
                                         }
+
                                         a_devices.push_back( dev );
                                     }
                                 }
@@ -603,15 +642,18 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                 if ( !dev_name.empty())
                                 {
                                     syslog( LOG_WARNING,
-                                        "%s: Ignoring Inactive Device [%s]",
+                                        "%s: %s [%s] -> %s = %d",
                                         "InputAdapter::parseConfigBuffer()",
-                                        dev_name.c_str() );
+                                        "Ignoring Inactive Device",
+                                        dev_name.c_str(), "Device ID", id );
                                 }
                                 else
                                 {
                                     syslog( LOG_WARNING,
-                                    "%s: Ignoring Unnamed Inactive Device!",
-                                      "InputAdapter::parseConfigBuffer()" );
+                                        "%s: %s! -> %s = %d",
+                                        "InputAdapter::parseConfigBuffer()",
+                                        "Ignoring Unnamed Inactive Device",
+                                        "Device ID", id );
                                 }
                                 usleep(30000); // give syslog a chance...
                             }
@@ -623,7 +665,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
         catch(...)
         {
             syslog( LOG_ERR,
-                "%s %s: Exception while parsing EPICS beamline XML",
+                "%s %s: Exception While Parsing EPICS beamline XML",
                 "PVSD ERROR:", "InputAdapter::parseConfigBuffer()" );
             res = false;
         }
