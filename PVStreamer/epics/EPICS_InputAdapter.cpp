@@ -307,18 +307,11 @@ InputAdapter::configFileMonitorThread()
                                 new_devices.insert( (*idev)->m_name );
                             }
 
-                            // Start device agent for all configured devices
-                            // It's OK if agents are already running
-                            // NOTE: The DeviceDescriptor ptrs in devices
-                            // vector will be deleted by startDevice call
-                            for ( idev = devices.begin();
-                                    idev != devices.end(); ++idev )
-                            {
-                                startDevice( *idev );
-                            }
-
                             // Stop device agents that are
                             // no longer configured
+                            // (Do This *Before* Starting New Devices,
+                            // to Avoid Any PV Name Clashes from
+                            // Device Re-Naming/Shuffling... ;-D)
                             for ( icur = m_cur_devices.begin();
                                     icur != m_cur_devices.end(); ++icur )
                             {
@@ -329,8 +322,20 @@ InputAdapter::configFileMonitorThread()
                                 }
                             }
 
-                            // Save new device names and new buffer
+                            // Save new device names
                             m_cur_devices = new_devices;
+
+                            // Start device agent for all configured devices
+                            // It's OK if agents are already running
+                            // NOTE: The DeviceDescriptor ptrs in devices
+                            // vector will be deleted by startDevice call
+                            for ( idev = devices.begin();
+                                    idev != devices.end(); ++idev )
+                            {
+                                startDevice( *idev );
+                            }
+
+                            // Save new config buffer
                             m_config_buffer = buffer;
 
                             ADARA::ComBus::SignalRetractMessage
