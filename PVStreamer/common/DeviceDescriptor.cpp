@@ -184,8 +184,9 @@ DeviceDescriptor::DeviceDescriptor( const string &a_device_name,
 
 
 DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
-    : m_id(0), m_name(a_source.m_name), m_protocol(a_source.m_protocol),
-    m_source(a_source.m_source), m_ready(0)
+    : m_id(a_source.m_id), m_name(a_source.m_name),
+    m_protocol(a_source.m_protocol), m_source(a_source.m_source),
+    m_ready(0)
 {
     for ( vector<EnumDescriptor*>::const_iterator e =
             a_source.m_enums.begin(); e != a_source.m_enums.end(); ++e )
@@ -298,9 +299,9 @@ DeviceDescriptor::getPvByConnection( const string &a_pv_connection ) const
 
 
 /**
- * @brief Equality operator to determine id two descriptors are exactly the same or not
+ * @brief Equality operator to determine if two descriptors are exactly the same or not
  * @param a_desc - Descriptor to compare against
- * @return False if descriptors are different, true if they are exactly the same
+ * @return False if descriptors are different, true if they are exactly the same (_Not_ comparing Device ID or Ready Status...!)
  */
 bool
 DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
@@ -309,7 +310,7 @@ DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
 
     // If device name, protocol, and source differ,
     // then devices are not the same
-    // (Note: Ignore Temp Device's "Ready" Count Here!)
+    // (Note: Ignore Temp Device's ID and "Ready" Count Here!)
     if ( m_name == a_desc.m_name
             && m_protocol == a_desc.m_protocol
             && m_source == a_desc.m_source
