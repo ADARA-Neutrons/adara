@@ -1929,7 +1929,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_RTDL_NO_DATA, "none",
-				2, 10, 5000, log_info ) ) {
+				2, 10, 216000, log_info ) ) {   // about once per hour...
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "pulseRTDL: Pulse with No Registered Event Sources!"
