@@ -179,7 +179,8 @@ void FastMeta::addDevice(const std::string &name,
 
 	readFile(name, path->second.data(), ddp);
 
-	uint32_t devId = m_meta->allocDev(++m_numDevs, 0, true);
+	bool reconnected = false; // ignored for FastMeta devices...
+	uint32_t devId = m_meta->allocDev(++m_numDevs, 0, true, reconnected);
 	uint32_t varId, key;
 	bool persist;
 	BOOST_FOREACH(const ptree::value_type &v, info) {
