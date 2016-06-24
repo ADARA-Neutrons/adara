@@ -48,7 +48,8 @@ public:
 	/* Allocate a unique output device identifier for a given input
 	 * source's device.
 	 */
-	uint32_t allocDev(uint32_t dev, uint32_t srcTag, bool do_log);
+	uint32_t allocDev(uint32_t dev, uint32_t srcTag,
+			bool do_log, bool &reconnected);
 
 private:
 	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
@@ -74,7 +75,8 @@ private:
 	void upstreamDisconnected(VariablePktMap &varPkts);
 
 	uint32_t lookupMappedDeviceId(uint32_t dev, uint32_t srcTag);
-	uint32_t lookupOldMappedDeviceId(uint32_t dev, uint32_t srcTag);
+	uint32_t lookupOldMappedDeviceId(uint32_t dev, uint32_t srcTag,
+			bool &reconnected);
 
 	void updateVariable(uint32_t dev, uint32_t varId,
 			    PacketSharedPtr &inPkt, uint32_t srcTag);

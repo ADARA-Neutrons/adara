@@ -202,7 +202,7 @@ uint32_t MetaDataMgr::lookupMappedDeviceId( uint32_t dev, uint32_t srcTag )
 // Note: Always Check lookupMappedDeviceId() First,
 // To Ensure "Mapped" Device ID is _Not_ Actively In Use...!
 uint32_t MetaDataMgr::lookupOldMappedDeviceId(
-		uint32_t dev, uint32_t srcTag )
+		uint32_t dev, uint32_t srcTag, bool &reconnected )
 {
 	uint64_t key = ((uint64_t) srcTag << 32) | dev;
 	std::map<uint64_t, uint32_t>::iterator diit;
@@ -237,13 +237,7 @@ uint32_t MetaDataMgr::lookupOldMappedDeviceId(
 
 		m_devIdMap[key] = mapped_dev;
 
-		/* Add the descriptor to the stream before we squirrel it away; this
-		 * keeps us from writing it twice in close proximity if we start
-		 * a new file with it.
-		 */
-		StorageManager::addPacket(
-			m_devices[mapped_dev].m_descriptorPkt->packet(),
-			m_devices[mapped_dev].m_descriptorPkt->packet_length() );
+		reconnected = true;
 
 		return mapped_dev;
 	}
@@ -252,7 +246,8 @@ uint32_t MetaDataMgr::lookupOldMappedDeviceId(
 	return 0;
 }
 
-uint32_t MetaDataMgr::allocDev( uint32_t dev, uint32_t srcTag, bool do_log )
+uint32_t MetaDataMgr::allocDev( uint32_t dev, uint32_t srcTag,
+		bool do_log, bool &reconnected )
 {
 	uint32_t mapped_dev;
 
@@ -265,7 +260,8 @@ uint32_t MetaDataMgr::allocDev( uint32_t dev, uint32_t srcTag, bool do_log )
 	}
 
 	// Reconnecting an Old Device...?
-	if ( (mapped_dev = lookupOldMappedDeviceId( dev, srcTag )) ) {
+	if ( (mapped_dev = lookupOldMappedDeviceId( dev, srcTag,
+			reconnected )) ) {
 		if ( do_log ) {
 			DEBUG("Old Device Lookup Reconnect mapped_dev=" << mapped_dev);
 		}
@@ -321,7 +317,10 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 		do_log = true; // link this rate-limited log to other related logs
 	}
 
-	uint32_t mapped_dev = allocDev( inPkt.devId(), srcTag, do_log );
+	bool reconnected = false;
+
+	uint32_t mapped_dev = allocDev( inPkt.devId(), srcTag,
+		do_log, reconnected );
 
 	DeviceMap::iterator dit = m_devices.find(mapped_dev);
 	if ( dit != m_devices.end() ) {
@@ -357,6 +356,18 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 			if ( do_log ) {
 				DEBUG("Inbound Descriptor is Identical");
 			}
+
+			/* *IF* Device is an Old Device Re-Connected, then we need to
+			 * Add the descriptor to the stream before we squirrel it away;
+			 * this keeps us from writing it twice in close proximity if we
+			 * start a new file with it.
+			 */
+			if ( reconnected ) {
+				StorageManager::addPacket(
+					dev.m_descriptorPkt->packet(),
+					dev.m_descriptorPkt->packet_length() );
+			}
+
 			return;
 		}
 
