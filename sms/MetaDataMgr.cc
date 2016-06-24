@@ -217,28 +217,33 @@ uint32_t MetaDataMgr::lookupOldMappedDeviceId(
 
 	m_oldDevIdMap.erase(diit);
 
-	DeviceMap::iterator dit = m_oldDevices.find(mapped_dev);
-	if ( dit != m_oldDevices.end() ) {
-
-		// Munge the Device ID in the Descriptor Packet *Back* to Original
-		// (So we can "Re-Munge" It, Lol...! ;-D)
-		ADARA::DeviceDescriptorPkt *ddp =
-			dynamic_cast<ADARA::DeviceDescriptorPkt *>
-				( dit->second.m_descriptorPkt.get() );
-		ddp->remapDeviceId( dit->second.m_devId );
+	DeviceMap::iterator odit = m_oldDevices.find(mapped_dev);
+	if ( odit != m_oldDevices.end() ) {
 
 		// We should have Already Checked for "mapped_dev" in m_devIdMap[],
 		// So we Know we're Not Overwriting an Existing Device here...! ;-b
-		m_devices[mapped_dev].m_devId = dit->second.m_devId;
-		m_devices[mapped_dev].m_srcTag = dit->second.m_srcTag;
-		m_devices[mapped_dev].m_descriptorPkt = dit->second.m_descriptorPkt;
-		m_devices[mapped_dev].m_variablePkts = dit->second.m_variablePkts;
+		m_devices[mapped_dev].m_devId =
+			odit->second.m_devId;
+		m_devices[mapped_dev].m_srcTag =
+			odit->second.m_srcTag;
+		m_devices[mapped_dev].m_descriptorPkt =
+			odit->second.m_descriptorPkt;
+		m_devices[mapped_dev].m_variablePkts =
+			odit->second.m_variablePkts;
 
-		m_oldDevices.erase(dit);
+		m_oldDevices.erase(odit);
 
 		m_activeDevId.insert( mapped_dev );
 
 		m_devIdMap[key] = mapped_dev;
+
+		/* Add the descriptor to the stream before we squirrel it away; this
+		 * keeps us from writing it twice in close proximity if we start
+		 * a new file with it.
+		 */
+		StorageManager::addPacket(
+			m_devices[mapped_dev].m_descriptorPkt->packet(),
+			m_devices[mapped_dev].m_descriptorPkt->packet_length() );
 
 		return mapped_dev;
 	}
