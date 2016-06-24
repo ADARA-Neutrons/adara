@@ -560,6 +560,8 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
         pkt->state = PVState(
             ::ADARA::VariableStatus::UPSTREAM_DISCONNECTED,
             ::ADARA::VariableSeverity::INVALID );
+        pkt->state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+        pkt->state.m_time.nsec = 0;
 
         m_stream_api->putFilledPacket( pkt );
     }
