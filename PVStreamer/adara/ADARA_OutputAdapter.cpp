@@ -147,7 +147,7 @@ OutputAdapter::streamProcessingThread()
                     "PVSD ERROR: %s: Null Packet/No Timeout - %s",
                     "OutputAdapter::streamProcessingThread()",
                     "Queues Deactivated, Exiting Thread" );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
                 break;
             }
         }
@@ -199,7 +199,7 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
     if ( a_pv_pkt.device == NULL ) {
         syslog( LOG_ERR, "PVSD ERROR: %s: Null Device! type=%d",
             "OutputAdapter::translate()", a_pv_pkt.type );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
     }
 
     switch ( a_pv_pkt.type )
@@ -220,14 +220,14 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
         if ( a_pv_pkt.pv == NULL ) {
             syslog( LOG_ERR, "PVSD ERROR: %s: Null PV! type=%d",
                 "OutputAdapter::translate()", a_pv_pkt.type );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         else if ( a_pv_pkt.pv->m_device == NULL ) {
             syslog( LOG_ERR,
                 "PVSD ERROR: %s: Null PV Device! type=%d varId=0x%x/%d",
                 "OutputAdapter::translate()", a_pv_pkt.type,
                 a_pv_pkt.pv->m_id, a_pv_pkt.pv->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
 
         buildVVP( a_adara_pkt, a_pv_pkt.pv, a_pv_pkt.state, a_payload );
@@ -492,7 +492,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
                 "device", a_pv->m_device->m_id,
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str(),
                 a_pv->m_id, " - Setting Payload Size to Zero" );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
             elemCount = 0;
         }
 
@@ -501,7 +501,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
             syslog( LOG_ERR, "%s: %s: uint_array[%u] = %u",
                 "PVSD ERROR", "OutputAdapter::buildVVP()",
                 i, uint_array[i] );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         a_adara_pkt.vvp_array.elemCount = elemCount;
         a_payload = vector<uint8_t>( elemCount * sizeof(uint32_t) );
@@ -546,7 +546,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
                 "device", a_pv->m_device->m_id,
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str(),
                 a_pv->m_id, " - Setting Payload Size to Zero" );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
             elemCount = 0;
         }
 
@@ -555,7 +555,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
             syslog( LOG_ERR, "%s: %s: double_array[%u] = %lf",
                 "PVSD ERROR", "OutputAdapter::buildVVP()",
                 i, double_array[i] );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         a_adara_pkt.vvp_array.elemCount = elemCount;
         a_payload = vector<uint8_t>( elemCount * sizeof(double) );
@@ -859,14 +859,14 @@ OutputAdapter::socketListenThread()
                 "PVSD ERROR: %s: Socket Accept Returned Error (%d) - %s",
                 "OutputAdapter::socketListenThread()",
                 e, strerror(e) );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             if ( !m_active )
             {
                 syslog( LOG_ERR, "PVSD ERROR: %s: %s",
                     "OutputAdapter::socketListenThread()",
                     "Output Adapter No Longer Active, Exiting Thread" );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
                 break;
             }
         }
@@ -880,7 +880,7 @@ OutputAdapter::socketListenThread()
                 "%s %s: Connected to ADARA SMS Client at %s (socket=%d)",
                 "PVSD ERROR:", "OutputAdapter::socketListenThread()",
                 info.addr.c_str(), info.socket );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -896,7 +896,7 @@ OutputAdapter::socketListenThread()
                 "%s %s: Initial Sends Complete to %s at %s (socket=%d)",
                 "PVSD ERROR:", "OutputAdapter::socketListenThread()",
                 "ADARA SMS Client", info.addr.c_str(), info.socket );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
     }
 }
@@ -915,7 +915,7 @@ OutputAdapter::sendCurrentData( int a_socket )
     syslog( LOG_INFO,
         "%s: Sending Current Data to ADARA SMS Client (socket=%d)",
         "OutputAdapter::sendCurrentData()", a_socket );
-    usleep(30000); // give syslog a chance...
+    usleep(33333); // give syslog a chance...
 
     // Use current time for DDP packets
     adara_pkt.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
@@ -931,7 +931,7 @@ OutputAdapter::sendCurrentData( int a_socket )
             "%s: Sending Device [%s] Descriptor to %s (socket=%d)",
             "OutputAdapter::sendCurrentData()", (*idev)->m_name.c_str(),
             "ADARA SMS Client", a_socket );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         payload.clear();
         buildDDP( adara_pkt, payload, *idev );
@@ -947,7 +947,7 @@ OutputAdapter::sendCurrentData( int a_socket )
             "OutputAdapter::sendCurrentData()",
             ipv->first->m_name.c_str(), ipv->first->m_connection.c_str(),
             "Variable Value Update", "ADARA SMS Client", a_socket );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
@@ -969,7 +969,7 @@ OutputAdapter::sendSourceInfo( int a_socket )
     syslog( LOG_INFO,
         "%s: Sending Source List to ADARA SMS Client (socket=%d)",
         "OutputAdapter::sendSourceInfo()", a_socket );
-    usleep(30000); // give syslog a chance...
+    usleep(33333); // give syslog a chance...
 
     adara_pkt.payload_len = 0;
     adara_pkt.format = ADARA_PKT_TYPE(
@@ -1007,7 +1007,7 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt,
         {
             syslog( LOG_ERR, "PVSD ERROR: %s: Send Failed! (socket=%d)",
                 "OutputAdapter::sendPacket()", a_socket );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             // Disconnect from client
             boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
@@ -1023,7 +1023,7 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt,
                         "OutputAdapter::sendPacket()",
                         "Disconnecting from ADARA SMS Client",
                         ic->addr.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
 
                     //notifyDisconnect( ic->addr );
                     m_client_info.erase(ic);
@@ -1057,7 +1057,7 @@ OutputAdapter::sendPacket( OutPacket &a_adara_pkt,
                     "OutputAdapter::sendPacket()", ic->socket,
                     "Disconnecting from ADARA SMS Client",
                     ic->addr.c_str() );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
 
                 // Disconnect from client
                 close( ic->socket );
@@ -1092,7 +1092,7 @@ OutputAdapter::send( int a_socket, const char *a_data, uint32_t a_len )
                 "%s: %s: Socket Write Failed! len=%u (socket=%d) - %s",
                 "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket,
                 strerror( errno ) );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
             return false;
         }
 

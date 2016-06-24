@@ -62,7 +62,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
     // syslog( LOG_DEBUG, "ConfigMgr::defineDevice(): [%s] %s/%lu",
         // a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
         // (unsigned long)a_descriptor.m_protocol );
-    // usleep(30000); // give syslog a chance...
+    // usleep(33333); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     DeviceRecordPtr record;
@@ -90,7 +90,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     (unsigned long) a_descriptor.m_protocol,
                     "*** Device ID Re-Numbered",
                     idev->second->m_id, a_descriptor.m_id );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
 
                 idev->second->m_id = a_descriptor.m_id;
             }
@@ -103,7 +103,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     a_descriptor.m_source.c_str(),
                     (unsigned long) a_descriptor.m_protocol,
                     a_descriptor.m_id );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
             }
 
             // Descriptor has not changed, so just return existing record
@@ -124,7 +124,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     (unsigned long) a_descriptor.m_protocol,
                     "*** Device ID Re-Numbered",
                     idev->second->m_id, a_descriptor.m_id );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
             }
             else
             {
@@ -135,7 +135,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     a_descriptor.m_source.c_str(),
                     (unsigned long) a_descriptor.m_protocol,
                     idev->second->m_id );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
             }
 
             // Record is different, must make new record but
@@ -175,7 +175,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str(),
                         (*ipv)->m_id );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
 
                     sendPvUndefined( idev->second, *ipv );
                 }
@@ -196,7 +196,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                         new_pv->m_name.c_str(),
                         new_pv->m_connection.c_str(),
                         "Keep", new_pv->m_id );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
                 }
             }
 
@@ -229,7 +229,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str(),
                         "Assign", (*ipv)->m_id );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
                 }
             }
 
@@ -258,7 +258,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
             (unsigned long) a_descriptor.m_protocol,
             new_desc->m_id );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         // PV IDs can be assigned arbitrarily for new devices
         Identifier id = 1;
@@ -274,7 +274,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 (*ipv)->m_name.c_str(),
                 (*ipv)->m_connection.c_str(),
                 (*ipv)->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
 
         // Ensure all new PV names are unique
@@ -308,7 +308,7 @@ ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
         "PVSD ERROR:", "ConfigManager::undefineDevice()",
         a_record->m_name.c_str(), a_record->m_source.c_str(),
         (unsigned long)a_record->m_protocol, a_record->m_id );
-    usleep(30000); // give syslog a chance...
+    usleep(33333); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
@@ -420,7 +420,7 @@ ConfigManager::makePvNamesUnique( const string &a_key,
                 "Renaming Name-Clash PV",
                 (*ipv)->m_name.c_str(), new_name.c_str(),
                 (*ipv)->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             (*ipv)->m_name = new_name;
         }
@@ -452,7 +452,7 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
                 "Descriptor Lost",
                 "Filled Queue Size",
                 (unsigned long) m_stream_api->getFilledQueueSize() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         else
         {
@@ -461,7 +461,7 @@ ConfigManager::sendDeviceDefined( DeviceRecordPtr a_dev_desc )
                 "PVSD ERROR:", "ConfigManager::sendDeviceDefined()",
                 "Queue Deactivated",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
     }
 }
@@ -491,7 +491,7 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
                 "Undefined Lost",
                 "Filled Queue Size",
                 (unsigned long) m_stream_api->getFilledQueueSize() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         else
         {
@@ -500,7 +500,7 @@ ConfigManager::sendDeviceUndefined( DeviceRecordPtr a_dev_desc )
                 "PVSD ERROR:", "ConfigManager::sendDeviceUndefined()",
                 "Queue Deactivated",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
     }
 }
@@ -532,7 +532,7 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
                 "Device ID", a_dev_desc->m_id, "Descriptor Update Lost",
                 "Filled Queue Size",
                 (unsigned long) m_stream_api->getFilledQueueSize() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         else
         {
@@ -541,7 +541,7 @@ ConfigManager::sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
                 "PVSD ERROR:", "ConfigManager::sendDeviceRedefined()",
                 "Queue Deactivated",
                 a_dev_desc->m_name.c_str(), a_dev_desc->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
     }
 }
@@ -579,7 +579,7 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
                 a_pv_desc->m_id, "Undefined Lost",
                 "Filled Queue Size",
                 (unsigned long) m_stream_api->getFilledQueueSize() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
         else
         {
@@ -591,7 +591,7 @@ ConfigManager::sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_d
                 a_pv_desc->m_name.c_str(),
                 a_pv_desc->m_connection.c_str(),
                 a_pv_desc->m_id );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
     }
 }

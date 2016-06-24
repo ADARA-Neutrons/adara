@@ -120,7 +120,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
 
         syslog( LOG_INFO, "%s: %sDisconnecting Old PV Channels...",
             "DeviceAgent::update()", deviceStr.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         for ( ipv = old_desc->m_pvs.begin();
                 ipv != old_desc->m_pvs.end(); ++ipv )
@@ -136,7 +136,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
 
         syslog( LOG_INFO, "%s: %sReuse/Create New PV Channels...",
             "DeviceAgent::update()", deviceStr.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         for ( ipv = a_device->m_pvs.begin();
                 ipv != a_device->m_pvs.end(); ++ipv )
@@ -162,7 +162,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                 syslog( LOG_INFO, "%s: %sReusing channel for PV <%s> (%s)",
                     "DeviceAgent::update()", deviceStr.c_str(),
                     (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str() );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
 
                 // Update PV pointer on channel info
                 idx = m_pv_index.find( old_pv->m_connection );
@@ -195,7 +195,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     {
         syslog( LOG_INFO, "%s: %sCreate New PV Channels...",
             "DeviceAgent::update()", deviceStr.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         for ( ipv = a_device->m_pvs.begin();
                 ipv != a_device->m_pvs.end(); ++ipv )
@@ -254,7 +254,7 @@ DeviceAgent::metadataUpdated()
                 m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             ich->second.m_pv->setMetadata(
                 epicsToPVType( ich->second.m_ca_type,
@@ -271,7 +271,7 @@ DeviceAgent::metadataUpdated()
                 m_dev_desc->m_name.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             // Re-request metadata from all other PV
             // (they may have changed too)
@@ -314,7 +314,7 @@ DeviceAgent::stop()
             "DeviceAgent::stop()", deviceStr.c_str(),
             ich->second.m_pv->m_name.c_str(),
             ich->second.m_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         if ( ich->second.m_subscribed )
         {
@@ -323,7 +323,7 @@ DeviceAgent::stop()
                 "DeviceAgent::stop()", deviceStr.c_str(),
                 ich->second.m_pv->m_name.c_str(),
                 ich->second.m_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             // *** Prevent Deadlock with New EPICS Callback Guard...!!
             lock.unlock();
@@ -336,7 +336,7 @@ DeviceAgent::stop()
             "DeviceAgent::stop()", deviceStr.c_str(),
             ich->second.m_pv->m_name.c_str(),
             ich->second.m_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         // *** Prevent Deadlock with New EPICS Callback Guard...!!
         lock.unlock();
@@ -348,7 +348,7 @@ DeviceAgent::stop()
             "DeviceAgent::stop()", deviceStr.c_str(),
             ich->second.m_pv->m_name.c_str(),
             ich->second.m_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         ca_flush_io();
     }
@@ -399,7 +399,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
     syslog( LOG_INFO, "%s: %sCreating channel for PV <%s> (%s)",
         "DeviceAgent::connectPV()", deviceStr.c_str(),
         a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-    usleep(30000); // give syslog a chance...
+    usleep(33333); // give syslog a chance...
 
     ChanInfo info;
     info.m_pv = a_pv;
@@ -422,7 +422,7 @@ DeviceAgent::connectPV( PVDescriptor *a_pv )
         syslog( LOG_ERR, "%s %s: %sFailed to create channel for PV <%s>",
             "PVSD ERROR:", "DeviceAgent::connectPV()", deviceStr.c_str(),
             a_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
     }
 }
 
@@ -450,7 +450,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
         syslog( LOG_INFO, "%s: %sDisconnecting channel for PV <%s> (%s)",
             "DeviceAgent::disconnectPV()", deviceStr.c_str(),
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         map<chid,ChanInfo>::iterator ich = m_chan_info.find( ipv->second );
 
@@ -460,7 +460,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                 "%s: %sFound Existing Channel for PV <%s> (%s)",
                 "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             if ( ich->second.m_subscribed )
             {
@@ -468,7 +468,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                     "%s: %sClearing Subscription for PV <%s> (%s)",
                     "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                     a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
 
                 // *** Prevent Deadlock with New EPICS Callback Guard...!!
                 lock.unlock();
@@ -480,7 +480,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                 "%s: %sClearing Channel for PV <%s> (%s)",
                 "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             // *** Prevent Deadlock with New EPICS Callback Guard...!!
             lock.unlock();
@@ -493,7 +493,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                 "%s: %sErasing Channel Info for PV <%s> (%s)",
                 "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             m_chan_info.erase( ich );
 
@@ -501,7 +501,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                 "%s: %sDone Disconnecting Channel Info for PV <%s> (%s)",
                 "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
 
             // Don't flush I/O here - update() method will call it
         }
@@ -511,7 +511,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
                 "%s: %sWarning: No Channel Info Found for PV <%s> (%s)",
                 "DeviceAgent::disconnectPV()", deviceStr.c_str(),
                 a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-            usleep(30000); // give syslog a chance...
+            usleep(33333); // give syslog a chance...
         }
 
         // Update name index structures
@@ -524,7 +524,7 @@ DeviceAgent::disconnectPV( PVDescriptor *a_pv,
             "PVSD ERROR:", "DeviceAgent::disconnectPV()",
             deviceStr.c_str(), "Failed to disconnect channel for PV",
             a_pv->m_name.c_str(), a_pv->m_connection.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
     }
 }
 
@@ -611,7 +611,7 @@ DeviceAgent::controlThread()
                             "Failed to get channel info for PV",
                             ich->second.m_pv->m_name.c_str(),
                             ich->second.m_pv->m_connection.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
                     }
                     pendingPVs.push_back( ich->second.m_pv->m_connection );
                     break;
@@ -736,7 +736,7 @@ DeviceAgent::controlThread()
                     syslog( LOG_INFO, "%s: %sWaiting for %ld Pending PVs",
                         "DeviceAgent::controlThread()", deviceStr.c_str(),
                         m_dev_desc->m_pvs.size() - ready );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
 
                     for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
                     {
@@ -744,7 +744,7 @@ DeviceAgent::controlThread()
                             "%s: %sPending PV Connection <%s>",
                             "DeviceAgent::controlThread()",
                             deviceStr.c_str(), pendingPVs[i].c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
                     }
 
                     // Save Number of "Ready" PVs, in case Device Hangs
@@ -861,7 +861,7 @@ DeviceAgent::monitorThread()
 
                         // Also log the error
                         syslog( LOG_ERR, ss.str().c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
 
                         if ( m_dev_record.get() )
                         {
@@ -891,7 +891,7 @@ DeviceAgent::monitorThread()
                         + string("Device [") + dev_name
                         + "] has recovered from hung state.";
                     syslog( LOG_ERR, message.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
 
                     // Change state
                     state = DSS_READY;
@@ -988,7 +988,7 @@ DeviceAgent::epicsConnectionHandler(
                         syslog( LOG_INFO, "%s: Subscription created%s%s",
                             "DeviceAgent::epicsConnectionHandler()",
                             deviceStr.c_str(), pvStr.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
 
                         ich->second.m_subscribed = true;
                     }
@@ -999,7 +999,7 @@ DeviceAgent::epicsConnectionHandler(
                             "PVSD ERROR:",
                             "DeviceAgent::epicsConnectionHandler()",
                             deviceStr.c_str(), pvStr.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
                     }
 
                     ca_flush_io();
@@ -1054,7 +1054,7 @@ DeviceAgent::epicsConnectionHandler(
                         "DeviceAgent::epicsConnectionHandler()",
                         "Clearing subscription (Down?)",
                         deviceStr.c_str(), pvStr.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    usleep(33333); // give syslog a chance...
 
                     // *** Prevent Deadlock with New EPICS Callback Guard!
                     lock.unlock();
@@ -1097,7 +1097,7 @@ DeviceAgent::epicsConnectionHandler(
                             "Filled Queue Size",
                             (unsigned long)
                                 m_stream_api.getFilledQueueSize() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
                     }
                     else
                     {
@@ -1106,7 +1106,7 @@ DeviceAgent::epicsConnectionHandler(
                             "DeviceAgent::epicsConnectionHandler()",
                             "Queue Deactivated,", "Ignore VariableUpdate",
                             deviceStr.c_str(), pvStr.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
                     }
                 }
             }
@@ -1352,7 +1352,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                                 "Filled Queue Size",
                                 (unsigned long)
                                     m_stream_api.getFilledQueueSize() );
-                            usleep(30000); // give syslog a chance...
+                            usleep(33333); // give syslog a chance...
                         }
                         else
                         {
@@ -1361,7 +1361,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                                 "DeviceAgent::epicsEventHandler()",
                                 "Queue Deactivated, Ignore VariableUpdate",
                                 deviceStr.c_str(), pvStr.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            usleep(33333); // give syslog a chance...
                         }
                     }
                 }
@@ -1487,7 +1487,7 @@ DeviceAgent::sendCurrentValues()
                     deviceStr.c_str(), pvStr.c_str(),
                     "Filled Queue Size",
                     (unsigned long) m_stream_api.getFilledQueueSize() );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
             }
             else
             {
@@ -1495,7 +1495,7 @@ DeviceAgent::sendCurrentValues()
                     "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
                     "Queue Deactivated, Ignore VariableUpdate for",
                     deviceStr.c_str(), pvStr.c_str() );
-                usleep(30000); // give syslog a chance...
+                usleep(33333); // give syslog a chance...
             }
         }
     }

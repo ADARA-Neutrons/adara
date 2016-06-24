@@ -88,7 +88,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
         syslog( LOG_DEBUG, "%s: Updating Device Agent for [%s]",
             "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         idev->second->update( a_device );
     }
@@ -97,7 +97,7 @@ InputAdapter::startDevice( DeviceDescriptor *a_device )
         syslog( LOG_DEBUG, "%s: Starting New Device Agent for [%s]",
             "InputAdapter::startDevice()",
             a_device->m_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         m_dev_agents[a_device->m_name] =
             new DeviceAgent( *m_stream_api, a_device, m_epics_context,
@@ -124,7 +124,7 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
         syslog( LOG_DEBUG, "%s: Stopping old device agent (%s) for [%s]",
             "InputAdapter::stopDevice()", "device no longer defined",
             a_dev_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
 
         idev->second->stop();
         m_garbage.push_back( idev->second );
@@ -136,7 +136,7 @@ InputAdapter::stopDevice( const std::string &a_dev_name )
             "%s %s: Error Stopping Device Agent: [%s] Not Found!",
             "PVSD ERROR:", "InputAdapter::stopDevice()",
             a_dev_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        usleep(33333); // give syslog a chance...
     }
 }
 
@@ -281,7 +281,7 @@ InputAdapter::configFileMonitorThread()
                             "%s: EPICS Beam Config File %s has Changed",
                             "InputAdapter::configFileMonitorThread():",
                             m_config_file.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        usleep(33333); // give syslog a chance...
 
                         boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
@@ -297,7 +297,7 @@ InputAdapter::configFileMonitorThread()
                             syslog( LOG_INFO,
                                 "%s: EPICS Beam Config File Parse OK",
                                 "InputAdapter::configFileMonitorThread():");
-                            usleep(30000); // give syslog a chance...
+                            usleep(33333); // give syslog a chance...
 
                             // Keep track of new device names
                             set<string> new_devices;
@@ -353,7 +353,7 @@ InputAdapter::configFileMonitorThread()
                                 << " EPICS beamline.xml Config File!";
 
                             syslog( LOG_ERR, "%s", ss.str().c_str() );
-                            usleep(30000); // give syslog a chance...
+                            usleep(33333); // give syslog a chance...
 
                             ADARA::ComBus::SignalAssertMessage msg(
                                 "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(),
@@ -578,7 +578,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                                         pv_conn.c_str(),
                                                         pv_name.c_str() );
                                                     // give syslog a chance
-                                                    usleep(30000);
+                                                    usleep(33333);
                                                 }
                                             }
                                         }
@@ -612,7 +612,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                             dev_name.c_str(),
                                             "Device ID", id );
                                         // give syslog a chance...
-                                        usleep(30000);
+                                        usleep(33333);
 
                                         for ( ipv = pvs.begin();
                                             ipv != pvs.end(); ++ipv )
@@ -660,7 +660,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         "Ignoring Unnamed Inactive Device",
                                         "Device ID", id );
                                 }
-                                usleep(30000); // give syslog a chance...
+                                usleep(33333); // give syslog a chance...
                             }
                         }
                     }
