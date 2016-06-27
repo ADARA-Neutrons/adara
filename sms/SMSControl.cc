@@ -1406,17 +1406,17 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	return m_pulses.insert(make_pair(pid, new_pulse)).first;
 }
 
-void SMSControl::sourceUp( uint32_t UNUSED(id) )
+void SMSControl::sourceUp( uint32_t UNUSED(srcId) )
 {
 	// New DataSource Connected!
 	// - Update the Status of Any Required DataSources...
 	updateDataSourceConnectivity();
 }
 
-void SMSControl::sourceDown( uint32_t id, bool stateChanged )
+void SMSControl::sourceDown( uint32_t srcId, bool stateChanged )
 {
 	// Reset the MetaData...
-	m_meta->dropTag( id );
+	m_meta->dropSourceTag( srcId );
 
 	// DataSource Disconnected...!
 	// - Update the Status of Any Required DataSources...
@@ -1929,7 +1929,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_RTDL_NO_DATA, "none",
-				2, 10, 100, log_info ) ) {
+				2, 10, 216000, log_info ) ) {   // about once per hour...
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "pulseRTDL: Pulse with No Registered Event Sources!"

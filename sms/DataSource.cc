@@ -39,17 +39,18 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_CONN_REFUSED              8
 #define RLL_CONN_REQUEST_ERROR        9
 #define RLL_CONN_FAILED              10
-#define RLL_READ_EXCEPTION           11
-#define RLL_READ_DELAY               12
-#define RLL_PULSEID_ZERO             13
-#define RLL_UNKNOWN_PACKET           14
-#define RLL_OVERSIZE_PACKET          15
-#define RLL_LOCAL_DUPLICATE_RTDL     16
-#define RLL_LOCAL_SAWTOOTH_RTDL      17
-#define RLL_LOCAL_RTDL_SEQUENCE      18
-#define RLL_RTDL_PULSE_IN_PAST       19
-#define RLL_RTDL_PULSE_IN_FUTURE     20
-#define RLL_HEARTBEAT                21
+#define RLL_PARSE_MAX_READ_CHUNK     11
+#define RLL_READ_EXCEPTION           12
+#define RLL_READ_DELAY               13
+#define RLL_PULSEID_ZERO             14
+#define RLL_UNKNOWN_PACKET           15
+#define RLL_OVERSIZE_PACKET          16
+#define RLL_LOCAL_DUPLICATE_RTDL     17
+#define RLL_LOCAL_SAWTOOTH_RTDL      18
+#define RLL_LOCAL_RTDL_SEQUENCE      19
+#define RLL_RTDL_PULSE_IN_PAST       20
+#define RLL_RTDL_PULSE_IN_FUTURE     21
+#define RLL_HEARTBEAT                22
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -1117,10 +1118,16 @@ void DataSource::dataReady(void)
 		msg += "': ";
 		msg += e.what();
 		// *Don't* Throw std::runtime_error(msg), Just Log Instead...
-		// XXX NEED RLL HERE! :-O
-		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "dataReady(): " << msg << " - Revert to Original"
-			<< " m_max_read_chunk=" << m_max_read_chunk);
+		/* Rate-limited log of failure */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+				RLL_PARSE_MAX_READ_CHUNK, m_name,
+				60, 3, 5000, log_info ) ) {
+			ERROR(log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "dataReady(): " << msg << " - Revert to Original"
+				<< " m_max_read_chunk=" << m_max_read_chunk);
+		}
 		// String parse failed, revert to original value...
 		tmp_max_read_chunk = m_max_read_chunk;
 	}

@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.5.3"
+#define PVSD_VERSION "1.6.0"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -160,7 +160,8 @@ daemonize()
 
     // Reopen log
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pvsd daemon %s starting", PVSD_VERSION );
+    syslog( LOG_INFO, "PVSD Daemon %s Starting. (ADARA Common %s)",
+        PVSD_VERSION, ::ADARA::VERSION.c_str() );
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
@@ -185,7 +186,8 @@ int main(int argc, char *argv[])
 
     // Initialize SysLog
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "pvsd %s starting", PVSD_VERSION );
+    syslog( LOG_INFO, "PVSD %s Starting (%s %s)", PVSD_VERSION,
+        "ADARA Common", ::ADARA::VERSION.c_str() );
 
     // Setup signal handlers to catch all termination handlers so we can
     // implement orderly shutdown.
@@ -272,7 +274,8 @@ int main(int argc, char *argv[])
     }
     else if ( opt_map.count( "version" ) && !daemon )
     {
-        cout << PVSD_VERSION << endl;
+        cout << PVSD_VERSION
+            << " (ADARA Common " << ::ADARA::VERSION << ")" << endl;
         return 0;
     }
 

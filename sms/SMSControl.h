@@ -54,8 +54,8 @@ public:
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
-	void sourceUp(uint32_t smsId);
-	void sourceDown(uint32_t smsId, bool stateChanged);
+	void sourceUp(uint32_t srcId);
+	void sourceDown(uint32_t srcId, bool stateChanged);
 
 	uint32_t registerEventSource(uint32_t hwId);
 	void unregisterEventSource(uint32_t smsId);
