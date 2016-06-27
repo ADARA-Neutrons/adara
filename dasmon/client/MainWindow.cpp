@@ -760,7 +760,11 @@ MainWindow::configRules()
 void
 MainWindow::about()
 {
-    QMessageBox::about( this, "About DAS Monitor", QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg( DASMON_GUI_VERSION ));
+    string version = DASMON_GUI_VERSION
+        + string( " (ADARA Common " ) + ADARA::VERSION + string( ")" );
+    QMessageBox::about( this, "About DAS Monitor",
+        QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg(
+            version.c_str() ) );
 }
 
 
