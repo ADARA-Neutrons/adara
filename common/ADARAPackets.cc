@@ -231,10 +231,12 @@ RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 		throw invalid_packet("Newer RunInfo packet is too short");
 
 	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("RunInfo V0 packet has oversize string");
+		throw invalid_packet("RunInfo V0 packet has Undersize XML string");
 	else if (m_version > ADARA::PacketType::RUN_INFO_VERSION
-			&& m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("Newer RunInfo packet has oversize string");
+			&& m_payload_len < (size + sizeof(uint32_t))) {
+		throw invalid_packet(
+			"Newer RunInfo packet has Undersize XML string");
+	}
 
 	/* TODO it would be better to create the string on access
 	 * rather than object construction; the user may not care.
@@ -262,12 +264,14 @@ TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 
 	m_status = (uint16_t) (size >> 16);
 	size &= 0xffff;
-	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("TransComplete V0 packet has oversize string");
+	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t))) {
+		throw invalid_packet(
+			"TransComplete V0 packet has Undersize Reason string");
+	}
 	else if (m_version > ADARA::PacketType::TRANS_COMPLETE_VERSION
 			&& m_payload_len < (size + sizeof(uint32_t))) {
 		throw invalid_packet(
-			"Newer TransComplete packet has oversize string");
+			"Newer TransComplete packet has Undersize Reason string");
 	}
 
 	/* TODO it would be better to create the string on access
@@ -320,12 +324,14 @@ AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 
 	uint16_t size = m_fields[0] & 0xffff;
 	if (m_version == 0x00
-			&& m_payload_len < (size + (2 * sizeof(uint32_t))))
-		throw invalid_packet("AnnotationPkt V0 packet has oversize string");
+			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
+		throw invalid_packet(
+			"AnnotationPkt V0 packet has Undersize Annotation string");
+	}
 	else if (m_version > ADARA::PacketType::STREAM_ANNOTATION_VERSION
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
 		throw invalid_packet(
-			"Newer AnnotationPkt packet has oversize string");
+			"Newer AnnotationPkt packet has Undersize Annotation string");
 	}
 }
 
@@ -346,10 +352,12 @@ SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
 
 	uint32_t size = *(const uint32_t *)(payload() + 24);
 	if (m_version == 0x00 && m_payload_len < (size + 28))
-		throw invalid_packet("Sync V0 packet has oversize string");
+		throw invalid_packet("Sync V0 packet has Undersize Sync string");
 	else if (m_version > ADARA::PacketType::SYNC_VERSION
-			&& m_payload_len < (size + 28))
-		throw invalid_packet("Newer Sync packet has oversize string");
+			&& m_payload_len < (size + 28)) {
+		throw invalid_packet(
+			"Newer Sync packet has Undersize Sync string");
+	}
 }
 
 SyncPkt::SyncPkt(const SyncPkt &pkt) :
@@ -385,11 +393,15 @@ GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 		throw invalid_packet("Newer Geometry packet is too short");
 
 	uint32_t size = *(const uint32_t *) payload();
-	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("Geometry V0 packet has oversize string");
+	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t))) {
+		throw invalid_packet(
+			"Geometry V0 packet has Undersize Geometry string");
+	}
 	else if (m_version > ADARA::PacketType::GEOMETRY_VERSION
-			&& m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("Newer Geometry packet has oversize string");
+			&& m_payload_len < (size + sizeof(uint32_t))) {
+		throw invalid_packet(
+			"Newer Geometry packet has Undersize Geometry string");
+	}
 
 	/* TODO it would be better to create the string on access
 	 * rather than object construction; the user may not care.
@@ -431,14 +443,20 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 	info_len = id_len + shortName_len + longName_len;
 
 	if (m_version == 0x00 && m_payload_len < (info_len + sizeof(uint32_t)))
-		throw invalid_packet("Beamline Info V0 packet has undersize data");
+	{
+		throw invalid_packet(
+			"Beamline Info V0 packet has Undersize Beamline Info data");
+	}
 	else if (m_version == 0x01
 			&& m_payload_len < (info_len + sizeof(uint32_t)))
-		throw invalid_packet("Beamline Info V1 packet has undersize data");
+	{
+		throw invalid_packet(
+			"Beamline Info V1 packet has Undersize Beamline Info data");
+	}
 	else if (m_version > ADARA::PacketType::BEAMLINE_INFO_VERSION
 			&& m_payload_len < (info_len + sizeof(uint32_t))) {
 		throw invalid_packet(
-			"Newer Beamline Info packet has undersize data");
+			"Newer Beamline Info packet has Undersize Beamline Info data");
 	}
 
 	m_id.assign(info, id_len);
@@ -696,12 +714,12 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(const uint8_t *data, uint32_t len) :
 	if (m_version == 0x00
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
 		throw invalid_packet(
-			"DeviceDescriptor V0 packet has oversize string");
+			"DeviceDescriptor V0 packet has Undersize Descriptor string");
 	}
 	else if (m_version > ADARA::PacketType::DEVICE_DESC_VERSION
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
 		throw invalid_packet(
-			"Newer DeviceDescriptor packet has oversize string");
+		  "Newer DeviceDescriptor packet has Undersize Descriptor string");
 	}
 
 	/* TODO it would be better to create the string on access
@@ -816,7 +834,7 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-			"VariableValue (String) V0 packet has oversize string: ");
+		  "VariableValue (String) V0 packet has Undersize Value string: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
@@ -826,7 +844,7 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 	else if (m_version > ADARA::PacketType::VAR_VALUE_STRING_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-			"Newer VariableValue (String) packet has oversize string: ");
+	  "Newer VariableValue (String) packet has Undersize Value string: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
@@ -886,7 +904,7 @@ VariableU32ArrayPkt::VariableU32ArrayPkt(
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-			"VariableValue (U32 Array) V0 packet has oversize array: ");
+		  "VariableValue (U32 Array) V0 packet has Undersize U32 array: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
@@ -896,7 +914,7 @@ VariableU32ArrayPkt::VariableU32ArrayPkt(
 	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-			"Newer VariableValue (U32 Array) packet has oversize array: ");
+	  "Newer VariableValue (U32 Array) packet has Undersize U32 array: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
@@ -958,7 +976,8 @@ VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-			"VariableValue (Double Array) V0 packet has oversize array: ");
+			"VariableValue (Double Array) V0 packet has Undersize ");
+		msg += std::string("Double array: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
@@ -968,7 +987,8 @@ VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
 		std::string msg(
-		"Newer VariableValue (Double Array) packet has oversize array: ");
+			"Newer VariableValue (Double Array) packet has Undersize ");
+		msg += std::string("Double array: ");
 		msg += boost::lexical_cast<std::string>(
 			size + (4 * sizeof(uint32_t)) );
 		msg += " vs payload ";
