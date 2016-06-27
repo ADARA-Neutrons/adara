@@ -323,10 +323,14 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 		do_log, reconnected );
 
 	DeviceMap::iterator dit = m_devices.find(mapped_dev);
+
+	/* Device exists already, ignore it if it didn't change. */
 	if ( dit != m_devices.end() ) {
-		/* Device exists already, ignore it if it didn't change. */
+
 		DeviceVariables &dev = dit->second;
-		ADARA::Packet *dev_pkt = dev.m_descriptorPkt.get();
+		ADARA::DeviceDescriptorPkt *devPkt =
+			dynamic_cast<ADARA::DeviceDescriptorPkt *>(
+				dev.m_descriptorPkt.get() );
 
 		if ( dit->second.m_srcTag != srcTag ) {
 			/* Rate-limited log that we got a Descriptor from
@@ -350,7 +354,7 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 			return;
 		}
 
-		if ( dev_pkt->packet_length() == inPkt.packet_length()
+		if ( devPkt->packet_length() == inPkt.packet_length()
 				&& devPkt->description().size()
 					== inPkt.description().size()
 				&& !devPkt->description().compare( inPkt.description() ) ) {
