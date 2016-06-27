@@ -92,6 +92,12 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     idev->second->m_id, a_descriptor.m_id );
                 usleep(33333); // give syslog a chance...
 
+                DeviceDescriptor *new_desc = new DeviceDescriptor(
+                    a_descriptor ); // Deep Copy, Keep ID!
+
+                sendDeviceRedefined( DeviceRecordPtr( new_desc ),
+                    idev->second );
+
                 idev->second->m_id = a_descriptor.m_id;
             }
             else
