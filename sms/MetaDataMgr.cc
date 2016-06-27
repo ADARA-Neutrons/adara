@@ -350,9 +350,10 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 			return;
 		}
 
-		if ( dev_pkt->packet_length() == inPkt.packet_length() &&
-				!memcmp( dev_pkt->payload(), inPkt.payload(),
-					dev_pkt->payload_length() ) ) {
+		if ( dev_pkt->packet_length() == inPkt.packet_length()
+				&& devPkt->description().size()
+					== inPkt.description().size()
+				&& !devPkt->description().compare( inPkt.description() ) ) {
 			if ( do_log ) {
 				DEBUG("Inbound Descriptor is Identical");
 			}
