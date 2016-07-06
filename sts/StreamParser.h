@@ -261,6 +261,19 @@ StreamParser::pvValueUpdate
         if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
             pvinfo->flushBuffers(0);
     }
+
+    // Log Value Update if Time Stamp Goes into the Past...! ;-D
+    // (Ignore the "Time Stamp Equals" case, as this happens All the Time
+    // on New SMS File boundaries...! ;-)
+    else if ( ts_nano < pvinfo->m_last_time )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s devId=%d pvId=%d - %ld < %ld",
+            g_pid, "STS Error:", "StreamParser::pvValueUpdate()",
+            "Variable Value Update SAWTOOTH",
+            a_device_id, a_pv_id, ts_nano, pvinfo->m_last_time );
+        // give syslog a chance...
+        usleep(30000);
+    }
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
