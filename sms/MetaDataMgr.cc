@@ -141,8 +141,11 @@ void MetaDataMgr::dropSourceTag( uint32_t srcTag )
 				m_devices[dit->first].m_srcTag;
 			m_oldDevices[dit->first].m_descriptorPkt =
 				m_devices[dit->first].m_descriptorPkt;
-			m_oldDevices[dit->first].m_variablePkts =
-				m_devices[dit->first].m_variablePkts;
+			// *Don't* Save Variable Value Packets on a Disconnect...
+			// - Go Ahead and Clear Out Any Previous Values, We'll Get
+			// _New_ Values on a Re-Connect... ;-D
+			// (cleaner this way, plus doesn't break "continuous" tests! :-)
+			m_oldDevices[dit->first].m_variablePkts.clear();
 			m_devices.erase(dit++);
 			dropped = true;
 		} else {
@@ -229,7 +232,7 @@ uint32_t MetaDataMgr::lookupOldMappedDeviceId(
 		m_devices[mapped_dev].m_descriptorPkt =
 			odit->second.m_descriptorPkt;
 		m_devices[mapped_dev].m_variablePkts =
-			odit->second.m_variablePkts;
+			odit->second.m_variablePkts;   // (cleared out on disconnect...)
 
 		m_oldDevices.erase(odit);
 
