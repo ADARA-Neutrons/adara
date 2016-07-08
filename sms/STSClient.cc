@@ -6,6 +6,7 @@
 
 #include <boost/bind.hpp>
 #include <string>
+#include <sstream>
 
 #include "EPICS.h"
 #include "STSClient.h"
@@ -47,7 +48,7 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	m_write(new ReadyAdapter(fd, fdrWrite,
 				 boost::bind(&STSClient::writable, this))),
 	m_timer(new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat)),
-	m_disp(STSClientMgr::CONNECTION_LOSS)
+	m_disp(STSClientMgr::CONNECTION_LOSS), m_reason("")
 {
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
@@ -72,7 +73,7 @@ STSClient::~STSClient()
 		m_files.front()->put_fd();
 
 	/* Inform the manager of our final status */
-	m_mgr.clientComplete(m_run, m_disp);
+	m_mgr.clientComplete(m_run, m_disp, m_reason);
 }
 
 bool STSClient::sendHeartbeat(void)
@@ -109,13 +110,16 @@ void STSClient::writable(void)
 			try {
 				m_file_fd = f->get_fd();
 			} catch (std::runtime_error re) {
-				ERROR("Unable to open file number " << f->fileNumber()
+				std::stringstream ss;
+				ss << "Unable to open file number " << f->fileNumber()
 					<< " (pause file number " << f->pauseFileNumber() << ")"
 					<< " (addendum file number "
 						<< f->addendumFileNumber() << ")"
 					<< " for run " << m_run->runNumber()
-					<< ": " << re.what());
+					<< ": " << re.what();
+				ERROR( ss.str() );
 				m_disp = STSClientMgr::PERMAMENT_FAIL;
+				m_reason = ss.str();
 				delete this;
 				return;
 			}
@@ -287,8 +291,11 @@ void STSClient::readable(void)
 				 << " log_info=(" << log_info << ")");
 		}
 	} catch (ADARA::invalid_packet e) {
-		WARN("Got invalid packet from STS: " << e.what());
+		std::stringstream ss;
+		ss << "Got invalid packet from STS: " << e.what();
+		WARN( ss.str() );
 		m_disp = STSClientMgr::INVALID_PROTOCOL;
+		m_reason = ss.str();
 		ok = false;
 	}
 
@@ -311,9 +318,12 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 	if (pkt.base_type() == ADARA::PacketType::TRANS_COMPLETE_TYPE)
 		return ADARA::Parser::rxPacket(pkt);
 
+	std::stringstream ss;
+	ss << "Received unexpected packet type 0x"
+		<< std::hex << pkt.type() << std::dec;
+	WARN( ss.str() );
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
-	WARN("Received unexpected packet type 0x"
-		<< std::hex << pkt.type() << std::dec);
+	m_reason = ss.str();
 	return true;
 }
 
@@ -326,59 +336,69 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	/* Ok, this is much bigger than we expected, stop processing
 	 * this stream and close the connection.
 	 */
-	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	std::stringstream ss;
 	if (hdr) {
-		ERROR("Received Unexpected Oversize Packet"
+		ss << "Received Unexpected Oversize Packet"
 			<< " at " << hdr->timestamp().tv_sec
 			<< "." << hdr->timestamp().tv_nsec
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
 			<< " payload_length=" << hdr->payload_length()
-			<< " max=" << MAX_PACKET_SIZE);
+			<< " max=" << MAX_PACKET_SIZE;
 	} else {
-		ERROR("Received Unexpected Oversize Packet"
+		ss << "Received Unexpected Oversize Packet"
 			<< " chunk_len=" << chunk_len
-			<< " max=" << MAX_PACKET_SIZE);
+			<< " max=" << MAX_PACKET_SIZE;
 	}
+	ERROR( ss.str() );
+	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	m_reason = ss.str();
 	return true;
 }
 
 bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 {
-	if (!pkt.status()) {
-		m_disp = STSClientMgr::SUCCESS;
-		if (pkt.reason().length()) {
-			INFO("Run " << m_run->runNumber() << " successfully "
+	std::stringstream ss;
+	if ( !pkt.status() ) {
+		if ( pkt.reason().length() ) {
+			ss << "Run " << m_run->runNumber() << " successfully "
 				"translated with status message \'"
-				<< pkt.reason() << "'");
+				<< pkt.reason() << "'";
 		} else {
-			INFO("Run " << m_run->runNumber() << " successfully "
-				"translated");
+			ss << "Run " << m_run->runNumber() << " successfully "
+				"translated";
 		}
-	} else if (pkt.status() < 0x8000) {
+		INFO( ss.str() );
+		m_disp = STSClientMgr::SUCCESS;
+		m_reason = ss.str();
+	} else if ( pkt.status() < 0x8000 ) {
 		/* TODO remove magic numbers */
+		if (pkt.reason().length()) {
+			ss << "Run " << m_run->runNumber() << " had a transient "
+				"failure, status 0x" << std::hex
+				<< pkt.status() << std::dec << ", message \'"
+				<< pkt.reason() << "'";
+		} else {
+			ss << "Run " << m_run->runNumber() << " had a transient "
+				"failure, status 0x" << std::hex
+				<< pkt.status() << std::dec;
+		}
+		WARN( ss.str() );
 		m_disp = STSClientMgr::TRANSIENT_FAIL;
-		if (pkt.reason().length()) {
-			WARN("Run " << m_run->runNumber() << " had a transient "
-				"failure, status 0x" << std::hex
-				<< pkt.status() << std::dec << ", message \'"
-				<< pkt.reason() << "'");
-		} else {
-			WARN("Run " << m_run->runNumber() << " had a transient "
-				"failure, status 0x" << std::hex
-				<< pkt.status() << std::dec);
-		}
+		m_reason = ss.str();
 	} else {
-		m_disp = STSClientMgr::PERMAMENT_FAIL;
-		if (pkt.reason().length()) {
-			ERROR("Run " << m_run->runNumber() << " had a "
+		if ( pkt.reason().length() ) {
+			ss << "Run " << m_run->runNumber() << " had a "
 				"permanent failure, status 0x" << std::hex
 				<< pkt.status() << std::dec << ", message \'"
-				<< pkt.reason() << "'");
+				<< pkt.reason() << "'";
 		} else {
-			ERROR("Run " << m_run->runNumber() << " had a "
+			ss << "Run " << m_run->runNumber() << " had a "
 				"permanent failure, status 0x" << std::hex
-				<< pkt.status() << std::dec);
+				<< pkt.status() << std::dec;
 		}
+		ERROR( ss.str() );
+		m_disp = STSClientMgr::PERMAMENT_FAIL;
+		m_reason = ss.str();
 	}
 	return true;
 }

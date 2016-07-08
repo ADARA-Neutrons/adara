@@ -38,6 +38,7 @@ private:
 	connection m_contConnection;
 	connection m_fileConnection;
 	STSClientMgr::Disposition m_disp;
+	std::string m_reason;
 
 	std::list<StorageFile::SharedPtr> m_files;
 

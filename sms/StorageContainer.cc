@@ -259,8 +259,7 @@ void StorageContainer::markManual(void)
 	ERROR("Marking Run " << m_runNumber
 		<< " as Requiring Manual Processing!");
 	if (createMarker(m_manual_marker))
-		ERROR("Run " << m_runNumber << " will be resent if SMS "
-		      "restarts. ");
+		ERROR("Run " << m_runNumber << " will be resent if SMS restarts.");
 	m_manual = true;
 }
 

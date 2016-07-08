@@ -83,7 +83,8 @@ private:
 	bool reconnectTimeout(void);
 	bool transientTimeout(void);
 
-	void clientComplete(StorageContainer::SharedPtr &c, Disposition disp);
+	void clientComplete(StorageContainer::SharedPtr &c,
+		Disposition disp, std::string reason);
 
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectRetryTimeout;

@@ -588,18 +588,21 @@ bool STSClientMgr::transientTimeout(void)
 }
 
 void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
-		Disposition disp)
+		Disposition disp, std::string reason)
 {
 	// clean up...
 	dequeueRun(c);
 
+	std::string result;
 	switch (disp) {
 	case SUCCESS:
 		/* STSClient already logged our success, we just need to
 		 * note that we've completed translation.
 		 */
-		StorageManager::sendComBus(c->runNumber(), c->propId(),
-			std::string("Translation succeeded"));
+		result = "Translation Succeeded";
+		if ( !reason.empty() )
+			result += " - " + reason;
+		StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 		c->markTranslated();
 		break;
 	case CONNECTION_LOSS:
@@ -613,8 +616,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			m_transient_timeout = m_pvTransientTimeout->value();
 			m_transient_timer->start(m_transient_timeout);
 		}
-		StorageManager::sendComBus(c->runNumber(), c->propId(),
-			std::string("STS Connection Error"));
+		result = "STS Connection Error";
+		if ( !reason.empty() )
+			result += " - " + reason;
+		StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 		queueRun(c); // re-queue run...
 		break;
 	case TRANSIENT_FAIL:
@@ -632,8 +637,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			ERROR("Maximum Re-Queue Count Reached!"
 				<< " Marking Run " << c->runNumber()
 				<< " for Manual Translation");
-			StorageManager::sendComBus(c->runNumber(), c->propId(),
-				std::string("Needs Manual Translation"));
+			result = "Needs Manual Translation";
+			if ( !reason.empty() )
+				result += " - " + reason;
+			StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 			c->markManual();
 		}
 		// Re-Queue Run to Try Again...
@@ -642,8 +649,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			c->incrRequeueCount();
 			ERROR("Requeueing Run " << c->runNumber()
 				<< ", Re-Queue #" << c->getRequeueCount());
-			StorageManager::sendComBus(c->runNumber(), c->propId(),
-				std::string("STS transient Error"));
+			result = "STS transient Error";
+			if ( !reason.empty() )
+				result += " - " + reason;
+			StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 			/* We shouldn't pound on the STS if we keep hitting problems,
 			 * back off and give it time to breathe.
 			 */
@@ -660,8 +669,10 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		/* STSClient already logged the failure, we just need to
 		 * mark it for manual processing.
 		 */
-		StorageManager::sendComBus(c->runNumber(), c->propId(),
-			std::string("Needs Manual Translation"));
+		result = "Needs Manual Translation";
+		if ( !reason.empty() )
+			result += " - " + reason;
+		StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 		c->markManual();
 		break;
 	}
