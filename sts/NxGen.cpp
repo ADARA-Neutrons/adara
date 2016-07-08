@@ -1051,6 +1051,11 @@ NxGen::bankFinalize
         // NeXus Histogram-based Data...
         if ( bi->m_has_histo )
         {
+            syslog( LOG_INFO,
+                "[%i] Detector Bank %d - Writing Histogram Data",
+                g_pid, a_bank.m_id );
+            usleep(30000); // give syslog a chance...
+
             // Create & Write Histogram Multi-dimensional Data...
             std::vector<hsize_t> dims;
             dims.push_back( bi->m_logical_pixelids.size() );

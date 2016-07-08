@@ -849,7 +849,7 @@ bool DataSource::timerExpired(void)
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				SMSControl *ctrl = SMSControl::getInstance();
-				WARN( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Timed out waiting for data from " << m_name );
 				m_pvConnected->failed();
 				connectionFailed(true, true, IDLE);
