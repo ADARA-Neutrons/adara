@@ -344,8 +344,8 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 			 * currently an unused bit at 31).
 			 */
 			tof = p[0];
-			if (p[1] & 0x70000000)
-				tof &= ~0xffc00000;
+			if ( (p[1] & 0x40000000) || (p[1] & 0x70000000) )
+				tof &= ~0xffe00000;
 			s = 1e-9 * 100 * tof;
 			printf("\t  %u: %08x %08x    (%0.7f seconds)\n",
 				i++, p[0], p[1], s);
