@@ -267,7 +267,7 @@ StreamParser::pvValueUpdate
     // on New SMS File boundaries...! ;-)
     else if ( ts_nano < pvinfo->m_last_time )
     {
-        syslog( LOG_ERR, "[%i] %s %s: %s devId=%d pvId=%d - %ld < %ld",
+        syslog( LOG_ERR, "[%i] %s %s: %s devId=%u pvId=%u - %ld < %ld",
             g_pid, "STS Error:", "StreamParser::pvValueUpdate()",
             "Variable Value Update SAWTOOTH",
             a_device_id, a_pv_id, ts_nano, pvinfo->m_last_time );
