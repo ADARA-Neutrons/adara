@@ -1112,18 +1112,23 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:RunNumber
 
 		caget $WAIT ${PRE}:SMS:Summary
-		caget $WAIT -S ${PRE}:SMS:SummaryReason
+		sr="${PRE}:SMS:SummaryReason"
+		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"
 
 		echo
 
 		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
-		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalTitle
-		caget $WAIT -S ${PRE}:SMS:RunInfo:RunTitle
+		pt="${PRE}:SMS:RunInfo:ProposalTitle"
+		caget $WAIT -S $pt | grep $pt | awk "$awkLineBreak"
+		rt="${PRE}:SMS:RunInfo:RunTitle"
+		caget $WAIT -S $rt | grep $rt | awk "$awkLineBreak"
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Environment
+		ui="${PRE}:SMS:RunInfo:UserInfo"
+		caget $WAIT -S $ui | grep $ui | awk "$awkLineBreak"
 
 		echo
 
