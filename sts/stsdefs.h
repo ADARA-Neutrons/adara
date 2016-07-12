@@ -500,7 +500,7 @@ struct UserInfo
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : target_station_number(1), run_number(0)
+    RunInfo() : target_station_number(1), run_number(0), run_title("NONE")
     {}
 
     uint32_t                target_station_number;
