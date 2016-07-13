@@ -137,29 +137,48 @@ private:
 	bool validateUser(const std::string &val) {
 		size_t sep, next;
 
-		/* Make sure there is a separator for the name,
-		 * and it isn't at the beginning of the string.
+		/* There are Now Two Possible Formats for UserInfo as of 7/2016...!
+		 *
+		 *    Name1:Uid1:Role1; Name2:Uid2:Role2; . . .
+		 * or
+		 *    Uid1; Uid2; Uid3; . . .
+		 *
+		 * We will handle Either One, and since we're postponing the
+		 * resolution of Uid-to-Name until "Later" (either STS or AutoRedux)
+		 * We will Now Accept "Empty" strings for the Name and Role, as in:
+		 *    :Uid1:; Name2:Uid2:; :Uid3:Role3; . . .
+		 */
+
+		/* See if there is a separator for the name,
+		 * if not then this is a Plain Uid format...
 		 */
 		sep = val.find_first_of(':');
-		if (sep == 0 || sep == std::string::npos)
-			return false;
+		if (sep == std::string::npos) {
+			DEBUG("validateUser(): Plain Uid Format");
+			return true;
+		}
 
-		/* Make sure there is a separator for the uid,
-		 * and it isn't directly following the name
-		 * separator.
+		/* Found a separator, so this is the Full Name:Uid:Role Format...
+		 * Make sure there is another separator for the uid,
+		 * and that it isn't directly following the name separator.
+		 * (We _Have_ to At Least have a Uid per person...! ;-)
 		 */
 		next = sep + 1;
 		sep = val.find_first_of(':', next);
-		if (sep == next || sep == std::string::npos)
+		if (sep == next || sep == std::string::npos) {
+			DEBUG("validateUser(): Empty Uid or Missing Separator");
 			return false;
+		}
 
-		/* Make sure that role is non-empty, and there
-		 * is no additional separator after it.
+		/* Ok now if the role is empty, and there's
+		 * no additional separator after it.
 		 */
 		sep++;
-		if (sep >= val.length())
-			return false;
+		// if (sep >= val.length())
+			// return false;
 
+		/* Make sure there are no additional separators...!
+		 */
 		sep = val.find_first_of(':', sep);
 		return sep == std::string::npos;
 	}
@@ -191,7 +210,10 @@ private:
 		}
 
 		/* Now get the last one */
-		return validateUser(val.substr(begin, end - begin));
+		if ( begin < val.size() )
+			return( validateUser(val.substr(begin, val.size() - begin)) );
+		else
+			return( true );
 	}
 
 	void changed(void) { m_runInfo->invalidateCache(); }
@@ -240,28 +262,108 @@ static void xmlEncodeTo(std::string &out, const std::string &in,
 
 static void addUserInfo(std::string &out, const std::string &info)
 {
-	size_t begin, end;
+	size_t begin, end, next_user;
+
+	DEBUG("addUserInfo() info=[" << info << "]");
 
 	out += "<users>";
 
-	for (begin = end = 0; end != std::string::npos; begin = end + 1) {
+	for ( begin = end = 0;
+			begin != std::string::npos && begin < info.size(); )
+	{
+		next_user = info.find_first_of(';', begin);
+		if ( next_user == begin )
+		{
+			begin++;
+			continue;
+		}
+
+		DEBUG("addUserInfo() next(" << begin << "," << next_user << ")=["
+			<< info.substr(begin, next_user - begin) << "]");
+
+		out += "<user>";
+
 		end = info.find_first_of(':', begin);
-		out += "<user><name>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</name>";
-		begin = end + 1;
+		// Name:Uid:Role
+		if ( end != begin && end < next_user )
+		{
+			out += "<name>";
+			xmlEncodeTo(out, info, begin, end);
+			out += "</name>";
+			begin = end + 1;
+		}
+		// Uid
+		else
+		{
+			out += "<name>XXX_UNRESOLVED_NAME_XXX</name>";
+			if ( end == begin )
+				begin = end + 1;
+		}
+		DEBUG("addUserInfo() After Name"
+			<< " begin=" << begin << " end=" << end
+			<< " next_user=" << next_user
+			<< " out...=[" << out << "]");
+
 		end = info.find_first_of(':', begin);
-		out += "<id>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</id>";
-		begin = end + 1;
-		end = info.find_first_of(';', begin);
-		out += "<role>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</role></user>";
+		// Missing Uid (...::...), Shouldn't Happen...? (validateUser()...)
+		if ( end == begin || begin >= info.size() )
+		{
+			out += "<id>XXX_UNRESOLVED_UID_XXX</id>";
+			begin = end + 1;
+		}
+		// ...:Uid:...
+		else if ( end < next_user )
+		{
+			out += "<id>";
+			xmlEncodeTo(out, info, begin, end);
+			out += "</id>";
+			begin = end + 1;
+		}
+		// Plain Uid...
+		else
+		{
+			out += "<id>";
+			xmlEncodeTo(out, info, begin, next_user);
+			out += "</id>";
+			begin = next_user;
+		}
+		DEBUG("addUserInfo() After Uid"
+			<< " begin=" << begin << " end=" << end
+			<< " next_user=" << next_user
+			<< " out...=[" << out << "]");
+
+		// Role, if present...
+		if ( begin < next_user && begin < info.size() )
+		{
+			out += "<role>";
+			xmlEncodeTo(out, info, begin, next_user);
+			out += "</role>";
+		}
+		// No Role...
+		else
+		{
+			out += "<role>XXX_UNRESOLVED_ROLE_XXX</role>";
+		}
+		DEBUG("addUserInfo() After Role"
+			<< " begin=" << begin << " end=" << end
+			<< " next_user=" << next_user
+			<< " out...=[" << out << "]");
+
+		out += "</user>";
+
+		// Next User of End of Loop...
+		begin = next_user;
+		if ( begin != std::string::npos )
+			begin++;
+		DEBUG("addUserInfo() After End-of-Loop Increment"
+			<< " begin=" << begin << " end=" << end
+			<< " next_user=" << next_user
+			<< " out...=[" << out << "]");
 	}
 
 	out += "</users>";
+
+	DEBUG("addUserInfo() out=[" << out << "]");
 }
 
 static void addElements(std::string &out, RunInfo::RunInfoMap &map,
