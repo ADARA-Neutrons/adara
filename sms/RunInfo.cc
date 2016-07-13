@@ -264,8 +264,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 {
 	size_t begin, end, next_user;
 
-	DEBUG("addUserInfo() info=[" << info << "]");
-
 	out += "<users>";
 
 	for ( begin = end = 0;
@@ -277,9 +275,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 			begin++;
 			continue;
 		}
-
-		DEBUG("addUserInfo() next(" << begin << "," << next_user << ")=["
-			<< info.substr(begin, next_user - begin) << "]");
 
 		out += "<user>";
 
@@ -299,10 +294,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 			if ( end == begin )
 				begin = end + 1;
 		}
-		DEBUG("addUserInfo() After Name"
-			<< " begin=" << begin << " end=" << end
-			<< " next_user=" << next_user
-			<< " out...=[" << out << "]");
 
 		end = info.find_first_of(':', begin);
 		// Missing Uid (...::...), Shouldn't Happen...? (validateUser()...)
@@ -327,10 +318,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 			out += "</id>";
 			begin = next_user;
 		}
-		DEBUG("addUserInfo() After Uid"
-			<< " begin=" << begin << " end=" << end
-			<< " next_user=" << next_user
-			<< " out...=[" << out << "]");
 
 		// Role, if present...
 		if ( begin < next_user && begin < info.size() )
@@ -344,10 +331,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 		{
 			out += "<role>XXX_UNRESOLVED_ROLE_XXX</role>";
 		}
-		DEBUG("addUserInfo() After Role"
-			<< " begin=" << begin << " end=" << end
-			<< " next_user=" << next_user
-			<< " out...=[" << out << "]");
 
 		out += "</user>";
 
@@ -355,10 +338,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 		begin = next_user;
 		if ( begin != std::string::npos )
 			begin++;
-		DEBUG("addUserInfo() After End-of-Loop Increment"
-			<< " begin=" << begin << " end=" << end
-			<< " next_user=" << next_user
-			<< " out...=[" << out << "]");
 	}
 
 	out += "</users>";
