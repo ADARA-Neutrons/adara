@@ -783,6 +783,16 @@ NxGen::processRunInfo
         writeString( sample_path, "environment",
             a_run_info.sample_environment );
 
+        writeScalar( sample_path, "mass", a_run_info.sample_mass, "g" );
+        writeScalar( sample_path, "density",
+            a_run_info.sample_density, "g cm-3" );
+
+        writeString( sample_path, "component", // no container in NXsample
+            a_run_info.sample_container );
+        writeString( sample_path, "description",
+            a_run_info.sample_description );
+        writeString( sample_path, "comments", a_run_info.sample_comments );
+
         size_t user_count = 0;
         string path;
         for ( vector<STS::UserInfo>::const_iterator u =
