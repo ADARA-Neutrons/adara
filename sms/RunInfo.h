@@ -14,12 +14,14 @@
 
 class RunUserInfoPV;
 class RunInfoResetPV;
+class RunInfoFloat64PV;
 class RunInfoPV;
 
 class RunInfo : boost::noncopyable {
 public:
 	typedef boost::shared_ptr<RunUserInfoPV> RunUserInfoPVSharedPtr;
 	typedef boost::shared_ptr<RunInfoResetPV> RunInfoResetPVSharedPtr;
+	typedef boost::shared_ptr<RunInfoFloat64PV> RunInfoFloat64PVSharedPtr;
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
@@ -52,6 +54,10 @@ private:
 	RunInfoMap m_sample;
 	RunInfoResetPVSharedPtr m_resetPV;
 	RunUserInfoPVSharedPtr m_userPV;
+	RunInfoPVSharedPtr m_massPV;
+	RunInfoPVSharedPtr m_densityPV;
+	RunInfoFloat64PVSharedPtr m_massFloat64PV;
+	RunInfoFloat64PVSharedPtr m_densityFloat64PV;
 
 	uint32_t m_runNumber;
 	bool m_packetValid;

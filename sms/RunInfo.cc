@@ -5,14 +5,22 @@
 #include <string>
 #include <sstream>
 
+#include "EPICS.h"
 #include "RunInfo.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
+#include <gddApps.h>
+
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+
+RateLimitedLogging::History RLLHistory_RunInfo;
+
+// Rate-Limited Logging IDs...
+#define RLL_PV_WRITE                  0
 
 class RunInfoResetPV : public smsTriggerPV {
 public:
@@ -28,6 +36,7 @@ private:
 	bool m_unlocked;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
+
 	void triggered(void) { m_master->reset(); }
 };
 
@@ -55,10 +64,60 @@ private:
 	bool m_lastValid;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
+
 	void changed(void)
 	{
 		m_runInfo->pvChanged(this);
 		m_lastValid = this->valid();
+	}
+
+	friend class RunInfoFloat64PV;
+};
+
+class RunInfoFloat64PV : public smsFloat64PV {
+public:
+	RunInfoFloat64PV(const std::string &name,
+			RunInfo::RunInfoPVSharedPtr stringRunInfoPV,
+			double min = -1.7976931348623157E308,
+			double max = 1.7976931348623157E308) :
+		smsFloat64PV(name, min, max), m_stringRunInfoPV(stringRunInfoPV) {}
+
+private:
+	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
+
+	// Defer to Regular *String* Version of This PV for Locking/Unlocking...
+	bool allowUpdate(const gdd &val)
+		{ return m_stringRunInfoPV->allowUpdate(val); }
+
+	caStatus write(const casCtx &ctx, const gdd &val)
+	{
+		if ( !allowUpdate(val) ) {
+			/* We don't want to update the PV at this time; still
+			 * send a notification to any watchers, and just return
+			 * success.
+			 */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_RunInfo,
+					RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+				DEBUG(log_info
+					<< "RunInfoFloat64PV::write() m_pv_name=" << m_pv_name
+					<< " Updates Not Allowed, Ignore Value.");
+			}
+			notify();
+			return S_casApp_success;
+		}
+
+		return( smsFloat64PV::write( ctx, val ) );
+	}
+
+	void changed(void)
+	{
+		// Just Set the Associated String RunInfoPV to Latest Float Value...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		std::stringstream ss;
+		ss << value();
+		m_stringRunInfoPV->update( ss.str(), &now );
 	}
 };
 
@@ -261,11 +320,26 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	addPV(prefix, "Formula", "chemical_formula", m_sample);
 	addPV(prefix, "Environment", "environment", m_sample);
 
+	m_massPV = addPV(prefix, "MassString", "mass", m_sample);
+	m_massFloat64PV.reset(new RunInfoFloat64PV(prefix + "Mass",
+		m_massPV, 0.0));
+	m_ctrl->addPV(m_massFloat64PV);
+
+	m_densityPV = addPV(prefix, "DensityString", "density", m_sample);
+	m_densityFloat64PV.reset(new RunInfoFloat64PV(prefix + "Density",
+		m_densityPV, 0.0 ));
+	m_ctrl->addPV(m_densityFloat64PV);
+
+	addPV(prefix, "Container", "container", m_sample);
+	addPV(prefix, "Description", "description", m_sample);
+	addPV(prefix, "Comments", "comments", m_sample);
+
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
 	 */
 
-	m_connection = StorageManager::onPrologue(boost::bind(&RunInfo::onPrologue, this));
+	m_connection = StorageManager::onPrologue(
+		boost::bind(&RunInfo::onPrologue, this));
 }
 
 RunInfo::~RunInfo()
