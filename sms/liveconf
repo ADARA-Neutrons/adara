@@ -1127,6 +1127,13 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Environment
+		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
+		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Container
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
 		ui="${PRE}:SMS:RunInfo:UserInfo"
 		caget $WAIT -S $ui | grep $ui | awk "$awkLineBreak"
 
