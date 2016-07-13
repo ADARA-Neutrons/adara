@@ -1311,16 +1311,19 @@ StreamParser::handleMonitorPulseGap
 /*! \brief This method processes Run Info ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Run Info packets. The processRunInfo() virtual method is used to communicate
+ * This method processes ADARA Run Info packets. The processRunInfo()
+ * virtual method is used to communicate
  * run info data to the stream adapter subclass.
  */
 bool
 StreamParser::rxPacket
 (
-    const ADARA::RunInfoPkt &a_pkt  ///< [in] The ADARA Run Info Packet to process
+    const ADARA::RunInfoPkt &a_pkt  ///< [in] ADARA RunInfo pkt to process
 )
 {
-    xmlDocPtr doc = xmlReadMemory( a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
+    xmlDocPtr doc = xmlReadMemory(
+        a_pkt.info().c_str(), a_pkt.info().length(), 0, 0, 0 );
+
     if ( doc )
     {
         string tag;
@@ -1328,57 +1331,133 @@ StreamParser::rxPacket
 
         try
         {
-            for ( xmlNode *node = xmlDocGetRootElement(doc)->children; node; node = node->next )
+            for ( xmlNode *node = xmlDocGetRootElement(doc)->children;
+                    node; node = node->next )
             {
                 tag = (char*)node->name;
                 getXmlNodeValue( node, value );
 
-                if ( xmlStrcmp( node->name, (const xmlChar*)"run_number" ) == 0)
-                    m_run_info.run_number = boost::lexical_cast<unsigned long>( value );
-                else if ( xmlStrcmp( node->name, (const xmlChar*)"proposal_id" ) == 0)
-                    m_run_info.proposal_id = value;
-                else if ( xmlStrcmp( node->name, (const xmlChar*)"run_title" ) == 0)
-                    m_run_info.run_title = value;
-                else if (xmlStrcmp( node->name, (const xmlChar*) "facility_name") == 0)
-                    m_run_info.facility_name = value;
-                else if ( xmlStrcmp( node->name, (const xmlChar*)"sample" ) == 0)
+                if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"run_number" ) == 0 )
                 {
-                    for ( xmlNode *sample_node = node->children; sample_node; sample_node = sample_node->next )
+                    m_run_info.run_number =
+                        boost::lexical_cast<unsigned long>( value );
+                }
+                else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"proposal_id" ) == 0 )
+                {
+                    m_run_info.proposal_id = value;
+                }
+                else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"run_title" ) == 0 )
+                {
+                    m_run_info.run_title = value;
+                }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "facility_name") == 0 )
+                {
+                    m_run_info.facility_name = value;
+                }
+                else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"sample" ) == 0 )
+                {
+                    for ( xmlNode *sample_node = node->children;
+                            sample_node; sample_node = sample_node->next )
                     {
                         tag = (char*)sample_node->name;
                         getXmlNodeValue( sample_node, value );
 
-                        if ( xmlStrcmp( sample_node->name, (const xmlChar*)"id" ) == 0)
+                        if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"id" ) == 0 )
+                        {
                             m_run_info.sample_id = value;
-                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"name" ) == 0)
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"name" ) == 0 )
+                        {
                             m_run_info.sample_name = value;
-                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"nature" ) == 0)
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"nature" ) == 0 )
+                        {
                             m_run_info.sample_nature = value;
-                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"chemical_formula" ) == 0)
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"chemical_formula" ) == 0 )
+                        {
                             m_run_info.sample_formula = value;
-                        else if ( xmlStrcmp( sample_node->name, (const xmlChar*)"environment" ) == 0)
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"environment" ) == 0 )
+                        {
                             m_run_info.sample_environment = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass" ) == 0 )
+                        {
+                            m_run_info.sample_mass =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"density" ) == 0 )
+                        {
+                            m_run_info.sample_density =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"container" ) == 0 )
+                        {
+                            m_run_info.sample_container = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"description" ) == 0 )
+                        {
+                            m_run_info.sample_description = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"comments" ) == 0 )
+                        {
+                            m_run_info.sample_comments = value;
+                        }
                     }
                 }
-                else if ( xmlStrcmp( node->name, (const xmlChar*)"users" ) == 0)
+                else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"users" ) == 0 )
                 {
-                    for ( xmlNode *user_node = node->children; user_node; user_node = user_node->next )
+                    for ( xmlNode *user_node = node->children;
+                            user_node; user_node = user_node->next )
                     {
-                        if ( xmlStrcmp( user_node->name, (const xmlChar*)"user" ) == 0)
+                        if ( xmlStrcmp( user_node->name,
+                                (const xmlChar*)"user" ) == 0 )
                         {
                             UserInfo ui;
 
-                            for ( xmlNode *uinfo_node = user_node->children; uinfo_node; uinfo_node = uinfo_node->next )
+                            for ( xmlNode *uinfo_node =
+                                        user_node->children;
+                                    uinfo_node;
+                                    uinfo_node = uinfo_node->next )
                             {
                                 tag = (char*)uinfo_node->name;
                                 getXmlNodeValue( uinfo_node, value );
 
-                                if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"id" ) == 0)
-                                    ui.id = (char*)uinfo_node->children->content;
-                                if ( xmlStrcmp( uinfo_node->name, (const xmlChar*)"name" ) == 0)
-                                    ui.name = (char*)uinfo_node->children->content;
-                                else if (xmlStrcmp( uinfo_node->name, (const xmlChar*)"role" ) == 0)
-                                    ui.role = (char*)uinfo_node->children->content;
+                                if ( xmlStrcmp( uinfo_node->name,
+                                        (const xmlChar*)"id" ) == 0 )
+                                {
+                                    ui.id = (char*)
+                                        uinfo_node->children->content;
+                                }
+                                else if ( xmlStrcmp( uinfo_node->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    ui.name = (char*)
+                                        uinfo_node->children->content;
+                                }
+                                else if (xmlStrcmp( uinfo_node->name,
+                                        (const xmlChar*)"role" ) == 0 )
+                                {
+                                    ui.role = (char*)
+                                        uinfo_node->children->content;
+                                }
                             }
 
                             m_run_info.users.push_back( ui );
@@ -1389,11 +1468,15 @@ StreamParser::rxPacket
         }
         catch( std::exception &e )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value << "; " << e.what() )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                "Failed parsing RunInfo packet on tag: " << tag
+                    << ", value: " << value << "; " << e.what() )
         }
         catch( ... )
         {
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, "Failed parsing RunInfo packet on tag: " << tag << ", value: " << value )
+            THROW_TRACE( ERR_UNEXPECTED_INPUT,
+                "Failed parsing RunInfo packet on tag: " << tag
+                    << ", value: " << value )
         }
 
         xmlFreeDoc( doc );
@@ -1404,14 +1487,14 @@ StreamParser::rxPacket
         // Verify we received all required fields in Run Info pkt
 
         string msg;
-        if ( !m_run_info.facility_name.size())
+        if ( !m_run_info.facility_name.size() )
             msg = "Required facility_name missing from RunInfo.";
-        else if ( !m_run_info.proposal_id.size())
+        else if ( !m_run_info.proposal_id.size() )
             msg = "Required proposal_id missing from RunInfo.";
         else if ( m_run_info.run_number == 0 )
             msg = "Required run_number missing from RunInfo.";
 
-        if ( msg.size())
+        if ( msg.size() )
             THROW_TRACE( ERR_UNEXPECTED_INPUT, msg )
     }
 
