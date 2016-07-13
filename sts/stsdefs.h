@@ -516,6 +516,11 @@ struct RunInfo
     std::string             sample_nature;
     std::string             sample_formula;
     std::string             sample_environment;
+    double                  sample_mass;
+    double                  sample_density;
+    std::string             sample_container;
+    std::string             sample_description;
+    std::string             sample_comments;
     std::vector<UserInfo>   users;
 };
 
