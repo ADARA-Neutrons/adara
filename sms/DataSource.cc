@@ -1309,7 +1309,8 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 		SMSControl *ctrl = SMSControl::getInstance();
 		ERROR(log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Unknown packet type " << pkt.type()
+			<< "Unknown packet type 0x"
+			<< std::hex << pkt.type() << std::dec
 			<< " from " << m_name);
 	}
 	// It's Ok If We Get Something We Don't Recognize, Probably "New"...
