@@ -42,6 +42,7 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_PULSE_PCHG_UNCORRECTED       6
 #define RLL_PULSE_PCHG_BUFFER_EMPTY      7
 #define RLL_NO_RTDL_FOR_PULSE            8
+#define RLL_CHOPPER_SYNC_ISSUE           9
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -2520,16 +2521,27 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							&& m_interPulseTimeChopperMin < tof
 							&& tof < m_interPulseTimeChopperMax )
 					{
-						DEBUG("buildChopperPackets():"
-							<< " *** Chopper " << cit->first
-							<< " Event Synchronization Error!"
-							<< " 1st Event TOF1=" << tof
-							<< " > 2nd Event TOF2=" << tof2
-							<< " and TOF1 in Neighborhood of"
-							<< " InterPulseTime ("
-							<< m_interPulseTimeChopperMin << ", "
-							<< m_interPulseTimeChopperMax << ")"
-							<< " - Resetting TOF1 to Zero!");
+						/* Rate-limited logging of no RTDL for pulse */
+						std::stringstream ss;
+						ss << cit->first;
+						std::string log_info;
+						if ( RateLimitedLogging::checkLog(
+								RLLHistory_SMSControl,
+								RLL_CHOPPER_SYNC_ISSUE, ss.str(),
+								9999, 10, 333, log_info ) ) {
+							ERROR(log_info
+								<< ( m_recording ? "[RECORDING] " : "" )
+								<< "buildChopperPackets():"
+								<< " *** Chopper " << cit->first
+								<< " Event Synchronization Error!"
+								<< " 1st Event TOF1=" << tof
+								<< " > 2nd Event TOF2=" << tof2
+								<< " and TOF1 in Neighborhood of"
+								<< " InterPulseTime ("
+								<< m_interPulseTimeChopperMin << ", "
+								<< m_interPulseTimeChopperMax << ")"
+								<< " - Resetting TOF1 to Zero!");
+						}
 						tof = 0;
 					}
 				}
