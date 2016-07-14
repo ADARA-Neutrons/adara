@@ -257,6 +257,9 @@ private:
 
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
+	static uint64_t m_interPulseTimeChopperMin;
+	static uint64_t m_interPulseTimeChopperMax;
+
 	boost::shared_ptr<smsBooleanPV> m_pvDoPulsePchgCorrect;
 	boost::shared_ptr<smsBooleanPV> m_pvDoPulseVetoCorrect;
 	static uint64_t m_interPulseTimeMin;

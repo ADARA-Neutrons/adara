@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.6.1"
+#define STS_VERSION "1.6.2"
 extern pid_t g_pid;
 
 namespace STS {
@@ -500,7 +500,7 @@ struct UserInfo
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : target_station_number(1), run_number(0)
+    RunInfo() : target_station_number(1), run_number(0), run_title("NONE")
     {}
 
     uint32_t                target_station_number;
@@ -516,6 +516,11 @@ struct RunInfo
     std::string             sample_nature;
     std::string             sample_formula;
     std::string             sample_environment;
+    double                  sample_mass;
+    double                  sample_density;
+    std::string             sample_container;
+    std::string             sample_description;
+    std::string             sample_comments;
     std::vector<UserInfo>   users;
 };
 

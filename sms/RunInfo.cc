@@ -5,14 +5,22 @@
 #include <string>
 #include <sstream>
 
+#include "EPICS.h"
 #include "RunInfo.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 
+#include <gddApps.h>
+
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+
+RateLimitedLogging::History RLLHistory_RunInfo;
+
+// Rate-Limited Logging IDs...
+#define RLL_PV_WRITE                  0
 
 class RunInfoResetPV : public smsTriggerPV {
 public:
@@ -28,6 +36,7 @@ private:
 	bool m_unlocked;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
+
 	void triggered(void) { m_master->reset(); }
 };
 
@@ -55,10 +64,60 @@ private:
 	bool m_lastValid;
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
+
 	void changed(void)
 	{
 		m_runInfo->pvChanged(this);
 		m_lastValid = this->valid();
+	}
+
+	friend class RunInfoFloat64PV;
+};
+
+class RunInfoFloat64PV : public smsFloat64PV {
+public:
+	RunInfoFloat64PV(const std::string &name,
+			RunInfo::RunInfoPVSharedPtr stringRunInfoPV,
+			double min = -1.7976931348623157E308,
+			double max = 1.7976931348623157E308) :
+		smsFloat64PV(name, min, max), m_stringRunInfoPV(stringRunInfoPV) {}
+
+private:
+	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
+
+	// Defer to Regular *String* Version of This PV for Locking/Unlocking...
+	bool allowUpdate(const gdd &val)
+		{ return m_stringRunInfoPV->allowUpdate(val); }
+
+	caStatus write(const casCtx &ctx, const gdd &val)
+	{
+		if ( !allowUpdate(val) ) {
+			/* We don't want to update the PV at this time; still
+			 * send a notification to any watchers, and just return
+			 * success.
+			 */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_RunInfo,
+					RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+				DEBUG(log_info
+					<< "RunInfoFloat64PV::write() m_pv_name=" << m_pv_name
+					<< " Updates Not Allowed, Ignore Value.");
+			}
+			notify();
+			return S_casApp_success;
+		}
+
+		return( smsFloat64PV::write( ctx, val ) );
+	}
+
+	void changed(void)
+	{
+		// Just Set the Associated String RunInfoPV to Latest Float Value...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		std::stringstream ss;
+		ss << value();
+		m_stringRunInfoPV->update( ss.str(), &now );
 	}
 };
 
@@ -78,29 +137,48 @@ private:
 	bool validateUser(const std::string &val) {
 		size_t sep, next;
 
-		/* Make sure there is a separator for the name,
-		 * and it isn't at the beginning of the string.
+		/* There are Now Two Possible Formats for UserInfo as of 7/2016...!
+		 *
+		 *    Name1:Uid1:Role1; Name2:Uid2:Role2; . . .
+		 * or
+		 *    Uid1; Uid2; Uid3; . . .
+		 *
+		 * We will handle Either One, and since we're postponing the
+		 * resolution of Uid-to-Name until "Later" (either STS or AutoRedux)
+		 * We will Now Accept "Empty" strings for the Name and Role, as in:
+		 *    :Uid1:; Name2:Uid2:; :Uid3:Role3; . . .
+		 */
+
+		/* See if there is a separator for the name,
+		 * if not then this is a Plain Uid format...
 		 */
 		sep = val.find_first_of(':');
-		if (sep == 0 || sep == std::string::npos)
-			return false;
+		if (sep == std::string::npos) {
+			DEBUG("validateUser(): Plain Uid Format");
+			return true;
+		}
 
-		/* Make sure there is a separator for the uid,
-		 * and it isn't directly following the name
-		 * separator.
+		/* Found a separator, so this is the Full Name:Uid:Role Format...
+		 * Make sure there is another separator for the uid,
+		 * and that it isn't directly following the name separator.
+		 * (We _Have_ to At Least have a Uid per person...! ;-)
 		 */
 		next = sep + 1;
 		sep = val.find_first_of(':', next);
-		if (sep == next || sep == std::string::npos)
+		if (sep == next || sep == std::string::npos) {
+			DEBUG("validateUser(): Empty Uid or Missing Separator");
 			return false;
+		}
 
-		/* Make sure that role is non-empty, and there
-		 * is no additional separator after it.
+		/* Ok now if the role is empty, and there's
+		 * no additional separator after it.
 		 */
 		sep++;
-		if (sep >= val.length())
-			return false;
+		// if (sep >= val.length())
+			// return false;
 
+		/* Make sure there are no additional separators...!
+		 */
 		sep = val.find_first_of(':', sep);
 		return sep == std::string::npos;
 	}
@@ -132,7 +210,10 @@ private:
 		}
 
 		/* Now get the last one */
-		return validateUser(val.substr(begin, end - begin));
+		if ( begin < val.size() )
+			return( validateUser(val.substr(begin, val.size() - begin)) );
+		else
+			return( true );
 	}
 
 	void changed(void) { m_runInfo->invalidateCache(); }
@@ -181,28 +262,87 @@ static void xmlEncodeTo(std::string &out, const std::string &in,
 
 static void addUserInfo(std::string &out, const std::string &info)
 {
-	size_t begin, end;
+	size_t begin, end, next_user;
 
 	out += "<users>";
 
-	for (begin = end = 0; end != std::string::npos; begin = end + 1) {
+	for ( begin = end = 0;
+			begin != std::string::npos && begin < info.size(); )
+	{
+		next_user = info.find_first_of(';', begin);
+		if ( next_user == begin )
+		{
+			begin++;
+			continue;
+		}
+
+		out += "<user>";
+
 		end = info.find_first_of(':', begin);
-		out += "<user><name>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</name>";
-		begin = end + 1;
+		// Name:Uid:Role
+		if ( end != begin && end < next_user )
+		{
+			out += "<name>";
+			xmlEncodeTo(out, info, begin, end);
+			out += "</name>";
+			begin = end + 1;
+		}
+		// Uid
+		else
+		{
+			out += "<name>XXX_UNRESOLVED_NAME_XXX</name>";
+			if ( end == begin )
+				begin = end + 1;
+		}
+
 		end = info.find_first_of(':', begin);
-		out += "<id>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</id>";
-		begin = end + 1;
-		end = info.find_first_of(';', begin);
-		out += "<role>";
-		xmlEncodeTo(out, info, begin, end);
-		out += "</role></user>";
+		// Missing Uid (...::...), Shouldn't Happen...? (validateUser()...)
+		if ( end == begin || begin >= info.size() )
+		{
+			out += "<id>XXX_UNRESOLVED_UID_XXX</id>";
+			begin = end + 1;
+		}
+		// ...:Uid:...
+		else if ( end < next_user )
+		{
+			out += "<id>";
+			xmlEncodeTo(out, info, begin, end);
+			out += "</id>";
+			begin = end + 1;
+		}
+		// Plain Uid...
+		else
+		{
+			out += "<id>";
+			xmlEncodeTo(out, info, begin, next_user);
+			out += "</id>";
+			begin = next_user;
+		}
+
+		// Role, if present...
+		if ( begin < next_user && begin < info.size() )
+		{
+			out += "<role>";
+			xmlEncodeTo(out, info, begin, next_user);
+			out += "</role>";
+		}
+		// No Role...
+		else
+		{
+			out += "<role>XXX_UNRESOLVED_ROLE_XXX</role>";
+		}
+
+		out += "</user>";
+
+		// Next User of End of Loop...
+		begin = next_user;
+		if ( begin != std::string::npos )
+			begin++;
 	}
 
 	out += "</users>";
+
+	DEBUG("addUserInfo() out=[" << out << "]");
 }
 
 static void addElements(std::string &out, RunInfo::RunInfoMap &map,
@@ -261,11 +401,26 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	addPV(prefix, "Formula", "chemical_formula", m_sample);
 	addPV(prefix, "Environment", "environment", m_sample);
 
+	m_massPV = addPV(prefix, "MassString", "mass", m_sample);
+	m_massFloat64PV.reset(new RunInfoFloat64PV(prefix + "Mass",
+		m_massPV, 0.0));
+	m_ctrl->addPV(m_massFloat64PV);
+
+	m_densityPV = addPV(prefix, "DensityString", "density", m_sample);
+	m_densityFloat64PV.reset(new RunInfoFloat64PV(prefix + "Density",
+		m_densityPV, 0.0 ));
+	m_ctrl->addPV(m_densityFloat64PV);
+
+	addPV(prefix, "Container", "container", m_sample);
+	addPV(prefix, "Description", "description", m_sample);
+	addPV(prefix, "Comments", "comments", m_sample);
+
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.
 	 */
 
-	m_connection = StorageManager::onPrologue(boost::bind(&RunInfo::onPrologue, this));
+	m_connection = StorageManager::onPrologue(
+		boost::bind(&RunInfo::onPrologue, this));
 }
 
 RunInfo::~RunInfo()

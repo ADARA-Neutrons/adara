@@ -42,6 +42,7 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_PULSE_PCHG_UNCORRECTED       6
 #define RLL_PULSE_PCHG_BUFFER_EMPTY      7
 #define RLL_NO_RTDL_FOR_PULSE            8
+#define RLL_CHOPPER_SYNC_ISSUE           9
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -54,6 +55,9 @@ std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
+
+uint64_t SMSControl::m_interPulseTimeChopperMin;
+uint64_t SMSControl::m_interPulseTimeChopperMax;
 
 uint64_t SMSControl::m_interPulseTimeMin;
 uint64_t SMSControl::m_interPulseTimeMax;
@@ -449,6 +453,8 @@ SMSControl::SMSControl() :
 
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
 	uint64_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
+	m_interPulseTimeChopperMin = 90 * baseInterPulseTime / 100;
+	m_interPulseTimeChopperMax = 110 * baseInterPulseTime / 100;
 	m_interPulseTimeMin = 77 * baseInterPulseTime / 100;
 	m_interPulseTimeMax = 123 * baseInterPulseTime / 100;
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
@@ -2492,19 +2498,66 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 		pkt[4] = 0x80000000 | cit->first;
 
 		ChopperEvents::iterator eit, eend = cit->second.end();
+		bool first = true;
 		for (eit = cit->second.begin(); eit != eend; ++eit) {
 			uint32_t val = *eit;
+			uint32_t tof = val >> 1;
+
+			// Check for Chopper Event Synchronization Issue from DSP...
+			// - E.g. 1st Chopper Event for a Pulse is _Really_ the
+			// _Last_ Chopper Event from the Previous Pulse...
+			//    -> Event TOF should be added to Previous Pulse Time,
+			//    but since we're already in _This_ Pulse, instead
+			//    just "Zero Out" the TOF and add to This Pulse Time... ;-Q
+			// - Identify This Case with the following criteria:
+			//    -> TOF for 1st Chopper Event is *Greater* than 2nd Event
+			//    -> TOF value is in the neighborhood of InterPulseTime...
+			if ( first )
+			{
+				if ( eit + 1 != eend )
+				{
+					uint32_t tof2 = *(eit + 1) >> 1;
+					if ( tof > tof2
+							&& m_interPulseTimeChopperMin < tof
+							&& tof < m_interPulseTimeChopperMax )
+					{
+						/* Rate-limited logging of no RTDL for pulse */
+						std::stringstream ss;
+						ss << cit->first;
+						std::string log_info;
+						if ( RateLimitedLogging::checkLog(
+								RLLHistory_SMSControl,
+								RLL_CHOPPER_SYNC_ISSUE, ss.str(),
+								9999, 10, 333, log_info ) ) {
+							ERROR(log_info
+								<< ( m_recording ? "[RECORDING] " : "" )
+								<< "buildChopperPackets():"
+								<< " *** Chopper " << cit->first
+								<< " Event Synchronization Error!"
+								<< " 1st Event TOF1=" << tof
+								<< " > 2nd Event TOF2=" << tof2
+								<< " and TOF1 in Neighborhood of"
+								<< " InterPulseTime ("
+								<< m_interPulseTimeChopperMin << ", "
+								<< m_interPulseTimeChopperMax << ")"
+								<< " - Resetting TOF1 to Zero!");
+						}
+						tof = 0;
+					}
+				}
+				first = false;
+			}
 
 			/* Set the variable ID and the updated value */
 			pkt[5] = (val & 1) + 1;
-			pkt[7] = val >> 1;
+			pkt[7] = tof;
 
 			/* Create a different timestamp for each variable
 			 * update packet by adding the TOF value to the pulse
 			 * ID, handling overflow of the nanoseconds field.
 			 */
 			uint32_t ns = pulse->m_id.first & 0xffffffff;
-			ns += val >> 1;
+			ns += tof;
 
 			pkt[2] = pulse->m_id.first >> 32;
 			if (ns >= (1000U * 1000 * 1000)) {
