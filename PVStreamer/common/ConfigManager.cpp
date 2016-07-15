@@ -95,6 +95,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 DeviceDescriptor *new_desc = new DeviceDescriptor(
                     *idev->second ); // Deep Copy, Keep ID!
 
+                new_desc->m_id = a_descriptor.m_id;
+
                 sendDeviceRedefined( DeviceRecordPtr( new_desc ),
                     idev->second );
 
