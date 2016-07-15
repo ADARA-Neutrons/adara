@@ -94,7 +94,7 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
 
 PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
         const PVDescriptor &a_source )
-    : m_device(a_device), m_id(0),
+    : m_device(a_device), m_id(a_source.m_id),
     m_name(a_source.m_name), m_connection(a_source.m_connection),
     m_type(a_source.m_type), m_elem_count(a_source.m_elem_count),
     m_enum(0), m_units(a_source.m_units), m_ignore(false)
