@@ -77,7 +77,8 @@ private:
     void            streamProcessingThread();
     void            buildDDP( OutPacket &a_adara_pkt,
                         std::vector<uint8_t> &a_payload,
-                        DeviceRecordPtr a_device );
+                        DeviceRecordPtr a_device,
+                        bool sendDescriptorXML = true );
     void            buildVVP( OutPacket &a_adara_pkt,
                         PVDescriptor *a_pv, PVState &a_state,
                         std::vector<uint8_t> &a_payload );
