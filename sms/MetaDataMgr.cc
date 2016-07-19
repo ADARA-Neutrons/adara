@@ -387,6 +387,16 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 			DEBUG("Updating Existing Descriptor");
 		}
 		m_devices.erase(dit);
+
+		// Empty Descriptor XML, "Undefine" Device...!
+		if ( inPkt.description().empty() )
+		{
+			if ( do_log ) {
+				DEBUG( "Empty Descriptor XML, Undefining Device devId="
+					<< inPkt.devId() );
+			}
+			return;
+		}
 	}
 
 	/* Fix the device id in the packet before further processing... */
