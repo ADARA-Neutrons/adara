@@ -51,7 +51,8 @@ private:
     void            gcThread();
     bool            parseConfigBuffer( const char* a_buffer,
                         int a_buffer_size,
-                        std::vector<DeviceDescriptor*> &a_devices );
+                        std::vector<DeviceDescriptor*> &a_devices,
+                        std::vector<Identifier> &a_inactive_device_ids );
     xmlNode*        xmlFind( const char *a_tag,
                         xmlNode *a_parent_node ) const;
     void            xmlGetValue( xmlNode *a_node,

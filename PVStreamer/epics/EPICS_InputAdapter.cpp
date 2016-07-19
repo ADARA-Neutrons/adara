@@ -212,6 +212,8 @@ void
 InputAdapter::configFileMonitorThread()
 {
     vector<DeviceDescriptor*>::iterator idev;
+    map<string,DeviceAgent*>::iterator ida;
+    vector<Identifier>::iterator iid;
     set<string>::iterator icur;
     boost::filesystem::path cfg_path( m_config_file );
     bool            changed;
@@ -283,15 +285,18 @@ InputAdapter::configFileMonitorThread()
                             m_config_file.c_str() );
                         usleep(33333); // give syslog a chance...
 
-                        boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+                        boost::lock_guard<boost::recursive_mutex>
+                            lock(m_mutex);
 
                         if ( !m_active )
                             break;
 
                         vector<DeviceDescriptor*> devices;
+                        vector<Identifier> inactive_device_ids;
 
                         if ( parseConfigBuffer(
-                            buffer.data(), buffer.size(), devices ) )
+                            buffer.data(), buffer.size(),
+                            devices, inactive_device_ids ) )
                         {
                             // Parsed successfully
                             syslog( LOG_INFO,
@@ -319,6 +324,38 @@ InputAdapter::configFileMonitorThread()
                                         == new_devices.end())
                                 {
                                     stopDevice( *icur );
+                                }
+                            }
+
+                            // No "Undefine" Any Old Device IDs that are
+                            // No Longer In Use...! ;-D
+                            for ( iid = inactive_device_ids.begin();
+                                    iid != inactive_device_ids.end();
+                                    ++iid )
+                            {
+                                bool found = false;
+
+                                for ( ida = m_dev_agents.begin();
+                                        ida != m_dev_agents.end(); ++ida )
+                                {
+                                    DeviceDescriptor *desc =
+                                        ida->second->get_desc();
+                                    if ( desc && desc->m_id == (*iid) )
+                                    {
+                                        ida->second->undefine();
+                                        found = true;
+                                    }
+                                }
+
+                                if ( !found )
+                                {
+                                    syslog( LOG_ERR, "%s %s::%s: %s %d %s",
+                                        "PVSD ERROR:",
+                                        "InputAdapter",
+                                        "configFileMonitorThread()",
+                                        "Inactive Device ID", *iid,
+                                        "Not Found!");
+                                    usleep(33333); // give syslog a chance
                                 }
                             }
 
@@ -414,7 +451,9 @@ InputAdapter::configFileMonitorThread()
   * configured for logging will be returned, unless m_track_logged is false.
   */
 bool
-InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector<DeviceDescriptor*> &a_devices )
+InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
+        vector<DeviceDescriptor*> &a_devices,
+        vector<Identifier> &a_inactive_device_ids )
 {
     /* This method parses XML in the following format
     <beamline>
@@ -661,6 +700,9 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size, vector
                                         "Device ID", id );
                                 }
                                 usleep(33333); // give syslog a chance...
+
+                                // Save Device ID to Inactive List...
+                                a_inactive_device_ids.push_back( id );
                             }
                         }
                     }
