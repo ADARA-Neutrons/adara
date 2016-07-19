@@ -77,7 +77,8 @@ private:
     void            streamProcessingThread();
     void            buildDDP( OutPacket &a_adara_pkt,
                         std::vector<uint8_t> &a_payload,
-                        DeviceRecordPtr a_device );
+                        DeviceRecordPtr a_device,
+                        bool sendDescriptorXML = true );
     void            buildVVP( OutPacket &a_adara_pkt,
                         PVDescriptor *a_pv, PVState &a_state,
                         std::vector<uint8_t> &a_payload );
@@ -101,6 +102,7 @@ private:
                         int a_socket = -1 );
     void            sendSourceInfo( int a_socket );
     void            sendCurrentData( int a_socket );
+    void            sendCurrentDeviceData( DeviceRecordPtr a_device );
     bool            send( int a_socket,
                         const char *a_data, uint32_t a_len );
 

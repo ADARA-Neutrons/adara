@@ -179,6 +179,10 @@ OutputAdapter::streamProcessingThread()
                 payload.clear();
                 if ( translate( *pvs_pkt, adara_pkt, payload ) )
                     sendPacket( adara_pkt, payload );
+
+                // If "DeviceRedefined", Re-Send Current PV Values...!
+                if ( pvs_pkt->type == DeviceRedefined )
+                    sendCurrentDeviceData( pvs_pkt->device );
             }
 
             m_stream_api->putFreePacket( pvs_pkt );
@@ -213,8 +217,11 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
         return true;
 
     case DeviceUndefined:
-        // Nothing to do since ADARA does not have a device undefined packet
-        return false;
+        // ADARA does not have a Device Undefined packet,
+        // so just send a Regular Descriptor packet
+        // with an "Empty" XML Descriptor to "Undefine" it... ;-D
+        buildDDP( a_adara_pkt, a_payload, a_pv_pkt.device, false );
+        return true;
 
     case VariableUpdate:
         if ( a_pv_pkt.pv == NULL ) {
@@ -245,10 +252,9 @@ OutputAdapter::translate( StreamPacket &a_pv_pkt, OutPacket &a_adara_pkt,
 void
 OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
         vector<uint8_t> &a_payload,
-        DeviceRecordPtr a_device )
+        DeviceRecordPtr a_device,
+        bool sendDescriptorXML )
 {
-    stringstream sstr;
-
     a_adara_pkt.format  = ADARA_PKT_TYPE(
         ::ADARA::PacketType::DEVICE_DESC_TYPE,
         ::ADARA::PacketType::DEVICE_DESC_VERSION );
@@ -258,95 +264,115 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
 
     // Encode XML
 
-    sstr << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl
-         << "  <device xmlns=\"http://public.sns.gov/schema/device.xsd\""
-         << endl
-         << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
-         << endl
-         << "  xsi:schemaLocation=\""
-         << "http://public.sns.gov/schema/device.xsd"
-         << " http://public.sns.gov/schema/device.xsd\">"
-         << endl;
+    stringstream sstr;
 
-    sstr << "  <device_name>" << a_device->m_name << "</device_name>"
-         << endl;
-
-    // Generate enumeration definitions for enums used by this device only
-
-    if ( a_device->m_enums.size() )
+    if ( sendDescriptorXML )
     {
-        sstr << "  <enumerations>" << endl;
-        unsigned short id = 1;
-        for ( vector<EnumDescriptor*>::const_iterator e =
-                    a_device->m_enums.begin();
-                e != a_device->m_enums.end(); ++e, ++id )
+        sstr << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl
+            << "  <device"
+            << " xmlns=\"http://public.sns.gov/schema/device.xsd\""
+            << endl
+            << "  xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+            << endl
+            << "  xsi:schemaLocation=\""
+            << "http://public.sns.gov/schema/device.xsd"
+            << " http://public.sns.gov/schema/device.xsd\">"
+            << endl;
+
+        sstr << "  <device_name>" << a_device->m_name << "</device_name>"
+            << endl;
+
+        // Generate enumeration definitions for enums
+        // used by this device only
+
+        if ( a_device->m_enums.size() )
         {
-            sstr << "    <enumeration>" << endl;
-            sstr << "      <enum_name>enum_"
-                 << setw(2) << setfill('0') << id << "</enum_name>"
-                 << endl;
-            for ( map<int32_t,std::string>::const_iterator iel =
-                        (*e)->m_values.begin();
-                    iel != (*e)->m_values.end(); ++iel )
+            sstr << "  <enumerations>" << endl;
+            unsigned short id = 1;
+            for ( vector<EnumDescriptor*>::const_iterator e =
+                        a_device->m_enums.begin();
+                    e != a_device->m_enums.end(); ++e, ++id )
             {
-                sstr << "        <enum_element>" << endl;
-                sstr << "          <enum_element_name>" << iel->second
-                     << "</enum_element_name>" << endl;
-                sstr << "          <enum_element_value>" << iel->first
-                     << "</enum_element_value>" << endl;
-                sstr << "        </enum_element>" << endl;
+                sstr << "    <enumeration>" << endl;
+                sstr << "      <enum_name>enum_"
+                    << setw(2) << setfill('0') << id << "</enum_name>"
+                    << endl;
+                for ( map<int32_t,std::string>::const_iterator iel =
+                            (*e)->m_values.begin();
+                        iel != (*e)->m_values.end(); ++iel )
+                {
+                    sstr << "        <enum_element>" << endl;
+                    sstr << "          <enum_element_name>" << iel->second
+                        << "</enum_element_name>" << endl;
+                    sstr << "          <enum_element_value>" << iel->first
+                        << "</enum_element_value>" << endl;
+                    sstr << "        </enum_element>" << endl;
+                }
+                sstr << "    </enumeration>" << endl;
             }
-            sstr << "    </enumeration>" << endl;
+            sstr << "  </enumerations>" << endl;
         }
-        sstr << "  </enumerations>" << endl;
+
+        // Generate process variable definitions
+
+        sstr << "  <process_variables>" << endl;
+
+        for ( vector<PVDescriptor*>::const_iterator ipv =
+                    a_device->m_pvs.begin();
+                ipv != a_device->m_pvs.end(); ++ipv )
+        {
+            sstr << "    <process_variable>" << endl;
+            sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>"
+                << endl;
+            sstr << "      <pv_connection>" << (*ipv)->m_connection
+                << "</pv_connection>" << endl;
+            sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
+            if ( (*ipv)->m_type == PV_ENUM )
+            {
+                sstr << "      <pv_type>enum_"
+                    << setw(2) << setfill('0') << (*ipv)->m_enum->m_id
+                    << "</pv_type>" << endl;
+            }
+            else
+            {
+                sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type)
+                    << "</pv_type>" << endl;
+            }
+            if ( (*ipv)->m_units.size() )
+            {
+                sstr << "      <pv_units>" << (*ipv)->m_units
+                    << "</pv_units>" << endl;
+            }
+            if ( (*ipv)->m_ignore )
+            {
+                sstr << "      <pv_ignore>" << (*ipv)->m_ignore
+                    << "</pv_ignore>" << endl;
+            }
+            sstr << "    </process_variable>" << endl;
+        }
+
+        sstr << "  </process_variables>" << endl;
+        sstr << "</device>" << endl;
+
+        // Save payload
+        a_payload = vector<uint8_t>( sstr.str().size() );
+        uint8_t *bytes = a_payload.data();
+        memcpy( bytes,
+            (uint8_t *)sstr.str().c_str(), sstr.str().size() );
     }
 
-    // Generate process variable definitions
-
-    sstr << "  <process_variables>" << endl;
-
-    for ( vector<PVDescriptor*>::const_iterator ipv =
-                a_device->m_pvs.begin();
-            ipv != a_device->m_pvs.end(); ++ipv )
+    // "Empty" Descriptor XML for Device "Undefine"...
+    else
     {
-        sstr << "    <process_variable>" << endl;
-        sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>"
-             << endl;
-        sstr << "      <pv_connection>" << (*ipv)->m_connection
-             << "</pv_connection>" << endl;
-        sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
-        if ( (*ipv)->m_type == PV_ENUM )
-        {
-            sstr << "      <pv_type>enum_"
-                 << setw(2) << setfill('0') << (*ipv)->m_enum->m_id
-                 << "</pv_type>" << endl;
-        }
-        else
-        {
-            sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type)
-                 << "</pv_type>" << endl;
-        }
-        if ( (*ipv)->m_units.size() )
-        {
-            sstr << "      <pv_units>" << (*ipv)->m_units
-                 << "</pv_units>" << endl;
-        }
-        if ( (*ipv)->m_ignore )
-        {
-            sstr << "      <pv_ignore>" << (*ipv)->m_ignore
-                 << "</pv_ignore>" << endl;
-        }
-        sstr << "    </process_variable>" << endl;
+        syslog( LOG_ERR,
+        "%s: %s: %s Device [%s] (%s id=%d) %s",
+            "PVSD ERROR", "OutputAdapter::buildDDP()",
+            "Sending Empty Descriptor to *Undefine*",
+            a_device->m_name.c_str(),
+            "device", a_device->m_id,
+            " - Setting Payload Size to Zero" );
+        usleep(33333); // give syslog a chance...
     }
-
-    sstr << "  </process_variables>" << endl;
-    sstr << "</device>" << endl;
-
-    // Save payload
-    a_payload = vector<uint8_t>( sstr.str().size() );
-    uint8_t *bytes = a_payload.data();
-    memcpy( bytes,
-        (uint8_t *)sstr.str().c_str(), sstr.str().size() );
 
     a_adara_pkt.ddp.xml_len = (unsigned long) a_payload.size();
     a_adara_pkt.payload_len = 8 + a_adara_pkt.ddp.xml_len;
@@ -613,7 +639,12 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
     for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
             ipv != a_device->m_pvs.end(); ++ipv )
     {
-        m_pv_state[*ipv] = PVState();
+        PVState state = PVState();
+
+        state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+        state.m_time.nsec = 0;
+
+        m_pv_state[*ipv] = state;
     }
 }
 
@@ -661,9 +692,14 @@ OutputAdapter::redefineDevice(
         // (until we get the first value from it)
         if ( !found )
         {
-            m_pv_state[*ipv] =
+            PVState state =
                 PVState( ::ADARA::VariableStatus::NOT_REPORTED,
                     ::ADARA::VariableSeverity::INVALID );
+
+            state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+            state.m_time.nsec = 0;
+
+            m_pv_state[*ipv] = state;
         }
     }
 
@@ -952,6 +988,41 @@ OutputAdapter::sendCurrentData( int a_socket )
         payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
         sendPacket( adara_pkt, payload, a_socket );
+    }
+}
+
+
+/** \brief (Re-)Sends VVPs for the configured device to all clients.
+  * \param a_device - the Device to send VVPs for
+  */
+void
+OutputAdapter::sendCurrentDeviceData( DeviceRecordPtr a_device )
+{
+    OutPacket adara_pkt;
+
+    vector<uint8_t> payload;
+
+    syslog( LOG_INFO, "%s: Re-Sending Current Device [%s] Data",
+        "OutputAdapter::sendCurrentDeviceData()",
+        a_device->m_name.c_str() );
+    usleep(33333); // give syslog a chance...
+
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    // Send value updates for the configured device to all clients
+    for ( vector<PVDescriptor*>::const_iterator ipv =
+                a_device->m_pvs.begin();
+            ipv != a_device->m_pvs.end(); ++ipv )
+    {
+        syslog( LOG_INFO, "%s: Sending PV <%s> (%s) %s",
+            "OutputAdapter::sendCurrentDeviceData()",
+            (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str(),
+            "Variable Value Update" );
+        usleep(33333); // give syslog a chance...
+
+        payload.clear();
+        buildVVP( adara_pkt, *ipv, m_pv_state[*ipv], payload );
+        sendPacket( adara_pkt, payload );
     }
 }
 

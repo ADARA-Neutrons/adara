@@ -97,10 +97,11 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 
                 new_desc->m_id = a_descriptor.m_id;
 
-                sendDeviceRedefined( DeviceRecordPtr( new_desc ),
-                    idev->second );
+                // Device ID Changed, Use New Descriptor...
+                record = DeviceRecordPtr(new_desc);
+                sendDeviceRedefined( record, idev->second );
 
-                idev->second->m_id = a_descriptor.m_id;
+                idev->second = record;
             }
             else
             {
@@ -112,10 +113,10 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                     (unsigned long) a_descriptor.m_protocol,
                     a_descriptor.m_id );
                 usleep(33333); // give syslog a chance...
-            }
 
-            // Descriptor has not changed, so just return existing record
-            record = idev->second;
+                // Descriptor has not changed, just return existing record
+                record = idev->second;
+            }
         }
         else
         {

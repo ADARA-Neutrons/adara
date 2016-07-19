@@ -37,9 +37,13 @@ public:
         time_t a_device_init_timeout );
     ~DeviceAgent();
 
+    DeviceDescriptor   *get_desc(void)
+        { return m_dev_desc ? m_dev_desc : m_dev_record.get(); }
+
     void    update( DeviceDescriptor *a_device );
-    void    stop();
-    bool    stopped();
+    void    stop(void);
+    void    undefine(void);
+    bool    stopped(void);
 
 private:
     enum ChanState

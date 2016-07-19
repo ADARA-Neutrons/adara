@@ -290,7 +290,7 @@ DeviceAgent::metadataUpdated()
  * more than once is safe and will have no side effects.
  */
 void
-DeviceAgent::stop()
+DeviceAgent::stop(void)
 {
     boost::unique_lock<boost::mutex> lock(m_mutex);
 
@@ -359,6 +359,51 @@ DeviceAgent::stop()
 
 
 /**
+ * @brief Marks DeviceAgent as "Undefined" when Device ID goes Inactive.
+ *
+ * This method _Only_ Undefines the Device Descriptor for an
+ * Old Device ID which has gone inactive; the DeviceAgent is
+ * _Still_ Alive and Ok to Proceed, it has _Only_ been "Re-Numbered"...!
+ */
+void
+DeviceAgent::undefine(void)
+{
+    boost::unique_lock<boost::mutex> lock(m_mutex);
+
+    DeviceDescriptor *dev = m_dev_desc ? m_dev_desc : m_dev_record.get();
+
+    std::string deviceStr = "";
+    if ( dev != NULL && !dev->m_name.empty() )
+        deviceStr = "Device [" + dev->m_name + "] - ";
+
+    // If a device is currently configured, undefine it
+    // so we make sure Old Inactive Device IDs get cleared.
+    if ( m_dev_record.get() )
+    {
+        syslog( LOG_INFO,
+            "%s: Undefining %sInactive Device ID %d",
+            "DeviceAgent::undefine()", deviceStr.c_str(),
+            dev ? dev->m_id : -1 );
+        usleep(33333); // give syslog a chance...
+
+        m_stream_api.getCfgMgr().undefineDevice( m_dev_record );
+        // *Don't* Reset the Descriptor Here, Device May Still Exist
+        // But Only Be Re-Numbered...! ;-D
+    }
+
+    // Device Record Not Found, Maybe Already Stopped...?
+    else
+    {
+        syslog( LOG_INFO,
+            "%s: %sInactive Device ID %d Not Found - Already Stopped?",
+            "DeviceAgent::undefine()", deviceStr.c_str(),
+            ( m_dev_desc != NULL ) ? m_dev_desc->m_id : -1 );
+        usleep(33333); // give syslog a chance...
+    }
+}
+
+
+/**
  * @brief This method determines if the DeviceAgent is in a stopped state
  * @return True if device is stopped; false otherwise
  *
@@ -369,7 +414,7 @@ DeviceAgent::stop()
  * additional callbacks will be made after clearing channels and subscriptions.
  */
 bool
-DeviceAgent::stopped()
+DeviceAgent::stopped(void)
 {
     boost::unique_lock<boost::mutex> lock(m_mutex);
     return m_chan_info.size() == 0;
