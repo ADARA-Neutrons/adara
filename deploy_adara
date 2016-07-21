@@ -126,7 +126,7 @@ if [ $IS_STS == 1 ]; then
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
 	HOST_TYPE="STS"
 elif [ $IS_PVSD == 1 ]; then
-	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl' | tail -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
@@ -141,7 +141,7 @@ elif [ $IS_PVSD == 1 ]; then
 	fi
 	HOST_TYPE="PVSD"
 elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
-	install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon'`
+	install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon' | tail -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${install_branch}-//"`
@@ -157,7 +157,7 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	fi
 	HOST_TYPE="DASMON"
 else
-	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl' | tail -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
