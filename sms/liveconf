@@ -86,6 +86,7 @@ option_id_type[$num_options]="source"
 option_name[$num_options]="required"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Required"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
 option_label[$num_options]="[Data Source is Required for Data Collection]"
 num_options=$(( num_options + 1 ))
 
