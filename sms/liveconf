@@ -1,4 +1,12 @@
 #!/bin/bash
+#
+# ADARA SMS LiveConf - Live Configuration and Status Script
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
 
 # default settings
 SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
