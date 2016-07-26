@@ -43,6 +43,7 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_PULSE_PCHG_BUFFER_EMPTY      7
 #define RLL_NO_RTDL_FOR_PULSE            8
 #define RLL_CHOPPER_SYNC_ISSUE           9
+#define RLL_CHOPPER_GLITCH_ISSUE        10
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -55,6 +56,9 @@ std::string SMSControl::m_pixelMapPath;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
+
+uint64_t SMSControl::m_interPulseTimeChopGlitchMin;
+uint64_t SMSControl::m_interPulseTimeChopGlitchMax;
 
 uint64_t SMSControl::m_interPulseTimeChopperMin;
 uint64_t SMSControl::m_interPulseTimeChopperMax;
@@ -453,6 +457,8 @@ SMSControl::SMSControl() :
 
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
 	uint64_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
+	m_interPulseTimeChopGlitchMin = 90 * 2 * baseInterPulseTime / 100;
+	m_interPulseTimeChopGlitchMax = 110 * 2 * baseInterPulseTime / 100;
 	m_interPulseTimeChopperMin = 90 * baseInterPulseTime / 100;
 	m_interPulseTimeChopperMax = 110 * baseInterPulseTime / 100;
 	m_interPulseTimeMin = 77 * baseInterPulseTime / 100;
@@ -2512,40 +2518,85 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			// - Identify This Case with the following criteria:
 			//    -> TOF for 1st Chopper Event is *Greater* than 2nd Event
 			//    -> TOF value is in the neighborhood of InterPulseTime...
+			// ALSO Check for Chopper Glitch Event Issue from DSP...?
+			// - E.g. Every 10 Seconds ("Magic" 600th Pulse...? ;-)
+			// an Erroneous Chopper Event comes in with TOF = 0.0333333-ish
+			// which falls _Between_ the "regularly scheduled" events
+			// at the given Chopper frequency... ;-Q
+			// - Identify This Case similarly, but with a Different
+			// neighborhood of "2 * InterPulseTime"... ;-b
+
 			if ( first )
 			{
+				first = false;
+
 				if ( eit + 1 != eend )
 				{
 					uint32_t tof2 = *(eit + 1) >> 1;
-					if ( tof > tof2
-							&& m_interPulseTimeChopperMin < tof
-							&& tof < m_interPulseTimeChopperMax )
+					if ( tof > tof2 )
 					{
-						/* Rate-limited logging of no RTDL for pulse */
-						std::stringstream ss;
-						ss << cit->first;
-						std::string log_info;
-						if ( RateLimitedLogging::checkLog(
-								RLLHistory_SMSControl,
-								RLL_CHOPPER_SYNC_ISSUE, ss.str(),
-								9999, 10, 333, log_info ) ) {
-							ERROR(log_info
-								<< ( m_recording ? "[RECORDING] " : "" )
-								<< "buildChopperPackets():"
-								<< " *** Chopper " << cit->first
-								<< " Event Synchronization Error!"
-								<< " 1st Event TOF1=" << tof
-								<< " > 2nd Event TOF2=" << tof2
-								<< " and TOF1 in Neighborhood of"
-								<< " InterPulseTime ("
-								<< m_interPulseTimeChopperMin << ", "
-								<< m_interPulseTimeChopperMax << ")"
-								<< " - Resetting TOF1 to Zero!");
+						// *** Chopper Sync Issue
+						// - Event Pushed to Subsequent Pulse...
+						if ( m_interPulseTimeChopperMin < tof
+								&& tof < m_interPulseTimeChopperMax )
+						{
+							/* Rate-limited logging of no RTDL for pulse */
+							std::stringstream ss;
+							ss << cit->first;
+							std::string log_info;
+							if ( RateLimitedLogging::checkLog(
+									RLLHistory_SMSControl,
+									RLL_CHOPPER_SYNC_ISSUE, ss.str(),
+									9999, 10, 333, log_info ) ) {
+								ERROR(log_info
+									<< ( m_recording
+										? "[RECORDING] " : "" )
+									<< "buildChopperPackets():"
+									<< " *** Chopper " << cit->first
+									<< " Event Synchronization Error!"
+									<< " 1st Event TOF1=" << tof
+									<< " > 2nd Event TOF2=" << tof2
+									<< " and TOF1 in Neighborhood of"
+									<< " InterPulseTime ("
+									<< m_interPulseTimeChopperMin << ", "
+									<< m_interPulseTimeChopperMax << ")"
+									<< " - Resetting TOF1 to Zero!");
+							}
+							tof = 0;
 						}
-						tof = 0;
+
+						// *** Chopper Glitch Issue
+						// - Errant Event in Otherwise Normal Sequence...
+						else if ( m_interPulseTimeChopGlitchMin < tof
+								&& tof < m_interPulseTimeChopGlitchMax )
+						{
+							/* Rate-limited logging of no RTDL for pulse */
+							std::stringstream ss;
+							ss << cit->first;
+							std::string log_info;
+							if ( RateLimitedLogging::checkLog(
+									RLLHistory_SMSControl,
+									RLL_CHOPPER_GLITCH_ISSUE, ss.str(),
+									9999, 10, 333, log_info ) ) {
+								ERROR(log_info
+									<< ( m_recording
+										? "[RECORDING] " : "" )
+									<< "buildChopperPackets():"
+									<< " *** Chopper " << cit->first
+									<< " Glitch Event Error!"
+									<< " 1st Event TOF1=" << tof
+									<< " > 2nd Event TOF2=" << tof2
+									<< " and TOF1 in Neighborhood of"
+									<< " 2 * InterPulseTime ("
+									<< m_interPulseTimeChopGlitchMin
+									<< ", "
+									<< m_interPulseTimeChopGlitchMax << ")"
+									<< " - Omitting Chopper Event!");
+							}
+							continue;
+						}
 					}
 				}
-				first = false;
 			}
 
 			/* Set the variable ID and the updated value */

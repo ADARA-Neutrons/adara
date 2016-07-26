@@ -1,4 +1,12 @@
 #!/bin/bash
+#
+# ADARA SMS LiveConf - Live Configuration and Status Script
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
 
 # default settings
 SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
@@ -86,6 +94,7 @@ option_id_type[$num_options]="source"
 option_name[$num_options]="required"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Required"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
 option_label[$num_options]="[Data Source is Required for Data Collection]"
 num_options=$(( num_options + 1 ))
 

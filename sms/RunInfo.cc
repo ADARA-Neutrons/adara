@@ -264,7 +264,7 @@ static void addUserInfo(std::string &out, const std::string &info)
 {
 	size_t begin, end, next_user;
 
-	out += "<users>";
+	out += "   <users>\n";
 
 	for ( begin = end = 0;
 			begin != std::string::npos && begin < info.size(); )
@@ -276,21 +276,21 @@ static void addUserInfo(std::string &out, const std::string &info)
 			continue;
 		}
 
-		out += "<user>";
+		out += "      <user>\n";
 
 		end = info.find_first_of(':', begin);
 		// Name:Uid:Role
 		if ( end != begin && end < next_user )
 		{
-			out += "<name>";
+			out += "         <name>";
 			xmlEncodeTo(out, info, begin, end);
-			out += "</name>";
+			out += "</name>\n";
 			begin = end + 1;
 		}
 		// Uid
 		else
 		{
-			out += "<name>XXX_UNRESOLVED_NAME_XXX</name>";
+			out += "         <name>XXX_UNRESOLVED_NAME_XXX</name>\n";
 			if ( end == begin )
 				begin = end + 1;
 		}
@@ -299,40 +299,40 @@ static void addUserInfo(std::string &out, const std::string &info)
 		// Missing Uid (...::...), Shouldn't Happen...? (validateUser()...)
 		if ( end == begin || begin >= info.size() )
 		{
-			out += "<id>XXX_UNRESOLVED_UID_XXX</id>";
+			out += "         <id>XXX_UNRESOLVED_UID_XXX</id>\n";
 			begin = end + 1;
 		}
 		// ...:Uid:...
 		else if ( end < next_user )
 		{
-			out += "<id>";
+			out += "         <id>";
 			xmlEncodeTo(out, info, begin, end);
-			out += "</id>";
+			out += "</id>\n";
 			begin = end + 1;
 		}
 		// Plain Uid...
 		else
 		{
-			out += "<id>";
+			out += "         <id>";
 			xmlEncodeTo(out, info, begin, next_user);
-			out += "</id>";
+			out += "</id>\n";
 			begin = next_user;
 		}
 
 		// Role, if present...
 		if ( begin < next_user && begin < info.size() )
 		{
-			out += "<role>";
+			out += "         <role>";
 			xmlEncodeTo(out, info, begin, next_user);
-			out += "</role>";
+			out += "</role>\n";
 		}
 		// No Role...
 		else
 		{
-			out += "<role>XXX_UNRESOLVED_ROLE_XXX</role>";
+			out += "         <role>XXX_UNRESOLVED_ROLE_XXX</role>\n";
 		}
 
-		out += "</user>";
+		out += "      </user>\n";
 
 		// Next User of End of Loop...
 		begin = next_user;
@@ -340,7 +340,7 @@ static void addUserInfo(std::string &out, const std::string &info)
 			begin++;
 	}
 
-	out += "</users>";
+	out += "   </users>\n";
 
 	DEBUG("addUserInfo() out=[" << out << "]");
 }
@@ -353,22 +353,23 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 {
 	RunInfo::RunInfoMap::iterator it;
 	bool stanza_added = !stanza;
+	std::string indent = ( stanza ) ? "   " : "";
 
 	for (it = map.begin(); it != map.end(); it++) {
 		if (it->second->valid()) {
 			if (!stanza_added) {
-				out += "<"; out += stanza; out += ">";
+				out += "   <"; out += stanza; out += ">\n";
 				stanza_added = true;
 			}
 
-			out += "<"; out += it->first; out += ">";
+			out += indent + "   <"; out += it->first; out += ">";
 			xmlEncodeTo(out, it->second->value());
-			out += "</"; out += it->first; out += ">";
+			out += "</"; out += it->first; out += ">\n";
 		}
 	}
 
 	if (stanza && stanza_added) {
-		out += "</"; out += stanza; out += ">";
+		out += "   </"; out += stanza; out += ">\n";
 	}
 }
 
@@ -549,21 +550,21 @@ void RunInfo::generatePacket(void)
 		return;
 
 	std::string xml;
-	xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+	xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 	xml += "<runinfo "
 		"xmlns=\"http://public.sns.gov/schema/runinfo.xsd\" "
 		"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
 		"xsi:schemaLocation=\"http://public.sns.gov/schema/runinfo.xsd "
-		"http://public.sns.gov/schema/runinfo.xsd\">";
-	xml += "<das_version>ADARA v0.1</das_version>";
-	xml += "<facility_name>SNS</facility_name>";
-	xml += "<instrument_name>";
+		"http://public.sns.gov/schema/runinfo.xsd\">\n";
+	xml += "   <das_version>ADARA v0.1</das_version>\n";
+	xml += "   <facility_name>SNS</facility_name>\n";
+	xml += "   <instrument_name>";
 	xml += m_beamline;
-	xml += "</instrument_name>";
+	xml += "</instrument_name>\n";
 
-	xml += "<run_number>";
+	xml += "   <run_number>";
 	xml += boost::lexical_cast<std::string>(m_runNumber);
-	xml += "</run_number>";
+	xml += "</run_number>\n";
 
 	addUserInfo(xml, m_userPV->value());
 
