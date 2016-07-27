@@ -112,7 +112,7 @@ public:
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
 			struct timespec now;
-			clock_gettime(CLOCK_REALTIME, &now);
+			clock_gettime(CLOCK_REALTIME_COARSE, &now);
 			m_pvHWSourceHwId->update(m_hwId, &now);
 			m_pvHWSourceSmsId->update(m_smsId, &now);
 			m_pvHWSourceEventBandwidthSecond->update(
@@ -227,7 +227,7 @@ public:
 		time_t sec = m_activePulse >> 32;
 		// check for "totally bogus" pulses, in distant past/future... ;-b
 		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
+		clock_gettime(CLOCK_REALTIME_COARSE, &now);
 		time_t future = 
 			now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
 		// before SNS time began... ;-D
@@ -513,7 +513,7 @@ DataSource::DataSource( const std::string &name,
 	// (All except "Enabled"!  Save that for later... :-)
 
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	m_pvName->update(m_name, &now);
 	m_pvDataURI->update(uri, &now);
@@ -676,7 +676,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	HWSrcMap::iterator it;
 
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
 		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
@@ -757,7 +757,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 	// Update/Dump Any Pulse/Event Bandwidth Statistics...
 	//    - Follow "dumpDiscarded" Flag for Logging Control...
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 	updateBandwidthSecond( now, dumpDiscarded );
 	updateBandwidthMinute( now, dumpDiscarded );
 	updateBandwidthTenMin( now, dumpDiscarded );
@@ -911,7 +911,7 @@ void DataSource::startConnect(void)
 		parseURI(uri);
 		// Update DataSource Name PV...
 		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
+		clock_gettime(CLOCK_REALTIME_COARSE, &now);
 		m_pvName->update(m_name, &now);
 	}
 
@@ -1096,7 +1096,7 @@ void DataSource::dataReady(void)
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;
-	clock_gettime(CLOCK_REALTIME, &readStart);
+	clock_gettime(CLOCK_REALTIME_COARSE, &readStart);
 
  	// reset read delayed flag, starting a new read now...
 	SMSControl *ctrl = SMSControl::getInstance();
@@ -1173,7 +1173,7 @@ void DataSource::dataReady(void)
 	if ( readOk )
 	{
 		struct timespec readEnd;
-		clock_gettime(CLOCK_REALTIME, &readEnd);
+		clock_gettime(CLOCK_REALTIME_COARSE, &readEnd);
 
 		double elapsed = calcDiffSeconds( readEnd, readStart );
 
@@ -1473,7 +1473,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 
 		// Update Number of HWSources PV...
 		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
+		clock_gettime(CLOCK_REALTIME_COARSE, &now);
 		m_pvNumHWSources->update(m_hwSources.size(), &now);
 	}
 
@@ -1536,7 +1536,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	// Get Current Time for Bandwidth Statistics
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	// Event Count Per Second
 	if ( m_last_second != now.tv_sec ) {
@@ -1546,10 +1546,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Second
 		m_last_second = now.tv_sec;
 	}
-	else {
-		m_event_count_second += pkt->num_events();
-		hw_src.m_event_count_second += pkt->num_events();
-	}
+	m_event_count_second += pkt->num_events();
+	hw_src.m_event_count_second += pkt->num_events();
 
 	// Event Count Per Minute
 	uint32_t min = now.tv_sec / 60;
@@ -1559,10 +1557,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Minute
 		m_last_minute = min;
 	}
-	else {
-		m_event_count_minute += pkt->num_events();
-		hw_src.m_event_count_minute += pkt->num_events();
-	}
+	m_event_count_minute += pkt->num_events();
+	hw_src.m_event_count_minute += pkt->num_events();
 
 	// Event Count Per Ten Minutes
 	uint32_t tenmin = now.tv_sec / 600;
@@ -1572,10 +1568,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
-	else {
-		m_event_count_tenmin += pkt->num_events();
-		hw_src.m_event_count_tenmin += pkt->num_events();
-	}
+	m_event_count_tenmin += pkt->num_events();
+	hw_src.m_event_count_tenmin += pkt->num_events();
 
 	return false;
 }
@@ -1635,7 +1629,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// check for "totally bogus" pulse times, in distant past/future... ;-b
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 	time_t future = 
 		now.tv_sec - ADARA::EPICS_EPOCH_OFFSET + SECS_PER_WEEK;
 
@@ -1756,9 +1750,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		// Reset Last Second
 		m_last_second = now.tv_sec;
 	}
-	else {
-		m_pulse_count_second++;
-	}
+	m_pulse_count_second++;
 
 	// Pulse Count Per Minute
 	uint32_t min = now.tv_sec / 60;
@@ -1768,9 +1760,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		// Reset Last Minute
 		m_last_minute = min;
 	}
-	else {
-		m_pulse_count_minute++;
-	}
+	m_pulse_count_minute++;
 
 	// Pulse Count Per Ten Minutes
 	uint32_t tenmin = now.tv_sec / 600;
@@ -1780,9 +1770,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
-	else {
-		m_pulse_count_tenmin++;
-	}
+	m_pulse_count_tenmin++;
 
 	return false;
 }
@@ -1809,6 +1797,8 @@ void DataSource::resetBandwidthStatistics(void)
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
+	static uint32_t every_three_seconds = 0;
+
 	SMSControl *ctrl = SMSControl::getInstance();
 
 	// Log the Second-Based Bandwidth Statistics Updates...
@@ -1819,28 +1809,32 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 			<< " Events=" << m_event_count_second );
 	}
 
-	// Update Bandwidth Count Per Second PVs...
-	m_pvPulseBandwidthSecond->update(m_pulse_count_second, &now);
-	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
+	if ( !( ++every_three_seconds % 3 ) )
+	{
+		// Update Bandwidth Count Per Second PVs...
+		m_pvPulseBandwidthSecond->update(m_pulse_count_second / 3, &now);
+		m_pvEventBandwidthSecond->update(m_event_count_second / 3, &now);
 
-	// Reset Counters for Next Second...
-	m_pulse_count_second = 0;
-	m_event_count_second = 0;
+		// Reset Counters for Next Second...
+		m_pulse_count_second = 0;
+		m_event_count_second = 0;
 
-	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
-	for ( HWSrcMap::iterator it = m_hwSources.begin();
-			it != m_hwSources.end() ; it++ ) {
-		if ( it->second->m_hwIndex >= 0 ) {
-			if ( do_log && it->second->m_event_count_second > 0 ) {
-				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "Bandwidth Per Second for " << m_name << ":"
-					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events=" << it->second->m_event_count_second );
+		// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
+		for ( HWSrcMap::iterator it = m_hwSources.begin();
+				it != m_hwSources.end() ; it++ ) {
+			if ( it->second->m_hwIndex >= 0 ) {
+				if ( do_log && it->second->m_event_count_second > 0 ) {
+					INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "Bandwidth Per Second for " << m_name << ":"
+						<< " HWSource HwId=" << it->second->hwId()
+						<< " Events="
+						<< it->second->m_event_count_second );
+				}
+				it->second->m_pvHWSourceEventBandwidthSecond->update(
+					it->second->m_event_count_second / 3, &now);
 			}
-			it->second->m_pvHWSourceEventBandwidthSecond->update(
-				it->second->m_event_count_second, &now);
+			it->second->m_event_count_second = 0;
 		}
-		it->second->m_event_count_second = 0;
 	}
 }
 
@@ -1981,7 +1975,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	//    - Only Do Logging If We _Just Now_ Went Idle ("1st Heartbeat"),
 	//    I.e. We Still had Some HWSources when this Heartbeat Arrived...
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 	bool do_log = ( m_hwSources.size() > 0 );
 	updateBandwidthSecond( now, do_log );
 	updateBandwidthMinute( now, do_log );
