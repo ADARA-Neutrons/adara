@@ -1388,15 +1388,15 @@ StreamParser::rxPacket
                             m_run_info.sample_formula = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
-                                (const xmlChar*)"environment" ) == 0 )
-                        {
-                            m_run_info.sample_environment = value;
-                        }
-                        else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass" ) == 0 )
                         {
                             m_run_info.sample_mass =
                                 boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass_units" ) == 0 )
+                        {
+                            m_run_info.sample_mass_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
@@ -1405,9 +1405,42 @@ StreamParser::rxPacket
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
-                                (const xmlChar*)"container" ) == 0 )
+                                (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_container = value;
+                            m_run_info.sample_density_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"container_id" ) == 0 )
+                        {
+                            m_run_info.sample_container_id = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                    (const xmlChar*)"container_name" ) == 0
+                                // Minor Backwards Compat...
+                                || xmlStrcmp( sample_node->name,
+                                    (const xmlChar*)"container" ) == 0 )
+                        {
+                            m_run_info.sample_container_name = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"can_indicator" ) == 0 )
+                        {
+                            m_run_info.sample_can_indicator = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"can_barcode" ) == 0 )
+                        {
+                            m_run_info.sample_can_barcode = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"can_name" ) == 0 )
+                        {
+                            m_run_info.sample_can_name = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"can_materials" ) == 0 )
+                        {
+                            m_run_info.sample_can_materials = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"description" ) == 0 )
@@ -1418,6 +1451,131 @@ StreamParser::rxPacket
                                 (const xmlChar*)"comments" ) == 0 )
                         {
                             m_run_info.sample_comments = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "height_in_container" ) == 0 )
+                        {
+                            m_run_info.sample_height_in_container =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "height_in_container_units" ) == 0 )
+                        {
+                            m_run_info.sample_height_in_container_units =
+                                value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "interior_diameter" ) == 0 )
+                        {
+                            m_run_info.sample_interior_diameter =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "interior_diameter_units" ) == 0 )
+                        {
+                            m_run_info.sample_interior_diameter_units =
+                                value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"interior_height" ) == 0 )
+                        {
+                            m_run_info.sample_interior_height =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "interior_height_units" ) == 0 )
+                        {
+                            m_run_info.sample_interior_height_units =
+                                value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"interior_width" ) == 0 )
+                        {
+                            m_run_info.sample_interior_width =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "interior_width_units" ) == 0 )
+                        {
+                            m_run_info.sample_interior_width_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"interior_depth" ) == 0 )
+                        {
+                            m_run_info.sample_interior_depth =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "interior_depth_units" ) == 0 )
+                        {
+                            m_run_info.sample_interior_depth_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"outer_diameter" ) == 0 )
+                        {
+                            m_run_info.sample_outer_diameter =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "outer_diameter_units" ) == 0 )
+                        {
+                            m_run_info.sample_outer_diameter_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"outer_height" ) == 0 )
+                        {
+                            m_run_info.sample_outer_height =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "outer_height_units" ) == 0 )
+                        {
+                            m_run_info.sample_outer_height_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"outer_width" ) == 0 )
+                        {
+                            m_run_info.sample_outer_width =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "outer_width_units" ) == 0 )
+                        {
+                            m_run_info.sample_outer_width_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"outer_depth" ) == 0 )
+                        {
+                            m_run_info.sample_outer_depth =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "outer_depth_units" ) == 0 )
+                        {
+                            m_run_info.sample_outer_depth_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"volume_cubic" ) == 0 )
+                        {
+                            m_run_info.sample_volume_cubic =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)
+                                    "volume_cubic_units" ) == 0 )
+                        {
+                            m_run_info.sample_volume_cubic_units = value;
                         }
                     }
                 }

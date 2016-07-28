@@ -1260,28 +1260,43 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t id, uint32_t dup)
 {
+	static PulseIdentifier lastPid(0,0);
+	static PulseMap::iterator lastIt;
+
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
-	// Manually search the map, so we can check for Sawtooth pulses... ;-b
-	// it = m_pulses.find(pid);
+	// Same as Last Pulse...? Save the Lookup Time... ;-D
+	if ( pid == lastPid ) {
+		return lastIt;
+	}
+
+	// Existing Pulse...?
+	it = m_pulses.find( pid );
+	if ( it != m_pulses.end() ) {
+		// Save Last Pulse & Iterator...
+		lastPid = pid;
+		lastIt = it;
+		return it;
+	}
+
+	// New Pulse...! If Any Pulses in list, Check for SAWTOOTH...
+	// Note: Map is _Already_ Sorted by Pulse Time (PulseIdentifier),
+	// so we can just grab Min and Max Time from the "ends" of the list
+	// to check for any SAWTOOTH Pulses... ;-b
 	if (m_pulses.begin() != m_pulses.end()) {
 
-		uint64_t min_id = (uint64_t) -1;
-		uint64_t max_id = (uint64_t) 0;
-		for (it = m_pulses.begin(); it != m_pulses.end(); it++) {
-			if (it->first.first < min_id) min_id = it->first.first;
-			if (it->first.first > max_id) max_id = it->first.first;
-			if (it->first == pid)
-				break;
-		}
+		// Get Min Pulse Time
+		it = m_pulses.begin();
+		uint64_t min_id = it->first.first;
 
-		if (it != m_pulses.end())
-			return it;
+		// Get Max Pulse Time
+		it = m_pulses.end(); it--;
+		uint64_t max_id = it->first.first;
 
-		// Log any Sawtooth pulses... :-o
+		// Log any SAWTOOTH pulses... :-o
 		if (id < min_id) {
-			/* Rate-limited logging of global sawtooth pulse */
+			/* Rate-limited logging of Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
@@ -1295,7 +1310,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			}
 		}
 		else if (id >= min_id && id < max_id) {
-			/* Rate-limited logging of global sawtooth pulse */
+			/* Rate-limited logging of Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
@@ -1310,9 +1325,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		}
 		m_lastPulseId = max_id;
 	}
+
+	// No Pulses in list, Just Compare Against "Last Pulse"...
 	else {
 		if ( id < m_lastPulseId ) {
-			/* Rate-limited logging of global sawtooth pulse */
+			/* Rate-limited logging of Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
@@ -1328,6 +1345,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		m_lastPulseId = id;
 	}
 
+	// Create New Pulse...!
 	PulsePtr new_pulse(new Pulse(pid, m_eventSources));
 
 	// By Default, All New Pulses Have Yet to Have Their
@@ -1415,7 +1433,14 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	}
 
 	// *NOW* Record the New Pulse... ;-D
-	return m_pulses.insert(make_pair(pid, new_pulse)).first;
+	it = m_pulses.insert( make_pair( pid, new_pulse ) ).first;
+
+	// Save Last Pulse & Iterator...
+	lastPid = pid;
+	lastIt = it;
+
+	// Return Iterator to New Pulse...
+	return it;
 }
 
 void SMSControl::sourceUp( uint32_t UNUSED(srcId) )
@@ -2523,6 +2548,9 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			// an Erroneous Chopper Event comes in with TOF = 0.0333333-ish
 			// which falls _Between_ the "regularly scheduled" events
 			// at the given Chopper frequency... ;-Q
+			//    -> NOTE: Problem Related to DSP Capturing *Both* the
+			//    Rising and Falling Edge Events for a Chopper...!
+			//    (No More Glitches when Just Capturing Rising Edge...! :-)
 			// - Identify This Case similarly, but with a Different
 			// neighborhood of "2 * InterPulseTime"... ;-b
 
