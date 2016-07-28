@@ -400,21 +400,113 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	addPV(prefix, "Name", "name", m_sample);
 	addPV(prefix, "Nature", "nature", m_sample);
 	addPV(prefix, "Formula", "chemical_formula", m_sample);
-	addPV(prefix, "Environment", "environment", m_sample);
 
 	m_massPV = addPV(prefix, "MassString", "mass", m_sample);
 	m_massFloat64PV.reset(new RunInfoFloat64PV(prefix + "Mass",
 		m_massPV, 0.0));
 	m_ctrl->addPV(m_massFloat64PV);
+	addPV(prefix, "MassUnits", "mass_units", m_sample);
 
 	m_densityPV = addPV(prefix, "DensityString", "density", m_sample);
 	m_densityFloat64PV.reset(new RunInfoFloat64PV(prefix + "Density",
 		m_densityPV, 0.0 ));
 	m_ctrl->addPV(m_densityFloat64PV);
+	addPV(prefix, "DensityUnits", "density_units", m_sample);
 
+	// For Minor Backwards Compat - "Container Name"... (Temporary)
 	addPV(prefix, "Container", "container", m_sample);
+
+	addPV(prefix, "ContainerId", "container_id", m_sample);
+	addPV(prefix, "ContainerName", "container_name", m_sample);
+
+	addPV(prefix, "CanIndicator", "can_indicator", m_sample);
+	addPV(prefix, "CanBarcode", "can_barcode", m_sample);
+	addPV(prefix, "CanName", "can_name", m_sample);
+	addPV(prefix, "CanMaterials", "can_materials", m_sample);
+
 	addPV(prefix, "Description", "description", m_sample);
 	addPV(prefix, "Comments", "comments", m_sample);
+
+	m_heightInContainerPV = addPV(prefix, "HeightInContainerString",
+		"height_in_container", m_sample);
+	m_heightInContainerFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "HeightInContainer",
+			m_heightInContainerPV, 0.0));
+	m_ctrl->addPV(m_heightInContainerFloat64PV);
+	addPV(prefix, "HeightInContainerUnits",
+		"height_in_container_units", m_sample);
+
+	m_interiorDiameterPV = addPV(prefix, "InteriorDiameterString",
+		"interior_diameter", m_sample);
+	m_interiorDiameterFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "InteriorDiameter",
+			m_interiorDiameterPV, 0.0));
+	m_ctrl->addPV(m_interiorDiameterFloat64PV);
+	addPV(prefix, "InteriorDiameterUnits",
+		"interior_diameter_units", m_sample);
+
+	m_interiorHeightPV = addPV(prefix, "InteriorHeightString",
+		"interior_height", m_sample);
+	m_interiorHeightFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "InteriorHeight",
+			m_interiorHeightPV, 0.0));
+	m_ctrl->addPV(m_interiorHeightFloat64PV);
+	addPV(prefix, "InteriorHeightUnits",
+		"interior_height_units", m_sample);
+
+	m_interiorWidthPV = addPV(prefix, "InteriorWidthString",
+		"interior_width", m_sample);
+	m_interiorWidthFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "InteriorWidth",
+			m_interiorWidthPV, 0.0));
+	m_ctrl->addPV(m_interiorWidthFloat64PV);
+	addPV(prefix, "InteriorWidthUnits",
+		"interior_width_units", m_sample);
+
+	m_interiorDepthPV = addPV(prefix, "InteriorDepthString",
+		"interior_depth", m_sample);
+	m_interiorDepthFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "InteriorDepth",
+			m_interiorDepthPV, 0.0));
+	m_ctrl->addPV(m_interiorDepthFloat64PV);
+	addPV(prefix, "InteriorDepthUnits",
+		"interior_depth_units", m_sample);
+
+	m_outerDiameterPV = addPV(prefix, "OuterDiameterString",
+		"outer_diameter", m_sample);
+	m_outerDiameterFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "OuterDiameter",
+			m_outerDiameterPV, 0.0));
+	m_ctrl->addPV(m_outerDiameterFloat64PV);
+	addPV(prefix, "OuterDiameterUnits", "outer_diameter_units", m_sample);
+
+	m_outerHeightPV = addPV(prefix, "OuterHeightString",
+		"outer_height", m_sample);
+	m_outerHeightFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "OuterHeight", m_outerHeightPV, 0.0));
+	m_ctrl->addPV(m_outerHeightFloat64PV);
+	addPV(prefix, "OuterHeightUnits", "outer_height_units", m_sample);
+
+	m_outerWidthPV = addPV(prefix, "OuterWidthString",
+		"outer_width", m_sample);
+	m_outerWidthFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "OuterWidth", m_outerWidthPV, 0.0));
+	m_ctrl->addPV(m_outerWidthFloat64PV);
+	addPV(prefix, "OuterWidthUnits", "outer_width_units", m_sample);
+
+	m_outerDepthPV = addPV(prefix, "OuterDepthString",
+		"outer_depth", m_sample);
+	m_outerDepthFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "OuterDepth", m_outerDepthPV, 0.0));
+	m_ctrl->addPV(m_outerDepthFloat64PV);
+	addPV(prefix, "OuterDepthUnits", "outer_depth_units", m_sample);
+
+	m_volumeCubicPV = addPV(prefix, "VolumeCubicString",
+		"volume_cubic", m_sample);
+	m_volumeCubicFloat64PV.reset(
+		new RunInfoFloat64PV(prefix + "VolumeCubic", m_volumeCubicPV, 0.0));
+	m_ctrl->addPV(m_volumeCubicFloat64PV);
+	addPV(prefix, "VolumeCubicUnits", "volume_cubic_units", m_sample);
 
 	/* Elements das_version, facility_name, instrument_name, and run_number
 	 * will be provided by this class rather than by CAS.

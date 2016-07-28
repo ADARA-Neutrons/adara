@@ -54,10 +54,42 @@ private:
 	RunInfoMap m_sample;
 	RunInfoResetPVSharedPtr m_resetPV;
 	RunUserInfoPVSharedPtr m_userPV;
+
 	RunInfoPVSharedPtr m_massPV;
-	RunInfoPVSharedPtr m_densityPV;
 	RunInfoFloat64PVSharedPtr m_massFloat64PV;
+
+	RunInfoPVSharedPtr m_densityPV;
 	RunInfoFloat64PVSharedPtr m_densityFloat64PV;
+
+	RunInfoPVSharedPtr m_heightInContainerPV;
+	RunInfoFloat64PVSharedPtr m_heightInContainerFloat64PV;
+
+	RunInfoPVSharedPtr m_interiorDiameterPV;
+	RunInfoFloat64PVSharedPtr m_interiorDiameterFloat64PV;
+
+	RunInfoPVSharedPtr m_interiorHeightPV;
+	RunInfoFloat64PVSharedPtr m_interiorHeightFloat64PV;
+
+	RunInfoPVSharedPtr m_interiorWidthPV;
+	RunInfoFloat64PVSharedPtr m_interiorWidthFloat64PV;
+
+	RunInfoPVSharedPtr m_interiorDepthPV;
+	RunInfoFloat64PVSharedPtr m_interiorDepthFloat64PV;
+
+	RunInfoPVSharedPtr m_outerDiameterPV;
+	RunInfoFloat64PVSharedPtr m_outerDiameterFloat64PV;
+
+	RunInfoPVSharedPtr m_outerHeightPV;
+	RunInfoFloat64PVSharedPtr m_outerHeightFloat64PV;
+
+	RunInfoPVSharedPtr m_outerWidthPV;
+	RunInfoFloat64PVSharedPtr m_outerWidthFloat64PV;
+
+	RunInfoPVSharedPtr m_outerDepthPV;
+	RunInfoFloat64PVSharedPtr m_outerDepthFloat64PV;
+
+	RunInfoPVSharedPtr m_volumeCubicPV;
+	RunInfoFloat64PVSharedPtr m_volumeCubicFloat64PV;
 
 	uint32_t m_runNumber;
 	bool m_packetValid;
