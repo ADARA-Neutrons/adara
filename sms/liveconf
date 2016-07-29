@@ -775,6 +775,7 @@ GET_LIVE_SETTING()
 
 COMMENTED_VALUE="(commented out)"
 VALUE_NOT_FOUND="(not found)"
+UNSET_VALUE="(unset)"
 
 opt_id_name=""
 id_name_indent=""
@@ -2451,6 +2452,18 @@ elif [[ "$command" == "confck" ]]; then
 					exit -3
 				fi
 				echo
+			fi
+
+			# Check for "Unset" Live PVs...
+			if [[ $live_value == $UNSET_VALUE ]]; then
+
+				if [[ $terse == 0 ]]; then
+					echo -e "\nlive_value = [$live_value]\n"
+				fi
+
+				echo "Warning: Live Option PV Not Set..."
+				live_value="XXX_NO_VALUE_SPECIFIED_XXX"
+
 			fi
 
 			if [[ $terse == 0 ]]; then echo; fi
