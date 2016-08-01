@@ -723,18 +723,12 @@ DeviceAgent::controlThread()
             {
                 if ( ready == m_dev_desc->m_pvs.size() )
                 {
-                    device_changed = false;
-
                     // Defined device with ConfigManager - this will return
                     // the "real" DeviceDescriptor record
+                    device_changed = false;
                     DeviceRecordPtr new_rec =
                         m_stream_api.getCfgMgr().defineDevice(
-                            *m_dev_desc );
-
-                    // If new record is the same as existing record,
-                    // then nothing has changed
-                    if ( new_rec != m_dev_record )
-                        device_changed = true;
+                            *m_dev_desc, device_changed );
 
                     // Save new device record
                     m_dev_record = new_rec;
@@ -763,7 +757,6 @@ DeviceAgent::controlThread()
                         sendCurrentValues();
 
                     m_defined = true;
-                    device_changed = false;
 
                     // Delete temporary device descriptor
                     delete m_dev_desc;
@@ -1488,7 +1481,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 void
 DeviceAgent::sendCurrentValues()
 {
-    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin();
+            ich != m_chan_info.end(); ++ich )
     {
         bool timeout;
         StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
