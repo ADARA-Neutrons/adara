@@ -179,10 +179,6 @@ OutputAdapter::streamProcessingThread()
                 payload.clear();
                 if ( translate( *pvs_pkt, adara_pkt, payload ) )
                     sendPacket( adara_pkt, payload );
-
-                // If "DeviceRedefined", Re-Send Current PV Values...!
-                if ( pvs_pkt->type == DeviceRedefined )
-                    sendCurrentDeviceData( pvs_pkt->device );
             }
 
             m_stream_api->putFreePacket( pvs_pkt );
@@ -988,41 +984,6 @@ OutputAdapter::sendCurrentData( int a_socket )
         payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
         sendPacket( adara_pkt, payload, a_socket );
-    }
-}
-
-
-/** \brief (Re-)Sends VVPs for the configured device to all clients.
-  * \param a_device - the Device to send VVPs for
-  */
-void
-OutputAdapter::sendCurrentDeviceData( DeviceRecordPtr a_device )
-{
-    OutPacket adara_pkt;
-
-    vector<uint8_t> payload;
-
-    syslog( LOG_INFO, "%s: Re-Sending Current Device [%s] Data",
-        "OutputAdapter::sendCurrentDeviceData()",
-        a_device->m_name.c_str() );
-    usleep(33333); // give syslog a chance...
-
-    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
-
-    // Send value updates for the configured device to all clients
-    for ( vector<PVDescriptor*>::const_iterator ipv =
-                a_device->m_pvs.begin();
-            ipv != a_device->m_pvs.end(); ++ipv )
-    {
-        syslog( LOG_INFO, "%s: Sending PV <%s> (%s) %s",
-            "OutputAdapter::sendCurrentDeviceData()",
-            (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str(),
-            "Variable Value Update" );
-        usleep(33333); // give syslog a chance...
-
-        payload.clear();
-        buildVVP( adara_pkt, *ipv, m_pv_state[*ipv], payload );
-        sendPacket( adara_pkt, payload );
     }
 }
 
