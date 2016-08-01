@@ -17,12 +17,15 @@ class IInputAdapterAPI;
 typedef boost::shared_ptr<DeviceDescriptor>    DeviceRecordPtr;
 
 /**
- * @brief The ConfigManager class manages device and process variable descriptors.
+ * @brief ConfigManager class manages device & process variable descriptors.
  *
- * The ConfigMaganger class manages and streams device and process variable configuration data.
- * Streaming is implemented over the internal generic protocol and feeds output protocol-adapters.
- * When devices are undefined or redefined, the ConfigManager automatically emits corresponding
- * process variable "disconnected" packets into the internal stream.
+ * The ConfigMaganger class manages and streams device and process variable
+ * configuration data.
+ * Streaming is implemented over the internal generic protocol and feeds
+ * output protocol-adapters.
+ * When devices are undefined or redefined, the ConfigManager automatically
+ * emits corresponding process variable "disconnected" packets
+ * into the internal stream.
  */
 class ConfigManager
 {
@@ -30,19 +33,26 @@ public:
     ConfigManager( uint32_t a_offset = 0 );
     ~ConfigManager();
 
-    DeviceRecordPtr getDeviceConfig( const std::string &a_device_name, const std::string &a_source, Protocol a_protocol );
-    DeviceRecordPtr defineDevice( DeviceDescriptor &a_descriptor );
+    DeviceRecordPtr getDeviceConfig( const std::string &a_device_name,
+                        const std::string &a_source, Protocol a_protocol );
+    DeviceRecordPtr defineDevice( DeviceDescriptor &a_descriptor,
+                        bool &a_device_changed );
     void            undefineDevice( DeviceRecordPtr &a_record );
     void            attach( IInputAdapterAPI *a_stream_api );
     uint32_t        getOffset(void) { return m_offset; }
 
 private:
-    std::string     makeDeviceKey( const std::string &a_name, const std::string &a_source, Protocol a_protocol ) const;
-    void            makePvNamesUnique(  const std::string &a_key, DeviceDescriptor &a_descriptor );
+    std::string     makeDeviceKey( const std::string &a_name,
+                        const std::string &a_source,
+                        Protocol a_protocol ) const;
+    void            makePvNamesUnique(  const std::string &a_key,
+                        DeviceDescriptor &a_descriptor );
     void            sendDeviceDefined( DeviceRecordPtr a_dev_desc );
     void            sendDeviceUndefined( DeviceRecordPtr a_dev_desc );
-    void            sendDeviceRedefined( DeviceRecordPtr a_dev_desc, DeviceRecordPtr a_old_dev_desc );
-    void            sendPvUndefined( DeviceRecordPtr a_dev_desc, PVDescriptor *a_pv_desc );
+    void            sendDeviceRedefined( DeviceRecordPtr a_dev_desc,
+                        DeviceRecordPtr a_old_dev_desc );
+    void            sendPvUndefined( DeviceRecordPtr a_dev_desc,
+                        PVDescriptor *a_pv_desc );
 
     IInputAdapterAPI*                       m_stream_api;
     uint32_t                                m_offset;

@@ -57,7 +57,8 @@ ConfigManager::getDeviceConfig( const string &a_device_name, const string &a_sou
   * existing device, or take no action if none is required.
   */
 DeviceRecordPtr
-ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
+ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
+        bool &a_device_changed )
 {
     // syslog( LOG_DEBUG, "ConfigMgr::defineDevice(): [%s] %s/%lu",
         // a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
@@ -66,6 +67,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     DeviceRecordPtr record;
+
+    a_device_changed = false;
 
     // Compare to the latest configuration records
     string key = makeDeviceKey( a_descriptor.m_name, a_descriptor.m_source,
@@ -102,6 +105,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
                 sendDeviceRedefined( record, idev->second );
 
                 idev->second = record;
+
+                a_device_changed = true;
             }
             else
             {
@@ -250,6 +255,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
             sendDeviceRedefined( record, idev->second );
 
             idev->second = record;
+
+            a_device_changed = true;
         }
     }
 
@@ -294,6 +301,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor )
         m_devices[key] = record;
 
         sendDeviceDefined( record );
+
+        a_device_changed = true;
     }
 
     return record;
