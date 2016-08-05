@@ -3,11 +3,13 @@
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "UserIdLdap.h"
 
 // Do Stu's Dummy PixelId-Filled Histogram Test...
 // #define HISTO_TEST
@@ -850,6 +852,7 @@ NxGen::processRunInfo
             a_run_info.sample_volume_cubic,
             a_run_info.sample_volume_cubic_units );
 
+        bool ldap_lookup = false;
         size_t user_count = 0;
         string path;
         for ( vector<STS::UserInfo>::const_iterator u =
@@ -861,9 +864,49 @@ NxGen::processRunInfo
             makeGroup( path, "NXuser" );
 
             writeString( path, "facility_user_id", u->id );
-            writeString( path, "name", u->name );
-            writeString( path, "role", u->role );
+
+            // If User Name _Not_ Specified, and User ID _Is_ Present,
+            // Then Resolve User Name Via LDAP Lookup...! ;-D
+
+            std::string user_name = u->name;
+
+            if ( !u->name.compare( "XXX_UNRESOLVED_NAME_XXX" )
+                    && !u->id.empty()
+                    && u->id.compare( "XXX_UNRESOLVED_UID_XXX" ) )
+            {
+                // Create LDAP Connection Only as Needed...
+                if ( !ldap_lookup )
+                {
+                    if ( stsLdapConnect( (const char *) NULL ) == 0 )
+                        ldap_lookup = true;
+                }
+
+                if ( ldap_lookup )
+                {
+                    char *name_lookup = stsLdapLookupUserName(
+                        (char *) u->id.c_str() );
+
+                    if ( name_lookup != NULL )
+                    {
+                        user_name = name_lookup;
+                        free( name_lookup );
+                    }
+                }
+            }
+
+            writeString( path, "name", user_name );
+
+            // No Longer Include User "Role" If Not Set, Irrelevant... ;-D
+            if ( !u->role.empty()
+                    && u->role.compare( "XXX_UNRESOLVED_ROLE_XXX" ) )
+            {
+                writeString( path, "role", u->role );
+            }
         }
+
+        // Close Any Open LDAP Connections...
+        if ( ldap_lookup )
+            stsLdapDisconnect();
     }
     catch( TraceException &e )
     {
