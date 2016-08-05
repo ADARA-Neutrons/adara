@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <syslog.h>
 #include <ldap.h>
@@ -19,6 +20,11 @@ int stsLdapConnect( const char *ldap_host )
 	char ldap_uri[255];
 
 	int desired_version = LDAP_VERSION3;
+
+	struct timeval network_timeout = { 3, 0 };
+	struct timeval sync_timeout = { 3, 0 };
+
+	int search_timelimit = 3;
 
 	int cc;
 
@@ -52,11 +58,51 @@ int stsLdapConnect( const char *ldap_host )
 			LDAP_OPT_PROTOCOL_VERSION, &desired_version))
 				!= LDAP_OPT_SUCCESS )
 	{
-		syslog( LOG_ERR, "[%i] %s %s: LDAP Set Option Failed - %s",
+		syslog( LOG_ERR, "[%i] %s %s: LDAP Set Protocol Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
 	    return( -3 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Protocol to Version 3.", g_pid );
+
+	// Set LDAP Network Timeout to 3 Seconds...
+	if ( (cc = ldap_set_option(stsLdapConn,
+			LDAP_OPT_NETWORK_TIMEOUT, &network_timeout))
+				!= LDAP_OPT_SUCCESS )
+	{
+		syslog( LOG_ERR,
+			"[%i] %s %s: LDAP Set Network Timeout Option Failed - %s",
+			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
+	    return( -4 );
+	}
+	syslog( LOG_INFO, "[%i] Set LDAP Network Timeout to %ld.%ld Seconds.",
+		g_pid, network_timeout.tv_sec, network_timeout.tv_usec );
+
+	// Set LDAP Search Time Limit to 3 Seconds...
+	if ( (cc = ldap_set_option(stsLdapConn,
+			LDAP_OPT_TIMELIMIT, &search_timelimit))
+				!= LDAP_OPT_SUCCESS )
+	{
+		syslog( LOG_ERR,
+			"[%i] %s %s: LDAP Set Search Time Limit Option Failed - %s",
+			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
+	    return( -4 );
+	}
+	syslog( LOG_INFO, "[%i] Set LDAP Search Time Limit to %d Seconds.",
+		g_pid, search_timelimit );
+
+	// Set LDAP Synchronous Timeout to 3 Seconds...
+	if ( (cc = ldap_set_option(stsLdapConn,
+			LDAP_OPT_TIMEOUT, &sync_timeout))
+				!= LDAP_OPT_SUCCESS )
+	{
+		syslog( LOG_ERR,
+			"[%i] %s %s: LDAP Set Synchronous Timeout Option Failed - %s",
+			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
+	    return( -4 );
+	}
+	syslog( LOG_INFO,
+		"[%i] Set LDAP Synchronous Timeout to %ld.%ld Seconds.",
+		g_pid, sync_timeout.tv_sec, sync_timeout.tv_usec );
 
 	return( 0 );
 }
@@ -70,6 +116,10 @@ char *stsLdapLookupUserName( char *uid )
 	char filter[1024];
 
 	const char *attrs[2];
+
+	struct timeval search_timeout = { 3, 0 };
+
+	char *result = (char *) NULL;
 
 	int cc;
 
@@ -99,8 +149,8 @@ char *stsLdapLookupUserName( char *uid )
 
 	// Search LDAP Server for User ID
 	if ( (cc = ldap_search_ext_s(stsLdapConn, base, LDAP_SCOPE_SUBTREE,
-			filter, (char **)attrs, 0, NULL, NULL, NULL, LDAP_NO_LIMIT,
-			&msg)) != LDAP_SUCCESS )
+			filter, (char **)attrs, 0, NULL, NULL,
+			&search_timeout, LDAP_NO_LIMIT, &msg)) != LDAP_SUCCESS )
 	{
 		syslog( LOG_ERR, "[%i] %s %s: LDAP Search Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
@@ -124,30 +174,35 @@ char *stsLdapLookupUserName( char *uid )
 				attr != NULL;
     			attr = ldap_next_attribute(stsLdapConn, entry, ber) )
 		{
-			struct berval **vals;
-			if ( (vals=ldap_get_values_len(stsLdapConn, entry, attr))
-					!= NULL )
+			// Found LDAP User Name! :-D
+			if ( !strcmp( attr, attrs[0] ) )
 			{
-				int i;
-				for ( i=0; vals[i] != NULL; i++ )
+				struct berval **vals;
+				if ( (vals=ldap_get_values_len(stsLdapConn, entry, attr))
+						!= NULL )
 				{
-					// Found LDAP User Name! :-D
-					if ( !strcmp( attr, attrs[0] ) )
+					if ( vals[0] != NULL )
 					{
+						result = strdup( vals[0]->bv_val );
 						syslog( LOG_INFO,
 							"[%i] %s: Found LDAP User Name [%s]",
-							g_pid, "stsLdapLookupUserName()",
-							vals[i]->bv_val );
-						return( strdup( vals[i]->bv_val) );
+							g_pid, "stsLdapLookupUserName()", result );
+						ldap_value_free_len(vals);
+						ber_free(ber, 0);
+						ldap_msgfree(msg);
+						return( result );
 					}
 				}
+				ldap_value_free_len(vals);
 			}
 		}
+		ber_free(ber, 0);
 	}
 
 	syslog( LOG_ERR, "[%i] %s %s: LDAP User Name Not Found for uid=[%s]!",
 		g_pid, "STS Error:", "stsLdapLookupUserName()", uid );
-	return( (char *) NULL );
+	ldap_msgfree(msg);
+	return( result );
 }
 
 int stsLdapDisconnect(void)
