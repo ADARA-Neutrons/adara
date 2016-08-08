@@ -784,8 +784,10 @@ NxGen::processRunInfo
 
         writeScalar( sample_path, "mass",
             a_run_info.sample_mass, a_run_info.sample_mass_units );
-        writeScalar( sample_path, "density",
-            a_run_info.sample_density, a_run_info.sample_density_units );
+
+        writeScalar( sample_path, "number_density",
+            a_run_info.sample_number_density,
+            a_run_info.sample_number_density_units );
 
         writeString( sample_path, "component", // no container in NXsample
             a_run_info.sample_container_id + ": "
