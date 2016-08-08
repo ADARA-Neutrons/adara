@@ -517,8 +517,8 @@ struct RunInfo
     std::string             sample_formula;
     double                  sample_mass;
     std::string             sample_mass_units;
-    double                  sample_density;
-    std::string             sample_density_units;
+    double                  sample_number_density;
+    std::string             sample_number_density_units;
     std::string             sample_container_id;
     std::string             sample_container_name;
     std::string             sample_can_indicator;
