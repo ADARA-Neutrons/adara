@@ -1398,16 +1398,33 @@ StreamParser::rxPacket
                         {
                             m_run_info.sample_mass_units = value;
                         }
+                        // TODO Delete When Phased Out... ;-Q
+                        // ("Density" is really "Number Density"...!)
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
                         {
-                            m_run_info.sample_density =
+                            m_run_info.sample_number_density =
                                 boost::lexical_cast<double>( value );
                         }
+                        // TODO Delete When Phased Out... ;-Q
+                        // ("Density Units" is really
+                        //    "Number Density Units"...!)
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_density_units = value;
+                            m_run_info.sample_number_density_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"number_density" ) == 0 )
+                        {
+                            m_run_info.sample_number_density =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"number_density_units" )
+                                    == 0 )
+                        {
+                            m_run_info.sample_number_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"container_id" ) == 0 )
