@@ -407,11 +407,14 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	m_ctrl->addPV(m_massFloat64PV);
 	addPV(prefix, "MassUnits", "mass_units", m_sample);
 
-	m_densityPV = addPV(prefix, "DensityString", "density", m_sample);
+	// NOTE: This is for *Number* Density, _Not_ "Mass Density"...!
+	// ("Mass Density" Must Be Computed During Reduction...)
+	m_densityPV = addPV(prefix, "DensityString",
+		"number_density", m_sample);
 	m_densityFloat64PV.reset(new RunInfoFloat64PV(prefix + "Density",
 		m_densityPV, 0.0 ));
 	m_ctrl->addPV(m_densityFloat64PV);
-	addPV(prefix, "DensityUnits", "density_units", m_sample);
+	addPV(prefix, "DensityUnits", "number_density_units", m_sample);
 
 	// For Minor Backwards Compat - "Container Name"... (Temporary)
 	addPV(prefix, "Container", "container", m_sample);
