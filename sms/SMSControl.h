@@ -217,6 +217,8 @@ private:
 	SourceSet m_liveClients;
 
 	PulseMap m_pulses;
+	PulseIdentifier m_lastPid;
+	PulseMap::iterator m_lastPulseIt;
 	uint64_t m_lastPulseId;
 	uint32_t m_lastRingPeriod;
 

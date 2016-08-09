@@ -466,6 +466,9 @@ SMSControl::SMSControl() :
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
 	m_pvDoPulseVetoCorrect->update(m_doPulseVetoCorrect, &now);
 
+	// Initialize Fast "Last Pulse" Lookup...
+	PulseIdentifier m_lastPid(-1,-1);
+
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
 
@@ -1164,6 +1167,12 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			recordPulse(it->second);
 			last_recorded = it;
 			recorded++;
+			// Reset Any "Last Pulse" ID for Fast Lookup...
+			if ( it->first == m_lastPid ) {
+				m_lastPid = PulseIdentifier(-1,-1);
+				//DEBUG("*** Freeing 'Last Pulse', Reset Last Pulse Id"
+					//<< std::hex << " 0x" << it->first.first << std::dec);
+			}
 		}
 
 		// Erase Any Now-Recorded Pulses
@@ -1248,8 +1257,14 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 		}
 	}
 
-	// Pop Given Pulse from Buffer...
+	// Reset Any "Last Pulse" ID for Fast Lookup...
+	if ( it->first == m_lastPid ) {
+		m_lastPid = PulseIdentifier(-1,-1);
+		//DEBUG("*** Freeing 'Last Pulse', Reset Last Pulse Id"
+			//<< std::hex << " 0x" << it->first.first << std::dec);
+	}
 
+	// Pop Given Pulse from Buffer...
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
 		<< "popPulseBuffer: Popping " << isLast << "Pulse "
 		<< " pulse_index=" << pulse_index
@@ -1260,23 +1275,20 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t id, uint32_t dup)
 {
-	static PulseIdentifier lastPid(0,0);
-	static PulseMap::iterator lastIt;
-
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
 	// Same as Last Pulse...? Save the Lookup Time... ;-D
-	if ( pid == lastPid ) {
-		return lastIt;
+	if ( pid == m_lastPid ) {
+		return m_lastPulseIt;
 	}
 
 	// Existing Pulse...?
 	it = m_pulses.find( pid );
 	if ( it != m_pulses.end() ) {
 		// Save Last Pulse & Iterator...
-		lastPid = pid;
-		lastIt = it;
+		m_lastPid = pid;
+		m_lastPulseIt = it;
 		return it;
 	}
 
@@ -1436,8 +1448,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	it = m_pulses.insert( make_pair( pid, new_pulse ) ).first;
 
 	// Save Last Pulse & Iterator...
-	lastPid = pid;
-	lastIt = it;
+	m_lastPid = pid;
+	m_lastPulseIt = it;
 
 	// Return Iterator to New Pulse...
 	return it;
@@ -2159,6 +2171,13 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		recordPulse(it->second);
 		last_recorded = it;
 		recorded++;
+
+		// Reset Any "Last Pulse" ID for Fast Lookup...
+		if ( it->first == m_lastPid ) {
+			m_lastPid = PulseIdentifier(-1,-1);
+			//DEBUG("*** Freeing 'Last Pulse', Reset Last Pulse Id"
+				//<< std::hex << " 0x" << it->first.first << std::dec);
+		}
 	}
 
 	// Erase Any Now-Recorded Pulses
