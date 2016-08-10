@@ -75,6 +75,7 @@
 #include <syslog.h>
 #include <string.h>
 #include <fcntl.h>
+#include <ldap.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -163,6 +164,8 @@ int main( int argc, char** argv )
         string broker_user;
         string broker_pass;
         string domain;
+        string ldap_host;
+        uint32_t ldap_port;
 
         namespace po = boost::program_options;
         po::options_description options( "sts program options" );
@@ -189,6 +192,8 @@ int main( int argc, char** argv )
                 ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
                 ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
+                ("ldap_host", po::value<string>( &ldap_host )->default_value( "data.sns.gov" ), "Override Default LDAP Host for User Name Lookup")
+                ("ldap_port", po::value<unsigned int>( &ldap_port )->default_value( LDAP_PORT ), "Override Default LDAP Port for User Name Lookup")
                 ;
 
 
@@ -254,6 +259,8 @@ int main( int argc, char** argv )
             cout << "  comp lev      : " << compression_level <<  endl;
             cout << "  keep temp     : " << ( keep_temp ? "yes" : "no" ) << endl;
             cout << "  gather stats  : " << ( gather_stats ? "yes" : "no" ) << endl;
+            cout << "  ldap_host     : " << ldap_host << endl;
+            cout << "  ldap_port     : " << ldap_port << endl;
         }
 
         if ( opt_map.count( "file" ))
@@ -274,8 +281,9 @@ int main( int argc, char** argv )
                 dup2( nullfd, 2 );
             }
 
-            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
-                            anc_buf_size, cache_size, compression_level );
+            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict,
+                gather_stats, ldap_host, ldap_port, chunk_size,
+                evt_buf_size, anc_buf_size, cache_size, compression_level );
 
             // Start ComBus monitor thread if not in interactive mode
             if ( !interact )
