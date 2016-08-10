@@ -31,7 +31,7 @@ int main()
 		perror("ldap_initialize failed");
 		return( -1 );
 	}
-	printf( "Connected to LDAP Server %s at port %d\n",
+	printf( "Initialized to LDAP Server %s at port %d\n",
 		ldap_host, LDAP_PORT );
 
 	// Set LDAP Protocol to Version 3
