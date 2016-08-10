@@ -2,8 +2,8 @@
 // User ID LDAP Lookup, C API...
 //
 
-#include <stdio.h>
-#include <string.h>
+#include <string>
+#include <sstream>
 #include <sys/time.h>
 #include <errno.h>
 #include <syslog.h>
@@ -11,14 +11,10 @@
 
 #include "stsdefs.h"
 
-extern "C" {
-
 LDAP *stsLdapConn = NULL;
 
-int stsLdapConnect( const char *ldap_host )
+int stsLdapConnect( std::string &ldap_host, uint32_t ldap_port )
 {
-	char ldap_uri[255];
-
 	int desired_version = LDAP_VERSION3;
 
 	struct timeval network_timeout = { 3, 0 };
@@ -29,29 +25,31 @@ int stsLdapConnect( const char *ldap_host )
 	int cc;
 
 	// Use Default LDAP Host, If Left Unspecified...
-	if ( ldap_host == NULL )
-		ldap_host = (const char *) "data.sns.gov";
-
-	// Check for LDAP Host Name Overflow...
-	else if ( strlen( ldap_host ) > sizeof( ldap_uri ) - 7 - 1 - 6 - 1 )
-	{
-		syslog( LOG_ERR, "[%i] %s %s: LDAP Server Host Name Too Long! [%s]",
-			g_pid, "STS Error:", "stsLdapConnect()", ldap_host );
-		return( -1 );
+	if ( ldap_host.empty() ) {
+		ldap_host = "data.sns.gov";
+		syslog( LOG_INFO, "[%i] %s: LDAP Host Defaults to %s (port=%d)",
+			g_pid, "stsLdapConnect()", ldap_host.c_str(), ldap_port );
 	}
 
 	// Build LDAP URI from Server Host Name and Default Port...
-	sprintf( ldap_uri, "ldap://%s:%d", ldap_host, LDAP_PORT );
+	std::stringstream ldap_uri;
+	ldap_uri << "ldap://";
+	ldap_uri << ldap_host;
+	ldap_uri << ":";
+	ldap_uri << ldap_port;
 
 	// Connect to the LDAP Server
-	if ( (cc = ldap_initialize( &stsLdapConn, ldap_uri )) != LDAP_SUCCESS )
+	if ( (cc = ldap_initialize( &stsLdapConn, ldap_uri.str().c_str() ))
+			!= LDAP_SUCCESS )
 	{
-		syslog( LOG_ERR, "[%i] %s %s: LDAP Initialize Failed - %s",
-			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-		return( -2 );
+		syslog( LOG_ERR,
+			"[%i] %s %s: LDAP Initialize Failed to Host %s port=%d - %s",
+			g_pid, "STS Error:", "stsLdapConnect()",
+			ldap_host.c_str(), ldap_port, ldap_err2string(cc) );
+		return( -1 );
 	}
-	syslog( LOG_INFO, "[%i] Connected to LDAP Server %s at port %d",
-		g_pid, ldap_host, LDAP_PORT );
+	syslog( LOG_INFO, "[%i] Initialized to LDAP Server %s at port %d",
+		g_pid, ldap_host.c_str(), ldap_port );
 
 	// Set LDAP Protocol to Version 3
 	if ( (cc = ldap_set_option(stsLdapConn,
@@ -60,7 +58,7 @@ int stsLdapConnect( const char *ldap_host )
 	{
 		syslog( LOG_ERR, "[%i] %s %s: LDAP Set Protocol Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -3 );
+	    return( -2 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Protocol to Version 3.", g_pid );
 
@@ -72,7 +70,7 @@ int stsLdapConnect( const char *ldap_host )
 		syslog( LOG_ERR,
 			"[%i] %s %s: LDAP Set Network Timeout Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -4 );
+	    return( -3 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Network Timeout to %ld.%ld Seconds.",
 		g_pid, network_timeout.tv_sec, network_timeout.tv_usec );
@@ -85,7 +83,7 @@ int stsLdapConnect( const char *ldap_host )
 		syslog( LOG_ERR,
 			"[%i] %s %s: LDAP Set Search Time Limit Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -4 );
+	    return( -3 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Search Time Limit to %d Seconds.",
 		g_pid, search_timelimit );
@@ -107,57 +105,47 @@ int stsLdapConnect( const char *ldap_host )
 	return( 0 );
 }
 
-char *stsLdapLookupUserName( char *uid )
+int stsLdapLookupUserName( std::string uid, std::string &user_name )
 {
 	LDAPMessage *msg;
 
-	const char *base = "ou=Users,dc=sns,dc=ornl,dc=gov";
+	std::string base = "ou=Users,dc=sns,dc=ornl,dc=gov";
 
-	char filter[1024];
+	std::string filter;
 
 	const char *attrs[2];
 
 	struct timeval search_timeout = { 3, 0 };
 
-	char *result = (char *) NULL;
-
 	int cc;
 
 	// Verify Valid UID String...
-	if ( uid == NULL && *uid == '\0' )
+	if ( uid.empty() )
 	{
 		syslog( LOG_ERR, "[%i] %s %s: Invalid User ID String! [%s]",
-			g_pid, "STS Error:", "stsLdapLookupUserName()",
-			( uid ) ? uid : "(null)" );
-		return( (char *) NULL );
-	}
-
-	// Check for UID String Overflow...
-	if ( strlen( uid ) > sizeof( filter ) - 4 - 1 )
-	{
-		syslog( LOG_ERR, "[%i] %s %s: User ID String Too Long! [%s]",
-			g_pid, "STS Error:", "stsLdapLookupUserName()", uid );
-		return( (char *) NULL );
+			g_pid, "STS Error:", "stsLdapLookupUserName()", uid.c_str() );
+		return( -1 );
 	}
 
 	// Set Up LDAP Search Filters...
-	sprintf( filter, "uid=%s", uid );
+	filter = "uid=" + uid;
 
 	// Choose Desired Attribute(s)...
 	attrs[0] = "cn";
 	attrs[1] = NULL;
 
 	// Search LDAP Server for User ID
-	if ( (cc = ldap_search_ext_s(stsLdapConn, base, LDAP_SCOPE_SUBTREE,
-			filter, (char **)attrs, 0, NULL, NULL,
+	if ( (cc = ldap_search_ext_s(stsLdapConn,
+			base.c_str(), LDAP_SCOPE_SUBTREE,
+			filter.c_str(), (char **)attrs, 0, NULL, NULL,
 			&search_timeout, LDAP_NO_LIMIT, &msg)) != LDAP_SUCCESS )
 	{
 		syslog( LOG_ERR, "[%i] %s %s: LDAP Search Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-		return( (char *) NULL );
+		return( -2 );
 	}
 	syslog( LOG_INFO, "[%i] %s: Searched LDAP Server for filter=[%s]",
-		g_pid, "stsLdapLookupUserName()", filter );
+		g_pid, "stsLdapLookupUserName()", filter.c_str() );
 
 	// Display LDAP Search Results
 	int num_entries_returned = ldap_count_entries(stsLdapConn, msg);
@@ -183,14 +171,15 @@ char *stsLdapLookupUserName( char *uid )
 				{
 					if ( vals[0] != NULL )
 					{
-						result = strdup( vals[0]->bv_val );
+						user_name = std::string( vals[0]->bv_val );
 						syslog( LOG_INFO,
 							"[%i] %s: Found LDAP User Name [%s]",
-							g_pid, "stsLdapLookupUserName()", result );
+							g_pid, "stsLdapLookupUserName()",
+							user_name.c_str() );
 						ldap_value_free_len(vals);
 						ber_free(ber, 0);
 						ldap_msgfree(msg);
-						return( result );
+						return( 0 );
 					}
 				}
 				ldap_value_free_len(vals);
@@ -200,9 +189,9 @@ char *stsLdapLookupUserName( char *uid )
 	}
 
 	syslog( LOG_ERR, "[%i] %s %s: LDAP User Name Not Found for uid=[%s]!",
-		g_pid, "STS Error:", "stsLdapLookupUserName()", uid );
+		g_pid, "STS Error:", "stsLdapLookupUserName()", uid.c_str() );
 	ldap_msgfree(msg);
-	return( result );
+	return( -3 );
 }
 
 int stsLdapDisconnect(void)
@@ -220,7 +209,5 @@ int stsLdapDisconnect(void)
 	syslog( LOG_INFO, "[%i] Ended Session with LDAP Server.", g_pid );
 
 	return( 0 );
-}
-
 }
 
