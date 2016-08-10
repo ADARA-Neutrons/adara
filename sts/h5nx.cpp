@@ -3,7 +3,7 @@
  */
 
 #include "h5nx.hpp"
-#include "stdint.h"
+#include <stdint.h>
 #include <iostream>
 #include <assert.h>
 #include <string.h>
