@@ -201,7 +201,9 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_full_buffer_count(0)
+            m_full_buffer_count(0),
+            m_value_enum_strings_max_len(-1),
+            m_value_enum_strings_not_found(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -282,6 +284,75 @@ private:
             // when fast metadata is supported
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
+
+            // Capture Value Strings for Enumerated Type PVs...
+            // (IFF Everything Works...! ;-D)
+            if ( this->m_type == STS::PVT_ENUM
+                    && this->m_enum_vector != NULL
+                    && this->m_enum_index != (uint32_t) -1 )
+            {
+                STS::PVEnumeratedType *pv_enum =
+                    &((*(this->m_enum_vector))[ this->m_enum_index ]);
+
+                // Do We Have a Matching (Usable) Value and Name Vectors?
+                if ( pv_enum->element_values.size()
+                        == pv_enum->element_names.size() )
+                {
+                    // Find Matching Value String for Each Buffer Value...
+                    // (I hope this isn't ever "Too Huge"... ;-b)
+                    for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                    {
+                        bool found = false;
+
+                        for ( uint32_t j=0 ; !found
+                                && j < pv_enum->element_values.size() ;
+                                j++ )
+                        {
+                            if ( value_buffer[i]
+                                    == pv_enum->element_values[j] )
+                            {
+                                m_value_enum_strings.push_back(
+                                    pv_enum->element_names[j] );
+
+                                // Determine Max Value String Length...
+                                if ( m_value_enum_strings_max_len
+                                        == (uint32_t) -1
+                                    || pv_enum->element_names[j].size()
+                                        > m_value_enum_strings_max_len )
+                                {
+                                    m_value_enum_strings_max_len =
+                                        pv_enum->element_names[j].size();
+                                }
+
+                                found = true;
+                            }
+                        }
+
+                        // Bummer, Enum Value Not Found... ;-Q
+                        // Put *Something* in there to Keep Order...
+                        if ( !found )
+                        {
+                            std::string something = "<Not Found!>";
+
+                            m_value_enum_strings.push_back( something );
+
+                            // Determine Max Value String Length...
+                            if ( m_value_enum_strings_max_len
+                                    == (uint32_t) -1
+                                || something.size()
+                                    > m_value_enum_strings_max_len )
+                            {
+                                m_value_enum_strings_max_len =
+                                    something.size();
+                            }
+
+                            // Just Log This Kind of Lookup Failure
+                            // *ONCE* at the End...! ;-D
+                            m_value_enum_strings_not_found++;
+                        }
+                    }
+                }
+            }
         }
 
         /// Writes Buffered Double PV Values to Nexus File 
@@ -611,6 +682,84 @@ private:
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
+
+                            // Write Any String Value Array for Enum Types
+                            if ( !m_value_enum_strings.empty() )
+                            {
+                                // NOW Log if we Couldn't Find Some
+                                // Particular Enumerated Type Values...
+                                if ( m_value_enum_strings_not_found > 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s: %d %s %s PV %s!",
+                                        g_pid, "STS Error",
+                                        m_value_enum_strings_not_found,
+                                        "Enumerated Type Value Strings",
+                                        "Not Found for",
+                                        this->m_name.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                // Make Sure We Don't Freak Out HDF5
+                                // No Matter What...
+                                if ( m_value_enum_strings_max_len
+                                        == (uint32_t) -1
+                                    || m_value_enum_strings_max_len == 0 )
+                                {
+                                    m_value_enum_strings_max_len = 1;
+                                }
+
+                                syslog( LOG_ERR,
+                                    "[%i] %s PV %s size=%lu max_len=%u",
+                                    g_pid,
+                                    "Enumerated Type Value Strings for",
+                                    this->m_name.c_str(),
+                                    m_value_enum_strings.size(),
+                                    m_value_enum_strings_max_len );
+                                usleep(30000); // give syslog a chance...
+
+                                // Value Strings as 2D String Dataset
+                                std::vector<hsize_t> dims;
+                                dims.push_back(
+                                    m_value_enum_strings.size() );
+                                dims.push_back(
+                                    m_value_enum_strings_max_len );
+
+                                // Pad the Strings with Spaces
+                                // to Be of Uniform Length...
+                                std::vector<std::string> values_vec;
+                                for ( uint32_t i=0 ;
+                                        i < m_value_enum_strings.size() ;
+                                        i++ )
+                                {
+                                    std::string str =
+                                        m_value_enum_strings[i];
+                                    if ( str.size()
+                                          < m_value_enum_strings_max_len )
+                                    {
+                                        str.insert( str.end(),
+                                            m_value_enum_strings_max_len
+                                                - str.size(), ' ' );
+                                    }
+                                    values_vec.push_back( str );
+                                }
+
+                                m_nxgen.writeMultidimDataset( m_log_path,
+                                    "value_strings", values_vec, dims );
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s: %s for PV %s - %s",
+                                    g_pid, "STS Error",
+                                    "Empty Enumerated Type Value Strings",
+                                    this->m_name.c_str(),
+                                    "Creating Dummy Value Strings" );
+                                usleep(30000); // give syslog a chance...
+
+                                m_nxgen.makeDataset( m_log_path,
+                                    "value_strings", NeXus::CHAR );
+                            }
                         }
 
                         // Last Pass, Create Any PV (Alias) Link Now!
@@ -659,6 +808,10 @@ private:
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
         uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
+        std::vector<std::string>
+                        m_value_enum_strings;   ///< Vector of Enumerated Type Value Strings
+        uint32_t        m_value_enum_strings_max_len;   ///< Max Length of Enumerated Type Value Strings
+        uint32_t        m_value_enum_strings_not_found;   ///< Number of Enumerated Type Value Strings Not Found
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
