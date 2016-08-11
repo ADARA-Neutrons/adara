@@ -22,8 +22,8 @@
 
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
  *
- * The NxGen class is a stream adapter subclass that specializes the ADARA StreamParser class for creating NeXus output
- * files.
+ * The NxGen class is a stream adapter subclass that specializes the
+ * ADARA StreamParser class for creating NeXus output files.
  */
 class NxGen : public STS::StreamParser
 {
@@ -118,7 +118,8 @@ private:
             NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
-            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
+            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve,
+                a_config ),
             m_index_cur_size(0),
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
@@ -209,11 +210,12 @@ private:
             // then there's No Alias, and No Need for a Distinct Link.
             if ( m_internal_name == m_internal_connection )
             {
-                m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
+                m_log_path =
+                    m_nxgen.m_daslogs_path + "/" + m_internal_name;
                 m_link_path = "";
             }
 
-            // Otherwise, If the PV Name and Connection String are Distinct,
+            // Otherwise, If the PV Name and Connection String are Distinct
             // then Use the Connection String for the Actual Data and
             // Create a Link Path using the (Alias) Name...
             else
@@ -389,7 +391,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs String PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D String Array to NeXus File...
@@ -444,7 +447,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs Uint32 Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D Uint32 Array to NeXus File...
@@ -503,7 +507,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs Double Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D Double Array to NeXus File...
@@ -548,8 +553,9 @@ private:
         {
             try
             {
-                // Write PV Values to NeXus File _If_ We're Writing to NeXus
-                // and _If_ We Care About This PV (_Not_ Ignored!) :-D
+                // Write PV Values to NeXus File _If_ We're Writing to
+                // NeXus and _If_ We Care About This PV (_Not_ Ignored!)
+                // :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
                     // Wait for End of Run to Dump String/Array PV Types...
@@ -557,7 +563,8 @@ private:
                     if ( !a_run_metrics &&
                             ( this->m_type == STS::PVT_STRING
                                 || this->m_type == STS::PVT_UINT_ARRAY
-                                || this->m_type == STS::PVT_DOUBLE_ARRAY ) )
+                                || this->m_type == STS::PVT_DOUBLE_ARRAY )
+                    )
                     {
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
@@ -807,7 +814,7 @@ private:
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
-        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
+        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging
         std::vector<std::string>
                         m_value_enum_strings;   ///< Vector of Enumerated Type Value Strings
         uint32_t        m_value_enum_strings_max_len;   ///< Max Length of Enumerated Type Value Strings
@@ -896,7 +903,8 @@ protected:
     void                markerComment( double a_time,
                             const std::string &a_comment );
     void                writeDeviceEnums( STS::Identifier a_devId,
-                            std::vector<STS::PVEnumeratedType> &a_enumVec );
+                            std::vector<STS::PVEnumeratedType>
+                                &a_enumVec );
 
 private:
     void                flushPauseData();
@@ -985,7 +993,8 @@ private:
                                 {
                                     buf.resize( m_chunk_size, a_value );
 
-                                    while ( count <= ( a_count - m_chunk_size ) )
+                                    while ( count
+                                            <= ( a_count - m_chunk_size ) )
                                     {
                                         writeSlab( a_path, buf, cur_size );
                                         count += buf.size();
