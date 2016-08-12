@@ -515,7 +515,7 @@ pvExistReturn SMSControl::pvExistTest(const casCtx &UNUSED(ctx),
 pvAttachReturn SMSControl::pvAttach(const casCtx &UNUSED(ctx),
 	const char *pv_name)
 {
-	std::map<std::string, boost::shared_ptr<casPV> >::iterator iter;
+	std::map<std::string, PVSharedPtr>::iterator iter;
 
 	iter = m_pv_map.find(pv_name);
 	if (iter == m_pv_map.end())
