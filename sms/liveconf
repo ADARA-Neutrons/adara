@@ -1228,6 +1228,8 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:Marker:Comment
 		caget $WAIT ${PRE}:SMS:Marker:Annotate
 		caget $WAIT ${PRE}:SMS:Marker:RunComment
+		caget $WAIT -S ${PRE}:SMS:Marker:NotesComment
+		caget $WAIT -S ${PRE}:SMS:Marker:AnnotationComment
 
 		echo
 
