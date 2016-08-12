@@ -11,12 +11,15 @@
 
 class MarkerPausedPV;
 class MarkerTriggerPV;
+class MarkerCommentPV;
 class smsStringPV;
 class smsUint32PV;
 
 class Markers : boost::noncopyable {
 public:
-	Markers(SMSControl *ctrl);
+	typedef boost::shared_ptr<smsStringPV> StringPVSharedPtr;
+
+	Markers( SMSControl *ctrl );
 	~Markers();
 
 	void newRun(void);
@@ -33,6 +36,9 @@ private:
 	boost::shared_ptr<MarkerTriggerPV> m_annotatePV;
 	boost::shared_ptr<MarkerTriggerPV> m_runCommentPV;
 
+	boost::shared_ptr<MarkerCommentPV> m_notesCommentPV;
+	boost::shared_ptr<MarkerCommentPV> m_annotationCommentPV;
+
 	boost::signals2::connection m_connection;
 
 	SMSControl *m_ctrl;
@@ -43,11 +49,18 @@ private:
 	void stopScan(void);
 	void annotate(void);
 	void addRunComment(void);
+	void addNotesComment(void);
+	void addAnnotationComment(void);
+
 	void onPrologue(void);
-	void emitPrologue(ADARA::MarkerType::Enum);
-	void emitPacket(ADARA::MarkerType::Enum, bool addComment = true);
-	void emitPacket(const struct timespec &, ADARA::MarkerType::Enum,
-			bool addComment, bool prologue = false);
+
+	void emitPrologue( ADARA::MarkerType::Enum );
+
+	void emitPacket( ADARA::MarkerType::Enum,
+		StringPVSharedPtr commentPV = StringPVSharedPtr() );
+
+	void emitPacket( const struct timespec &, ADARA::MarkerType::Enum,
+		StringPVSharedPtr commentPV = StringPVSharedPtr(), bool prologue = false );
 };
 
 #endif /* __MARKERS_H */
