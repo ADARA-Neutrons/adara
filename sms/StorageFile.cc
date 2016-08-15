@@ -387,9 +387,6 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 
 void StorageFile::terminateSave(void)
 {
-	/* Disable the generation of a sync packet as we're closing out
-	 * the file and want the run status to be the last packet.
-	 */
 	m_active = false;
 
 	put_fd();
