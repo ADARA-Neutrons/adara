@@ -1380,7 +1380,7 @@ NxGen::runComment
 {
     if ( m_haveRunComment ) {
         syslog( LOG_WARNING,
-        "[%i] %s Unexpected input: duplicate run comment specified: %s",
+        "[%i] %s Duplicate Run Comment Specified (Discarded): %s",
             g_pid, "STS Error:", a_comment.c_str() );
         usleep(30000); // give syslog a chance...
         return;
