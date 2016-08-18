@@ -1,4 +1,5 @@
 
+#include <boost/lexical_cast.hpp>
 #include <boost/function.hpp>
 #include <stdint.h>
 #include <string>
@@ -155,13 +156,15 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	if ( m_scanIndex ) {
 		std::string comment = "Warning: Scan Stopped at New Run Start!";
 		emitPacket( now, ADARA::MarkerType::SCAN_STOP, comment );
+		// _Also_ Queue This Scan Stop/Comment for _After_ Run Start...
+		std::stringstream ss_scan;
+		ss_scan << m_scanIndex << "|";
+		scanStopQueue.push_back(
+			std::pair<struct timespec, std::string>( now,
+				ss_scan.str() + "[PRE-RUN] " + comment ) );
 		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
-		// _Also_ Queue This Scan Stop/Comment for _After_ Run Start...
-		scanStopQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
-				"[PRE-RUN] " + comment ) );
 	}
 
 	// Don't Unset Comment PV(s) on Run Start, _Only_ on Run Stop...
@@ -293,6 +296,8 @@ void Markers::startScan(void)
 	{
 		struct timespec now;
 		clock_gettime( CLOCK_REALTIME, &now );
+		std::stringstream ss_scan;
+		ss_scan << m_scanIndex << "|";
 		std::string label = "";
 		if ( !m_inRun )
 			label = "[PRE-RUN] ";
@@ -300,7 +305,7 @@ void Markers::startScan(void)
 			label = "[PAUSED] ";
 		scanStartQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
-				label + ss.str() ) );
+				ss_scan.str() + label + ss.str() ) );
 	}
 }
 
@@ -310,13 +315,14 @@ void Markers::stopScan(void)
 	ss << "Scan #" << m_scanIndex << " Stopped.";
 	DEBUG( ss.str() );
 	emitPacket( ADARA::MarkerType::SCAN_STOP, ss.str() );
-	m_scanIndex = 0;
 
 	// If Not in Run, or if Paused, then _Also_ Queue Message for Later...
 	if ( !m_inRun || m_isPaused )
 	{
 		struct timespec now;
 		clock_gettime( CLOCK_REALTIME, &now );
+		std::stringstream ss_scan;
+		ss_scan << m_scanIndex << "|";
 		std::string label = "";
 		if ( !m_inRun )
 			label = "[PRE-RUN] ";
@@ -324,8 +330,10 @@ void Markers::stopScan(void)
 			label = "[PAUSED] ";
 		scanStopQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
-				label + ss.str() ) );
+				ss_scan.str() + label + ss.str() ) );
 	}
+
+	m_scanIndex = 0;
 }
 
 // DEPRECATED
@@ -426,6 +434,9 @@ void Markers::addScanComment(void)
 		struct timespec now;
 		clock_gettime( CLOCK_REALTIME, &now );
 
+		std::stringstream ss_scan;
+		ss_scan << m_scanIndex << "|";
+
 		std::string label = "";
 		if ( !m_inRun )
 			label = "[PRE-RUN] ";
@@ -441,7 +452,7 @@ void Markers::addScanComment(void)
 
 		scanCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
-				label + ss.str() ) );
+				ss_scan.str() + label + ss.str() ) );
 	}
 }
 
@@ -574,11 +585,13 @@ void Markers::dumpQueuedComments(void)
 		MarkerQueue::iterator next_it;
 		ADARA::MarkerType::Enum markerType = ADARA::MarkerType::GENERIC;
 		uint64_t t, next = (uint64_t) -1;
+		bool is_scan = false;
 
 		if ( scan_start_it != scanStartQueue.end()
 				&& (t=timespec_to_nsec( scan_start_it->first )) < next ) {
 			next_it = scan_start_it;
 			markerType = ADARA::MarkerType::SCAN_START;
+			is_scan = true;
 			next = t;
 		}
 
@@ -586,6 +599,7 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( scan_stop_it->first )) < next ) {
 			next_it = scan_stop_it;
 			markerType = ADARA::MarkerType::SCAN_STOP;
+			is_scan = true;
 			next = t;
 		}
 
@@ -593,6 +607,7 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( scan_comment_it->first )) < next ) {
 			next_it = scan_comment_it;
 			markerType = ADARA::MarkerType::GENERIC;
+			is_scan = true;
 			next = t;
 		}
 
@@ -600,16 +615,38 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( annotation_it->first )) < next ) {
 			next_it = annotation_it;
 			markerType = ADARA::MarkerType::GENERIC;
+			is_scan = false;
 			next = t;
 		}
 
+		// Handle Scan Index Decoding from Saved Comment String... ;-Q
+		uint32_t save_scanIndex = (uint32_t) -1;
+		std::string comment = next_it->second;
+		std::stringstream ss_scan;
+		if ( is_scan )
+		{
+			save_scanIndex = m_scanIndex;
+			std::size_t found;
+			if ( (found = next_it->second.find("|")) != std::string::npos )
+			{
+				m_scanIndex = boost::lexical_cast<uint32_t>(
+					next_it->second.substr( 0, found ) );
+				comment = next_it->second.substr( found + 1 );
+			}
+			ss_scan << "scanIndex=" << m_scanIndex << " ";
+		}
+
 		// Dump Next Comment/Marker...
-		DEBUG("dumpQueuedComments() Dump Next Comment/Marker,"
+		DEBUG( "dumpQueuedComments() Dump Next Comment/Marker,"
 			<< "MarkerType=" << markerType << " - "
 			<< next_it->first.tv_sec << "." << next_it->first.tv_nsec
-			<< ":" << next_it->second);
+			<< ": " << ss_scan.str() << comment );
 
-		emitPacket( next_it->first, markerType, next_it->second );
+		emitPacket( next_it->first, markerType, comment );
+
+		// Handle Scan Index Restore... ;-b
+		if ( is_scan )
+			m_scanIndex = save_scanIndex;
 
 		// Increment Given Iterator...
 		if ( next_it == scan_start_it )
