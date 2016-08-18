@@ -634,7 +634,7 @@ bool SMSControl::setRecording( bool v )
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we start recording
 				// in a new container.
-				m_markers->newRun();
+				m_markers->beforeNewRun( m_currentRunNumber );
 
 				// Actually Start a New Recording...
 				StorageManager::startRecording( m_currentRunNumber,
