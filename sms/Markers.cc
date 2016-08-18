@@ -136,6 +136,8 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	 * seen for sure in a regular Un-Paused stream data file...
 	 */
 	if ( m_pausedPV->value() ) {
+		// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
+		m_isPaused = false;
 		// Clean Up Container before Actual Start!
 		m_ctrl->resumeRecording();
 		// Spew "We've Resumed" Packet
@@ -143,7 +145,6 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		emitPacket( now, ADARA::MarkerType::RESUME, comment );
 		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
-		m_isPaused = false;
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
 		// (just use generic Annotation Comment... ;-)
 		annotationCommentQueue.push_back(
@@ -191,15 +192,23 @@ void Markers::runStop(void)
 	 * Un-Paused stream data file...
 	 */
 	if ( m_pausedPV->value() ) {
+		// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
+		m_isPaused = false;
 		// Clean Up Container before Full Stop!
 		m_ctrl->resumeRecording();
+		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
+		// Dump Latest of Any Interim Run Notes Comment (Log Intervening)
+		dumpLastRunNotes();
+		// Dump Any Pre-Run Scan Comments Now...
+		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
 		emitPacket( now, ADARA::MarkerType::RESUME,
 			"Warning: Run Resumed at Run Stop!" );
 		// update() doesn't trigger changed()!
 		m_pausedPV->update(false, &now);
-		m_isPaused = false;
 	}
+
+	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
 
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
 	dumpLastRunNotes();
@@ -232,10 +241,11 @@ void Markers::runStop(void)
 
 void Markers::pause(void)
 {
-	m_isPaused = true;
 	std::string comment = "Run Paused.";
 	DEBUG(comment);
 	emitPacket( ADARA::MarkerType::PAUSE, comment );
+	// Set Paused State _Before_ Pause, for Next Prologue to Skip Queued
+	m_isPaused = true;
 	m_ctrl->pauseRecording();
 
 	// If Not in Run, then _Also_ Queue Message for Later...
@@ -251,9 +261,10 @@ void Markers::pause(void)
 
 void Markers::resume(void)
 {
-	m_isPaused = false;
 	std::string comment = "Run Resumed.";
 	DEBUG(comment);
+	// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
+	m_isPaused = false;
 	m_ctrl->resumeRecording();
 	emitPacket( ADARA::MarkerType::RESUME, comment );
 
