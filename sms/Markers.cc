@@ -148,9 +148,8 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		m_pausedPV->update(false, &now);
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
 		// (just use generic Annotation Comment... ;-)
-		annotationCommentQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
-				"[PRE-RUN] " + comment ) );
+		resumeQueue.push_back( std::pair<struct timespec, std::string>( now,
+			"[PRE-RUN] " + comment ) );
 	}
 
 	if ( m_scanIndex ) {
@@ -212,10 +211,8 @@ void Markers::runStop(void)
 	}
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
-
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
 	dumpLastRunNotes();
-
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
 
@@ -256,9 +253,8 @@ void Markers::pause(void)
 	{
 		struct timespec now;
 		clock_gettime( CLOCK_REALTIME, &now );
-		annotationCommentQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
-				"[PRE-RUN] " + comment ) );
+		pauseQueue.push_back( std::pair<struct timespec, std::string>( now,
+			"[PRE-RUN] " + comment ) );
 	}
 }
 
@@ -276,9 +272,8 @@ void Markers::resume(void)
 	{
 		struct timespec now;
 		clock_gettime( CLOCK_REALTIME, &now );
-		annotationCommentQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
-				"[PRE-RUN] " + comment ) );
+		resumeQueue.push_back( std::pair<struct timespec, std::string>( now,
+			"[PRE-RUN] " + comment ) );
 	}
 }
 
@@ -571,13 +566,17 @@ void Markers::dumpQueuedComments(void)
 	if ( !m_inRun || m_isPaused )
 		return;
 
+	MarkerQueue::iterator pause_it = pauseQueue.begin();
+	MarkerQueue::iterator resume_it = resumeQueue.begin();
 	MarkerQueue::iterator scan_start_it = scanStartQueue.begin();
 	MarkerQueue::iterator scan_stop_it = scanStopQueue.begin();
 	MarkerQueue::iterator scan_comment_it = scanCommentQueue.begin();
 	MarkerQueue::iterator annotation_it = annotationCommentQueue.begin();
 
 	// Dump Queued Markers in Proper Time Order
-	while ( scan_start_it != scanStartQueue.end()
+	while ( pause_it != pauseQueue.end()
+			|| resume_it != resumeQueue.end()
+			|| scan_start_it != scanStartQueue.end()
 			|| scan_stop_it != scanStopQueue.end()
 			|| scan_comment_it != scanCommentQueue.end()
 			|| annotation_it != annotationCommentQueue.end() )
@@ -586,6 +585,22 @@ void Markers::dumpQueuedComments(void)
 		ADARA::MarkerType::Enum markerType = ADARA::MarkerType::GENERIC;
 		uint64_t t, next = (uint64_t) -1;
 		bool is_scan = false;
+
+		if ( pause_it != pauseQueue.end()
+				&& (t=timespec_to_nsec( pause_it->first )) < next ) {
+			next_it = pause_it;
+			markerType = ADARA::MarkerType::PAUSE;
+			is_scan = false;
+			next = t;
+		}
+
+		if ( resume_it != resumeQueue.end()
+				&& (t=timespec_to_nsec( resume_it->first )) < next ) {
+			next_it = resume_it;
+			markerType = ADARA::MarkerType::RESUME;
+			is_scan = false;
+			next = t;
+		}
 
 		if ( scan_start_it != scanStartQueue.end()
 				&& (t=timespec_to_nsec( scan_start_it->first )) < next ) {
@@ -649,7 +664,11 @@ void Markers::dumpQueuedComments(void)
 			m_scanIndex = save_scanIndex;
 
 		// Increment Given Iterator...
-		if ( next_it == scan_start_it )
+		if ( next_it == pause_it )
+			pause_it++;
+		else if ( next_it == resume_it )
+			resume_it++;
+		else if ( next_it == scan_start_it )
 			scan_start_it++;
 		else if ( next_it == scan_stop_it )
 			scan_stop_it++;
@@ -658,6 +677,12 @@ void Markers::dumpQueuedComments(void)
 		else if ( next_it == annotation_it )
 			annotation_it++;
 	}
+
+	// Clear Out Queued Pauses
+	pauseQueue.clear();
+
+	// Clear Out Queued Resumes
+	resumeQueue.clear();
 
 	// Clear Out Queued Scan Starts
 	scanStartQueue.clear();
@@ -676,7 +701,7 @@ void Markers::onPrologue(void)
 {
 	if ( m_scanIndex )
 		emitPrologue( ADARA::MarkerType::SCAN_START );
-	if ( m_pausedPV->value() )
+	if ( m_isPaused )
 		emitPrologue( ADARA::MarkerType::PAUSE );
 
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)

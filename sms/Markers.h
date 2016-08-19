@@ -54,6 +54,8 @@ private:
 
 	uint32_t m_scanIndex;
 
+	MarkerQueue pauseQueue;
+	MarkerQueue resumeQueue;
 	MarkerQueue scanStopQueue;
 	MarkerQueue scanStartQueue;
 	MarkerQueue scanCommentQueue;
