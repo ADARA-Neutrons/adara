@@ -280,10 +280,16 @@ void Markers::resume(void)
 void Markers::startScan(void)
 {
 	m_scanIndex = m_indexPV->value();
+	std::string label = "";
+	if ( !m_inRun )
+		label = "[PRE-RUN] ";
+	else if ( m_isPaused )
+		label = "[PAUSED] ";
 	std::stringstream ss;
-	ss << "Scan #" << m_scanIndex << " Started.";
+	ss << label << "Scan #" << m_scanIndex << " Started.";
 	DEBUG( ss.str() );
-	// NOTE: *Don't* Include "Scan Comment" Here, Already Added on Set...
+	// NOTE: *Don't* Include "Scan Comment" Here,
+	// Already Added on Scan Comment PV Set...
 	emitPacket( ADARA::MarkerType::SCAN_START, ss.str() );
 
 	// If Not in Run, or if Paused, then _Also_ Queue Message for Later...
@@ -293,21 +299,21 @@ void Markers::startScan(void)
 		clock_gettime( CLOCK_REALTIME, &now );
 		std::stringstream ss_scan;
 		ss_scan << m_scanIndex << "|";
-		std::string label = "";
-		if ( !m_inRun )
-			label = "[PRE-RUN] ";
-		else if ( m_isPaused )
-			label = "[PAUSED] ";
 		scanStartQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
-				ss_scan.str() + label + ss.str() ) );
+				ss_scan.str() + ss.str() ) );
 	}
 }
 
 void Markers::stopScan(void)
 {
+	std::string label = "";
+	if ( !m_inRun )
+		label = "[PRE-RUN] ";
+	else if ( m_isPaused )
+		label = "[PAUSED] ";
 	std::stringstream ss;
-	ss << "Scan #" << m_scanIndex << " Stopped.";
+	ss << label << "Scan #" << m_scanIndex << " Stopped.";
 	DEBUG( ss.str() );
 	emitPacket( ADARA::MarkerType::SCAN_STOP, ss.str() );
 
@@ -318,14 +324,9 @@ void Markers::stopScan(void)
 		clock_gettime( CLOCK_REALTIME, &now );
 		std::stringstream ss_scan;
 		ss_scan << m_scanIndex << "|";
-		std::string label = "";
-		if ( !m_inRun )
-			label = "[PRE-RUN] ";
-		else if ( m_isPaused )
-			label = "[PAUSED] ";
 		scanStopQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
-				ss_scan.str() + label + ss.str() ) );
+				ss_scan.str() + ss.str() ) );
 	}
 
 	m_scanIndex = 0;
