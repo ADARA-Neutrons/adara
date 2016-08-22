@@ -700,23 +700,42 @@ void Markers::dumpQueuedComments(void)
 
 void Markers::onPrologue(void)
 {
-	if ( m_scanIndex )
-		emitPrologue( ADARA::MarkerType::SCAN_START );
-	if ( m_isPaused )
-		emitPrologue( ADARA::MarkerType::PAUSE );
-
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
 	dumpLastRunNotes();
 
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
+
+	if ( m_scanIndex )
+	{
+		std::string label = "";
+		if ( !m_inRun )
+			label = "[PRE-RUN] ";
+		else if ( m_isPaused )
+			label = "[PAUSED] ";
+		std::stringstream ss;
+		ss << "[NEW RUN FILE CONTINUATION] "
+			<< label << "Scan #" << m_scanIndex << " Started.";
+		emitPrologue( ADARA::MarkerType::SCAN_START, ss.str() );
+	}
+
+	if ( m_isPaused )
+	{
+		std::string label = "";
+		if ( !m_inRun )
+			label = "[PRE-RUN] ";
+		std::string comment = "[NEW RUN FILE CONTINUATION] "
+			+ label + "Run Paused.";
+		emitPrologue( ADARA::MarkerType::PAUSE, comment );
+	}
 }
 
-void Markers::emitPrologue( ADARA::MarkerType::Enum markerType )
+void Markers::emitPrologue( ADARA::MarkerType::Enum markerType,
+		std::string prefix )
 {
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME, &now );
-	emitPacket( now, markerType, "", StringPVSharedPtr(), true );
+	emitPacket( now, markerType, prefix, StringPVSharedPtr(), true );
 }
 
 void Markers::emitPacket( ADARA::MarkerType::Enum markerType,

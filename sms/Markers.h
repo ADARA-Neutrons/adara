@@ -75,7 +75,7 @@ private:
 
 	void onPrologue(void);
 
-	void emitPrologue( ADARA::MarkerType::Enum );
+	void emitPrologue( ADARA::MarkerType::Enum, std::string prefix = "" );
 
 	void emitPacket( ADARA::MarkerType::Enum,
 		std::string prefix = "",
