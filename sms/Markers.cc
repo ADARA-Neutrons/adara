@@ -140,6 +140,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
 		m_isPaused = false;
 		// Clean Up Container before Actual Start!
+		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->resumeRecording();
 		// Spew "We've Resumed" Packet
 		std::string comment = "Warning: Run Resumed at New Run Start!";
@@ -197,7 +198,13 @@ void Markers::runStop(void)
 		// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
 		m_isPaused = false;
 		// Clean Up Container before Full Stop!
+		// Thwart Impending "Scan Start Continuation" Packet as we Stop Run!
+		uint32_t save_scanIndex = m_scanIndex;
+		m_scanIndex = 0;
+		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->resumeRecording();
+		// Restore Any Hanging Scan Index for Completion of Stop...
+		m_scanIndex = save_scanIndex;
 		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
 		// Dump Latest of Any Interim Run Notes Comment (Log Intervening)
 		dumpLastRunNotes();
@@ -246,6 +253,7 @@ void Markers::pause(void)
 	emitPacket( ADARA::MarkerType::PAUSE, comment );
 	// Set Paused State _Before_ Pause, for Next Prologue to Skip Queued
 	m_isPaused = true;
+	// NOTE: Triggers New File/Prologue with _Current_ State...!
 	m_ctrl->pauseRecording();
 
 	// If Not in Run, then _Also_ Queue Message for Later...
@@ -264,6 +272,7 @@ void Markers::resume(void)
 	DEBUG(comment);
 	// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
 	m_isPaused = false;
+	// NOTE: Triggers New File/Prologue with _Current_ State...!
 	m_ctrl->resumeRecording();
 	emitPacket( ADARA::MarkerType::RESUME, comment );
 
