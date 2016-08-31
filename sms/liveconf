@@ -385,7 +385,7 @@ option_id_type[$num_options]="storage"
 option_name[$num_options]="max_blocks_allowed"
 option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowed"
 option_value_type[$num_options]="UINT32_VALUE(blocks)"
-option_default[$num_options]="0"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
 option_label[$num_options]="[Max Blocks of Storage Allowed]"
 num_options=$(( num_options + 1 ))
 
@@ -2573,19 +2573,32 @@ elif [[ "$command" == "confck" ]]; then
 
 			if [[ "$live_value" != "$config_value" ]]; then
 
-				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+				if [[ "$config_value" == "XXX_IGNORE_IF_NOT_SET_XXX" ]]; \
+				then
 
-				echo "   ${option_label[$i]}${subscript}:"
-				echo "      Config:[$config_value]"
-				echo "         != Live:[$live_value]"
+					echo "*** Warning: Ignore File Config If Not Set! ***"
 
-				addToErrSummary "\n" \
-					"*** ERROR! Mismatch in Live vs. File Config! ***\n" \
-					"   ${option_label[$i]}${subscript}:\n" \
-					"      Config:[$config_value]\n" \
-					"         != Live:[$live_value]\n"
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Live:[$live_value]"
 
-				num_mismatch=$(( num_mismatch + 1 ))
+				else
+
+					echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Config:[$config_value]"
+					echo "         != Live:[$live_value]"
+
+					addToErrSummary "\n" \
+						"*** ERROR! Mismatch in " \
+						"Live vs. File Config! ***\n" \
+						"   ${option_label[$i]}${subscript}:\n" \
+						"      Config:[$config_value]\n" \
+						"         != Live:[$live_value]\n"
+
+					num_mismatch=$(( num_mismatch + 1 ))
+
+				fi
 
 			else
 				echo "Live Config Matches File Config:"
