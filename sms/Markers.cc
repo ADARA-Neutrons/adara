@@ -65,7 +65,8 @@ private:
 };
 
 Markers::Markers( SMSControl *ctrl ) :
-	m_ctrl(ctrl), m_inRun(false), m_isPaused(false),
+	m_ctrl(ctrl),
+	m_inRun(false), m_isPaused(false), m_notesCommentSet(false),
 	m_runNumber(0), m_scanIndex(0)
 {
 	std::string prefix(ctrl->getBeamlineId());
@@ -207,7 +208,7 @@ void Markers::runStop(void)
 		m_scanIndex = save_scanIndex;
 		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
 		// Dump Latest of Any Interim Run Notes Comment (Log Intervening)
-		dumpLastRunNotes();
+		dumpRunNotesComments( true ); // USE FIRST
 		// Dump Any Pre-Run Scan Comments Now...
 		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
@@ -219,7 +220,7 @@ void Markers::runStop(void)
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpLastRunNotes();
+	dumpRunNotesComments( true ); // USE FIRST
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
 
@@ -244,6 +245,9 @@ void Markers::runStop(void)
 
 	// No Longer in a Run Now...
 	m_inRun = false;
+
+	// Reset Run Notes Flag, Allow Set Again for Next Run...
+	m_notesCommentSet = false;
 }
 
 void Markers::pause(void)
@@ -349,7 +353,7 @@ void Markers::annotate(void)
 		emitPacket( ADARA::MarkerType::GENERIC, "", m_commentPV );
 
 		// Annotation Comments are one-shot,
-		// reset once the packet is inserted.
+		// Reset once the packet is inserted.
 		m_commentPV->unset();
 	}
 
@@ -382,16 +386,31 @@ void Markers::annotate(void)
 // DEPRECATED
 void Markers::addRunComment(void)
 {
+	// In a Run, Add Run Comment Now...
 	if ( m_inRun && !m_isPaused )
 	{
-		emitPacket( ADARA::MarkerType::OVERALL_RUN_COMMENT,
-			"", m_commentPV );
+		// This Is It! :-D
+		if ( !m_notesCommentSet )
+		{
+			emitPacket( ADARA::MarkerType::OVERALL_RUN_COMMENT,
+				"", m_commentPV );
 
-		// Run Comments are one-shot, and reset once the packet is inserted.
+			m_notesCommentSet = true;
+		}
+
+		// Extraneous Extra Run Notes, Emit as Generic Comment...
+		else
+		{
+			emitPacket( ADARA::MarkerType::GENERIC,
+				"[DISCARDED RUN NOTES]", m_commentPV );
+		}
+
+		// Run Notes Comments are One-Shot,
+		// Reset once the packet is inserted.
 		m_commentPV->unset();
 	}
 
-	// Otherwise, Save Last Run Comment String for Next Run...
+	// Otherwise, Save Run Notes Comment String for Next Run...
 	else
 	{
 		struct timespec now;
@@ -466,11 +485,24 @@ void Markers::addNotesComment(void)
 	// In a Run, Add Run Comment Now...
 	if ( m_inRun && !m_isPaused )
 	{
-		emitPacket( ADARA::MarkerType::OVERALL_RUN_COMMENT,
-			"", m_notesCommentPV );
+		// This Is It! :-D
+		if ( !m_notesCommentSet )
+		{
+			emitPacket( ADARA::MarkerType::OVERALL_RUN_COMMENT,
+				"", m_notesCommentPV );
+
+			m_notesCommentSet = true;
+		}
+
+		// Extraneous Extra Run Notes, Emit as Generic Comment...
+		else
+		{
+			emitPacket( ADARA::MarkerType::GENERIC,
+				"[DISCARDED RUN NOTES]", m_notesCommentPV );
+		}
 	}
 
-	// Otherwise, Save Last Run Comment String for Next Run...
+	// Otherwise, Save Run Notes Comment String for Next Run...
 	else
 	{
 		struct timespec now;
@@ -525,28 +557,62 @@ void Markers::addAnnotationComment(void)
 	}
 }
 
-void Markers::dumpLastRunNotes(void)
+void Markers::dumpRunNotesComments( bool useFirstComment )
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
 		return;
 
-	// Dump Last Run Notes, If Any...
-
-	MarkerQueue::reverse_iterator last_notes_it =
-		notesCommentQueue.rbegin();
-
-	if ( last_notes_it != notesCommentQueue.rend() )
+	// Only Dump *One* Set of Official Run Notes for Any Given Run...
+	if ( !m_notesCommentSet )
 	{
-		DEBUG("dumpLastRunNotes() Found Last Run Note - "
-			<< last_notes_it->first.tv_sec
-			<< "." << last_notes_it->first.tv_nsec
-			<< ":" << last_notes_it->second);
+		// Dump First Run Notes Comment Entered, If Any...
+		if ( useFirstComment )
+		{
+			MarkerQueue::iterator first_notes_it =
+				notesCommentQueue.begin();
 
-		emitPacket( last_notes_it->first,
-			ADARA::MarkerType::OVERALL_RUN_COMMENT, last_notes_it->second );
+			if ( first_notes_it != notesCommentQueue.end() )
+			{
+				DEBUG("dumpRunNotesComments()"
+					<< " Found First Run Notes Comment - "
+					<< first_notes_it->first.tv_sec
+					<< "." << first_notes_it->first.tv_nsec
+					<< ":" << first_notes_it->second);
 
-		notesCommentQueue.pop_back();
+				emitPacket( first_notes_it->first,
+					ADARA::MarkerType::OVERALL_RUN_COMMENT,
+					first_notes_it->second );
+
+				notesCommentQueue.erase( first_notes_it );
+
+				m_notesCommentSet = true;
+			}
+		}
+
+		// Dump Last Run Notes Comment Entered, If Any...
+		else
+		{
+			MarkerQueue::reverse_iterator last_notes_it =
+				notesCommentQueue.rbegin();
+
+			if ( last_notes_it != notesCommentQueue.rend() )
+			{
+				DEBUG("dumpRunNotesComments()"
+					<< " Found Last Run Notes Comment - "
+					<< last_notes_it->first.tv_sec
+					<< "." << last_notes_it->first.tv_nsec
+					<< ":" << last_notes_it->second);
+
+				emitPacket( last_notes_it->first,
+					ADARA::MarkerType::OVERALL_RUN_COMMENT,
+					last_notes_it->second );
+
+				notesCommentQueue.pop_back();
+
+				m_notesCommentSet = true;
+			}
+		}
 	}
 
 	// Log Any Intervening Run Notes & Discard...
@@ -555,7 +621,8 @@ void Markers::dumpLastRunNotes(void)
 
 	while ( notes_it != notesCommentQueue.end() )
 	{
-		ERROR("dumpLastRunNotes(): Discarding Intervening Pre-Run Notes - "
+		ERROR("dumpRunNotesComments(): Discarding Intervening"
+			<< " Pre-Run Notes - "
 			<< notes_it->first.tv_sec << "." << notes_it->first.tv_nsec
 			<< ":" << notes_it->second);
 
@@ -710,7 +777,7 @@ void Markers::dumpQueuedComments(void)
 void Markers::onPrologue(void)
 {
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpLastRunNotes();
+	dumpRunNotesComments( false ); // USE LAST
 
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
