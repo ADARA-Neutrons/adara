@@ -1135,6 +1135,9 @@ if [[ "$command" == "status" \
 		|| "$command" == "live_status" \
 		|| "$command" == "bandwidth" ]]; then
 
+	# Dump Intro Output Now, No "Quiet" Mode in Status Commands... ;-D
+	echo -e -n "$introOutput"
+
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
 	caget $WAIT ${PRE}:SMS:Recording > /dev/null 2>&1
@@ -1510,6 +1513,9 @@ if [[ "$command" == "status" \
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
 elif [[ "$command" == "option" ]]; then
+
+	# Dump Intro Output Now, No "Quiet" Mode in Option Commands... ;-D
+	echo -e -n "$introOutput"
 
 	#
 	# Parse Option Arg String into Pieces... ;-D
