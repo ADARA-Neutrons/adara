@@ -50,6 +50,7 @@ private:
 	bool m_inRun;
 	bool m_isPaused;
 	bool m_notesCommentSet;
+	bool m_useFirstNotesComment;
 
 	uint32_t m_runNumber;
 
@@ -71,7 +72,7 @@ private:
 	void addNotesComment(void);
 	void addAnnotationComment(void);
 
-	void dumpRunNotesComments( bool useFirstComment );
+	void dumpRunNotesComments(void);
 	void dumpQueuedComments(void);
 
 	void onPrologue(void);

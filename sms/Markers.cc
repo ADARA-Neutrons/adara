@@ -65,8 +65,8 @@ private:
 };
 
 Markers::Markers( SMSControl *ctrl ) :
-	m_ctrl(ctrl),
-	m_inRun(false), m_isPaused(false), m_notesCommentSet(false),
+	m_ctrl(ctrl), m_inRun(false), m_isPaused(false),
+	m_notesCommentSet(false), m_useFirstNotesComment(false),
 	m_runNumber(0), m_scanIndex(0)
 {
 	std::string prefix(ctrl->getBeamlineId());
@@ -208,7 +208,7 @@ void Markers::runStop(void)
 		m_scanIndex = save_scanIndex;
 		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
 		// Dump Latest of Any Interim Run Notes Comment (Log Intervening)
-		dumpRunNotesComments( true ); // USE FIRST
+		dumpRunNotesComments();
 		// Dump Any Pre-Run Scan Comments Now...
 		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
@@ -220,7 +220,7 @@ void Markers::runStop(void)
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComments( true ); // USE FIRST
+	dumpRunNotesComments();
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
 
@@ -417,6 +417,11 @@ void Markers::addRunComment(void)
 		clock_gettime( CLOCK_REALTIME, &now );
 
 		// No "[PRE-RUN]" or "[PAUSED]" Labels for Run Notes...! ;-D
+		// -> Set "Use First Run Notes" Flag Tho...! :-D
+		if ( !m_inRun )
+			m_useFirstNotesComment = false;
+		else if ( m_isPaused )
+			m_useFirstNotesComment = true;
 
 		std::string comment;
 		if ( m_commentPV->valid() ) {
@@ -509,6 +514,11 @@ void Markers::addNotesComment(void)
 		clock_gettime( CLOCK_REALTIME, &now );
 
 		// No "[PRE-RUN]" or "[PAUSED]" Labels for Run Notes...! ;-D
+		// -> Set "Use First Run Notes" Flag Tho...! :-D
+		if ( !m_inRun )
+			m_useFirstNotesComment = false;
+		else if ( m_isPaused )
+			m_useFirstNotesComment = true;
 
 		std::string comment;
 		if ( m_notesCommentPV->valid() ) {
@@ -557,7 +567,7 @@ void Markers::addAnnotationComment(void)
 	}
 }
 
-void Markers::dumpRunNotesComments( bool useFirstComment )
+void Markers::dumpRunNotesComments(void)
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
@@ -567,7 +577,7 @@ void Markers::dumpRunNotesComments( bool useFirstComment )
 	if ( !m_notesCommentSet )
 	{
 		// Dump First Run Notes Comment Entered, If Any...
-		if ( useFirstComment )
+		if ( m_useFirstNotesComment )
 		{
 			MarkerQueue::iterator first_notes_it =
 				notesCommentQueue.begin();
@@ -777,7 +787,7 @@ void Markers::dumpQueuedComments(void)
 void Markers::onPrologue(void)
 {
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComments( false ); // USE LAST
+	dumpRunNotesComments();
 
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
