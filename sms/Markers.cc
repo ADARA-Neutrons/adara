@@ -208,7 +208,7 @@ void Markers::runStop(void)
 		m_scanIndex = save_scanIndex;
 		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
 		// Dump Latest of Any Interim Run Notes Comment (Log Intervening)
-		dumpRunNotesComments();
+		dumpRunNotesComment();
 		// Dump Any Pre-Run Scan Comments Now...
 		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
@@ -220,7 +220,7 @@ void Markers::runStop(void)
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComments();
+	dumpRunNotesComment();
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
 
@@ -402,7 +402,7 @@ void Markers::addRunComment(void)
 		else
 		{
 			emitPacket( ADARA::MarkerType::GENERIC,
-				"[DISCARDED RUN NOTES]", m_commentPV );
+				"[DISCARDED RUN NOTES] ", m_commentPV );
 		}
 
 		// Run Notes Comments are One-Shot,
@@ -503,7 +503,7 @@ void Markers::addNotesComment(void)
 		else
 		{
 			emitPacket( ADARA::MarkerType::GENERIC,
-				"[DISCARDED RUN NOTES]", m_notesCommentPV );
+				"[DISCARDED RUN NOTES] ", m_notesCommentPV );
 		}
 	}
 
@@ -567,7 +567,7 @@ void Markers::addAnnotationComment(void)
 	}
 }
 
-void Markers::dumpRunNotesComments(void)
+void Markers::dumpRunNotesComment(void)
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
@@ -584,7 +584,7 @@ void Markers::dumpRunNotesComments(void)
 
 			if ( first_notes_it != notesCommentQueue.end() )
 			{
-				DEBUG("dumpRunNotesComments()"
+				DEBUG("dumpRunNotesComment()"
 					<< " Found First Run Notes Comment - "
 					<< first_notes_it->first.tv_sec
 					<< "." << first_notes_it->first.tv_nsec
@@ -608,7 +608,7 @@ void Markers::dumpRunNotesComments(void)
 
 			if ( last_notes_it != notesCommentQueue.rend() )
 			{
-				DEBUG("dumpRunNotesComments()"
+				DEBUG("dumpRunNotesComment()"
 					<< " Found Last Run Notes Comment - "
 					<< last_notes_it->first.tv_sec
 					<< "." << last_notes_it->first.tv_nsec
@@ -625,26 +625,8 @@ void Markers::dumpRunNotesComments(void)
 		}
 	}
 
-	// Log Any Intervening Run Notes & Discard...
-
-	MarkerQueue::iterator notes_it = notesCommentQueue.begin();
-
-	while ( notes_it != notesCommentQueue.end() )
-	{
-		ERROR("dumpRunNotesComments(): Discarding Intervening"
-			<< " Pre-Run Notes - "
-			<< notes_it->first.tv_sec << "." << notes_it->first.tv_nsec
-			<< ":" << notes_it->second);
-
-		// Add Discarded Run Comment to Annotation Comments...
-		std::string comment = "[DISCARDED RUN NOTES] " + notes_it->second;
-		emitPacket( notes_it->first, ADARA::MarkerType::GENERIC, comment );
-
-		notes_it++;
-	}
-
-	// Clear Out Queued Run Notes
-	notesCommentQueue.clear();
+	// Now Log Any Intervening Run Notes & Discard...
+	// (...Done in dumpQueuedComments() to Interleave with Other Queues...)
 }
 
 void Markers::dumpQueuedComments(void)
@@ -658,6 +640,7 @@ void Markers::dumpQueuedComments(void)
 	MarkerQueue::iterator scan_start_it = scanStartQueue.begin();
 	MarkerQueue::iterator scan_stop_it = scanStopQueue.begin();
 	MarkerQueue::iterator scan_comment_it = scanCommentQueue.begin();
+	MarkerQueue::iterator notes_it = notesCommentQueue.begin();
 	MarkerQueue::iterator annotation_it = annotationCommentQueue.begin();
 
 	// Dump Queued Markers in Proper Time Order
@@ -666,17 +649,24 @@ void Markers::dumpQueuedComments(void)
 			|| scan_start_it != scanStartQueue.end()
 			|| scan_stop_it != scanStopQueue.end()
 			|| scan_comment_it != scanCommentQueue.end()
+			|| notes_it != notesCommentQueue.end()
 			|| annotation_it != annotationCommentQueue.end() )
 	{
 		MarkerQueue::iterator next_it;
 		ADARA::MarkerType::Enum markerType = ADARA::MarkerType::GENERIC;
+		std::string prefix = "";
+		std::string desc = "";
 		uint64_t t, next = (uint64_t) -1;
+		bool is_error = false;
 		bool is_scan = false;
 
 		if ( pause_it != pauseQueue.end()
 				&& (t=timespec_to_nsec( pause_it->first )) < next ) {
 			next_it = pause_it;
 			markerType = ADARA::MarkerType::PAUSE;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = false;
 			next = t;
 		}
@@ -685,6 +675,9 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( resume_it->first )) < next ) {
 			next_it = resume_it;
 			markerType = ADARA::MarkerType::RESUME;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = false;
 			next = t;
 		}
@@ -693,6 +686,9 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( scan_start_it->first )) < next ) {
 			next_it = scan_start_it;
 			markerType = ADARA::MarkerType::SCAN_START;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = true;
 			next = t;
 		}
@@ -701,6 +697,9 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( scan_stop_it->first )) < next ) {
 			next_it = scan_stop_it;
 			markerType = ADARA::MarkerType::SCAN_STOP;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = true;
 			next = t;
 		}
@@ -709,7 +708,21 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( scan_comment_it->first )) < next ) {
 			next_it = scan_comment_it;
 			markerType = ADARA::MarkerType::GENERIC;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = true;
+			next = t;
+		}
+
+		if ( notes_it != notesCommentQueue.end()
+				&& (t=timespec_to_nsec( notes_it->first )) < next ) {
+			next_it = notes_it;
+			markerType = ADARA::MarkerType::GENERIC;
+			prefix = "[DISCARDED RUN NOTES] ";
+			desc = "Discarding Intervening Pre-Run Notes";
+			is_error = true;
+			is_scan = false;
 			next = t;
 		}
 
@@ -717,6 +730,9 @@ void Markers::dumpQueuedComments(void)
 				&& (t=timespec_to_nsec( annotation_it->first )) < next ) {
 			next_it = annotation_it;
 			markerType = ADARA::MarkerType::GENERIC;
+			prefix = "";
+			desc = "Dump Next Comment/Marker";
+			is_error = false;
 			is_scan = false;
 			next = t;
 		}
@@ -739,12 +755,18 @@ void Markers::dumpQueuedComments(void)
 		}
 
 		// Dump Next Comment/Marker...
-		DEBUG( "dumpQueuedComments() Dump Next Comment/Marker,"
-			<< "MarkerType=" << markerType << " - "
+		std::stringstream ss;
+		ss << "dumpQueuedComments() " << desc
+			<< " MarkerType=" << markerType << " - "
 			<< next_it->first.tv_sec << "." << next_it->first.tv_nsec
-			<< ": " << ss_scan.str() << comment );
+			<< ": " << ss_scan.str() << prefix << comment;
 
-		emitPacket( next_it->first, markerType, comment );
+		if ( is_error )
+			ERROR( ss.str() );
+		else
+			DEBUG( ss.str() );
+
+		emitPacket( next_it->first, markerType, prefix + comment );
 
 		// Handle Scan Index Restore... ;-b
 		if ( is_scan )
@@ -761,6 +783,8 @@ void Markers::dumpQueuedComments(void)
 			scan_stop_it++;
 		else if ( next_it == scan_comment_it )
 			scan_comment_it++;
+		else if ( next_it == notes_it )
+			notes_it++;
 		else if ( next_it == annotation_it )
 			annotation_it++;
 	}
@@ -780,6 +804,9 @@ void Markers::dumpQueuedComments(void)
 	// Clear Out Queued Scan Comments
 	scanCommentQueue.clear();
 
+	// Clear Out Queued Run Notes Comments
+	notesCommentQueue.clear();
+
 	// Clear Out Queued Annotation Comments
 	annotationCommentQueue.clear();
 }
@@ -787,7 +814,7 @@ void Markers::dumpQueuedComments(void)
 void Markers::onPrologue(void)
 {
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComments();
+	dumpRunNotesComment();
 
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();

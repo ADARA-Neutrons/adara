@@ -72,7 +72,7 @@ private:
 	void addNotesComment(void);
 	void addAnnotationComment(void);
 
-	void dumpRunNotesComments(void);
+	void dumpRunNotesComment(void);
 	void dumpQueuedComments(void);
 
 	void onPrologue(void);
