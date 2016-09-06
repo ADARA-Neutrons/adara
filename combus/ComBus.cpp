@@ -725,6 +725,8 @@ Connection::broadcast( MessageBase &a_msg )
                 p.first = m_session->createTopic(
                     m_domain + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
+                p.second->setDeliveryMode(
+                    cms::DeliveryMode::NON_PERSISTENT );
                 m_producer_topics[topic] = p;
                 p.second->send( cmsmsg );
             }
@@ -802,6 +804,8 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id,
                     pr.first = m_session->createTopic(
                         m_domain + "INPUT." + dest_proc_name );
                     pr.second = m_session->createProducer( pr.first );
+                    pr.second->setDeliveryMode(
+                        cms::DeliveryMode::NON_PERSISTENT );
                     m_producer_topics[dest_proc_name] = pr;
 
                     pr.second->send( cmsmsg );
@@ -857,6 +861,7 @@ Connection::postWorkflow( MessageBase &a_msg )
 
             auto_ptr<cms::MessageProducer> producer(
                 m_session->createProducer( q.get()) );
+            producer->setDeliveryMode( cms::DeliveryMode::NON_PERSISTENT );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
