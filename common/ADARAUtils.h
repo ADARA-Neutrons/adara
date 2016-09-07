@@ -177,7 +177,7 @@ public:
 	static bool sanitizeString( std::string & a_str, bool a_preserve_uri )
 	{
 		std::string all_bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
-		std::string uri_bad = " \t\'\",;<>[]{}()|\\?~!@#$%^&*+=";
+		std::string uri_bad = " \t\'\";<>[]{}|\\~!@#$%^*+";
 
 		std::string bad = ( a_preserve_uri ) ? uri_bad : all_bad;
 
