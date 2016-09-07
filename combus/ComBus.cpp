@@ -529,8 +529,13 @@ Connection::reconnectThread()
         {
             // TODO - Should probably report exceptions somewhere
 
+            // ActiveMQ CPP Session Destructor Broken... ;-Q
+            if ( m_session ) m_session->close();
             delete m_session;
             m_session = 0;
+
+            // ActiveMQ CPP Connection Destructor Broken... ;-Q
+            if ( m_connection ) m_connection->close();
             delete m_connection;
             m_connection = 0;
 
@@ -639,8 +644,13 @@ Connection::disconnect()
         if ( m_input_listener )
             m_input_translator->disconnect_all();
 
+        // ActiveMQ CPP Session Destructor Broken... ;-Q
+        if ( m_session ) m_session->close();
         delete m_session;
         m_session = 0;
+
+        // ActiveMQ CPP Connection Destructor Broken... ;-Q
+        if ( m_connection ) m_connection->close();
         delete m_connection;
         m_connection = 0;
 
