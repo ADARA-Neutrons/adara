@@ -233,3 +233,6 @@ protected:
 }}
 
 #endif // COMBUSMESSAGES_H
+
+// vim: expandtab
+

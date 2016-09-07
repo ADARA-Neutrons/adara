@@ -143,3 +143,6 @@ protected:
 }}}
 
 #endif // STSMESSAGES_H
+
+// vim: expandtab
+

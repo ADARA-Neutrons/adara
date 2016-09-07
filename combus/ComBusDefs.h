@@ -439,3 +439,6 @@ const unsigned long TemplMessageBase<MT,T>::MSG_TYPE = Factory::Inst().registerC
 }}
 
 #endif // COMBUSDEFS_H
+
+// vim: expandtab
+

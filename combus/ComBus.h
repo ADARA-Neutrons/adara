@@ -209,3 +209,5 @@ private:
 
 #endif // COMBUS_H
 
+// vim: expandtab
+
