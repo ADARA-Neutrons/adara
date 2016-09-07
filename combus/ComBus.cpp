@@ -276,15 +276,15 @@ Connection::~Connection() throw()
     m_running = false;
     lock.unlock();
 
+    // Wait for status thread to exit
     m_status_cond.notify_one();
     m_status_thread->join();
 
-    if ( m_input_translator )
-        delete m_input_translator;
+    // Wait for reconnect thread to exit
+    while ( m_reconnect_thread )
+        sleep(1);
 
-    map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
-    for( ; ilist != m_listeners.end(); ++ilist )
-        delete ilist->second;
+    disconnect();
 
     activemq::library::ActiveMQCPP::shutdownLibrary();
 
@@ -442,7 +442,7 @@ bool
 Connection::waitForConnect( unsigned short a_timeout ) const
 {
     unsigned short t = a_timeout;
-    while ( 1 )
+    while ( m_running )
     {
         if ( m_connected )
             return true;
@@ -480,11 +480,11 @@ Connection::reconnectThread()
     {
         lock.lock();
 
-        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri + "?soConnectTimeout=500" );
-
         // Exit if terminating
         if ( !m_running )
             break;
+
+        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri + "?soConnectTimeout=500" );
 
         try
         {
@@ -620,6 +620,9 @@ Connection::disconnect()
             m_producer_topics.begin();
         for ( ; ip != m_producer_topics.end(); ++ip )
         {
+            // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
+            ip->second.second->close();
+
             delete ip->second.second;
             delete ip->second.first;
         }
@@ -866,6 +869,9 @@ Connection::postWorkflow( MessageBase &a_msg )
             a_msg.serialize( *cmsmsg );
 
             producer->send( cmsmsg );
+
+            // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
+            producer->close();
 
             res = true;
         }
