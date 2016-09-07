@@ -5,6 +5,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/lexical_cast.hpp>
 #include <unistd.h>
+#include <cctype>
 #include <time.h>
 #include "ComBus.h"
 #include "ComBusMessages.h"
@@ -329,12 +330,35 @@ Connection::checkBrokerURI( std::string &a_broker_uri )
         a_broker_uri = string("tcp://") + a_broker_uri;
 
     // Will always return a valid pos b/c of code above
-    size_t pos = a_broker_uri.find_last_of(":");
-    try
+    size_t pos = a_broker_uri.find_last_of(":") + 1;
+
+    // Section Off/Check for Any Potential Port Number Suffix...
+    size_t len = 0;
+    for ( size_t i=pos ; i < a_broker_uri.length() ; i++ )
     {
-        boost::lexical_cast<uint32_t>( a_broker_uri.substr( pos + 1 ) );
+        if ( isdigit( a_broker_uri[i] ) )
+            len++;
+        else
+            break;
     }
-    catch ( boost::bad_lexical_cast &e )
+
+    // Found Some Digits, Try Parsing Port Number...
+    if ( len > 0 )
+    {
+        try
+        {
+            boost::lexical_cast<uint32_t>(
+                a_broker_uri.substr( pos, len ) );
+        }
+        catch ( boost::bad_lexical_cast &e )
+        {
+            // Apply default port if not set
+            a_broker_uri += string( ":61616" );
+        }
+    }
+    
+    // No Digits, No Port...
+    else
     {
         // Apply default port if not set
         a_broker_uri += string( ":61616" );
@@ -476,7 +500,7 @@ Connection::reconnectThread()
     boost::unique_lock<boost::mutex> lock( m_status_mutex,
         boost::defer_lock );
 
-    while( 1 )
+    while ( 1 )
     {
         lock.lock();
 
@@ -484,7 +508,8 @@ Connection::reconnectThread()
         if ( !m_running )
             break;
 
-        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri + "?soConnectTimeout=500" );
+        activemq::core::ActiveMQConnectionFactory factory(
+            m_broker_uri + "?soConnectTimeout=500" );
 
         try
         {
@@ -1084,4 +1109,6 @@ Connection::createTopicConsumer( const string &a_topic_name,
 
 } // End ComBus namespace
 } // End ADARA namespace
+
+// vim: expandtab
 
