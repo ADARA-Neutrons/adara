@@ -861,7 +861,6 @@ Connection::postWorkflow( MessageBase &a_msg )
 
             auto_ptr<cms::MessageProducer> producer(
                 m_session->createProducer( q.get()) );
-            producer->setDeliveryMode( cms::DeliveryMode::NON_PERSISTENT );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
