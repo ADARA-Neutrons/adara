@@ -222,7 +222,8 @@ int main( int argc, char** argv )
             suppress_nexus = false;
         }
 
-        // Can't support statistics display in interactive mode
+        // Can't support statistics display when _Not_ in interactive mode
+        // (Normally, _Only_ response to SMS is written to stdout...!)
         if ( gather_stats && !interact )
             gather_stats = false;
 
@@ -274,7 +275,8 @@ int main( int argc, char** argv )
         {
             if ( !interact )
             {
-                // In non-interactive mode, must hack around chatty HDF5 library: remap stdout and stderr to /dev/null
+                // In non-interactive mode, must hack around chatty
+                // HDF5 library: remap stdout and stderr to /dev/null
                 outfd = dup( 1 );
                 int nullfd = open( "/dev/null", O_RDWR );
                 dup2( nullfd, 1 );
@@ -285,13 +287,10 @@ int main( int argc, char** argv )
                 gather_stats, ldap_host, ldap_port, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level );
 
-            // Start ComBus monitor thread if not in interactive mode
-            if ( !interact )
-            {
-                monitor = new ComBusTransMon();
-                monitor->start( *nxgen,
-                    broker_uri, broker_user, broker_pass, domain );
-            }
+            // Start ComBus monitor thread (even in interactive mode!)
+            monitor = new ComBusTransMon();
+            monitor->start( *nxgen,
+                broker_uri, broker_user, broker_pass, domain );
 
             // Begin ADARA stream processing - does not return until recording ends
             nxgen->processStream();
@@ -384,6 +383,10 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] STS failed: Translation%s failed. code: %u",
             g_pid, run_desc.c_str(), (unsigned int)sms_code );
+
+        // Notify ComBus Monitor of Failure...
+        if ( monitor )
+            monitor->failure( sms_code, sms_reason );
     }
     else
     {
@@ -393,11 +396,6 @@ int main( int argc, char** argv )
 
     if ( !interact )
     {
-        if ( sms_code != STS::TS_SUCCESS && monitor )
-        {
-            monitor->failure( sms_code, sms_reason );
-        }
-
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         uint32_t heartbeat_pkt[4] = {0,0x00400900,0,0};
 
