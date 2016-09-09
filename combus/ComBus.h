@@ -20,6 +20,8 @@
 namespace ADARA {
 namespace ComBus {
 
+const std::string VERSION = "2.2.0";
+
 class MessageBase;
 
 
