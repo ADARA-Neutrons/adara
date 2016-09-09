@@ -112,6 +112,7 @@ static void parse_options(int argc, char **argv)
 	if (vm.count("version")) {
 		std::cerr << "SMS Daemon Version " << SMSD_VERSION
 			<< " (ADARA Common Version " << ADARA::VERSION
+			<< ", ComBus Version " << ADARA::ComBus::VERSION
 			<< ", Tag Name " << ADARA::TAG_NAME << ")"
 			<< std::endl;
 		exit(2);
@@ -416,6 +417,7 @@ int main(int argc, char **argv)
 	std::string version_str =
 		" SMSD Version " + SMSD_VERSION
 		+ " (ADARA Common Version " + ADARA::VERSION
+		+ ", ComBus Version " + ADARA::ComBus::VERSION
 		+ ", Tag Name " + ADARA::TAG_NAME + ")";
 
 	INFO("SMS Daemon Started, " << version_str);
