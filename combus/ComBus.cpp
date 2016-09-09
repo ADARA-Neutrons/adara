@@ -282,8 +282,17 @@ Connection::~Connection() throw()
     m_status_thread->join();
 
     // Wait for reconnect thread to exit
-    while ( m_reconnect_thread )
+    int i = 0;
+    while ( m_reconnect_thread && i++ < 12 )
         sleep(1);
+
+    // No One Can Seem to Catch This, So Don't Bother... ;-b
+    // (Too Many Odd Accompanying Exceptions from Boost/ActiveMQ...)
+    // if ( m_reconnect_thread )
+    // {
+        // throw std::runtime_error(
+            // "ComBus::Connection Destructor Timed Out Waiting for Reconnect Thread!");
+    // }
 
     disconnect();
 
@@ -524,14 +533,16 @@ Connection::reconnectThread()
                     "Failed to create ActiveMQConnection" );
             }
 
+            // Unlock _Now_ as Connection Start & Session Create can Hang!
+            // Besides, We're Done with the Broker Connection Parameters.
+            lock.unlock();
+
             m_connection->start();
 
             m_session = m_connection->createSession(
                 cms::Session::AUTO_ACKNOWLEDGE );
 
             m_connected = true;
-
-            lock.unlock();
 
             // Reconnect all message consumers
             for ( map<ITopicListener*,Translator*>::iterator il =
@@ -575,6 +586,9 @@ Connection::reconnectThread()
         // can interrupt this thread
         sleep( retry_period );
     }
+
+    // Notify connection status thread we're giving up...
+    m_status_cond.notify_one();
 
     // Self-destruct!
     delete m_reconnect_thread;
@@ -641,6 +655,7 @@ void
 Connection::disconnect()
 {
     boost::lock_guard<boost::mutex> lock( m_status_mutex );
+
     if ( m_connected )
     {
         m_connected = false;
