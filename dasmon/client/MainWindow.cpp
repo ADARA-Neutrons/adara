@@ -761,7 +761,8 @@ void
 MainWindow::about()
 {
     string version = DASMON_GUI_VERSION
-        + string( " (ADARA Common " ) + ADARA::VERSION + string( ")" );
+        + string( " (ADARA Common " ) + ADARA::VERSION
+        + string( ", ComBus " ) + ADARA::ComBus::VERSION + string( ")" );
     QMessageBox::about( this, "About DAS Monitor",
         QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg(
             version.c_str() ) );
