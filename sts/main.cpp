@@ -148,9 +148,12 @@ int main( int argc, char** argv )
     g_pid = getpid();
 
     openlog( "sts", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "[%i] Started. STS ver: %s, common ver: %s, tag: %s",
-        g_pid, STS_VERSION,
-        ADARA::VERSION.c_str(), ADARA::TAG_NAME.c_str() );
+    syslog( LOG_INFO,
+        "[%i] %s. STS ver: %s, %s ver: %s, ComBus ver: %s, tag: %s",
+        g_pid, "Started", STS_VERSION,
+        "ADARA Common", ADARA::VERSION.c_str(),
+        ADARA::ComBus::VERSION.c_str(),
+        ADARA::TAG_NAME.c_str() );
 
     try
     {
