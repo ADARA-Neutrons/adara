@@ -1403,6 +1403,42 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         }
                     }
                 }
+
+                // Device Not Yet Defined, Ignoring Value Update...!
+                else
+                {
+                    std::string deviceStr = "";
+                    if ( ich->second.m_device != NULL )
+                    {
+                        deviceStr = " Device ["
+                            + ich->second.m_device->m_name + "]";
+                    }
+
+                    std::string pvStr = "";
+                    if ( ich->second.m_pv != NULL )
+                    {
+                        pvStr = " for PV <"
+                            + ich->second.m_pv->m_name + "> ("
+                            + ich->second.m_pv->m_connection + ")";
+                    }
+
+                    syslog( LOG_ERR, "%s %s: %s %s%s",
+                        "PVSD ERROR:",
+                        "DeviceAgent::epicsEventHandler()",
+                        "Device Not Yet Defined, Ignore VariableUpdate",
+                        deviceStr.c_str(), pvStr.c_str() );
+                    usleep(33333); // give syslog a chance...
+                }
+            }
+
+            // Invalid EPICS Channel/Not Found...!
+            else
+            {
+                 syslog( LOG_ERR, "%s %s: %s Unknown Channel Id...",
+                    "PVSD ERROR:",
+                    "DeviceAgent::epicsEventHandler()",
+                    "Error Looking Up EPICS Data Event, " );
+                usleep(33333); // give syslog a chance...
             }
         }
         // Metadata event?
@@ -1452,6 +1488,16 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     m_state_changed = true;
                     m_state_cond.notify_one();
                 }
+            }
+
+            // Invalid EPICS Channel/Not Found...!
+            else
+            {
+                 syslog( LOG_ERR, "%s %s: %s Unknown Channel Id...",
+                    "PVSD ERROR:",
+                    "DeviceAgent::epicsEventHandler()",
+                    "Error Looking Up EPICS Metadata Event, " );
+                usleep(33333); // give syslog a chance...
             }
         }
     }
