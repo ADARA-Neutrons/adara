@@ -135,9 +135,9 @@ private:
 	static int m_base_fd;
 
 	static std::string m_poolsize;
-	static int m_percent;
+	static uint32_t m_percent;
 
-	static uint32_t m_block_size;
+	static uint64_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
 
@@ -198,7 +198,7 @@ private:
 				bool last);
 	static void populateDailyCache(void);
 
-	static void addBaseStorage(off_t size);
+	static void addBaseStorage(uint64_t size);
 	static void startContainer(uint32_t run = 0,
 				std::string propId = std::string("UNKNOWN"));
 	static void endCurrentContainer(void);

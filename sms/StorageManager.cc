@@ -38,7 +38,7 @@ public:
 		smsStringPV(name), m_block_size(block_size) {}
 private:
 
-	uint32_t m_block_size;
+	uint64_t m_block_size;
 
 	void changed(void)
 	{
@@ -85,14 +85,14 @@ public:
 private:
 
 	std::string m_baseDir;
-	uint32_t m_block_size;
+	uint64_t m_block_size;
 
 	void changed(void)
 	{
 		DEBUG("PercentPV: " << m_pv_name
 			<< " PV value changed, Set Max Blocks Allowed...");
 
-		int percent = value();
+		uint32_t percent = value();
 		uint64_t maxSize;
 
 		/* If the user doesn't specify a size, we'll use a percentage
@@ -109,7 +109,7 @@ private:
 			return;
 		}
 
-		maxSize = fsstats.f_blocks * percent / 100;
+		maxSize = fsstats.f_blocks * ((uint64_t) percent) / 100;
 		maxSize *= m_block_size;
 
 		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
@@ -221,9 +221,9 @@ StorageManager::ContainerSignal StorageManager::m_contChange;
 StorageManager::PrologueSignal StorageManager::m_prologue;
 
 std::string StorageManager::m_poolsize;
-int StorageManager::m_percent;
+uint32_t StorageManager::m_percent;
 
-uint32_t StorageManager::m_block_size;
+uint64_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
 uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
 
@@ -289,7 +289,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		throw std::runtime_error(msg);
 	}
 
-	m_block_size = stats.st_blksize;
+	m_block_size = (uint64_t) stats.st_blksize;
 	DEBUG("Filesystem Block Size = " << m_block_size);
 
 	// Max Blocks Allowed - Option Priorities:
@@ -333,7 +333,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 			DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
 
 			m_percent = conf.get<int>("storage.percent", 80);
-			maxSize = fsstats.f_blocks * m_percent / 100;
+			maxSize = ((uint64_t) fsstats.f_blocks)
+				* ((uint64_t) m_percent) / 100;
 			maxSize *= m_block_size;
 
 			DEBUG("Percent = " << m_percent
@@ -372,12 +373,12 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 	else {
 		/* Limit Max Blocks to Total Size of Filesystem at Most... ;-D */
 		if ( (m_max_blocks_allowed * m_block_size)
-				> (fsstats.f_blocks * m_block_size) ) {
+				> (((uint64_t) fsstats.f_blocks) * m_block_size) ) {
 			DEBUG("Max Blocks Too Big: requested size="
 				<< (m_max_blocks_allowed * m_block_size)
 				<< " > filesystem size="
 				<< (fsstats.f_blocks * m_block_size));
-			m_max_blocks_allowed = fsstats.f_blocks;
+			m_max_blocks_allowed = (uint64_t) fsstats.f_blocks;
 			DEBUG("Max Blocks Allowed limited to "
 				<< m_max_blocks_allowed);
 			return( true ); // requested value was Changed...!
@@ -737,9 +738,9 @@ bool StorageManager::cleanupRunFiles(void)
 	return false;
 }
 
-void StorageManager::addBaseStorage(off_t size)
+void StorageManager::addBaseStorage(uint64_t size)
 {
-	off_t blocks;
+	uint64_t blocks;
 
 	/* Now that the file is no longer being written to, we can add
 	 * account for its use of blocks
@@ -959,7 +960,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 
 	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
-	off_t size, blocks, resumeLocation;
+	uint64_t size, blocks;
+	off_t resumeLocation;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
@@ -1021,7 +1023,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 {
 	uint32_t len = validatePacket(iovec);
-	off_t size, blocks;
+	uint64_t size, blocks;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
