@@ -156,6 +156,20 @@ private:
 	}
 };
 
+class BlockSizePV : public smsUint32PV {
+public:
+	BlockSizePV(const std::string &name) :
+		smsUint32PV(name) {}
+
+private:
+
+	// Make "Read-Only" By Design... ;-D
+	bool allowUpdate(const gdd &)
+	{
+		return false;
+	}
+};
+
 class RescanRunDirPV : public smsStringPV {
 public:
 	RescanRunDirPV(const std::string &name) :
@@ -247,6 +261,8 @@ boost::shared_ptr<MaxBlocksPV>
 	StorageManager::m_pvMaxBlocksAllowed;
 boost::shared_ptr<MaxBlocksPV>
 	StorageManager::m_pvMaxBlocksAllowedMultiplier;
+
+boost::shared_ptr<BlockSizePV> StorageManager::m_pvBlockSize;
 
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
@@ -568,6 +584,9 @@ void StorageManager::lateInit(void)
 	m_pvMaxBlocksAllowedMultiplier = boost::shared_ptr<MaxBlocksPV>(new
 		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true));
 
+	m_pvBlockSize = boost::shared_ptr<BlockSizePV>(new
+		BlockSizePV(prefix + ":BlockSize"));
+
 	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
 		RescanRunDirPV(prefix + ":RescanRunDir"));
 
@@ -575,6 +594,7 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
 	ctrl->addPV(m_pvMaxBlocksAllowedMultiplier);
+	ctrl->addPV(m_pvBlockSize);
 	ctrl->addPV(m_pvRescanRunDir);
 
 	/* Set the fencepost for the scan; any containers with a
@@ -595,6 +615,8 @@ void StorageManager::lateInit(void)
 	// - m_pvMaxBlocksAllowed
 	// - m_pvMaxBlocksAllowedMultiplier
 	StorageManager::update_max_blocks_allowed_pv();
+
+	m_pvBlockSize->update((uint32_t) m_block_size, &m_scanStart);
 
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);

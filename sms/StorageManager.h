@@ -24,6 +24,7 @@ class EventFd;
 class PoolsizePV;
 class PercentPV;
 class MaxBlocksPV;
+class BlockSizePV;
 class RescanRunDirPV;
 
 class StorageManager {
@@ -151,6 +152,7 @@ private:
 	static boost::shared_ptr<PercentPV> m_pvPercent;
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowed;
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowedMultiplier;
+	static boost::shared_ptr<BlockSizePV> m_pvBlockSize;
 	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
 
 	static struct timespec m_scanStart;
