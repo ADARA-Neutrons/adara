@@ -71,7 +71,7 @@ private:
 		/* Set Max Blocks Allowed for StorageManager... */
 		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
-		/* Update Max Blocks Allowed EPICS PV... */
+		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
 };
@@ -121,29 +121,36 @@ private:
 		/* Set Max Blocks Allowed for StorageManager... */
 		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
-		/* Update Max Blocks Allowed EPICS PV... */
+		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
 };
 
 class MaxBlocksPV : public smsUint32PV {
 public:
-	MaxBlocksPV(const std::string &name) :
-		smsUint32PV(name) {}
+	MaxBlocksPV(const std::string &name, bool isMultiplier) :
+		smsUint32PV(name), m_isMultiplier(isMultiplier) {}
 
 private:
 
+	bool m_isMultiplier;
+
 	void changed(void)
 	{
-		uint64_t max_blocks_allowed = value();
+		uint32_t max_blocks_allowed_value = value();
 
-		DEBUG("MaxBlocksPV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed to "
-			<< max_blocks_allowed);
+		DEBUG( "MaxBlocksPV: " << m_pv_name
+			<< " PV value changed, Set Max Blocks Allowed"
+			<< ( m_isMultiplier ? " Multiplier" : " Base" )
+			<< " to "
+			<< max_blocks_allowed_value );
 
-		/* Set Max Blocks Allowed for StorageManager... */
-		if ( StorageManager::set_max_blocks_allowed(max_blocks_allowed) ) {
-			/* Update Max Blocks Allowed PV if Requested Value Changed! */
+		// Set Max Blocks Allowed Value (Multiplier/Base)
+		// for StorageManager...
+		if ( StorageManager::set_max_blocks_allowed_value(
+				max_blocks_allowed_value, m_isMultiplier ) )
+		{
+			/* Update Max Blocks Allowed PVs if Requested Value Changed! */
 			StorageManager::update_max_blocks_allowed_pv();
 		}
 	}
@@ -223,13 +230,24 @@ StorageManager::PrologueSignal StorageManager::m_prologue;
 std::string StorageManager::m_poolsize;
 uint32_t StorageManager::m_percent;
 
+uint32_t StorageManager::m_max_blocks_allowed_multiplier = 1;
+uint32_t StorageManager::m_max_blocks_allowed_base = 0x40000000;
+
 uint64_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
-uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
+uint64_t StorageManager::m_max_blocks_allowed =
+	(uint64_t) m_max_blocks_allowed_base
+		* (uint64_t) m_max_blocks_allowed_multiplier;
 
 boost::shared_ptr<PoolsizePV> StorageManager::m_pvPoolsize;
+
 boost::shared_ptr<PercentPV> StorageManager::m_pvPercent;
-boost::shared_ptr<MaxBlocksPV> StorageManager::m_pvMaxBlocksAllowed;
+
+boost::shared_ptr<MaxBlocksPV>
+	StorageManager::m_pvMaxBlocksAllowed;
+boost::shared_ptr<MaxBlocksPV>
+	StorageManager::m_pvMaxBlocksAllowedMultiplier;
+
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
 struct timespec StorageManager::m_scanStart;
@@ -353,6 +371,20 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	StorageFile::config(conf);
 }
 
+bool StorageManager::set_max_blocks_allowed_value(
+		uint32_t max_blocks_allowed_value, bool isMultiplier )
+{
+	if ( isMultiplier )
+		m_max_blocks_allowed_multiplier = max_blocks_allowed_value;
+	else
+		m_max_blocks_allowed_base = max_blocks_allowed_value;
+
+	uint64_t max_blocks_allowed = (uint64_t) m_max_blocks_allowed_base
+		* (uint64_t) m_max_blocks_allowed_multiplier;
+
+	return( set_max_blocks_allowed( max_blocks_allowed ) );
+}
+
 bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 {
 	m_max_blocks_allowed = max_blocks_allowed;
@@ -394,9 +426,63 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 
 void StorageManager::update_max_blocks_allowed_pv(void)
 {
+	static uint64_t prime_factors[] = { 2, 3, 5, 7, 11, 13, 17, 19 };
+	static uint32_t nfactors = sizeof(prime_factors) / sizeof(uint64_t);
+
+	// Magically Factor Uint64 "Max Blocks Allowed" into Base/Multiplier...
+	uint64_t base = m_max_blocks_allowed;
+	m_max_blocks_allowed_multiplier = 1;
+
+	DEBUG("update_max_blocks_allowed_pv(): Before Loop"
+		<< " m_max_blocks_allowed=" << m_max_blocks_allowed
+		<< " UINT32_MAX=" << UINT32_MAX
+		<< " base=" << base
+		<< " multiplier=" << m_max_blocks_allowed_multiplier);
+
+	while ( base > UINT32_MAX )
+	{
+		DEBUG("update_max_blocks_allowed_pv(): Loop"
+			<< " base=" << base
+			<< " > UINT32_MAX=" << UINT32_MAX
+			<< ", multiplier=" << m_max_blocks_allowed_multiplier);
+
+		// Check Divisibility by Prime Factors...
+		bool found_match = false;
+		for ( uint32_t i = 0 ; !found_match && i < nfactors ; i++ )
+		{
+			uint64_t q = base / prime_factors[i];
+			DEBUG("prime_factors[" << i << "]=" << prime_factors[i]
+				<< " q=" << q);
+			if ( q * prime_factors[i] == base )
+			{
+				DEBUG("Divisible!");
+				m_max_blocks_allowed_multiplier *= prime_factors[i];
+				base = q;
+				found_match = true;
+			}
+		}
+
+		// No Easy Prime Factor Found, Munge by 10's... ;-Q
+		if ( !found_match )
+		{
+			DEBUG("No Prime Factor Found! Divide By 10...!");
+			m_max_blocks_allowed_multiplier *= 10;
+			base /= 10;
+		}
+	}
+
+	m_max_blocks_allowed_base = base;
+
+	DEBUG("update_max_blocks_allowed_pv(): Loop Done"
+		<< " m_max_blocks_allowed_base=" << m_max_blocks_allowed_base
+		<< " m_max_blocks_allowed_multiplier="
+			<< m_max_blocks_allowed_multiplier);
+
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &now);
+	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed_base, &now);
+	m_pvMaxBlocksAllowedMultiplier->update(
+		m_max_blocks_allowed_multiplier, &now);
 }
 
 void StorageManager::init(void)
@@ -477,7 +563,10 @@ void StorageManager::lateInit(void)
 		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
 
 	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowed"));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false));
+
+	m_pvMaxBlocksAllowedMultiplier = boost::shared_ptr<MaxBlocksPV>(new
+		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true));
 
 	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
 		RescanRunDirPV(prefix + ":RescanRunDir"));
@@ -485,6 +574,7 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
+	ctrl->addPV(m_pvMaxBlocksAllowedMultiplier);
 	ctrl->addPV(m_pvRescanRunDir);
 
 	/* Set the fencepost for the scan; any containers with a
@@ -495,10 +585,16 @@ void StorageManager::lateInit(void)
 	clock_gettime(CLOCK_REALTIME, &m_scanStart);
 
 	/* Initialize Storage Manager PVs... */
+
 	m_pvPoolsize->update(
 		m_poolsize.length() ? m_poolsize : "(unset)", &m_scanStart);
+
 	m_pvPercent->update(m_percent, &m_scanStart);
-	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &m_scanStart);
+
+	// Update Max Blocks Allowed EPICS PVs...
+	// - m_pvMaxBlocksAllowed
+	// - m_pvMaxBlocksAllowedMultiplier
+	StorageManager::update_max_blocks_allowed_pv();
 
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
@@ -1006,8 +1102,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 */
 	blocks = size + m_block_size - 1;
 	blocks /= m_block_size;
-	/* Update Max Blocks Allowed from PV... */
-	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	// *Don't* Update "Max Blocks Allowed" from PV...!
+	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
@@ -1037,8 +1133,8 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	 */
 	blocks = size + m_block_size - 1;
 	blocks /= m_block_size;
-	/* Update Max Blocks Allowed from PV... */
-	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	// *Don't* Update "Max Blocks Allowed" from PV...!
+	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;

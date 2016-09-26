@@ -104,6 +104,9 @@ public:
 
 	static void config(const boost::property_tree::ptree &conf);
 
+	static bool set_max_blocks_allowed_value(
+		uint32_t max_blocks_allowed_value, bool isMultiplier );
+
 	static bool set_max_blocks_allowed(uint64_t maxSize);
 
 	static void update_max_blocks_allowed_pv(void);
@@ -137,6 +140,9 @@ private:
 	static std::string m_poolsize;
 	static uint32_t m_percent;
 
+	static uint32_t m_max_blocks_allowed_multiplier;
+	static uint32_t m_max_blocks_allowed_base;
+
 	static uint64_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
@@ -144,6 +150,7 @@ private:
 	static boost::shared_ptr<PoolsizePV> m_pvPoolsize;
 	static boost::shared_ptr<PercentPV> m_pvPercent;
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowed;
+	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowedMultiplier;
 	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
 
 	static struct timespec m_scanStart;
