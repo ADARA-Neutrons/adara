@@ -391,12 +391,22 @@ option_label[$num_options]=\
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
-option_name[$num_options]="XXX_NO_CONFIG_VALUE_XXX"
+option_name[$num_options]="max_blocks_allowed_multiplier"
+option_no_config[$num_options]=1
 option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowedMultiplier"
 option_value_type[$num_options]="UINT32_VALUE(blocks)"
 option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
 option_label[$num_options]=\
 "[Max Storage Blocks Allowed (*Uint32* _Multiplier_ Limit!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="block_size"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:StorageManager:BlockSize"
+option_value_type[$num_options]="UINT32_VALUE(blocksize)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]="[Storage Block Size (Read-Only!)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
@@ -1411,6 +1421,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowedMultiplier
+		caget $WAIT ${PRE}:SMS:StorageManager:BlockSize
 		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
 
 		echo
