@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <sstream>
 #include <stdexcept>
 
 #include <boost/lexical_cast.hpp>
@@ -1129,15 +1130,14 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
-		SMSControl *ctrl = SMSControl::getInstance();
-		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "addPacket() Requesting Purge"
+		std::stringstream ss;
+		ss << "addPacket() Purge Request"
 			<< " (m_blocks_used=" << m_blocks_used
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")");
-		requestPurge(goal);
+			<< ": goal=" << goal << ")";
+		requestPurge( goal, ss.str() );
 	}
 
 	// DEBUG("addPacket() exit len=" << len);
@@ -1165,15 +1165,14 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
 		uint64_t goal = m_blocks_used + blocks;
 		goal -= m_max_blocks_allowed;
-		SMSControl *ctrl = SMSControl::getInstance();
-		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "savePacket() Requesting Purge"
+		std::stringstream ss;
+		ss << "savePacket() Purge Request"
 			<< " (m_blocks_used=" << m_blocks_used
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")");
-		requestPurge(goal);
+			<< ": goal=" << goal << ")";
+		requestPurge( goal, ss.str() );
 	}
 }
 
@@ -1390,14 +1389,11 @@ void StorageManager::ioCompleted(void)
 	DEBUG("ioCompleted exit");
 }
 
-void StorageManager::requestPurge(uint64_t goal)
+void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 {
 	/* Only one I/O action at a time. */
-	if (m_ioActive) {
-		DEBUG("Purge Already In Progress - Defer..."
-			<< " (goal=" << goal << ")");
+	if (m_ioActive)
 		return;
-	}
 
 	/* In the unlikely event we're purging enough to get into our
 	 * command range, just clamp the goal -- we'll pick up and
@@ -1406,7 +1402,10 @@ void StorageManager::requestPurge(uint64_t goal)
 	if (goal >= IOCMD_PURGE_MAX)
 		goal = IOCMD_PURGE_MAX;
 
-	DEBUG("Signaling Purge Request of " << goal << " Blocks!");
+	SMSControl *ctrl = SMSControl::getInstance();
+	DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		<< "Signaling Purge Request of " << goal << " Blocks - "
+		<< logStr );
 
 	m_ioActive = true;
 	m_ioStartEvent->signal(goal);
@@ -1551,9 +1550,6 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		fs::remove(fs::path(dir));
 	} catch (fs::filesystem_error e) {
 	}
-
-	DEBUG("purgeDaily(): Purged " << total_purged << " Blocks Total"
-		<< " from " << dir);
 
 	return total_purged;
 }

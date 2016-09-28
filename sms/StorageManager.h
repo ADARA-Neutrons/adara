@@ -201,7 +201,7 @@ private:
 
 	static void backgroundIo(void);
 	static void ioCompleted(void);
-	static void requestPurge(uint64_t goal);
+	static void requestPurge(uint64_t goal, std::string logStr);
 	static uint64_t purgeData(uint64_t goal);
 	static uint64_t purgeDaily(const std::string &dir, uint64_t goal,
 				bool last);
