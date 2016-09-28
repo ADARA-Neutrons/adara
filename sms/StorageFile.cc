@@ -510,12 +510,13 @@ StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
 }
 
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-		const std::string &path, bool &saved_file)
+		const std::string &path, bool &saved_file, uint64_t &saved_size)
 {
 	fs::path p(path);
 	uint32_t fileNumber = 0, saveFileNumber = 0, runNumber = 0;
 	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
 	uint32_t sourceId = 0;
+	std::string save_type;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
@@ -532,17 +533,13 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	}
 	else if ( sscanf(p.filename().c_str(), "ds%u-s%u-run-%u.adara",
 			&sourceId, &saveFileNumber, &runNumber) == 3 ) {
-		DEBUG("Ignoring ADARA Data Source " << sourceId
-			<< " Saved Input Stream Run file: " << p);
+		save_type = "Run";
 		saved_file = true;
-		return StorageFile::SharedPtr();
 	}
 	else if ( sscanf(p.filename().c_str(), "ds%u-s%u.adara",
 			&sourceId, &saveFileNumber) == 2 ) {
-		DEBUG("Ignoring ADARA Data Source " << sourceId
-			<< " Saved Input Stream Non-Run file: " << p);
+		save_type = "Non-Run";
 		saved_file = true;
-		return StorageFile::SharedPtr();
 	}
 	// *Only* Support Addendums to Run Containers, Not Between Runs...
 	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
@@ -562,6 +559,38 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 			&& sscanf(p.filename().c_str(), "f%u.adara",
 				&fileNumber) != 1 ) {
 		WARN("Improperly named ADARA file: " << p);
+		return StorageFile::SharedPtr();
+	}
+
+	// Handle Saved Data Source Stream Files/Return Block Count...
+	if ( saved_file )
+	{
+		// Create Temporary File, Just to Get Block Count...
+		StorageFile::SharedPtr f(
+			new StorageFile(owner, saveFileNumber, pauseFileNumber) );
+		f->m_path = path;
+		f->open(O_RDONLY);
+
+		struct stat statbuf;
+		int err = fstat(f->m_fd, &statbuf);
+		if (err)
+			err = errno;
+		f->put_fd();
+
+		if (err) {
+			std::string msg("StorageFile::addFile() stat error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
+
+		saved_size = statbuf.st_size;
+
+		f.reset();
+
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream " << save_type << " file: " << p
+			<< " (" << saved_size << " bytes)");
+
 		return StorageFile::SharedPtr();
 	}
 
