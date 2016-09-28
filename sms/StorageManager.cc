@@ -1078,7 +1078,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 
 	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
-	uint64_t size, blocks;
+	uint64_t cur_size, blocks;
 	off_t resumeLocation;
 
 	if (!m_cur_container)
@@ -1103,7 +1103,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * to this location for replay after a snapshot.
 	 */
 	resumeLocation = m_cur_container->file()->size();
-	size = m_cur_container->write(iovec, len, notify);
+	cur_size = m_cur_container->write(iovec, len, notify);
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
@@ -1122,7 +1122,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
 	 */
-	blocks = size + m_block_size - 1;
+	blocks = cur_size + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
@@ -1131,7 +1131,12 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		goal -= m_max_blocks_allowed;
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "addPacket() requestPurge! goal=" << goal);
+			<< "addPacket() Requesting Purge"
+			<< " (m_blocks_used=" << m_blocks_used
+			<< " + blocks=" << blocks
+			<< " = " << (m_blocks_used + blocks)
+			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
+			<< ": goal=" << goal << ")");
 		requestPurge(goal);
 	}
 
@@ -1141,19 +1146,19 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 {
 	uint32_t len = validatePacket(iovec);
-	uint64_t size, blocks;
+	uint64_t cur_size, blocks;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	size = m_cur_container->save(iovec, len, dataSourceId);
+	cur_size = m_cur_container->save(iovec, len, dataSourceId);
 
 	/* Is it time to initiate a purge of old data?
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
 	 */
-	blocks = size + m_block_size - 1;
+	blocks = cur_size + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
@@ -1162,7 +1167,12 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 		goal -= m_max_blocks_allowed;
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "savePacket() requestPurge! goal=" << goal);
+			<< "savePacket() Requesting Purge"
+			<< " (m_blocks_used=" << m_blocks_used
+			<< " + blocks=" << blocks
+			<< " = " << (m_blocks_used + blocks)
+			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
+			<< ": goal=" << goal << ")");
 		requestPurge(goal);
 	}
 }
@@ -1272,26 +1282,26 @@ void StorageManager::scanStorage(void)
 		fs::file_status status = it->status();
 
 		/* Skip over the storage for the next run number */
-		if (file == m_run_filename || file == m_run_tempname)
+		if ( file == m_run_filename || file == m_run_tempname )
 			continue;
 
 		/* Skip index directories; they are handled by other means. */
-		if (file.string().compare(0, m_stateDirPrefix.length(),
-						m_stateDirPrefix) == 0)
+		if ( file.string().compare( 0, m_stateDirPrefix.length(),
+						m_stateDirPrefix ) == 0 )
 			continue;
 
-		if (status.type() != fs::directory_file) {
+		if ( status.type() != fs::directory_file ) {
 			WARN("Ignoring non-directory '" << it->path() << "'");
 			continue;
 		}
 
-		if (!isValidDaily(file.string())) {
+		if ( !isValidDaily( file.string() ) ) {
 			WARN("Daily directory '" << it->path()
 				<< "' has invalid format");
 			continue;
 		}
 
-		scanDaily(it->path().string());
+		scanDaily( it->path().string() );
 	}
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
@@ -1371,7 +1381,7 @@ void StorageManager::ioCompleted(void)
 		if (!m_pendingRuns.empty())
 			sts->startConnect();
 	} else {
-		DEBUG("ioCompleted purged " << m_purgedBlocks << " blocks");
+		DEBUG("ioCompleted(): Purged " << m_purgedBlocks << " Blocks");
 		m_blocks_used -= m_purgedBlocks;
 	}
 
@@ -1383,8 +1393,11 @@ void StorageManager::ioCompleted(void)
 void StorageManager::requestPurge(uint64_t goal)
 {
 	/* Only one I/O action at a time. */
-	if (m_ioActive)
+	if (m_ioActive) {
+		DEBUG("Purge Already In Progress - Defer..."
+			<< " (goal=" << goal << ")");
 		return;
+	}
 
 	/* In the unlikely event we're purging enough to get into our
 	 * command range, just clamp the goal -- we'll pick up and
@@ -1393,7 +1406,7 @@ void StorageManager::requestPurge(uint64_t goal)
 	if (goal >= IOCMD_PURGE_MAX)
 		goal = IOCMD_PURGE_MAX;
 
-	DEBUG("Requesting purge of " << goal << " blocks");
+	DEBUG("Signaling Purge Request of " << goal << " Blocks!");
 
 	m_ioActive = true;
 	m_ioStartEvent->signal(goal);
@@ -1403,7 +1416,7 @@ void StorageManager::populateDailyCache(void)
 {
 	fs::directory_iterator end, it(m_baseDir);
 
-	DEBUG("Building cache of daily directories");
+	DEBUG("Building Cache of Daily Directories for Purging");
 	m_dailyCache.clear();
 
 	for (; it != end; ++it) {
@@ -1411,16 +1424,16 @@ void StorageManager::populateDailyCache(void)
 		fs::file_status status = it->status();
 
 		/* Skip over the storage for the next run number */
-		if (file == m_run_filename || file == m_run_tempname)
+		if ( file == m_run_filename || file == m_run_tempname )
 			continue;
 
-		if (status.type() != fs::directory_file)
+		if ( status.type() != fs::directory_file )
 			continue;
 
-		if (!isValidDaily(file.string()))
+		if ( !isValidDaily( file.string() ) )
 			continue;
 
-		m_dailyCache.push_back(file.string());
+		m_dailyCache.push_back( file.string() );
 	}
 
 	/* The daily directories have the format YYYYMMDD, so the default
@@ -1442,7 +1455,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	for (; it != end; ++it) {
 		fs::file_status status = it->status();
 
-		if (status.type() != fs::directory_file)
+		if ( status.type() != fs::directory_file )
 			continue;
 
 		containers.push_back(it->path());
@@ -1495,12 +1508,20 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 */
 		++cit;
 
+		// Skip the Last Container in the Last Daily Folder...
+		// (Because This is the One We're Currently Writing To...! ;-O)
+		if ( last && cit == cend ) {
+			DEBUG("purgeDaily():"
+				<< " Skipping Last Container in Last Daily Folder"
+				<< " (Active?) " << cpath.string());
+			continue;
+		}
+
 		// Try to Purge this Container...
 		std::string propId;
 		bool path_deleted = false;
 		purged = StorageContainer::purge(cpath.string(),
 							goal - total_purged,
-							last && cit == cend,
 							propId, path_deleted);
 
 		// If No ProposalId Found, Set to "UNKNOWN"...
@@ -1531,6 +1552,9 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	} catch (fs::filesystem_error e) {
 	}
 
+	DEBUG("purgeDaily(): Purged " << total_purged << " Blocks Total"
+		<< " from " << dir);
+
 	return total_purged;
 }
 
@@ -1552,7 +1576,7 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			populateDailyCache();
 	} catch (...) {
 		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "purgeData() populating cache");
+			<< "purgeData() Error Populating Daily Cache for Purging!");
 		/* If we cannot populate the cache, then we cannot purge. */
 		return 0;
 	}
@@ -1564,12 +1588,13 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		fs::path dir(m_baseDir);
 		dir /= *it;
 		if (!fs::exists(dir)) {
+			// TODO: Manually/Externally Deleted, Subtract Blocks...?
 			it = m_dailyCache.erase(it);
 			continue;
 		}
 
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Purging daily " << *it);
+			<< "Purging Daily " << *it);
 
 		/* We need to do the increment in the loop, as we may delete
 		 * elements from the list as we clean the directories. We
@@ -1583,6 +1608,10 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 	}
 
 	m_dailyExhausted = (purged < purgeRequested);
+
+	DEBUG("purgeData(): Purged " << purged << " Total Blocks"
+		<< " (dailyExhausted=" << m_dailyExhausted << ")");
+
 	return purged;
 }
 
