@@ -565,27 +565,20 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	// Handle Saved Data Source Stream Files/Return Block Count...
 	if ( saved_file )
 	{
-		// Create Temporary File, Just to Get Block Count...
-		StorageFile::SharedPtr f(
-			new StorageFile(owner, saveFileNumber, pauseFileNumber) );
-		f->m_path = path;
-		f->open(O_RDONLY);
+		std::string full_path = StorageManager::base_dir() + "/" + path;
 
 		struct stat statbuf;
-		int err = fstat(f->m_fd, &statbuf);
+		int err = stat(full_path.c_str(), &statbuf);
 		if (err)
 			err = errno;
-		f->put_fd();
 
 		if (err) {
-			std::string msg("StorageFile::addFile() stat error: ");
+			std::string msg("StorageFile::importFile() stat error: ");
 			msg += strerror(err);
 			throw std::runtime_error(msg);
 		}
 
 		saved_size = statbuf.st_size;
-
-		f.reset();
 
 		DEBUG("Ignoring ADARA Data Source " << sourceId
 			<< " Saved Input Stream " << save_type << " file: " << p
