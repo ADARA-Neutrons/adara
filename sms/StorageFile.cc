@@ -565,21 +565,8 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	// Handle Saved Data Source Stream Files/Return Block Count...
 	if ( saved_file )
 	{
-		std::string full_path = StorageManager::base_dir() + "/" + path;
-
-		struct stat statbuf;
-		int err = stat(full_path.c_str(), &statbuf);
-		if (err)
-			err = errno;
-
-		if (err) {
-			std::string msg("StorageFile::importFile() stat error: ");
-			msg += strerror(err);
-			throw std::runtime_error(msg);
-		}
-
-		saved_size = statbuf.st_size;
-
+		saved_size = fileSize( path );
+		
 		DEBUG("Ignoring ADARA Data Source " << sourceId
 			<< " Saved Input Stream " << save_type << " file: " << p
 			<< " (" << saved_size << " bytes)");
@@ -629,5 +616,25 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	f->m_size = statbuf.st_size;
 	return f;
+}
+
+uint64_t StorageFile::fileSize(const std::string &path)
+{
+	std::string full_path = StorageManager::base_dir() + "/" + path;
+
+	struct stat statbuf;
+	int err = stat(full_path.c_str(), &statbuf);
+	if (err)
+		err = errno;
+
+	if (err) {
+		std::string msg("StorageFile::fileSize() stat error: ");
+		msg += strerror(err);
+		throw std::runtime_error(msg);
+	}
+
+	uint64_t file_size = statbuf.st_size;
+
+	return( file_size );
 }
 
