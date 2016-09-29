@@ -76,7 +76,9 @@ public:
 		addPrologue(iovec);
 	}
 
-	static int base_fd() { return m_base_fd; }
+	static int base_fd(void) { return m_base_fd; }
+
+	static std::string base_dir(void) { return m_baseDir; }
 
 	static boost::signals2::connection onContainerChange(
 					const ContainerSignal::slot_type &s) {
