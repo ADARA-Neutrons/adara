@@ -628,9 +628,10 @@ uint64_t StorageFile::fileSize(const std::string &path)
 		err = errno;
 
 	if (err) {
-		std::string msg("StorageFile::fileSize() stat error: ");
+		std::string msg("fileSize() stat error: ");
 		msg += strerror(err);
-		throw std::runtime_error(msg);
+		DEBUG(msg);
+		throw std::runtime_error("StorageFile::" + msg);
 	}
 
 	uint64_t file_size = statbuf.st_size;
