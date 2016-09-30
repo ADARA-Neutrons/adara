@@ -184,7 +184,9 @@ private:
 	static uint64_t m_purgedBlocks;
 
 	static bool m_dailyExhausted;
-	static std::list< std::pair<std::string, uint64_t> > m_dailyCache;
+	static std::list<
+		std::pair<std::string,
+			std::map<std::string, uint64_t> > > m_dailyCache;
 
 	static ComBusSMSMon *m_combus;
 
@@ -205,10 +207,12 @@ private:
 	static void ioCompleted(void);
 	static void requestPurge(uint64_t goal, std::string logStr);
 	static uint64_t purgeData(uint64_t goal);
-	static uint64_t purgeDaily(const std::string &dir, uint64_t goal,
-				bool last);
+	static uint64_t purgeDaily(const std::string &dir,
+				std::map<std::string, uint64_t> &daily_map,
+				uint64_t goal, bool last, bool &daily_deleted);
 	static void populateDailyCache(void);
-	static uint64_t getDirSize(const std::string &dir);
+	static std::map<std::string, uint64_t> getDirSize(
+				const std::string &dir, uint64_t &total_size);
 
 	static void addBaseStorage(uint64_t size);
 	static void startContainer(uint32_t run = 0,

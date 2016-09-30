@@ -268,15 +268,21 @@ boost::shared_ptr<BlockSizePV> StorageManager::m_pvBlockSize;
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
 struct timespec StorageManager::m_scanStart;
-uint64_t StorageManager::m_scannedBlocks;
+
 std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
 
 bool StorageManager::m_ioActive = false;
+
 EventFd *StorageManager::m_ioStartEvent;
 EventFd *StorageManager::m_ioCompleteEvent;
+
+uint64_t StorageManager::m_scannedBlocks;
 uint64_t StorageManager::m_purgedBlocks;
+
 bool StorageManager::m_dailyExhausted;
-std::list< std::pair<std::string, uint64_t> > StorageManager::m_dailyCache;
+
+std::list< std::pair<std::string, std::map<std::string, uint64_t> > >
+	StorageManager::m_dailyCache;
 
 ComBusSMSMon *StorageManager::m_combus;
 
@@ -1128,8 +1134,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		uint64_t goal = m_blocks_used + blocks;
-		goal -= m_max_blocks_allowed;
+		uint64_t goal = ( m_blocks_used + blocks ) - m_max_blocks_allowed;
 		std::stringstream ss;
 		ss << "addPacket() Purge Request"
 			<< " (m_blocks_used=" << m_blocks_used
@@ -1163,8 +1168,7 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		uint64_t goal = m_blocks_used + blocks;
-		goal -= m_max_blocks_allowed;
+		uint64_t goal = ( m_blocks_used + blocks ) - m_max_blocks_allowed;
 		std::stringstream ss;
 		ss << "savePacket() Purge Request"
 			<< " (m_blocks_used=" << m_blocks_used
@@ -1433,13 +1437,18 @@ void StorageManager::populateDailyCache(void)
 		if ( !isValidDaily( file.string() ) )
 			continue;
 
-		uint64_t daily_size = getDirSize( it->path().filename() );
+		uint64_t total_size = 0;
+
+		std::map<std::string, uint64_t> daily_map =
+			getDirSize( it->path().filename(), total_size );
 
 		DEBUG("populateDailyCache(): Daily " << it->path().filename()
-			<< " Total Files Size = " << daily_size);
+			<< " - " << daily_map.size() << " Sub-Directories,"
+			<< " Total Files Size = " << total_size);
 
-		m_dailyCache.push_back( std::pair< std::string, uint64_t > (
-			file.string(), daily_size ) );
+		m_dailyCache.push_back(
+			std::pair< std::string, std::map<std::string, uint64_t> > (
+				file.string(), daily_map ) );
 	}
 
 	/* The daily directories have the format YYYYMMDD, so the default
@@ -1451,11 +1460,14 @@ void StorageManager::populateDailyCache(void)
 	m_dailyCache.sort();
 }
 
-uint64_t StorageManager::getDirSize(const std::string &dir)
+std::map<std::string, uint64_t> StorageManager::getDirSize(
+		const std::string &dir, uint64_t &total_size )
 {
+	std::map<std::string, uint64_t> daily_map;
+
 	fs::directory_iterator end, it( m_baseDir + "/" + dir );
 
-	uint64_t dir_size = 0;
+	total_size = 0;
 
 	for (; it != end; ++it) {
 
@@ -1463,18 +1475,25 @@ uint64_t StorageManager::getDirSize(const std::string &dir)
 
 		fs::directory_iterator sub_end, sub( m_baseDir + "/" + sub_dir );
 
+		uint64_t sub_size = 0;
+
 		for (; sub != sub_end; ++sub) {
 
-			dir_size += StorageFile::fileSize(
+			sub_size += StorageFile::fileSize(
 				sub_dir + "/" + sub->path().filename() );
 		}
+
+		daily_map[ it->path().filename() ] = sub_size;
+
+		total_size += sub_size;
 	}
 
-	return( dir_size );
+	return( daily_map );
 }
 
-uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
-					bool last)
+uint64_t StorageManager::purgeDaily( const std::string &dir,
+		std::map<std::string, uint64_t> &UNUSED(daily_map),
+		uint64_t goal, bool last, bool &daily_deleted )
 {
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
@@ -1578,9 +1597,11 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	}
 
 	/* Try to remove the directory, but expect to fail. */
+	daily_deleted = true;
 	try {
 		fs::remove(fs::path(dir));
 	} catch (fs::filesystem_error e) {
+		daily_deleted = false;
 	}
 
 	return total_purged;
@@ -1609,40 +1630,62 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 		return 0;
 	}
 
-	std::list< std::pair<std::string, uint64_t> >::iterator it,
-		end = m_dailyCache.end();
 	uint64_t purged = 0;
-	for (it = m_dailyCache.begin(); purged < purgeRequested &&
-								it != end; ) {
+
+	std::list< std::pair<std::string,
+		std::map<std::string, uint64_t> > >::iterator it, next,
+			end = m_dailyCache.end();
+
+	for ( it = m_dailyCache.begin();
+			purged < purgeRequested && it != end; ) {
+
 		fs::path dir(m_baseDir);
 		dir /= it->first;
-		DEBUG("purgeData(): " << dir.string());
-		if (!fs::exists(dir)) {
-			//  Manually/Externally Deleted, Subtract Blocks...
-			uint64_t blocks = it->second + m_block_size - 1;
-			blocks /= m_block_size;
-			DEBUG("purgeData(): Directory " << it->first
-				<< " Externally Deleted!"
-				<< " Recovered " << blocks << " Blocks"
-				<< " (" << it->second << " Bytes)");
-			purged += blocks;
+
+		// Whole Daily Directory is Gone...! :-D
+		// Must Be Manually/Externally Deleted, Subtract All Blocks...
+		if ( !fs::exists(dir) ) {
+			DEBUG("purgeData(): Whole Daily Directory " << it->first
+				<< " has been Externally Deleted!"
+				<< " Recover Manually Freed Blocks...");
+			std::map<std::string, uint64_t>::iterator subs,
+				subs_end = it->second.end();
+			for (subs = it->second.begin() ; subs != subs_end; subs++) {
+				uint64_t blocks = subs->second + m_block_size - 1;
+				blocks /= m_block_size;
+				DEBUG("purgeData(): Directory "
+					<< it->first << "/" << subs->first
+					<< " Found Deleted - Recovered " << blocks << " Blocks"
+					<< " (" << subs->second << " Bytes)");
+				purged += blocks;
+			}
 			it = m_dailyCache.erase(it);
 			continue;
 		}
 
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Purging Daily " << it->first
-			<< " (Directory Size = " << it->second << ")");
+			<< "Purging Daily " << it->first);
 
-		/* We need to do the increment in the loop, as we may delete
-		 * elements from the list as we clean the directories. We
-		 * also need to know when we're working on the last known
+		/* We need to know when we're working on the last known
 		 * daily directory so we can tell purgeDir(). It will use
 		 * this to avoid erasing the current container.
 		 */
-		++it;
-		purged += purgeDaily(dir.string(), purgeRequested - purged,
-					it == end);
+		bool daily_deleted = false;
+		next = it;
+		purged += purgeDaily( dir.string(), it->second,
+			purgeRequested - purged, ++next == end, daily_deleted );
+
+		// Clean Up Daily Cache if Directory Deleted...
+		if ( daily_deleted ) {
+			DEBUG("Removed Daily " << it->first);
+			it = m_dailyCache.erase(it);
+		}
+
+		// We need to do the increment within the loop, as we may delete
+		// elements from the list as we clean the directories.
+		else {
+			++it;
+		}
 	}
 
 	m_dailyExhausted = (purged < purgeRequested);
