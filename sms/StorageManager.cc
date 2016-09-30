@@ -276,7 +276,7 @@ EventFd *StorageManager::m_ioStartEvent;
 EventFd *StorageManager::m_ioCompleteEvent;
 uint64_t StorageManager::m_purgedBlocks;
 bool StorageManager::m_dailyExhausted;
-std::list<std::string> StorageManager::m_dailyCache;
+std::list< std::pair<std::string, uint64_t> > StorageManager::m_dailyCache;
 
 ComBusSMSMon *StorageManager::m_combus;
 
@@ -1415,7 +1415,8 @@ void StorageManager::populateDailyCache(void)
 {
 	fs::directory_iterator end, it(m_baseDir);
 
-	DEBUG("Building Cache of Daily Directories for Purging");
+	DEBUG("populateDailyCache():"
+		<< " Building Cache of Daily Directories for Purging");
 	m_dailyCache.clear();
 
 	for (; it != end; ++it) {
@@ -1432,13 +1433,44 @@ void StorageManager::populateDailyCache(void)
 		if ( !isValidDaily( file.string() ) )
 			continue;
 
-		m_dailyCache.push_back( file.string() );
+		uint64_t daily_size = getDirSize( it->path().filename() );
+
+		DEBUG("populateDailyCache(): Daily " << it->path().filename()
+			<< " Total Files Size = " << daily_size);
+
+		m_dailyCache.push_back( std::pair< std::string, uint64_t > (
+			file.string(), daily_size ) );
 	}
 
 	/* The daily directories have the format YYYYMMDD, so the default
 	 * lexical sort works.
+	 * Also, there shouldn't be any duplicate daily directories,
+	 * so the new std::pair<std::string, uint64_t> types will
+	 * _Always_ lexicographically sort on the first string field... ;-D
 	 */
 	m_dailyCache.sort();
+}
+
+uint64_t StorageManager::getDirSize(const std::string &dir)
+{
+	fs::directory_iterator end, it( m_baseDir + "/" + dir );
+
+	uint64_t dir_size = 0;
+
+	for (; it != end; ++it) {
+
+		std::string sub_dir = dir + "/" + it->path().filename();
+
+		fs::directory_iterator sub_end, sub( m_baseDir + "/" + sub_dir );
+
+		for (; sub != sub_end; ++sub) {
+
+			dir_size += StorageFile::fileSize(
+				sub_dir + "/" + sub->path().filename() );
+		}
+	}
+
+	return( dir_size );
 }
 
 uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
@@ -1572,25 +1604,35 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			populateDailyCache();
 	} catch (...) {
 		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "purgeData() Error Populating Daily Cache for Purging!");
+			<< "purgeData(): Error Populating Daily Cache for Purging!");
 		/* If we cannot populate the cache, then we cannot purge. */
 		return 0;
 	}
 
+	std::list< std::pair<std::string, uint64_t> >::iterator it,
+		end = m_dailyCache.end();
 	uint64_t purged = 0;
-	std::list<std::string>::iterator it, end = m_dailyCache.end();
 	for (it = m_dailyCache.begin(); purged < purgeRequested &&
 								it != end; ) {
 		fs::path dir(m_baseDir);
-		dir /= *it;
+		dir /= it->first;
+		DEBUG("purgeData(): " << dir.string());
 		if (!fs::exists(dir)) {
-			// TODO: Manually/Externally Deleted, Subtract Blocks...?
+			//  Manually/Externally Deleted, Subtract Blocks...
+			uint64_t blocks = it->second + m_block_size - 1;
+			blocks /= m_block_size;
+			DEBUG("purgeData(): Directory " << it->first
+				<< " Externally Deleted!"
+				<< " Recovered " << blocks << " Blocks"
+				<< " (" << it->second << " Bytes)");
+			purged += blocks;
 			it = m_dailyCache.erase(it);
 			continue;
 		}
 
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Purging Daily " << *it);
+			<< "Purging Daily " << it->first
+			<< " (Directory Size = " << it->second << ")");
 
 		/* We need to do the increment in the loop, as we may delete
 		 * elements from the list as we clean the directories. We
