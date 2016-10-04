@@ -10,6 +10,7 @@
 
 #include <string>
 #include <sstream>
+#include <algorithm>
 #include <stdexcept>
 
 #include <boost/lexical_cast.hpp>
@@ -1492,7 +1493,7 @@ std::map<std::string, uint64_t> StorageManager::getDirSize(
 }
 
 uint64_t StorageManager::purgeDaily( const std::string &dir,
-		std::map<std::string, uint64_t> &UNUSED(daily_map),
+		std::map<std::string, uint64_t> &daily_map,
 		uint64_t goal, bool last, bool &daily_deleted )
 {
 	/* We could cache the list of containers to avoid rescanning
@@ -1516,7 +1517,35 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 	 */
 	containers.sort();
 
+	/* Check Daily Cache Map Against Current Container File List
+	 * - Any Missing Sub-Directories must have been Manually/Externally
+	 *   Deleted, so we can deduct their File Size from the Purge Count
+	 *   and then remove them from the Daily Cache Map... ;-D
+	 */
 	uint64_t total_purged = 0;
+	std::map<std::string, uint64_t>::iterator subs,
+		subs_end = daily_map.end();
+	for ( subs = daily_map.begin() ; subs != subs_end; ++subs ) {
+		// Look for Sub-Directory in Current List of Containers...
+		std::list<fs::path>::iterator cit =
+			std::find( containers.begin(), containers.end(),
+				dir + "/" + subs->first );
+		if ( cit == containers.end() )
+		{
+			// Sub-Directory Not Found, Must Be Manually/Externally Deleted
+			uint64_t blocks = subs->second + m_block_size - 1;
+			blocks /= m_block_size;
+			DEBUG("purgeDaily(): Sub-Directory "
+				<< dir << "/" << subs->first
+				<< " Found Deleted - Recovered " << blocks << " Blocks"
+				<< " (" << subs->second << " Bytes)");
+			total_purged += blocks;
+			daily_map.erase(subs);
+		}
+	}
+
+	/* Now purge files until we reach our goal...
+	 */
 	uint64_t purged;
 	std::list<fs::path>::iterator cit, cend = containers.end();
 	for (cit = containers.begin(); total_purged < goal && cit != cend; ) {
@@ -1653,7 +1682,7 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			for (subs = it->second.begin() ; subs != subs_end; subs++) {
 				uint64_t blocks = subs->second + m_block_size - 1;
 				blocks /= m_block_size;
-				DEBUG("purgeData(): Directory "
+				DEBUG("purgeData(): Sub-Directory "
 					<< it->first << "/" << subs->first
 					<< " Found Deleted - Recovered " << blocks << " Blocks"
 					<< " (" << subs->second << " Bytes)");
