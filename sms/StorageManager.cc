@@ -1165,6 +1165,8 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
+	 * (query the StorageContainer to get the Total Size of
+	 * all open files...! ;-)
 	 */
 	blocks = m_cur_container->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
