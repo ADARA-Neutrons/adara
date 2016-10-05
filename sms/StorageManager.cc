@@ -1484,7 +1484,7 @@ std::map<std::string, uint64_t> StorageManager::getDirSize(
 				sub_dir + "/" + sub->path().filename() );
 		}
 
-		daily_map[ it->path().filename() ] = sub_size;
+		daily_map[ m_baseDir + "/" + sub_dir ] = sub_size;
 
 		total_size += sub_size;
 	}
@@ -1528,19 +1528,17 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 	for ( subs = daily_map.begin() ; subs != subs_end; ++subs ) {
 		// Look for Sub-Directory in Current List of Containers...
 		std::list<fs::path>::iterator cit =
-			std::find( containers.begin(), containers.end(),
-				dir + "/" + subs->first );
+			std::find( containers.begin(), containers.end(), subs->first );
 		if ( cit == containers.end() )
 		{
 			// Sub-Directory Not Found, Must Be Manually/Externally Deleted
 			uint64_t blocks = subs->second + m_block_size - 1;
 			blocks /= m_block_size;
-			DEBUG("purgeDaily(): Sub-Directory "
-				<< dir << "/" << subs->first
+			DEBUG("purgeDaily(): Sub-Directory " << subs->first
 				<< " Found Deleted - Recovered " << blocks << " Blocks"
 				<< " (" << subs->second << " Bytes)");
 			total_purged += blocks;
-			daily_map.erase(subs);
+			daily_map.erase( subs );
 		}
 	}
 
@@ -1619,6 +1617,16 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 			struct timespec now;
 			clock_gettime(CLOCK_REALTIME, &now);
 			m_combus->sendOriginal(run, propId, purgeMsg, now);
+		}
+
+		// If Container Deleted, Remove from Daily Cache Map...!
+		if ( path_deleted ) {
+			subs = daily_map.find( cpath.string() );
+			if ( subs != subs_end ) {
+				DEBUG("purgeDaily(): Removing Container "
+					<< cpath.string() << " from Daily Cache Map");
+				daily_map.erase( subs );
+			}
 		}
 
 		// Accumulate Total Blocks Purged
