@@ -1086,7 +1086,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 
 	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
-	uint64_t cur_size, blocks;
+	uint64_t blocks;
 	off_t resumeLocation;
 
 	if (!m_cur_container)
@@ -1111,7 +1111,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * to this location for replay after a snapshot.
 	 */
 	resumeLocation = m_cur_container->file()->size();
-	cur_size = m_cur_container->write(iovec, len, notify);
+	m_cur_container->write(iovec, len, notify);
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
@@ -1129,8 +1129,10 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
+	 * (query the StorageContainer to get the Total Size of
+	 * all open files...! ;-)
 	 */
-	blocks = cur_size + m_block_size - 1;
+	blocks = m_cur_container->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
@@ -1152,19 +1154,19 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 {
 	uint32_t len = validatePacket(iovec);
-	uint64_t cur_size, blocks;
+	uint64_t blocks;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	cur_size = m_cur_container->save(iovec, len, dataSourceId);
+	m_cur_container->save(iovec, len, dataSourceId);
 
 	/* Is it time to initiate a purge of old data?
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
 	 */
-	blocks = cur_size + m_block_size - 1;
+	blocks = m_cur_container->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
