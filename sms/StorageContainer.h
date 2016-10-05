@@ -61,6 +61,8 @@ public:
 	void markTranslated(void);
 	void markManual(void);
 
+	uint64_t openSize(void);
+
 private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;

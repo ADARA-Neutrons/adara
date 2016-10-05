@@ -756,3 +756,20 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 	return purged;
 }
+
+uint64_t StorageContainer::openSize(void)
+{
+	uint64_t openSize = 0;
+
+	if (m_cur_file)
+		openSize += m_cur_file->size();
+
+	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+	{
+		if ( m_ds_input_files[i] )
+			openSize += m_ds_input_files[i]->size();
+	}
+
+	return( openSize );
+}
+
