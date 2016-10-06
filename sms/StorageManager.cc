@@ -1476,7 +1476,8 @@ std::map<std::string, uint64_t> StorageManager::getDirSize(
 
 	for (; it != end; ++it) {
 
-		std::string sub_dir = dir + "/" + it->path().filename();
+		std::string sub_dir = dir + "/"
+			+ std::string( it->path().filename().c_str() );
 
 		fs::directory_iterator sub_end, sub( m_baseDir + "/" + sub_dir );
 
@@ -1484,8 +1485,8 @@ std::map<std::string, uint64_t> StorageManager::getDirSize(
 
 		for (; sub != sub_end; ++sub) {
 
-			sub_size += StorageFile::fileSize(
-				sub_dir + "/" + sub->path().filename() );
+			sub_size += StorageFile::fileSize( sub_dir + "/"
+					+ std::string( sub->path().filename().c_str() ) );
 		}
 
 		daily_map[ m_baseDir + "/" + sub_dir ] = sub_size;
