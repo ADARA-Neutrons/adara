@@ -1403,7 +1403,7 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
                         {
-                            m_run_info.sample_number_density =
+                            m_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete When Phased Out... ;-Q
@@ -1412,19 +1412,35 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_number_density_units = value;
+                            m_run_info.sample_mass_density_units = value;
                         }
+                        // TODO Delete Re-Name Leftover When Phased Out...
+                        // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density" ) == 0 )
                         {
-                            m_run_info.sample_number_density =
+                            m_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
+                        // TODO Delete Re-Name Leftover When Phased Out...
+                        // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_number_density_units = value;
+                            m_run_info.sample_mass_density_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass_density" ) == 0 )
+                        {
+                            m_run_info.sample_mass_density =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass_density_units" )
+                                    == 0 )
+                        {
+                            m_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"container_id" ) == 0 )
