@@ -1445,9 +1445,9 @@ void StorageManager::populateDailyCache(void)
 		uint64_t total_size = 0;
 
 		std::map<std::string, uint64_t> daily_map =
-			getDirSize( it->path().filename(), total_size );
+			getDirSize( file.string(), total_size );
 
-		DEBUG("populateDailyCache(): Daily " << it->path().filename()
+		DEBUG("populateDailyCache(): Daily " << file.string()
 			<< " - " << daily_map.size() << " Sub-Directories,"
 			<< " Total Files Size = " << total_size);
 
