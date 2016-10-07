@@ -482,8 +482,6 @@ StreamParser::rxPacket
         // Skip Unmapped Sections of Pixel Map...!
         if ( bank_id == (uint16_t) UNMAPPED_BANK )
         {
-            syslog( LOG_INFO, "[%i] %s: skipping bank_id=%u/0x%x...",
-                g_pid, "PixelMappingPkt", bank_id, bank_id);
             // Next Section
             rpos += pix_count;
             continue;
