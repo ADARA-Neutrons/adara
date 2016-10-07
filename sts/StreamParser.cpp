@@ -461,12 +461,15 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos2 >> 16);
         pix_count = (uint16_t)(*rpos2 & 0xFFFF);
         rpos2++;
-        if ( bank_id > bank_count )
+        if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
             bank_count = bank_id;
         rpos2 += pix_count;
     }
 
     m_banks.resize( bank_count + 1, 0 );
+
+    syslog( LOG_INFO,
+        "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
 
     // Now build banks and populate bank container
     while ( rpos < epos )
@@ -475,6 +478,16 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
+
+        // Skip Unmapped Sections of Pixel Map...!
+        if ( bank_id == (uint16_t) UNMAPPED_BANK )
+        {
+            syslog( LOG_INFO, "[%i] %s: skipping bank_id=%u/0x%x...",
+                g_pid, "PixelMappingPkt", bank_id, bank_id);
+            // Next Section
+            rpos += pix_count;
+            continue;
+        }
 
         // Create New BankInfo...
         if ( !m_banks[bank_id] )
