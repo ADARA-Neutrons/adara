@@ -2594,7 +2594,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_SYNC_ISSUE, ss.str(),
-									9999, 10, 333, log_info ) ) {
+									9999, 10, 999, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )
@@ -2624,7 +2624,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_GLITCH_ISSUE, ss.str(),
-									9999, 10, 333, log_info ) ) {
+									9999, 10, 999, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )
