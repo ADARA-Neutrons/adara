@@ -473,16 +473,23 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	if (p && *p == '.') {
 		char tmp[16];
 		strftime(tmp, sizeof(tmp), "%Y%m%d-%H%M%S", &tm);
-		if (strncmp(cname.string().c_str(), tmp, 15))
+		if (strncmp(cname.string().c_str(), tmp, 15)) {
+			DEBUG("validatePath():"
+				<< " Error Parsing Run/Data Directory Time/Date Stamp: ["
+				<< cname.string() << "](0-14) != [" << tmp << "]");
 			p = NULL;
+		}
 	}
 
 	/* If p is not NULL, it points to the period; now get the
 	 * nanoseconds and run number, if any.
 	 */
 	run = 0;
-	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run))
+	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run)) {
+		DEBUG("validatePath():"
+			<< " Error Parsing Nanoseconds & Run Number: [" << p << "]");
 		p = NULL;
+	}
 
 	/* We've been able to pull out everything so far, now try to
 	 * build the expected name and make sure it matches.
@@ -495,8 +502,12 @@ bool StorageContainer::validatePath(const std::string &in_path,
 			snprintf(expected + 25, sizeof(expected) - 25,
 				 "-run-%u", run);
 		}
-		if (strcmp(cname.string().c_str(), expected))
+		if (strcmp(cname.string().c_str(), expected)) {
+			DEBUG("validatePath():"
+				<< " Error Validating Parsed Run/Data Directory Name: ["
+				<< cname.string() << "] != [" << expected << "]");
 			p = NULL;
+		}
 	}
 
 	/* We use the UTC time in the container name, so we cannot use
