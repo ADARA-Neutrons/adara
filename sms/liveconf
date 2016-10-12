@@ -2718,6 +2718,7 @@ CONFCK()
 		if [[ ${_ckconfck} != 0 ]]; then
 			echo -e -n "$introOutput"
 			echo -e "$doConfCk\n"
+			exit ${_ckconfck}
 		fi
 	else
 		CONFCK
