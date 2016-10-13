@@ -1717,6 +1717,7 @@ StreamMonitor::dbThread()
                 // deleted before we're done writing them to DB
                 int_pvs.clear();
                 dbl_pvs.clear();
+                str_pvs.clear();
 
                 m_mutex.lock();
 
