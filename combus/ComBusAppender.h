@@ -93,3 +93,6 @@ typedef helpers::ObjectPtrT<Log4cxxAppender> Log4cxxAppenderPtr;
 }}
 
 #endif // COMBUSAPPENDER_H
+
+// vim: expandtab
+

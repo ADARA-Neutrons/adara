@@ -515,7 +515,7 @@ pvExistReturn SMSControl::pvExistTest(const casCtx &UNUSED(ctx),
 pvAttachReturn SMSControl::pvAttach(const casCtx &UNUSED(ctx),
 	const char *pv_name)
 {
-	std::map<std::string, boost::shared_ptr<casPV> >::iterator iter;
+	std::map<std::string, PVSharedPtr>::iterator iter;
 
 	iter = m_pv_map.find(pv_name);
 	if (iter == m_pv_map.end())
@@ -634,7 +634,7 @@ bool SMSControl::setRecording( bool v )
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we start recording
 				// in a new container.
-				m_markers->newRun();
+				m_markers->beforeNewRun( m_currentRunNumber );
 
 				// Actually Start a New Recording...
 				StorageManager::startRecording( m_currentRunNumber,
@@ -2594,7 +2594,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_SYNC_ISSUE, ss.str(),
-									9999, 10, 333, log_info ) ) {
+									9999, 10, 999, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )
@@ -2624,7 +2624,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_GLITCH_ISSUE, ss.str(),
-									9999, 10, 333, log_info ) ) {
+									9999, 10, 999, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )

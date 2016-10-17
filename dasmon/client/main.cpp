@@ -86,7 +86,8 @@ int main(int argc, char *argv[])
     else if ( opt_map.count( "version" ))
     {
         cout << DASMON_GUI_VERSION
-             << " (ADARA Common " << ADARA::VERSION << ")" << endl;
+             << " (ADARA Common " << ADARA::VERSION
+             << ", ComBus " << ADARA::ComBus::VERSION << ")" << endl;
         return 0;
     }
 

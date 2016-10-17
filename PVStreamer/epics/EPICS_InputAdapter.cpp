@@ -321,13 +321,13 @@ InputAdapter::configFileMonitorThread()
                                     icur != m_cur_devices.end(); ++icur )
                             {
                                 if ( new_devices.find( *icur )
-                                        == new_devices.end())
+                                        == new_devices.end() )
                                 {
                                     stopDevice( *icur );
                                 }
                             }
 
-                            // No "Undefine" Any Old Device IDs that are
+                            // Now "Undefine" Any Old Device IDs that are
                             // No Longer In Use...! ;-D
                             for ( iid = inactive_device_ids.begin();
                                     iid != inactive_device_ids.end();

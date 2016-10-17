@@ -22,8 +22,8 @@
 
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
  *
- * The NxGen class is a stream adapter subclass that specializes the ADARA StreamParser class for creating NeXus output
- * files.
+ * The NxGen class is a stream adapter subclass that specializes the
+ * ADARA StreamParser class for creating NeXus output files.
  */
 class NxGen : public STS::StreamParser
 {
@@ -118,7 +118,8 @@ private:
             NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
-            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve, a_config ),
+            MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve,
+                a_config ),
             m_index_cur_size(0),
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
@@ -201,17 +202,20 @@ private:
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
             m_cur_size(0),
-            m_full_buffer_count(0)
+            m_full_buffer_count(0),
+            m_value_enum_strings_max_len(-1),
+            m_value_enum_strings_not_found(0)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
             if ( m_internal_name == m_internal_connection )
             {
-                m_log_path = m_nxgen.m_daslogs_path + "/" + m_internal_name;
+                m_log_path =
+                    m_nxgen.m_daslogs_path + "/" + m_internal_name;
                 m_link_path = "";
             }
 
-            // Otherwise, If the PV Name and Connection String are Distinct,
+            // Otherwise, If the PV Name and Connection String are Distinct
             // then Use the Connection String for the Actual Data and
             // Create a Link Path using the (Alias) Name...
             else
@@ -282,6 +286,75 @@ private:
             // when fast metadata is supported
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
+
+            // Capture Value Strings for Enumerated Type PVs...
+            // (IFF Everything Works...! ;-D)
+            if ( this->m_type == STS::PVT_ENUM
+                    && this->m_enum_vector != NULL
+                    && this->m_enum_index != (uint32_t) -1 )
+            {
+                STS::PVEnumeratedType *pv_enum =
+                    &((*(this->m_enum_vector))[ this->m_enum_index ]);
+
+                // Do We Have a Matching (Usable) Value and Name Vectors?
+                if ( pv_enum->element_values.size()
+                        == pv_enum->element_names.size() )
+                {
+                    // Find Matching Value String for Each Buffer Value...
+                    // (I hope this isn't ever "Too Huge"... ;-b)
+                    for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                    {
+                        bool found = false;
+
+                        for ( uint32_t j=0 ; !found
+                                && j < pv_enum->element_values.size() ;
+                                j++ )
+                        {
+                            if ( value_buffer[i]
+                                    == pv_enum->element_values[j] )
+                            {
+                                m_value_enum_strings.push_back(
+                                    pv_enum->element_names[j] );
+
+                                // Determine Max Value String Length...
+                                if ( m_value_enum_strings_max_len
+                                        == (uint32_t) -1
+                                    || pv_enum->element_names[j].size()
+                                        > m_value_enum_strings_max_len )
+                                {
+                                    m_value_enum_strings_max_len =
+                                        pv_enum->element_names[j].size();
+                                }
+
+                                found = true;
+                            }
+                        }
+
+                        // Bummer, Enum Value Not Found... ;-Q
+                        // Put *Something* in there to Keep Order...
+                        if ( !found )
+                        {
+                            std::string something = "<Not Found!>";
+
+                            m_value_enum_strings.push_back( something );
+
+                            // Determine Max Value String Length...
+                            if ( m_value_enum_strings_max_len
+                                    == (uint32_t) -1
+                                || something.size()
+                                    > m_value_enum_strings_max_len )
+                            {
+                                m_value_enum_strings_max_len =
+                                    something.size();
+                            }
+
+                            // Just Log This Kind of Lookup Failure
+                            // *ONCE* at the End...! ;-D
+                            m_value_enum_strings_not_found++;
+                        }
+                    }
+                }
+            }
         }
 
         /// Writes Buffered Double PV Values to Nexus File 
@@ -318,7 +391,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs String PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D String Array to NeXus File...
@@ -373,7 +447,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs Uint32 Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D Uint32 Array to NeXus File...
@@ -432,7 +507,8 @@ private:
 
             syslog( LOG_INFO,
                 "[%i] DASlogs Double Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_name.c_str(), value_buffer.size(), max_len );
+                g_pid, this->m_name.c_str(),
+                value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
             // Write 2D Double Array to NeXus File...
@@ -477,8 +553,9 @@ private:
         {
             try
             {
-                // Write PV Values to NeXus File _If_ We're Writing to NeXus
-                // and _If_ We Care About This PV (_Not_ Ignored!) :-D
+                // Write PV Values to NeXus File _If_ We're Writing to
+                // NeXus and _If_ We Care About This PV (_Not_ Ignored!)
+                // :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
                     // Wait for End of Run to Dump String/Array PV Types...
@@ -486,7 +563,8 @@ private:
                     if ( !a_run_metrics &&
                             ( this->m_type == STS::PVT_STRING
                                 || this->m_type == STS::PVT_UINT_ARRAY
-                                || this->m_type == STS::PVT_DOUBLE_ARRAY ) )
+                                || this->m_type == STS::PVT_DOUBLE_ARRAY )
+                    )
                     {
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
@@ -611,6 +689,84 @@ private:
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
+
+                            // Write Any String Value Array for Enum Types
+                            if ( !m_value_enum_strings.empty() )
+                            {
+                                // NOW Log if we Couldn't Find Some
+                                // Particular Enumerated Type Values...
+                                if ( m_value_enum_strings_not_found > 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s: %d %s %s PV %s!",
+                                        g_pid, "STS Error",
+                                        m_value_enum_strings_not_found,
+                                        "Enumerated Type Value Strings",
+                                        "Not Found for",
+                                        this->m_name.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                // Make Sure We Don't Freak Out HDF5
+                                // No Matter What...
+                                if ( m_value_enum_strings_max_len
+                                        == (uint32_t) -1
+                                    || m_value_enum_strings_max_len == 0 )
+                                {
+                                    m_value_enum_strings_max_len = 1;
+                                }
+
+                                syslog( LOG_ERR,
+                                    "[%i] %s PV %s size=%lu max_len=%u",
+                                    g_pid,
+                                    "Enumerated Type Value Strings for",
+                                    this->m_name.c_str(),
+                                    m_value_enum_strings.size(),
+                                    m_value_enum_strings_max_len );
+                                usleep(30000); // give syslog a chance...
+
+                                // Value Strings as 2D String Dataset
+                                std::vector<hsize_t> dims;
+                                dims.push_back(
+                                    m_value_enum_strings.size() );
+                                dims.push_back(
+                                    m_value_enum_strings_max_len );
+
+                                // Pad the Strings with Spaces
+                                // to Be of Uniform Length...
+                                std::vector<std::string> values_vec;
+                                for ( uint32_t i=0 ;
+                                        i < m_value_enum_strings.size() ;
+                                        i++ )
+                                {
+                                    std::string str =
+                                        m_value_enum_strings[i];
+                                    if ( str.size()
+                                          < m_value_enum_strings_max_len )
+                                    {
+                                        str.insert( str.end(),
+                                            m_value_enum_strings_max_len
+                                                - str.size(), ' ' );
+                                    }
+                                    values_vec.push_back( str );
+                                }
+
+                                m_nxgen.writeMultidimDataset( m_log_path,
+                                    "value_strings", values_vec, dims );
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s: %s for PV %s - %s",
+                                    g_pid, "STS Error",
+                                    "Empty Enumerated Type Value Strings",
+                                    this->m_name.c_str(),
+                                    "Creating Dummy Value Strings" );
+                                usleep(30000); // give syslog a chance...
+
+                                m_nxgen.makeDataset( m_log_path,
+                                    "value_strings", NeXus::CHAR );
+                            }
                         }
 
                         // Last Pass, Create Any PV (Alias) Link Now!
@@ -658,7 +814,11 @@ private:
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
-        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging...
+        uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging
+        std::vector<std::string>
+                        m_value_enum_strings;   ///< Vector of Enumerated Type Value Strings
+        uint32_t        m_value_enum_strings_max_len;   ///< Max Length of Enumerated Type Value Strings
+        uint32_t        m_value_enum_strings_not_found;   ///< Number of Enumerated Type Value Strings Not Found
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
@@ -681,6 +841,8 @@ public:
         std::string &a_nexus_out_file,
         bool a_strict,
         bool a_gather_stats,
+        std::string &a_ldap_host,
+        uint32_t a_ldap_port,
         unsigned long a_chunk_size = 2048,
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
@@ -741,7 +903,8 @@ protected:
     void                markerComment( double a_time,
                             const std::string &a_comment );
     void                writeDeviceEnums( STS::Identifier a_devId,
-                            std::vector<STS::PVEnumeratedType> &a_enumVec );
+                            std::vector<STS::PVEnumeratedType>
+                                &a_enumVec );
 
 private:
     void                flushPauseData();
@@ -830,7 +993,8 @@ private:
                                 {
                                     buf.resize( m_chunk_size, a_value );
 
-                                    while ( count <= ( a_count - m_chunk_size ) )
+                                    while ( count
+                                            <= ( a_count - m_chunk_size ) )
                                     {
                                         writeSlab( a_path, buf, cur_size );
                                         count += buf.size();
@@ -891,6 +1055,8 @@ private:
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
     uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
     struct timespec             m_sts_start_time;       /// STS Start of Processing Time
+    std::string                 m_ldap_host;            /// LDAP Host for User Name Lookup
+    uint32_t                    m_ldap_port;            /// LDAP Port for User Name Lookup
 };
 
 #endif // NXGEN_H

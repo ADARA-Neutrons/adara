@@ -9,6 +9,10 @@
 #define INT32_MAX (2147483647)
 #endif
 
+#ifndef UINT32_MAX
+#define UINT32_MAX (4294967295U)
+#endif
+
 #include <gddAppFuncTable.h>
 #include <smartGDDPointer.h>
 #include <casdef.h>

@@ -461,12 +461,15 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos2 >> 16);
         pix_count = (uint16_t)(*rpos2 & 0xFFFF);
         rpos2++;
-        if ( bank_id > bank_count )
+        if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
             bank_count = bank_id;
         rpos2 += pix_count;
     }
 
     m_banks.resize( bank_count + 1, 0 );
+
+    syslog( LOG_INFO,
+        "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
 
     // Now build banks and populate bank container
     while ( rpos < epos )
@@ -475,6 +478,14 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
+
+        // Skip Unmapped Sections of Pixel Map...!
+        if ( bank_id == (uint16_t) UNMAPPED_BANK )
+        {
+            // Next Section
+            rpos += pix_count;
+            continue;
+        }
 
         // Create New BankInfo...
         if ( !m_banks[bank_id] )
@@ -1403,7 +1414,7 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
                         {
-                            m_run_info.sample_number_density =
+                            m_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete When Phased Out... ;-Q
@@ -1412,19 +1423,35 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_number_density_units = value;
+                            m_run_info.sample_mass_density_units = value;
                         }
+                        // TODO Delete Re-Name Leftover When Phased Out...
+                        // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density" ) == 0 )
                         {
-                            m_run_info.sample_number_density =
+                            m_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
+                        // TODO Delete Re-Name Leftover When Phased Out...
+                        // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_number_density_units = value;
+                            m_run_info.sample_mass_density_units = value;
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass_density" ) == 0 )
+                        {
+                            m_run_info.sample_mass_density =
+                                boost::lexical_cast<double>( value );
+                        }
+                        else if ( xmlStrcmp( sample_node->name,
+                                (const xmlChar*)"mass_density_units" )
+                                    == 0 )
+                        {
+                            m_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"container_id" ) == 0 )

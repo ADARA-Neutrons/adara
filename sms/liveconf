@@ -385,8 +385,28 @@ option_id_type[$num_options]="storage"
 option_name[$num_options]="max_blocks_allowed"
 option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowed"
 option_value_type[$num_options]="UINT32_VALUE(blocks)"
-option_default[$num_options]="0"
-option_label[$num_options]="[Max Blocks of Storage Allowed]"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]=\
+"[Max Storage Blocks Allowed (*Uint32* Base Limit!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="max_blocks_allowed_multiplier"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowedMultiplier"
+option_value_type[$num_options]="UINT32_VALUE(blocks)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]=\
+"[Max Storage Blocks Allowed (*Uint32* _Multiplier_ Limit!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="block_size"
+option_no_config[$num_options]=1
+option_pv[$num_options]="SMS:StorageManager:BlockSize"
+option_value_type[$num_options]="UINT32_VALUE(blocksize)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]="[Storage Block Size (Read-Only!)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
@@ -494,7 +514,6 @@ num_options=$(( num_options + 1 ))
 
 USAGE()
 {
-	echo
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] \\"
@@ -503,7 +522,8 @@ USAGE()
 	echo "            [bmon_status] [detset_status] [combus_status] \\"
 	echo "            [live_status] [bandwidth] [confck] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
-	echo "            [--skiplive] [--testonly] [--terse] [--help]"
+	echo "            [--skiplive] [--testonly] \\"
+	echo "            [--terse] [--quiet] [--help]"
 	echo
 
 	echo "where:"
@@ -515,6 +535,7 @@ USAGE()
 	echo "   --skiplive            = *don't* set live config option"
 	echo "   --testonly            = *don't* actually change anything!"
 	echo "   --terse               = display minimal output details"
+	echo "   --quiet               = display NO ConfCk output unless error"
 	echo "   --help                = display this help/usage information"
 	echo
 
@@ -559,15 +580,26 @@ USAGE()
 
 # Check for any of possible required command line options (else 'usage')
 if [ $# == 0 ]; then
+	echo
 	USAGE
 	exit -1
 fi
 
-echo
+# Function to Collect Intro Output (for Quiet Mode)
+addToIntroOutput()
+{
+	for arg in "$@" ; do
+		introOutput="${introOutput}$arg";
+	done
+}
+introOutput=""
+
+addToIntroOutput "\n"
 
 # Make Sure we found the EPICS utilities... ;-b
 epicsck=`which caget 2>&1`
 if [ $? != 0 ]; then
+	echo -e -n "$introOutput"
 	echo "Error: EPICS Utilities Not Found...! Check EPICS Path..."
 	exit -999
 fi
@@ -576,6 +608,7 @@ fi
 skiplive=0
 testonly=0
 terse=0
+quiet=0
 PRE="[NotSet]"
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -585,32 +618,41 @@ for arg in "$@" ; do
     # echo "value=$value"
 	if [ "#$key#" == '#--beamline#' ]; then
 		PRE="$value"
-		echo -e "Setting EPICS PV Prefix to: $PRE\n"
+		addToIntroOutput "Setting EPICS PV Prefix to: $PRE\n\n"
 	elif [ "#$key#" == '#--config#' ]; then
 		SMSD_CONFIG="$value"
-		echo -e "Using SMS Daemon Config File in:\n   $SMSD_CONFIG\n"
+		addToIntroOutput "Using SMS Daemon Config File in:\n" \
+			"   $SMSD_CONFIG\n\n"
 	elif [ "#$key#" == '#--repo#' ]; then
 		CONFIG_REPO="$value"
-		echo -e "Using Git Config Repository in:\n   $CONFIG_REPO\n"
+		addToIntroOutput "Using Git Config Repository in:\n"
+			"   $CONFIG_REPO\n\n"
 	elif [ "#$key#" == '#--option#' ]; then
 		command="option"
 		opt_arg="$value"
-		echo -e "Setting Command to:\n   $command $opt_arg\n"
+		addToIntroOutput "Setting Command to:\n" \
+			"   $command $opt_arg\n\n"
 	elif [ "#$key#" == '#--skiplive#' ]; then
 		skiplive=1
-		echo -e "*** Skipping Live Config - Update Config File Only!\n"
+		addToIntroOutput \
+			"*** Skipping Live Config - Update Config File Only!\n\n"
 	elif [ "#$key#" == '#--testonly#' ]; then
 		testonly=1
-		echo -e "*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n"
+		addToIntroOutput \
+			"*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n\n"
 	elif [ "#$key#" == '#--terse#' ]; then
 		terse=1
-		echo -e "Setting for Terse Operation.\n"
+		addToIntroOutput "Setting for Terse Operation.\n\n"
+	elif [ "#$key#" == '#--quiet#' ]; then
+		quiet=1
+		addToIntroOutput "Setting for Quiet Operation.\n\n"
 	elif [ "#$key#" == '#--help#' ]; then
+		echo -e -n "$introOutput"
 		USAGE
 		exit -1
 	else
 		command="$key"
-		echo -e "Setting Command to:\n   $command\n"
+		addToIntroOutput "Setting Command to:\n   $command\n\n"
 	fi
 done
 
@@ -627,22 +669,31 @@ config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
 config_blnum=`echo "$config_host" | sed 's/-.*//'`
 
 if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
-	echo -e "\nWarning: This is _Not_ a Beamline SMS Computer!\n"
+	addToIntroOutput \
+		"\nWarning: This is _Not_ a Beamline SMS Computer!\n\n"
 	not_a_beamline_computer=1
 	config_host=`hostname`
 	config_blnum="bl99"
 	do_git_config=0
 fi
 
-echo -e \
-"Changing/Checking Configuration on Host ${config_host} [$config_blnum].\n"
+addToIntroOutput "Changing/Checking Configuration on " \
+	"Host ${config_host} [$config_blnum].\n\n"
 
 if [ ${PRE} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
+		echo -e "   $SMSD_CONFIG\n"
+		exit -90
+	fi
 
 	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
 		| wc | awk '{print $1}'`
 	if [[ "#$bid_ck#" != '#1#' ]]; then
-		echo -e "\nError: Invalid Beamline Id in SMSD Config File!\n"
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid Beamline Id in SMSD Config File!\n"
 		ls -l $SMSD_CONFIG
 		echo
 		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
@@ -656,33 +707,39 @@ if [ ${PRE} == "[NotSet]" ]; then
 	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
 
 	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
-		echo -e "\nError Parsing Beamline Id in SMSD Config File!\n"
+		echo -e -n "$introOutput"
+		echo -e "Error Parsing Beamline Id in SMSD Config File!\n"
 		ls -l $SMSD_CONFIG
 		echo -e "\n   $bid_clean\n"
 		exit -92
 	fi
 
 	PRE="$bid_value"
-	echo "Setting EPICS PV Prefix from SMSD Config File:"
-	echo "   $SMSD_CONFIG"
-	echo "      -> $bid_key = $bid_value"
-	echo "         => [${PRE}]."
-	echo
+
+	addToIntroOutput "Setting EPICS PV Prefix from SMSD Config File:\n" \
+		"   $SMSD_CONFIG\n" \
+		"      -> $bid_key = $bid_value\n" \
+		"         => [${PRE}].\n" \
+		"\n"
 
 fi
 
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
 if [ "#$daq_ck#" == '#1#' ]; then
-	echo -e "[DAQ Beamline Host.]\n"
+	addToIntroOutput "[DAQ Beamline Host.]\n\n"
 	CONFIG_REPO="${CONFIG_REPO}-daq1"
 	config_branch=`echo "$config_host" | sed 's/\..*//'`
 else
 	config_branch="$config_blnum"
 fi
 
-echo -e "Git Config Repository: [${CONFIG_REPO}].\n"
+addToIntroOutput "Git Config Repository: [${CONFIG_REPO}].\n\n"
 
-echo -e "Git Config Repository Branch: [${config_branch}].\n"
+addToIntroOutput "Git Config Repository Branch: [${config_branch}].\n\n"
+
+if [[ $quiet == 0 ]]; then
+	echo -e -n "$introOutput"
+fi
 
 awkLineBreak=" \
 	{ \
@@ -1098,6 +1155,9 @@ if [[ "$command" == "status" \
 		|| "$command" == "live_status" \
 		|| "$command" == "bandwidth" ]]; then
 
+	# Dump Intro Output Now, No "Quiet" Mode in Status Commands... ;-D
+	echo -e -n "$introOutput"
+
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
 	caget $WAIT ${PRE}:SMS:Recording > /dev/null 2>&1
@@ -1228,6 +1288,9 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:Marker:Comment
 		caget $WAIT ${PRE}:SMS:Marker:Annotate
 		caget $WAIT ${PRE}:SMS:Marker:RunComment
+		caget $WAIT -S ${PRE}:SMS:Marker:ScanComment
+		caget $WAIT -S ${PRE}:SMS:Marker:NotesComment
+		caget $WAIT -S ${PRE}:SMS:Marker:AnnotationComment
 
 		echo
 
@@ -1357,6 +1420,8 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
 		caget $WAIT ${PRE}:SMS:StorageManager:Percent
 		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
+		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowedMultiplier
+		caget $WAIT ${PRE}:SMS:StorageManager:BlockSize
 		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
 
 		echo
@@ -1470,6 +1535,9 @@ if [[ "$command" == "status" \
 
 # Set No End-of-Pulse Internal Pulse Buffer Size...
 elif [[ "$command" == "option" ]]; then
+
+	# Dump Intro Output Now, No "Quiet" Mode in Option Commands... ;-D
+	echo -e -n "$introOutput"
 
 	#
 	# Parse Option Arg String into Pieces... ;-D
@@ -2338,8 +2406,13 @@ OPEN_CONFIG_REPO()
 # Check/Compare SMS Live Configuration Settings vs. Config File Settings!
 elif [[ "$command" == "confck" ]]; then
 
+# Make ConfCk a Function, so we can Capture It's Output
+# and Choose Whether to Spew It when in a Cron Job... ;-D
+CONFCK()
+{
 	echo -e "ADARA SMS LiveConf Configuration Check - Live vs. File:\n"
 
+	# Function to Collect Error Summary Output
 	addToErrSummary()
 	{
 		for arg in "$@" ; do
@@ -2570,19 +2643,32 @@ elif [[ "$command" == "confck" ]]; then
 
 			if [[ "$live_value" != "$config_value" ]]; then
 
-				echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+				if [[ "$config_value" == "XXX_IGNORE_IF_NOT_SET_XXX" ]]; \
+				then
 
-				echo "   ${option_label[$i]}${subscript}:"
-				echo "      Config:[$config_value]"
-				echo "         != Live:[$live_value]"
+					echo "*** Warning: Ignore File Config If Not Set! ***"
 
-				addToErrSummary "\n" \
-					"*** ERROR! Mismatch in Live vs. File Config! ***\n" \
-					"   ${option_label[$i]}${subscript}:\n" \
-					"      Config:[$config_value]\n" \
-					"         != Live:[$live_value]\n"
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Live:[$live_value]"
 
-				num_mismatch=$(( num_mismatch + 1 ))
+				else
+
+					echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Config:[$config_value]"
+					echo "         != Live:[$live_value]"
+
+					addToErrSummary "\n" \
+						"*** ERROR! Mismatch in " \
+						"Live vs. File Config! ***\n" \
+						"   ${option_label[$i]}${subscript}:\n" \
+						"      Config:[$config_value]\n" \
+						"         != Live:[$live_value]\n"
+
+					num_mismatch=$(( num_mismatch + 1 ))
+
+				fi
 
 			else
 				echo "Live Config Matches File Config:"
@@ -2623,7 +2709,20 @@ elif [[ "$command" == "confck" ]]; then
 		echo -e "Config OK - All Options Matched Between Live and File.\n"
 	fi
 
-	exit $num_mismatch
+	return $num_mismatch
+}
+
+	if [[ $quiet == 1 ]]; then
+		doConfCk=`CONFCK`
+		_ckconfck=$?
+		if [[ ${_ckconfck} != 0 ]]; then
+			echo -e -n "$introOutput"
+			echo -e "$doConfCk\n"
+			exit ${_ckconfck}
+		fi
+	else
+		CONFCK
+	fi
 
 # Done
 fi

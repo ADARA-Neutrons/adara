@@ -21,8 +21,9 @@ testRedundantConfig( ConfigManager &cfgmgr )
     dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
     dev1.definePV( "d1p3", "conn_d1p3", PV_UINT, 1, 0, "m/s" );
 
-    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
-    DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev1 );
+	bool device_changed = false;
+    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1, device_changed );
+    DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev1, device_changed );
     //rec1->print( cout );
 
     bool res = (rec1 == rec2);
@@ -41,13 +42,14 @@ testIDReuse( ConfigManager &cfgmgr )
     dev2.definePV( "d2p2", "conn_d2p2", PV_REAL, 1, 0, "b" );
     dev2.definePV( "d2p3", "conn_d2p3", PV_UINT, 1, 0, "c" );
 
-    DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev2 );
+	bool device_changed = false;
+    DeviceRecordPtr rec2 = cfgmgr.defineDevice( dev2, device_changed );
 
     DeviceDescriptor dev2a( "dev2", "host-a", 1 );
     dev2a.definePV( "d2p1", "conn_d2p1", PV_INT, 1, 0, "a" );
     dev2a.definePV( "d2p3", "conn_d2p3", PV_UINT, 1, 0, "c" );
 
-    DeviceRecordPtr rec2a = cfgmgr.defineDevice( dev2a );
+    DeviceRecordPtr rec2a = cfgmgr.defineDevice( dev2a, device_changed );
 
     bool res = true;
 
@@ -73,7 +75,8 @@ testDeviceUndefine( ConfigManager &cfgmgr )
     dev1.definePV( "d1p1", "conn_d1p1", PV_INT, 1, 0, "m/s" );
     dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
 
-    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
+	bool device_changed = false;
+    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1, device_changed );
 
     cfgmgr.undefineDevice( rec1 );
 
@@ -99,7 +102,8 @@ testEnums( ConfigManager &cfgmgr )
     dev1.definePV( "d1p2", "conn_d1p2", PV_REAL, 1, 0, "m/s" );
     dev1.definePV( "d1p3", "conn_d1p3", PV_ENUM, 1, e, "" );
 
-    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1 );
+	bool device_changed = false;
+    DeviceRecordPtr rec1 = cfgmgr.defineDevice( dev1, device_changed );
 
     vals[4] = "VAL4";
 
@@ -107,7 +111,7 @@ testEnums( ConfigManager &cfgmgr )
 
     dev1.definePV( "d1p4", "conn_d1p4", PV_ENUM, 1, e, "" );
 
-    rec1 = cfgmgr.defineDevice( dev1 );
+    rec1 = cfgmgr.defineDevice( dev1, device_changed );
 
     bool res = true;
 

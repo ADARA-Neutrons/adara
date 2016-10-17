@@ -3,11 +3,13 @@
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <libxml/tree.h>
 #include "NxGen.h"
 #include "TraceException.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "UserIdLdap.h"
 
 // Do Stu's Dummy PixelId-Filled Histogram Test...
 // #define HISTO_TEST
@@ -28,6 +30,8 @@ NxGen::NxGen
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
+    string         &a_ldap_host,                ///< [in] LDAP Host for User Name Lookup
+    uint32_t        a_ldap_port,                ///< [in] LDAP Port for User Name Lookup
     unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size
     unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
@@ -35,8 +39,9 @@ NxGen::NxGen
     unsigned short  a_compression_level         ///< [in] HDF5 compression level (0 = off to 9 = max)
 )
 :
-    StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats, a_chunk_size*a_event_buf_chunk_count,
-                  a_chunk_size*a_anc_buf_chunk_count ),
+    StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
+        a_chunk_size * a_event_buf_chunk_count,
+        a_chunk_size * a_anc_buf_chunk_count ),
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
     m_entry_path(string("/entry")),
@@ -56,7 +61,9 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_haveRunComment(false)
+    m_haveRunComment(false),
+    m_ldap_host(a_ldap_host),
+    m_ldap_port(a_ldap_port)
 {
     // Capture STS "Start of Processing Time"...
     clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
@@ -785,9 +792,9 @@ NxGen::processRunInfo
         writeScalar( sample_path, "mass",
             a_run_info.sample_mass, a_run_info.sample_mass_units );
 
-        writeScalar( sample_path, "number_density",
-            a_run_info.sample_number_density,
-            a_run_info.sample_number_density_units );
+        writeScalar( sample_path, "mass_density",
+            a_run_info.sample_mass_density,
+            a_run_info.sample_mass_density_units );
 
         writeString( sample_path, "component", // no container in NXsample
             a_run_info.sample_container_id + ": "
@@ -852,6 +859,7 @@ NxGen::processRunInfo
             a_run_info.sample_volume_cubic,
             a_run_info.sample_volume_cubic_units );
 
+        bool ldap_lookup = false;
         size_t user_count = 0;
         string path;
         for ( vector<STS::UserInfo>::const_iterator u =
@@ -863,9 +871,40 @@ NxGen::processRunInfo
             makeGroup( path, "NXuser" );
 
             writeString( path, "facility_user_id", u->id );
-            writeString( path, "name", u->name );
-            writeString( path, "role", u->role );
+
+            // If User Name _Not_ Specified, and User ID _Is_ Present,
+            // Then Resolve User Name Via LDAP Lookup...! ;-D
+
+            std::string user_name = u->name;
+
+            if ( !u->name.compare( "XXX_UNRESOLVED_NAME_XXX" )
+                    && !u->id.empty()
+                    && u->id.compare( "XXX_UNRESOLVED_UID_XXX" ) )
+            {
+                // Create LDAP Connection Only as Needed...
+                if ( !ldap_lookup )
+                {
+                    if ( stsLdapConnect( m_ldap_host, m_ldap_port ) == 0 )
+                        ldap_lookup = true;
+                }
+
+                if ( ldap_lookup )
+                    stsLdapLookupUserName( u->id, user_name );
+            }
+
+            writeString( path, "name", user_name );
+
+            // No Longer Include User "Role" If Not Set, Irrelevant... ;-D
+            if ( !u->role.empty()
+                    && u->role.compare( "XXX_UNRESOLVED_ROLE_XXX" ) )
+            {
+                writeString( path, "role", u->role );
+            }
         }
+
+        // Close Any Open LDAP Connections...
+        if ( ldap_lookup )
+            stsLdapDisconnect();
     }
     catch( TraceException &e )
     {
@@ -1341,7 +1380,7 @@ NxGen::runComment
 {
     if ( m_haveRunComment ) {
         syslog( LOG_WARNING,
-        "[%i] %s Unexpected input: duplicate run comment specified: %s",
+        "[%i] %s Duplicate Run Comment Specified (Discarded): %s",
             g_pid, "STS Error:", a_comment.c_str() );
         usleep(30000); // give syslog a chance...
         return;

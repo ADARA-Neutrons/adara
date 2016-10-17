@@ -267,14 +267,16 @@ StorageContainer::StorageContainer(const struct timespec &start,
 		uint32_t run, std::string &propId) :
 	m_startTime(start), m_runNumber(run), m_propId(propId),
 	m_numFiles(0), m_numPauseFiles(0), m_active(true), m_paused(false),
-	m_translated(false), m_manual(false), m_requeueCount(0)
+	m_translated(false), m_manual(false), m_requeueCount(0),
+	m_saved_size(0)
 {
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
 	m_runNumber(0), m_propId("UNKNOWN"), m_numFiles(0), m_numPauseFiles(0),
 	m_name(name), m_active(false), m_paused(false),
-	m_translated(false), m_manual(false), m_requeueCount(0)
+	m_translated(false), m_manual(false), m_requeueCount(0),
+	m_saved_size(0)
 {
 }
 
@@ -345,6 +347,11 @@ uint64_t StorageContainer::blocks(void) const
 		blocks /= StorageManager::m_block_size;
 		total += blocks;
 	}
+
+	// Include the Blocks from Any Imported Saved Data Source Stream Files!
+	blocks = m_saved_size + StorageManager::m_block_size - 1;
+	blocks /= StorageManager::m_block_size;
+	total += blocks;
 
 	return total;
 }
@@ -466,16 +473,23 @@ bool StorageContainer::validatePath(const std::string &in_path,
 	if (p && *p == '.') {
 		char tmp[16];
 		strftime(tmp, sizeof(tmp), "%Y%m%d-%H%M%S", &tm);
-		if (strncmp(cname.string().c_str(), tmp, 15))
+		if (strncmp(cname.string().c_str(), tmp, 15)) {
+			DEBUG("validatePath():"
+				<< " Error Parsing Run/Data Directory Time/Date Stamp: ["
+				<< cname.string() << "](0-14) != [" << tmp << "]");
 			p = NULL;
+		}
 	}
 
 	/* If p is not NULL, it points to the period; now get the
 	 * nanoseconds and run number, if any.
 	 */
 	run = 0;
-	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run))
+	if (p && !sscanf(p, ".%9u-run-%u", &ns, &run)) {
+		DEBUG("validatePath():"
+			<< " Error Parsing Nanoseconds & Run Number: [" << p << "]");
 		p = NULL;
+	}
 
 	/* We've been able to pull out everything so far, now try to
 	 * build the expected name and make sure it matches.
@@ -488,8 +502,12 @@ bool StorageContainer::validatePath(const std::string &in_path,
 			snprintf(expected + 25, sizeof(expected) - 25,
 				 "-run-%u", run);
 		}
-		if (strcmp(cname.string().c_str(), expected))
+		if (strcmp(cname.string().c_str(), expected)) {
+			DEBUG("validatePath():"
+				<< " Error Validating Parsed Run/Data Directory Name: ["
+				<< cname.string() << "] != [" << expected << "]");
 			p = NULL;
+		}
 	}
 
 	/* We use the UTC time in the container name, so we cannot use
@@ -591,10 +609,14 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 		rel_path /= *rit;
 
 		bool saved_file = false;
-		f = StorageFile::importFile(c, rel_path.string(), saved_file);
-		if (f)
+		uint64_t saved_size = 0;
+		f = StorageFile::importFile( c, rel_path.string(),
+			saved_file, saved_size );
+		if ( f )
 			c->m_files.push_back(f);
-		else if (!saved_file)
+		else if ( saved_file )
+			c->m_saved_size += saved_size;
+		else
 			had_errors = true;
 	}
 
@@ -619,7 +641,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 }
 
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
-		bool keep, std::string &propId, bool &path_deleted )
+		std::string &propId, bool &path_deleted )
 {
 	std::string cpath;
 	struct timespec ts;
@@ -712,13 +734,13 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		}
 	}
 
-	DEBUG("Purged " << purged << " blocks from container " << path);
+	DEBUG("Purged " << purged << " Blocks from Container " << path);
 
-	/* If we removed all of the ADARA files, and are not being asked to
-	 * keep the container around, remove the translation complete marker
-	 * and the container directory.
+	/* If we removed all of the ADARA files, then also remove the
+	 * translation complete marker, proposal id marker,
+	 * and the container directory itself.
 	 */
-	if (!keep && files.empty()) {
+	if (files.empty()) {
 		fs::path base(path), completed(path), proposal_id(path);
 		completed /= m_completed_marker;
 		proposal_id /= m_proposal_id_marker_prefix + propId;
@@ -745,3 +767,20 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 	return purged;
 }
+
+uint64_t StorageContainer::openSize(void)
+{
+	uint64_t openSize = 0;
+
+	if (m_cur_file)
+		openSize += m_cur_file->size();
+
+	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+	{
+		if ( m_ds_input_files[i] )
+			openSize += m_ds_input_files[i]->size();
+	}
+
+	return( openSize );
+}
+

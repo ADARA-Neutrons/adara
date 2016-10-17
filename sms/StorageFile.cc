@@ -387,9 +387,6 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 
 void StorageFile::terminateSave(void)
 {
-	/* Disable the generation of a sync packet as we're closing out
-	 * the file and want the run status to be the last packet.
-	 */
 	m_active = false;
 
 	put_fd();
@@ -513,12 +510,13 @@ StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
 }
 
 StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
-		const std::string &path, bool &saved_file)
+		const std::string &path, bool &saved_file, uint64_t &saved_size)
 {
 	fs::path p(path);
 	uint32_t fileNumber = 0, saveFileNumber = 0, runNumber = 0;
 	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
 	uint32_t sourceId = 0;
+	std::string save_type;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
@@ -535,17 +533,13 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	}
 	else if ( sscanf(p.filename().c_str(), "ds%u-s%u-run-%u.adara",
 			&sourceId, &saveFileNumber, &runNumber) == 3 ) {
-		DEBUG("Ignoring ADARA Data Source " << sourceId
-			<< " Saved Input Stream Run file: " << p);
+		save_type = "Run";
 		saved_file = true;
-		return StorageFile::SharedPtr();
 	}
 	else if ( sscanf(p.filename().c_str(), "ds%u-s%u.adara",
 			&sourceId, &saveFileNumber) == 2 ) {
-		DEBUG("Ignoring ADARA Data Source " << sourceId
-			<< " Saved Input Stream Non-Run file: " << p);
+		save_type = "Non-Run";
 		saved_file = true;
-		return StorageFile::SharedPtr();
 	}
 	// *Only* Support Addendums to Run Containers, Not Between Runs...
 	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
@@ -565,6 +559,18 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 			&& sscanf(p.filename().c_str(), "f%u.adara",
 				&fileNumber) != 1 ) {
 		WARN("Improperly named ADARA file: " << p);
+		return StorageFile::SharedPtr();
+	}
+
+	// Handle Saved Data Source Stream Files/Return Block Count...
+	if ( saved_file )
+	{
+		saved_size = fileSize( path );
+		
+		DEBUG("Ignoring ADARA Data Source " << sourceId
+			<< " Saved Input Stream " << save_type << " file: " << p
+			<< " (" << saved_size << " bytes)");
+
 		return StorageFile::SharedPtr();
 	}
 
@@ -610,5 +616,26 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	f->m_size = statbuf.st_size;
 	return f;
+}
+
+uint64_t StorageFile::fileSize(const std::string &path)
+{
+	std::string full_path = StorageManager::base_dir() + "/" + path;
+
+	struct stat statbuf;
+	int err = stat(full_path.c_str(), &statbuf);
+	if (err)
+		err = errno;
+
+	if (err) {
+		std::string msg("fileSize() stat error: ");
+		msg += strerror(err);
+		DEBUG(msg);
+		throw std::runtime_error("StorageFile::" + msg);
+	}
+
+	uint64_t file_size = statbuf.st_size;
+
+	return( file_size );
 }
 

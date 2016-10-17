@@ -70,3 +70,6 @@ protected:
 }}}
 
 #endif // SMSMESSAGES_H
+
+// vim: expandtab
+

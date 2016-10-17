@@ -42,7 +42,7 @@ public:
 		uint32_t run, std::string &propId);
 	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
-				bool keep, std::string &propId, bool &path_deleted);
+				std::string &propId, bool &path_deleted);
 
 	void newFile(void);
 	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
@@ -61,6 +61,8 @@ public:
 	void markTranslated(void);
 	void markManual(void);
 
+	uint64_t openSize(void);
+
 private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;
@@ -76,6 +78,7 @@ private:
 	bool m_translated;
 	bool m_manual;
 	uint32_t m_requeueCount;
+	uint64_t m_saved_size;
 
 	std::list<StorageFile::SharedPtr> m_files;
 

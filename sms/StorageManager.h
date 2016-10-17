@@ -24,6 +24,7 @@ class EventFd;
 class PoolsizePV;
 class PercentPV;
 class MaxBlocksPV;
+class BlockSizePV;
 class RescanRunDirPV;
 
 class StorageManager {
@@ -75,7 +76,9 @@ public:
 		addPrologue(iovec);
 	}
 
-	static int base_fd() { return m_base_fd; }
+	static int base_fd(void) { return m_base_fd; }
+
+	static std::string base_dir(void) { return m_baseDir; }
 
 	static boost::signals2::connection onContainerChange(
 					const ContainerSignal::slot_type &s) {
@@ -103,6 +106,9 @@ public:
 	}
 
 	static void config(const boost::property_tree::ptree &conf);
+
+	static bool set_max_blocks_allowed_value(
+		uint32_t max_blocks_allowed_value, bool isMultiplier );
 
 	static bool set_max_blocks_allowed(uint64_t maxSize);
 
@@ -135,15 +141,20 @@ private:
 	static int m_base_fd;
 
 	static std::string m_poolsize;
-	static int m_percent;
+	static uint32_t m_percent;
 
-	static uint32_t m_block_size;
+	static uint32_t m_max_blocks_allowed_multiplier;
+	static uint32_t m_max_blocks_allowed_base;
+
+	static uint64_t m_block_size;
 	static uint64_t m_blocks_used;
 	static uint64_t m_max_blocks_allowed;
 
 	static boost::shared_ptr<PoolsizePV> m_pvPoolsize;
 	static boost::shared_ptr<PercentPV> m_pvPercent;
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowed;
+	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowedMultiplier;
+	static boost::shared_ptr<BlockSizePV> m_pvBlockSize;
 	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
 
 	static struct timespec m_scanStart;
@@ -173,7 +184,9 @@ private:
 	static uint64_t m_purgedBlocks;
 
 	static bool m_dailyExhausted;
-	static std::list<std::string> m_dailyCache;
+	static std::list<
+		std::pair<std::string,
+			std::map<std::string, uint64_t> > > m_dailyCache;
 
 	static ComBusSMSMon *m_combus;
 
@@ -192,13 +205,16 @@ private:
 
 	static void backgroundIo(void);
 	static void ioCompleted(void);
-	static void requestPurge(uint64_t goal);
+	static void requestPurge(uint64_t goal, std::string logStr);
 	static uint64_t purgeData(uint64_t goal);
-	static uint64_t purgeDaily(const std::string &dir, uint64_t goal,
-				bool last);
+	static uint64_t purgeDaily(const std::string &dir,
+				std::map<std::string, uint64_t> &daily_map,
+				uint64_t goal, bool last, bool &daily_deleted);
 	static void populateDailyCache(void);
+	static std::map<std::string, uint64_t> getDirSize(
+				const std::string &dir, uint64_t &total_size);
 
-	static void addBaseStorage(off_t size);
+	static void addBaseStorage(uint64_t size);
 	static void startContainer(uint32_t run = 0,
 				std::string propId = std::string("UNKNOWN"));
 	static void endCurrentContainer(void);

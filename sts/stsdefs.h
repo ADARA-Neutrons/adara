@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.6.4"
+#define STS_VERSION "1.6.6"
 extern pid_t g_pid;
 
 namespace STS {
@@ -517,8 +517,8 @@ struct RunInfo
     std::string             sample_formula;
     double                  sample_mass;
     std::string             sample_mass_units;
-    double                  sample_number_density;
-    std::string             sample_number_density_units;
+    double                  sample_mass_density;
+    std::string             sample_mass_density_units;
     std::string             sample_container_id;
     std::string             sample_container_name;
     std::string             sample_can_indicator;

@@ -49,7 +49,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.5.2"
+#define DASMON_VERSION "1.5.3"
 
 
 bool g_child_signal = false;
@@ -225,15 +225,18 @@ int main(int argc, char *argv[])
     else if ( opt_map.count( "version" ) && !daemon )
     {
         cout << DASMON_VERSION
-			<< " (ADARA Common " << ADARA::VERSION << ")" << endl;
+			<< " (ADARA Common " << ADARA::VERSION
+			<< ", ComBus " << ADARA::ComBus::VERSION << ")" << endl;
         return 0;
     }
 
     // Initialize SysLog
 
     openlog( "dasmond", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "Dasmon Daemon %s Started. (%s %s)", DASMON_VERSION,
-		"ADARA Common", ADARA::VERSION.c_str() );
+    syslog( LOG_INFO,
+		"Dasmon Daemon %s Started. (%s %s, %s %s)", DASMON_VERSION,
+		"ADARA Common", ADARA::VERSION.c_str(),
+		"ComBus", ADARA::ComBus::VERSION.c_str() );
 
     if ( !opt_map.count( "domain" ))
     {

@@ -53,3 +53,5 @@ Log4cxxAppenderRegistration = ADARA::ComBus::Log4cxxAppender::registerClass();
 
 //}}
 
+// vim: expandtab
+

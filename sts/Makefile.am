@@ -4,7 +4,8 @@ bin_PROGRAMS += sts/sts
 endif
 
 sts_sts_SOURCES = sts/main.cpp sts/NxGen.cpp sts/StreamParser.cpp \
-    sts/h5nx.cpp sts/ComBusTransMon.cpp combus/ComBus.cpp $(POSIX_PARSER)
+    sts/h5nx.cpp sts/ComBusTransMon.cpp combus/ComBus.cpp \
+	sts/UserIdLdap.cpp $(POSIX_PARSER)
 
 sts_sts_CPPFLAGS = -Ists $(libxml_CPPFLAGS) $(activemq_CPPFLAGS) \
 		$(apr_CPPFLAGS) $(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \
@@ -17,4 +18,5 @@ sts_sts_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 sts_sts_LDADD = -lboost_system -lboost_filesystem \
 	        -lboost_program_options -lboost_thread-mt \
 		$(activemq_LIBS) $(apr_LIBS) $(libxml_LIBS) \
-		$(HDF5_LDFLAGS)
+		$(HDF5_LDFLAGS) -lldap -llber
+

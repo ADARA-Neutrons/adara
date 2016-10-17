@@ -723,18 +723,12 @@ DeviceAgent::controlThread()
             {
                 if ( ready == m_dev_desc->m_pvs.size() )
                 {
-                    device_changed = false;
-
                     // Defined device with ConfigManager - this will return
                     // the "real" DeviceDescriptor record
+                    device_changed = false;
                     DeviceRecordPtr new_rec =
                         m_stream_api.getCfgMgr().defineDevice(
-                            *m_dev_desc );
-
-                    // If new record is the same as existing record,
-                    // then nothing has changed
-                    if ( new_rec != m_dev_record )
-                        device_changed = true;
+                            *m_dev_desc, device_changed );
 
                     // Save new device record
                     m_dev_record = new_rec;
@@ -763,7 +757,6 @@ DeviceAgent::controlThread()
                         sendCurrentValues();
 
                     m_defined = true;
-                    device_changed = false;
 
                     // Delete temporary device descriptor
                     delete m_dev_desc;
@@ -1410,6 +1403,42 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         }
                     }
                 }
+
+                // Device Not Yet Defined, Ignoring Value Update...!
+                else
+                {
+                    std::string deviceStr = "";
+                    if ( ich->second.m_device != NULL )
+                    {
+                        deviceStr = " Device ["
+                            + ich->second.m_device->m_name + "]";
+                    }
+
+                    std::string pvStr = "";
+                    if ( ich->second.m_pv != NULL )
+                    {
+                        pvStr = " for PV <"
+                            + ich->second.m_pv->m_name + "> ("
+                            + ich->second.m_pv->m_connection + ")";
+                    }
+
+                    syslog( LOG_ERR, "%s %s: %s %s%s",
+                        "PVSD ERROR:",
+                        "DeviceAgent::epicsEventHandler()",
+                        "Device Not Yet Defined, Ignore VariableUpdate",
+                        deviceStr.c_str(), pvStr.c_str() );
+                    usleep(33333); // give syslog a chance...
+                }
+            }
+
+            // Invalid EPICS Channel/Not Found...!
+            else
+            {
+                 syslog( LOG_ERR, "%s %s: %s Unknown Channel Id...",
+                    "PVSD ERROR:",
+                    "DeviceAgent::epicsEventHandler()",
+                    "Error Looking Up EPICS Data Event, " );
+                usleep(33333); // give syslog a chance...
             }
         }
         // Metadata event?
@@ -1460,6 +1489,16 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     m_state_cond.notify_one();
                 }
             }
+
+            // Invalid EPICS Channel/Not Found...!
+            else
+            {
+                 syslog( LOG_ERR, "%s %s: %s Unknown Channel Id...",
+                    "PVSD ERROR:",
+                    "DeviceAgent::epicsEventHandler()",
+                    "Error Looking Up EPICS Metadata Event, " );
+                usleep(33333); // give syslog a chance...
+            }
         }
     }
     catch( TraceException &e )
@@ -1488,7 +1527,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 void
 DeviceAgent::sendCurrentValues()
 {
-    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin(); ich != m_chan_info.end(); ++ich )
+    for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin();
+            ich != m_chan_info.end(); ++ich )
     {
         bool timeout;
         StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );

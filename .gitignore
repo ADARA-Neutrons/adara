@@ -16,6 +16,7 @@ sms/testfs
 sms/test/storage-test
 
 sts/sts
+sts/UserIdLdap
 
 dasmon/server/dasmond
 

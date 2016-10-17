@@ -9,6 +9,8 @@
 #include <stdint.h>
 
 #include <string>
+#include <sstream>
+#include <algorithm>
 #include <stdexcept>
 
 #include <boost/lexical_cast.hpp>
@@ -38,7 +40,7 @@ public:
 		smsStringPV(name), m_block_size(block_size) {}
 private:
 
-	uint32_t m_block_size;
+	uint64_t m_block_size;
 
 	void changed(void)
 	{
@@ -71,7 +73,7 @@ private:
 		/* Set Max Blocks Allowed for StorageManager... */
 		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
-		/* Update Max Blocks Allowed EPICS PV... */
+		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
 };
@@ -85,14 +87,14 @@ public:
 private:
 
 	std::string m_baseDir;
-	uint32_t m_block_size;
+	uint64_t m_block_size;
 
 	void changed(void)
 	{
 		DEBUG("PercentPV: " << m_pv_name
 			<< " PV value changed, Set Max Blocks Allowed...");
 
-		int percent = value();
+		uint32_t percent = value();
 		uint64_t maxSize;
 
 		/* If the user doesn't specify a size, we'll use a percentage
@@ -109,7 +111,7 @@ private:
 			return;
 		}
 
-		maxSize = fsstats.f_blocks * percent / 100;
+		maxSize = fsstats.f_blocks * ((uint64_t) percent) / 100;
 		maxSize *= m_block_size;
 
 		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
@@ -121,31 +123,52 @@ private:
 		/* Set Max Blocks Allowed for StorageManager... */
 		StorageManager::set_max_blocks_allowed(max_blocks_allowed);
 
-		/* Update Max Blocks Allowed EPICS PV... */
+		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
 };
 
 class MaxBlocksPV : public smsUint32PV {
 public:
-	MaxBlocksPV(const std::string &name) :
+	MaxBlocksPV(const std::string &name, bool isMultiplier) :
+		smsUint32PV(name), m_isMultiplier(isMultiplier) {}
+
+private:
+
+	bool m_isMultiplier;
+
+	void changed(void)
+	{
+		uint32_t max_blocks_allowed_value = value();
+
+		DEBUG( "MaxBlocksPV: " << m_pv_name
+			<< " PV value changed, Set Max Blocks Allowed"
+			<< ( m_isMultiplier ? " Multiplier" : " Base" )
+			<< " to "
+			<< max_blocks_allowed_value );
+
+		// Set Max Blocks Allowed Value (Multiplier/Base)
+		// for StorageManager...
+		if ( StorageManager::set_max_blocks_allowed_value(
+				max_blocks_allowed_value, m_isMultiplier ) )
+		{
+			/* Update Max Blocks Allowed PVs if Requested Value Changed! */
+			StorageManager::update_max_blocks_allowed_pv();
+		}
+	}
+};
+
+class BlockSizePV : public smsUint32PV {
+public:
+	BlockSizePV(const std::string &name) :
 		smsUint32PV(name) {}
 
 private:
 
-	void changed(void)
+	// Make "Read-Only" By Design... ;-D
+	bool allowUpdate(const gdd &)
 	{
-		uint64_t max_blocks_allowed = value();
-
-		DEBUG("MaxBlocksPV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed to "
-			<< max_blocks_allowed);
-
-		/* Set Max Blocks Allowed for StorageManager... */
-		if ( StorageManager::set_max_blocks_allowed(max_blocks_allowed) ) {
-			/* Update Max Blocks Allowed PV if Requested Value Changed! */
-			StorageManager::update_max_blocks_allowed_pv();
-		}
+		return false;
 	}
 };
 
@@ -221,27 +244,46 @@ StorageManager::ContainerSignal StorageManager::m_contChange;
 StorageManager::PrologueSignal StorageManager::m_prologue;
 
 std::string StorageManager::m_poolsize;
-int StorageManager::m_percent;
+uint32_t StorageManager::m_percent;
 
-uint32_t StorageManager::m_block_size;
+uint32_t StorageManager::m_max_blocks_allowed_multiplier = 1;
+uint32_t StorageManager::m_max_blocks_allowed_base = 0x40000000;
+
+uint64_t StorageManager::m_block_size;
 uint64_t StorageManager::m_blocks_used;
-uint64_t StorageManager::m_max_blocks_allowed = 0x40000000;
+uint64_t StorageManager::m_max_blocks_allowed =
+	(uint64_t) m_max_blocks_allowed_base
+		* (uint64_t) m_max_blocks_allowed_multiplier;
 
 boost::shared_ptr<PoolsizePV> StorageManager::m_pvPoolsize;
+
 boost::shared_ptr<PercentPV> StorageManager::m_pvPercent;
-boost::shared_ptr<MaxBlocksPV> StorageManager::m_pvMaxBlocksAllowed;
+
+boost::shared_ptr<MaxBlocksPV>
+	StorageManager::m_pvMaxBlocksAllowed;
+boost::shared_ptr<MaxBlocksPV>
+	StorageManager::m_pvMaxBlocksAllowedMultiplier;
+
+boost::shared_ptr<BlockSizePV> StorageManager::m_pvBlockSize;
+
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
 struct timespec StorageManager::m_scanStart;
-uint64_t StorageManager::m_scannedBlocks;
+
 std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
 
 bool StorageManager::m_ioActive = false;
+
 EventFd *StorageManager::m_ioStartEvent;
 EventFd *StorageManager::m_ioCompleteEvent;
+
+uint64_t StorageManager::m_scannedBlocks;
 uint64_t StorageManager::m_purgedBlocks;
+
 bool StorageManager::m_dailyExhausted;
-std::list<std::string> StorageManager::m_dailyCache;
+
+std::list< std::pair<std::string, std::map<std::string, uint64_t> > >
+	StorageManager::m_dailyCache;
 
 ComBusSMSMon *StorageManager::m_combus;
 
@@ -289,7 +331,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		throw std::runtime_error(msg);
 	}
 
-	m_block_size = stats.st_blksize;
+	m_block_size = (uint64_t) stats.st_blksize;
 	DEBUG("Filesystem Block Size = " << m_block_size);
 
 	// Max Blocks Allowed - Option Priorities:
@@ -333,7 +375,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 			DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
 
 			m_percent = conf.get<int>("storage.percent", 80);
-			maxSize = fsstats.f_blocks * m_percent / 100;
+			maxSize = ((uint64_t) fsstats.f_blocks)
+				* ((uint64_t) m_percent) / 100;
 			maxSize *= m_block_size;
 
 			DEBUG("Percent = " << m_percent
@@ -350,6 +393,20 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
 
 	StorageFile::config(conf);
+}
+
+bool StorageManager::set_max_blocks_allowed_value(
+		uint32_t max_blocks_allowed_value, bool isMultiplier )
+{
+	if ( isMultiplier )
+		m_max_blocks_allowed_multiplier = max_blocks_allowed_value;
+	else
+		m_max_blocks_allowed_base = max_blocks_allowed_value;
+
+	uint64_t max_blocks_allowed = (uint64_t) m_max_blocks_allowed_base
+		* (uint64_t) m_max_blocks_allowed_multiplier;
+
+	return( set_max_blocks_allowed( max_blocks_allowed ) );
 }
 
 bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
@@ -372,12 +429,12 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 	else {
 		/* Limit Max Blocks to Total Size of Filesystem at Most... ;-D */
 		if ( (m_max_blocks_allowed * m_block_size)
-				> (fsstats.f_blocks * m_block_size) ) {
+				> (((uint64_t) fsstats.f_blocks) * m_block_size) ) {
 			DEBUG("Max Blocks Too Big: requested size="
 				<< (m_max_blocks_allowed * m_block_size)
 				<< " > filesystem size="
 				<< (fsstats.f_blocks * m_block_size));
-			m_max_blocks_allowed = fsstats.f_blocks;
+			m_max_blocks_allowed = (uint64_t) fsstats.f_blocks;
 			DEBUG("Max Blocks Allowed limited to "
 				<< m_max_blocks_allowed);
 			return( true ); // requested value was Changed...!
@@ -393,9 +450,63 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 
 void StorageManager::update_max_blocks_allowed_pv(void)
 {
+	static uint64_t prime_factors[] = { 2, 3, 5, 7, 11, 13, 17, 19 };
+	static uint32_t nfactors = sizeof(prime_factors) / sizeof(uint64_t);
+
+	// Magically Factor Uint64 "Max Blocks Allowed" into Base/Multiplier...
+	uint64_t base = m_max_blocks_allowed;
+	m_max_blocks_allowed_multiplier = 1;
+
+	DEBUG("update_max_blocks_allowed_pv(): Before Loop"
+		<< " m_max_blocks_allowed=" << m_max_blocks_allowed
+		<< " UINT32_MAX=" << UINT32_MAX
+		<< " base=" << base
+		<< " multiplier=" << m_max_blocks_allowed_multiplier);
+
+	while ( base > UINT32_MAX )
+	{
+		DEBUG("update_max_blocks_allowed_pv(): Loop"
+			<< " base=" << base
+			<< " > UINT32_MAX=" << UINT32_MAX
+			<< ", multiplier=" << m_max_blocks_allowed_multiplier);
+
+		// Check Divisibility by Prime Factors...
+		bool found_match = false;
+		for ( uint32_t i = 0 ; !found_match && i < nfactors ; i++ )
+		{
+			uint64_t q = base / prime_factors[i];
+			DEBUG("prime_factors[" << i << "]=" << prime_factors[i]
+				<< " q=" << q);
+			if ( q * prime_factors[i] == base )
+			{
+				DEBUG("Divisible!");
+				m_max_blocks_allowed_multiplier *= prime_factors[i];
+				base = q;
+				found_match = true;
+			}
+		}
+
+		// No Easy Prime Factor Found, Munge by 10's... ;-Q
+		if ( !found_match )
+		{
+			DEBUG("No Prime Factor Found! Divide By 10...!");
+			m_max_blocks_allowed_multiplier *= 10;
+			base /= 10;
+		}
+	}
+
+	m_max_blocks_allowed_base = base;
+
+	DEBUG("update_max_blocks_allowed_pv(): Loop Done"
+		<< " m_max_blocks_allowed_base=" << m_max_blocks_allowed_base
+		<< " m_max_blocks_allowed_multiplier="
+			<< m_max_blocks_allowed_multiplier);
+
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &now);
+	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed_base, &now);
+	m_pvMaxBlocksAllowedMultiplier->update(
+		m_max_blocks_allowed_multiplier, &now);
 }
 
 void StorageManager::init(void)
@@ -476,7 +587,13 @@ void StorageManager::lateInit(void)
 		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
 
 	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowed"));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false));
+
+	m_pvMaxBlocksAllowedMultiplier = boost::shared_ptr<MaxBlocksPV>(new
+		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true));
+
+	m_pvBlockSize = boost::shared_ptr<BlockSizePV>(new
+		BlockSizePV(prefix + ":BlockSize"));
 
 	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
 		RescanRunDirPV(prefix + ":RescanRunDir"));
@@ -484,6 +601,8 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
+	ctrl->addPV(m_pvMaxBlocksAllowedMultiplier);
+	ctrl->addPV(m_pvBlockSize);
 	ctrl->addPV(m_pvRescanRunDir);
 
 	/* Set the fencepost for the scan; any containers with a
@@ -494,10 +613,18 @@ void StorageManager::lateInit(void)
 	clock_gettime(CLOCK_REALTIME, &m_scanStart);
 
 	/* Initialize Storage Manager PVs... */
+
 	m_pvPoolsize->update(
 		m_poolsize.length() ? m_poolsize : "(unset)", &m_scanStart);
+
 	m_pvPercent->update(m_percent, &m_scanStart);
-	m_pvMaxBlocksAllowed->update(m_max_blocks_allowed, &m_scanStart);
+
+	// Update Max Blocks Allowed EPICS PVs...
+	// - m_pvMaxBlocksAllowed
+	// - m_pvMaxBlocksAllowedMultiplier
+	StorageManager::update_max_blocks_allowed_pv();
+
+	m_pvBlockSize->update((uint32_t) m_block_size, &m_scanStart);
 
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
@@ -737,9 +864,9 @@ bool StorageManager::cleanupRunFiles(void)
 	return false;
 }
 
-void StorageManager::addBaseStorage(off_t size)
+void StorageManager::addBaseStorage(uint64_t size)
 {
-	off_t blocks;
+	uint64_t blocks;
 
 	/* Now that the file is no longer being written to, we can add
 	 * account for its use of blocks
@@ -959,7 +1086,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 
 	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
 	uint32_t len = validatePacket(iovec);
-	off_t size, blocks, resumeLocation;
+	uint64_t blocks;
+	off_t resumeLocation;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
@@ -983,7 +1111,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * to this location for replay after a snapshot.
 	 */
 	resumeLocation = m_cur_container->file()->size();
-	size = m_cur_container->write(iovec, len, notify);
+	m_cur_container->write(iovec, len, notify);
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
@@ -1001,18 +1129,23 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
+	 * (query the StorageContainer to get the Total Size of
+	 * all open files...! ;-)
 	 */
-	blocks = size + m_block_size - 1;
+	blocks = m_cur_container->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
-	/* Update Max Blocks Allowed from PV... */
-	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	// *Don't* Update "Max Blocks Allowed" from PV...!
+	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		uint64_t goal = m_blocks_used + blocks;
-		goal -= m_max_blocks_allowed;
-		SMSControl *ctrl = SMSControl::getInstance();
-		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "addPacket() requestPurge! goal=" << goal);
-		requestPurge(goal);
+		uint64_t goal = ( m_blocks_used + blocks ) - m_max_blocks_allowed;
+		std::stringstream ss;
+		ss << "addPacket() Purge Request"
+			<< " (m_blocks_used=" << m_blocks_used
+			<< " + blocks=" << blocks
+			<< " = " << (m_blocks_used + blocks)
+			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
+			<< ": goal=" << goal << ")";
+		requestPurge( goal, ss.str() );
 	}
 
 	// DEBUG("addPacket() exit len=" << len);
@@ -1021,29 +1154,34 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 {
 	uint32_t len = validatePacket(iovec);
-	off_t size, blocks;
+	uint64_t blocks;
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	size = m_cur_container->save(iovec, len, dataSourceId);
+	m_cur_container->save(iovec, len, dataSourceId);
 
 	/* Is it time to initiate a purge of old data?
 	 *
 	 * m_blocks_used contains the size of all of our closed files,
 	 * and we don't add the current file until we're done with it.
+	 * (query the StorageContainer to get the Total Size of
+	 * all open files...! ;-)
 	 */
-	blocks = size + m_block_size - 1;
+	blocks = m_cur_container->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
-	/* Update Max Blocks Allowed from PV... */
-	m_max_blocks_allowed = m_pvMaxBlocksAllowed->value();
+	// *Don't* Update "Max Blocks Allowed" from PV...!
+	// Already Handled in Various PV->changed() Methods...
 	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
-		uint64_t goal = m_blocks_used + blocks;
-		goal -= m_max_blocks_allowed;
-		SMSControl *ctrl = SMSControl::getInstance();
-		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "savePacket() requestPurge! goal=" << goal);
-		requestPurge(goal);
+		uint64_t goal = ( m_blocks_used + blocks ) - m_max_blocks_allowed;
+		std::stringstream ss;
+		ss << "savePacket() Purge Request"
+			<< " (m_blocks_used=" << m_blocks_used
+			<< " + blocks=" << blocks
+			<< " = " << (m_blocks_used + blocks)
+			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
+			<< ": goal=" << goal << ")";
+		requestPurge( goal, ss.str() );
 	}
 }
 
@@ -1152,26 +1290,26 @@ void StorageManager::scanStorage(void)
 		fs::file_status status = it->status();
 
 		/* Skip over the storage for the next run number */
-		if (file == m_run_filename || file == m_run_tempname)
+		if ( file == m_run_filename || file == m_run_tempname )
 			continue;
 
 		/* Skip index directories; they are handled by other means. */
-		if (file.string().compare(0, m_stateDirPrefix.length(),
-						m_stateDirPrefix) == 0)
+		if ( file.string().compare( 0, m_stateDirPrefix.length(),
+						m_stateDirPrefix ) == 0 )
 			continue;
 
-		if (status.type() != fs::directory_file) {
+		if ( status.type() != fs::directory_file ) {
 			WARN("Ignoring non-directory '" << it->path() << "'");
 			continue;
 		}
 
-		if (!isValidDaily(file.string())) {
+		if ( !isValidDaily( file.string() ) ) {
 			WARN("Daily directory '" << it->path()
 				<< "' has invalid format");
 			continue;
 		}
 
-		scanDaily(it->path().string());
+		scanDaily( it->path().string() );
 	}
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
@@ -1251,7 +1389,7 @@ void StorageManager::ioCompleted(void)
 		if (!m_pendingRuns.empty())
 			sts->startConnect();
 	} else {
-		DEBUG("ioCompleted purged " << m_purgedBlocks << " blocks");
+		DEBUG("ioCompleted(): Purged " << m_purgedBlocks << " Blocks");
 		m_blocks_used -= m_purgedBlocks;
 	}
 
@@ -1260,7 +1398,7 @@ void StorageManager::ioCompleted(void)
 	DEBUG("ioCompleted exit");
 }
 
-void StorageManager::requestPurge(uint64_t goal)
+void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 {
 	/* Only one I/O action at a time. */
 	if (m_ioActive)
@@ -1273,7 +1411,10 @@ void StorageManager::requestPurge(uint64_t goal)
 	if (goal >= IOCMD_PURGE_MAX)
 		goal = IOCMD_PURGE_MAX;
 
-	DEBUG("Requesting purge of " << goal << " blocks");
+	SMSControl *ctrl = SMSControl::getInstance();
+	DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		<< "Signaling Purge Request of " << goal << " Blocks - "
+		<< logStr );
 
 	m_ioActive = true;
 	m_ioStartEvent->signal(goal);
@@ -1283,7 +1424,8 @@ void StorageManager::populateDailyCache(void)
 {
 	fs::directory_iterator end, it(m_baseDir);
 
-	DEBUG("Building cache of daily directories");
+	DEBUG("populateDailyCache():"
+		<< " Building Cache of Daily Directories for Purging");
 	m_dailyCache.clear();
 
 	for (; it != end; ++it) {
@@ -1291,26 +1433,73 @@ void StorageManager::populateDailyCache(void)
 		fs::file_status status = it->status();
 
 		/* Skip over the storage for the next run number */
-		if (file == m_run_filename || file == m_run_tempname)
+		if ( file == m_run_filename || file == m_run_tempname )
 			continue;
 
-		if (status.type() != fs::directory_file)
+		if ( status.type() != fs::directory_file )
 			continue;
 
-		if (!isValidDaily(file.string()))
+		if ( !isValidDaily( file.string() ) )
 			continue;
 
-		m_dailyCache.push_back(file.string());
+		uint64_t total_size = 0;
+
+		std::map<std::string, uint64_t> daily_map =
+			getDirSize( file.string(), total_size );
+
+		DEBUG("populateDailyCache(): Daily " << file.string()
+			<< " - " << daily_map.size() << " Sub-Directories,"
+			<< " Total Files Size = " << total_size);
+
+		m_dailyCache.push_back(
+			std::pair< std::string, std::map<std::string, uint64_t> > (
+				file.string(), daily_map ) );
 	}
 
 	/* The daily directories have the format YYYYMMDD, so the default
 	 * lexical sort works.
+	 * Also, there shouldn't be any duplicate daily directories,
+	 * so the new std::pair<std::string, uint64_t> types will
+	 * _Always_ lexicographically sort on the first string field... ;-D
 	 */
 	m_dailyCache.sort();
 }
 
-uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
-					bool last)
+std::map<std::string, uint64_t> StorageManager::getDirSize(
+		const std::string &dir, uint64_t &total_size )
+{
+	std::map<std::string, uint64_t> daily_map;
+
+	fs::directory_iterator end, it( m_baseDir + "/" + dir );
+
+	total_size = 0;
+
+	for (; it != end; ++it) {
+
+		std::string sub_dir = dir + "/"
+			+ std::string( it->path().filename().c_str() );
+
+		fs::directory_iterator sub_end, sub( m_baseDir + "/" + sub_dir );
+
+		uint64_t sub_size = 0;
+
+		for (; sub != sub_end; ++sub) {
+
+			sub_size += StorageFile::fileSize( sub_dir + "/"
+					+ std::string( sub->path().filename().c_str() ) );
+		}
+
+		daily_map[ m_baseDir + "/" + sub_dir ] = sub_size;
+
+		total_size += sub_size;
+	}
+
+	return( daily_map );
+}
+
+uint64_t StorageManager::purgeDaily( const std::string &dir,
+		std::map<std::string, uint64_t> &daily_map,
+		uint64_t goal, bool last, bool &daily_deleted )
 {
 	/* We could cache the list of containers to avoid rescanning
 	 * each time we wish to purge, but we expect the list to be
@@ -1322,7 +1511,7 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	for (; it != end; ++it) {
 		fs::file_status status = it->status();
 
-		if (status.type() != fs::directory_file)
+		if ( status.type() != fs::directory_file )
 			continue;
 
 		containers.push_back(it->path());
@@ -1333,7 +1522,33 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 	 */
 	containers.sort();
 
+	/* Check Daily Cache Map Against Current Container File List
+	 * - Any Missing Sub-Directories must have been Manually/Externally
+	 *   Deleted, so we can deduct their File Size from the Purge Count
+	 *   and then remove them from the Daily Cache Map... ;-D
+	 */
 	uint64_t total_purged = 0;
+	std::map<std::string, uint64_t>::iterator subs,
+		subs_end = daily_map.end();
+	for ( subs = daily_map.begin() ; subs != subs_end; ++subs ) {
+		// Look for Sub-Directory in Current List of Containers...
+		std::list<fs::path>::iterator cit =
+			std::find( containers.begin(), containers.end(), subs->first );
+		if ( cit == containers.end() )
+		{
+			// Sub-Directory Not Found, Must Be Manually/Externally Deleted
+			uint64_t blocks = subs->second + m_block_size - 1;
+			blocks /= m_block_size;
+			DEBUG("purgeDaily(): Sub-Directory " << subs->first
+				<< " Found Deleted - Recovered " << blocks << " Blocks"
+				<< " (" << subs->second << " Bytes)");
+			total_purged += blocks;
+			daily_map.erase( subs );
+		}
+	}
+
+	/* Now purge files until we reach our goal...
+	 */
 	uint64_t purged;
 	std::list<fs::path>::iterator cit, cend = containers.end();
 	for (cit = containers.begin(); total_purged < goal && cit != cend; ) {
@@ -1375,12 +1590,20 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 		 */
 		++cit;
 
+		// Skip the Last Container in the Last Daily Folder...
+		// (Because This is the One We're Currently Writing To...! ;-O)
+		if ( last && cit == cend ) {
+			DEBUG("purgeDaily():"
+				<< " Skipping Last Container in Last Daily Folder"
+				<< " (Active?) " << cpath.string());
+			continue;
+		}
+
 		// Try to Purge this Container...
 		std::string propId;
 		bool path_deleted = false;
 		purged = StorageContainer::purge(cpath.string(),
 							goal - total_purged,
-							last && cit == cend,
 							propId, path_deleted);
 
 		// If No ProposalId Found, Set to "UNKNOWN"...
@@ -1401,14 +1624,26 @@ uint64_t StorageManager::purgeDaily(const std::string &dir, uint64_t goal,
 			m_combus->sendOriginal(run, propId, purgeMsg, now);
 		}
 
+		// If Container Deleted, Remove from Daily Cache Map...!
+		if ( path_deleted ) {
+			subs = daily_map.find( cpath.string() );
+			if ( subs != subs_end ) {
+				DEBUG("purgeDaily(): Removing Container "
+					<< cpath.string() << " from Daily Cache Map");
+				daily_map.erase( subs );
+			}
+		}
+
 		// Accumulate Total Blocks Purged
 		total_purged += purged;
 	}
 
 	/* Try to remove the directory, but expect to fail. */
+	daily_deleted = true;
 	try {
 		fs::remove(fs::path(dir));
 	} catch (fs::filesystem_error e) {
+		daily_deleted = false;
 	}
 
 	return total_purged;
@@ -1432,37 +1667,74 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			populateDailyCache();
 	} catch (...) {
 		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "purgeData() populating cache");
+			<< "purgeData(): Error Populating Daily Cache for Purging!");
 		/* If we cannot populate the cache, then we cannot purge. */
 		return 0;
 	}
 
 	uint64_t purged = 0;
-	std::list<std::string>::iterator it, end = m_dailyCache.end();
-	for (it = m_dailyCache.begin(); purged < purgeRequested &&
-								it != end; ) {
+
+	std::list< std::pair<std::string,
+		std::map<std::string, uint64_t> > >::iterator it, next,
+			end = m_dailyCache.end();
+
+	for ( it = m_dailyCache.begin();
+			purged < purgeRequested && it != end; ) {
+
 		fs::path dir(m_baseDir);
-		dir /= *it;
-		if (!fs::exists(dir)) {
+		dir /= it->first;
+
+		// Whole Daily Directory is Gone...! :-D
+		// Must Be Manually/Externally Deleted, Subtract All Blocks...
+		if ( !fs::exists(dir) ) {
+			DEBUG("purgeData(): Whole Daily Directory " << it->first
+				<< " has been Externally Deleted!"
+				<< " Recover Manually Freed Blocks...");
+			std::map<std::string, uint64_t>::iterator subs,
+				subs_end = it->second.end();
+			for (subs = it->second.begin() ; subs != subs_end; subs++) {
+				uint64_t blocks = subs->second + m_block_size - 1;
+				blocks /= m_block_size;
+				DEBUG("purgeData(): Sub-Directory "
+					<< it->first << "/" << subs->first
+					<< " Found Deleted - Recovered " << blocks << " Blocks"
+					<< " (" << subs->second << " Bytes)");
+				purged += blocks;
+			}
 			it = m_dailyCache.erase(it);
 			continue;
 		}
 
 		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Purging daily " << *it);
+			<< "Purging Daily " << it->first);
 
-		/* We need to do the increment in the loop, as we may delete
-		 * elements from the list as we clean the directories. We
-		 * also need to know when we're working on the last known
+		/* We need to know when we're working on the last known
 		 * daily directory so we can tell purgeDir(). It will use
 		 * this to avoid erasing the current container.
 		 */
-		++it;
-		purged += purgeDaily(dir.string(), purgeRequested - purged,
-					it == end);
+		bool daily_deleted = false;
+		next = it;
+		purged += purgeDaily( dir.string(), it->second,
+			purgeRequested - purged, ++next == end, daily_deleted );
+
+		// Clean Up Daily Cache if Directory Deleted...
+		if ( daily_deleted ) {
+			DEBUG("Removed Daily " << it->first);
+			it = m_dailyCache.erase(it);
+		}
+
+		// We need to do the increment within the loop, as we may delete
+		// elements from the list as we clean the directories.
+		else {
+			++it;
+		}
 	}
 
 	m_dailyExhausted = (purged < purgeRequested);
+
+	DEBUG("purgeData(): Purged " << purged << " Total Blocks"
+		<< " (dailyExhausted=" << m_dailyExhausted << ")");
+
 	return purged;
 }
 

@@ -48,6 +48,8 @@ ComBusTransMon::~ComBusTransMon()
         delete m_comm_thread;
     }
 
+    syslog( LOG_INFO, "[%i] Disconnecting ComBus...", g_pid );
+
     if ( m_combus )
         delete m_combus;
 
@@ -202,7 +204,7 @@ ComBusTransMon::commThread()
             {
                 // After infoReady() returns true,
                 // it is safe to access run information
-                if ( m_domain.empty())
+                if ( m_domain.empty() )
                 {
                     m_domain = m_stream_parser->getFacilityName()
                         + "." + m_stream_parser->getBeamShortName();

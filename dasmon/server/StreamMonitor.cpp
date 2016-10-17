@@ -1670,6 +1670,7 @@ StreamMonitor::dbThread()
     PGconn *conn;
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
+    string arr_str;
     char buf[500];
     bool send_all =  true;
     bool update;
@@ -1679,9 +1680,12 @@ StreamMonitor::dbThread()
     vector<pair<PVInfoLite,uint32_t> >::iterator    iintpv;
     vector<pair<PVInfoLite,double> >                dbl_pvs;
     vector<pair<PVInfoLite,double> >::iterator      idblpv;
+    vector<pair<PVInfoLite,string> >                str_pvs;
+    vector<pair<PVInfoLite,string> >::iterator      istrpv;
 
     int_pvs.reserve(200);
     dbl_pvs.reserve(200);
+    str_pvs.reserve(200);
 
     while ( 1 )
     {
@@ -1709,9 +1713,11 @@ StreamMonitor::dbThread()
                 m_db_state = TS_RUNNING;
 
                 // Cache updated PVs
-                // Must ~copy~ data from PVs since they could be deleted before we're done writing them to DB
+                // Must ~copy~ data from PVs since they could be
+                // deleted before we're done writing them to DB
                 int_pvs.clear();
                 dbl_pvs.clear();
+                str_pvs.clear();
 
                 m_mutex.lock();
 
@@ -1724,19 +1730,42 @@ StreamMonitor::dbThread()
                         {
                         case PVT_FLOAT:
                         case PVT_DOUBLE:
-                            dbl_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<double>*)(ipvm->second))->m_value ));
+                            dbl_pvs.push_back( make_pair(
+                                PVInfoLite( ipvm->second ),
+                                ((PVInfo<double>*)(ipvm->second))->
+                                    m_value ) );
                             break;
                         case PVT_INT:
                         case PVT_UINT:
                         case PVT_ENUM:
-                            int_pvs.push_back( make_pair(PVInfoLite( ipvm->second ), ((PVInfo<uint32_t>*)(ipvm->second))->m_value ));
+                            int_pvs.push_back( make_pair(
+                                PVInfoLite( ipvm->second ),
+                                ((PVInfo<uint32_t>*)(ipvm->second))->
+                                    m_value ) );
                             break;
-                        case PVT_DOUBLE_ARRAY:
-                        case PVT_UINT_ARRAY:
                         case PVT_STRING:
-                            // Web monitor db does not support strings yet
-                            // Nor Integer or Double Arrays...!
-                            continue;
+                            str_pvs.push_back( make_pair(
+                                PVInfoLite( ipvm->second ),
+                                ((PVInfo<string>*)(ipvm->second))->
+                                    m_value ) );
+                            break;
+                        // Pass Integer or Double Arrays as Strings...!
+                        case PVT_DOUBLE_ARRAY:
+                            Utils::printArrayString(
+                                ((PVInfo< vector<double> >*)
+                                    (ipvm->second))->m_value,
+                                arr_str );
+                            str_pvs.push_back( make_pair(
+                                PVInfoLite( ipvm->second ), arr_str ) );
+                            break;
+                        case PVT_UINT_ARRAY:
+                            Utils::printArrayString(
+                                ((PVInfo< vector<uint32_t> >*)
+                                    (ipvm->second))->m_value,
+                                arr_str );
+                            str_pvs.push_back( make_pair(
+                                PVInfoLite( ipvm->second ), arr_str ) );
+                            break;
                         }
                     }
                 }
@@ -1747,7 +1776,8 @@ StreamMonitor::dbThread()
                 ++m_db_ticker;
 
                 // Send double-value PV updates to database
-                for ( idblpv = dbl_pvs.begin(); idblpv != dbl_pvs.end(); ++idblpv )
+                for ( idblpv = dbl_pvs.begin();
+                        idblpv != dbl_pvs.end(); ++idblpv )
                 {
                     sprintf( buf,
                         "select \"pvUpdate\"('%s','%s',%g,%u,%u)",
@@ -1758,9 +1788,10 @@ StreamMonitor::dbThread()
                         idblpv->first.m_time );
 
                     res = PQexec( conn, buf );
-                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
-                        syslog( LOG_ERR, "Database update call failed." );
+                        syslog( LOG_ERR,
+                            "Database Double Update Call Failed." );
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
                         syslog( LOG_ERR, buf );
 
@@ -1776,7 +1807,8 @@ StreamMonitor::dbThread()
                 ++m_db_ticker;
 
                 // Send int-value PV updates to database
-                for ( iintpv = int_pvs.begin(); iintpv != int_pvs.end(); ++iintpv )
+                for ( iintpv = int_pvs.begin();
+                        iintpv != int_pvs.end(); ++iintpv )
                 {
                     sprintf( buf,
                         "select \"pvUpdate\"('%s','%s',%u,%u,%u)",
@@ -1789,7 +1821,39 @@ StreamMonitor::dbThread()
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
                     {
-                        syslog( LOG_ERR, "Database update call failed." );
+                        syslog( LOG_ERR,
+                            "Database Int Update Call Failed." );
+                        syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        syslog( LOG_ERR, buf );
+
+                        update = false;
+                        break;
+                    }
+
+                    PQclear( res );
+                    send_all = false;
+                    ++m_db_ticker;
+                }
+
+                ++m_db_ticker;
+
+                // Send string-value PV updates to database
+                for ( istrpv = str_pvs.begin();
+                        istrpv != str_pvs.end(); ++istrpv )
+                {
+                    sprintf( buf,
+                        "select \"pvStringUpdate\"('%s','%s','%s',%u,%u)",
+                        m_beam_info.m_beam_sname.c_str(),
+                        istrpv->first.m_name.c_str(),
+                        istrpv->second.c_str(),
+                        istrpv->first.m_status,
+                        istrpv->first.m_time );
+
+                    res = PQexec( conn, buf );
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                    {
+                        syslog( LOG_ERR,
+                            "Database String Update Call Failed." );
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
                         syslog( LOG_ERR, buf );
 
@@ -1807,7 +1871,8 @@ StreamMonitor::dbThread()
             ++m_db_ticker;
         }
 
-        // Error may have been caused by DB being off-line, or network error
+        // Error may have been caused by DB being off-line,
+        // or network error...
         // wait a bit and try connecting again
         for ( i = 0; i < 15; ++i )
         {

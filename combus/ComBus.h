@@ -20,6 +20,8 @@
 namespace ADARA {
 namespace ComBus {
 
+const std::string VERSION = "2.2.0";
+
 class MessageBase;
 
 
@@ -208,4 +210,6 @@ private:
 } // End ADARA namespace
 
 #endif // COMBUS_H
+
+// vim: expandtab
 

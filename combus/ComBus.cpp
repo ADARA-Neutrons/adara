@@ -5,6 +5,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/lexical_cast.hpp>
 #include <unistd.h>
+#include <cctype>
 #include <time.h>
 #include "ComBus.h"
 #include "ComBusMessages.h"
@@ -276,15 +277,24 @@ Connection::~Connection() throw()
     m_running = false;
     lock.unlock();
 
+    // Wait for status thread to exit
     m_status_cond.notify_one();
     m_status_thread->join();
 
-    if ( m_input_translator )
-        delete m_input_translator;
+    // Wait for reconnect thread to exit
+    int i = 0;
+    while ( m_reconnect_thread && i++ < 12 )
+        sleep(1);
 
-    map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
-    for( ; ilist != m_listeners.end(); ++ilist )
-        delete ilist->second;
+    // No One Can Seem to Catch This, So Don't Bother... ;-b
+    // (Too Many Odd Accompanying Exceptions from Boost/ActiveMQ...)
+    // if ( m_reconnect_thread )
+    // {
+        // throw std::runtime_error(
+            // "ComBus::Connection Destructor Timed Out Waiting for Reconnect Thread!");
+    // }
+
+    disconnect();
 
     activemq::library::ActiveMQCPP::shutdownLibrary();
 
@@ -329,12 +339,35 @@ Connection::checkBrokerURI( std::string &a_broker_uri )
         a_broker_uri = string("tcp://") + a_broker_uri;
 
     // Will always return a valid pos b/c of code above
-    size_t pos = a_broker_uri.find_last_of(":");
-    try
+    size_t pos = a_broker_uri.find_last_of(":") + 1;
+
+    // Section Off/Check for Any Potential Port Number Suffix...
+    size_t len = 0;
+    for ( size_t i=pos ; i < a_broker_uri.length() ; i++ )
     {
-        boost::lexical_cast<uint32_t>( a_broker_uri.substr( pos + 1 ) );
+        if ( isdigit( a_broker_uri[i] ) )
+            len++;
+        else
+            break;
     }
-    catch ( boost::bad_lexical_cast &e )
+
+    // Found Some Digits, Try Parsing Port Number...
+    if ( len > 0 )
+    {
+        try
+        {
+            boost::lexical_cast<uint32_t>(
+                a_broker_uri.substr( pos, len ) );
+        }
+        catch ( boost::bad_lexical_cast &e )
+        {
+            // Apply default port if not set
+            a_broker_uri += string( ":61616" );
+        }
+    }
+    
+    // No Digits, No Port...
+    else
     {
         // Apply default port if not set
         a_broker_uri += string( ":61616" );
@@ -442,7 +475,7 @@ bool
 Connection::waitForConnect( unsigned short a_timeout ) const
 {
     unsigned short t = a_timeout;
-    while ( 1 )
+    while ( m_running )
     {
         if ( m_connected )
             return true;
@@ -476,15 +509,16 @@ Connection::reconnectThread()
     boost::unique_lock<boost::mutex> lock( m_status_mutex,
         boost::defer_lock );
 
-    while( 1 )
+    while ( 1 )
     {
         lock.lock();
-
-        activemq::core::ActiveMQConnectionFactory factory(m_broker_uri + "?soConnectTimeout=500" );
 
         // Exit if terminating
         if ( !m_running )
             break;
+
+        activemq::core::ActiveMQConnectionFactory factory(
+            m_broker_uri + "?soConnectTimeout=500" );
 
         try
         {
@@ -499,14 +533,16 @@ Connection::reconnectThread()
                     "Failed to create ActiveMQConnection" );
             }
 
+            // Unlock _Now_ as Connection Start & Session Create can Hang!
+            // Besides, We're Done with the Broker Connection Parameters.
+            lock.unlock();
+
             m_connection->start();
 
             m_session = m_connection->createSession(
                 cms::Session::AUTO_ACKNOWLEDGE );
 
             m_connected = true;
-
-            lock.unlock();
 
             // Reconnect all message consumers
             for ( map<ITopicListener*,Translator*>::iterator il =
@@ -529,8 +565,13 @@ Connection::reconnectThread()
         {
             // TODO - Should probably report exceptions somewhere
 
+            // ActiveMQ CPP Session Destructor Broken... ;-Q
+            if ( m_session ) m_session->close();
             delete m_session;
             m_session = 0;
+
+            // ActiveMQ CPP Connection Destructor Broken... ;-Q
+            if ( m_connection ) m_connection->close();
             delete m_connection;
             m_connection = 0;
 
@@ -545,6 +586,9 @@ Connection::reconnectThread()
         // can interrupt this thread
         sleep( retry_period );
     }
+
+    // Notify connection status thread we're giving up...
+    m_status_cond.notify_one();
 
     // Self-destruct!
     delete m_reconnect_thread;
@@ -611,6 +655,7 @@ void
 Connection::disconnect()
 {
     boost::lock_guard<boost::mutex> lock( m_status_mutex );
+
     if ( m_connected )
     {
         m_connected = false;
@@ -620,6 +665,9 @@ Connection::disconnect()
             m_producer_topics.begin();
         for ( ; ip != m_producer_topics.end(); ++ip )
         {
+            // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
+            ip->second.second->close();
+
             delete ip->second.second;
             delete ip->second.first;
         }
@@ -636,8 +684,13 @@ Connection::disconnect()
         if ( m_input_listener )
             m_input_translator->disconnect_all();
 
+        // ActiveMQ CPP Session Destructor Broken... ;-Q
+        if ( m_session ) m_session->close();
         delete m_session;
         m_session = 0;
+
+        // ActiveMQ CPP Connection Destructor Broken... ;-Q
+        if ( m_connection ) m_connection->close();
         delete m_connection;
         m_connection = 0;
 
@@ -725,6 +778,8 @@ Connection::broadcast( MessageBase &a_msg )
                 p.first = m_session->createTopic(
                     m_domain + topic + "." + m_proc_name );
                 p.second = m_session->createProducer( p.first );
+                p.second->setDeliveryMode(
+                    cms::DeliveryMode::NON_PERSISTENT );
                 m_producer_topics[topic] = p;
                 p.second->send( cmsmsg );
             }
@@ -802,6 +857,8 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id,
                     pr.first = m_session->createTopic(
                         m_domain + "INPUT." + dest_proc_name );
                     pr.second = m_session->createProducer( pr.first );
+                    pr.second->setDeliveryMode(
+                        cms::DeliveryMode::NON_PERSISTENT );
                     m_producer_topics[dest_proc_name] = pr;
 
                     pr.second->send( cmsmsg );
@@ -862,6 +919,9 @@ Connection::postWorkflow( MessageBase &a_msg )
             a_msg.serialize( *cmsmsg );
 
             producer->send( cmsmsg );
+
+            // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
+            producer->close();
 
             res = true;
         }
@@ -1064,4 +1124,6 @@ Connection::createTopicConsumer( const string &a_topic_name,
 
 } // End ComBus namespace
 } // End ADARA namespace
+
+// vim: expandtab
 

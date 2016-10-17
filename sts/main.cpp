@@ -75,6 +75,7 @@
 #include <syslog.h>
 #include <string.h>
 #include <fcntl.h>
+#include <ldap.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -147,9 +148,12 @@ int main( int argc, char** argv )
     g_pid = getpid();
 
     openlog( "sts", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "[%i] Started. STS ver: %s, common ver: %s, tag: %s",
-        g_pid, STS_VERSION,
-        ADARA::VERSION.c_str(), ADARA::TAG_NAME.c_str() );
+    syslog( LOG_INFO,
+        "[%i] %s. STS ver: %s, %s ver: %s, ComBus ver: %s, tag: %s",
+        g_pid, "Started", STS_VERSION,
+        "ADARA Common", ADARA::VERSION.c_str(),
+        ADARA::ComBus::VERSION.c_str(),
+        ADARA::TAG_NAME.c_str() );
 
     try
     {
@@ -163,6 +167,8 @@ int main( int argc, char** argv )
         string broker_user;
         string broker_pass;
         string domain;
+        string ldap_host;
+        uint32_t ldap_port;
 
         namespace po = boost::program_options;
         po::options_description options( "sts program options" );
@@ -189,6 +195,8 @@ int main( int argc, char** argv )
                 ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
                 ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
+                ("ldap_host", po::value<string>( &ldap_host )->default_value( "data.sns.gov" ), "Override Default LDAP Host for User Name Lookup")
+                ("ldap_port", po::value<unsigned int>( &ldap_port )->default_value( LDAP_PORT ), "Override Default LDAP Port for User Name Lookup")
                 ;
 
 
@@ -217,7 +225,8 @@ int main( int argc, char** argv )
             suppress_nexus = false;
         }
 
-        // Can't support statistics display in interactive mode
+        // Can't support statistics display when _Not_ in interactive mode
+        // (Normally, _Only_ response to SMS is written to stdout...!)
         if ( gather_stats && !interact )
             gather_stats = false;
 
@@ -254,6 +263,8 @@ int main( int argc, char** argv )
             cout << "  comp lev      : " << compression_level <<  endl;
             cout << "  keep temp     : " << ( keep_temp ? "yes" : "no" ) << endl;
             cout << "  gather stats  : " << ( gather_stats ? "yes" : "no" ) << endl;
+            cout << "  ldap_host     : " << ldap_host << endl;
+            cout << "  ldap_port     : " << ldap_port << endl;
         }
 
         if ( opt_map.count( "file" ))
@@ -267,23 +278,22 @@ int main( int argc, char** argv )
         {
             if ( !interact )
             {
-                // In non-interactive mode, must hack around chatty HDF5 library: remap stdout and stderr to /dev/null
+                // In non-interactive mode, must hack around chatty
+                // HDF5 library: remap stdout and stderr to /dev/null
                 outfd = dup( 1 );
                 int nullfd = open( "/dev/null", O_RDWR );
                 dup2( nullfd, 1 );
                 dup2( nullfd, 2 );
             }
 
-            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict, gather_stats, chunk_size, evt_buf_size,
-                            anc_buf_size, cache_size, compression_level );
+            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict,
+                gather_stats, ldap_host, ldap_port, chunk_size,
+                evt_buf_size, anc_buf_size, cache_size, compression_level );
 
-            // Start ComBus monitor thread if not in interactive mode
-            if ( !interact )
-            {
-                monitor = new ComBusTransMon();
-                monitor->start( *nxgen,
-                    broker_uri, broker_user, broker_pass, domain );
-            }
+            // Start ComBus monitor thread (even in interactive mode!)
+            monitor = new ComBusTransMon();
+            monitor->start( *nxgen,
+                broker_uri, broker_user, broker_pass, domain );
 
             // Begin ADARA stream processing - does not return until recording ends
             nxgen->processStream();
@@ -376,6 +386,10 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] STS failed: Translation%s failed. code: %u",
             g_pid, run_desc.c_str(), (unsigned int)sms_code );
+
+        // Notify ComBus Monitor of Failure...
+        if ( monitor )
+            monitor->failure( sms_code, sms_reason );
     }
     else
     {
@@ -385,11 +399,6 @@ int main( int argc, char** argv )
 
     if ( !interact )
     {
-        if ( sms_code != STS::TS_SUCCESS && monitor )
-        {
-            monitor->failure( sms_code, sms_reason );
-        }
-
         STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
         uint32_t heartbeat_pkt[4] = {0,0x00400900,0,0};
 

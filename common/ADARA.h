@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.7.1";
+const std::string VERSION = "1.7.2";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 namespace PacketType {
