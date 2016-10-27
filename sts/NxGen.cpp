@@ -1528,11 +1528,9 @@ NxGen::flushPauseData()
         // Create Pause Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/pause", "NXlog" );
         makeDataset( m_daslogs_path + "/pause", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS,
-            m_pause_time.size() * sizeof(double) );
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_pause_time.size() );
         makeDataset( m_daslogs_path + "/pause", "value",
-            NeXus::UINT16, "",
-            m_pause_value.size() * sizeof(uint16_t) );
+            NeXus::UINT16, "", m_pause_value.size() );
 
         // Write Pause Time and Value Slabs
         writeSlab( m_daslogs_path + "/pause/time", m_pause_time, 0 );
@@ -1560,11 +1558,9 @@ NxGen::flushScanData()
         // Create Scan Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
         makeDataset( m_daslogs_path + "/scan_index", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS,
-            m_scan_time.size() * sizeof(double) );
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_scan_time.size() );
         makeDataset( m_daslogs_path + "/scan_index", "value",
-            NeXus::UINT32, "",
-            m_scan_value.size() * sizeof(uint32_t) );
+            NeXus::UINT32, "", m_scan_value.size() );
 
         // Write Scan Index Time and Value Slabs
         writeSlab( m_daslogs_path + "/scan_index/time", m_scan_time, 0 );
@@ -1592,8 +1588,7 @@ NxGen::flushCommentData()
         // Create Comment Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/comments", "NXcollection" );
         makeDataset( m_daslogs_path + "/comments", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS,
-            m_comment_time.size() * sizeof(double) );
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_comment_time.size() );
 
         // Write Comment Time Slab
         writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
