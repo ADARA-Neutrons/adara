@@ -32,7 +32,7 @@ NxGen::NxGen
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     string         &a_ldap_host,                ///< [in] LDAP Host for User Name Lookup
     uint32_t        a_ldap_port,                ///< [in] LDAP Port for User Name Lookup
-    unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size
+    unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
     unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
     unsigned long   a_cache_size,               ///< [in] HDF5 cache size
@@ -40,8 +40,8 @@ NxGen::NxGen
 )
 :
     StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
-        a_chunk_size * a_event_buf_chunk_count,
-        a_chunk_size * a_anc_buf_chunk_count ),
+        a_chunk_size * a_event_buf_chunk_count, // number of elements
+        a_chunk_size * a_anc_buf_chunk_count ), // number of elements
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
     m_entry_path(string("/entry")),
@@ -74,7 +74,7 @@ NxGen::NxGen
         m_h5nx.H5NXset_cache_size( a_cache_size );
     }
 
-    // Reserve internal buffer for veto pulse times
+    // Reserve internal buffer for veto pulse times (in Dataset Elements!)
     m_pulse_vetoes.reserve( a_chunk_size );
 }
 
@@ -467,24 +467,6 @@ NxGen::initialize()
             NeXus::FLOAT64, TIME_SEC_UNITS );
         makeDataset( m_daslogs_path + "/pulse_flags", "value",
             NeXus::UINT32 );
-
-        // Create pause event log
-        makeGroup( m_daslogs_path + "/pause", "NXlog" );
-        makeDataset( m_daslogs_path + "/pause", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/pause", "value", NeXus::UINT16 );
-
-        // Create scan event log
-        makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
-        makeDataset( m_daslogs_path + "/scan_index", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/scan_index", "value",
-            NeXus::UINT32 );
-
-        // Create comment event log
-        makeGroup( m_daslogs_path + "/comments", "NXcollection" );
-        makeDataset( m_daslogs_path + "/comments", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -988,6 +970,7 @@ NxGen::pulseBuffersReady
                 m_pulse_vetoes.push_back( *t );
         }
 
+        // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_vetoes.size() > m_chunk_size )
         {
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
@@ -996,6 +979,7 @@ NxGen::pulseBuffersReady
             m_pulse_vetoes.clear();
         }
 
+        // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_flags_value.size() > m_chunk_size )
         {
             writeSlab( m_daslogs_path + "/pulse_flags/time",
@@ -1541,6 +1525,16 @@ NxGen::flushPauseData()
 {
     try
     {
+        // Create Pause Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/pause", "NXlog" );
+        makeDataset( m_daslogs_path + "/pause", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS,
+            m_pause_time.size() * sizeof(double) );
+        makeDataset( m_daslogs_path + "/pause", "value",
+            NeXus::UINT16, "",
+            m_pause_value.size() * sizeof(uint16_t) );
+
+        // Write Pause Time and Value Slabs
         writeSlab( m_daslogs_path + "/pause/time", m_pause_time, 0 );
         writeSlab( m_daslogs_path + "/pause/value", m_pause_value, 0 );
 
@@ -1563,6 +1557,16 @@ NxGen::flushScanData()
 {
     try
     {
+        // Create Scan Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
+        makeDataset( m_daslogs_path + "/scan_index", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS,
+            m_scan_time.size() * sizeof(double) );
+        makeDataset( m_daslogs_path + "/scan_index", "value",
+            NeXus::UINT32, "",
+            m_scan_value.size() * sizeof(uint32_t) );
+
+        // Write Scan Index Time and Value Slabs
         writeSlab( m_daslogs_path + "/scan_index/time", m_scan_time, 0 );
         writeSlab( m_daslogs_path + "/scan_index/value", m_scan_value, 0 );
 
@@ -1585,6 +1589,13 @@ NxGen::flushCommentData()
 {
     try
     {
+        // Create Comment Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/comments", "NXcollection" );
+        makeDataset( m_daslogs_path + "/comments", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS,
+            m_comment_time.size() * sizeof(double) );
+
+        // Write Comment Time Slab
         writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
 
         // Comment Strings as 2D String Dataset
@@ -1894,6 +1905,7 @@ NxGen::makeDataset
 )
 {
     // Accept Chunk Size Override for Less-Than-Full-Chunk-Size Data...
+    // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
     unsigned long chunk_size =
         ( a_chunk_size && a_chunk_size < m_chunk_size ) ?
             a_chunk_size : m_chunk_size;

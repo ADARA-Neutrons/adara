@@ -843,7 +843,7 @@ public:
         bool a_gather_stats,
         std::string &a_ldap_host,
         uint32_t a_ldap_port,
-        unsigned long a_chunk_size = 2048,
+        unsigned long a_chunk_size = 2048,   // in Dataset Elements! :-O
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
         unsigned long a_cache_size = 10485760,
@@ -990,6 +990,8 @@ private:
                                 uint64_t cur_size = a_cur_size;
                                 uint64_t count = 0;
 
+                                // NOTE: Chunk Size is measured in
+                                // *Dataset Elements*...! :-O
                                 if ( a_count >= m_chunk_size )
                                 {
                                     buf.resize( m_chunk_size, a_value );
@@ -1033,7 +1035,7 @@ private:
     std::string         m_data_name;            ///< Name of Histo data in Nexus file
     std::string         m_histo_pid_name;       ///< Name of Histo PixelId data in Nexus file
     std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
-    unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
+    unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file (in Dataset Elements!)
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_cur_size;  ///< Current size of pulse info datasets (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times
