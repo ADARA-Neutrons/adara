@@ -913,10 +913,11 @@ private:
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path,
                             const std::string &a_type );
-    void                makeDataset( const std::string &dataset_path,
-                            const std::string &dataset_name,
-                            NeXus::NXnumtype nxdatatype,
-                            const std::string units = "" );
+    void                makeDataset( const std::string &a_path,
+                            const std::string &a_name,
+                            NeXus::NXnumtype a_type,
+                            const std::string a_units = "",
+                            unsigned long a_chunk_size = 0 );
     template <typename TypeT>
     void                writeMultidimDataset(
                             const std::string &a_path,

@@ -1889,11 +1889,17 @@ NxGen::makeDataset
     const std::string  &a_path,     ///< [in] Nexus path of new dataset
     const std::string  &a_name,     ///< [in] Name of new dataset
     NeXus::NXnumtype    a_type,     ///< [in] Nexus type of new dataset
-    const string        a_units     ///< [in] Optional units of new dataset
+    const string        a_units,    ///< [in] Optional units of new dataset
+    unsigned long       a_chunk_size ///< [in] Optional chunk size override
 )
 {
+    // Accept Chunk Size Override for Less-Than-Full-Chunk-Size Data...
+    unsigned long chunk_size =
+        ( a_chunk_size && a_chunk_size < m_chunk_size ) ?
+            a_chunk_size : m_chunk_size;
+
     if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type,
-            m_chunk_size ) != SUCCEED )
+            chunk_size ) != SUCCEED )
     {
         THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
             "H5NXcreate_dataset_extend() failed for path: " << a_path
