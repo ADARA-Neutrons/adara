@@ -35,8 +35,8 @@ StreamParser::StreamParser
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
-    uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold
-    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
+    uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
+    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold (number of elements)
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
