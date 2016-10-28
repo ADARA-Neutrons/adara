@@ -319,21 +319,13 @@ NxGen::initializeNxBank
             }
 
             // NeXus Histogram-based Structures
-            if ( a_bi->m_has_histo )
-            {
-                // Histo data
+            // ( a_bi->m_has_histo )
 
-                // (defer creation/writing of actual histogram data
-                //     to bankFinalize(), create & write in one shot...)
+            // (Defer creation/writing of actual histogram data
+            //     to bankFinalize(), create & write in one shot...)
 
-                makeDataset( a_bi->m_instr_path, m_histo_pid_name,
-                    NeXus::UINT32 );
-                makeDataset( a_bi->m_instr_path, m_tofbin_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
-
-                // (defer linking of histogram data, which won't exist
-                //     until later in bankFinalize()... :-)
-            }
+            // (Defer linking of histogram data, which won't exist
+            //     until later in bankFinalize()... :-)
 
             // NeXus Structures are Now Initialized
             a_bi->m_nexus_init = true;
@@ -1172,6 +1164,14 @@ NxGen::bankFinalize
             // Add "Signal" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
                 "signal", "1" );
+
+            // Create Histo Bank PixelIds and TOF Bins Now...
+            // (including proper Chunk Size Overriding...! ;-D)
+            makeDataset( bi->m_instr_path, m_histo_pid_name,
+                NeXus::UINT32, "", bi->m_logical_pixelids.size() );
+            makeDataset( bi->m_instr_path, m_tofbin_name,
+                NeXus::FLOAT32, TIME_USEC_UNITS,
+                bi->m_tofbin_buffer.size() );
 
             // Write out Bank PixelIds...
             writeSlab( bi->m_histo_pid_path,
