@@ -602,11 +602,13 @@ private:
                         {
                             m_nxgen.makeDataset( m_log_path, "value",
                                 m_nxgen.toNxType( this->m_type ),
-                                this->m_units );
+                                this->m_units,
+                                this->m_value_buffer.size() );
                         }
 
                         m_nxgen.makeDataset( m_log_path, "time",
-                            NeXus::FLOAT64, TIME_SEC_UNITS );
+                            NeXus::FLOAT64, TIME_SEC_UNITS,
+                            this->m_time_buffer.size() );
 
                         m_nxgen.writeString( m_log_path, "device_name",
                             this->m_device_name );
