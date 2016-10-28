@@ -331,17 +331,8 @@ NxGen::initializeNxBank
                 makeDataset( a_bi->m_instr_path, m_tofbin_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS );
 
-                // Top-level Histo data group
-
-                makeGroup( a_bi->m_histo_path, "NXdata" );
-
                 // (defer linking of histogram data, which won't exist
                 //     until later in bankFinalize()... :-)
-
-                makeLink( a_bi->m_histo_pid_path,
-                    a_bi->m_histo_path + "/" + m_histo_pid_name );
-                makeLink( a_bi->m_tofbin_path,
-                    a_bi->m_histo_path + "/" + m_tofbin_name );
             }
 
             // NeXus Structures are Now Initialized
@@ -1182,10 +1173,6 @@ NxGen::bankFinalize
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
                 "signal", "1" );
 
-            // Link Multi-dimensional Data into NXdata Histo group...
-            makeLink( bi->m_data_path,
-                bi->m_histo_path + "/" + m_data_name );
-
             // Write out Bank PixelIds...
             writeSlab( bi->m_histo_pid_path,
                 bi->m_logical_pixelids, 0 );
@@ -1200,6 +1187,19 @@ NxGen::bankFinalize
             // Add "Axis" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute(
                 bi->m_instr_path + "/" + m_tofbin_name, "axis", "2" );
+
+            // Top-level Histo data group
+            makeGroup( bi->m_histo_path, "NXdata" );
+
+            // Link Multi-dimensional Data into NXdata Histo group...
+            makeLink( bi->m_data_path,
+                bi->m_histo_path + "/" + m_data_name );
+
+            // Link Pixel Id and TOF Bin Data into NXdata Histo group...
+            makeLink( bi->m_histo_pid_path,
+                bi->m_histo_path + "/" + m_histo_pid_name );
+            makeLink( bi->m_tofbin_path,
+                bi->m_histo_path + "/" + m_tofbin_name );
 
             // Write Out Total Counts for Histograms, too... ;-D
             writeScalar( bi->m_histo_path, "total_counts",
