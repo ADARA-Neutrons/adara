@@ -1637,7 +1637,7 @@ NxGen::flushCommentData()
                 "No Comment Strings, Creating Empty Comments Value" );
             usleep(30000); // give syslog a chance...
             makeDataset( m_daslogs_path + "/comments",
-                "value", NeXus::CHAR );
+                "value", NeXus::CHAR, "", 1 );
         }
 
         m_comment_time.clear();
@@ -1727,7 +1727,8 @@ NxGen::writeDeviceEnums
 
             makeGroup( ss.str(), "NXcollection" );
 
-            makeDataset( ss.str(), "values", NeXus::UINT32 );
+            makeDataset( ss.str(), "values", NeXus::UINT32, "",
+                ienum->element_values.size() );
 
             // Does Everything "Match Up" for the "Easy" Enum Format...?
             bool easy = true;
@@ -1802,7 +1803,7 @@ NxGen::writeDeviceEnums
                     "STS Error: Empty Enum Names",
                     "Creating Dummy Names", ss.str().c_str() );
                 usleep(30000); // give syslog a chance...
-                makeDataset( ss.str(), "names", NeXus::CHAR );
+                makeDataset( ss.str(), "names", NeXus::CHAR, "", 1 );
             }
 
             // Enum Element Values

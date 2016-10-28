@@ -421,7 +421,7 @@ private:
                     "Creating Empty String Value" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::CHAR, this->m_units );
+                    "value", NeXus::CHAR, this->m_units, 1 );
             }
         }
 
@@ -481,7 +481,7 @@ private:
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::UINT32, this->m_units );
+                    "value", NeXus::UINT32, this->m_units, 1 );
             }
         }
 
@@ -541,7 +541,7 @@ private:
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::FLOAT64, this->m_units );
+                    "value", NeXus::FLOAT64, this->m_units, 1 );
             }
         }
 
@@ -765,7 +765,7 @@ private:
                                 usleep(30000); // give syslog a chance...
 
                                 m_nxgen.makeDataset( m_log_path,
-                                    "value_strings", NeXus::CHAR );
+                                    "value_strings", NeXus::CHAR, "", 1 );
                             }
                         }
 
