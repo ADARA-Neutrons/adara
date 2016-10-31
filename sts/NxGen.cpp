@@ -371,10 +371,8 @@ NxGen::makeMonitorInfo
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( mi->m_path, m_data_name,
-                    NeXus::UINT32, "" );
-                makeDataset( mi->m_path, m_tofbin_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                // (Defer creation/writing of actual histogram data
+                //     to monitorFinalize(), create & write in one shot...)
 
                 writeScalar( mi->m_path, "distance",
                     mi->m_config->distance, "" );
@@ -1326,8 +1324,19 @@ NxGen::monitorFinalize
         // Histo-based Monitor
         if ( mi->m_config != NULL )
         {
+            // Create Monitor Histo Data and TOF Bins Now...
+            // (including proper Chunk Size Overriding...! ;-D)
+            makeDataset( mi->m_path, m_data_name,
+                NeXus::UINT32, "",
+                mi->m_data_buffer.size() );
+            makeDataset( mi->m_path, m_tofbin_name,
+                NeXus::FLOAT32, TIME_USEC_UNITS,
+                mi->m_tofbin_buffer.size() );
+
+            // Write out Monitor Histo Data...
             writeSlab( mi->m_data_path, mi->m_data_buffer, 0 );
 
+            // Write out TOF Bins...
             writeSlab( mi->m_tofbin_path, mi->m_tofbin_buffer, 0 );
 
             // Write Out Total Counts for Histogram Mode, too... ;-D
