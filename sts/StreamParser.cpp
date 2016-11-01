@@ -3262,6 +3262,13 @@ StreamParser::finalizeStreamProcessing()
         bankFinalize( **ibi );
     }
 
+    // Write remaining pulse info and statistics
+    // (*Must* Do This _Before_ Beam Monitors, as they "Borrow" the
+    //    Pulse Time series possibly created herein, via makeLink()...)
+
+    if ( m_pulse_info.times.size())
+        pulseBuffersReady( m_pulse_info );
+
     // Write any remaining data in monitor buffers
 
     for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
@@ -3288,11 +3295,6 @@ StreamParser::finalizeStreamProcessing()
         // All Beam Monitors...
         monitorFinalize( *imi->second );
     }
-
-    // Write remaining pulse info and statistics
-
-    if ( m_pulse_info.times.size())
-        pulseBuffersReady( m_pulse_info );
 
     // Write any Enumerated Types, per DeviceId, into logs...
 
