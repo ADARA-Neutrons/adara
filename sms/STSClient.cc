@@ -290,11 +290,21 @@ void STSClient::readable(void)
 			WARN("Lost connection to STS for run " << m_run->runNumber()
 				 << " log_info=(" << log_info << ")");
 		}
-	} catch (ADARA::invalid_packet e) {
+	}
+	catch (ADARA::invalid_packet e) {
 		std::stringstream ss;
 		ss << "Got invalid packet from STS: " << e.what();
 		WARN( ss.str() );
 		m_disp = STSClientMgr::INVALID_PROTOCOL;
+		m_reason = ss.str();
+		ok = false;
+	}
+	catch (std::runtime_error &r) {
+		std::stringstream ss;
+		ss << "Exception reading from STS for run " << m_run->runNumber()
+			 << " log_info=(" << log_info << ") - " << r.what();
+		ERROR( ss.str() );
+		m_disp = STSClientMgr::TRANSIENT_FAIL;
 		m_reason = ss.str();
 		ok = false;
 	}
