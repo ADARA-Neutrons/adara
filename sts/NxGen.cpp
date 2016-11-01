@@ -439,15 +439,9 @@ NxGen::initialize()
 
         // Create pulse veto log
         makeGroup( m_daslogs_path + "/Veto_pulse", "NXcollection" );
-        makeDataset( m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
 
         // Create pulse flag log
         makeGroup( m_daslogs_path + "/pulse_flags", "NXcollection" );
-        makeDataset( m_daslogs_path + "/pulse_flags", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/pulse_flags", "value",
-            NeXus::UINT32 );
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -503,15 +497,46 @@ NxGen::finalize
         // Flush any remaining pulse vetos
         if ( m_pulse_vetoes.size() )
         {
+            // Create Pulse Vetoes Dataset on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_vetoes_cur_size )
+            {
+                makeDataset(
+                    m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_vetoes.size() );
+            }
+
+            // Write Pulse Vetoes Time Buffer
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
                 m_pulse_vetoes, m_pulse_vetoes_cur_size );
             m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
+        // Make Sure We Create Empty Pulse Vetoes Log, Even if No Vetoes!
+        else if ( !m_pulse_vetoes_cur_size )
+        {
+            makeDataset( m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, 1 );
+        }
+
         // Flush any remaining pulse flags
         if ( m_pulse_flags_time.size() )
         {
+            // Create Pulse Flags Datasets on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_flags_cur_size )
+            {
+                makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_flags_time.size() );
+                makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                    NeXus::UINT32, "",
+                    m_pulse_flags_value.size() );
+            }
+
+            // Write Pulse Flags Time and Value Buffers
             writeSlab( m_daslogs_path + "/pulse_flags/time",
                 m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
@@ -519,6 +544,15 @@ NxGen::finalize
             m_pulse_flags_cur_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
+        }
+
+        // Make Sure We Create Empty Pulse Flags Logs, Even if No Flags!
+        else if ( !m_pulse_flags_cur_size )
+        {
+            makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, 1 );
+            makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                NeXus::UINT32, "", 1 );
         }
 
         // Flush stream marker data
@@ -954,6 +988,17 @@ NxGen::pulseBuffersReady
         // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_vetoes.size() > m_chunk_size )
         {
+            // Create Pulse Vetoes Dataset on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_vetoes_cur_size )
+            {
+                makeDataset(
+                    m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_vetoes.size() );
+            }
+
+            // Write Pulse Vetoes Time Buffer
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
                 m_pulse_vetoes, m_pulse_vetoes_cur_size );
             m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
@@ -963,6 +1008,19 @@ NxGen::pulseBuffersReady
         // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_flags_value.size() > m_chunk_size )
         {
+            // Create Pulse Flags Datasets on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_flags_cur_size )
+            {
+                makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_flags_time.size() );
+                makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                    NeXus::UINT32, "",
+                    m_pulse_flags_value.size() );
+            }
+
+            // Write Pulse Flags Time and Value Buffers
             writeSlab( m_daslogs_path + "/pulse_flags/time",
                 m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
