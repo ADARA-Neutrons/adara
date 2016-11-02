@@ -3236,6 +3236,16 @@ StreamParser::finalizeStreamProcessing()
             "No neutron pulses received in stream.")
     }
 
+    // Write remaining pulse info and statistics
+    // (*Must* Do This _Before_ Detector Banks and Beam Monitors,
+    //    as they "Borrow" the Pulse Time series possibly created herein,
+    //    via various makeLink() calls...)
+    //
+    // Call pulseBuffersReady() even if m_pulse_info.times.size() == 0,
+    //    as we _Always_ need _Some_ Pulse Time dataset for linking...!
+
+    pulseBuffersReady( m_pulse_info );
+
     // Write any remaining data in bank buffers
 
     for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
@@ -3261,13 +3271,6 @@ StreamParser::finalizeStreamProcessing()
 
         bankFinalize( **ibi );
     }
-
-    // Write remaining pulse info and statistics
-    // (*Must* Do This _Before_ Beam Monitors, as they "Borrow" the
-    //    Pulse Time series possibly created herein, via makeLink()...)
-
-    if ( m_pulse_info.times.size())
-        pulseBuffersReady( m_pulse_info );
 
     // Write any remaining data in monitor buffers
 
