@@ -311,11 +311,8 @@ NxGen::initializeNxBank
                 makeLink( a_bi->m_index_path,
                     a_bi->m_event_path + "/" + m_index_name );
 
-                // Link pulse time to bank event times
-                makeLink( a_bi->m_time_path,
-                    a_bi->m_instr_path + "/" + m_pulse_time_name );
-                makeLink( a_bi->m_time_path,
-                    a_bi->m_event_path + "/" + m_pulse_time_name );
+                // (Defer linking of Pulse Time data, which won't exist
+                //     until later in bankFinalize()... :-)
             }
 
             // NeXus Histogram-based Structures
@@ -386,8 +383,8 @@ NxGen::makeMonitorInfo
                     NeXus::FLOAT32, TIME_USEC_UNITS );
                 makeDataset( mi->m_path, m_index_name, NeXus::UINT64 );
 
-                makeLink( m_daslogs_freq_path + "/time",
-                    mi->m_path + "/" + m_pulse_time_name );
+                // (Defer creation of Pulse Time Link to monitorFinalize(),
+                //    after the Dataset is sure to have been created...)
             }
         }
 
@@ -425,23 +422,29 @@ NxGen::initialize()
 
         // Create pulse frequency log
         makeGroup( m_daslogs_freq_path, "NXlog" );
-        makeDataset( m_daslogs_freq_path, "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_freq_path, "value",
-            NeXus::FLOAT64, FREQ_UNITS );
+
+        // (Defer creation of actual frequency datasets
+        //     to pulseBuffersReady(), create & write in one shot...)
 
         // Create proton charge log (time same as pulse frequency)
         makeGroup( m_daslogs_pchg_path, "NXlog" );
-        makeDataset( m_daslogs_pchg_path, "value",
-            NeXus::FLOAT64, CHARGE_UNITS );
-        makeLink( m_daslogs_freq_path + "/time",
-            m_daslogs_pchg_path + "/time" );
+
+        // (Defer creation of actual proton charge datasets
+        //     to pulseBuffersReady(), create & write in one shot...)
 
         // Create pulse veto log
         makeGroup( m_daslogs_path + "/Veto_pulse", "NXcollection" );
 
+        // (Defer creation of actual pulse veto dataset
+        //     to pulseBuffersReady() or finalize(),
+        //     create & write in one shot...)
+
         // Create pulse flag log
         makeGroup( m_daslogs_path + "/pulse_flags", "NXcollection" );
+
+        // (Defer creation of actual pulse flags datasets
+        //     to pulseBuffersReady() or finalize(),
+        //     create & write in one shot...)
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -955,14 +958,63 @@ NxGen::pulseBuffersReady
 
     try
     {
-        writeSlab( m_daslogs_freq_path + "/time",
-            a_pulse_info.times, m_pulse_info_cur_size );
-        writeSlab( m_daslogs_freq_path + "/value",
-            a_pulse_info.freqs, m_pulse_info_cur_size );
-        writeSlab( m_daslogs_pchg_path + "/value",
-            a_pulse_info.charges, m_pulse_info_cur_size );
+        // Create Pulse Frequency/Time and Pulse Proton Charge Datasets
+        //    on First (or Final) Buffer Flush...
+        // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+        if ( !m_pulse_info_cur_size )
+        {
+            // Determine Appropriate Chunk Size for Datasets...
+            unsigned long chunk_size;
+            if ( a_pulse_info.times.size() )
+            {
+                // This could be the same as the Default Chunk Size
+                //    if we're dumping buffers mid-run...
+                // Otherwise, if this is the Final Dump, it could be Less!
+                chunk_size = a_pulse_info.times.size();
+            }
+            else
+            {
+                // This is the Final Dump and There aren't any Pulses?!
+                // Create Some Dummy Datasets for Linking, etc...
+                syslog( LOG_ERR, "[%i] %s! %s for %s and %s", g_pid,
+                    "STS Error: Empty Final Pulse Info Buffer(s)",
+                    "Creating Dummy Datasets",
+                    m_daslogs_freq_path.c_str(),
+                    m_daslogs_pchg_path.c_str() );
+                usleep(30000); // give syslog a chance...
+                chunk_size = 1;
+            }
 
-        m_pulse_info_cur_size += a_pulse_info.times.size();
+            // Create Pulse Frequency Time & Value Datasets
+            makeDataset( m_daslogs_freq_path, "time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, chunk_size );
+            makeDataset( m_daslogs_freq_path, "value",
+                NeXus::FLOAT64, FREQ_UNITS, chunk_size );
+
+            // Create Pulse Proton Charge Dataset
+            makeDataset( m_daslogs_pchg_path, "value",
+                NeXus::FLOAT64, CHARGE_UNITS, chunk_size );
+
+            // Link Proton Charge Time from Pulse Frequency Time Dataset
+            // (Now that it's created... :-)
+            makeLink( m_daslogs_freq_path + "/time",
+                m_daslogs_pchg_path + "/time" );
+        }
+
+        // Now Only Write Pulse Frequency/Time and Pulse Proton Charge
+        //    if there's something to write...
+        // (Buffers could already be empty for final call...)
+        if ( a_pulse_info.times.size() )
+        {
+            writeSlab( m_daslogs_freq_path + "/time",
+                a_pulse_info.times, m_pulse_info_cur_size );
+            writeSlab( m_daslogs_freq_path + "/value",
+                a_pulse_info.freqs, m_pulse_info_cur_size );
+            writeSlab( m_daslogs_pchg_path + "/value",
+                a_pulse_info.charges, m_pulse_info_cur_size );
+
+            m_pulse_info_cur_size += a_pulse_info.times.size();
+        }
 
         // Must process pulse flags linearly
         vector<double>::iterator t = a_pulse_info.times.begin();
@@ -980,7 +1032,7 @@ NxGen::pulseBuffersReady
                     (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
             }
 
-            // Write pulse vetoes to dedicated DASlog area
+            // Write pulse vetoes to dedicated DASlog buffer
             if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
                 m_pulse_vetoes.push_back( *t );
         }
@@ -1172,11 +1224,19 @@ NxGen::bankFinalize
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Create and Link Total Counts for this Detector Bank...
             string total_path = m_instrument_path + "/" + bi->m_name;
             writeScalar( total_path, "total_counts",
                 bi->m_event_count, "" );
             makeLink( total_path + "/total_counts",
                 m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+
+            // NOW Link Pulse Time to this Detector Bank...
+            //    - the Pulse Time Dataset Must have been Created by Now!
+            makeLink( bi->m_time_path,
+                bi->m_instr_path + "/" + m_pulse_time_name );
+            makeLink( bi->m_time_path,
+                bi->m_event_path + "/" + m_pulse_time_name );
         }
 
         // NeXus Histogram-based Data...
@@ -1409,6 +1469,11 @@ NxGen::monitorFinalize
         {
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_counts", mi->m_event_count, "" );
+
+            // NOW Link Pulse Time to this Monitor...
+            //    - the Pulse Time Dataset Must have been Created by Now!
+            makeLink( m_daslogs_freq_path + "/time",
+                mi->m_path + "/" + m_pulse_time_name );
         }
     }
     catch( TraceException &e )
