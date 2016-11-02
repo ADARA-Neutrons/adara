@@ -114,17 +114,24 @@ Connection::Translator::onMessage( const cms::Message *a_msg ) throw()
 void
 Connection::Translator::attach( const std::string &a_topic )
 {
-    if ( m_topics.find( a_topic ) == m_topics.end())
+    try
     {
-        Connection &conn = ComBus::Connection::getInst();
-        pair<cms::Topic*,cms::MessageConsumer*> p;
+        if ( m_topics.find( a_topic ) == m_topics.end())
+        {
+            Connection &conn = ComBus::Connection::getInst();
+            pair<cms::Topic*,cms::MessageConsumer*> p;
 
-        conn.createTopicConsumer( a_topic, &p.first, &p.second );
+            conn.createTopicConsumer( a_topic, &p.first, &p.second );
 
-        if ( p.second )
-            p.second->setMessageListener( this );
+            if ( p.second )
+                p.second->setMessageListener( this );
 
-        m_topics[a_topic] = p;
+            m_topics[a_topic] = p;
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -137,13 +144,20 @@ Connection::Translator::attach( const std::string &a_topic )
 void
 Connection::Translator::detach( const std::string &a_topic )
 {
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
-        m_topics.find( a_topic );
-    if ( itop != m_topics.end())
+    try
     {
-        delete itop->second.second;
-        delete itop->second.first;
-        m_topics.erase( itop );
+        map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator
+            itop = m_topics.find( a_topic );
+        if ( itop != m_topics.end())
+        {
+            delete itop->second.second;
+            delete itop->second.first;
+            m_topics.erase( itop );
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -157,28 +171,35 @@ Connection::Translator::detach( const std::string &a_topic )
 void
 Connection::Translator::connect_all()
 {
-    Connection &conn = ComBus::Connection::getInst();
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
-        m_topics.begin();
-    for ( ; itop != m_topics.end(); ++itop )
+    try
     {
-        // If called when still connected, clean-up current connections
-        // before proceeding
-        if ( itop->second.first )
+        Connection &conn = ComBus::Connection::getInst();
+        map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator
+            itop = m_topics.begin();
+        for ( ; itop != m_topics.end(); ++itop )
         {
-            delete itop->second.first;
-            itop->second.first = 0;
-        }
-        if ( itop->second.second )
-        {
-            delete itop->second.second;
-            itop->second.second = 0;
-        }
+            // If called when still connected, clean-up current connections
+            // before proceeding
+            if ( itop->second.first )
+            {
+                delete itop->second.first;
+                itop->second.first = 0;
+            }
+            if ( itop->second.second )
+            {
+                delete itop->second.second;
+                itop->second.second = 0;
+            }
 
-        conn.createTopicConsumer( itop->first,
-            &itop->second.first, &itop->second.second );
-        if ( itop->second.second )
-            itop->second.second->setMessageListener( this );
+            conn.createTopicConsumer( itop->first,
+                &itop->second.first, &itop->second.second );
+            if ( itop->second.second )
+                itop->second.second->setMessageListener( this );
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -193,14 +214,21 @@ Connection::Translator::connect_all()
 void
 Connection::Translator::disconnect_all()
 {
-    map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator itop =
-        m_topics.begin();
-    for ( ; itop != m_topics.end(); ++itop )
+    try
     {
-        delete itop->second.second;
-        itop->second.second = 0;
-        delete itop->second.first;
-        itop->second.first = 0;
+        map<string,pair<cms::Topic*,cms::MessageConsumer*> >::iterator
+            itop = m_topics.begin();
+        for ( ; itop != m_topics.end(); ++itop )
+        {
+            delete itop->second.second;
+            itop->second.second = 0;
+            delete itop->second.first;
+            itop->second.first = 0;
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -256,7 +284,14 @@ Connection::Connection( std::string &a_domain,
 
     m_log_file += a_log_dir + "/ComBus.Log." + m_proc_id + ".txt";
 
-    activemq::library::ActiveMQCPP::initializeLibrary();
+    try
+    {
+        activemq::library::ActiveMQCPP::initializeLibrary();
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
+    }
 
     m_status_thread = new boost::thread( boost::bind(
         &Connection::connectionStatusNotifyThread, this ));
@@ -296,7 +331,14 @@ Connection::~Connection() throw()
 
     disconnect();
 
-    activemq::library::ActiveMQCPP::shutdownLibrary();
+    try
+    {
+        activemq::library::ActiveMQCPP::shutdownLibrary();
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
+    }
 
     g_inst = 0;
 }
@@ -415,10 +457,18 @@ Connection::setConnection( std::string &a_domain,
     boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
     // Drop all general topic subscriptions
-    map<ITopicListener*,Translator*>::iterator ilist = m_listeners.begin();
-    for( ; ilist != m_listeners.end(); ++ilist )
-        delete ilist->second;
-    m_listeners.clear();
+    try
+    {
+        map<ITopicListener*,Translator*>::iterator ilist =
+            m_listeners.begin();
+        for( ; ilist != m_listeners.end(); ++ilist )
+            delete ilist->second;
+        m_listeners.clear();
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
+    }
 
     m_domain = a_domain;
     m_broker_uri = a_broker_uri;
@@ -451,16 +501,23 @@ Connection::setConnection( std::string &a_domain,
 void
 Connection::setInputListener( IInputListener &a_input_listener )
 {
-    if ( m_input_translator )
+    try
     {
-        delete m_input_translator;
-        m_input_translator = 0;
-        m_input_listener = 0;
-    }
+        if ( m_input_translator )
+        {
+            delete m_input_translator;
+            m_input_translator = 0;
+            m_input_listener = 0;
+        }
 
-    m_input_listener = &a_input_listener;
-    m_input_translator = new Translator( *m_input_listener );
-    m_input_translator->attach( m_domain + "INPUT." + m_proc_name );
+        m_input_listener = &a_input_listener;
+        m_input_translator = new Translator( *m_input_listener );
+        m_input_translator->attach( m_domain + "INPUT." + m_proc_name );
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
+    }
 }
 
 
@@ -517,11 +574,11 @@ Connection::reconnectThread()
         if ( !m_running )
             break;
 
-        activemq::core::ActiveMQConnectionFactory factory(
-            m_broker_uri + "?soConnectTimeout=500" );
-
         try
         {
+            activemq::core::ActiveMQConnectionFactory factory(
+                m_broker_uri + "?soConnectTimeout=500" );
+
             m_connection =
                 dynamic_cast<activemq::core::ActiveMQConnection*>(
                     factory.createConnection(
@@ -622,11 +679,19 @@ Connection::connectionStatusNotifyThread()
         if ( last_connection_state != m_connected )
         {
             boost::lock_guard<boost::mutex> lock(m_mutex);
-            for ( vector<IConnectionListener*>::iterator l =
-                        m_status_listeners.begin();
-                    l != m_status_listeners.end(); ++l )
+
+            try
             {
-                (*l)->comBusConnectionStatus( m_connected );
+                for ( vector<IConnectionListener*>::iterator l =
+                            m_status_listeners.begin();
+                        l != m_status_listeners.end(); ++l )
+                {
+                    (*l)->comBusConnectionStatus( m_connected );
+                }
+            }
+            catch(...)
+            {
+                // TODO - Should probably report exceptions somewhere
             }
 
             last_connection_state = m_connected;
@@ -660,39 +725,46 @@ Connection::disconnect()
     {
         m_connected = false;
 
-        // Disconnect all message producers
-        map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator ip =
-            m_producer_topics.begin();
-        for ( ; ip != m_producer_topics.end(); ++ip )
+        try
         {
-            // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
-            ip->second.second->close();
+            // Disconnect all message producers
+            map<string,pair<cms::Topic*,cms::MessageProducer*> >::iterator
+                ip = m_producer_topics.begin();
+            for ( ; ip != m_producer_topics.end(); ++ip )
+            {
+                // ActiveMQ CPP MessageProducer Destructor Broken... ;-Q
+                ip->second.second->close();
 
-            delete ip->second.second;
-            delete ip->second.first;
+                delete ip->second.second;
+                delete ip->second.first;
+            }
+            m_producer_topics.clear();
+
+            // Disconnect all message consumers
+            for ( map<ITopicListener*,Translator*>::iterator il =
+                    m_listeners.begin(); il != m_listeners.end(); ++il )
+            {
+                il->second->disconnect_all();
+            }
+
+            // Disconnect control listener, if specified
+            if ( m_input_listener )
+                m_input_translator->disconnect_all();
+
+            // ActiveMQ CPP Session Destructor Broken... ;-Q
+            if ( m_session ) m_session->close();
+            delete m_session;
+            m_session = 0;
+
+            // ActiveMQ CPP Connection Destructor Broken... ;-Q
+            if ( m_connection ) m_connection->close();
+            delete m_connection;
+            m_connection = 0;
         }
-        m_producer_topics.clear();
-
-        // Disconnect all message consumers
-        for ( map<ITopicListener*,Translator*>::iterator il =
-                m_listeners.begin(); il != m_listeners.end(); ++il )
+        catch(...)
         {
-            il->second->disconnect_all();
+            // TODO - Should probably report exceptions somewhere
         }
-
-        // Disconnect control listener, if specified
-        if ( m_input_listener )
-            m_input_translator->disconnect_all();
-
-        // ActiveMQ CPP Session Destructor Broken... ;-Q
-        if ( m_session ) m_session->close();
-        delete m_session;
-        m_session = 0;
-
-        // ActiveMQ CPP Connection Destructor Broken... ;-Q
-        if ( m_connection ) m_connection->close();
-        delete m_connection;
-        m_connection = 0;
 
         // Wake up status notify thread
         m_status_cond.notify_one();
@@ -721,23 +793,32 @@ Connection::log( const std::string &a_msg, Level a_level,
 {
     bool res = false;
 
-    if ( m_connected )
+    try
     {
-        LogMessage msg( a_msg, a_level, a_file, a_line, a_tid );
-        res = broadcast( msg );
-    }
-
-    // If combus fails, fallback to log file output
-    if ( !res )
-    {
-        ofstream outf( m_log_file.c_str(), ios_base::out | ios_base::app );
-        if ( outf.is_open() )
+        if ( m_connected )
         {
-            outf << time(0) << "," << a_level << ",\"" << a_msg << "\","
-                 << (a_file?a_file:"") << "," << a_line << "," << a_tid
-                 << endl;
-            outf.close();
+            LogMessage msg( a_msg, a_level, a_file, a_line, a_tid );
+            res = broadcast( msg );
         }
+
+        // If combus fails, fallback to log file output
+        if ( !res )
+        {
+            ofstream outf( m_log_file.c_str(),
+                ios_base::out | ios_base::app );
+            if ( outf.is_open() )
+            {
+                outf << time(0) << "," << a_level << ",\""
+                    << a_msg << "\","
+                    << (a_file?a_file:"") << "," << a_line << "," << a_tid
+                    << endl;
+                outf.close();
+            }
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 
     return res;
@@ -955,18 +1036,27 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
     // body must be parsed here first to extract the message type
     // (for object creation).
 
-    boost::property_tree::ptree prop_tree;
-    std::stringstream sstr( a_msg.getText() );
-    read_json( sstr, prop_tree );
+    MessageBase *msg = 0;
 
-    uint32_t msg_type = prop_tree.get( "msg_type", 0UL );
+    try
+    {
+        boost::property_tree::ptree prop_tree;
+        std::stringstream sstr( a_msg.getText() );
+        read_json( sstr, prop_tree );
 
-    MessageBase *msg = Factory::Inst().make( (MessageType) msg_type );
+        uint32_t msg_type = prop_tree.get( "msg_type", 0UL );
 
-    msg->unserialize( prop_tree );
+        msg = Factory::Inst().make( (MessageType) msg_type );
 
-    if ( msg->getCorrelationID().empty() )
-        msg->setCorrelationID( a_msg.getCMSMessageID() );
+        msg->unserialize( prop_tree );
+
+        if ( msg->getCorrelationID().empty() )
+            msg->setCorrelationID( a_msg.getCMSMessageID() );
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
+    }
 
     return msg;
 }
@@ -979,13 +1069,21 @@ void
 Connection::attach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IConnectionListener*>::iterator l =
-        find( m_status_listeners.begin(), m_status_listeners.end(),
-            &a_subscriber );
-    if ( l == m_status_listeners.end() )
+
+    try
     {
-        m_status_listeners.push_back( &a_subscriber );
-        a_subscriber.comBusConnectionStatus( m_connected );
+        vector<IConnectionListener*>::iterator l =
+            find( m_status_listeners.begin(), m_status_listeners.end(),
+                &a_subscriber );
+        if ( l == m_status_listeners.end() )
+        {
+            m_status_listeners.push_back( &a_subscriber );
+            a_subscriber.comBusConnectionStatus( m_connected );
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -997,12 +1095,20 @@ void
 Connection::detach( IConnectionListener  &a_subscriber )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    vector<IConnectionListener*>::iterator l =
-        find( m_status_listeners.begin(), m_status_listeners.end(),
-            &a_subscriber );
-    if ( l != m_status_listeners.end() )
+
+    try
     {
-        m_status_listeners.erase( l );
+        vector<IConnectionListener*>::iterator l =
+            find( m_status_listeners.begin(), m_status_listeners.end(),
+                &a_subscriber );
+        if ( l != m_status_listeners.end() )
+        {
+            m_status_listeners.erase( l );
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -1021,17 +1127,24 @@ Connection::attach( ITopicListener &a_listener,
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l =
-        m_listeners.find(&a_listener);
-    if ( l == m_listeners.end())
+    try
     {
-        Translator *trans = new Translator(a_listener);
-        m_listeners[&a_listener] = trans;
-        trans->attach( m_domain + a_topic );
+        map<ITopicListener*,Translator*>::iterator l =
+            m_listeners.find(&a_listener);
+        if ( l == m_listeners.end())
+        {
+            Translator *trans = new Translator(a_listener);
+            m_listeners[&a_listener] = trans;
+            trans->attach( m_domain + a_topic );
+        }
+        else
+        {
+            l->second->attach( m_domain + a_topic );
+        }
     }
-    else
+    catch(...)
     {
-        l->second->attach( m_domain + a_topic );
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -1048,20 +1161,27 @@ Connection::detach( ITopicListener &a_listener,
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l =
-        m_listeners.find( &a_listener );
-    if ( l != m_listeners.end())
+    try
     {
-        // If the listener is attached to topic, ask associated translator
-        // to detach from topic.
-
-        l->second->detach( m_domain + a_topic );
-        if ( !l->second->haveTopics() )
+        map<ITopicListener*,Translator*>::iterator l =
+            m_listeners.find( &a_listener );
+        if ( l != m_listeners.end())
         {
-            // If associated Translator is now empty, delete it.
-            delete l->second;
-            m_listeners.erase( l );
+            // If the listener is attached to topic, ask associated
+            // translator to detach from topic.
+
+            l->second->detach( m_domain + a_topic );
+            if ( !l->second->haveTopics() )
+            {
+                // If associated Translator is now empty, delete it.
+                delete l->second;
+                m_listeners.erase( l );
+            }
         }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
@@ -1077,12 +1197,19 @@ Connection::detach( ITopicListener &a_listener )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    map<ITopicListener*,Translator*>::iterator l =
-        m_listeners.find( &a_listener );
-    if ( l != m_listeners.end())
+    try
     {
-        delete l->second;
-        m_listeners.erase( l );
+        map<ITopicListener*,Translator*>::iterator l =
+            m_listeners.find( &a_listener );
+        if ( l != m_listeners.end())
+        {
+            delete l->second;
+            m_listeners.erase( l );
+        }
+    }
+    catch(...)
+    {
+        // TODO - Should probably report exceptions somewhere
     }
 }
 
