@@ -1110,25 +1110,45 @@ OutputAdapter::send( int a_socket, const char *a_data, uint32_t a_len )
     size_t      sent = 0;
     uint16_t    max_retries = 5;
 
-    while ( sent < a_len )
+    try
     {
-        rc = write( a_socket, a_data + sent, a_len - sent );
-        if ( rc < 0 )
+        while ( sent < a_len )
         {
-            // Interrupted?
-            if (( rc == EAGAIN || rc == EINTR ) && --max_retries )
-                continue;
+            rc = write( a_socket, a_data + sent, a_len - sent );
+            if ( rc < 0 )
+            {
+                // Interrupted?
+                if (( rc == EAGAIN || rc == EINTR ) && --max_retries )
+                    continue;
 
-            // Serious error
-            syslog( LOG_ERR,
-                "%s: %s: Socket Write Failed! len=%u (socket=%d) - %s",
-                "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket,
-                strerror( errno ) );
-            usleep(33333); // give syslog a chance...
-            return false;
+                // Serious error
+                syslog( LOG_ERR,
+                    "%s: %s: Socket Write Failed! len=%u (socket=%d) - %s",
+                    "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket,
+                    strerror( errno ) );
+                usleep(33333); // give syslog a chance...
+                return false;
+            }
+
+            sent += rc;
         }
-
-        sent += rc;
+    }
+    catch ( exception &e )
+    {
+        syslog( LOG_ERR,
+            "%s: %s: Socket Write Exception! len=%u (socket=%d) - %s",
+            "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket,
+            e.what() );
+        usleep(33333); // give syslog a chance...
+        return false;
+    }
+    catch (...)
+    {
+        syslog( LOG_ERR,
+            "%s: %s: Socket Write Unknown Exception! len=%u (socket=%d)",
+            "PVSD ERROR", "OutputAdapter::send()", a_len, a_socket );
+        usleep(33333); // give syslog a chance...
+        return false;
     }
 
     return true;
