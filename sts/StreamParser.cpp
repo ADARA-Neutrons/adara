@@ -1115,7 +1115,8 @@ StreamParser::rxPacket
  * The events are read from the packet and placed into internal
  * event buffers (units are converted for event time of flight).
  * When the event buffers are full, they are flushed to a subclassed
- * stream adapter via the monitorBuffersReady() virtual method.
+ * stream adapter via the now-split dual monitorTOFBuffersReady() and
+ * monitorIndexBuffersReady() virtual methods.
  * This method also detects pulse gaps and corrects the event index
  * as required (see handleMonitorPulseGap() method for more details).
  * Note that unlike banked events, monitors events do not contain a
@@ -1245,18 +1246,26 @@ StreamParser::processMonitorEvents
         imi->second->m_event_count += a_event_count;
         imi->second->m_last_pulse_with_data = m_pulse_count;
 
-        // Check to see if buffers are ready to write
-        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh
-          || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        // Write Monitor TOF and Event Index Buffers Independently
+        //    to Enable Chunk Size Override Optimizations...! ;-D
+
+        // Check to see if TOF buffers are ready to write
+        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh )
         {
-            monitorBuffersReady( *imi->second );
+            monitorTOFBuffersReady( *imi->second );
     
 #ifdef PARANOID
             resetInUseVector<float>( imi->second->m_tof_buffer,
                 imi->second->m_tof_buffer_size );
 #endif
             imi->second->m_tof_buffer_size = 0;
+        }
 
+        // Check to see if Event Index buffers are ready to write
+        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        {
+            monitorIndexBuffersReady( *imi->second );
+    
             imi->second->m_index_buffer.clear();
         }
     }
@@ -1298,9 +1307,11 @@ StreamParser::handleMonitorPulseGap
     {
         // Otherwise, if the gap is too large - flush current buffered data
         // & fill index directly
-        // Note: it is acceptable to call monitorBuffersReady even if
-        // they are empty.
-        monitorBuffersReady( a_mi );
+        // Note: it is acceptable to call the twin monitorTOFBuffersReady()
+        // and monitorEventBuffersReady() methods even if the
+        // associated buffers are empty.
+        monitorTOFBuffersReady( a_mi );
+        monitorIndexBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
 
 #ifdef PARANOID
@@ -3287,11 +3298,19 @@ StreamParser::finalizeStreamProcessing()
                     m_pulse_count - imi->second->m_last_pulse_with_data );
             }
 
-            // Flush monitor buffers
-            if ( imi->second->m_tof_buffer_size
-                || imi->second->m_index_buffer.size() )
+            // Write Monitor TOF and Event Index Buffers Independently
+            //    to Enable Chunk Size Override Optimizations...! ;-D
+
+            // Flush TOF monitor buffers
+            if ( imi->second->m_tof_buffer_size )
             {
-                monitorBuffersReady( *imi->second );
+                monitorTOFBuffersReady( *imi->second );
+            }
+
+            // Flush Event Index monitor buffers
+            if ( imi->second->m_index_buffer.size() )
+            {
+                monitorIndexBuffersReady( *imi->second );
             }
         }
 
