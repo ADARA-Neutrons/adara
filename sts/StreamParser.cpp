@@ -1307,18 +1307,10 @@ StreamParser::handleMonitorPulseGap
     {
         // Otherwise, if the gap is too large - flush current buffered data
         // & fill index directly
-        // Note: it is acceptable to call the twin monitorTOFBuffersReady()
-        // and monitorEventBuffersReady() methods even if the
-        // associated buffers are empty.
-        monitorTOFBuffersReady( a_mi );
+        // Note: it is acceptable to call monitorIndexBuffersReady()
+        // even if the associated buffers are empty.
         monitorIndexBuffersReady( a_mi );
         monitorPulseGap( a_mi, a_count );
-
-#ifdef PARANOID
-        resetInUseVector<float>( a_mi.m_tof_buffer,
-            a_mi.m_tof_buffer_size );
-#endif
-        a_mi.m_tof_buffer_size = 0;
 
         a_mi.m_index_buffer.clear();
     }
@@ -3301,17 +3293,13 @@ StreamParser::finalizeStreamProcessing()
             // Write Monitor TOF and Event Index Buffers Independently
             //    to Enable Chunk Size Override Optimizations...! ;-D
 
-            // Flush TOF monitor buffers
-            if ( imi->second->m_tof_buffer_size )
-            {
-                monitorTOFBuffersReady( *imi->second );
-            }
+            // _Always_ Flush TOF monitor buffers in the end,
+            //    to create any Dummy/Empty Datasets...
+            monitorTOFBuffersReady( *imi->second );
 
-            // Flush Event Index monitor buffers
-            if ( imi->second->m_index_buffer.size() )
-            {
-                monitorIndexBuffersReady( *imi->second );
-            }
+            // _Always_ Flush Event Index monitor buffers in the end,
+            //    to create any Dummy/Empty Datasets...
+            monitorIndexBuffersReady( *imi->second );
         }
 
         // All Beam Monitors...
