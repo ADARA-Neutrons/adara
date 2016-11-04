@@ -1264,7 +1264,7 @@ StreamParser::processMonitorEvents
         // Check to see if Event Index buffers are ready to write
         if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
         {
-            monitorIndexBuffersReady( *imi->second );
+            monitorIndexBuffersReady( *imi->second, false );
     
             imi->second->m_index_buffer.clear();
         }
@@ -1305,11 +1305,11 @@ StreamParser::handleMonitorPulseGap
     }
     else
     {
-        // Otherwise, if the gap is too large - flush current buffered data
-        // & fill index directly
+        // Otherwise, if the gap is too large
+        //    - flush current buffered data & fill index directly
         // Note: it is acceptable to call monitorIndexBuffersReady()
-        // even if the associated buffers are empty.
-        monitorIndexBuffersReady( a_mi );
+        //    even if the associated buffers are empty.
+        monitorIndexBuffersReady( a_mi, true );
         monitorPulseGap( a_mi, a_count );
 
         a_mi.m_index_buffer.clear();
@@ -3299,7 +3299,7 @@ StreamParser::finalizeStreamProcessing()
 
             // _Always_ Flush Event Index monitor buffers in the end,
             //    to create any Dummy/Empty Datasets...
-            monitorIndexBuffersReady( *imi->second );
+            monitorIndexBuffersReady( *imi->second, false );
         }
 
         // All Beam Monitors...
