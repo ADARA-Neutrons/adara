@@ -886,7 +886,9 @@ protected:
     void                bankPulseGap( STS::BankInfo &a_bank,
                             uint64_t a_count );
     void                bankFinalize( STS::BankInfo &a_bank );
-    void                monitorBuffersReady(
+    void                monitorTOFBuffersReady(
+                            STS::MonitorInfo &a_monitor_info );
+    void                monitorIndexBuffersReady(
                             STS::MonitorInfo &a_monitor_info );
     void                monitorPulseGap( STS::MonitorInfo &a_monitor,
                             uint64_t a_count );

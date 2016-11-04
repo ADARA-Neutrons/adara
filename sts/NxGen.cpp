@@ -1332,13 +1332,13 @@ NxGen::bankFinalize
 }
 
 
-/*! \brief Writes monitor event buffers to Nexus file
+/*! \brief Writes Monitor Event TOF buffers to Nexus file
  *
- * This method writes time of flight and index data in monitor buffers
+ * This method writes event time of flight data in monitor buffers
  * to the Nexus file.
  */
 void
-NxGen::monitorBuffersReady
+NxGen::monitorTOFBuffersReady
 (
     STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
@@ -1352,7 +1352,7 @@ NxGen::monitorBuffersReady
         if ( !mi )
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
-                "Invalid monitor object passed to monitorBuffersReady()" )
+              "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
 
         // Event-based Monitors Only...
@@ -1362,7 +1362,43 @@ NxGen::monitorBuffersReady
                 a_monitor.m_tof_buffer, a_monitor.m_tof_buffer_size,
                 mi->m_event_cur_size );
             mi->m_event_cur_size += a_monitor.m_tof_buffer_size;
+        }
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e,
+            "monitorTOFBuffersReady() failed for monitor id: "
+            << a_monitor.m_id )
+    }
+}
 
+
+/*! \brief Writes Monitor Event Index buffers to Nexus file
+ *
+ * This method writes event index data in monitor buffers
+ * to the Nexus file.
+ */
+void
+NxGen::monitorIndexBuffersReady
+(
+    STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
+)
+{
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
+        NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+        if ( !mi )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+            "Invalid monitor object passed to monitorIndexBuffersReady()" )
+        }
+
+        // Event-based Monitors Only...
+        if ( mi->m_config == NULL )
+        {
             writeSlab( mi->m_index_path,
                 a_monitor.m_index_buffer, mi->m_index_cur_size );
             mi->m_index_cur_size += a_monitor.m_index_buffer.size();
@@ -1370,7 +1406,8 @@ NxGen::monitorBuffersReady
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "monitorBuffersReady() failed for monitor id: "
+        RETHROW_TRACE( e,
+            "monitorIndexBuffersReady() failed for monitor id: "
             << a_monitor.m_id )
     }
 }
