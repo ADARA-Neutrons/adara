@@ -846,7 +846,8 @@ public:
     virtual void            monitorTOFBuffersReady(
                                 STS::MonitorInfo &a_monitor_info ) = 0;
     virtual void            monitorIndexBuffersReady(
-                                STS::MonitorInfo &a_monitor_info ) = 0;
+                                STS::MonitorInfo &a_monitor_info,
+                                bool use_default_chunk_size ) = 0;
     virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
