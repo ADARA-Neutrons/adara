@@ -843,7 +843,9 @@ public:
     virtual void            bankPulseGap( STS::BankInfo &a_bank,
                                 uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady(
+    virtual void            monitorTOFBuffersReady(
+                                STS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorIndexBuffersReady(
                                 STS::MonitorInfo &a_monitor_info ) = 0;
     virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
                                 uint64_t a_count ) = 0;
