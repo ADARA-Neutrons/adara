@@ -379,8 +379,10 @@ NxGen::makeMonitorInfo
             // Event-based Monitor
             else
             {
-                makeDataset( mi->m_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                // (Defer creation/writing of actual Monitor TOF data
+                //    to monitorTOFBuffersReady(), create & write
+                //    in one shot...)
+
                 makeDataset( mi->m_path, m_index_name, NeXus::UINT64 );
 
                 // (Defer creation of Pulse Time Link to monitorFinalize(),
@@ -1358,6 +1360,15 @@ NxGen::monitorTOFBuffersReady
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
+            // Create Monitor TOF Dataset on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !(mi->m_event_cur_size) )
+            {
+                makeDataset( mi->m_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS,
+                    a_monitor.m_tof_buffer_size );
+            }
+
             writeSlab( mi->m_tof_path,
                 a_monitor.m_tof_buffer, a_monitor.m_tof_buffer_size,
                 mi->m_event_cur_size );
