@@ -889,7 +889,8 @@ protected:
     void                monitorTOFBuffersReady(
                             STS::MonitorInfo &a_monitor_info );
     void                monitorIndexBuffersReady(
-                            STS::MonitorInfo &a_monitor_info );
+                            STS::MonitorInfo &a_monitor_info,
+                            bool use_default_chunk_size );
     void                monitorPulseGap( STS::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );

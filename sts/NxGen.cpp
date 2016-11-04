@@ -376,18 +376,18 @@ NxGen::makeMonitorInfo
                 writeString( mi->m_path, "mode", "monitor" );
             }
 
-            // Event-based Monitor
-            else
-            {
-                // (Defer creation/writing of actual Monitor TOF data
-                //    to monitorTOFBuffersReady(), create & write
-                //    in one shot...)
+            // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
 
-                makeDataset( mi->m_path, m_index_name, NeXus::UINT64 );
+            // (Defer creation/writing of actual Monitor TOF data
+            //    to monitorTOFBuffersReady(), create & write
+            //    in one shot...)
 
-                // (Defer creation of Pulse Time Link to monitorFinalize(),
-                //    after the Dataset is sure to have been created...)
-            }
+            // (Defer creation/writing of actual Monitor Event Index data
+            //    to monitorIndexBuffersReady(), create & write
+            //    in one shot...)
+
+            // (Defer creation of Pulse Time Link to monitorFinalize(),
+            //    after the Dataset is sure to have been created...)
         }
 
         return mi;
@@ -1364,9 +1364,13 @@ NxGen::monitorTOFBuffersReady
             // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
             if ( !(mi->m_event_cur_size) )
             {
+                // Chunk Size Override: If There's _No_ TOF Values,
+                //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                unsigned long chunk_size = ( a_monitor.m_tof_buffer_size )
+                    ? ( a_monitor.m_tof_buffer_size ) : 1;
+
                 makeDataset( mi->m_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS,
-                    a_monitor.m_tof_buffer_size );
+                    NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
             }
 
             writeSlab( mi->m_tof_path,
@@ -1392,7 +1396,8 @@ NxGen::monitorTOFBuffersReady
 void
 NxGen::monitorIndexBuffersReady
 (
-    STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
+    STS::MonitorInfo &a_monitor,    ///< [in] Monitor with events to write
+    bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
     if (!m_gen_nexus)
@@ -1410,6 +1415,29 @@ NxGen::monitorIndexBuffersReady
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
+            // Create Monitor Event Index Dataset
+            //    on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override,
+            //    unless Explicitly Default for Pulse Gap Handling...)
+            if ( !(mi->m_index_cur_size) )
+            {
+                unsigned long chunk_size;
+                // Use Default Chunking (for Pulse Gap Fill Handling...)
+                if ( use_default_chunk_size )
+                    chunk_size = 0;
+                // Use Chunk Size Override...
+                else
+                {
+                    // If There's _No_ Event Indices,
+                    //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                    chunk_size = ( a_monitor.m_index_buffer.size() )
+                        ? ( a_monitor.m_index_buffer.size() ) : 1;
+                }
+
+                makeDataset( mi->m_path, m_index_name,
+                    NeXus::UINT64, "", chunk_size );
+            }
+
             writeSlab( mi->m_index_path,
                 a_monitor.m_index_buffer, mi->m_index_cur_size );
             mi->m_index_cur_size += a_monitor.m_index_buffer.size();
@@ -1451,6 +1479,10 @@ NxGen::monitorPulseGap
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
+            // Note: monitorIndexBuffersReady() must have been called
+            //    _Before_ Now, to Create Monitor Event Index Dataset...!
+            // (This is done in StreamParser::handleMonitorPulseGap().)
+
             fillSlab( mi->m_index_path, mi->m_event_count,
                 a_count, mi->m_index_cur_size );
             mi->m_index_cur_size += a_count;
