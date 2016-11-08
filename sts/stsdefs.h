@@ -839,7 +839,10 @@ public:
                                 const std::string &a_xml ) = 0;
     virtual void            pulseBuffersReady(
                                 STS::PulseInfo &a_pulse_info ) = 0;
-    virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
+    virtual void            bankPidTOFBuffersReady(
+                                STS::BankInfo &a_bank ) = 0;
+    virtual void            bankIndexBuffersReady(
+                                STS::BankInfo &a_bank ) = 0;
     virtual void            bankPulseGap( STS::BankInfo &a_bank,
                                 uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
