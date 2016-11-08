@@ -852,7 +852,7 @@ StreamParser::processBankEvents
             // Check to see if Index buffers are ready to write
             if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
             {
-                bankIndexBuffersReady( *bi );
+                bankIndexBuffersReady( *bi, false );
 
                 bi->m_index_buffer.clear();
             }
@@ -1033,10 +1033,11 @@ StreamParser::handleBankPulseGap
     }
     else
     {
-        // Otherwise, if the gap is too large - flush buffers & fill gap
+        // Otherwise, if the gap is too large
+        //    - flush current buffered data & fill index directly
         // Note: it is acceptable to call bankIndexBuffersReady()
-        // even if they are empty.
-        bankIndexBuffersReady( a_bi );
+        //    even if the associated buffer is empty.
+        bankIndexBuffersReady( a_bi, true );
         bankPulseGap( a_bi, a_count );
 
         a_bi.m_index_buffer.clear();
@@ -1306,7 +1307,7 @@ StreamParser::handleMonitorPulseGap
         // Otherwise, if the gap is too large
         //    - flush current buffered data & fill index directly
         // Note: it is acceptable to call monitorIndexBuffersReady()
-        //    even if the associated buffers are empty.
+        //    even if the associated buffer is empty.
         monitorIndexBuffersReady( a_mi, true );
         monitorPulseGap( a_mi, a_count );
 
@@ -3275,7 +3276,7 @@ StreamParser::finalizeStreamProcessing()
 
         // _Always_ Flush Event Index bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankIndexBuffersReady( **ibi );
+        bankIndexBuffersReady( **ibi, false );
 
         bankFinalize( **ibi );
     }
