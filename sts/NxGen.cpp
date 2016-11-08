@@ -1091,12 +1091,12 @@ NxGen::pulseBuffersReady
 }
 
 
-/*! \brief Writes bank event buffers to Nexus file
+/*! \brief Writes Bank PID and TOF Event Buffers to Nexus file
  *
- * This method writes time of flight, pixel ID, and index data in bank event buffers to the Nexus file.
+ * This method writes pixel ID and time of flight in bank event buffers to the Nexus file.
  */
 void
-NxGen::bankBuffersReady
+NxGen::bankPidTOFBuffersReady
 (
     STS::BankInfo &a_bank   ///< [in] Detector bank to write
 )
@@ -1110,7 +1110,7 @@ NxGen::bankBuffersReady
         if ( !bi )
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
-                "Invalid bank object passed to bankBuffersReady()" )
+                "Invalid bank object passed to bankPidTOFBuffersReady()" )
         }
 
         // Make Sure Data has been (Late) Initialized...
@@ -1132,7 +1132,52 @@ NxGen::bankBuffersReady
                 bi->m_event_cur_size );
 
             bi->m_event_cur_size += a_bank.m_tof_buffer_size;
+        }
 
+        // No NeXus Histogram-based Handling Needed Here...
+
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "bankPidTOFBuffersReady() failed for bank id: "
+            << a_bank.m_id )
+    }
+}
+
+
+/*! \brief Writes Bank Event Index Buffers to Nexus file
+ *
+ * This method writes index data in bank event buffers to the Nexus file.
+ */
+void
+NxGen::bankIndexBuffersReady
+(
+    STS::BankInfo &a_bank   ///< [in] Detector bank to write
+)
+{
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
+        NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+        if ( !bi )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankIndexBuffersReady()" )
+        }
+
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank( false );
+
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi, false );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
             writeSlab( bi->m_index_path,
                 a_bank.m_index_buffer, bi->m_index_cur_size );
 
@@ -1144,7 +1189,7 @@ NxGen::bankBuffersReady
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: "
+        RETHROW_TRACE( e, "bankIndexBuffersReady() failed for bank id: "
             << a_bank.m_id )
     }
 }
