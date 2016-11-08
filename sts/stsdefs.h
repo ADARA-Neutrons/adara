@@ -842,7 +842,8 @@ public:
     virtual void            bankPidTOFBuffersReady(
                                 STS::BankInfo &a_bank ) = 0;
     virtual void            bankIndexBuffersReady(
-                                STS::BankInfo &a_bank ) = 0;
+                                STS::BankInfo &a_bank,
+                                bool use_default_chunk_size ) = 0;
     virtual void            bankPulseGap( STS::BankInfo &a_bank,
                                 uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
