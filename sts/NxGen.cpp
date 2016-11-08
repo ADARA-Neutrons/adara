@@ -294,20 +294,16 @@ NxGen::initializeNxBank
             // NeXus Event-based Structures
             if ( a_bi->m_has_event )
             {
+                // (Defer creation/writing of actual Bank Pid/TOF data
+                //    to bankPidTOFBuffersReady(), create & write
+                //    in one shot...)
+
                 // Event data
-                makeDataset( a_bi->m_instr_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
-                makeDataset( a_bi->m_instr_path, m_pid_name,
-                    NeXus::UINT32 );
                 makeDataset( a_bi->m_instr_path, m_index_name,
                     NeXus::UINT64 );
 
                 // Top-level Event data group
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
-                makeLink( a_bi->m_tof_path,
-                    a_bi->m_event_path + "/" + m_tof_name );
-                makeLink( a_bi->m_pid_path,
-                    a_bi->m_event_path + "/" + m_pid_name );
                 makeLink( a_bi->m_index_path,
                     a_bi->m_event_path + "/" + m_index_name );
 
@@ -1124,6 +1120,25 @@ NxGen::bankPidTOFBuffersReady
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Create Bank Pid/TOF Dataset on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !(bi->m_event_cur_size) )
+            {
+                makeDataset( bi->m_instr_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS,
+                    a_bank.m_tof_buffer_size );
+                makeDataset( bi->m_instr_path, m_pid_name,
+                    NeXus::UINT32, "",
+                    a_bank.m_tof_buffer_size );
+
+                // Link Bank Pid/TOF Datasets to Top-level Event Data Group
+                // (Now that they're created... :-)
+                makeLink( bi->m_tof_path,
+                    bi->m_event_path + "/" + m_tof_name );
+                makeLink( bi->m_pid_path,
+                    bi->m_event_path + "/" + m_pid_name );
+            }
+
             writeSlab( bi->m_tof_path,
                 a_bank.m_tof_buffer, a_bank.m_tof_buffer_size,
                 bi->m_event_cur_size );
