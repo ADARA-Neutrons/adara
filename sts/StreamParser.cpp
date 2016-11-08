@@ -765,9 +765,10 @@ StreamParser::processPulseInfo
  * bank. The events are read from the packet and placed into internal event
  * buffers (units are converted for event time of flight). When the event
  * buffers are full, they are flushed to a subclassed stream adapter via
- * the bankBuffersReady() virtual method. This method also detects pulse
- * gaps and corrects the event index as required (see handleBankPulseGap()
- * method for more details).
+ * the now-split dual bankPidTOFBuffersReady() and bankIndexBuffersReady()
+ * virtual methods. This method also detects pulse gaps and corrects the
+ * event index as required (see handleBankPulseGap() method for
+ * more details).
  */
 void
 StreamParser::processBankEvents
@@ -834,11 +835,10 @@ StreamParser::processBankEvents
 
             bi->m_last_pulse_with_data = m_pulse_count;
 
-            // Check to see if buffers are ready to write
-            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh
-                   || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            // Check to see if Pid/TOF buffers are ready to write
+            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh )
             {
-                bankBuffersReady( *bi );
+                bankPidTOFBuffersReady( *bi );
 
 #ifdef PARANOID
                 resetInUseVector<float>( bi->m_tof_buffer,
@@ -847,6 +847,12 @@ StreamParser::processBankEvents
                     bi->m_tof_buffer_size );
 #endif
                 bi->m_tof_buffer_size = 0;
+            }
+
+            // Check to see if Index buffers are ready to write
+            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            {
+                bankIndexBuffersReady( *bi );
 
                 bi->m_index_buffer.clear();
             }
@@ -1028,18 +1034,10 @@ StreamParser::handleBankPulseGap
     else
     {
         // Otherwise, if the gap is too large - flush buffers & fill gap
-        // Note: it is acceptable to call bankBuffersReady
+        // Note: it is acceptable to call bankIndexBuffersReady()
         // even if they are empty.
-        bankBuffersReady( a_bi );
+        bankIndexBuffersReady( a_bi );
         bankPulseGap( a_bi, a_count );
-
-#ifdef PARANOID
-        resetInUseVector<float>( a_bi.m_tof_buffer,
-            a_bi.m_tof_buffer_size );
-        resetInUseVector<uint32_t>( a_bi.m_pid_buffer,
-            a_bi.m_tof_buffer_size );
-#endif
-        a_bi.m_tof_buffer_size = 0;
 
         a_bi.m_index_buffer.clear();
     }
@@ -3268,9 +3266,16 @@ StreamParser::finalizeStreamProcessing()
                 m_pulse_count - (*ibi)->m_last_pulse_with_data );
         }
 
-        // Flush bank buffers
-        if ( (*ibi)->m_tof_buffer_size || (*ibi)->m_index_buffer.size() )
-            bankBuffersReady( **ibi );
+        // Write Bank Pid/TOF and Event Index Buffers Independently
+        //    to Enable Chunk Size Override Optimizations...! ;-D
+
+        // _Always_ Flush Pid/TOF bank buffers in the end,
+        //    to create any Dummy/Empty Datasets...
+        bankPidTOFBuffersReady( **ibi );
+
+        // _Always_ Flush Event Index bank buffers in the end,
+        //    to create any Dummy/Empty Datasets...
+        bankIndexBuffersReady( **ibi );
 
         bankFinalize( **ibi );
     }
