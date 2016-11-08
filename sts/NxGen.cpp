@@ -298,14 +298,15 @@ NxGen::initializeNxBank
                 //    to bankPidTOFBuffersReady(), create & write
                 //    in one shot...)
 
-                // Event data
-                makeDataset( a_bi->m_instr_path, m_index_name,
-                    NeXus::UINT64 );
+                // (Defer creation/writing of actual Bank Event Index data
+                //    to bankIndexBuffersReady(), create & write
+                //    in one shot...)
 
                 // Top-level Event data group
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
-                makeLink( a_bi->m_index_path,
-                    a_bi->m_event_path + "/" + m_index_name );
+
+                // (Defer linking of Top-level Event data, which
+                //     won't exist until later in bankFinalize()... :-)
 
                 // (Defer linking of Pulse Time data, which won't exist
                 //     until later in bankFinalize()... :-)
@@ -1124,12 +1125,15 @@ NxGen::bankPidTOFBuffersReady
             // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
             if ( !(bi->m_event_cur_size) )
             {
+                // Chunk Size Override: If There's _No_ Pid/TOF Values,
+                //    Then Create Dummy Empty Datasets (Chunk Size = 1)
+                unsigned long chunk_size = ( a_bank.m_tof_buffer_size )
+                    ? ( a_bank.m_tof_buffer_size ) : 1;
+
                 makeDataset( bi->m_instr_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS,
-                    a_bank.m_tof_buffer_size );
+                    NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
                 makeDataset( bi->m_instr_path, m_pid_name,
-                    NeXus::UINT32, "",
-                    a_bank.m_tof_buffer_size );
+                    NeXus::UINT32, "", chunk_size );
 
                 // Link Bank Pid/TOF Datasets to Top-level Event Data Group
                 // (Now that they're created... :-)
@@ -1167,7 +1171,8 @@ NxGen::bankPidTOFBuffersReady
 void
 NxGen::bankIndexBuffersReady
 (
-    STS::BankInfo &a_bank   ///< [in] Detector bank to write
+    STS::BankInfo &a_bank,          ///< [in] Detector bank to write
+    bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
     if (!m_gen_nexus)
@@ -1193,6 +1198,35 @@ NxGen::bankIndexBuffersReady
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Create Bank Event Index Dataset
+            //    on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override,
+            //    unless Explicitly Default for Pulse Gap Handling...)
+            if ( !(bi->m_index_cur_size) )
+            {
+                unsigned long chunk_size;
+                // Use Default Chunking (for Pulse Gap Fill Handling...)
+                if ( use_default_chunk_size )
+                    chunk_size = 0;
+                // Use Chunk Size Override...
+                else
+                {
+                    // If There's _No_ Event Indices,
+                    //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                    chunk_size = ( a_bank.m_index_buffer.size() )
+                        ? ( a_bank.m_index_buffer.size() ) : 1;
+                }
+
+                makeDataset( bi->m_instr_path, m_index_name,
+                    NeXus::UINT64, "", chunk_size );
+
+                // Link Bank Event Index Dataset
+                //    to Top-level Event Data Group
+                // (Now that it's created... :-)
+                makeLink( bi->m_index_path,
+                    bi->m_event_path + "/" + m_index_name );
+            }
+
             writeSlab( bi->m_index_path,
                 a_bank.m_index_buffer, bi->m_index_cur_size );
 
@@ -1241,6 +1275,10 @@ NxGen::bankPulseGap
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Note: bankIndexBuffersReady() must have been called
+            //    _Before_ Now, to Create Bank Event Index Dataset...!
+            // (This is done in StreamParser::handleBankPulseGap().)
+
             fillSlab( bi->m_index_path,
                 bi->m_event_count, a_count, bi->m_index_cur_size );
             bi->m_index_cur_size += a_count;

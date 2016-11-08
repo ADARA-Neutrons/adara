@@ -883,7 +883,8 @@ protected:
     void                processGeometry( const std::string &a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
-    void                bankIndexBuffersReady( STS::BankInfo &a_bank );
+    void                bankIndexBuffersReady( STS::BankInfo &a_bank,
+                            bool use_default_chunk_size );
     void                bankPulseGap( STS::BankInfo &a_bank,
                             uint64_t a_count );
     void                bankFinalize( STS::BankInfo &a_bank );
