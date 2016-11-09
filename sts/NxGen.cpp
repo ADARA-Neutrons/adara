@@ -306,7 +306,7 @@ NxGen::initializeNxBank
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
 
                 // (Defer linking of Top-level Event data, which
-                //     won't exist until later in bankFinalize()... :-)
+                //     won't exist until later in bank*BuffersReady()...)
 
                 // (Defer linking of Pulse Time data, which won't exist
                 //     until later in bankFinalize()... :-)
