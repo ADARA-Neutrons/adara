@@ -9,7 +9,7 @@ sts_sts_SOURCES = sts/main.cpp sts/NxGen.cpp sts/StreamParser.cpp \
 
 sts_sts_CPPFLAGS = -Ists $(libxml_CPPFLAGS) $(activemq_CPPFLAGS) \
 		$(apr_CPPFLAGS) $(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \
-		$(AM_CPPFLAGS)
+		$(AM_CPPFLAGS) -DSYSLOG_LOGGING
 
 # TODO clean this up to compile with these warnings enabled
 sts_sts_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
