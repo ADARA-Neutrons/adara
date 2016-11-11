@@ -1,6 +1,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <string.h>
+#include <sstream>
 #include <boost/thread/thread_time.hpp>
 #include <boost/thread/locks.hpp>
 #include "ComBusTransMon.h"
@@ -210,8 +211,18 @@ ComBusTransMon::commThread()
                         + "." + m_stream_parser->getBeamShortName();
                 }
 
+                // STS ComBus Log Info Prefix
+                stringstream ss_info;
+                ss_info << "[" << g_pid << "] STS";
+
+                // STS ComBus Log Error Prefix
+                stringstream ss_err;
+                ss_err << "[" << g_pid << "] STS Error";
+
+                // Make STS ComBus Connection...
                 m_combus = new ADARA::ComBus::Connection( m_domain, "STS",
-                    getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+                    getpid(), m_broker_uri, m_broker_user, m_broker_pass,
+                    ss_info.str(), ss_err.str() );
 
                 if ( !m_combus->waitForConnect( 5 ) ) { 
                     syslog( LOG_WARNING,

@@ -248,7 +248,9 @@ int main(int argc, char *argv[])
     if ( daemon )
         daemonize();
 
-    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( domain, "DASMON", 0, broker_uri, broker_user, broker_pass );
+    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection(
+		domain, "DASMON", 0, broker_uri, broker_user, broker_pass,
+		"Dasmon Daemon", "Dasmon Daemon Error" );
 
     try
     {
