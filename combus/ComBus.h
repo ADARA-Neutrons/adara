@@ -22,6 +22,11 @@ namespace ComBus {
 
 const std::string VERSION = "2.2.0";
 
+enum LogStatus {
+    INFO_LOG    =   0x0,
+    ERR_LOG     =   0x1,
+};
+
 class MessageBase;
 
 
@@ -83,6 +88,8 @@ public:
         const std::string &a_proc_name, uint32_t a_inst_num,
         std::string &a_broker_uri, const std::string &a_user,
         const std::string &a_pass,
+        const std::string &a_log_info_prefix,
+        const std::string &a_log_err_prefix,
         const std::string &a_log_dir = "/tmp" );
 
     ~Connection() throw();
@@ -122,6 +129,9 @@ public:
                             const std::string *a_correlation_id = 0 );
 
     bool                postWorkflow( MessageBase &a_msg );
+
+    void                exceptionLog( std::string a_msg,
+                            ADARA::ComBus::LogStatus a_status );
 
 private:
 
@@ -192,7 +202,9 @@ private:
     std::string                             m_broker_uri;       ///< AMQP broker URI
     std::string                             m_broker_user;      ///< AMQP broker user name
     std::string                             m_broker_pass;      ///< AMQP broker password
-    std::string                             m_log_file;         ///< Alternative log ouput file
+    std::string                             m_log_info_prefix;  ///< Exception Log Info Prefix
+    std::string                             m_log_err_prefix;   ///< Exception Log Error Prefix
+    std::string                             m_log_file;         ///< Alternative log output file
     activemq::core::ActiveMQConnection     *m_connection;       ///< AMQP connction instance
     cms::Session                           *m_session;          ///< AMQP session instance
     std::vector<IConnectionListener*>       m_status_listeners; ///< Connection status listeners
