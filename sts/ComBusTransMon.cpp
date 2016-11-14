@@ -213,11 +213,11 @@ ComBusTransMon::commThread()
 
                 // STS ComBus Log Info Prefix
                 stringstream ss_info;
-                ss_info << "[" << g_pid << "] STS";
+                ss_info << "[" << g_pid << "] STS ComBus";
 
                 // STS ComBus Log Error Prefix
                 stringstream ss_err;
-                ss_err << "[" << g_pid << "] STS Error";
+                ss_err << "[" << g_pid << "] STS Error ComBus";
 
                 // Make STS ComBus Connection...
                 m_combus = new ADARA::ComBus::Connection( m_domain, "STS",

@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
 
     ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection(
 		domain, "DASMON", 0, broker_uri, broker_user, broker_pass,
-		"Dasmon Daemon", "Dasmon Daemon Error" );
+		"Dasmon Daemon ComBus", "Dasmon Daemon Error ComBus" );
 
     try
     {

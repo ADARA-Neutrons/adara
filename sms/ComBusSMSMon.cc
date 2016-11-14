@@ -188,7 +188,7 @@ void ComBusSMSMon::openComm()
 		m_combus = new ADARA::ComBus::Connection(
 			m_domain, "SMS", getpid(),
 			m_broker_uri, m_broker_user, m_broker_pass,
-			"SMS", "ERROR SMS" );
+			"SMS ComBus", "ERROR SMS ComBus" );
 
 		if ( !m_combus->waitForConnect( 5 ) )
 		{
