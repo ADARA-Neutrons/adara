@@ -474,6 +474,14 @@ Connection::setConnection( std::string &a_domain,
         std::string &a_broker_uri, const std::string &a_user,
         const std::string &a_pass )
 {
+    std::stringstream ss;
+    ss << "setConnection(): Setting ComBus/ActiveMQ Connection"
+        << " domain=[" << a_domain << "]"
+        << " broker_uri=[" << a_broker_uri << "]"
+        << " broker_user=[" << a_user << "]"
+        << " broker_pass=[" << a_pass << "]";
+    exceptionLog(ss.str(), ERR_LOG);
+
     boost::unique_lock<boost::mutex> lock( m_status_mutex );
 
     // Drop all general topic subscriptions
@@ -585,6 +593,8 @@ Connection::waitForConnect( unsigned short a_timeout ) const
 void
 Connection::reconnectThread()
 {
+    exceptionLog("Entry reconnectThread().", INFO_LOG);
+
     unsigned short retry_period = 2;
     boost::unique_lock<boost::mutex> lock( m_status_mutex,
         boost::defer_lock );
@@ -639,6 +649,10 @@ Connection::reconnectThread()
             // Notify connection status thread
             m_status_cond.notify_one();
 
+            exceptionLog(
+                "reconnectThread(): ActiveMQ Connection Successful.",
+                INFO_LOG);
+
             // Connected! (Retain lock)
             break;
         }
@@ -673,6 +687,8 @@ Connection::reconnectThread()
     // Notify connection status thread we're giving up...
     m_status_cond.notify_one();
 
+    exceptionLog("Exiting reconnectThread().", INFO_LOG);
+
     // Self-destruct!
     delete m_reconnect_thread;
     m_reconnect_thread = 0;
@@ -691,6 +707,8 @@ Connection::reconnectThread()
 void
 Connection::connectionStatusNotifyThread()
 {
+    exceptionLog("Entry connectionStatusNotifyThread().", INFO_LOG);
+
     bool last_connection_state = false;
 
     while( 1 )
@@ -736,6 +754,8 @@ Connection::connectionStatusNotifyThread()
         // Wait for status condition var to be signalled
         m_status_cond.wait( lock );
     }
+
+    exceptionLog("Exiting connectionStatusNotifyThread().", INFO_LOG);
 }
 
 /** \brief Disconnects from AMQP broker.
@@ -751,6 +771,10 @@ Connection::disconnect()
 
     if ( m_connected )
     {
+        exceptionLog(
+            "disconnect(): Disconnecting ComBus/ActiveMQ Connection!",
+            INFO_LOG);
+
         m_connected = false;
 
         try
