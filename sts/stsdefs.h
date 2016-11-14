@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.6.6"
+#define STS_VERSION "1.7.0"
 extern pid_t g_pid;
 
 namespace STS {
