@@ -13,6 +13,7 @@
 #include <activemq/library/ActiveMQCPP.h>
 #include <cms/Connection.h>
 #include <cms/Session.h>
+#include <cms/ExceptionListener.h>
 #include <activemq/transport/TransportListener.h>
 #include "ComBusDefs.h"
 
@@ -81,7 +82,7 @@ public:
  * connection is lost and re-acquired; in this case, all subscriptions are
  * automatically reconnected when the connection is re-established.
  */
-class Connection
+class Connection : public cms::ExceptionListener
 {
 public:
     Connection( std::string &a_domain,
@@ -132,6 +133,8 @@ public:
 
     void                exceptionLog( std::string a_msg,
                             ADARA::ComBus::LogStatus a_status );
+
+    void                onException( const cms::CMSException &ex );
 
 private:
 

@@ -1,5 +1,6 @@
 
 #include <fstream>
+#include <sstream>
 #include <activemq/commands/Command.h>
 #include <decaf/io/EOFException.h>
 #include <boost/thread/locks.hpp>
@@ -617,6 +618,7 @@ Connection::reconnectThread()
             lock.unlock();
 
             m_connection->start();
+            m_connection->setExceptionListener(this);
 
             m_session = m_connection->createSession(
                 cms::Session::AUTO_ACKNOWLEDGE );
@@ -1339,6 +1341,24 @@ Connection::exceptionLog( string a_msg, ADARA::ComBus::LogStatus a_status )
 
 #endif
 
+}
+
+
+/** \brief ActiveMQ Exception Listener Method.
+  * \param ex - CMS Exception to Handle.
+  *
+  * Don't let the ActiveMQ Library gracefully shut us down on a
+  * severe network exception (or any exception for that matter).
+  * Just Log & Continue - Rage against the dying of the light...! ;-D
+  */
+void
+Connection::onException( const cms::CMSException &ex )
+{
+    std::stringstream ss;
+    ss << "*** ActiveMQ Exception Listener Called - "
+        << ex.getMessage()
+        << " [" << ex.getStackTraceString() << "]";
+    exceptionLog(ss.str(), ERR_LOG);
 }
 
 
