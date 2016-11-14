@@ -21,7 +21,7 @@
 namespace ADARA {
 namespace ComBus {
 
-const std::string VERSION = "2.2.0";
+const std::string VERSION = "2.3.0";
 
 enum LogStatus {
     INFO_LOG    =   0x0,
