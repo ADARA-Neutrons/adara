@@ -30,8 +30,10 @@ namespace STS {
 class StreamParser : public ADARA::POSIXParser, public IStreamAdapter
 {
 public:
-    StreamParser( int a_fd, const std::string & a_adara_out_file, bool a_strict, bool a_gather_stats = false,
-                  uint32_t a_event_buf_write_thresh = 40960, uint32_t a_ancillary_buf_write_thresh = 4096 );
+    StreamParser( int a_fd, const std::string & a_adara_out_file,
+        bool a_strict, bool a_gather_stats = false,
+        uint32_t a_event_buf_write_thresh = 40960, // number of elems
+        uint32_t a_ancillary_buf_write_thresh = 4096 ); // number of elems
 
     virtual ~StreamParser();
 
@@ -153,8 +155,8 @@ private:
     std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
     std::map<Identifier,std::vector<PVEnumeratedType> >
                                             m_enums_by_dev;             ///< Container of Enumerated Types (by device)
-    uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors)
-    uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc)
+    uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors; number of elements)
+    uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc; number of elements)
     unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received
     RunInfo                                 m_run_info;                 ///< Run (and instrument) information
     RunMetrics                              m_run_metrics;              ///< Run metrics

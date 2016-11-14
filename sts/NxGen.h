@@ -421,7 +421,7 @@ private:
                     "Creating Empty String Value" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::CHAR, this->m_units );
+                    "value", NeXus::CHAR, this->m_units, 1 );
             }
         }
 
@@ -481,7 +481,7 @@ private:
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::UINT32, this->m_units );
+                    "value", NeXus::UINT32, this->m_units, 1 );
             }
         }
 
@@ -541,7 +541,7 @@ private:
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
-                    "value", NeXus::FLOAT64, this->m_units );
+                    "value", NeXus::FLOAT64, this->m_units, 1 );
             }
         }
 
@@ -602,11 +602,13 @@ private:
                         {
                             m_nxgen.makeDataset( m_log_path, "value",
                                 m_nxgen.toNxType( this->m_type ),
-                                this->m_units );
+                                this->m_units,
+                                this->m_value_buffer.size() );
                         }
 
                         m_nxgen.makeDataset( m_log_path, "time",
-                            NeXus::FLOAT64, TIME_SEC_UNITS );
+                            NeXus::FLOAT64, TIME_SEC_UNITS,
+                            this->m_time_buffer.size() );
 
                         m_nxgen.writeString( m_log_path, "device_name",
                             this->m_device_name );
@@ -765,7 +767,7 @@ private:
                                 usleep(30000); // give syslog a chance...
 
                                 m_nxgen.makeDataset( m_log_path,
-                                    "value_strings", NeXus::CHAR );
+                                    "value_strings", NeXus::CHAR, "", 1 );
                             }
                         }
 
@@ -843,7 +845,7 @@ public:
         bool a_gather_stats,
         std::string &a_ldap_host,
         uint32_t a_ldap_port,
-        unsigned long a_chunk_size = 2048,
+        unsigned long a_chunk_size = 2048,   // in Dataset Elements! :-O
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
         unsigned long a_cache_size = 10485760,
@@ -880,12 +882,17 @@ protected:
     void                processRunInfo( const STS::RunInfo &a_run_info );
     void                processGeometry( const std::string &a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
-    void                bankBuffersReady( STS::BankInfo &a_bank );
+    void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
+    void                bankIndexBuffersReady( STS::BankInfo &a_bank,
+                            bool use_default_chunk_size );
     void                bankPulseGap( STS::BankInfo &a_bank,
                             uint64_t a_count );
     void                bankFinalize( STS::BankInfo &a_bank );
-    void                monitorBuffersReady(
+    void                monitorTOFBuffersReady(
                             STS::MonitorInfo &a_monitor_info );
+    void                monitorIndexBuffersReady(
+                            STS::MonitorInfo &a_monitor_info,
+                            bool use_default_chunk_size );
     void                monitorPulseGap( STS::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
@@ -913,10 +920,11 @@ private:
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path,
                             const std::string &a_type );
-    void                makeDataset( const std::string &dataset_path,
-                            const std::string &dataset_name,
-                            NeXus::NXnumtype nxdatatype,
-                            const std::string units = "" );
+    void                makeDataset( const std::string &a_path,
+                            const std::string &a_name,
+                            NeXus::NXnumtype a_type,
+                            const std::string a_units = "",
+                            unsigned long a_chunk_size = 0 );
     template <typename TypeT>
     void                writeMultidimDataset(
                             const std::string &a_path,
@@ -989,6 +997,8 @@ private:
                                 uint64_t cur_size = a_cur_size;
                                 uint64_t count = 0;
 
+                                // NOTE: Chunk Size is measured in
+                                // *Dataset Elements*...! :-O
                                 if ( a_count >= m_chunk_size )
                                 {
                                     buf.resize( m_chunk_size, a_value );
@@ -1032,7 +1042,7 @@ private:
     std::string         m_data_name;            ///< Name of Histo data in Nexus file
     std::string         m_histo_pid_name;       ///< Name of Histo PixelId data in Nexus file
     std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
-    unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file
+    unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file (in Dataset Elements!)
     H5nx                m_h5nx;                 ///< HDF5 library object
     uint64_t            m_pulse_info_cur_size;  ///< Current size of pulse info datasets (charge, time, frequency)
     std::vector<double> m_pulse_vetoes;         ///< Buffer of pulse veto times

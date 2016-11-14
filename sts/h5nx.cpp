@@ -1247,6 +1247,7 @@ int H5nx::H5NXcreate_dataset_extend( const std::string &group_path,
     dim[0] = 0;
     maxdim[0] = H5S_UNLIMITED;
     chunk_dim[0] = chunk_size;
+        // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
 
     //create  dataspace
     if ( (sid = H5Screate_simple( 1, dim, maxdim)) < 0 )

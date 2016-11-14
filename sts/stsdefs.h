@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.6.6"
+#define STS_VERSION "1.7.0"
 extern pid_t g_pid;
 
 namespace STS {
@@ -839,12 +839,19 @@ public:
                                 const std::string &a_xml ) = 0;
     virtual void            pulseBuffersReady(
                                 STS::PulseInfo &a_pulse_info ) = 0;
-    virtual void            bankBuffersReady( STS::BankInfo &a_bank ) = 0;
+    virtual void            bankPidTOFBuffersReady(
+                                STS::BankInfo &a_bank ) = 0;
+    virtual void            bankIndexBuffersReady(
+                                STS::BankInfo &a_bank,
+                                bool use_default_chunk_size ) = 0;
     virtual void            bankPulseGap( STS::BankInfo &a_bank,
                                 uint64_t a_count ) = 0;
     virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
-    virtual void            monitorBuffersReady(
+    virtual void            monitorTOFBuffersReady(
                                 STS::MonitorInfo &a_monitor_info ) = 0;
+    virtual void            monitorIndexBuffersReady(
+                                STS::MonitorInfo &a_monitor_info,
+                                bool use_default_chunk_size ) = 0;
     virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(

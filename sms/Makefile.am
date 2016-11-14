@@ -16,7 +16,7 @@ sms_smsd_SOURCES = sms/smsd.cc \
 sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
 		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
-		-I/home/controls/Accelerator
+		-I/home/controls/Accelerator -DLOGCXX_LOGGING
 sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
 sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_signals \

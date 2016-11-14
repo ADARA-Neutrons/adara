@@ -35,8 +35,8 @@ StreamParser::StreamParser
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
-    uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold
-    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold
+    uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
+    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold (number of elements)
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
@@ -765,9 +765,10 @@ StreamParser::processPulseInfo
  * bank. The events are read from the packet and placed into internal event
  * buffers (units are converted for event time of flight). When the event
  * buffers are full, they are flushed to a subclassed stream adapter via
- * the bankBuffersReady() virtual method. This method also detects pulse
- * gaps and corrects the event index as required (see handleBankPulseGap()
- * method for more details).
+ * the now-split dual bankPidTOFBuffersReady() and bankIndexBuffersReady()
+ * virtual methods. This method also detects pulse gaps and corrects the
+ * event index as required (see handleBankPulseGap() method for
+ * more details).
  */
 void
 StreamParser::processBankEvents
@@ -834,11 +835,10 @@ StreamParser::processBankEvents
 
             bi->m_last_pulse_with_data = m_pulse_count;
 
-            // Check to see if buffers are ready to write
-            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh
-                   || bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            // Check to see if Pid/TOF buffers are ready to write
+            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh )
             {
-                bankBuffersReady( *bi );
+                bankPidTOFBuffersReady( *bi );
 
 #ifdef PARANOID
                 resetInUseVector<float>( bi->m_tof_buffer,
@@ -847,6 +847,12 @@ StreamParser::processBankEvents
                     bi->m_tof_buffer_size );
 #endif
                 bi->m_tof_buffer_size = 0;
+            }
+
+            // Check to see if Index buffers are ready to write
+            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            {
+                bankIndexBuffersReady( *bi, false );
 
                 bi->m_index_buffer.clear();
             }
@@ -1027,19 +1033,12 @@ StreamParser::handleBankPulseGap
     }
     else
     {
-        // Otherwise, if the gap is too large - flush buffers & fill gap
-        // Note: it is acceptable to call bankBuffersReady
-        // even if they are empty.
-        bankBuffersReady( a_bi );
+        // Otherwise, if the gap is too large
+        //    - flush current buffered data & fill index directly
+        // Note: it is acceptable to call bankIndexBuffersReady()
+        //    even if the associated buffer is empty.
+        bankIndexBuffersReady( a_bi, true );
         bankPulseGap( a_bi, a_count );
-
-#ifdef PARANOID
-        resetInUseVector<float>( a_bi.m_tof_buffer,
-            a_bi.m_tof_buffer_size );
-        resetInUseVector<uint32_t>( a_bi.m_pid_buffer,
-            a_bi.m_tof_buffer_size );
-#endif
-        a_bi.m_tof_buffer_size = 0;
 
         a_bi.m_index_buffer.clear();
     }
@@ -1115,7 +1114,8 @@ StreamParser::rxPacket
  * The events are read from the packet and placed into internal
  * event buffers (units are converted for event time of flight).
  * When the event buffers are full, they are flushed to a subclassed
- * stream adapter via the monitorBuffersReady() virtual method.
+ * stream adapter via the now-split dual monitorTOFBuffersReady() and
+ * monitorIndexBuffersReady() virtual methods.
  * This method also detects pulse gaps and corrects the event index
  * as required (see handleMonitorPulseGap() method for more details).
  * Note that unlike banked events, monitors events do not contain a
@@ -1245,18 +1245,26 @@ StreamParser::processMonitorEvents
         imi->second->m_event_count += a_event_count;
         imi->second->m_last_pulse_with_data = m_pulse_count;
 
-        // Check to see if buffers are ready to write
-        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh
-          || imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        // Write Monitor TOF and Event Index Buffers Independently
+        //    to Enable Chunk Size Override Optimizations...! ;-D
+
+        // Check to see if TOF buffers are ready to write
+        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh )
         {
-            monitorBuffersReady( *imi->second );
+            monitorTOFBuffersReady( *imi->second );
     
 #ifdef PARANOID
             resetInUseVector<float>( imi->second->m_tof_buffer,
                 imi->second->m_tof_buffer_size );
 #endif
             imi->second->m_tof_buffer_size = 0;
+        }
 
+        // Check to see if Event Index buffers are ready to write
+        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        {
+            monitorIndexBuffersReady( *imi->second, false );
+    
             imi->second->m_index_buffer.clear();
         }
     }
@@ -1296,18 +1304,12 @@ StreamParser::handleMonitorPulseGap
     }
     else
     {
-        // Otherwise, if the gap is too large - flush current buffered data
-        // & fill index directly
-        // Note: it is acceptable to call monitorBuffersReady even if
-        // they are empty.
-        monitorBuffersReady( a_mi );
+        // Otherwise, if the gap is too large
+        //    - flush current buffered data & fill index directly
+        // Note: it is acceptable to call monitorIndexBuffersReady()
+        //    even if the associated buffer is empty.
+        monitorIndexBuffersReady( a_mi, true );
         monitorPulseGap( a_mi, a_count );
-
-#ifdef PARANOID
-        resetInUseVector<float>( a_mi.m_tof_buffer,
-            a_mi.m_tof_buffer_size );
-#endif
-        a_mi.m_tof_buffer_size = 0;
 
         a_mi.m_index_buffer.clear();
     }
@@ -3236,6 +3238,16 @@ StreamParser::finalizeStreamProcessing()
             "No neutron pulses received in stream.")
     }
 
+    // Write remaining pulse info and statistics
+    // (*Must* Do This _Before_ Detector Banks and Beam Monitors,
+    //    as they "Borrow" the Pulse Time series possibly created herein,
+    //    via various makeLink() calls...)
+    //
+    // Call pulseBuffersReady() even if m_pulse_info.times.size() == 0,
+    //    as we _Always_ need _Some_ Pulse Time dataset for linking...!
+
+    pulseBuffersReady( m_pulse_info );
+
     // Write any remaining data in bank buffers
 
     for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
@@ -3255,9 +3267,16 @@ StreamParser::finalizeStreamProcessing()
                 m_pulse_count - (*ibi)->m_last_pulse_with_data );
         }
 
-        // Flush bank buffers
-        if ( (*ibi)->m_tof_buffer_size || (*ibi)->m_index_buffer.size() )
-            bankBuffersReady( **ibi );
+        // Write Bank Pid/TOF and Event Index Buffers Independently
+        //    to Enable Chunk Size Override Optimizations...! ;-D
+
+        // _Always_ Flush Pid/TOF bank buffers in the end,
+        //    to create any Dummy/Empty Datasets...
+        bankPidTOFBuffersReady( **ibi );
+
+        // _Always_ Flush Event Index bank buffers in the end,
+        //    to create any Dummy/Empty Datasets...
+        bankIndexBuffersReady( **ibi, false );
 
         bankFinalize( **ibi );
     }
@@ -3277,22 +3296,21 @@ StreamParser::finalizeStreamProcessing()
                     m_pulse_count - imi->second->m_last_pulse_with_data );
             }
 
-            // Flush monitor buffers
-            if ( imi->second->m_tof_buffer_size
-                || imi->second->m_index_buffer.size() )
-            {
-                monitorBuffersReady( *imi->second );
-            }
+            // Write Monitor TOF and Event Index Buffers Independently
+            //    to Enable Chunk Size Override Optimizations...! ;-D
+
+            // _Always_ Flush TOF monitor buffers in the end,
+            //    to create any Dummy/Empty Datasets...
+            monitorTOFBuffersReady( *imi->second );
+
+            // _Always_ Flush Event Index monitor buffers in the end,
+            //    to create any Dummy/Empty Datasets...
+            monitorIndexBuffersReady( *imi->second, false );
         }
 
         // All Beam Monitors...
         monitorFinalize( *imi->second );
     }
-
-    // Write remaining pulse info and statistics
-
-    if ( m_pulse_info.times.size())
-        pulseBuffersReady( m_pulse_info );
 
     // Write any Enumerated Types, per DeviceId, into logs...
 

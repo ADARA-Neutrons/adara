@@ -32,7 +32,7 @@ NxGen::NxGen
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     string         &a_ldap_host,                ///< [in] LDAP Host for User Name Lookup
     uint32_t        a_ldap_port,                ///< [in] LDAP Port for User Name Lookup
-    unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size
+    unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
     unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
     unsigned long   a_cache_size,               ///< [in] HDF5 cache size
@@ -40,8 +40,8 @@ NxGen::NxGen
 )
 :
     StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
-        a_chunk_size * a_event_buf_chunk_count,
-        a_chunk_size * a_anc_buf_chunk_count ),
+        a_chunk_size * a_event_buf_chunk_count, // number of elements
+        a_chunk_size * a_anc_buf_chunk_count ), // number of elements
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
     m_entry_path(string("/entry")),
@@ -74,7 +74,7 @@ NxGen::NxGen
         m_h5nx.H5NXset_cache_size( a_cache_size );
     }
 
-    // Reserve internal buffer for veto pulse times
+    // Reserve internal buffer for veto pulse times (in Dataset Elements!)
     m_pulse_vetoes.reserve( a_chunk_size );
 }
 
@@ -294,55 +294,32 @@ NxGen::initializeNxBank
             // NeXus Event-based Structures
             if ( a_bi->m_has_event )
             {
-                // Event data
-                makeDataset( a_bi->m_instr_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
-                makeDataset( a_bi->m_instr_path, m_pid_name,
-                    NeXus::UINT32 );
-                makeDataset( a_bi->m_instr_path, m_index_name,
-                    NeXus::UINT64 );
+                // (Defer creation/writing of actual Bank Pid/TOF data
+                //    to bankPidTOFBuffersReady(), create & write
+                //    in one shot...)
+
+                // (Defer creation/writing of actual Bank Event Index data
+                //    to bankIndexBuffersReady(), create & write
+                //    in one shot...)
 
                 // Top-level Event data group
                 makeGroup( a_bi->m_event_path, "NXevent_data" );
-                makeLink( a_bi->m_tof_path,
-                    a_bi->m_event_path + "/" + m_tof_name );
-                makeLink( a_bi->m_pid_path,
-                    a_bi->m_event_path + "/" + m_pid_name );
-                makeLink( a_bi->m_index_path,
-                    a_bi->m_event_path + "/" + m_index_name );
 
-                // Link pulse time to bank event times
-                makeLink( a_bi->m_time_path,
-                    a_bi->m_instr_path + "/" + m_pulse_time_name );
-                makeLink( a_bi->m_time_path,
-                    a_bi->m_event_path + "/" + m_pulse_time_name );
+                // (Defer linking of Top-level Event data, which
+                //     won't exist until later in bank*BuffersReady()...)
+
+                // (Defer linking of Pulse Time data, which won't exist
+                //     until later in bankFinalize()... :-)
             }
 
             // NeXus Histogram-based Structures
-            if ( a_bi->m_has_histo )
-            {
-                // Histo data
+            // ( a_bi->m_has_histo )
 
-                // (defer creation/writing of actual histogram data
-                //     to bankFinalize(), create & write in one shot...)
+            // (Defer creation/writing of actual histogram data
+            //     to bankFinalize(), create & write in one shot...)
 
-                makeDataset( a_bi->m_instr_path, m_histo_pid_name,
-                    NeXus::UINT32 );
-                makeDataset( a_bi->m_instr_path, m_tofbin_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
-
-                // Top-level Histo data group
-
-                makeGroup( a_bi->m_histo_path, "NXdata" );
-
-                // (defer linking of histogram data, which won't exist
-                //     until later in bankFinalize()... :-)
-
-                makeLink( a_bi->m_histo_pid_path,
-                    a_bi->m_histo_path + "/" + m_histo_pid_name );
-                makeLink( a_bi->m_tofbin_path,
-                    a_bi->m_histo_path + "/" + m_tofbin_name );
-            }
+            // (Defer linking of histogram data, which won't exist
+            //     until later in bankFinalize()... :-)
 
             // NeXus Structures are Now Initialized
             a_bi->m_nexus_init = true;
@@ -388,26 +365,26 @@ NxGen::makeMonitorInfo
             // Histo-based Monitor
             if ( mi->m_config != NULL )
             {
-                makeDataset( mi->m_path, m_data_name,
-                    NeXus::UINT32, "" );
-                makeDataset( mi->m_path, m_tofbin_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
+                // (Defer creation/writing of actual histogram data
+                //     to monitorFinalize(), create & write in one shot...)
 
                 writeScalar( mi->m_path, "distance",
                     mi->m_config->distance, "" );
                 writeString( mi->m_path, "mode", "monitor" );
             }
 
-            // Event-based Monitor
-            else
-            {
-                makeDataset( mi->m_path, m_tof_name,
-                    NeXus::FLOAT32, TIME_USEC_UNITS );
-                makeDataset( mi->m_path, m_index_name, NeXus::UINT64 );
+            // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
 
-                makeLink( m_daslogs_freq_path + "/time",
-                    mi->m_path + "/" + m_pulse_time_name );
-            }
+            // (Defer creation/writing of actual Monitor TOF data
+            //    to monitorTOFBuffersReady(), create & write
+            //    in one shot...)
+
+            // (Defer creation/writing of actual Monitor Event Index data
+            //    to monitorIndexBuffersReady(), create & write
+            //    in one shot...)
+
+            // (Defer creation of Pulse Time Link to monitorFinalize(),
+            //    after the Dataset is sure to have been created...)
         }
 
         return mi;
@@ -444,47 +421,29 @@ NxGen::initialize()
 
         // Create pulse frequency log
         makeGroup( m_daslogs_freq_path, "NXlog" );
-        makeDataset( m_daslogs_freq_path, "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_freq_path, "value",
-            NeXus::FLOAT64, FREQ_UNITS );
+
+        // (Defer creation of actual frequency datasets
+        //     to pulseBuffersReady(), create & write in one shot...)
 
         // Create proton charge log (time same as pulse frequency)
         makeGroup( m_daslogs_pchg_path, "NXlog" );
-        makeDataset( m_daslogs_pchg_path, "value",
-            NeXus::FLOAT64, CHARGE_UNITS );
-        makeLink( m_daslogs_freq_path + "/time",
-            m_daslogs_pchg_path + "/time" );
+
+        // (Defer creation of actual proton charge datasets
+        //     to pulseBuffersReady(), create & write in one shot...)
 
         // Create pulse veto log
         makeGroup( m_daslogs_path + "/Veto_pulse", "NXcollection" );
-        makeDataset( m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
+
+        // (Defer creation of actual pulse veto dataset
+        //     to pulseBuffersReady() or finalize(),
+        //     create & write in one shot...)
 
         // Create pulse flag log
         makeGroup( m_daslogs_path + "/pulse_flags", "NXcollection" );
-        makeDataset( m_daslogs_path + "/pulse_flags", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/pulse_flags", "value",
-            NeXus::UINT32 );
 
-        // Create pause event log
-        makeGroup( m_daslogs_path + "/pause", "NXlog" );
-        makeDataset( m_daslogs_path + "/pause", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/pause", "value", NeXus::UINT16 );
-
-        // Create scan event log
-        makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
-        makeDataset( m_daslogs_path + "/scan_index", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
-        makeDataset( m_daslogs_path + "/scan_index", "value",
-            NeXus::UINT32 );
-
-        // Create comment event log
-        makeGroup( m_daslogs_path + "/comments", "NXcollection" );
-        makeDataset( m_daslogs_path + "/comments", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS );
+        // (Defer creation of actual pulse flags datasets
+        //     to pulseBuffersReady() or finalize(),
+        //     create & write in one shot...)
 
         // Insert initial "not in scan" value
         m_scan_time.push_back( 0.0 );
@@ -540,15 +499,46 @@ NxGen::finalize
         // Flush any remaining pulse vetos
         if ( m_pulse_vetoes.size() )
         {
+            // Create Pulse Vetoes Dataset on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_vetoes_cur_size )
+            {
+                makeDataset(
+                    m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_vetoes.size() );
+            }
+
+            // Write Pulse Vetoes Time Buffer
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
                 m_pulse_vetoes, m_pulse_vetoes_cur_size );
             m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
+        // Make Sure We Create Empty Pulse Vetoes Log, Even if No Vetoes!
+        else if ( !m_pulse_vetoes_cur_size )
+        {
+            makeDataset( m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, 1 );
+        }
+
         // Flush any remaining pulse flags
         if ( m_pulse_flags_time.size() )
         {
+            // Create Pulse Flags Datasets on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_flags_cur_size )
+            {
+                makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_flags_time.size() );
+                makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                    NeXus::UINT32, "",
+                    m_pulse_flags_value.size() );
+            }
+
+            // Write Pulse Flags Time and Value Buffers
             writeSlab( m_daslogs_path + "/pulse_flags/time",
                 m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
@@ -556,6 +546,15 @@ NxGen::finalize
             m_pulse_flags_cur_size +=  m_pulse_flags_time.size();
             m_pulse_flags_time.clear();
             m_pulse_flags_value.clear();
+        }
+
+        // Make Sure We Create Empty Pulse Flags Logs, Even if No Flags!
+        else if ( !m_pulse_flags_cur_size )
+        {
+            makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, 1 );
+            makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                NeXus::UINT32, "", 1 );
         }
 
         // Flush stream marker data
@@ -958,14 +957,63 @@ NxGen::pulseBuffersReady
 
     try
     {
-        writeSlab( m_daslogs_freq_path + "/time",
-            a_pulse_info.times, m_pulse_info_cur_size );
-        writeSlab( m_daslogs_freq_path + "/value",
-            a_pulse_info.freqs, m_pulse_info_cur_size );
-        writeSlab( m_daslogs_pchg_path + "/value",
-            a_pulse_info.charges, m_pulse_info_cur_size );
+        // Create Pulse Frequency/Time and Pulse Proton Charge Datasets
+        //    on First (or Final) Buffer Flush...
+        // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+        if ( !m_pulse_info_cur_size )
+        {
+            // Determine Appropriate Chunk Size for Datasets...
+            unsigned long chunk_size;
+            if ( a_pulse_info.times.size() )
+            {
+                // This could be the same as the Default Chunk Size
+                //    if we're dumping buffers mid-run...
+                // Otherwise, if this is the Final Dump, it could be Less!
+                chunk_size = a_pulse_info.times.size();
+            }
+            else
+            {
+                // This is the Final Dump and There aren't any Pulses?!
+                // Create Some Dummy Datasets for Linking, etc...
+                syslog( LOG_ERR, "[%i] %s! %s for %s and %s", g_pid,
+                    "STS Error: Empty Final Pulse Info Buffer(s)",
+                    "Creating Dummy Datasets",
+                    m_daslogs_freq_path.c_str(),
+                    m_daslogs_pchg_path.c_str() );
+                usleep(30000); // give syslog a chance...
+                chunk_size = 1;
+            }
 
-        m_pulse_info_cur_size += a_pulse_info.times.size();
+            // Create Pulse Frequency Time & Value Datasets
+            makeDataset( m_daslogs_freq_path, "time",
+                NeXus::FLOAT64, TIME_SEC_UNITS, chunk_size );
+            makeDataset( m_daslogs_freq_path, "value",
+                NeXus::FLOAT64, FREQ_UNITS, chunk_size );
+
+            // Create Pulse Proton Charge Dataset
+            makeDataset( m_daslogs_pchg_path, "value",
+                NeXus::FLOAT64, CHARGE_UNITS, chunk_size );
+
+            // Link Proton Charge Time from Pulse Frequency Time Dataset
+            // (Now that it's created... :-)
+            makeLink( m_daslogs_freq_path + "/time",
+                m_daslogs_pchg_path + "/time" );
+        }
+
+        // Now Only Write Pulse Frequency/Time and Pulse Proton Charge
+        //    if there's something to write...
+        // (Buffers could already be empty for final call...)
+        if ( a_pulse_info.times.size() )
+        {
+            writeSlab( m_daslogs_freq_path + "/time",
+                a_pulse_info.times, m_pulse_info_cur_size );
+            writeSlab( m_daslogs_freq_path + "/value",
+                a_pulse_info.freqs, m_pulse_info_cur_size );
+            writeSlab( m_daslogs_pchg_path + "/value",
+                a_pulse_info.charges, m_pulse_info_cur_size );
+
+            m_pulse_info_cur_size += a_pulse_info.times.size();
+        }
 
         // Must process pulse flags linearly
         vector<double>::iterator t = a_pulse_info.times.begin();
@@ -983,21 +1031,47 @@ NxGen::pulseBuffersReady
                     (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
             }
 
-            // Write pulse vetoes to dedicated DASlog area
+            // Write pulse vetoes to dedicated DASlog buffer
             if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
                 m_pulse_vetoes.push_back( *t );
         }
 
+        // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_vetoes.size() > m_chunk_size )
         {
+            // Create Pulse Vetoes Dataset on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_vetoes_cur_size )
+            {
+                makeDataset(
+                    m_daslogs_path + "/Veto_pulse", "veto_pulse_time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_vetoes.size() );
+            }
+
+            // Write Pulse Vetoes Time Buffer
             writeSlab( m_daslogs_path + "/Veto_pulse/veto_pulse_time",
                 m_pulse_vetoes, m_pulse_vetoes_cur_size );
             m_pulse_vetoes_cur_size +=  m_pulse_vetoes.size();
             m_pulse_vetoes.clear();
         }
 
+        // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
         if ( m_pulse_flags_value.size() > m_chunk_size )
         {
+            // Create Pulse Flags Datasets on First Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !m_pulse_flags_cur_size )
+            {
+                makeDataset( m_daslogs_path + "/pulse_flags", "time",
+                    NeXus::FLOAT64, TIME_SEC_UNITS,
+                    m_pulse_flags_time.size() );
+                makeDataset( m_daslogs_path + "/pulse_flags", "value",
+                    NeXus::UINT32, "",
+                    m_pulse_flags_value.size() );
+            }
+
+            // Write Pulse Flags Time and Value Buffers
             writeSlab( m_daslogs_path + "/pulse_flags/time",
                 m_pulse_flags_time, m_pulse_flags_cur_size );
             writeSlab( m_daslogs_path + "/pulse_flags/value",
@@ -1014,12 +1088,12 @@ NxGen::pulseBuffersReady
 }
 
 
-/*! \brief Writes bank event buffers to Nexus file
+/*! \brief Writes Bank PID and TOF Event Buffers to Nexus file
  *
- * This method writes time of flight, pixel ID, and index data in bank event buffers to the Nexus file.
+ * This method writes pixel ID and time of flight in bank event buffers to the Nexus file.
  */
 void
-NxGen::bankBuffersReady
+NxGen::bankPidTOFBuffersReady
 (
     STS::BankInfo &a_bank   ///< [in] Detector bank to write
 )
@@ -1033,7 +1107,7 @@ NxGen::bankBuffersReady
         if ( !bi )
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
-                "Invalid bank object passed to bankBuffersReady()" )
+                "Invalid bank object passed to bankPidTOFBuffersReady()" )
         }
 
         // Make Sure Data has been (Late) Initialized...
@@ -1047,6 +1121,28 @@ NxGen::bankBuffersReady
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Create Bank Pid/TOF Dataset on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !(bi->m_event_cur_size) )
+            {
+                // Chunk Size Override: If There's _No_ Pid/TOF Values,
+                //    Then Create Dummy Empty Datasets (Chunk Size = 1)
+                unsigned long chunk_size = ( a_bank.m_tof_buffer_size )
+                    ? ( a_bank.m_tof_buffer_size ) : 1;
+
+                makeDataset( bi->m_instr_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
+                makeDataset( bi->m_instr_path, m_pid_name,
+                    NeXus::UINT32, "", chunk_size );
+
+                // Link Bank Pid/TOF Datasets to Top-level Event Data Group
+                // (Now that they're created... :-)
+                makeLink( bi->m_tof_path,
+                    bi->m_event_path + "/" + m_tof_name );
+                makeLink( bi->m_pid_path,
+                    bi->m_event_path + "/" + m_pid_name );
+            }
+
             writeSlab( bi->m_tof_path,
                 a_bank.m_tof_buffer, a_bank.m_tof_buffer_size,
                 bi->m_event_cur_size );
@@ -1055,6 +1151,81 @@ NxGen::bankBuffersReady
                 bi->m_event_cur_size );
 
             bi->m_event_cur_size += a_bank.m_tof_buffer_size;
+        }
+
+        // No NeXus Histogram-based Handling Needed Here...
+
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "bankPidTOFBuffersReady() failed for bank id: "
+            << a_bank.m_id )
+    }
+}
+
+
+/*! \brief Writes Bank Event Index Buffers to Nexus file
+ *
+ * This method writes index data in bank event buffers to the Nexus file.
+ */
+void
+NxGen::bankIndexBuffersReady
+(
+    STS::BankInfo &a_bank,          ///< [in] Detector bank to write
+    bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
+)
+{
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
+        NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
+        if ( !bi )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+                "Invalid bank object passed to bankIndexBuffersReady()" )
+        }
+
+        // Make Sure Data has been (Late) Initialized...
+        if ( !(bi->m_initialized) )
+            bi->initializeBank( false );
+
+        // Make Sure NeXus Structures have been (Late) Initialized...
+        if ( !(bi->m_nexus_init) )
+            initializeNxBank( bi, false );
+
+        // NeXus Event-based Data...
+        if ( bi->m_has_event )
+        {
+            // Create Bank Event Index Dataset
+            //    on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override,
+            //    unless Explicitly Default for Pulse Gap Handling...)
+            if ( !(bi->m_index_cur_size) )
+            {
+                unsigned long chunk_size;
+                // Use Default Chunking (for Pulse Gap Fill Handling...)
+                if ( use_default_chunk_size )
+                    chunk_size = 0;
+                // Use Chunk Size Override...
+                else
+                {
+                    // If There's _No_ Event Indices,
+                    //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                    chunk_size = ( a_bank.m_index_buffer.size() )
+                        ? ( a_bank.m_index_buffer.size() ) : 1;
+                }
+
+                makeDataset( bi->m_instr_path, m_index_name,
+                    NeXus::UINT64, "", chunk_size );
+
+                // Link Bank Event Index Dataset
+                //    to Top-level Event Data Group
+                // (Now that it's created... :-)
+                makeLink( bi->m_index_path,
+                    bi->m_event_path + "/" + m_index_name );
+            }
 
             writeSlab( bi->m_index_path,
                 a_bank.m_index_buffer, bi->m_index_cur_size );
@@ -1067,7 +1238,7 @@ NxGen::bankBuffersReady
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "bankBuffersReady() failed for bank id: "
+        RETHROW_TRACE( e, "bankIndexBuffersReady() failed for bank id: "
             << a_bank.m_id )
     }
 }
@@ -1104,6 +1275,10 @@ NxGen::bankPulseGap
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Note: bankIndexBuffersReady() must have been called
+            //    _Before_ Now, to Create Bank Event Index Dataset...!
+            // (This is done in StreamParser::handleBankPulseGap().)
+
             fillSlab( bi->m_index_path,
                 bi->m_event_count, a_count, bi->m_index_cur_size );
             bi->m_index_cur_size += a_count;
@@ -1149,11 +1324,19 @@ NxGen::bankFinalize
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
+            // Create and Link Total Counts for this Detector Bank...
             string total_path = m_instrument_path + "/" + bi->m_name;
             writeScalar( total_path, "total_counts",
                 bi->m_event_count, "" );
             makeLink( total_path + "/total_counts",
                 m_entry_path + "/" + bi->m_eventname + "/total_counts" );
+
+            // NOW Link Pulse Time to this Detector Bank...
+            //    - the Pulse Time Dataset Must have been Created by Now!
+            makeLink( bi->m_time_path,
+                bi->m_instr_path + "/" + m_pulse_time_name );
+            makeLink( bi->m_time_path,
+                bi->m_event_path + "/" + m_pulse_time_name );
         }
 
         // NeXus Histogram-based Data...
@@ -1198,9 +1381,13 @@ NxGen::bankFinalize
             writeStringAttribute( bi->m_instr_path + "/" + m_data_name,
                 "signal", "1" );
 
-            // Link Multi-dimensional Data into NXdata Histo group...
-            makeLink( bi->m_data_path,
-                bi->m_histo_path + "/" + m_data_name );
+            // Create Histo Bank PixelIds and TOF Bins Now...
+            // (including proper Chunk Size Overriding...! ;-D)
+            makeDataset( bi->m_instr_path, m_histo_pid_name,
+                NeXus::UINT32, "", bi->m_logical_pixelids.size() );
+            makeDataset( bi->m_instr_path, m_tofbin_name,
+                NeXus::FLOAT32, TIME_USEC_UNITS,
+                bi->m_tofbin_buffer.size() );
 
             // Write out Bank PixelIds...
             writeSlab( bi->m_histo_pid_path,
@@ -1217,6 +1404,19 @@ NxGen::bankFinalize
             writeStringAttribute(
                 bi->m_instr_path + "/" + m_tofbin_name, "axis", "2" );
 
+            // Top-level Histo data group
+            makeGroup( bi->m_histo_path, "NXdata" );
+
+            // Link Multi-dimensional Data into NXdata Histo group...
+            makeLink( bi->m_data_path,
+                bi->m_histo_path + "/" + m_data_name );
+
+            // Link Pixel Id and TOF Bin Data into NXdata Histo group...
+            makeLink( bi->m_histo_pid_path,
+                bi->m_histo_path + "/" + m_histo_pid_name );
+            makeLink( bi->m_tofbin_path,
+                bi->m_histo_path + "/" + m_tofbin_name );
+
             // Write Out Total Counts for Histograms, too... ;-D
             writeScalar( bi->m_histo_path, "total_counts",
                 bi->m_histo_event_count, "" );
@@ -1232,13 +1432,13 @@ NxGen::bankFinalize
 }
 
 
-/*! \brief Writes monitor event buffers to Nexus file
+/*! \brief Writes Monitor Event TOF buffers to Nexus file
  *
- * This method writes time of flight and index data in monitor buffers
+ * This method writes event time of flight data in monitor buffers
  * to the Nexus file.
  */
 void
-NxGen::monitorBuffersReady
+NxGen::monitorTOFBuffersReady
 (
     STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
@@ -1252,16 +1452,89 @@ NxGen::monitorBuffersReady
         if ( !mi )
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
-                "Invalid monitor object passed to monitorBuffersReady()" )
+              "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
 
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
+            // Create Monitor TOF Dataset on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
+            if ( !(mi->m_event_cur_size) )
+            {
+                // Chunk Size Override: If There's _No_ TOF Values,
+                //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                unsigned long chunk_size = ( a_monitor.m_tof_buffer_size )
+                    ? ( a_monitor.m_tof_buffer_size ) : 1;
+
+                makeDataset( mi->m_path, m_tof_name,
+                    NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
+            }
+
             writeSlab( mi->m_tof_path,
                 a_monitor.m_tof_buffer, a_monitor.m_tof_buffer_size,
                 mi->m_event_cur_size );
             mi->m_event_cur_size += a_monitor.m_tof_buffer_size;
+        }
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e,
+            "monitorTOFBuffersReady() failed for monitor id: "
+            << a_monitor.m_id )
+    }
+}
+
+
+/*! \brief Writes Monitor Event Index buffers to Nexus file
+ *
+ * This method writes event index data in monitor buffers
+ * to the Nexus file.
+ */
+void
+NxGen::monitorIndexBuffersReady
+(
+    STS::MonitorInfo &a_monitor,    ///< [in] Monitor with events to write
+    bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
+)
+{
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
+        NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
+        if ( !mi )
+        {
+            THROW_TRACE( STS::ERR_CAST_FAILED,
+            "Invalid monitor object passed to monitorIndexBuffersReady()" )
+        }
+
+        // Event-based Monitors Only...
+        if ( mi->m_config == NULL )
+        {
+            // Create Monitor Event Index Dataset
+            //    on First (or Final) Buffer Flush
+            // ("Lazy" Dataset Create, with Chunk Size Override,
+            //    unless Explicitly Default for Pulse Gap Handling...)
+            if ( !(mi->m_index_cur_size) )
+            {
+                unsigned long chunk_size;
+                // Use Default Chunking (for Pulse Gap Fill Handling...)
+                if ( use_default_chunk_size )
+                    chunk_size = 0;
+                // Use Chunk Size Override...
+                else
+                {
+                    // If There's _No_ Event Indices,
+                    //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+                    chunk_size = ( a_monitor.m_index_buffer.size() )
+                        ? ( a_monitor.m_index_buffer.size() ) : 1;
+                }
+
+                makeDataset( mi->m_path, m_index_name,
+                    NeXus::UINT64, "", chunk_size );
+            }
 
             writeSlab( mi->m_index_path,
                 a_monitor.m_index_buffer, mi->m_index_cur_size );
@@ -1270,7 +1543,8 @@ NxGen::monitorBuffersReady
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "monitorBuffersReady() failed for monitor id: "
+        RETHROW_TRACE( e,
+            "monitorIndexBuffersReady() failed for monitor id: "
             << a_monitor.m_id )
     }
 }
@@ -1303,6 +1577,10 @@ NxGen::monitorPulseGap
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
+            // Note: monitorIndexBuffersReady() must have been called
+            //    _Before_ Now, to Create Monitor Event Index Dataset...!
+            // (This is done in StreamParser::handleMonitorPulseGap().)
+
             fillSlab( mi->m_index_path, mi->m_event_count,
                 a_count, mi->m_index_cur_size );
             mi->m_index_cur_size += a_count;
@@ -1342,8 +1620,19 @@ NxGen::monitorFinalize
         // Histo-based Monitor
         if ( mi->m_config != NULL )
         {
+            // Create Monitor Histo Data and TOF Bins Now...
+            // (including proper Chunk Size Overriding...! ;-D)
+            makeDataset( mi->m_path, m_data_name,
+                NeXus::UINT32, "",
+                mi->m_data_buffer.size() );
+            makeDataset( mi->m_path, m_tofbin_name,
+                NeXus::FLOAT32, TIME_USEC_UNITS,
+                mi->m_tofbin_buffer.size() );
+
+            // Write out Monitor Histo Data...
             writeSlab( mi->m_data_path, mi->m_data_buffer, 0 );
 
+            // Write out TOF Bins...
             writeSlab( mi->m_tofbin_path, mi->m_tofbin_buffer, 0 );
 
             // Write Out Total Counts for Histogram Mode, too... ;-D
@@ -1358,6 +1647,11 @@ NxGen::monitorFinalize
         {
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_counts", mi->m_event_count, "" );
+
+            // NOW Link Pulse Time to this Monitor...
+            //    - the Pulse Time Dataset Must have been Created by Now!
+            makeLink( m_daslogs_freq_path + "/time",
+                mi->m_path + "/" + m_pulse_time_name );
         }
     }
     catch( TraceException &e )
@@ -1541,6 +1835,14 @@ NxGen::flushPauseData()
 {
     try
     {
+        // Create Pause Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/pause", "NXlog" );
+        makeDataset( m_daslogs_path + "/pause", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_pause_time.size() );
+        makeDataset( m_daslogs_path + "/pause", "value",
+            NeXus::UINT16, "", m_pause_value.size() );
+
+        // Write Pause Time and Value Slabs
         writeSlab( m_daslogs_path + "/pause/time", m_pause_time, 0 );
         writeSlab( m_daslogs_path + "/pause/value", m_pause_value, 0 );
 
@@ -1563,6 +1865,14 @@ NxGen::flushScanData()
 {
     try
     {
+        // Create Scan Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
+        makeDataset( m_daslogs_path + "/scan_index", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_scan_time.size() );
+        makeDataset( m_daslogs_path + "/scan_index", "value",
+            NeXus::UINT32, "", m_scan_value.size() );
+
+        // Write Scan Index Time and Value Slabs
         writeSlab( m_daslogs_path + "/scan_index/time", m_scan_time, 0 );
         writeSlab( m_daslogs_path + "/scan_index/value", m_scan_value, 0 );
 
@@ -1585,6 +1895,12 @@ NxGen::flushCommentData()
 {
     try
     {
+        // Create Comment Event Log (with Known Minimum Chunk Size...)
+        makeGroup( m_daslogs_path + "/comments", "NXcollection" );
+        makeDataset( m_daslogs_path + "/comments", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_comment_time.size() );
+
+        // Write Comment Time Slab
         writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
 
         // Comment Strings as 2D String Dataset
@@ -1631,7 +1947,7 @@ NxGen::flushCommentData()
                 "No Comment Strings, Creating Empty Comments Value" );
             usleep(30000); // give syslog a chance...
             makeDataset( m_daslogs_path + "/comments",
-                "value", NeXus::CHAR );
+                "value", NeXus::CHAR, "", 1 );
         }
 
         m_comment_time.clear();
@@ -1721,7 +2037,8 @@ NxGen::writeDeviceEnums
 
             makeGroup( ss.str(), "NXcollection" );
 
-            makeDataset( ss.str(), "values", NeXus::UINT32 );
+            makeDataset( ss.str(), "values", NeXus::UINT32, "",
+                ienum->element_values.size() );
 
             // Does Everything "Match Up" for the "Easy" Enum Format...?
             bool easy = true;
@@ -1796,7 +2113,7 @@ NxGen::writeDeviceEnums
                     "STS Error: Empty Enum Names",
                     "Creating Dummy Names", ss.str().c_str() );
                 usleep(30000); // give syslog a chance...
-                makeDataset( ss.str(), "names", NeXus::CHAR );
+                makeDataset( ss.str(), "names", NeXus::CHAR, "", 1 );
             }
 
             // Enum Element Values
@@ -1889,11 +2206,18 @@ NxGen::makeDataset
     const std::string  &a_path,     ///< [in] Nexus path of new dataset
     const std::string  &a_name,     ///< [in] Name of new dataset
     NeXus::NXnumtype    a_type,     ///< [in] Nexus type of new dataset
-    const string        a_units     ///< [in] Optional units of new dataset
+    const string        a_units,    ///< [in] Optional units of new dataset
+    unsigned long       a_chunk_size ///< [in] Optional chunk size override
 )
 {
+    // Accept Chunk Size Override for Less-Than-Full-Chunk-Size Data...
+    // NOTE: Chunk Size is measured in *Dataset Elements*...! :-O
+    unsigned long chunk_size =
+        ( a_chunk_size && a_chunk_size < m_chunk_size ) ?
+            a_chunk_size : m_chunk_size;
+
     if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type,
-            m_chunk_size ) != SUCCEED )
+            chunk_size ) != SUCCEED )
     {
         THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
             "H5NXcreate_dataset_extend() failed for path: " << a_path

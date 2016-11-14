@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.6.3"
+#define PVSD_VERSION "1.6.4"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -296,7 +296,9 @@ int main(int argc, char *argv[])
     try
     {
         // Create ComBus instance
-        combus = new ::ADARA::ComBus::Connection( domain, "PVSD", pid, broker_uri, broker_user, broker_pass );
+        combus = new ::ADARA::ComBus::Connection(
+            domain, "PVSD", pid, broker_uri, broker_user, broker_pass,
+            "PVSD ComBus", "PVSD ERROR ComBus" );
 
         // Create and start protocol streamer
         StreamService   streamer( 100, offset );

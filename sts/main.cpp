@@ -133,7 +133,7 @@ int main( int argc, char** argv )
     bool                        interact;
     string                      work_path;
     string                      base_path;
-    unsigned long               chunk_size;
+    unsigned long               chunk_size; // in Dataset Elements! :-O
     unsigned short              evt_buf_size;
     unsigned short              anc_buf_size;
     unsigned long               cache_size;
@@ -187,7 +187,7 @@ int main( int argc, char** argv )
                 ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
                 ("base-path,b",po::value<string>( &base_path ),"set base cataloging path (none by defualt)")
                 ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
-                ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 49152 ),"set hdf5 chunk size (in bytes)")
+                ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 49152 ),"set hdf5 chunk size (in Dataset Elements!)")
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
                 ("event-buf-size", po::value<unsigned short>( &evt_buf_size )->default_value( 200 ),"set event buffers to (in chunks)")
                 ("anc-buf-size", po::value<unsigned short>( &anc_buf_size )->default_value( 20 ),"set ancillary buffers (in chunks)")
@@ -256,7 +256,8 @@ int main( int argc, char** argv )
             cout << "  work path     : " << work_path << endl;
             cout << "  base path     : " << base_path << endl;
             cout << "  move nexus    : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  chunk size    : " << chunk_size << " (bytes)" << endl;
+            cout << "  chunk size    : " << chunk_size
+                 << " (Dataset Elements!)" << endl;
             cout << "  cache size    : " << cache_size << " (bytes)" << endl;
             cout << "  evt buf size  : " << evt_buf_size << " (chunks)" << endl;
             cout << "  anc buf size  : " << anc_buf_size << " (chunks)" << endl;

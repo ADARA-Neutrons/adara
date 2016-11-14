@@ -23,6 +23,19 @@ namespace EPICS {
 //=============================================================================
 //----- Public Methods --------------------------------------------------------
 
+void ca_exception_handler( struct exception_handler_args args )
+{
+    const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
+
+    syslog( LOG_ERR,
+        "%s %s: %s! %s=[%s] - %s %s=[%s] %s=%ld %s=[%s] %s=%ld [%s]",
+        "PVSD ERROR:", "EPICSInputAdapter::ca_exception_handler()",
+        "Caught EPICS Exception", "Context", args.ctx,
+        "with Request", "ChannelId", pName, "Operation", args.op,
+        "DataType", dbr_type_to_text( args.type ), "Count", args.count,
+        "Continuing...!" );
+    usleep(33333); // give syslog a chance...
+}
 
 /** \brief EPICS::InputAdapter constructor
   * \param a_stream_serv - Parent StreamService instance
@@ -44,6 +57,10 @@ InputAdapter::InputAdapter( StreamService &a_stream_serv,
 
     // Capture the StreamService's ConfigManager's Device ID Offset... ;-Q
     m_offset = a_stream_serv.getCfgMgr().getOffset();
+
+    // Install Non-Default (And Non-Terminating!) Channel Access
+    // Exception Handler for the PVSD...! ;-D
+    ca_add_exception_event ( ca_exception_handler , 0 );
 
     // Start monitor and GC threads
     m_cfg_mon_thread = new boost::thread(

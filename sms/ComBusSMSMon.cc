@@ -34,6 +34,19 @@ bool SMSRunStatus::hasTime()
 	return m_start_time.tv_sec || m_start_time.tv_nsec;
 }
 
+void ca_exception_handler( struct exception_handler_args args )
+{
+	const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
+
+	ERROR("ComBusSMSMon::ca_exception_handler(): Caught EPICS Exception!"
+		<< " Context=[" << args.ctx << "]"
+		<< " - with Request ChannelId=[" << pName << "]"
+		<< " Operation=" << args.op
+		<< " DataType=[" << dbr_type_to_text( args.type ) << "]"
+		<< " Count=" << args.count
+		<< " [Continuing...!]");
+}
+
 ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 		std::string a_facility = std::string("SNS") ) :
 	m_combus(0),
@@ -42,7 +55,11 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_comm_thread(0),
 	m_stop(false),
 	m_inqueue(new epicsMessageQueue(100, sizeof(SMSRunStatus *)))
-{ }
+{
+	// Install Non-Default (And Non-Terminating!) Channel Access
+	// Exception Handler for the SMS...! ;-D
+	ca_add_exception_event ( ca_exception_handler , 0 );
+}
 
 ComBusSMSMon::~ComBusSMSMon()
 {
@@ -83,8 +100,19 @@ void ComBusSMSMon::sendOriginal(
 	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
 		a_run_state, a_start_time );
 
-	if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
-		ERROR("ComBusSMSMon::SendOriginal() failed");
+	try
+	{
+		if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
+			ERROR("ComBusSMSMon::SendOriginal() failed");
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon::SendOriginal() Exception - " << e.what());
+	}
+	catch (...)
+	{
+		ERROR("ComBusSMSMon::SendOriginal() Unknown Exception!");
+	}
 }
 
 void ComBusSMSMon::sendUpdate(
@@ -94,8 +122,19 @@ void ComBusSMSMon::sendUpdate(
 	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
 		a_run_state );
 
-	if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
-		ERROR("ComBusSMSMon::SendUpdate() failed");
+	try
+	{
+		if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
+			ERROR("ComBusSMSMon::SendUpdate() failed");
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon::SendUpdate() Exception - " << e.what());
+	}
+	catch (...)
+	{
+		ERROR("ComBusSMSMon::SendUpdate() Unknown Exception!");
+	}
 }
 
 void
@@ -144,19 +183,39 @@ ComBusSMSMon::start(void)
 
 void ComBusSMSMon::openComm()
 {
-	m_combus = new ADARA::ComBus::Connection( m_domain, "SMS", getpid(),
-		m_broker_uri, m_broker_user, m_broker_pass );
-
-	if ( !m_combus->waitForConnect( 5 ) )
+	try
 	{
-		ERROR("SMS ComBus Connection Timeout"
+		m_combus = new ADARA::ComBus::Connection(
+			m_domain, "SMS", getpid(),
+			m_broker_uri, m_broker_user, m_broker_pass,
+			"SMS ComBus", "ERROR SMS ComBus" );
+
+		if ( !m_combus->waitForConnect( 5 ) )
+		{
+			ERROR("SMS ComBus Connection Timeout"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
+		}
+		else
+		{
+			INFO("SMS ComBus Connection Succeeded"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
+		}
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon::openComm() Exception"
 			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
-			<< " as User " << m_broker_user);
+			<< " as User " << m_broker_user
+			<< " - " << e.what());
 	}
-	else
+	catch (...)
 	{
-		INFO("SMS ComBus Connection Succeeded"
+		ERROR("ComBusSMSMon::openComm() Unknown Exception"
 			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
@@ -165,19 +224,37 @@ void ComBusSMSMon::openComm()
 
 void ComBusSMSMon::reOpenComm()
 {
-	m_combus->setConnection(m_domain, m_broker_uri, m_broker_user,
-				m_broker_pass);
-
-	if ( !m_combus->waitForConnect( 5 ) )
+	try
 	{
-		ERROR("SMS ComBus Reconnection Timeout"
+		m_combus->setConnection(m_domain, m_broker_uri, m_broker_user,
+			m_broker_pass);
+
+		if ( !m_combus->waitForConnect( 5 ) )
+		{
+			ERROR("SMS ComBus Reconnection Timeout"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
+		}
+		else
+		{
+			INFO("SMS ComBus Reconnection Succeeded"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
+		}
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon::reOpenComm() Exception"
 			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
-			<< " as User " << m_broker_user);
+			<< " as User " << m_broker_user
+			<< " - " << e.what());
 	}
-	else
+	catch (...)
 	{
-		INFO("SMS ComBus Reconnection Succeeded"
+		ERROR("ComBusSMSMon::reOpenComm() Unknown Exception"
 			<< " for Domain " << m_domain
 			<< " to URI " << m_broker_uri
 			<< " as User " << m_broker_user);
@@ -197,7 +274,7 @@ void ComBusSMSMon::restartCallback(struct event_handler_args args) {
 void ComBusSMSMon::commThread()
 {
 	unsigned long hb = 0;
-	SMSRunStatus *inpu, *lookup;
+	SMSRunStatus *inpu = 0, *lookup = 0;
 	int bytesrec = 0;
 	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
 	char inbuf[smsStringPV::MAX_LENGTH];
@@ -307,52 +384,79 @@ void ComBusSMSMon::commThread()
 			continue;
 		}
 
-		bytesrec = m_inqueue->receive( &inpu, sizeof(SMSRunStatus *), 1.0 );
-		if ( bytesrec == -1 || !inpu ) {
-			hb++;
-			if (hb > 5) {
-				m_combus->status( ADARA::ComBus::STATUS_OK );
-				hb = 0;
-			}
-			continue;
-		}
-
-		if ( m_run_dict.count( inpu->m_run_num ) ) {
-			lookup = m_run_dict[ inpu->m_run_num ];
-			lookup->m_proposal_id = inpu->m_proposal_id;
-			lookup->m_reason = inpu->m_reason;
-			if ( inpu->hasTime() ) {
-				lookup->m_start_time = inpu->m_start_time;
-			}
-			delete inpu; inpu = 0;
-		}
-		else {
-			m_run_dict[ inpu->m_run_num ] = inpu;
-			lookup = inpu;
-		}
-
-		ADARA::ComBus::SMS::StatusUpdateMsg newmsg( m_facility,
-			m_beam_sname,
-			lookup->m_start_time,
-			lookup->m_run_num,
-			lookup->m_proposal_id,
-			lookup->m_reason );
-
-		if ( !m_combus->broadcast( newmsg ) )
+		try
 		{
-			WARN("SMS ComBus run " << lookup->m_run_num
+			bytesrec = m_inqueue->receive( &inpu,
+				sizeof(SMSRunStatus *), 1.0 );
+			if ( bytesrec == -1 || !inpu ) {
+				hb++;
+				if (hb > 5) {
+					m_combus->status( ADARA::ComBus::STATUS_OK );
+					hb = 0;
+				}
+				continue;
+			}
+
+			if ( m_run_dict.count( inpu->m_run_num ) ) {
+				lookup = m_run_dict[ inpu->m_run_num ];
+				lookup->m_proposal_id = inpu->m_proposal_id;
+				lookup->m_reason = inpu->m_reason;
+				if ( inpu->hasTime() ) {
+					lookup->m_start_time = inpu->m_start_time;
+				}
+				delete inpu; inpu = 0;
+			}
+			else {
+				m_run_dict[ inpu->m_run_num ] = inpu;
+				lookup = inpu;
+			}
+
+			ADARA::ComBus::SMS::StatusUpdateMsg newmsg( m_facility,
+				m_beam_sname,
+				lookup->m_start_time,
+				lookup->m_run_num,
+				lookup->m_proposal_id,
+				lookup->m_reason );
+
+			if ( !m_combus->broadcast( newmsg ) )
+			{
+				WARN("SMS ComBus run " << lookup->m_run_num
+					<< " proposal " << lookup->m_proposal_id
+					<< " status <" << lookup->m_reason
+					<< "> send failed"
+					<< " for Domain " << m_domain
+					<< " to URI " << m_broker_uri
+					<< " as User " << m_broker_user);
+			}
+			else
+			{
+				INFO("SMS ComBus run " << lookup->m_run_num
+					<< " proposal " << lookup->m_proposal_id
+					<< " status <" << lookup->m_reason << "> sent"
+					<< " for Domain " << m_domain
+					<< " to URI " << m_broker_uri
+					<< " as User " << m_broker_user);
+			}
+		}
+		catch ( std::exception &e )
+		{
+			ERROR("ComBusSMSMon::commThread() Receive Exception"
+				<< " for run " << lookup->m_run_num
 				<< " proposal " << lookup->m_proposal_id
 				<< " status <" << lookup->m_reason
 				<< "> send failed"
 				<< " for Domain " << m_domain
 				<< " to URI " << m_broker_uri
-				<< " as User " << m_broker_user);
+				<< " as User " << m_broker_user
+				<< " - " << e.what());
 		}
-		else
+		catch (...)
 		{
-			INFO("SMS ComBus run " << lookup->m_run_num
+			ERROR("ComBusSMSMon::commThread() Unknown Receive Exception"
+				<< " for run " << lookup->m_run_num
 				<< " proposal " << lookup->m_proposal_id
-				<< " status <" << lookup->m_reason << "> sent"
+				<< " status <" << lookup->m_reason
+				<< "> send failed"
 				<< " for Domain " << m_domain
 				<< " to URI " << m_broker_uri
 				<< " as User " << m_broker_user);

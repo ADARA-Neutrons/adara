@@ -81,7 +81,9 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
         m_domain += ".";
 
-    m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+    m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI",
+        a_master ? 0 : getpid(),
+        m_broker_uri, m_broker_user, m_broker_pass, "", "" );
 
     updateMainWindowTitle();
 

@@ -49,7 +49,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.5.3"
+#define DASMON_VERSION "1.5.4"
 
 
 bool g_child_signal = false;
@@ -248,7 +248,9 @@ int main(int argc, char *argv[])
     if ( daemon )
         daemonize();
 
-    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection( domain, "DASMON", 0, broker_uri, broker_user, broker_pass );
+    ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection(
+		domain, "DASMON", 0, broker_uri, broker_user, broker_pass,
+		"Dasmon Daemon ComBus", "Dasmon Daemon Error ComBus" );
 
     try
     {
