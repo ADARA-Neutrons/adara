@@ -25,6 +25,7 @@ libxml_CPPFLAGS ?= $(libxml_CFLAGS)
 
 bin_PROGRAMS =
 noinst_PROGRAMS =
+EXTRA_PROGRAMS =
 
 include common/Makefile.am
 include tools/Makefile.am
@@ -32,3 +33,6 @@ include sms/Makefile.am
 include sts/Makefile.am
 include dasmon/server/Makefile.am
 include PVStreamer/pvsd/Makefile.am
+
+extra: $(EXTRA_PROGRAMS)
+

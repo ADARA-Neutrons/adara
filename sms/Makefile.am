@@ -1,7 +1,7 @@
 
 if BUILD_SMS
 bin_PROGRAMS += sms/smsd
-noinst_PROGRAMS += sms/test/storage-test
+EXTRA_PROGRAMS += sms/test/storage-test
 endif
 
 sms_smsd_SOURCES = sms/smsd.cc \
