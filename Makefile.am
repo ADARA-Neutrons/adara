@@ -34,5 +34,5 @@ include sts/Makefile.am
 include dasmon/server/Makefile.am
 include PVStreamer/pvsd/Makefile.am
 
-extra: $(EXTRA_PROGRAMS)
+test: $(EXTRA_PROGRAMS)
 
