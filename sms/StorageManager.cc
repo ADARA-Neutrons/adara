@@ -1240,17 +1240,20 @@ void StorageManager::scanDaily(const std::string &dir)
 			m_scannedBlocks += c->blocks();
 
 			if (c->runNumber()) {
-				if (c->isTranslated()) {
-					/* Send STS Succeeded Message */
-					m_combus->sendOriginal(c->runNumber(), c->propId(),
-							std::string("STS Send Succeeded"),
-							c->startTime());
-				} else if (c->isManual()) {
+				/* DON'T Send STS Succeeded Message...!
+				 * - the original ComBus Message was sent
+				 * _Before_ the "Translation Completed" Marker
+				 * is written to the local Run Container Directory,
+				 * so we _Really_ don't need to Re-Notify the Web Monitor!
+				 * (and flood it with 10s of 1000s of old redundant
+				 * run messages... ;-b)
+				 */
+				if (c->isManual()) {
 					/* Send STS Failed Message */
 					m_combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("Needs Manual Translation"),
 							c->startTime());
-				} else {
+				} else if (!c->isTranslated()) {
 					/* Note Pending for Later Translation */
 					m_pendingRuns.push_back(c);
 					/* Send Run Queued Message */
