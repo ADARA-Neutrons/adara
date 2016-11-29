@@ -457,17 +457,18 @@ void StorageManager::update_max_blocks_allowed_pv(void)
 	uint64_t base = m_max_blocks_allowed;
 	m_max_blocks_allowed_multiplier = 1;
 
+	// Uint32's in EPICS are Really Int32's... ;-b
 	DEBUG("update_max_blocks_allowed_pv(): Before Loop"
 		<< " m_max_blocks_allowed=" << m_max_blocks_allowed
-		<< " UINT32_MAX=" << UINT32_MAX
+		<< " INT32_MAX=" << INT32_MAX
 		<< " base=" << base
 		<< " multiplier=" << m_max_blocks_allowed_multiplier);
 
-	while ( base > UINT32_MAX )
+	while ( base > INT32_MAX )
 	{
 		DEBUG("update_max_blocks_allowed_pv(): Loop"
 			<< " base=" << base
-			<< " > UINT32_MAX=" << UINT32_MAX
+			<< " > INT32_MAX=" << INT32_MAX
 			<< ", multiplier=" << m_max_blocks_allowed_multiplier);
 
 		// Check Divisibility by Prime Factors...
