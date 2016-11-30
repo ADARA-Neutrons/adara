@@ -1931,36 +1931,141 @@ bool DataSource::rxPacket(const ADARA::SourceListPkt &pkt)
 
 bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Device Descriptor Packet for Each Device ID...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Remove Any Former Device Descriptor Packet for This Device ID...
+	if ( dit != m_devices.end() ) {
+		m_devices.erase(dit);
+	}
+	// If Not An Empty Descriptor, then Save Descriptor Packet...
+	if ( !pkt.description().empty() ) {
+		boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
+		ddp.reset(new ADARA::DeviceDescriptorPkt(pkt));
+		m_devices[ pkt.devId() ].m_descriptorPkt = ddp;
+		m_devices[ pkt.devId() ].m_devId = pkt.devId();
+	}
+
 	SMSControl::getInstance()->updateDescriptor(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableU32Pkt> vvp;
+		vvp.reset(new ADARA::VariableU32Pkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableDoublePkt> vvp;
+		vvp.reset(new ADARA::VariableDoublePkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableStringPkt> vvp;
+		vvp.reset(new ADARA::VariableStringPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableU32ArrayPkt> vvp;
+		vvp.reset(new ADARA::VariableU32ArrayPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vvp;
+		vvp.reset(new ADARA::VariableDoubleArrayPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
