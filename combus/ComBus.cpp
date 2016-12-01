@@ -601,6 +601,8 @@ Connection::reconnectThread()
 
     while ( 1 )
     {
+        exceptionLog("reconnectThread() - Loop...", INFO_LOG);
+
         lock.lock();
 
         // Exit if terminating
@@ -662,15 +664,30 @@ Connection::reconnectThread()
                 "reconnectThread(): Error Creating ActiveMQ Connection!",
                 ERR_LOG);
 
-            // ActiveMQ CPP Session Destructor Broken... ;-Q
-            if ( m_session ) m_session->close();
-            delete m_session;
-            m_session = 0;
+            try
+            {
+                // ActiveMQ CPP Session Destructor Broken... ;-Q
+                if ( m_session ) m_session->close();
+                delete m_session;
+                m_session = 0;
 
-            // ActiveMQ CPP Connection Destructor Broken... ;-Q
-            if ( m_connection ) m_connection->close();
-            delete m_connection;
-            m_connection = 0;
+                // ActiveMQ CPP Connection Destructor Broken... ;-Q
+                if ( m_connection ) m_connection->close();
+                delete m_connection;
+                m_connection = 0;
+            }
+            catch(...)
+            {
+                exceptionLog(
+              "reconnectThread(): Exception Freeing ActiveMQ Connection!",
+                    ERR_LOG);
+
+                // We Couldn't Close Connection/Session Gracefully,
+                // So Just Clear Them Out... ;-b
+                // (Better to Leave Garbage Behind than Die Cleaning Up!)
+                m_session = 0;
+                m_connection = 0;
+            }
 
             // Failed to connect
             if ( retry_period < 10 )
