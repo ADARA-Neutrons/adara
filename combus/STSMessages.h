@@ -16,11 +16,11 @@ public:
         : m_run_num(0)
     {}
 
-    TranslationStartedMsg( unsigned long a_run_num, const std::string &a_host )
+    TranslationStartedMsg( uint32_t a_run_num, const std::string &a_host )
         : m_run_num(a_run_num), m_host(a_host)
     {}
 
-    unsigned long   m_run_num;
+    uint32_t        m_run_num;
     std::string     m_host;
 
 protected:
@@ -50,7 +50,7 @@ public:
     {}
 
     TranslationFinishedMsg( const std::string &a_facility, const std::string &a_beam_sname,
-                            const std::string &a_proposal_id, unsigned long a_run_num,
+                            const std::string &a_proposal_id, uint32_t a_run_num,
                             const std::string &a_nexus_file, const std::string &a_host )
         : m_facility(a_facility), m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id),
         m_run_num(a_run_num), m_nexus_file(a_nexus_file), m_host(a_host)
@@ -59,7 +59,7 @@ public:
     std::string         m_facility;
     std::string         m_beam_sname;
     std::string         m_proposal_id;
-    unsigned long       m_run_num;
+    uint32_t            m_run_num;
     std::string         m_nexus_file;
     std::string         m_host;
 
@@ -101,7 +101,7 @@ public:
     {}
 
     TranslationFailedMsg( const std::string &a_beam_sname, const std::string &a_proposal_id,
-                          unsigned long a_run_num, ::STS::TranslationStatusCode a_code,
+                          uint32_t a_run_num, ::STS::TranslationStatusCode a_code,
                           const std::string &a_reason, const std::string &a_host )
         : m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id), m_run_num(a_run_num), m_code(a_code),
           m_reason(a_reason), m_host(a_host)
@@ -109,7 +109,7 @@ public:
 
     std::string                 m_beam_sname;
     std::string                 m_proposal_id;
-    unsigned long               m_run_num;
+    uint32_t                    m_run_num;
     ::STS::TranslationStatusCode  m_code;
     std::string                 m_reason;
     std::string                 m_host;
