@@ -146,7 +146,11 @@ StreamParser::processStream()
 
                         // On fatal error, flush buffers to Nexus
                         // before terminating
-                        markerComment( m_pulse_info.last_time,
+                        markerComment(
+                            ( m_pulse_info.last_time
+                                - m_pulse_info.start_time ) / 1000000000.0,
+                            m_pulse_info.start_time
+                                + m_pulse_info.last_time,
                             "Stream processing terminated abnormally." );
                         m_run_metrics.end_time = nsec_to_timespec(
                             m_pulse_info.start_time
@@ -730,7 +734,8 @@ StreamParser::processPulseInfo
             pulse_time -= m_pulse_info.start_time;
 
         m_pulse_info.times.push_back( pulse_time/1000000000.0 );
-        m_pulse_info.freqs.push_back( 1000000000.0 / ( pulse_time - m_pulse_info.last_time ));
+        m_pulse_info.freqs.push_back( 1000000000.0
+            / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
     }
@@ -2123,7 +2128,10 @@ StreamParser::rxPacket
             usleep(30000); // give syslog a chance...
 
             // On fatal error, flush buffers to Nexus before terminating
-            markerComment( m_pulse_info.last_time,
+            markerComment(
+                ( m_pulse_info.last_time - m_pulse_info.start_time )
+                    / 1000000000.0,
+                m_pulse_info.start_time + m_pulse_info.last_time,
                 "Stream processing terminated abnormally." );
             m_run_metrics.end_time = nsec_to_timespec(
                 m_pulse_info.start_time + m_pulse_info.last_time );
@@ -3128,6 +3136,8 @@ StreamParser::rxPacket
     const ADARA::AnnotationPkt &a_pkt     ///< [in] The ADARA Annotation Packet to process
 )
 {
+    uint64_t tOrig = timespec_to_nsec( a_pkt.timestamp() );
+
     double t = 0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
@@ -3143,19 +3153,19 @@ StreamParser::rxPacket
     switch ( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::GENERIC:
-        markerComment( t, a_pkt.comment() );
+        markerComment( t, tOrig, a_pkt.comment() );
         break;
     case ADARA::MarkerType::PAUSE:
-        markerPause( t, a_pkt.comment() );
+        markerPause( t, tOrig, a_pkt.comment() );
         break;
     case ADARA::MarkerType::RESUME:
-        markerResume( t, a_pkt.comment() );
+        markerResume( t, tOrig, a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_START:
-        markerScanStart( t, a_pkt.scanIndex(), a_pkt.comment() );
+        markerScanStart( t, tOrig, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_STOP:
-        markerScanStop( t, a_pkt.scanIndex(), a_pkt.comment() );
+        markerScanStop( t, tOrig, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
         runComment( a_pkt.comment() );
