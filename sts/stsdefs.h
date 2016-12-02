@@ -507,7 +507,7 @@ struct RunInfo
     std::string             instr_id;
     std::string             instr_shortname;
     std::string             instr_longname;
-    unsigned long           run_number;
+    uint32_t                run_number;
     std::string             run_title;
     std::string             proposal_id;
     std::string             facility_name;
