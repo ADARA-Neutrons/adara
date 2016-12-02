@@ -445,9 +445,14 @@ NxGen::initialize()
         //     to pulseBuffersReady() or finalize(),
         //     create & write in one shot...)
 
-        // Insert initial "not in scan" value
-        m_scan_time.push_back( 0.0 );
-        m_scan_value.push_back( 0 );
+        // Insert initial "not in scan" value:
+        //     - Current Nexus scan log calls for 0
+        //     to be used for all scan stops
+        //     - Just use 0 for the Starting Non-Normalized Nanosecond
+        //     Time Stamp (guaranteed to be 1st Chronologically...! ;-D)
+        m_scan_multimap.insert(
+            std::pair< uint64_t, std::pair<double, uint32_t> >(
+                0, std::pair<double, uint32_t>(0.0, 0) ) );
 
         // Insert initial "not paused" value
         m_pause_time.push_back( 0.0 );
@@ -1749,21 +1754,23 @@ NxGen::markerResume
 
 /*! \brief Inserts a scan start marker into Nexus file
  *
- * This method inserts a scan start marker into the marker logs of the Nexus file.
+ * This method inserts a scan start marker into the marker logs
+ * of the Nexus file.
  */
 void
 NxGen::markerScanStart
 (
     double a_time,                      ///< [in] Time associated with marker
     uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
-    unsigned long a_scan_index,         ///< [in] Scan index associated with scan
+    uint32_t a_scan_index,              ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
     try
     {
-        m_scan_time.push_back( a_time );
-        m_scan_value.push_back( a_scan_index );
+        m_scan_multimap.insert(
+            std::pair< uint64_t, std::pair<double, uint32_t> >( a_tOrig,
+                std::pair<double, uint32_t>(a_time, a_scan_index) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_tOrig, a_comment );
@@ -1777,21 +1784,25 @@ NxGen::markerScanStart
 
 /*! \brief Inserts a scan stop marker into Nexus file
  *
- * This method inserts a scan stop marker into the marker logs of the Nexus file.
+ * This method inserts a scan stop marker into the marker logs
+ * of the Nexus file.
  */
 void
 NxGen::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
     uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
-    unsigned long UNUSED(a_scan_index), ///< [in] Scan index associated with scan
+    uint32_t UNUSED(a_scan_index),      ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
     try
     {
-        m_scan_time.push_back( a_time );
-        m_scan_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for all scan stops
+        // Current Nexus scan log calls for
+        // 0 to be used for all scan stops
+        m_scan_multimap.insert(
+            std::pair< uint64_t, std::pair<double, uint32_t> >( a_tOrig,
+                std::pair<double, uint32_t>(a_time, 0) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_tOrig, a_comment );
@@ -1870,21 +1881,35 @@ NxGen::flushPauseData()
 void
 NxGen::flushScanData()
 {
+    multimap< uint64_t, pair<double, uint32_t> >::iterator smm;
+
     try
     {
         // Create Scan Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/scan_index", "NXlog" );
-        makeDataset( m_daslogs_path + "/scan_index", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS, m_scan_time.size() );
         makeDataset( m_daslogs_path + "/scan_index", "value",
-            NeXus::UINT32, "", m_scan_value.size() );
+            NeXus::UINT32, "", m_scan_multimap.size() );
+        makeDataset( m_daslogs_path + "/scan_index", "time",
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_scan_multimap.size() );
+
+        // Extract Scan Index and Time Vectors from Multi-Map/Pair Beast!
+        vector<uint32_t> value_vec;
+        vector<double> time_vec;
+        for ( smm = m_scan_multimap.begin();
+                smm != m_scan_multimap.end(); ++smm )
+        {
+            // Create Scan Index Vector
+            value_vec.push_back( smm->second.second );
+
+            // Create Time Vector
+            time_vec.push_back( smm->second.first );
+        }
 
         // Write Scan Index Time and Value Slabs
-        writeSlab( m_daslogs_path + "/scan_index/time", m_scan_time, 0 );
-        writeSlab( m_daslogs_path + "/scan_index/value", m_scan_value, 0 );
+        writeSlab( m_daslogs_path + "/scan_index/value", value_vec, 0 );
+        writeSlab( m_daslogs_path + "/scan_index/time", time_vec, 0 );
 
-        m_scan_time.clear();
-        m_scan_value.clear();
+        m_scan_multimap.clear();
     }
     catch( TraceException &e )
     {
@@ -1900,7 +1925,7 @@ NxGen::flushScanData()
 void
 NxGen::flushCommentData()
 {
-    multimap< uint64_t, pair<double, string> >::iterator cm;
+    multimap< uint64_t, pair<double, string> >::iterator cmm;
 
     try
     {
@@ -1913,13 +1938,13 @@ NxGen::flushCommentData()
 
         // Determine Max Comment String Length...
         uint32_t max_len = (uint32_t) -1;
-        for ( cm = m_comment_multimap.begin();
-                cm != m_comment_multimap.end(); ++cm )
+        for ( cmm = m_comment_multimap.begin();
+                cmm != m_comment_multimap.end(); ++cmm )
         {
             if ( max_len == (uint32_t) -1
-                    || cm->second.second.size() > max_len )
+                    || cmm->second.second.size() > max_len )
             {
-                max_len = cm->second.second.size();
+                max_len = cmm->second.second.size();
             }
         }
         // Make Sure We Don't Freak Out HDF5 No Matter What...
@@ -1940,17 +1965,17 @@ NxGen::flushCommentData()
 
             // Pad the Strings with Spaces to Be of Uniform Length...
             vector<string> value_vec;
-            for ( cm = m_comment_multimap.begin();
-                    cm != m_comment_multimap.end(); ++cm )
+            for ( cmm = m_comment_multimap.begin();
+                    cmm != m_comment_multimap.end(); ++cmm )
             {
                 // Pad Comment String...
-                string str = cm->second.second;
+                string str = cmm->second.second;
                 if ( str.size() < max_len )
                     str.insert( str.end(), max_len - str.size(), ' ' );
                 value_vec.push_back( str );
 
                 // Create Time Vector
-                time_vec.push_back( cm->second.first );
+                time_vec.push_back( cmm->second.first );
             }
 
             // Write 2D String Dataset

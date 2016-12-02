@@ -902,10 +902,10 @@ protected:
     void                markerResume( double a_time, uint64_t tOrig,
                             const std::string &a_comment  );
     void                markerScanStart( double a_time, uint64_t tOrig,
-                            unsigned long a_scan_index,
+                            uint32_t a_scan_index,
                             const std::string &a_comment );
     void                markerScanStop( double a_time, uint64_t tOrig,
-                            unsigned long a_scan_index,
+                            uint32_t a_scan_index,
                             const std::string &a_comment  );
     void                markerComment( double a_time, uint64_t tOrig,
                             const std::string &a_comment );
@@ -1054,8 +1054,8 @@ private:
 
     std::vector<double>         m_pause_time;           /// Pause annotation timestamp buffer
     std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
-    std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
-    std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
+    std::multimap<uint64_t, std::pair<double, uint32_t> >
+                                m_scan_multimap;        /// Scan annotation nsec-to-timestamp/state (on/off) map
     std::multimap<uint64_t, std::pair<double, std::string> >
                                 m_comment_multimap;     /// Comment annotation nsec-to-timestamp/string map
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
