@@ -857,17 +857,17 @@ public:
     virtual void            monitorFinalize(
                                 STS::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment ) = 0;
-    virtual void            markerPause( double a_time,
+    virtual void            markerPause( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerResume( double a_time,
+    virtual void            markerResume( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerScanStart( double a_time,
+    virtual void            markerScanStart( double a_time, uint64_t tOrig,
                                 unsigned long a_scan_index,
                                 const std::string &a_scan_comment ) = 0;
-    virtual void            markerScanStop( double a_time,
+    virtual void            markerScanStop( double a_time, uint64_t tOrig,
                                 unsigned long a_scan_index,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerComment( double a_time,
+    virtual void            markerComment( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            writeDeviceEnums( Identifier a_devId,
                                 std::vector<STS::PVEnumeratedType>
