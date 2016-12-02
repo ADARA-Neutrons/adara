@@ -862,10 +862,10 @@ public:
     virtual void            markerResume( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            markerScanStart( double a_time, uint64_t tOrig,
-                                unsigned long a_scan_index,
+                                uint32_t a_scan_index,
                                 const std::string &a_scan_comment ) = 0;
     virtual void            markerScanStop( double a_time, uint64_t tOrig,
-                                unsigned long a_scan_index,
+                                uint32_t a_scan_index,
                                 const std::string &a_comment ) = 0;
     virtual void            markerComment( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
