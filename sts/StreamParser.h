@@ -43,7 +43,7 @@ public:
     std::string             getFacilityName() const { return m_run_info.facility_name; }
     std::string             getBeamShortName() const { return m_run_info.instr_shortname; }
     std::string             getProposalID() const { return m_run_info.proposal_id; }
-    unsigned long           getRunNumber() const { return m_run_info.run_number; }
+    uint32_t                getRunNumber() const { return m_run_info.run_number; }
     bool                    infoReady() const { return (m_info_rcvd & INFO_SENT); }
 
 private:
