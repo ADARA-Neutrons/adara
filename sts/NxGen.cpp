@@ -1701,6 +1701,7 @@ void
 NxGen::markerPause
 (
     double a_time,              ///< [in] Time associated with marker
+    uint64_t a_tOrig,           ///< [in] Actual Timestamp in Nanoseconds
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
@@ -1709,8 +1710,8 @@ NxGen::markerPause
         m_pause_time.push_back( a_time );
         m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
 
-        if ( a_comment.size())
-            markerComment( a_time, a_comment );
+        if ( a_comment.size() )
+            markerComment( a_time, a_tOrig, a_comment );
     }
     catch( TraceException &e )
     {
@@ -1727,6 +1728,7 @@ void
 NxGen::markerResume
 (
     double a_time,              ///< [in] Time associated with marker
+    uint64_t a_tOrig,           ///< [in] Actual Timestamp in Nanoseconds
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
@@ -1735,8 +1737,8 @@ NxGen::markerResume
         m_pause_time.push_back( a_time );
         m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
 
-        if ( a_comment.size())
-            markerComment( a_time, a_comment );
+        if ( a_comment.size() )
+            markerComment( a_time, a_tOrig, a_comment );
     }
     catch( TraceException &e )
     {
@@ -1753,6 +1755,7 @@ void
 NxGen::markerScanStart
 (
     double a_time,                      ///< [in] Time associated with marker
+    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
     unsigned long a_scan_index,         ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
@@ -1762,8 +1765,8 @@ NxGen::markerScanStart
         m_scan_time.push_back( a_time );
         m_scan_value.push_back( a_scan_index );
 
-        if ( a_comment.size())
-            markerComment( a_time, a_comment );
+        if ( a_comment.size() )
+            markerComment( a_time, a_tOrig, a_comment );
     }
     catch( TraceException &e )
     {
@@ -1780,6 +1783,7 @@ void
 NxGen::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
+    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
     unsigned long UNUSED(a_scan_index), ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
@@ -1789,8 +1793,8 @@ NxGen::markerScanStop
         m_scan_time.push_back( a_time );
         m_scan_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for all scan stops
 
-        if ( a_comment.size())
-            markerComment( a_time, a_comment );
+        if ( a_comment.size() )
+            markerComment( a_time, a_tOrig, a_comment );
     }
     catch( TraceException &e )
     {
@@ -1807,6 +1811,7 @@ void
 NxGen::markerComment
 (
     double a_time,                      ///< [in] Time associated with marker
+    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
     const std::string &a_comment        ///< [in] Comment to insert
 )
 {
@@ -1814,9 +1819,11 @@ NxGen::markerComment
     {
         if ( a_comment.size() )
         {
-            m_comment_time.push_back( a_time );
-
-            m_comment_vec.push_back( a_comment );
+            // Geez, this got complicated fast... Lol... ;-D
+            m_comment_multimap.insert(
+                std::pair< uint64_t, std::pair<double, std::string> >(
+                    a_tOrig,
+                    std::pair<double, std::string>(a_time, a_comment) ) );
         }
     }
     catch( TraceException &e )
@@ -1893,26 +1900,26 @@ NxGen::flushScanData()
 void
 NxGen::flushCommentData()
 {
+    multimap< uint64_t, pair<double, string> >::iterator cm;
+
     try
     {
         // Create Comment Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/comments", "NXcollection" );
         makeDataset( m_daslogs_path + "/comments", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS, m_comment_time.size() );
-
-        // Write Comment Time Slab
-        writeSlab( m_daslogs_path + "/comments/time", m_comment_time, 0 );
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_comment_multimap.size() );
 
         // Comment Strings as 2D String Dataset
 
         // Determine Max Comment String Length...
         uint32_t max_len = (uint32_t) -1;
-        for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+        for ( cm = m_comment_multimap.begin();
+                cm != m_comment_multimap.end(); ++cm )
         {
             if ( max_len == (uint32_t) -1
-                    || m_comment_vec[i].size() > max_len )
+                    || cm->second.second.size() > max_len )
             {
-                max_len = m_comment_vec[i].size();
+                max_len = cm->second.second.size();
             }
         }
         // Make Sure We Don't Freak Out HDF5 No Matter What...
@@ -1920,29 +1927,39 @@ NxGen::flushCommentData()
             max_len = 1;
 
         syslog( LOG_INFO, "[%i] DASlogs Comments size=%lu max_len=%u",
-            g_pid, m_comment_vec.size(), max_len );
+            g_pid, m_comment_multimap.size(), max_len );
         usleep(30000); // give syslog a chance...
 
-        if ( m_comment_vec.size() )
+        vector<double> time_vec;
+
+        if ( m_comment_multimap.size() )
         {
             vector<hsize_t> dims;
-            dims.push_back( m_comment_vec.size() );
+            dims.push_back( m_comment_multimap.size() );
             dims.push_back( max_len );
 
             // Pad the Strings with Spaces to Be of Uniform Length...
             vector<string> value_vec;
-            for ( uint32_t i=0 ; i < m_comment_vec.size() ; i++ )
+            for ( cm = m_comment_multimap.begin();
+                    cm != m_comment_multimap.end(); ++cm )
             {
-                string str = m_comment_vec[i];
+                // Pad Comment String...
+                string str = cm->second.second;
                 if ( str.size() < max_len )
                     str.insert( str.end(), max_len - str.size(), ' ' );
                 value_vec.push_back( str );
+
+                // Create Time Vector
+                time_vec.push_back( cm->second.first );
             }
+
+            // Write 2D String Dataset
             writeMultidimDataset( m_daslogs_path + "/comments",
                 "value", value_vec, dims );
         }
         else
         {
+            // Write Dummy Empty Comments Dataset...
             syslog( LOG_INFO, "[%i] %s", g_pid,
                 "No Comment Strings, Creating Empty Comments Value" );
             usleep(30000); // give syslog a chance...
@@ -1950,8 +1967,10 @@ NxGen::flushCommentData()
                 "value", NeXus::CHAR, "", 1 );
         }
 
-        m_comment_time.clear();
-        m_comment_vec.clear();
+        // Write Comment Time Slab
+        writeSlab( m_daslogs_path + "/comments/time", time_vec, 0 );
+
+        m_comment_multimap.clear();
     }
     catch( TraceException &e )
     {

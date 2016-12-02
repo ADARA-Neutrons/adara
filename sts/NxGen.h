@@ -897,17 +897,17 @@ protected:
                             uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment );
-    void                markerPause( double a_time,
+    void                markerPause( double a_time, uint64_t tOrig,
                             const std::string &a_comment  );
-    void                markerResume( double a_time,
+    void                markerResume( double a_time, uint64_t tOrig,
                             const std::string &a_comment  );
-    void                markerScanStart( double a_time,
+    void                markerScanStart( double a_time, uint64_t tOrig,
                             unsigned long a_scan_index,
                             const std::string &a_comment );
-    void                markerScanStop( double a_time,
+    void                markerScanStop( double a_time, uint64_t tOrig,
                             unsigned long a_scan_index,
                             const std::string &a_comment  );
-    void                markerComment( double a_time,
+    void                markerComment( double a_time, uint64_t tOrig,
                             const std::string &a_comment );
     void                writeDeviceEnums( STS::Identifier a_devId,
                             std::vector<STS::PVEnumeratedType>
@@ -1056,8 +1056,8 @@ private:
     std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
     std::vector<double>         m_scan_time;            /// Scan annotation value (on/off) buffer
     std::vector<uint32_t>       m_scan_value;           /// Scan value (index) buffer
-    std::vector<double>         m_comment_time;         /// Comment annotation timestamp buffer
-    std::vector<std::string>    m_comment_vec;          /// Comment string vector
+    std::multimap<uint64_t, std::pair<double, std::string> >
+                                m_comment_multimap;     /// Comment annotation nsec-to-timestamp/string map
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
     float                       m_duration;             /// Save Total Run Duration (seconds)
