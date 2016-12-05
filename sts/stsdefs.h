@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.7.0"
+#define STS_VERSION "1.7.1"
 extern pid_t g_pid;
 
 namespace STS {
@@ -507,7 +507,7 @@ struct RunInfo
     std::string             instr_id;
     std::string             instr_shortname;
     std::string             instr_longname;
-    unsigned long           run_number;
+    uint32_t                run_number;
     std::string             run_title;
     std::string             proposal_id;
     std::string             facility_name;
@@ -857,17 +857,17 @@ public:
     virtual void            monitorFinalize(
                                 STS::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment ) = 0;
-    virtual void            markerPause( double a_time,
+    virtual void            markerPause( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerResume( double a_time,
+    virtual void            markerResume( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerScanStart( double a_time,
-                                unsigned long a_scan_index,
+    virtual void            markerScanStart( double a_time, uint64_t tOrig,
+                                uint32_t a_scan_index,
                                 const std::string &a_scan_comment ) = 0;
-    virtual void            markerScanStop( double a_time,
-                                unsigned long a_scan_index,
+    virtual void            markerScanStop( double a_time, uint64_t tOrig,
+                                uint32_t a_scan_index,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerComment( double a_time,
+    virtual void            markerComment( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            writeDeviceEnums( Identifier a_devId,
                                 std::vector<STS::PVEnumeratedType>

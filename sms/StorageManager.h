@@ -76,6 +76,16 @@ public:
 		addPrologue(iovec);
 	}
 
+	static void addSavePrologue(IoVector &iovec, uint32_t dataSourceId);
+	static void addSavePrologue(const void *pkt, uint32_t len,
+			uint32_t dataSourceId)
+	{
+		IoVector iovec(1);
+		iovec[0].iov_base = (void *) pkt;
+		iovec[0].iov_len = len;
+		addSavePrologue(iovec, dataSourceId);
+	}
+
 	static int base_fd(void) { return m_base_fd; }
 
 	static std::string base_dir(void) { return m_baseDir; }
@@ -88,6 +98,14 @@ public:
 	static boost::signals2::connection onPrologue(
 					const PrologueSignal::slot_type &s) {
 		return m_prologue.connect(s);
+	}
+
+	static boost::signals2::connection onSavePrologue(
+					const PrologueSignal::slot_type &s,
+					uint32_t dataSourceId ) {
+		m_savePrologue[ dataSourceId ] = boost::shared_ptr<PrologueSignal>(
+			new PrologueSignal());
+		return m_savePrologue[ dataSourceId ]->connect(s);
 	}
 
 	static StorageContainer::SharedPtr &container(void) {
@@ -167,6 +185,9 @@ private:
 	static ContainerSignal m_contChange;
 	static PrologueSignal m_prologue;
 
+	static std::map<uint32_t, boost::shared_ptr<PrologueSignal> >
+		m_savePrologue;
+
 	static const char *m_run_filename;
 	static const char *m_run_tempname;
 	static std::string m_stateDirPrefix;
@@ -220,6 +241,8 @@ private:
 	static void endCurrentContainer(void);
 	static void fileCreated(StorageFile::SharedPtr &f);
 	static uint32_t validatePacket(const IoVector &iovec);
+
+	static void saveCreated(uint32_t dataSourceId);
 
 	friend class StorageContainer;
 };

@@ -49,7 +49,8 @@ public:
 	void terminate(void);
 	void notify(void);
 
-	off_t save(IoVector &iovec, uint32_t len, uint32_t dataSourceId);
+	off_t save(IoVector &iovec, uint32_t len, uint32_t dataSourceId,
+			bool notify);
 
 	void pause(void);
 	void resume(void);

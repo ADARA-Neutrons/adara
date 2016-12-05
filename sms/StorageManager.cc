@@ -243,6 +243,9 @@ StorageFile::SharedPtr StorageManager::m_prologueFile;
 StorageManager::ContainerSignal StorageManager::m_contChange;
 StorageManager::PrologueSignal StorageManager::m_prologue;
 
+std::map<uint32_t, boost::shared_ptr<StorageManager::PrologueSignal> >
+	StorageManager::m_savePrologue;
+
 std::string StorageManager::m_poolsize;
 uint32_t StorageManager::m_percent;
 
@@ -457,17 +460,18 @@ void StorageManager::update_max_blocks_allowed_pv(void)
 	uint64_t base = m_max_blocks_allowed;
 	m_max_blocks_allowed_multiplier = 1;
 
+	// Uint32's in EPICS are Really Int32's... ;-b
 	DEBUG("update_max_blocks_allowed_pv(): Before Loop"
 		<< " m_max_blocks_allowed=" << m_max_blocks_allowed
-		<< " UINT32_MAX=" << UINT32_MAX
+		<< " INT32_MAX=" << INT32_MAX
 		<< " base=" << base
 		<< " multiplier=" << m_max_blocks_allowed_multiplier);
 
-	while ( base > UINT32_MAX )
+	while ( base > INT32_MAX )
 	{
 		DEBUG("update_max_blocks_allowed_pv(): Loop"
 			<< " base=" << base
-			<< " > UINT32_MAX=" << UINT32_MAX
+			<< " > INT32_MAX=" << INT32_MAX
 			<< ", multiplier=" << m_max_blocks_allowed_multiplier);
 
 		// Check Divisibility by Prime Factors...
@@ -954,6 +958,15 @@ void StorageManager::fileCreated(StorageFile::SharedPtr &f)
 	stateSnapshot(f);
 }
 
+void StorageManager::saveCreated(uint32_t dataSourceId)
+{
+	/* Each new Saved Input Stream file needs to get a copy of
+	 * all the Device Descriptors and Starting PV Values,
+	 * so trigger a Prologue Spew for the given Data Source. :-D
+	 */
+	(*(m_savePrologue[ dataSourceId ]))();
+}
+
 void StorageManager::startRecording(uint32_t run, std::string propId)
 {
 	if (!run) {
@@ -1159,7 +1172,7 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
 
-	m_cur_container->save(iovec, len, dataSourceId);
+	m_cur_container->save(iovec, len, dataSourceId, true);
 
 	/* Is it time to initiate a purge of old data?
 	 *
@@ -1215,6 +1228,16 @@ uint32_t StorageManager::validatePacket(const IoVector &iovec)
 		throw std::logic_error("Packet too small");
 
 	return len;
+}
+
+void StorageManager::addSavePrologue(IoVector &iovec,
+		uint32_t dataSourceId)
+{
+	/* We're writing a prologue before putting Saved Input Stream
+	 * data into a file, so we know we have a current container.
+	 */
+	uint32_t len = validatePacket(iovec);
+	m_cur_container->save(iovec, len, dataSourceId, false);
 }
 
 void StorageManager::scanDaily(const std::string &dir)

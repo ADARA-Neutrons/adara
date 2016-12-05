@@ -82,6 +82,8 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 	 * in order to avoid creating a new file just for the end-of-run
 	 * marker. Instead, we wait for the run to start or the next packet
 	 * to be written (and clients notified).
+	 * (Note: this is encapsulated in the StorageFile::oversize() method,
+	 * which only triggers when "notify" is true... A-Ha! ;-D)
 	 */
 	if (m_cur_file && m_cur_file->oversize())
 		terminateFile();
@@ -119,7 +121,7 @@ void StorageContainer::notify(void)
 }
 
 off_t StorageContainer::save(IoVector &iovec, uint32_t len,
-		uint32_t dataSourceId)
+		uint32_t dataSourceId, bool notify)
 {
 	// Verify the Saved Input Stream File for this Data Source,
 	// Create it as needed...
@@ -137,13 +139,14 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 			m_ds_input_files.push_back( StorageFile::SharedPtr() );
 		}
 	}
-
-	/* We don't immediately close a file when we exceed the size limit
-	 * in order to avoid creating a new file just for the end-of-run
-	 * marker. Instead, we wait for the run to start or the next packet
-	 * to be written (and clients notified).
+ 
+	/* This Saved Input Stream file exceeds the size limit;
+	 * close it so we can make a new one now...
+	 * (Note: we do a manual "notify" trigger for Saved Input Stream
+	 * file writes, so StorageFile::oversize() won't immediately be set
+	 * for Saved File Prologue writes... ;-D)
 	 */
-	if ( m_ds_input_files[dataSourceId]
+	if ( notify && m_ds_input_files[dataSourceId]
 			&& m_ds_input_files[dataSourceId]->oversize() )
 	{
 		// Terminate Saved Input Stream File
@@ -154,6 +157,7 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 		m_ds_input_files[dataSourceId].reset();
 	}
 
+	// Make a new Saved Input Stream file...?
 	if ( !m_ds_input_files[dataSourceId] )
 	{
 		// Create the Saved Input Stream File
@@ -161,6 +165,11 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 		m_ds_input_files[dataSourceId] =
 			StorageFile::saveFile( m_weakThis, dataSourceId,
 					++(m_ds_input_num_files[dataSourceId]) );
+
+		/* Tell the storage manager about the new Saved Input Stream file
+		 * so we can add the prologue before anyone else sees it.
+	 	 */
+		StorageManager::saveCreated( dataSourceId );
 	}
 
 	return m_ds_input_files[dataSourceId]->save(iovec, len);

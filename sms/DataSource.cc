@@ -586,6 +586,11 @@ DataSource::DataSource( const std::string &name,
 
 	m_readDelay = false;
 
+	// Register for Signal to Dump Device Descriptor & Starting Values
+	// into Saved Input Streams...
+	m_connection = StorageManager::onSavePrologue(
+		boost::bind(&DataSource::onSavePrologue, this), m_smsSourceId );
+
 	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
 	m_pvEnabled->update(m_enabled, &now);
 }
@@ -601,6 +606,7 @@ DataSource::~DataSource()
 		delete m_fdreg;
 	if (m_fd != -1)
 		close(m_fd);
+	m_connection.disconnect();
 }
 
 void DataSource::parseURI(std::string uri)
@@ -1925,36 +1931,141 @@ bool DataSource::rxPacket(const ADARA::SourceListPkt &pkt)
 
 bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Device Descriptor Packet for Each Device ID...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Remove Any Former Device Descriptor Packet for This Device ID...
+	if ( dit != m_devices.end() ) {
+		m_devices.erase(dit);
+	}
+	// If Not An Empty Descriptor, then Save Descriptor Packet...
+	if ( !pkt.description().empty() ) {
+		boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
+		ddp.reset(new ADARA::DeviceDescriptorPkt(pkt));
+		m_devices[ pkt.devId() ].m_descriptorPkt = ddp;
+		m_devices[ pkt.devId() ].m_devId = pkt.devId();
+	}
+
 	SMSControl::getInstance()->updateDescriptor(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableU32Pkt> vvp;
+		vvp.reset(new ADARA::VariableU32Pkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableDoublePkt> vvp;
+		vvp.reset(new ADARA::VariableDoublePkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableStringPkt> vvp;
+		vvp.reset(new ADARA::VariableStringPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableU32ArrayPkt> vvp;
+		vvp.reset(new ADARA::VariableU32ArrayPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
 bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 {
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Variable Value Packet...
+		boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vvp;
+		vvp.reset(new ADARA::VariableDoubleArrayPkt(pkt));
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
 	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
 	return false;
 }
@@ -1995,5 +2106,77 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	m_lastRTDLCycle = 0;
 
 	return false;
+}
+
+void DataSource::onSavePrologue(void)
+{
+	// Make a Little Stream Annotation Packet for This Saved Input Stream
+
+	uint32_t pkt[ 2 + sizeof(ADARA::Header) / sizeof(uint32_t) ];
+	uint32_t pad = 0;
+	struct iovec iov;
+	IoVector iovec;
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	pkt[0] = 2 * sizeof(uint32_t);
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::STREAM_ANNOTATION_TYPE,
+		ADARA::PacketType::STREAM_ANNOTATION_VERSION );
+	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	pkt[3] = now.tv_nsec;
+
+	pkt[4] = (uint32_t) ADARA::MarkerType::OVERALL_RUN_COMMENT << 16;
+	pkt[5] = 0;
+
+	iov.iov_base = pkt;
+	iov.iov_len = sizeof(pkt);
+	iovec.push_back(iov);
+
+	std::stringstream ss;
+	ss << "SMS Saved Input Stream"
+		<< " for Data Source ID " << m_smsSourceId
+		<< " [" << m_name << "]";
+	
+	pkt[0] += ( ss.str().size() + 3 ) & ~3;
+	pkt[4] |= ss.str().size();
+
+	iov.iov_base = const_cast<char *>(ss.str().c_str());
+	iov.iov_len = ss.str().size();
+	iovec.push_back(iov);
+
+	if ( ss.str().size() % 4 ) {
+		iov.iov_base = &pad;
+		iov.iov_len = 4 - ( ss.str().size() % 4 );
+		iovec.push_back(iov);
+	}
+
+	StorageManager::addSavePrologue( iovec, m_smsSourceId );
+
+	// Dump All Known Device Descriptors and Last Variable Value Updates
+
+	DeviceMap::iterator dit, dend = m_devices.end();
+
+	for ( dit = m_devices.begin(); dit != dend; ++dit ) {
+
+		DeviceVariables &dev = dit->second;
+		ADARA::Packet *dev_pkt = dev.m_descriptorPkt.get();
+
+		StorageManager::addSavePrologue(
+			dev_pkt->packet(), dev_pkt->packet_length(), m_smsSourceId );
+
+		VariablePktMap &varPkts = dev.m_variablePkts;
+		VariablePktMap::iterator vit, vend = varPkts.end();
+
+		for ( vit = varPkts.begin(); vit != vend; ++vit ) {
+
+			ADARA::Packet *var_pkt = vit->second.get();
+
+			StorageManager::addSavePrologue(
+				var_pkt->packet(), var_pkt->packet_length(),
+				m_smsSourceId );
+		}
+	}
 }
 

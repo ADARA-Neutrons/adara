@@ -2,6 +2,7 @@
 #define __DATA_SOURCE_H
 
 #include <boost/smart_ptr.hpp>
+#include <boost/signals2.hpp>
 #include <stdint.h>
 #include <map>
 #include <bitset>
@@ -160,6 +161,26 @@ private:
 	void updateBandwidthSecond(struct timespec &now, bool do_log);
 	void updateBandwidthMinute(struct timespec &now, bool do_log);
 	void updateBandwidthTenMin(struct timespec &now, bool do_log);
+
+	void onSavePrologue(void);
+
+	// Device Descriptor and Variable Packet Tracking
+	// (for Saved Input Stream File Prologue...)
+	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
+	typedef std::map<uint32_t, PacketSharedPtr> VariablePktMap;
+
+	struct DeviceVariables {
+		uint32_t    m_devId;
+		// No Need for a Source Tag here (a la MetaDataMgr.h)
+		PacketSharedPtr m_descriptorPkt;
+		VariablePktMap  m_variablePkts;
+	};
+
+	typedef std::map<uint32_t, DeviceVariables> DeviceMap;
+
+	DeviceMap m_devices;
+
+	boost::signals2::connection m_connection;
 
 	// Last Packet Debug
 	uint32_t m_last_pkt_type;
