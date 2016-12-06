@@ -10,6 +10,7 @@
 
 #include "ADARAPackets.h"
 #include "POSIXParser.h"
+#include "SMSControl.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
@@ -34,6 +35,8 @@ public:
 		bool ignore_eop, bool mixed_data_packets, unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
+
+	SMSControl *m_ctrl;
 
 	bool m_readDelay;
 
