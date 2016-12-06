@@ -1690,7 +1690,9 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	static uint32_t cnt = 0;
 
 	// Once Per Second...
-	if ( !(++cnt % 60) )
+	uint32_t freq = 60;
+
+	if ( !(++cnt % freq) )
 	{
 		// Update RTDL "No Data" Threshold from PV...
 		m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
@@ -1701,7 +1703,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 		while ( it != m_hwSources.end() ) {
 
-			if ( ++(it->second->m_rtdlNoDataCount) > m_rtdlNoDataThresh ) {
+			if ( ( it->second->m_rtdlNoDataCount += freq )
+					> m_rtdlNoDataThresh ) {
 
 				ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Run-Away Data Source " << m_name
