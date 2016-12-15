@@ -26,6 +26,7 @@
 #include <time.h>
 #include <math.h>
 #include <boost/lexical_cast.hpp>
+#include <boost/make_shared.hpp>
 #include <stdint.h>
 
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
@@ -1971,7 +1972,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 	/* Note: pkt.badCycle() and pkt.badVeto() are Deprecated. */
 
-	pulse->m_rtdl.reset(new ADARA::RTDLPkt(pkt));
+	pulse->m_rtdl = boost::make_shared<ADARA::RTDLPkt>(pkt);
 
 	// Is pulse pending from any data sources...?
 	if (!pulse->m_pending.any()) {

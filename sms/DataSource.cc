@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 #include <stdexcept>
 
@@ -1933,7 +1934,7 @@ bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 	// If Not An Empty Descriptor, then Save Descriptor Packet...
 	if ( !pkt.description().empty() ) {
 		boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
-		ddp.reset(new ADARA::DeviceDescriptorPkt(pkt));
+		ddp = boost::make_shared<ADARA::DeviceDescriptorPkt>(pkt);
 		m_devices[ pkt.devId() ].m_descriptorPkt = ddp;
 		m_devices[ pkt.devId() ].m_devId = pkt.devId();
 	}
@@ -1958,7 +1959,7 @@ bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableU32Pkt> vvp;
-		vvp.reset(new ADARA::VariableU32Pkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableU32Pkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
@@ -1982,7 +1983,7 @@ bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableDoublePkt> vvp;
-		vvp.reset(new ADARA::VariableDoublePkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableDoublePkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
@@ -2006,7 +2007,7 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableStringPkt> vvp;
-		vvp.reset(new ADARA::VariableStringPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableStringPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
@@ -2030,7 +2031,7 @@ bool DataSource::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableU32ArrayPkt> vvp;
-		vvp.reset(new ADARA::VariableU32ArrayPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableU32ArrayPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
@@ -2054,7 +2055,7 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vvp;
-		vvp.reset(new ADARA::VariableDoubleArrayPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableDoubleArrayPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
