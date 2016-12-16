@@ -1090,8 +1090,16 @@ void DataSource::dataReady(void)
 
 	m_timer->cancel();
 
-	// Update Data Timeout from PV...
-	m_data_timeout = m_pvDataTimeout->value();
+	// Update Our Data Timeout/Max Read Chunk Internals Less Frequently,
+	// It Takes Some Time...!
+	// Only allow updates every few seconds (depending on bandwidth... ;-)
+	static uint32_t cnt = 0;
+	uint32_t freq = 333;
+
+	// Update Data Timeout from PV... (Periodically...)
+	if ( !(++cnt % freq) ) {
+		m_data_timeout = m_pvDataTimeout->value();
+	}
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;
@@ -1105,40 +1113,43 @@ void DataSource::dataReady(void)
 	m_rtdl_pkt_counts = 0;
 	m_data_pkt_counts = 0;
 
-	// Update Max Read Chunk from PV...
-	std::string val = m_pvMaxReadChunk->value();
-	unsigned int tmp_max_read_chunk;
-	try {
-		tmp_max_read_chunk = parse_size(val);
-	} catch (std::runtime_error e) {
-		std::string msg("Unable to parse read size for source '");
-		msg += m_name;
-		msg += "': ";
-		msg += e.what();
-		// *Don't* Throw std::runtime_error(msg), Just Log Instead...
-		/* Rate-limited log of failure */
-		std::string log_info;
-		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-				RLL_PARSE_MAX_READ_CHUNK, m_name,
-				60, 3, 5000, log_info ) ) {
-			ERROR(log_info
-				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "dataReady(): " << msg << " - Revert to Original"
-				<< " m_max_read_chunk=" << m_max_read_chunk);
+	// Update Max Read Chunk from PV... (Periodically...)
+	// (Note: count already incremented above for Data Timeout...!)
+	if ( !(cnt % freq) ) {
+		std::string val = m_pvMaxReadChunk->value();
+		unsigned int tmp_max_read_chunk;
+		try {
+			tmp_max_read_chunk = parse_size(val);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse read size for source '");
+			msg += m_name;
+			msg += "': ";
+			msg += e.what();
+			// *Don't* Throw std::runtime_error(msg), Just Log Instead...
+			/* Rate-limited log of failure */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_PARSE_MAX_READ_CHUNK, m_name,
+					60, 3, 5000, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "dataReady(): " << msg << " - Revert to Original"
+					<< " m_max_read_chunk=" << m_max_read_chunk);
+			}
+			// String parse failed, revert to original value...
+			tmp_max_read_chunk = m_max_read_chunk;
 		}
-		// String parse failed, revert to original value...
-		tmp_max_read_chunk = m_max_read_chunk;
-	}
-	if ( tmp_max_read_chunk != m_max_read_chunk ) {
-		m_max_read_chunk = tmp_max_read_chunk;
-		// Log the change...
-		std::stringstream ssMRC;
-		ssMRC << ( m_ctrl->getRecording() ? "[RECORDING] " : "" );
-		ssMRC << "Setting Max Read Chunk Size for " << m_name;
-		ssMRC << " to ";
-		ssMRC << m_max_read_chunk;
-		ssMRC << " (" << val << ")";
-		INFO(ssMRC.str());
+		if ( tmp_max_read_chunk != m_max_read_chunk ) {
+			m_max_read_chunk = tmp_max_read_chunk;
+			// Log the change...
+			std::stringstream ssMRC;
+			ssMRC << ( m_ctrl->getRecording() ? "[RECORDING] " : "" );
+			ssMRC << "Setting Max Read Chunk Size for " << m_name;
+			ssMRC << " to ";
+			ssMRC << m_max_read_chunk;
+			ssMRC << " (" << val << ")";
+			INFO(ssMRC.str());
+		}
 	}
 
 	try {
@@ -1194,6 +1205,8 @@ void DataSource::dataReady(void)
 			}
 			m_ctrl->setSourcesReadDelay();
 			if ( dumpStats ) dumpLastReadStats("dataReady() (Read Delay)");
+			// We were "Away" for a while... Trigger Internals PV Update!
+			cnt = freq - 1;
 		}
 	}
 }
