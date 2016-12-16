@@ -1505,6 +1505,10 @@ bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
 bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		bool is_mapped)
 {
+	// Infrequently Update Internal Config from Live Control PV Values...
+	static uint32_t cnt = 0;
+	++cnt;
+
 	HWSource &hw_src = getHWSource(pkt->sourceID());
 
 	// Reset "RTDL Packets with No Data Packets" Count...
@@ -1523,9 +1527,14 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	if ( good_pulse )
 	{
-		// Update "Mixed Data Packets" Option for This Data Source
-		// from Live Config...
-		m_mixed_data_packets = m_pvMixedDataPackets->value();
+		// [VERY INFREQUENTLY] Update "Mixed Data Packets" Option
+		// for This Data Source, from Live Config PV Value...
+		// - We don't expect this to change very often, if ever,
+		// so only check very rarely, like every 10 minutes... ;-D
+		// (Note: count already incremented above for overall method...!)
+		if ( !(cnt % 999999) ) {
+			m_mixed_data_packets = m_pvMixedDataPackets->value();
+		}
 
 		m_ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
 			is_mapped, m_mixed_data_packets);
@@ -1535,7 +1544,11 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	}
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
-	m_ignore_eop = m_pvIgnoreEoP->value();
+	// - Infrequently Update from Live Control PV Value, once per minute?
+	// (Note: count already incremented above for overall method...!)
+	if ( !(cnt % 99999) ) {
+		m_ignore_eop = m_pvIgnoreEoP->value();
+	}
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
