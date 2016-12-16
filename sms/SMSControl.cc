@@ -1370,78 +1370,99 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	if (dup)
 		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
 
-	// Update Max Pulse Buffer Size from PV...
-	m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+	// [LESS FREQUENTLY] Check for Internal Pulse Buffer Size Overflow...
+	// (Happens when One or More of Multiple Event Sources suddenly
+	// Stop Sending Event Data, and we Keep Waiting, Hanging Onto Pulses
+	// so they can All be Marked "Complete" Across All Data Sources... ;-)
+	// - When This Happens, Regardless of the Cause, We Need to Flush
+	// Some Pulses from Our Internal Pulse Buffer, so we Don't Swell Up
+	// and Pop...! ;-D
 
-	// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
-	// (Give the "New Guy" a chance to exist before we dump it... ;-D)
-	if ( m_pulses.size() > m_maxPulseBufferSize ) {
+	static uint32_t cnt = 0;
 
-		// Record & Free Just Enough Pulses as Required to Stay Under Max!
-		// (Even after adding the next one, already in hand...!)
-		uint32_t num_to_record =
-			m_pulses.size() - m_maxPulseBufferSize + 1;
+	// Once Per Second...
+	uint32_t freq = 60;
 
-		// Record Complete/Partial Pulses Past the Buffering Threshold
-		PulseMap::iterator last_recorded;
-		uint32_t recorded = 0;
-		it = m_pulses.begin();
-		for ( uint32_t i=0 ;
-				i < num_to_record && it != m_pulses.end() ; i++ ) {
-			// Pulse will Never be Made Complete, Mark as Partial...
-			if (it->second->m_pending.any()) {
-				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
-			}
-			// Correct Proton Charge...
-			// (This Pulse's PCharge comes from _Next_ Pulse...!)
-			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
-			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
-				PulseMap::iterator next = it;
-				if (++next != m_pulses.end())
-					correctPChargeVeto(it->second, next->second);
-				else {
-					/* Rate-limited logging of global sawtooth pulse */
-					std::string log_info;
-					if ( RateLimitedLogging::checkLog(
-							RLLHistory_SMSControl,
-							RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
-							2, 10, 100, log_info ) ) {
-						ERROR(log_info
-							<< ( m_recording ? "[RECORDING] " : "" )
-							<< "getPulse:"
-							<< " No More Pulses for"
-							<< " Proton Charge/Veto Flags Correction! 0x"
-							<< std::hex << it->first.first << std::dec);
+	if ( !(++cnt % freq) )
+	{
+		// Update Max Pulse Buffer Size from PV...
+		m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+
+		// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
+		// (Give the "New Guy" a chance to exist before we dump it... ;-D)
+		if ( m_pulses.size() > m_maxPulseBufferSize ) {
+
+			// Record & Free Just Enough Pulses as Required to Stay Under
+			// the Max Internal Pulse Buffer Size...!
+			// (Even after adding the next one, already in hand...!)
+			uint32_t num_to_record =
+				m_pulses.size() - m_maxPulseBufferSize + 1;
+
+			// Record Complete/Partial Pulses Past the Buffering Threshold
+			PulseMap::iterator last_recorded;
+			uint32_t recorded = 0;
+			it = m_pulses.begin();
+			for ( uint32_t i=0 ;
+					i < num_to_record && it != m_pulses.end() ; i++ ) {
+				// Pulse will Never be Made Complete, Mark as Partial...
+				if (it->second->m_pending.any()) {
+					it->second->m_flags |=
+						ADARA::BankedEventPkt::PARTIAL_DATA;
+				}
+				// Correct Proton Charge...
+				// (This Pulse's PCharge comes from _Next_ Pulse...!)
+				m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+				m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+				if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
+					PulseMap::iterator next = it;
+					if (++next != m_pulses.end())
+						correctPChargeVeto(it->second, next->second);
+					else {
+						/* Rate-limited logging of global sawtooth pulse */
+						std::string log_info;
+						if ( RateLimitedLogging::checkLog(
+								RLLHistory_SMSControl,
+								RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
+								2, 10, 100, log_info ) ) {
+							ERROR(log_info
+								<< ( m_recording ? "[RECORDING] " : "" )
+								<< "getPulse:"
+								<< " No More Pulses for"
+								<< " Proton Charge/Veto Flags Correction!"
+								<< " 0x" << std::hex << it->first.first
+								<< std::dec);
+						}
 					}
 				}
+				// Record Pulse to Reduce Overflow Buffer Size...
+				recordPulse(it->second);
+				last_recorded = it++;
+				recorded++;
 			}
-			// Record Pulse to Reduce Overflow Buffer Size...
-			recordPulse(it->second);
-			last_recorded = it++;
-			recorded++;
-		}
 
-		// Log What Pulse Map Size Will Be _After_ Freeing Recorded Pulses
-		std::string log_info;
-		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-				RLL_PULSE_BUFFER_OVERFLOW, "none",
-				2, 10, 100, log_info ) ) {
-			ERROR(log_info
-				<< ( m_recording ? "[RECORDING] " : "" )
-				<< "*** Internal Pulse Buffer Overflow!"
-				<< " Length = " << ( m_pulses.size() - recorded )
-				<< " (recorded=" << recorded << ")"
-				<< std::hex
-				<< " (not counting new pulse 0x" << id << ")"
-				<< " - Recorded Pulses 0x" << m_pulses.begin()->first.first
-				<< " up to 0x" << last_recorded->first.first
-				<< std::dec);
-		}
+			// Log What the Pulse Map Size Will Be _After_ Freeing
+			// these Recorded Pulses...
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_PULSE_BUFFER_OVERFLOW, "none",
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "*** Internal Pulse Buffer Overflow!"
+					<< " Length = " << ( m_pulses.size() - recorded )
+					<< " (recorded=" << recorded << ")"
+					<< std::hex
+					<< " (not counting new pulse 0x" << id << ")"
+					<< " - Recorded Pulses"
+					<< " 0x" << m_pulses.begin()->first.first
+					<< " up to 0x" << last_recorded->first.first
+					<< std::dec);
+			}
 
-		// Erase Any Now-Recorded Pulses
-		if (recorded) {
-			m_pulses.erase(m_pulses.begin(), ++last_recorded);
+			// Erase Any Now-Recorded Pulses
+			if (recorded) {
+				m_pulses.erase(m_pulses.begin(), ++last_recorded);
+			}
 		}
 	}
 
