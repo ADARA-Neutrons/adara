@@ -1235,16 +1235,22 @@ void DataSource::disabled(void)
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Meter Live Control PV Updates and "Discarded Packet" statistics...
+	static uint32_t cnt = 0;
+
 	// Optionally Save Input Stream to Storage Container File...
-	m_save_input_stream = m_pvSaveInputStream->value();
+	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
+	if ( !( ++cnt % 99999 ) ) {
+		m_save_input_stream = m_pvSaveInputStream->value();
+	}
 	if (m_save_input_stream) {
 		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
 			m_smsSourceId);
 	}
 
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
-	static uint64_t dump_count = 0;
-	if ( !( ++dump_count % 1000000 ) ) {
+	// (Note: count already incremented above for Save Input Stream...!)
+	if ( !( cnt % 999999 ) ) {
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
