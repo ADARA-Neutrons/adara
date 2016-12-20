@@ -1142,9 +1142,11 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		// Include "Last Complete Pulse" (With Any Buffering Adjustments)
 		last_minus_buffer++;
 
+		// Get Latest Pulse Charge and Veto Corrections Settings from PV...
+		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+
 		for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
-			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
 			if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 				PulseMap::iterator next = it;
 				if (++next != m_pulses.end())
@@ -1398,6 +1400,10 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			uint32_t num_to_record =
 				m_pulses.size() - m_maxPulseBufferSize + 1;
 
+			// Get Latest Pulse Charge/Veto Corrections Settings from PV...
+			m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+			m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+
 			// Record Complete/Partial Pulses Past the Buffering Threshold
 			PulseMap::iterator last_recorded;
 			uint32_t recorded = 0;
@@ -1411,8 +1417,6 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 				}
 				// Correct Proton Charge...
 				// (This Pulse's PCharge comes from _Next_ Pulse...!)
-				m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-				m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
 				if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 					PulseMap::iterator next = it;
 					if (++next != m_pulses.end())
@@ -2160,6 +2164,10 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
 	last_minus_buffer++;
 
+	// Get Latest Pulse Charge and Veto Corrections Settings from PV...
+	m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+	m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+
 	for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
 
 		// Previous Pulses will Never be Made Complete,
@@ -2167,8 +2175,6 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 		// Correct Proton Charge...
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
-		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
 		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 			PulseMap::iterator next = it;
 			if (++next != m_pulses.end())
