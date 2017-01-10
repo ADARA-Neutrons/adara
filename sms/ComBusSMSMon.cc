@@ -34,19 +34,6 @@ bool SMSRunStatus::hasTime()
 	return m_start_time.tv_sec || m_start_time.tv_nsec;
 }
 
-void ca_exception_handler( struct exception_handler_args args )
-{
-	const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
-
-	ERROR("ComBusSMSMon::ca_exception_handler(): Caught EPICS Exception!"
-		<< " Context=[" << args.ctx << "]"
-		<< " - with Request ChannelId=[" << pName << "]"
-		<< " Operation=" << args.op
-		<< " DataType=[" << dbr_type_to_text( args.type ) << "]"
-		<< " Count=" << args.count
-		<< " [Continuing...!]");
-}
-
 ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 		std::string a_facility = std::string("SNS") ) :
 	m_combus(0),
@@ -56,9 +43,7 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_stop(false),
 	m_inqueue(new epicsMessageQueue(100, sizeof(SMSRunStatus *)))
 {
-	// Install Non-Default (And Non-Terminating!) Channel Access
-	// Exception Handler for the SMS...! ;-D
-	ca_add_exception_event ( ca_exception_handler , 0 );
+	// Install Channel Access Exception Handler in commThread() now... :-D
 }
 
 ComBusSMSMon::~ComBusSMSMon()
@@ -271,6 +256,19 @@ void ComBusSMSMon::restartCallback(struct event_handler_args args) {
 	}
 }
 
+void ca_exception_handler( struct exception_handler_args args )
+{
+	const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
+
+	ERROR("ComBusSMSMon::ca_exception_handler(): Caught EPICS Exception!"
+		<< " Context=[" << args.ctx << "]"
+		<< " - with Request ChannelId=[" << pName << "]"
+		<< " Operation=" << args.op
+		<< " DataType=[" << dbr_type_to_text( args.type ) << "]"
+		<< " Count=" << args.count
+		<< " [Continuing...!]");
+}
+
 void ComBusSMSMon::commThread()
 {
 	unsigned long hb = 0;
@@ -297,6 +295,12 @@ void ComBusSMSMon::commThread()
 	// explicitly specify single threaded context. CA being used as ipc.
 	SMSSEVCHK(ca_context_create(ca_disable_preemptive_callback),
 		"create ca context");
+
+	// Install Non-Default (And Non-Terminating!) Channel Access
+	// Exception Handler for the SMS...! ;-D
+	SMSSEVCHK(ca_add_exception_event(ca_exception_handler, 0),
+		"add EPICS exception handler");
+
 	SMSSEVCHK(ca_create_channel(m_pvDomain->getName(), 0, 0, 0,
 			&domain_chid),
 		"create domain channel");
