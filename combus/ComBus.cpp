@@ -598,12 +598,14 @@ Connection::reconnectThread()
     unsigned short retry_period = 2;
     boost::unique_lock<boost::mutex> lock( m_status_mutex,
         boost::defer_lock );
+    bool unlocked = true; // because boost can't take a joke... ;-b
 
     while ( 1 )
     {
         exceptionLog("reconnectThread() - Loop...", INFO_LOG);
 
         lock.lock();
+        unlocked = false;
 
         // Exit if terminating
         if ( !m_running )
@@ -628,6 +630,7 @@ Connection::reconnectThread()
             // Unlock _Now_ as Connection Start & Session Create can Hang!
             // Besides, We're Done with the Broker Connection Parameters.
             lock.unlock();
+            unlocked = true;
 
             m_connection->start();
             m_connection->setExceptionListener(this);
@@ -655,7 +658,7 @@ Connection::reconnectThread()
                 "reconnectThread(): ActiveMQ Connection Successful.",
                 INFO_LOG);
 
-            // Connected! (Retain lock)
+            // Connected! (Lock Already Unlocked...)
             break;
         }
         catch(...)
@@ -667,14 +670,20 @@ Connection::reconnectThread()
             try
             {
                 // ActiveMQ CPP Session Destructor Broken... ;-Q
-                if ( m_session ) m_session->close();
-                delete m_session;
-                m_session = 0;
+                if ( m_session )
+                {
+                    m_session->close();
+                    delete m_session;
+                    m_session = 0;
+                }
 
                 // ActiveMQ CPP Connection Destructor Broken... ;-Q
-                if ( m_connection ) m_connection->close();
-                delete m_connection;
-                m_connection = 0;
+                if ( m_connection )
+                {
+                    m_connection->close();
+                    delete m_connection;
+                    m_connection = 0;
+                }
             }
             catch(...)
             {
@@ -689,17 +698,48 @@ Connection::reconnectThread()
                 m_connection = 0;
             }
 
+            exceptionLog(
+                "reconnectThread(): ActiveMQ Error Cleanup Complete.",
+                ERR_LOG);
+
             // Failed to connect
             if ( retry_period < 10 )
                 retry_period += 2;
         }
 
-        lock.unlock();
+        exceptionLog(
+            "reconnectThread(): After ActiveMQ Reconnect Attempt.",
+            ERR_LOG);
+
+        // _ONLY_ Unlock If Not Already Unlocked...! ;-Q
+        if ( !unlocked )
+        {
+            exceptionLog( "reconnectThread(): Unlocking Lock...",
+                ERR_LOG );
+
+            lock.unlock();
+
+            exceptionLog( "reconnectThread(): After Unlock...",
+                ERR_LOG );
+        }
+
+        std::stringstream ss;
+        ss << "reconnectThread(): Sleeping for "
+            << " retry_period=" << retry_period;
+        exceptionLog( ss.str(), ERR_LOG );
 
         // TODO Replace with a timed cond var wait so destructor
         // can interrupt this thread
         sleep( retry_period );
+
+        ss << "reconnectThread(): After Retry Sleep..."
+            << " (retry_period=" << retry_period << ")";
+        exceptionLog( ss.str(), ERR_LOG );
     }
+
+    exceptionLog(
+        "reconnectThread(): After Reconnect Loop...",
+        ERR_LOG);
 
     // Notify connection status thread we're giving up...
     m_status_cond.notify_one();
@@ -710,7 +750,7 @@ Connection::reconnectThread()
     delete m_reconnect_thread;
     m_reconnect_thread = 0;
 
-    // lock will unlock when method exits
+    // lock will unlock (as needed) when method exits
 }
 
 
@@ -821,14 +861,20 @@ Connection::disconnect()
                 m_input_translator->disconnect_all();
 
             // ActiveMQ CPP Session Destructor Broken... ;-Q
-            if ( m_session ) m_session->close();
-            delete m_session;
-            m_session = 0;
+            if ( m_session )
+            {
+                m_session->close();
+                delete m_session;
+                m_session = 0;
+            }
 
             // ActiveMQ CPP Connection Destructor Broken... ;-Q
-            if ( m_connection ) m_connection->close();
-            delete m_connection;
-            m_connection = 0;
+            if ( m_connection )
+            {
+                m_connection->close();
+                delete m_connection;
+                m_connection = 0;
+            }
         }
         catch(...)
         {
