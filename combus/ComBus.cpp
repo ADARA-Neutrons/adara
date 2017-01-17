@@ -739,7 +739,7 @@ Connection::reconnectThread()
 
     exceptionLog(
         "reconnectThread(): After Reconnect Loop...",
-        ERR_LOG);
+        INFO_LOG);
 
     // Notify connection status thread we're giving up...
     m_status_cond.notify_one();
