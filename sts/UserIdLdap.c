@@ -13,7 +13,7 @@ int main()
 
 	LDAPMessage *msg;
 
-	char *ldap_host = "data.sns.gov";
+	char *ldap_host = "ldap-vip.sns.gov";
 	char ldap_uri[255];
 
 	char *base = "ou=Users,dc=sns,dc=ornl,dc=gov";
