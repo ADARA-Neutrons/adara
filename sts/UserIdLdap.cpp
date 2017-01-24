@@ -40,7 +40,7 @@ int stsLdapConnect()
 		syslog( LOG_ERR,
 			"[%i] %s %s: LDAP Set Network Timeout Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -3 );
+	    return( -2 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Network Timeout to %ld.%ld Seconds.",
 		g_pid, network_timeout.tv_sec, network_timeout.tv_usec );
@@ -53,7 +53,7 @@ int stsLdapConnect()
 		syslog( LOG_ERR,
 			"[%i] %s %s: LDAP Set Search Time Limit Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -4 );
+	    return( -3 );
 	}
 	syslog( LOG_INFO, "[%i] Set LDAP Search Time Limit to %d Seconds.",
 		g_pid, search_timelimit );
@@ -66,7 +66,7 @@ int stsLdapConnect()
 		syslog( LOG_ERR,
 			"[%i] %s %s: LDAP Set Synchronous Timeout Option Failed - %s",
 			g_pid, "STS Error:", "stsLdapConnect()", ldap_err2string(cc) );
-	    return( -5 );
+	    return( -4 );
 	}
 	syslog( LOG_INFO,
 		"[%i] Set LDAP Synchronous Timeout to %ld.%ld Seconds.",
