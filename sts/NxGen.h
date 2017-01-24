@@ -843,8 +843,6 @@ public:
         std::string &a_nexus_out_file,
         bool a_strict,
         bool a_gather_stats,
-        std::string &a_ldap_host,
-        uint32_t a_ldap_port,
         unsigned long a_chunk_size = 2048,   // in Dataset Elements! :-O
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
@@ -1065,8 +1063,6 @@ private:
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
     uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
     struct timespec             m_sts_start_time;       /// STS Start of Processing Time
-    std::string                 m_ldap_host;            /// LDAP Host for User Name Lookup
-    uint32_t                    m_ldap_port;            /// LDAP Port for User Name Lookup
 };
 
 #endif // NXGEN_H

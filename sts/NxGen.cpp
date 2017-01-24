@@ -30,8 +30,6 @@ NxGen::NxGen
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
-    string         &a_ldap_host,                ///< [in] LDAP Host for User Name Lookup
-    uint32_t        a_ldap_port,                ///< [in] LDAP Port for User Name Lookup
     unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
     unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
@@ -61,9 +59,7 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_haveRunComment(false),
-    m_ldap_host(a_ldap_host),
-    m_ldap_port(a_ldap_port)
+    m_haveRunComment(false)
 {
     // Capture STS "Start of Processing Time"...
     clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
@@ -888,7 +884,7 @@ NxGen::processRunInfo
                 // Create LDAP Connection Only as Needed...
                 if ( !ldap_lookup )
                 {
-                    if ( stsLdapConnect( m_ldap_host, m_ldap_port ) == 0 )
+                    if ( stsLdapConnect() == 0 )
                         ldap_lookup = true;
                 }
 
