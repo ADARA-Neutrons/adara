@@ -196,7 +196,7 @@ int main( int argc, char** argv )
                 ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
                 ("ldap_host", po::value<string>( &ldap_host )->default_value( "ldap-vip.sns.gov" ), "Override Default LDAP Host for User Name Lookup")
-                ("ldap_port", po::value<unsigned int>( &ldap_port )->default_value( LDAPS_PORT ), "Override Default LDAP Port for User Name Lookup")
+                ("ldap_port", po::value<unsigned int>( &ldap_port )->default_value( LDAP_PORT ), "Override Default LDAP Port for User Name Lookup")
                 ;
 
 
