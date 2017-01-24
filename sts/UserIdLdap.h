@@ -5,7 +5,7 @@
 #include <string>
 #include <stdint.h>
 
-int stsLdapConnect( std::string &ldap_host, uint32_t ldap_port );
+int stsLdapConnect();
 
 int stsLdapLookupUserName( std::string uid, std::string &user_name );
 
