@@ -35,14 +35,6 @@ int main()
 	}
 	printf( "Initialized to LDAP Server.\n" );
 
-	// Set LDAP Protocol to Version 3
-	if ( ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &desired_version)
-			!= LDAP_OPT_SUCCESS ) {
-	    ldap_perror(ld, "ldap_set_option failed!");
-	    return( -1 );
-	}
-	printf( "Set LDAP Protocol to Version 3.\n" );
-
 	// Set Up LDAP Search Filters...
 	filter[0] = "uid=FENG_BNL";
 	filter[1] = "uid=WANGDAWEI";
