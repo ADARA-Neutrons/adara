@@ -1073,7 +1073,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 
 		last_minus_buffer = last;
 		uint32_t recorded = 0;
-		uint32_t cnt = 0;
+		uint32_t pcnt = 0;
 
 		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
 		// (Any Other Remaining Sources Could Still Spew Out-of-Order...)
@@ -1085,7 +1085,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			// Work Backward from *End of Buffer*...
 			// (_Not_ the Last Complete Pulse!)
 			PulseMap::reverse_iterator rit = m_pulses.rbegin();
-			while ( cnt++ < m_noEoPPulseBufferSize ) {
+			while ( pcnt++ < m_noEoPPulseBufferSize ) {
 				// End of the Line, Not Enough Buffered Pulses to Proceed
 				if ( rit != m_pulses.rend() ) {
 					// Skip Over Pulse to Satisfy Buffering Requirement
@@ -2114,16 +2114,24 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
 
-	// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
-	m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
+	// [LESS FREQUENTLY] Get Latest "No End-of-Pulse Buffer Size" Value
+	// from PV...
+	static uint32_t cnt = 0;
+
+	// Once Every 10 Seconds...
+	uint32_t freq = 600;
+
+	if ( !(++cnt % freq) ) {
+		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
+	}
 
 	last_minus_buffer = last;
 	uint32_t recorded = 0;
-	uint32_t cnt = 0;
+	uint32_t pcnt = 0;
 
 	// Work Backward from *End of Buffer* (_Not_ the Last Complete Pulse!)
 	PulseMap::reverse_iterator rit = m_pulses.rbegin();
-	while ( cnt++ < m_noEoPPulseBufferSize ) {
+	while ( pcnt++ < m_noEoPPulseBufferSize ) {
 		// End of the Line, Not Enough Buffered Pulses to Proceed
 		if ( rit != m_pulses.rend() ) {
 			// Skip Over Pulse to Satisfy Buffering Requirement
@@ -2164,9 +2172,14 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
 	last_minus_buffer++;
 
-	// Get Latest Pulse Charge and Veto Corrections Settings from PV...
-	m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-	m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+	// [LESS FREQUENTLY] Get Latest Pulse Charge and Veto Corrections
+	// Settings from PVs...
+	// (Note: count already incremented above for
+	//    "No End-of-Pulse Buffer Size"...)
+	if ( !(cnt % freq) ) {
+		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
+		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+	}
 
 	for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
 
