@@ -22,7 +22,7 @@ that might be of interest to developers and maintainers of the system. :-)
 
    -> add cron job to periodically run the script, every 5 minutes:
 
-   $ sudo crontab -e   (or edit /etc/crontab)
+   $ sudo crontab -e   (*** or edit /etc/crontab ***)
 
    . . .
 
