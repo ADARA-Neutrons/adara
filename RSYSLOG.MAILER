@@ -33,6 +33,10 @@ that might be of interest to developers and maintainers of the system. :-)
 
    */5 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
+   (*** Note: with /etc/crontab, the *User* must also be specified, i.e.:
+      */5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+   Duh... ;-)
+
    (Note: the named pipe "/etc/rsyslog.pipes/criticalMessages" is
    now hard-coded as $namedPipeFile in the actual "rsyslogMailer" script!)
 
