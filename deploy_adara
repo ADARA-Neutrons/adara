@@ -526,7 +526,9 @@ if [ $need_build == 1 ]; then
 		exit -12
 	fi
 
-	# Build the ADARA software suite, using EPICS in /home/controls/epics
+	# Build the ADARA software suite, using EPICS linked to in:
+	#   EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"...
+	# -> e.g. "/home/controls/prod/epics/base/rel3.14.12.4_20140619"
 
 	echo -e "\nBuilding the ADARA software suite." | tee -a $LOG
 
