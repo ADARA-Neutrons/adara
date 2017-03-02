@@ -1512,9 +1512,9 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			postEvent(mask, *edge);
 
 			ts.tv_nsec++;
-			if (ts.tv_nsec > 1000000000) {
+			if (ts.tv_nsec > NANO_PER_SECOND_LL) {
 				ts.tv_sec++;
-				ts.tv_nsec -= 1000000000;
+				ts.tv_nsec -= NANO_PER_SECOND_LL;
 			}
 			m_value->setTimeStamp(&ts);
 			postEvent(mask, *m_value);

@@ -148,7 +148,8 @@ StreamParser::processStream()
                         // before terminating
                         markerComment(
                             ( m_pulse_info.last_time
-                                - m_pulse_info.start_time ) / 1000000000.0,
+                                    - m_pulse_info.start_time )
+                                / NANO_PER_SECOND_D,
                             m_pulse_info.start_time
                                 + m_pulse_info.last_time,
                             "Stream processing terminated abnormally." );
@@ -733,8 +734,8 @@ StreamParser::processPulseInfo
         else
             pulse_time -= m_pulse_info.start_time;
 
-        m_pulse_info.times.push_back( pulse_time/1000000000.0 );
-        m_pulse_info.freqs.push_back( 1000000000.0
+        m_pulse_info.times.push_back( pulse_time / NANO_PER_SECOND_D );
+        m_pulse_info.freqs.push_back( NANO_PER_SECOND_D
             / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
@@ -2130,7 +2131,7 @@ StreamParser::rxPacket
             // On fatal error, flush buffers to Nexus before terminating
             markerComment(
                 ( m_pulse_info.last_time - m_pulse_info.start_time )
-                    / 1000000000.0,
+                    / NANO_PER_SECOND_D,
                 m_pulse_info.start_time + m_pulse_info.last_time,
                 "Stream processing terminated abnormally." );
             m_run_metrics.end_time = nsec_to_timespec(
@@ -3146,7 +3147,7 @@ StreamParser::rxPacket
         uint64_t t1 = timespec_to_nsec( a_pkt.timestamp() );
         // Truncate negative time offsets to 0
         if ( t1 > m_pulse_info.start_time )
-            t = ( t1 - m_pulse_info.start_time ) / 1000000000.0;
+            t = ( t1 - m_pulse_info.start_time ) / NANO_PER_SECOND_D;
     }
 
     // Switch on event type

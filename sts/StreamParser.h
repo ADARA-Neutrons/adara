@@ -234,7 +234,8 @@ StreamParser::pvValueUpdate
             // Truncate negative time offsets to 0
             if ( ts_nano > m_pulse_info.start_time )
             {
-                t = (ts_nano - m_pulse_info.start_time)/1000000000.0;
+                t = ( ts_nano - m_pulse_info.start_time )
+                    / NANO_PER_SECOND_D;
             }
             else if ( pvinfo->m_value_buffer.size() )
             {
@@ -275,8 +276,8 @@ StreamParser::pvValueUpdate
             "Variable Value Update SAWTOOTH",
             a_device_id, a_pv_id,
             a_timestamp.tv_sec, a_timestamp.tv_nsec,
-            (unsigned long) (pvinfo->m_last_time / 1000000000LL),
-            (unsigned long) (pvinfo->m_last_time % 1000000000LL) );
+            (unsigned long) ( pvinfo->m_last_time / NANO_PER_SECOND_LL ),
+            (unsigned long) (pvinfo->m_last_time % NANO_PER_SECOND_LL ) );
         // give syslog a chance...
         usleep(30000);
     }
