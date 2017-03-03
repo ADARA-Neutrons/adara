@@ -548,7 +548,23 @@ StreamParser::rxPacket
 {
     // Ignore duplicate pulses
     if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    {
+        // Log Duplicate Pulse if it had Any Events...!
+        uint32_t nbytes = a_pkt.payload_length() - 16;
+        if ( nbytes > 16 ) // appears to be minimal "empty"-ish packet...
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u.%09u with Events (%u %s) in %s - Ignoring!",
+                g_pid, "STS Error:", "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventPkt" );
+            usleep(30000); // give syslog a chance...
+        }
         return false;
+    }
 
     // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
     // any other value indicates an error with SMS packet generation
@@ -1069,7 +1085,22 @@ StreamParser::rxPacket
 {
     // Ignore duplicate pulses
     if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    {
+        // Log Duplicate Pulse if it had Any Events...!
+        uint32_t nevents = ( a_pkt.payload_length() / 4 ) - 4;
+        if ( nevents )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u.%09u with %u Events in %s - Ignoring!",
+                g_pid, "STS Error:", "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nevents, "BeamMonitorPkt" );
+            usleep(30000); // give syslog a chance...
+        }
         return false;
+    }
 
     // Pulse flag should be 0 (no data processed yet) or 1 (event data processed)
     // any other value indicates an error with SMS packet generation
