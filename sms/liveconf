@@ -1349,12 +1349,18 @@ if [[ "$command" == "status" \
 
 					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthSecond "---"
 					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthSecond "---"
 
 					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthMinute "---"
 					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthMinute "---"
 
 					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthTenMin "---"
 					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthTenMin "---"
 
 				fi
 
@@ -1390,8 +1396,16 @@ if [[ "$command" == "status" \
 					if [[ "$command" == "bandwidth" ]]; then
 
 						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthSecond
+
 						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthMinute
+
 						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthTenMin
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthTenMin
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthTenMin
 
 					fi
 
