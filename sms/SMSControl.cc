@@ -457,7 +457,7 @@ SMSControl::SMSControl() :
 	m_pvPopPulseBuffer->update(0, &now);
 
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
-	uint64_t baseInterPulseTime = 1000000000 / CYCLE_FREQUENCY;
+	uint64_t baseInterPulseTime = NANO_PER_SECOND_LL / CYCLE_FREQUENCY;
 	m_interPulseTimeChopGlitchMin = 90 * 2 * baseInterPulseTime / 100;
 	m_interPulseTimeChopGlitchMax = 110 * 2 * baseInterPulseTime / 100;
 	m_interPulseTimeChopperMin = 90 * baseInterPulseTime / 100;
@@ -1776,7 +1776,8 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 
 void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		uint32_t hwId, uint32_t dup,
-		bool is_mapped, bool mixed_data_packets )
+		bool is_mapped, bool mixed_data_packets,
+		uint32_t &event_count, uint32_t &meta_count, uint32_t &err_count )
 {
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
@@ -1844,6 +1845,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				pulse->m_numMonEvents++;
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
+				meta_count++;
 				continue;
 
 			case 7: // Chopper Event
@@ -1854,6 +1856,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				addChopperEvent(pkt, pulse, phys, events[i].tof);
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
+				meta_count++;
 				continue;
 
 			case 0: // Detector Event
@@ -1880,9 +1883,13 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				}
 				// Count This Pulse's Proton Charge - We Got Neutrons! :-D
 				got_neutrons = true;
+				event_count++;
 				break;
 
 			case 5: case 6: // Fast-Metadata Variable Update
+				// Don't Count This Pulse's Proton Charge - No Neutrons
+				got_metadata = true;
+				// Only Count Meta-Data Event _Once_ in Fall-Through...!
 				/* This is a fast-metadata update, see if we have a
 				 * mapping for it. If not, let it fall through to the
 				 * common error pixel handling.
@@ -1892,16 +1899,18 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						pulse->m_fastMetaEvents.reserve(m_fastMetaReserve);
 					}
 					pulse->m_fastMetaEvents.push_back(events[i]);
+					meta_count++;
 					continue;
 				}
-				// Don't Count This Pulse's Proton Charge - No Neutrons
-				got_metadata = true;
+				// No mapping, Error Pixel...
 				/* FALLTHROUGH */
 
 			case 1: case 2: case 3: // Unused as yet...
 				/* Unused sources, let them drop into error handling */
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
+				// Only Count Meta-Data Event _Once_ in Fall-Through...!
+				meta_count++;
 				/* FALLTHROUGH */
 
 			default: // Error Event
@@ -1914,6 +1923,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						// Bank Index = 0...! :-D
 
 				pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
+				err_count++;
 
 		} // switch (phys >> 28)
 
@@ -2248,7 +2258,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 	uint64_t next_pulse_nsec = next_pulse_id & 0xffffffff;
 
 	uint64_t interPulseTime =
-		( ( next_pulse_sec - pulse_sec ) * 1000000000 )
+		( ( next_pulse_sec - pulse_sec ) * NANO_PER_SECOND_LL )
 			+ ( next_pulse_nsec - pulse_nsec );
 
 	if ( m_interPulseTimeMin < interPulseTime
