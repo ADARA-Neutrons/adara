@@ -91,13 +91,25 @@ public:
 		boost::shared_ptr<smsUint32PV> & pvHWSourceSmsId,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthSecond,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthMinute,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthTenMin ) :
+		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthTenMin,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthSecond,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthMinute,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthTenMin,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthSecond,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthMinute,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthTenMin ) :
 		m_hwIndex(hwIndex),
 		m_pvHWSourceHwId(pvHWSourceHwId),
 		m_pvHWSourceSmsId(pvHWSourceSmsId),
 		m_pvHWSourceEventBandwidthSecond(pvHWSourceEventBandwidthSecond),
 		m_pvHWSourceEventBandwidthMinute(pvHWSourceEventBandwidthMinute),
 		m_pvHWSourceEventBandwidthTenMin(pvHWSourceEventBandwidthTenMin),
+		m_pvHWSourceMetaBandwidthSecond(pvHWSourceMetaBandwidthSecond),
+		m_pvHWSourceMetaBandwidthMinute(pvHWSourceMetaBandwidthMinute),
+		m_pvHWSourceMetaBandwidthTenMin(pvHWSourceMetaBandwidthTenMin),
+		m_pvHWSourceErrBandwidthSecond(pvHWSourceErrBandwidthSecond),
+		m_pvHWSourceErrBandwidthMinute(pvHWSourceErrBandwidthMinute),
+		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
@@ -112,6 +124,12 @@ public:
 		m_event_count_second = 0;
 		m_event_count_minute = 0;
 		m_event_count_tenmin = 0;
+		m_meta_count_second = 0;
+		m_meta_count_minute = 0;
+		m_meta_count_tenmin = 0;
+		m_err_count_second = 0;
+		m_err_count_minute = 0;
+		m_err_count_tenmin = 0;
 
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
@@ -125,6 +143,18 @@ public:
 				m_event_count_minute, &now);
 			m_pvHWSourceEventBandwidthTenMin->update(
 				m_event_count_tenmin, &now);
+			m_pvHWSourceMetaBandwidthSecond->update(
+				m_meta_count_second, &now);
+			m_pvHWSourceMetaBandwidthMinute->update(
+				m_meta_count_minute, &now);
+			m_pvHWSourceMetaBandwidthTenMin->update(
+				m_meta_count_tenmin, &now);
+			m_pvHWSourceErrBandwidthSecond->update(
+				m_err_count_second, &now);
+			m_pvHWSourceErrBandwidthMinute->update(
+				m_err_count_minute, &now);
+			m_pvHWSourceErrBandwidthTenMin->update(
+				m_err_count_tenmin, &now);
 		}
 	}
 
@@ -346,12 +376,24 @@ public:
 	uint32_t	m_event_count_second;
 	uint32_t	m_event_count_minute;
 	uint32_t	m_event_count_tenmin;
+	uint32_t	m_meta_count_second;
+	uint32_t	m_meta_count_minute;
+	uint32_t	m_meta_count_tenmin;
+	uint32_t	m_err_count_second;
+	uint32_t	m_err_count_minute;
+	uint32_t	m_err_count_tenmin;
 
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceHwId;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceSmsId;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthSecond;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthMinute;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthTenMin;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthTenMin;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthTenMin;
 
 private:
 
@@ -469,20 +511,38 @@ DataSource::DataSource( const std::string &name,
 	m_pvPulseBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthSecond"));
 
-	m_pvEventBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":EventBandwidthSecond"));
-
 	m_pvPulseBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthMinute"));
-
-	m_pvEventBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":EventBandwidthMinute"));
 
 	m_pvPulseBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthTenMin"));
 
+	m_pvEventBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":EventBandwidthSecond"));
+
+	m_pvEventBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":EventBandwidthMinute"));
+
 	m_pvEventBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":EventBandwidthTenMin"));
+
+	m_pvMetaBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthSecond"));
+
+	m_pvMetaBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthMinute"));
+
+	m_pvMetaBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthTenMin"));
+
+	m_pvErrBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthSecond"));
+
+	m_pvErrBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthMinute"));
+
+	m_pvErrBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthTenMin"));
 
 	m_pvNumHWSources = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":NumHWSources"));
@@ -502,11 +562,17 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvSaveInputStream);
 
 	m_ctrl->addPV(m_pvPulseBandwidthSecond);
-	m_ctrl->addPV(m_pvEventBandwidthSecond);
 	m_ctrl->addPV(m_pvPulseBandwidthMinute);
-	m_ctrl->addPV(m_pvEventBandwidthMinute);
 	m_ctrl->addPV(m_pvPulseBandwidthTenMin);
+	m_ctrl->addPV(m_pvEventBandwidthSecond);
+	m_ctrl->addPV(m_pvEventBandwidthMinute);
 	m_ctrl->addPV(m_pvEventBandwidthTenMin);
+	m_ctrl->addPV(m_pvMetaBandwidthSecond);
+	m_ctrl->addPV(m_pvMetaBandwidthMinute);
+	m_ctrl->addPV(m_pvMetaBandwidthTenMin);
+	m_ctrl->addPV(m_pvErrBandwidthSecond);
+	m_ctrl->addPV(m_pvErrBandwidthMinute);
+	m_ctrl->addPV(m_pvErrBandwidthTenMin);
 
 	m_ctrl->addPV(m_pvNumHWSources);
 
@@ -529,11 +595,17 @@ DataSource::DataSource( const std::string &name,
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
 	m_pvPulseBandwidthSecond->update(m_pulse_count_second, &now);
-	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
-	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
+	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
+	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
 	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
+	m_pvMetaBandwidthSecond->update(m_meta_count_second, &now);
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
+	m_pvErrBandwidthSecond->update(m_err_count_second, &now);
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
 
 	m_pvNumHWSources->update(0, &now);
 
@@ -1403,6 +1475,12 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		boost::shared_ptr<smsUint32PV> pvEventBwSecond;
 		boost::shared_ptr<smsUint32PV> pvEventBwMinute;
 		boost::shared_ptr<smsUint32PV> pvEventBwTenMin;
+		boost::shared_ptr<smsUint32PV> pvMetaBwSecond;
+		boost::shared_ptr<smsUint32PV> pvMetaBwMinute;
+		boost::shared_ptr<smsUint32PV> pvMetaBwTenMin;
+		boost::shared_ptr<smsUint32PV> pvErrBwSecond;
+		boost::shared_ptr<smsUint32PV> pvErrBwMinute;
+		boost::shared_ptr<smsUint32PV> pvErrBwTenMin;
 
 		// Create/Get Persistent EPICS PVs for This HWSource Instance...
 		if ( hwIndex >= 0 ) {
@@ -1458,6 +1536,48 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":EventBandwidthTenMin"));
 				m_ctrl->addPV(m_pvHWSourceEventBandwidthTenMin[hwIndex]);
+
+				// HWSource Meta Bandwidth Second...
+				m_pvHWSourceMetaBandwidthSecond.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthSecond[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthSecond"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthSecond[hwIndex]);
+
+				// HWSource Meta Bandwidth Minute...
+				m_pvHWSourceMetaBandwidthMinute.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthMinute[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthMinute"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthMinute[hwIndex]);
+
+				// HWSource Meta Bandwidth Ten Minutes...
+				m_pvHWSourceMetaBandwidthTenMin.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthTenMin[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthTenMin"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthTenMin[hwIndex]);
+
+				// HWSource Err Bandwidth Second...
+				m_pvHWSourceErrBandwidthSecond.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthSecond[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthSecond"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthSecond[hwIndex]);
+
+				// HWSource Err Bandwidth Minute...
+				m_pvHWSourceErrBandwidthMinute.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthMinute[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthMinute"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthMinute[hwIndex]);
+
+				// HWSource Err Bandwidth Ten Minutes...
+				m_pvHWSourceErrBandwidthTenMin.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthTenMin[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthTenMin"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthTenMin[hwIndex]);
 			}
 
 			pvHwId = m_pvHWSourceHwIds[hwIndex];
@@ -1465,6 +1585,12 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 			pvEventBwSecond = m_pvHWSourceEventBandwidthSecond[hwIndex];
 			pvEventBwMinute = m_pvHWSourceEventBandwidthMinute[hwIndex];
 			pvEventBwTenMin = m_pvHWSourceEventBandwidthTenMin[hwIndex];
+			pvMetaBwSecond = m_pvHWSourceMetaBandwidthSecond[hwIndex];
+			pvMetaBwMinute = m_pvHWSourceMetaBandwidthMinute[hwIndex];
+			pvMetaBwTenMin = m_pvHWSourceMetaBandwidthTenMin[hwIndex];
+			pvErrBwSecond = m_pvHWSourceErrBandwidthSecond[hwIndex];
+			pvErrBwMinute = m_pvHWSourceErrBandwidthMinute[hwIndex];
+			pvErrBwTenMin = m_pvHWSourceErrBandwidthTenMin[hwIndex];
 		}
 		else {
 			DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
@@ -1477,7 +1603,9 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		// Create New HWSource... (Pass In Id and Bandwidth PVs...)
 		HWSrcPtr src( new HWSource(
 			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
-			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin ) );
+			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
+			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
+			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin ) );
 
 		// Add to HWSource List for This DataSource...
 		it = m_hwSources.insert(HWSrcMap::value_type(hwId, src)).first;
@@ -1525,6 +1653,10 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	else
 		good_pulse = hw_src.pulseGood();
 
+	// Event Type Counts for Live Bandwidth Statistics...
+	uint32_t event_count = 0, meta_count = 0, err_count = 0;
+
+	// Pulse is "Good", Process Events...
 	if ( good_pulse )
 	{
 		// [VERY INFREQUENTLY] Update "Mixed Data Packets" Option
@@ -1537,10 +1669,16 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		}
 
 		m_ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
-			is_mapped, m_mixed_data_packets);
+			is_mapped, m_mixed_data_packets,
+			event_count, meta_count, err_count);
 
 		if (hw_src.checkSeq(*pkt))
 			m_ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+	}
+
+	// Pulse is "Bad", Count All Events as Errors...
+	else {
+		err_count = pkt->num_events();
 	}
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
@@ -1562,15 +1700,19 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	// Event Count Per Second
-	if ( m_last_second != now.tv_sec ) {
+	if ( m_last_second_time.tv_sec != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
 		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
 		updateBandwidthSecond( now, false );
 		// Reset Last Second
-		m_last_second = now.tv_sec;
+		m_last_second_time = now;
 	}
-	m_event_count_second += pkt->num_events();
-	hw_src.m_event_count_second += pkt->num_events();
+	m_event_count_second += event_count;
+	m_meta_count_second += meta_count;
+	m_err_count_second += err_count;
+	hw_src.m_event_count_second += event_count;
+	hw_src.m_meta_count_second += meta_count;
+	hw_src.m_err_count_second += err_count;
 
 	// Event Count Per Minute
 	uint32_t min = now.tv_sec / 60;
@@ -1580,8 +1722,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Minute
 		m_last_minute = min;
 	}
-	m_event_count_minute += pkt->num_events();
-	hw_src.m_event_count_minute += pkt->num_events();
+	m_event_count_minute += event_count;
+	m_meta_count_minute += meta_count;
+	m_err_count_minute += err_count;
+	hw_src.m_event_count_minute += event_count;
+	hw_src.m_meta_count_minute += meta_count;
+	hw_src.m_err_count_minute += err_count;
 
 	// Event Count Per Ten Minutes
 	uint32_t tenmin = now.tv_sec / 600;
@@ -1591,8 +1737,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
-	m_event_count_tenmin += pkt->num_events();
-	hw_src.m_event_count_tenmin += pkt->num_events();
+	m_event_count_tenmin += event_count;
+	m_meta_count_tenmin += meta_count;
+	m_err_count_tenmin += err_count;
+	hw_src.m_event_count_tenmin += event_count;
+	hw_src.m_meta_count_tenmin += meta_count;
+	hw_src.m_err_count_tenmin += err_count;
 
 	return false;
 }
@@ -1780,12 +1930,12 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	m_rtdl_pkt_counts++;
 
 	// Pulse Count Per Second
-	if ( m_last_second != now.tv_sec ) {
+	if ( m_last_second_time.tv_sec != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
 		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
 		updateBandwidthSecond( now, false );
 		// Reset Last Second
-		m_last_second = now.tv_sec;
+		m_last_second_time = now;
 	}
 	m_pulse_count_second++;
 
@@ -1817,19 +1967,28 @@ void DataSource::resetBandwidthStatistics(void)
 	// Reset Bandwidth Times & Counts (Triggers Initial Logging)
 
 	// Per Second...
-	m_last_second = -1;
 	m_pulse_count_second = 0;
 	m_event_count_second = 0;
+	m_meta_count_second = 0;
+	m_err_count_second = 0;
 
 	// Per Minute...
-	m_last_minute = -1;
 	m_pulse_count_minute = 0;
 	m_event_count_minute = 0;
+	m_meta_count_minute = 0;
+	m_err_count_minute = 0;
 
 	// Per Ten Minutes...
-	m_last_tenmin = -1;
 	m_pulse_count_tenmin = 0;
 	m_event_count_tenmin = 0;
+	m_meta_count_tenmin = 0;
+	m_err_count_tenmin = 0;
+
+	// Time Trackers...
+	m_last_second_time.tv_sec = -1;
+	m_last_second_time.tv_nsec = -1;
+	m_last_minute = -1;
+	m_last_tenmin = -1;
 }
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
@@ -1841,18 +2000,35 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Second for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_second
-			<< " Events=" << m_event_count_second );
+			<< " Events=" << m_event_count_second
+			<< " Meta=" << m_meta_count_second
+			<< " Err=" << m_err_count_second );
 	}
 
 	if ( !( ++every_three_seconds % 3 ) )
 	{
+		// Compute _Actual_ Elapsed Time...! ;-D
+		double elapsed =
+			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
+					* NANO_PER_SECOND_D )
+				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
+			/ NANO_PER_SECOND_D;
+
 		// Update Bandwidth Count Per Second PVs...
-		m_pvPulseBandwidthSecond->update(m_pulse_count_second / 3, &now);
-		m_pvEventBandwidthSecond->update(m_event_count_second / 3, &now);
+		m_pvPulseBandwidthSecond->update(
+			(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
+		m_pvEventBandwidthSecond->update(
+			(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
+		m_pvMetaBandwidthSecond->update(
+			(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
+		m_pvErrBandwidthSecond->update(
+			(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
 
 		// Reset Counters for Next Second...
 		m_pulse_count_second = 0;
 		m_event_count_second = 0;
+		m_meta_count_second = 0;
+		m_err_count_second = 0;
 
 		// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 		for ( HWSrcMap::iterator it = m_hwSources.begin();
@@ -1863,12 +2039,25 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 						<< "Bandwidth Per Second for " << m_name << ":"
 						<< " HWSource HwId=" << it->second->hwId()
 						<< " Events="
-						<< it->second->m_event_count_second );
+						<< it->second->m_event_count_second
+						<< " Meta="
+						<< it->second->m_meta_count_second
+						<< " Err="
+						<< it->second->m_err_count_second );
 				}
 				it->second->m_pvHWSourceEventBandwidthSecond->update(
-					it->second->m_event_count_second / 3, &now);
+					(uint32_t)( ((double) it->second->m_event_count_second)
+						/ elapsed ), &now);
+				it->second->m_pvHWSourceMetaBandwidthSecond->update(
+					(uint32_t)( ((double) it->second->m_meta_count_second)
+						/ elapsed ), &now);
+				it->second->m_pvHWSourceErrBandwidthSecond->update(
+					(uint32_t)( ((double) it->second->m_err_count_second)
+						/ elapsed ), &now);
 			}
 			it->second->m_event_count_second = 0;
+			it->second->m_meta_count_second = 0;
+			it->second->m_err_count_second = 0;
 		}
 	}
 }
@@ -1880,16 +2069,22 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Minute for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_minute
-			<< " Events=" << m_event_count_minute );
+			<< " Events=" << m_event_count_minute
+			<< " Meta=" << m_meta_count_minute
+			<< " Err=" << m_err_count_minute );
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
 	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
 
 	// Reset Counters for Next Minute...
 	m_pulse_count_minute = 0;
 	m_event_count_minute = 0;
+	m_meta_count_minute = 0;
+	m_err_count_minute = 0;
 
 	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
@@ -1899,12 +2094,20 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Minute for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events=" << it->second->m_event_count_minute );
+					<< " Events=" << it->second->m_event_count_minute
+					<< " Meta=" << it->second->m_meta_count_minute
+					<< " Err=" << it->second->m_err_count_minute );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
 				it->second->m_event_count_minute, &now);
+			it->second->m_pvHWSourceMetaBandwidthMinute->update(
+				it->second->m_meta_count_minute, &now);
+			it->second->m_pvHWSourceErrBandwidthMinute->update(
+				it->second->m_err_count_minute, &now);
 		}
 		it->second->m_event_count_minute = 0;
+		it->second->m_meta_count_minute = 0;
+		it->second->m_err_count_minute = 0;
 	}
 }
 
@@ -1915,16 +2118,22 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_tenmin
-			<< " Events=" << m_event_count_tenmin );
+			<< " Events=" << m_event_count_tenmin
+			<< " Meta=" << m_meta_count_tenmin
+			<< " Err=" << m_err_count_tenmin );
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
 	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
 
 	// Reset Counters for Next Ten Minutes...
 	m_pulse_count_tenmin = 0;
 	m_event_count_tenmin = 0;
+	m_meta_count_tenmin = 0;
+	m_err_count_tenmin = 0;
 
 	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
@@ -1934,12 +2143,20 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events=" << it->second->m_event_count_tenmin );
+					<< " Events=" << it->second->m_event_count_tenmin
+					<< " Meta=" << it->second->m_meta_count_tenmin
+					<< " Err=" << it->second->m_err_count_tenmin );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
 				it->second->m_event_count_tenmin, &now);
+			it->second->m_pvHWSourceMetaBandwidthTenMin->update(
+				it->second->m_meta_count_tenmin, &now);
+			it->second->m_pvHWSourceErrBandwidthTenMin->update(
+				it->second->m_err_count_tenmin, &now);
 		}
 		it->second->m_event_count_tenmin = 0;
+		it->second->m_meta_count_tenmin = 0;
+		it->second->m_err_count_tenmin = 0;
 	}
 }
 
