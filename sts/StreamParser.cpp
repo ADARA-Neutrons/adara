@@ -563,6 +563,20 @@ StreamParser::rxPacket
                 "BankedEventPkt" );
             usleep(30000); // give syslog a chance...
         }
+        // Else Just Note the Dropped Duplicate Pulse
+        // (if for no other reason than diagnostics and testing :-)
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] %s %u.%09u (%u %s) in %s - Ignoring!",
+                g_pid, "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventPkt" );
+            usleep(30000); // give syslog a chance...
+        }
         return false;
     }
 
@@ -1097,6 +1111,19 @@ StreamParser::rxPacket
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nevents, "BeamMonitorPkt" );
+            usleep(30000); // give syslog a chance...
+        }
+        // Else Just Note the Dropped Duplicate Pulse
+        // (if for no other reason than diagnostics and testing :-)
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] %s %u.%09u in %s - Ignoring!",
+                g_pid, "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                "BeamMonitorPkt" );
             usleep(30000); // give syslog a chance...
         }
         return false;
