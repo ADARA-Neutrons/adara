@@ -1039,8 +1039,8 @@ for exe_path in "$tag_archive"/* ; do
 	if [ -L "$tag_link" ]; then
 
 		# First, save what this previous version originally linked to...!
-		previous_version=\
-			`/bin/ls -l "$tag_link" | awk -F " -> " '{print $2}'`
+		previous_version=`/bin/ls -l "$tag_link" \
+			| awk -F " -> " '{print $2}'`
 
 		echo -e "\nPrevious Version:\n" | tee -a $LOG
 		echo "   $previous_version" | tee -a $LOG
