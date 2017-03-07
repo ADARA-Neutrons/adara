@@ -10,6 +10,7 @@
 
 #include "ADARAPackets.h"
 #include "POSIXParser.h"
+#include "SMSControl.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
@@ -34,6 +35,8 @@ public:
 		bool ignore_eop, bool mixed_data_packets, unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
+
+	SMSControl *m_ctrl;
 
 	bool m_readDelay;
 
@@ -93,11 +96,20 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvSaveInputStream;
 
 	boost::shared_ptr<smsUint32PV> m_pvPulseBandwidthSecond;
-	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthSecond;
 	boost::shared_ptr<smsUint32PV> m_pvPulseBandwidthMinute;
-	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthMinute;
 	boost::shared_ptr<smsUint32PV> m_pvPulseBandwidthTenMin;
+
+	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthMinute;
 	boost::shared_ptr<smsUint32PV> m_pvEventBandwidthTenMin;
+
+	boost::shared_ptr<smsUint32PV> m_pvMetaBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvMetaBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvMetaBandwidthTenMin;
+
+	boost::shared_ptr<smsUint32PV> m_pvErrBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvErrBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvErrBandwidthTenMin;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumHWSources;
 
@@ -112,6 +124,20 @@ private:
 		m_pvHWSourceEventBandwidthMinute;
 	std::vector< boost::shared_ptr<smsUint32PV> >
 		m_pvHWSourceEventBandwidthTenMin;
+
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceMetaBandwidthSecond;
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceMetaBandwidthMinute;
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceMetaBandwidthTenMin;
+
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceErrBandwidthSecond;
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceErrBandwidthMinute;
+	std::vector< boost::shared_ptr<smsUint32PV> >
+		m_pvHWSourceErrBandwidthTenMin;
 
 	uint64_t m_lastRTDLPulseId;
 	uint16_t m_lastRTDLCycle;
@@ -193,15 +219,22 @@ private:
 	uint32_t m_data_pkt_counts;
 
 	// Pulse/Event Bandwidth Statistics
-	uint32_t	m_last_second;
 	uint32_t	m_pulse_count_second;
-	uint32_t	m_event_count_second;
-	uint32_t	m_last_minute;
 	uint32_t	m_pulse_count_minute;
-	uint32_t	m_event_count_minute;
-	uint32_t	m_last_tenmin;
 	uint32_t	m_pulse_count_tenmin;
+	uint32_t	m_event_count_second;
+	uint32_t	m_event_count_minute;
 	uint32_t	m_event_count_tenmin;
+	uint32_t	m_meta_count_second;
+	uint32_t	m_meta_count_minute;
+	uint32_t	m_meta_count_tenmin;
+	uint32_t	m_err_count_second;
+	uint32_t	m_err_count_minute;
+	uint32_t	m_err_count_tenmin;
+
+	struct timespec	m_last_second_time;
+	uint32_t	m_last_minute;
+	uint32_t	m_last_tenmin;
 
 	HWSource &getHWSource(uint32_t hwId);
 

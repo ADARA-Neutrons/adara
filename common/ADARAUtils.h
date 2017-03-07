@@ -549,6 +549,11 @@ public:
 };
 
 
+// Nanoseconds Per Second Constants
+#define NANO_PER_SECOND_LL (1000000000LL)
+#define NANO_PER_SECOND_D (1000000000.0)
+
+
 /*! \brief Converts a timespec struct to nanoseconds
  *  \return Time value in nanoseconds
  */
@@ -557,7 +562,7 @@ inline uint64_t timespec_to_nsec
     const struct timespec &a_ts     ///< [in] Time value to convert
 )
 {
-    return a_ts.tv_sec*1000000000LL + a_ts.tv_nsec;
+    return( ( a_ts.tv_sec * NANO_PER_SECOND_LL ) + a_ts.tv_nsec );
 }
 
 
@@ -571,8 +576,8 @@ inline struct timespec nsec_to_timespec
 {
     struct timespec ts;
 
-    ts.tv_sec = a_nsec / 1000000000LL;
-    ts.tv_nsec = a_nsec - (ts.tv_sec*1000000000LL);
+    ts.tv_sec = a_nsec / NANO_PER_SECOND_LL;
+    ts.tv_nsec = a_nsec - ( ts.tv_sec * NANO_PER_SECOND_LL );
 
     return ts;
 }

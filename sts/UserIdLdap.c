@@ -13,9 +13,6 @@ int main()
 
 	LDAPMessage *msg;
 
-	char *ldap_host = "data.sns.gov";
-	char ldap_uri[255];
-
 	char *base = "ou=Users,dc=sns,dc=ornl,dc=gov";
 	char *filter[3];
 	char *attrs[2];
@@ -26,21 +23,17 @@ int main()
 	int result;
 
 	// Connect to the LDAP Server
-	sprintf( ldap_uri, "ldap://%s:%d", ldap_host, LDAP_PORT );
-	if ( ldap_initialize( &ld, ldap_uri ) != LDAP_SUCCESS ) {
+	// *Don't* Pass Server URI...!
+	//    -> Rely on Local System Config in /etc/openldap/ldap.conf
+	//    	BASE dc=sns,dc=ornl,dc=gov
+	//    	TLS_CACERTDIR /etc/openldap/cacerts
+	//    	LDAP_Protocol_Version 3
+	//    	URI ldaps://ldap-vip.sns.gov
+	if ( ldap_initialize( &ld, NULL ) != LDAP_SUCCESS ) {
 		perror("ldap_initialize failed");
 		return( -1 );
 	}
-	printf( "Initialized to LDAP Server %s at port %d\n",
-		ldap_host, LDAP_PORT );
-
-	// Set LDAP Protocol to Version 3
-	if ( ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &desired_version)
-			!= LDAP_OPT_SUCCESS ) {
-	    ldap_perror(ld, "ldap_set_option failed!");
-	    return( -1 );
-	}
-	printf( "Set LDAP Protocol to Version 3.\n" );
+	printf( "Initialized to LDAP Server.\n" );
 
 	// Set Up LDAP Search Filters...
 	filter[0] = "uid=FENG_BNL";

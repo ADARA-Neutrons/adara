@@ -212,9 +212,10 @@ more:
 	 * there is room in the socket buffer. We also do not need to send
 	 * any heartbeat packets, as we have a full pipe.
 	 */
-	if (!m_write.get())
+	if (!m_write.get()) {
 		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
 				boost::bind(&STSClient::writable, this)));
+	}
 	// DEBUG("writable() more exit");
 }
 

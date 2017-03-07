@@ -171,6 +171,12 @@ void LiveClient::writable(void)
 {
 	// DEBUG("writable() entry");
 
+	static uint32_t cnt = 0;
+
+	// [LESS FREQUENTLY] Update Send Paused Data PV,
+	// Once Every 100 Calls...
+	uint32_t freq = 100;
+
 	FileList::iterator it;
 	ssize_t len, rc;
 
@@ -182,8 +188,10 @@ void LiveClient::writable(void)
 
 		// Allow Client Override to Force Inclusion of Paused Data...
 		if ( !(m_client_flags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA) ) {
+			if ( !(++cnt % freq) ) {
+				m_send_paused_data = m_server->getSendPausedData();
+			}
 			// Ignore Paused Run Files as Configured (by SMS or Client)...
-			m_send_paused_data = m_server->getSendPausedData();
 			if ( f->paused() && !cur_offset // don't trash a file midstream!
 					&& ( !m_send_paused_data
 						|| m_client_flags

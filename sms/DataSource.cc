@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
 #include <stdexcept>
 
@@ -90,17 +91,32 @@ public:
 		boost::shared_ptr<smsUint32PV> & pvHWSourceSmsId,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthSecond,
 		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthMinute,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthTenMin ) :
+		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthTenMin,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthSecond,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthMinute,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthTenMin,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthSecond,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthMinute,
+		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthTenMin ) :
 		m_hwIndex(hwIndex),
 		m_pvHWSourceHwId(pvHWSourceHwId),
 		m_pvHWSourceSmsId(pvHWSourceSmsId),
 		m_pvHWSourceEventBandwidthSecond(pvHWSourceEventBandwidthSecond),
 		m_pvHWSourceEventBandwidthMinute(pvHWSourceEventBandwidthMinute),
 		m_pvHWSourceEventBandwidthTenMin(pvHWSourceEventBandwidthTenMin),
+		m_pvHWSourceMetaBandwidthSecond(pvHWSourceMetaBandwidthSecond),
+		m_pvHWSourceMetaBandwidthMinute(pvHWSourceMetaBandwidthMinute),
+		m_pvHWSourceMetaBandwidthTenMin(pvHWSourceMetaBandwidthTenMin),
+		m_pvHWSourceErrBandwidthSecond(pvHWSourceErrBandwidthSecond),
+		m_pvHWSourceErrBandwidthMinute(pvHWSourceErrBandwidthMinute),
+		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
 	{
+		// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
+		m_ctrl = SMSControl::getInstance();
+
 		// Initialize "RTDL Packets with No Data Packets" Count...
 		m_rtdlNoDataCount = 0;
 
@@ -108,6 +124,12 @@ public:
 		m_event_count_second = 0;
 		m_event_count_minute = 0;
 		m_event_count_tenmin = 0;
+		m_meta_count_second = 0;
+		m_meta_count_minute = 0;
+		m_meta_count_tenmin = 0;
+		m_err_count_second = 0;
+		m_err_count_minute = 0;
+		m_err_count_tenmin = 0;
 
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
@@ -121,6 +143,18 @@ public:
 				m_event_count_minute, &now);
 			m_pvHWSourceEventBandwidthTenMin->update(
 				m_event_count_tenmin, &now);
+			m_pvHWSourceMetaBandwidthSecond->update(
+				m_meta_count_second, &now);
+			m_pvHWSourceMetaBandwidthMinute->update(
+				m_meta_count_minute, &now);
+			m_pvHWSourceMetaBandwidthTenMin->update(
+				m_meta_count_tenmin, &now);
+			m_pvHWSourceErrBandwidthSecond->update(
+				m_err_count_second, &now);
+			m_pvHWSourceErrBandwidthMinute->update(
+				m_err_count_minute, &now);
+			m_pvHWSourceErrBandwidthTenMin->update(
+				m_err_count_tenmin, &now);
 		}
 	}
 
@@ -135,8 +169,6 @@ public:
 		if (!m_activePulse)
 			return;
 
-		SMSControl *ctrl = SMSControl::getInstance();
-
 		if (!eop) {
 #if 0
 			/* We currently get this on every other pulse for
@@ -148,13 +180,13 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_DROPPED_PACKETS, m_name, 2, 10, 100, log_info ) ) {
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Dropped packet from " << m_name << " src 0x"
 					<< std::hex << m_hwId << std::dec);
 			}
 #endif
 			if ( m_pulseGood )
-				ctrl->markPartial(m_activePulse, m_dupCount);
+				m_ctrl->markPartial(m_activePulse, m_dupCount);
 
 			m_trueNew = false;
 		}
@@ -163,7 +195,7 @@ public:
 		}
 
 		if ( m_pulseGood )
-			ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
+			m_ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
 
 		m_lastPulse = m_activePulse;
 		m_activePulse = 0;
@@ -189,9 +221,8 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
 					2, 10, 100, log_info ) ) {
-				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local Duplicate pulse from "
 					<< m_name
 					<< std::hex << " src=0x" << m_hwId
@@ -210,9 +241,8 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_SAWTOOTH_PULSE, m_name,
 					2, 10, 100, log_info ) ) {
-				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "newPulse(RawDataPkt): Local SAWTOOTH RawData"
 					<< " from " << m_name
 					<< std::hex << " src=0x" << m_hwId
@@ -238,9 +268,8 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_RAWDATA_PULSE_IN_PAST, m_name,
 					2, 10, 100, log_info ) ) {
-				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Past (Before Facility Start Time)!"
 					<< std::hex << " src=0x" << m_hwId
@@ -258,9 +287,8 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_RAWDATA_PULSE_IN_FUTURE, m_name,
 					2, 10, 100, log_info ) ) {
-				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Future (Over One Week from Now)!"
 					<< std::hex << " src=0x" << m_hwId
@@ -325,9 +353,8 @@ public:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_PACKET_SEQUENCE, m_name,
 					2, 10, 100, log_info ) ) {
-				SMSControl *ctrl = SMSControl::getInstance();
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "checkSeq() Local Packet Sequence Out-of-Order: "
 					<< pkt.pktSeq() << " != " << m_pktSeq
 					<< std::hex << " src=0x" << m_hwId
@@ -349,14 +376,29 @@ public:
 	uint32_t	m_event_count_second;
 	uint32_t	m_event_count_minute;
 	uint32_t	m_event_count_tenmin;
+	uint32_t	m_meta_count_second;
+	uint32_t	m_meta_count_minute;
+	uint32_t	m_meta_count_tenmin;
+	uint32_t	m_err_count_second;
+	uint32_t	m_err_count_minute;
+	uint32_t	m_err_count_tenmin;
 
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceHwId;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceSmsId;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthSecond;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthMinute;
 	boost::shared_ptr<smsUint32PV> m_pvHWSourceEventBandwidthTenMin;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceMetaBandwidthTenMin;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthSecond;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthMinute;
+	boost::shared_ptr<smsUint32PV> m_pvHWSourceErrBandwidthTenMin;
 
 private:
+
+	SMSControl *m_ctrl;
+
 	const std::string &m_name;
 
 	uint32_t	m_hwId;
@@ -398,6 +440,9 @@ DataSource::DataSource( const std::string &name,
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
+	// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
+	m_ctrl = SMSControl::getInstance();
+
 	// Parse Basic Data Source Info...
 
 	m_name += " (";
@@ -416,9 +461,7 @@ DataSource::DataSource( const std::string &name,
 
 	// Create Run-Time Status and Configuration PVs Per Data Source...
 
-	SMSControl *ctrl = SMSControl::getInstance();
-
-	std::string prefix(ctrl->getBeamlineId());
+	std::string prefix(m_ctrl->getBeamlineId());
 	prefix += ":SMS";
 	prefix += ":DataSource:";
 
@@ -468,46 +511,70 @@ DataSource::DataSource( const std::string &name,
 	m_pvPulseBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthSecond"));
 
-	m_pvEventBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":EventBandwidthSecond"));
-
 	m_pvPulseBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthMinute"));
-
-	m_pvEventBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":EventBandwidthMinute"));
 
 	m_pvPulseBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthTenMin"));
 
+	m_pvEventBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":EventBandwidthSecond"));
+
+	m_pvEventBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":EventBandwidthMinute"));
+
 	m_pvEventBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":EventBandwidthTenMin"));
+
+	m_pvMetaBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthSecond"));
+
+	m_pvMetaBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthMinute"));
+
+	m_pvMetaBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MetaBandwidthTenMin"));
+
+	m_pvErrBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthSecond"));
+
+	m_pvErrBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthMinute"));
+
+	m_pvErrBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":ErrBandwidthTenMin"));
 
 	m_pvNumHWSources = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":NumHWSources"));
 
-	ctrl->addPV(m_pvName);
-	ctrl->addPV(m_pvDataURI);
-	ctrl->addPV(m_pvEnabled);
-	ctrl->addPV(m_pvRequired);
-	ctrl->addPV(m_pvConnected);
-	ctrl->addPV(m_pvConnectRetryTimeout);
-	ctrl->addPV(m_pvConnectTimeout);
-	ctrl->addPV(m_pvDataTimeout);
-	ctrl->addPV(m_pvIgnoreEoP);
-	ctrl->addPV(m_pvMixedDataPackets);
-	ctrl->addPV(m_pvMaxReadChunk);
-	ctrl->addPV(m_pvRTDLNoDataThresh);
-	ctrl->addPV(m_pvSaveInputStream);
+	m_ctrl->addPV(m_pvName);
+	m_ctrl->addPV(m_pvDataURI);
+	m_ctrl->addPV(m_pvEnabled);
+	m_ctrl->addPV(m_pvRequired);
+	m_ctrl->addPV(m_pvConnected);
+	m_ctrl->addPV(m_pvConnectRetryTimeout);
+	m_ctrl->addPV(m_pvConnectTimeout);
+	m_ctrl->addPV(m_pvDataTimeout);
+	m_ctrl->addPV(m_pvIgnoreEoP);
+	m_ctrl->addPV(m_pvMixedDataPackets);
+	m_ctrl->addPV(m_pvMaxReadChunk);
+	m_ctrl->addPV(m_pvRTDLNoDataThresh);
+	m_ctrl->addPV(m_pvSaveInputStream);
 
-	ctrl->addPV(m_pvPulseBandwidthSecond);
-	ctrl->addPV(m_pvEventBandwidthSecond);
-	ctrl->addPV(m_pvPulseBandwidthMinute);
-	ctrl->addPV(m_pvEventBandwidthMinute);
-	ctrl->addPV(m_pvPulseBandwidthTenMin);
-	ctrl->addPV(m_pvEventBandwidthTenMin);
+	m_ctrl->addPV(m_pvPulseBandwidthSecond);
+	m_ctrl->addPV(m_pvPulseBandwidthMinute);
+	m_ctrl->addPV(m_pvPulseBandwidthTenMin);
+	m_ctrl->addPV(m_pvEventBandwidthSecond);
+	m_ctrl->addPV(m_pvEventBandwidthMinute);
+	m_ctrl->addPV(m_pvEventBandwidthTenMin);
+	m_ctrl->addPV(m_pvMetaBandwidthSecond);
+	m_ctrl->addPV(m_pvMetaBandwidthMinute);
+	m_ctrl->addPV(m_pvMetaBandwidthTenMin);
+	m_ctrl->addPV(m_pvErrBandwidthSecond);
+	m_ctrl->addPV(m_pvErrBandwidthMinute);
+	m_ctrl->addPV(m_pvErrBandwidthTenMin);
 
-	ctrl->addPV(m_pvNumHWSources);
+	m_ctrl->addPV(m_pvNumHWSources);
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
@@ -528,11 +595,17 @@ DataSource::DataSource( const std::string &name,
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
 	m_pvPulseBandwidthSecond->update(m_pulse_count_second, &now);
-	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
-	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
+	m_pvEventBandwidthSecond->update(m_event_count_second, &now);
+	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
 	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
+	m_pvMetaBandwidthSecond->update(m_meta_count_second, &now);
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
+	m_pvErrBandwidthSecond->update(m_err_count_second, &now);
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
 
 	m_pvNumHWSources->update(0, &now);
 
@@ -550,7 +623,7 @@ DataSource::DataSource( const std::string &name,
 			freeaddrinfo(m_addrinfo);
 			m_addrinfo = NULL;
 		}
-		std::string msg( ( ctrl->getRecording() ? "[RECORDING] " : "" ) );
+		std::string msg( m_ctrl->getRecording() ? "[RECORDING] " : "" );
 		msg += "Unable to Create TimerAdapter for Data Source ";
 		msg += m_name;
 		msg += ": Bailing! ";
@@ -563,7 +636,7 @@ DataSource::DataSource( const std::string &name,
 			freeaddrinfo(m_addrinfo);
 			m_addrinfo = NULL;
 		}
-		std::string msg( ( ctrl->getRecording() ? "[RECORDING] " : "" ) );
+		std::string msg( m_ctrl->getRecording() ? "[RECORDING] " : "" );
 		msg += "Unable to Create TimerAdapter for Data Source ";
 		msg += m_name;
 		msg += ": Bailing! ";
@@ -668,8 +741,7 @@ void DataSource::setRequired(bool is_required)
 	}
 
 	// Tell Control We've Changed Our Required Status...
-	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->updateDataSourceConnectivity();
+	m_ctrl->updateDataSourceConnectivity();
 }
 
 void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
@@ -678,14 +750,13 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	/* Complete any outstanding pulses, and inform the manager
 	 * of our change of status
 	 */
-	SMSControl *ctrl = SMSControl::getInstance();
 	HWSrcMap::iterator it;
 
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Unregistering Event Source " << it->second->smsId()
 			<< " for " << why << " Data Source " << m_name );
 		it->second->endPulse(false);
@@ -694,7 +765,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 			it->second->m_pvHWSourceSmsId->update(-1, &now);
 			m_hwIndices.reset( it->second->m_hwIndex );
 		}
-		ctrl->unregisterEventSource(it->second->smsId());
+		m_ctrl->unregisterEventSource(it->second->smsId());
 	}
 
 	m_hwSources.clear();
@@ -703,7 +774,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	m_pvNumHWSources->update(0, &now);
 
 	if (isSourceDown)
-		ctrl->sourceDown(m_smsSourceId, stateChanged);
+		m_ctrl->sourceDown(m_smsSourceId, stateChanged);
 }
 
 void DataSource::dumpLastReadStats(std::string who)
@@ -754,8 +825,8 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		// Dump Discarded Packet Statistics...
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
-		SMSControl *ctrl = SMSControl::getInstance();
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" ) << log_info );
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< log_info );
 		// Reset Discarded Packet Statistics...
 		Parser::resetDiscardedPacketsStats();
 	}
@@ -836,8 +907,7 @@ bool DataSource::timerExpired(void)
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
 				// Leave m_pvConnected in its current state, latch failures
-				SMSControl *ctrl = SMSControl::getInstance();
-				WARN( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				WARN( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Connection request timed out to " << m_name );
 				connectionFailed(false, false, IDLE);
 			}
@@ -854,8 +924,7 @@ bool DataSource::timerExpired(void)
 				m_timer->start(m_data_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
-				SMSControl *ctrl = SMSControl::getInstance();
-				ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Timed out waiting for data from " << m_name );
 				m_pvConnected->failed();
 				connectionFailed(true, true, IDLE);
@@ -894,8 +963,6 @@ void DataSource::fdReady(void)
 
 void DataSource::startConnect(void)
 {
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	std::string log_info;
 	int flags, rc;
 
@@ -905,7 +972,7 @@ void DataSource::startConnect(void)
 	// Update Data URI from PV...
 	std::string uri = m_pvDataURI->value();
 	if ( uri != m_uri ) {
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Setting New Data URI from PV: " << uri );
 		m_uri = uri;
 		// Regenerate DataSource Name...
@@ -927,7 +994,7 @@ void DataSource::startConnect(void)
 				RLL_WONT_CONN, m_name,
 				600, 3, 10, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "startConnect():"
 				<< " Invalid Address Info/Lookup for Data Source "
 				<< m_name << " - *** Won't Attempt to Connect...!");
@@ -940,14 +1007,14 @@ void DataSource::startConnect(void)
 			RLL_TRYING_CONN, m_name,
 			600, 3, 10, log_info ) ) {
 		INFO(log_info
-			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Trying connection to " << m_name);
 	}
 	m_pvConnected->trying_to_connect();
 
 	m_fd = socket(m_addrinfo->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
-		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Error creating socket for " << m_name );
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
@@ -955,12 +1022,12 @@ void DataSource::startConnect(void)
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0) {
-		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Error getting socket flags for " << m_name );
 		goto error_fd;
 	}
 	if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK)) {
-		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Error setting socket flags for " << m_name );
 		goto error_fd;
 	}
@@ -977,7 +1044,7 @@ void DataSource::startConnect(void)
 					RLL_CONN_REFUSED, m_name,
 					600, 3, 10, log_info ) ) {
 				WARN(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Connection refused by " << m_name);
 			}
 			goto error_fd;
@@ -988,12 +1055,12 @@ void DataSource::startConnect(void)
 			break;
 
 		case 0:
-			INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Connection established to " << m_name );
 			m_state = ACTIVE;
 			m_pvConnected->connected();
 			resetBandwidthStatistics();
-			SMSControl::getInstance()->sourceUp(m_smsSourceId);
+			m_ctrl->sourceUp(m_smsSourceId);
 			break;
 
 		default:
@@ -1001,7 +1068,7 @@ void DataSource::startConnect(void)
 					RLL_CONN_REQUEST_ERROR, m_name,
 					600, 3, 10, log_info ) ) {
 				WARN(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Unknown connection request error for " << m_name
 					<< ": " << strerror(rc) << " (Ignoring!)");
 			}
@@ -1018,7 +1085,7 @@ void DataSource::startConnect(void)
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
 	} catch (std::bad_alloc e) {
-		ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bad Alloc Error for " << m_name
 			<< " adapter: " << e.what());
 		goto error_fd;
@@ -1040,8 +1107,6 @@ error:
 
 void DataSource::connectComplete(void)
 {
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
@@ -1063,9 +1128,9 @@ void DataSource::connectComplete(void)
 
 		resetBandwidthStatistics();
 
-		SMSControl::getInstance()->sourceUp(m_smsSourceId);
+		m_ctrl->sourceUp(m_smsSourceId);
 
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Connection established to " << m_name );
 		return;
 	}
@@ -1083,7 +1148,7 @@ void DataSource::connectComplete(void)
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_CONN_FAILED, m_name, 600, 3, 10, log_info ) ) {
 		WARN(log_info
-			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Connection request to " << m_name
 			<< " failed: " << strerror(e));
 	}
@@ -1097,62 +1162,72 @@ void DataSource::dataReady(void)
 
 	m_timer->cancel();
 
-	// Update Data Timeout from PV...
-	m_data_timeout = m_pvDataTimeout->value();
+	// Update Our Data Timeout/Max Read Chunk Internals Less Frequently,
+	// It Takes Some Time...!
+	// Only allow updates every few seconds (depending on bandwidth... ;-)
+	static uint32_t cnt = 0;
+	uint32_t freq = 333;
+
+	// Update Data Timeout from PV... (Periodically...)
+	if ( !(++cnt % freq) ) {
+		m_data_timeout = m_pvDataTimeout->value();
+	}
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;
 	clock_gettime(CLOCK_REALTIME_COARSE, &readStart);
 
  	// reset read delayed flag, starting a new read now...
-	SMSControl *ctrl = SMSControl::getInstance();
-	ctrl->resetSourcesReadDelay();
+	m_ctrl->resetSourcesReadDelay();
 
 	bool readOk = true;
 
 	m_rtdl_pkt_counts = 0;
 	m_data_pkt_counts = 0;
 
-	// Update Max Read Chunk from PV...
-	std::string val = m_pvMaxReadChunk->value();
-	unsigned int tmp_max_read_chunk;
-	try {
-		tmp_max_read_chunk = parse_size(val);
-	} catch (std::runtime_error e) {
-		std::string msg("Unable to parse read size for source '");
-		msg += m_name;
-		msg += "': ";
-		msg += e.what();
-		// *Don't* Throw std::runtime_error(msg), Just Log Instead...
-		/* Rate-limited log of failure */
-		std::string log_info;
-		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-				RLL_PARSE_MAX_READ_CHUNK, m_name,
-				60, 3, 5000, log_info ) ) {
-			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "dataReady(): " << msg << " - Revert to Original"
-				<< " m_max_read_chunk=" << m_max_read_chunk);
+	// Update Max Read Chunk from PV... (Periodically...)
+	// (Note: count already incremented above for Data Timeout...!)
+	if ( !(cnt % freq) ) {
+		std::string val = m_pvMaxReadChunk->value();
+		unsigned int tmp_max_read_chunk;
+		try {
+			tmp_max_read_chunk = parse_size(val);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse read size for source '");
+			msg += m_name;
+			msg += "': ";
+			msg += e.what();
+			// *Don't* Throw std::runtime_error(msg), Just Log Instead...
+			/* Rate-limited log of failure */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_PARSE_MAX_READ_CHUNK, m_name,
+					60, 3, 5000, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "dataReady(): " << msg << " - Revert to Original"
+					<< " m_max_read_chunk=" << m_max_read_chunk);
+			}
+			// String parse failed, revert to original value...
+			tmp_max_read_chunk = m_max_read_chunk;
 		}
-		// String parse failed, revert to original value...
-		tmp_max_read_chunk = m_max_read_chunk;
-	}
-	if ( tmp_max_read_chunk != m_max_read_chunk ) {
-		m_max_read_chunk = tmp_max_read_chunk;
-		// Log the change...
-		std::stringstream ssMRC;
-		ssMRC << ( ctrl->getRecording() ? "[RECORDING] " : "" );
-		ssMRC << "Setting Max Read Chunk Size for " << m_name;
-		ssMRC << " to ";
-		ssMRC << m_max_read_chunk;
-		ssMRC << " (" << val << ")";
-		INFO(ssMRC.str());
+		if ( tmp_max_read_chunk != m_max_read_chunk ) {
+			m_max_read_chunk = tmp_max_read_chunk;
+			// Log the change...
+			std::stringstream ssMRC;
+			ssMRC << ( m_ctrl->getRecording() ? "[RECORDING] " : "" );
+			ssMRC << "Setting Max Read Chunk Size for " << m_name;
+			ssMRC << " to ";
+			ssMRC << m_max_read_chunk;
+			ssMRC << " (" << val << ")";
+			INFO(ssMRC.str());
+		}
 	}
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
-			INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Connection closed with " << m_name
 				<< " log_info=(" << log_info << ")" );
 			m_pvConnected->disconnected();
@@ -1166,7 +1241,7 @@ void DataSource::dataReady(void)
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_READ_EXCEPTION, m_name, 60, 5, 10, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Exception reading from " << m_name
 				<< ": " << e.what());
 			dumpStats = true;
@@ -1192,7 +1267,7 @@ void DataSource::dataReady(void)
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
 				ERROR(log_info
-					<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"
 					<< " elapsed=" << elapsed << " (" << m_name << ")"
 					<< " log_info=(" << log_info << ")"
@@ -1200,8 +1275,10 @@ void DataSource::dataReady(void)
 					<< " m_data_pkt_counts=" << m_data_pkt_counts);
 				dumpStats = true;
 			}
-			ctrl->setSourcesReadDelay();
+			m_ctrl->setSourcesReadDelay();
 			if ( dumpStats ) dumpLastReadStats("dataReady() (Read Delay)");
+			// We were "Away" for a while... Trigger Internals PV Update!
+			cnt = freq - 1;
 		}
 	}
 }
@@ -1230,20 +1307,25 @@ void DataSource::disabled(void)
 
 bool DataSource::rxPacket(const ADARA::Packet &pkt)
 {
+	// Meter Live Control PV Updates and "Discarded Packet" statistics...
+	static uint32_t cnt = 0;
+
 	// Optionally Save Input Stream to Storage Container File...
-	m_save_input_stream = m_pvSaveInputStream->value();
+	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
+	if ( !( ++cnt % 99999 ) ) {
+		m_save_input_stream = m_pvSaveInputStream->value();
+	}
 	if (m_save_input_stream) {
 		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
 			m_smsSourceId);
 	}
 
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
-	static uint64_t dump_count = 0;
-	if ( !( ++dump_count % 1000000 ) ) {
+	// (Note: count already incremented above for Save Input Stream...!)
+	if ( !( cnt % 999999 ) ) {
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
-		SMSControl *ctrl = SMSControl::getInstance();
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "rxPacket(): " << log_info );
 	}
 
@@ -1291,9 +1373,8 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 						RLL_PULSEID_ZERO, m_name,
 						2, 10, 100, log_info ) ) {
-					SMSControl *ctrl = SMSControl::getInstance();
 					WARN(log_info
-						<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 						<< "Received pulse id 0 from " << m_name);
 				}
 				return false;
@@ -1312,9 +1393,8 @@ bool DataSource::rxUnknownPkt(const ADARA::Packet &pkt)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_UNKNOWN_PACKET, m_name, 2, 10, 100, log_info ) ) {
-		SMSControl *ctrl = SMSControl::getInstance();
 		ERROR(log_info
-			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Unknown packet type 0x"
 			<< std::hex << pkt.type() << std::dec
 			<< " from " << m_name);
@@ -1333,11 +1413,10 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_OVERSIZE_PACKET, m_name, 2, 10, 100, log_info ) ) {
-		SMSControl *ctrl = SMSControl::getInstance();
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Oversized packet"
 				<< " at " << hdr->timestamp().tv_sec
 				<< "." << hdr->timestamp().tv_nsec
@@ -1346,7 +1425,7 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 				<< " from " << m_name);
 		} else {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Oversized packet"
 				<< " chunk_len=" << chunk_len
 				<< " from " << m_name);
@@ -1360,8 +1439,7 @@ void DataSource::resetPacketStats(void)
 	// Dump Total Discarded Packet Statistics before Reset...
 	std::string log_info;
 	Parser::getDiscardedPacketsLogString(log_info);
-	SMSControl *ctrl = SMSControl::getInstance();
-	INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+	INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 		<< "resetPacketStats(): Totals Before Reset - " << log_info );
 
 	// Reset Discarded Packet Statistics...
@@ -1376,8 +1454,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 
 	if (it == m_hwSources.end()) {
 
-		SMSControl *ctrl = SMSControl::getInstance();
-		uint32_t smsId = ctrl->registerEventSource(hwId);
+		uint32_t smsId = m_ctrl->registerEventSource(hwId);
 
 		// Get Next Available HW Index for PVs...
 		size_t i, max = m_hwIndices.size();
@@ -1385,7 +1462,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		for (i = 0; i < max && hwIndex < 0; i++) {
 			if (!m_hwIndices[i]) {
 				m_hwIndices.set(i);
-				DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "getHWSource() assigning PV hwIndex=" << i
 					<< " to HWSource hwId=" << hwId
 					<< " smsId=" << smsId );
@@ -1398,6 +1475,12 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		boost::shared_ptr<smsUint32PV> pvEventBwSecond;
 		boost::shared_ptr<smsUint32PV> pvEventBwMinute;
 		boost::shared_ptr<smsUint32PV> pvEventBwTenMin;
+		boost::shared_ptr<smsUint32PV> pvMetaBwSecond;
+		boost::shared_ptr<smsUint32PV> pvMetaBwMinute;
+		boost::shared_ptr<smsUint32PV> pvMetaBwTenMin;
+		boost::shared_ptr<smsUint32PV> pvErrBwSecond;
+		boost::shared_ptr<smsUint32PV> pvErrBwMinute;
+		boost::shared_ptr<smsUint32PV> pvErrBwTenMin;
 
 		// Create/Get Persistent EPICS PVs for This HWSource Instance...
 		if ( hwIndex >= 0 ) {
@@ -1405,7 +1488,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 			// Make New HWSource PVs, as needed...
 			if ( (uint32_t) hwIndex >= m_pvHWSourceHwIds.size() ) {
 
-				std::string prefix(ctrl->getBeamlineId());
+				std::string prefix(m_ctrl->getBeamlineId());
 				prefix += ":SMS";
 				prefix += ":DataSource:";
 
@@ -1424,35 +1507,77 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 				m_pvHWSourceHwIds[hwIndex] =
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":HwId"));
-				ctrl->addPV(m_pvHWSourceHwIds[hwIndex]);
+				m_ctrl->addPV(m_pvHWSourceHwIds[hwIndex]);
 
 				// HWSource SMS Id...
 				m_pvHWSourceSmsIds.resize(hwIndex + 1);
 				m_pvHWSourceSmsIds[hwIndex] =
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":SmsId"));
-				ctrl->addPV(m_pvHWSourceSmsIds[hwIndex]);
+				m_ctrl->addPV(m_pvHWSourceSmsIds[hwIndex]);
 
 				// HWSource Event Bandwidth Second...
 				m_pvHWSourceEventBandwidthSecond.resize(hwIndex + 1);
 				m_pvHWSourceEventBandwidthSecond[hwIndex] =
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":EventBandwidthSecond"));
-				ctrl->addPV(m_pvHWSourceEventBandwidthSecond[hwIndex]);
+				m_ctrl->addPV(m_pvHWSourceEventBandwidthSecond[hwIndex]);
 
 				// HWSource Event Bandwidth Minute...
 				m_pvHWSourceEventBandwidthMinute.resize(hwIndex + 1);
 				m_pvHWSourceEventBandwidthMinute[hwIndex] =
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":EventBandwidthMinute"));
-				ctrl->addPV(m_pvHWSourceEventBandwidthMinute[hwIndex]);
+				m_ctrl->addPV(m_pvHWSourceEventBandwidthMinute[hwIndex]);
 
 				// HWSource Event Bandwidth Ten Minutes...
 				m_pvHWSourceEventBandwidthTenMin.resize(hwIndex + 1);
 				m_pvHWSourceEventBandwidthTenMin[hwIndex] =
 					boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":EventBandwidthTenMin"));
-				ctrl->addPV(m_pvHWSourceEventBandwidthTenMin[hwIndex]);
+				m_ctrl->addPV(m_pvHWSourceEventBandwidthTenMin[hwIndex]);
+
+				// HWSource Meta Bandwidth Second...
+				m_pvHWSourceMetaBandwidthSecond.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthSecond[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthSecond"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthSecond[hwIndex]);
+
+				// HWSource Meta Bandwidth Minute...
+				m_pvHWSourceMetaBandwidthMinute.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthMinute[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthMinute"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthMinute[hwIndex]);
+
+				// HWSource Meta Bandwidth Ten Minutes...
+				m_pvHWSourceMetaBandwidthTenMin.resize(hwIndex + 1);
+				m_pvHWSourceMetaBandwidthTenMin[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":MetaBandwidthTenMin"));
+				m_ctrl->addPV(m_pvHWSourceMetaBandwidthTenMin[hwIndex]);
+
+				// HWSource Err Bandwidth Second...
+				m_pvHWSourceErrBandwidthSecond.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthSecond[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthSecond"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthSecond[hwIndex]);
+
+				// HWSource Err Bandwidth Minute...
+				m_pvHWSourceErrBandwidthMinute.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthMinute[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthMinute"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthMinute[hwIndex]);
+
+				// HWSource Err Bandwidth Ten Minutes...
+				m_pvHWSourceErrBandwidthTenMin.resize(hwIndex + 1);
+				m_pvHWSourceErrBandwidthTenMin[hwIndex] =
+					boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":ErrBandwidthTenMin"));
+				m_ctrl->addPV(m_pvHWSourceErrBandwidthTenMin[hwIndex]);
 			}
 
 			pvHwId = m_pvHWSourceHwIds[hwIndex];
@@ -1460,9 +1585,15 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 			pvEventBwSecond = m_pvHWSourceEventBandwidthSecond[hwIndex];
 			pvEventBwMinute = m_pvHWSourceEventBandwidthMinute[hwIndex];
 			pvEventBwTenMin = m_pvHWSourceEventBandwidthTenMin[hwIndex];
+			pvMetaBwSecond = m_pvHWSourceMetaBandwidthSecond[hwIndex];
+			pvMetaBwMinute = m_pvHWSourceMetaBandwidthMinute[hwIndex];
+			pvMetaBwTenMin = m_pvHWSourceMetaBandwidthTenMin[hwIndex];
+			pvErrBwSecond = m_pvHWSourceErrBandwidthSecond[hwIndex];
+			pvErrBwMinute = m_pvHWSourceErrBandwidthMinute[hwIndex];
+			pvErrBwTenMin = m_pvHWSourceErrBandwidthTenMin[hwIndex];
 		}
 		else {
-			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "getHWSource(): Out of PV Indices"
 				<< " for HWSource hwId=" << hwId
 				<< " smsId=" << smsId << "!" );
@@ -1472,7 +1603,9 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		// Create New HWSource... (Pass In Id and Bandwidth PVs...)
 		HWSrcPtr src( new HWSource(
 			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
-			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin ) );
+			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
+			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
+			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin ) );
 
 		// Add to HWSource List for This DataSource...
 		it = m_hwSources.insert(HWSrcMap::value_type(hwId, src)).first;
@@ -1500,6 +1633,10 @@ bool DataSource::rxPacket(const ADARA::MappedDataPkt &pkt)
 bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		bool is_mapped)
 {
+	// Infrequently Update Internal Config from Live Control PV Values...
+	static uint32_t cnt = 0;
+	++cnt;
+
 	HWSource &hw_src = getHWSource(pkt->sourceID());
 
 	// Reset "RTDL Packets with No Data Packets" Count...
@@ -1516,22 +1653,40 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	else
 		good_pulse = hw_src.pulseGood();
 
+	// Event Type Counts for Live Bandwidth Statistics...
+	uint32_t event_count = 0, meta_count = 0, err_count = 0;
+
+	// Pulse is "Good", Process Events...
 	if ( good_pulse )
 	{
-		// Update "Mixed Data Packets" Option for This Data Source
-		// from Live Config...
-		m_mixed_data_packets = m_pvMixedDataPackets->value();
+		// [VERY INFREQUENTLY] Update "Mixed Data Packets" Option
+		// for This Data Source, from Live Config PV Value...
+		// - We don't expect this to change very often, if ever,
+		// so only check very rarely, like every 10 minutes... ;-D
+		// (Note: count already incremented above for overall method...!)
+		if ( !(cnt % 999999) ) {
+			m_mixed_data_packets = m_pvMixedDataPackets->value();
+		}
 
-		SMSControl *ctrl = SMSControl::getInstance();
-		ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
-			is_mapped, m_mixed_data_packets);
+		m_ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
+			is_mapped, m_mixed_data_packets,
+			event_count, meta_count, err_count);
 
 		if (hw_src.checkSeq(*pkt))
-			ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+			m_ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+	}
+
+	// Pulse is "Bad", Count All Events as Errors...
+	else {
+		err_count = pkt->num_events();
 	}
 
 	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
-	m_ignore_eop = m_pvIgnoreEoP->value();
+	// - Infrequently Update from Live Control PV Value, once per minute?
+	// (Note: count already incremented above for overall method...!)
+	if ( !(cnt % 99999) ) {
+		m_ignore_eop = m_pvIgnoreEoP->value();
+	}
 	if (!m_ignore_eop && pkt->endOfPulse())
 		hw_src.endPulse();
 
@@ -1545,15 +1700,19 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	// Event Count Per Second
-	if ( m_last_second != now.tv_sec ) {
+	if ( m_last_second_time.tv_sec != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
 		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
 		updateBandwidthSecond( now, false );
 		// Reset Last Second
-		m_last_second = now.tv_sec;
+		m_last_second_time = now;
 	}
-	m_event_count_second += pkt->num_events();
-	hw_src.m_event_count_second += pkt->num_events();
+	m_event_count_second += event_count;
+	m_meta_count_second += meta_count;
+	m_err_count_second += err_count;
+	hw_src.m_event_count_second += event_count;
+	hw_src.m_meta_count_second += meta_count;
+	hw_src.m_err_count_second += err_count;
 
 	// Event Count Per Minute
 	uint32_t min = now.tv_sec / 60;
@@ -1563,8 +1722,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Minute
 		m_last_minute = min;
 	}
-	m_event_count_minute += pkt->num_events();
-	hw_src.m_event_count_minute += pkt->num_events();
+	m_event_count_minute += event_count;
+	m_meta_count_minute += meta_count;
+	m_err_count_minute += err_count;
+	hw_src.m_event_count_minute += event_count;
+	hw_src.m_meta_count_minute += meta_count;
+	hw_src.m_err_count_minute += err_count;
 
 	// Event Count Per Ten Minutes
 	uint32_t tenmin = now.tv_sec / 600;
@@ -1574,8 +1737,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// Reset Last Ten Minutes
 		m_last_tenmin = tenmin;
 	}
-	m_event_count_tenmin += pkt->num_events();
-	hw_src.m_event_count_tenmin += pkt->num_events();
+	m_event_count_tenmin += event_count;
+	m_meta_count_tenmin += meta_count;
+	m_err_count_tenmin += err_count;
+	hw_src.m_event_count_tenmin += event_count;
+	hw_src.m_meta_count_tenmin += meta_count;
+	hw_src.m_err_count_tenmin += err_count;
 
 	return false;
 }
@@ -1587,8 +1754,6 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	 * SMSControl.
 	 */
 
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	bool drop_pulse = false;
 
 	// do duplicate checking on a per-datasource basis
@@ -1599,7 +1764,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_DUPLICATE_RTDL, m_name,
 					2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local Duplicate RTDL"
 				<< " from " << m_name
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1618,7 +1783,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_SAWTOOTH_RTDL, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local SAWTOOTH RTDL from " << m_name
 				<< std::hex << " m_lastRTDLPulseId=0x" << m_lastRTDLPulseId
 				<< " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1648,7 +1813,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_RTDL_PULSE_IN_PAST, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "*** Dropping Bogus RTDL Pulse Time"
 				<< " from Distant Past (Before Facility Start Time)!"
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1667,7 +1832,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_RTDL_PULSE_IN_FUTURE, m_name,
 				2, 10, 100, log_info ) ) {
 			ERROR(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "*** Dropping Bogus RTDL Pulse Time"
 				<< " from Distant Future (Over One Week from Now)!"
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
@@ -1685,7 +1850,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				RLL_LOCAL_RTDL_SEQUENCE, m_name,
 				2, 10, 100, log_info ) ) {
 			WARN(log_info
-				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "rxPacket(RTDLPkt): Local RTDL Cycle Out of Sequence"
 				<< " from " << m_name
 				<< " m_lastRTDLCycle=" << m_lastRTDLCycle
@@ -1698,50 +1863,66 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	// Ok, Process Pulse Now (Maybe... :-)
 	if ( !drop_pulse ) {
-		ctrl->pulseRTDL(pkt, m_dupRTDL);
+		m_ctrl->pulseRTDL(pkt, m_dupRTDL);
 	}
 
-	// Check for Run-Away Data Sources...
+	// [LESS FREQUENTLY] Check for Run-Away Data Sources...
 	// (Lots of RTDLs filling up our internal Pulse Buffer,
 	// with No RawDataPkts to release them... ;-b)
 
-	// Update RTDL "No Data" Threshold from PV...
-	m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
+	static uint32_t cnt = 0;
 
-	HWSrcMap::iterator it = m_hwSources.begin();
+	// Once Per Second...
+	uint32_t freq = 60;
 
-	while ( it != m_hwSources.end() ) {
+	if ( !(++cnt % freq) )
+	{
+		// Update RTDL "No Data" Threshold from PV...
+		m_rtdlNoDataThresh = m_pvRTDLNoDataThresh->value();
 
-		if ( ++(it->second->m_rtdlNoDataCount) > m_rtdlNoDataThresh ) {
+		HWSrcMap::iterator it = m_hwSources.begin();
 
-			ERROR( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "Run-Away Data Source " << m_name
-				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
-				<< ", " << it->second->m_rtdlNoDataCount
-				<< " (> " << m_rtdlNoDataThresh << ")"
-				<< " RTDL Pulses without a Corresponding RawDataPkt!"
-				<< " Unregistering Event Source " << it->second->smsId());
+		bool changed = false;
 
-			// Reset HWSource PV Index Bit, Clear Out SMS Id PV Value...
-			if ( it->second->m_hwIndex >= 0 ) {
-				it->second->m_pvHWSourceSmsId->update(-1, &now);
-				m_hwIndices.reset( it->second->m_hwIndex );
+		while ( it != m_hwSources.end() ) {
+
+			if ( ( it->second->m_rtdlNoDataCount += freq )
+					> m_rtdlNoDataThresh ) {
+
+				ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Run-Away Data Source " << m_name
+					<< " pulseId=0x"
+						<< std::hex << pkt.pulseId() << std::dec
+					<< ", " << it->second->m_rtdlNoDataCount
+					<< " (> " << m_rtdlNoDataThresh << ")"
+					<< " RTDL Pulses without a Corresponding RawDataPkt!"
+					<< " Unregistering Event Source "
+						<< it->second->smsId());
+
+				// Reset HWSource PV Index Bit, Clear Out SMS Id PV Value.
+				if ( it->second->m_hwIndex >= 0 ) {
+					it->second->m_pvHWSourceSmsId->update(-1, &now);
+					m_hwIndices.reset( it->second->m_hwIndex );
+				}
+
+				m_ctrl->unregisterEventSource(it->second->smsId());
+
+				// Remove Hardware Source from Map...
+				// (Note: iterator increments to next element,
+				// but returns current element for deletion... :-)
+				m_hwSources.erase(it++);
+
+				changed = true;
 			}
-
-			ctrl->unregisterEventSource(it->second->smsId());
-
-			// Remove Hardware Source from Map...
-			// (Note: iterator increments to next element,
-			// but returns current element for deletion... :-)
-			m_hwSources.erase(it++);
+			else {
+				++it;
+			}
 		}
-		else {
-			++it;
-		}
+
+		// Update Number of HWSources PV...
+		if ( changed )
+			m_pvNumHWSources->update(m_hwSources.size(), &now);
 	}
-
-	// Update Number of HWSources PV...
-	m_pvNumHWSources->update(m_hwSources.size(), &now);
 
 	// Count Pulse in Various Statistics...
 
@@ -1749,12 +1930,12 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	m_rtdl_pkt_counts++;
 
 	// Pulse Count Per Second
-	if ( m_last_second != now.tv_sec ) {
+	if ( m_last_second_time.tv_sec != now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
 		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
 		updateBandwidthSecond( now, false );
 		// Reset Last Second
-		m_last_second = now.tv_sec;
+		m_last_second_time = now;
 	}
 	m_pulse_count_second++;
 
@@ -1786,135 +1967,196 @@ void DataSource::resetBandwidthStatistics(void)
 	// Reset Bandwidth Times & Counts (Triggers Initial Logging)
 
 	// Per Second...
-	m_last_second = -1;
 	m_pulse_count_second = 0;
 	m_event_count_second = 0;
+	m_meta_count_second = 0;
+	m_err_count_second = 0;
 
 	// Per Minute...
-	m_last_minute = -1;
 	m_pulse_count_minute = 0;
 	m_event_count_minute = 0;
+	m_meta_count_minute = 0;
+	m_err_count_minute = 0;
 
 	// Per Ten Minutes...
-	m_last_tenmin = -1;
 	m_pulse_count_tenmin = 0;
 	m_event_count_tenmin = 0;
+	m_meta_count_tenmin = 0;
+	m_err_count_tenmin = 0;
+
+	// Time Trackers...
+	m_last_second_time.tv_sec = -1;
+	m_last_second_time.tv_nsec = -1;
+	m_last_minute = -1;
+	m_last_tenmin = -1;
 }
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
 	static uint32_t every_three_seconds = 0;
 
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Second for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_second
-			<< " Events=" << m_event_count_second );
+			<< " Events=" << m_event_count_second
+			<< " Meta=" << m_meta_count_second
+			<< " Err=" << m_err_count_second );
 	}
 
 	if ( !( ++every_three_seconds % 3 ) )
 	{
+		// Compute _Actual_ Elapsed Time...! ;-D
+		double elapsed =
+			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
+					* NANO_PER_SECOND_D )
+				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
+			/ NANO_PER_SECOND_D;
+
 		// Update Bandwidth Count Per Second PVs...
-		m_pvPulseBandwidthSecond->update(m_pulse_count_second / 3, &now);
-		m_pvEventBandwidthSecond->update(m_event_count_second / 3, &now);
+		m_pvPulseBandwidthSecond->update(
+			(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
+		m_pvEventBandwidthSecond->update(
+			(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
+		m_pvMetaBandwidthSecond->update(
+			(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
+		m_pvErrBandwidthSecond->update(
+			(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
 
 		// Reset Counters for Next Second...
 		m_pulse_count_second = 0;
 		m_event_count_second = 0;
+		m_meta_count_second = 0;
+		m_err_count_second = 0;
 
 		// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 		for ( HWSrcMap::iterator it = m_hwSources.begin();
 				it != m_hwSources.end() ; it++ ) {
 			if ( it->second->m_hwIndex >= 0 ) {
 				if ( do_log && it->second->m_event_count_second > 0 ) {
-					INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+					INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 						<< "Bandwidth Per Second for " << m_name << ":"
 						<< " HWSource HwId=" << it->second->hwId()
 						<< " Events="
-						<< it->second->m_event_count_second );
+						<< it->second->m_event_count_second
+						<< " Meta="
+						<< it->second->m_meta_count_second
+						<< " Err="
+						<< it->second->m_err_count_second );
 				}
 				it->second->m_pvHWSourceEventBandwidthSecond->update(
-					it->second->m_event_count_second / 3, &now);
+					(uint32_t)( ((double) it->second->m_event_count_second)
+						/ elapsed ), &now);
+				it->second->m_pvHWSourceMetaBandwidthSecond->update(
+					(uint32_t)( ((double) it->second->m_meta_count_second)
+						/ elapsed ), &now);
+				it->second->m_pvHWSourceErrBandwidthSecond->update(
+					(uint32_t)( ((double) it->second->m_err_count_second)
+						/ elapsed ), &now);
 			}
 			it->second->m_event_count_second = 0;
+			it->second->m_meta_count_second = 0;
+			it->second->m_err_count_second = 0;
 		}
 	}
 }
 
 void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 {
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	// Log the Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Minute for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_minute
-			<< " Events=" << m_event_count_minute );
+			<< " Events=" << m_event_count_minute
+			<< " Meta=" << m_meta_count_minute
+			<< " Err=" << m_err_count_minute );
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
 	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
 	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
 
 	// Reset Counters for Next Minute...
 	m_pulse_count_minute = 0;
 	m_event_count_minute = 0;
+	m_meta_count_minute = 0;
+	m_err_count_minute = 0;
 
 	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
 			if ( do_log && it->second->m_event_count_minute > 0 ) {
-				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Minute for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events=" << it->second->m_event_count_minute );
+					<< " Events=" << it->second->m_event_count_minute
+					<< " Meta=" << it->second->m_meta_count_minute
+					<< " Err=" << it->second->m_err_count_minute );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
 				it->second->m_event_count_minute, &now);
+			it->second->m_pvHWSourceMetaBandwidthMinute->update(
+				it->second->m_meta_count_minute, &now);
+			it->second->m_pvHWSourceErrBandwidthMinute->update(
+				it->second->m_err_count_minute, &now);
 		}
 		it->second->m_event_count_minute = 0;
+		it->second->m_meta_count_minute = 0;
+		it->second->m_err_count_minute = 0;
 	}
 }
 
 void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 {
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	// Log the Ten-Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
-		INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_tenmin
-			<< " Events=" << m_event_count_tenmin );
+			<< " Events=" << m_event_count_tenmin
+			<< " Meta=" << m_meta_count_tenmin
+			<< " Err=" << m_err_count_tenmin );
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
 	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
 	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
 
 	// Reset Counters for Next Ten Minutes...
 	m_pulse_count_tenmin = 0;
 	m_event_count_tenmin = 0;
+	m_meta_count_tenmin = 0;
+	m_err_count_tenmin = 0;
 
 	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
 			if ( do_log && it->second->m_event_count_tenmin > 0 ) {
-				INFO( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events=" << it->second->m_event_count_tenmin );
+					<< " Events=" << it->second->m_event_count_tenmin
+					<< " Meta=" << it->second->m_meta_count_tenmin
+					<< " Err=" << it->second->m_err_count_tenmin );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
 				it->second->m_event_count_tenmin, &now);
+			it->second->m_pvHWSourceMetaBandwidthTenMin->update(
+				it->second->m_meta_count_tenmin, &now);
+			it->second->m_pvHWSourceErrBandwidthTenMin->update(
+				it->second->m_err_count_tenmin, &now);
 		}
 		it->second->m_event_count_tenmin = 0;
+		it->second->m_meta_count_tenmin = 0;
+		it->second->m_err_count_tenmin = 0;
 	}
 }
 
@@ -1941,12 +2183,12 @@ bool DataSource::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 	// If Not An Empty Descriptor, then Save Descriptor Packet...
 	if ( !pkt.description().empty() ) {
 		boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
-		ddp.reset(new ADARA::DeviceDescriptorPkt(pkt));
+		ddp = boost::make_shared<ADARA::DeviceDescriptorPkt>(pkt);
 		m_devices[ pkt.devId() ].m_descriptorPkt = ddp;
 		m_devices[ pkt.devId() ].m_devId = pkt.devId();
 	}
 
-	SMSControl::getInstance()->updateDescriptor(pkt, m_smsSourceId);
+	m_ctrl->updateDescriptor(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -1966,11 +2208,11 @@ bool DataSource::rxPacket(const ADARA::VariableU32Pkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableU32Pkt> vvp;
-		vvp.reset(new ADARA::VariableU32Pkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableU32Pkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
-	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	m_ctrl->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -1990,11 +2232,11 @@ bool DataSource::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableDoublePkt> vvp;
-		vvp.reset(new ADARA::VariableDoublePkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableDoublePkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
-	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	m_ctrl->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -2014,11 +2256,11 @@ bool DataSource::rxPacket(const ADARA::VariableStringPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableStringPkt> vvp;
-		vvp.reset(new ADARA::VariableStringPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableStringPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
-	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	m_ctrl->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -2038,11 +2280,11 @@ bool DataSource::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableU32ArrayPkt> vvp;
-		vvp.reset(new ADARA::VariableU32ArrayPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableU32ArrayPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
-	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	m_ctrl->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -2062,11 +2304,11 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 		}
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vvp;
-		vvp.reset(new ADARA::VariableDoubleArrayPkt(pkt));
+		vvp = boost::make_shared<ADARA::VariableDoubleArrayPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
-	SMSControl::getInstance()->updateValue(pkt, m_smsSourceId);
+	m_ctrl->updateValue(pkt, m_smsSourceId);
 	return false;
 }
 
@@ -2076,9 +2318,8 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_HEARTBEAT, m_name, 60, 3, 10, log_info ) ) {
-		SMSControl *ctrl = SMSControl::getInstance();
 		INFO(log_info
-			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Heartbeat Packet for " << m_name);
 	}
 

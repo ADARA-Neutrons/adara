@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <boost/make_shared.hpp>
+
 #include "ADARA.h"
 #include "ADARAPackets.h"
 #include "ADARAUtils.h"
@@ -401,7 +403,7 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
-	ddp.reset(new ADARA::DeviceDescriptorPkt(inPkt));
+	ddp = boost::make_shared<ADARA::DeviceDescriptorPkt>(inPkt);
 	ddp->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(ddp);
 
@@ -481,7 +483,8 @@ void MetaDataMgr::addFastMetaDDP( const timespec &ts, uint32_t mapped_dev,
 	 */
 	if ( StorageManager::streaming() )
 		StorageManager::addPacket( pkt, size );
-	m_devices[mapped_dev].m_descriptorPkt.reset(new ADARA::Packet(wrapped));
+	m_devices[mapped_dev].m_descriptorPkt =
+		boost::make_shared<ADARA::Packet>(wrapped);
 	m_devices[mapped_dev].m_devId = -1; // FastMetaDDP...!
 	m_devices[mapped_dev].m_srcTag = 0;
 }
@@ -512,7 +515,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableU32Pkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableU32Pkt> vup;
-	vup.reset(new ADARA::VariableU32Pkt(inPkt));
+	vup = boost::make_shared<ADARA::VariableU32Pkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
@@ -545,7 +548,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableDoublePkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableDoublePkt> vup;
-	vup.reset(new ADARA::VariableDoublePkt(inPkt));
+	vup = boost::make_shared<ADARA::VariableDoublePkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
@@ -578,7 +581,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableStringPkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableStringPkt> vup;
-	vup.reset(new ADARA::VariableStringPkt(inPkt));
+	vup = boost::make_shared<ADARA::VariableStringPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
@@ -612,7 +615,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableU32ArrayPkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableU32ArrayPkt> vup;
-	vup.reset(new ADARA::VariableU32ArrayPkt(inPkt));
+	vup = boost::make_shared<ADARA::VariableU32ArrayPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 
@@ -646,7 +649,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableDoubleArrayPkt &inPkt,
 
 	/* Fix the device id in the packet before further processing... */
 	boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vup;
-	vup.reset(new ADARA::VariableDoubleArrayPkt(inPkt));
+	vup = boost::make_shared<ADARA::VariableDoubleArrayPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
 	PacketSharedPtr pkt(vup);
 

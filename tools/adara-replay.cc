@@ -12,6 +12,7 @@
 
 
 #include "ADARAParser.h"
+#include "ADARAUtil.h"
 
 #include <time.h>
 
@@ -95,8 +96,8 @@ private:
         }
         else
         {
-            rv = ((end.tv_sec - start.tv_sec) * 1000000000) +
-                  (end.tv_nsec - start.tv_nsec);
+            rv = ( ( end.tv_sec - start.tv_sec ) * NANO_PER_SECOND_LL ) +
+                  ( end.tv_nsec - start.tv_nsec );
         }
         return rv;
     }

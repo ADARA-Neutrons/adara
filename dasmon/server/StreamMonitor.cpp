@@ -956,12 +956,16 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     }
 
     if ( m_last_pulse_time )
-        m_pfreq.addSample( 1000000000.0 /(pulse_time - m_last_pulse_time));
+    {
+        m_pfreq.addSample( NANO_PER_SECOND_D
+            / ( pulse_time - m_last_pulse_time ) );
+    }
 
     m_last_pulse_time = pulse_time;
     m_bank_count_info.addSample( event_count );
     m_run_metrics.m_total_counts += event_count;
-    m_run_metrics.m_time = (pulse_time - m_first_pulse_time)/1000000000.0;
+    m_run_metrics.m_time = ( pulse_time - m_first_pulse_time )
+        / NANO_PER_SECOND_D;
 
     return false;
 }
@@ -1011,15 +1015,15 @@ StreamMonitor::rxPacket( const ADARA::BeamMonitorPkt &a_pkt )
     for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); )
     {
         dt = a_pkt.pulseId() - m_mon_last_pulse[im->first];
-        if ( dt > 0 ) //&& dt <= 1000000000 )
+        if ( dt > 0 ) // && dt <= NANO_PER_SECOND_LL
         {
             im->second.addSample(0);
             ++im;
         }
-        //else if ( dt > 1000000000 )
-        //{
-        //    m_mon_count_info.erase(im++);
-        //}
+        // else if ( dt > NANO_PER_SECOND_LL )
+        // {
+        //     m_mon_count_info.erase(im++);
+        // }
         else
             ++im;
     }
