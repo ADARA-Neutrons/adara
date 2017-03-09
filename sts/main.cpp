@@ -75,6 +75,9 @@
 #include <syslog.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -132,6 +135,7 @@ int main( int argc, char** argv )
     bool                        interact;
     string                      work_path;
     string                      base_path;
+    string                      config_file;
     unsigned long               chunk_size; // in Dataset Elements! :-O
     unsigned short              evt_buf_size;
     unsigned short              anc_buf_size;
@@ -183,6 +187,7 @@ int main( int argc, char** argv )
                 ("file,f",po::value<string>(),"read input from file instead of stdin")
                 ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
                 ("base-path,b",po::value<string>( &base_path ),"set base cataloging path (none by defualt)")
+                ("config,C",po::value<string>( &config_file ),"set STS Config File path (none by defualt)")
                 ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
                 ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 49152 ),"set hdf5 chunk size (in Dataset Elements!)")
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
@@ -239,6 +244,34 @@ int main( int argc, char** argv )
         if ( !suppress_nexus )
             nexus_outfile = work_path + tempName + ".nxs";
 
+        if ( config_file.size() )
+        {
+            struct stat statbuf;
+            int err = stat(config_file.c_str(), &statbuf);
+            if ( err )
+            {
+                syslog( LOG_ERR,
+                    "[%i] Stat Error on Config File: %s, %s - Ignoring...",
+                    g_pid, config_file.c_str(), strerror(errno) );
+                config_file.clear();
+            }
+            else if ( statbuf.st_size == 0 )
+            {
+                syslog( LOG_ERR,
+                    "[%i] Empty Config File: %s - Ignoring...",
+                    g_pid, config_file.c_str() );
+                config_file.clear();
+            }
+            else
+            {
+                syslog( LOG_INFO, "[%i] STS Config File Specified: %s",
+                    g_pid, config_file.c_str() );
+            }
+        }
+        else {
+            syslog( LOG_ERR, "[%i] No STS Config File Specified", g_pid );
+        }
+
         if ( interact && verbose )
         {
             cout << "sts information" << endl;
@@ -250,6 +283,7 @@ int main( int argc, char** argv )
             cout << "  strict        : " << ( move ? "yes" : "no" ) << endl;
             cout << "  work path     : " << work_path << endl;
             cout << "  base path     : " << base_path << endl;
+            cout << "  config file   : " << config_file << endl;
             cout << "  move nexus    : " << ( move ? "yes" : "no" ) << endl;
             cout << "  chunk size    : " << chunk_size
                  << " (Dataset Elements!)" << endl;
@@ -280,9 +314,9 @@ int main( int argc, char** argv )
                 dup2( nullfd, 2 );
             }
 
-            nxgen = new NxGen( infd, adara_outfile, nexus_outfile, strict,
-                gather_stats, chunk_size, evt_buf_size, anc_buf_size,
-                cache_size, compression_level );
+            nxgen = new NxGen( infd, adara_outfile, nexus_outfile,
+                config_file, strict, gather_stats, chunk_size,
+                evt_buf_size, anc_buf_size, cache_size, compression_level );
 
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
