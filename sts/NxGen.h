@@ -841,6 +841,7 @@ public:
         int a_fd_in,
         std::string &a_adara_out_file,
         std::string &a_nexus_out_file,
+        std::string &a_config_file,
         bool a_strict,
         bool a_gather_stats,
         unsigned long a_chunk_size = 2048,   // in Dataset Elements! :-O
@@ -930,6 +931,8 @@ private:
                             std::vector<TypeT> &a_data,
                             std::vector<hsize_t> &a_dims,
                             const std::string a_units = "" );
+    void                parseSTSConfigFile(
+                            const std::string &a_config_file );
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
     void                makeGroupLink( const std::string &source_path,
@@ -1028,6 +1031,7 @@ private:
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file
+    std::string         m_config_file;          ///< Name of STS Config file
     std::string         m_entry_path;           ///< Path to Nexus NXentry
     std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs

@@ -28,6 +28,7 @@ NxGen::NxGen
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
+    string         &a_config_file,              ///< [in] Filename of STS Config file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
@@ -42,6 +43,7 @@ NxGen::NxGen
         a_chunk_size * a_anc_buf_chunk_count ), // number of elements
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
+    m_config_file(a_config_file),
     m_entry_path(string("/entry")),
     m_instrument_path(m_entry_path + string("/instrument")),
     m_daslogs_path(m_entry_path + string("/DASlogs")),
@@ -69,6 +71,10 @@ NxGen::NxGen
         m_gen_nexus = true;
         m_h5nx.H5NXset_cache_size( a_cache_size );
     }
+
+    // Parse STS Config File
+    if ( !m_config_file.empty() )
+        parseSTSConfigFile( m_config_file );
 
     // Reserve internal buffer for veto pulse times (in Dataset Elements!)
     m_pulse_vetoes.reserve( a_chunk_size );
@@ -2311,6 +2317,76 @@ NxGen::writeMultidimDataset
                 "H5NXmake_attribute_string() failed for path: " << a_path
                      << ", name: " << a_name )
         }
+    }
+}
+
+
+/*! \brief Parses External STS Config File
+ *
+ * This method parses an External STS Config File
+ * to generate a Custom NeXus File Group/Mapping Set.
+ */
+void
+NxGen::parseSTSConfigFile
+(
+    const string &a_config_file     ///< [in] STS Config File Path
+)
+{
+    xmlDocPtr doc = xmlReadFile( a_config_file.c_str(), 0, 0 );
+
+    if ( doc )
+    {
+        string tag;
+        string value;
+        bool parsed = false;
+
+        try
+        {
+            for ( xmlNode *node = xmlDocGetRootElement(doc)->children;
+                    node; node = node->next )
+            {
+                tag = (char*)node->name;
+                getXmlNodeValue( node, value );
+
+                parsed = true;
+
+                syslog( LOG_INFO, "[%i] Parsing STS Config File <%s>=[%s]",
+                    g_pid, tag.c_str(), value.c_str() );
+                usleep(30000); // give syslog a chance...
+            }
+        }
+        catch( std::exception &e )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s Exception Parsing STS Config File: %s - %s",
+                g_pid, "STS Error:", a_config_file.c_str(), e.what() );
+            usleep(30000); // give syslog a chance...
+        }
+        catch( ... )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s Unknown Exception Parsing STS Config File: %s",
+                g_pid, "STS Error:", a_config_file.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+
+        if ( !parsed )
+        {
+            syslog( LOG_ERR, "[%i] %s Parsing STS Config File: %s - %s",
+                g_pid, "STS Error:", a_config_file.c_str(),
+                "No Valid XML Tags Parsed!" );
+            usleep(30000); // give syslog a chance...
+        }
+
+        xmlFreeDoc( doc );
+    }
+
+    else
+    {
+        syslog( LOG_ERR, "[%i] %s Reading STS Config File: %s - %s",
+            g_pid, "STS Error:", a_config_file.c_str(),
+            "Empty or Invalid XML Document?" );
+        usleep(30000); // give syslog a chance...
     }
 }
 
