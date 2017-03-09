@@ -39,6 +39,7 @@ public:
 
     void    processStream();
     void    printStats( std::ostream &a_os ) const;
+    void    getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
 
     std::string             getFacilityName() const { return m_run_info.facility_name; }
     std::string             getBeamShortName() const { return m_run_info.instr_shortname; }
@@ -137,8 +138,6 @@ private:
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &a_pkt ) const;
     const char* getPktName( uint32_t a_pkt_type ) const;
-    void        getXmlNodeValue( xmlNode *a_node,
-                    std::string & a_value ) const;
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
