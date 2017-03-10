@@ -2403,10 +2403,25 @@ NxGen::parseSTSConfigFile
                         if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"name" ) == 0 )
                         {
-                            // REMOVE ME...
-                            syslog( LOG_INFO, "[%i] %s Group Name [%s]",
-                                g_pid, "STS Config", value.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            // Already Got A Group Name...?
+                            if ( group.name.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Name",
+                                    group.name.c_str(), value.c_str(),
+                                    "Using New Group Name..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Name [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
 
                             group.name = value;
                         }
@@ -2414,10 +2429,25 @@ NxGen::parseSTSConfigFile
                         else if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"path" ) == 0 )
                         {
-                            // REMOVE ME...
-                            syslog( LOG_INFO, "[%i] %s Group Path [%s]",
-                                g_pid, "STS Config", value.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            // Already Got A Group Path...?
+                            if ( group.path.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Path",
+                                    group.path.c_str(), value.c_str(),
+                                    "Using New Group Path..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Path [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
 
                             group.path = value;
                         }
@@ -2448,12 +2478,31 @@ NxGen::parseSTSConfigFile
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Element Pattern [%s]",
-                                        g_pid, "STS Config",
-                                        value.c_str() );
-                                    usleep(30000); // give syslog a chance
+                                    // Already Got An Element Pattern...?
+                                    if ( element.pattern.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Pattern",
+                                            element.pattern.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Pattern..."
+                                        );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Pattern [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.pattern = value;
                                 }
@@ -2461,12 +2510,30 @@ NxGen::parseSTSConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"name" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Element Name [%s]",
-                                        g_pid, "STS Config",
-                                        value.c_str() );
-                                    usleep(30000); // give syslog a chance
+                                    // Already Got An Element Name...?
+                                    if ( element.name.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Name",
+                                            element.name.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Name..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Name [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.name = value;
                                 }
@@ -2474,12 +2541,30 @@ NxGen::parseSTSConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"type" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Element Type [%s]",
-                                        g_pid, "STS Config",
-                                        value.c_str() );
-                                    usleep(30000); // give syslog a chance
+                                    // Already Got An Element Type...?
+                                    if ( element.type.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Type",
+                                            element.type.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Type..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Type [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.type = value;
                                 }
@@ -2502,18 +2587,26 @@ NxGen::parseSTSConfigFile
                                     && element.name.size()
                                     && element.type.size() )
                             {
-                                // REMOVE ME...
-                                syslog( LOG_INFO,
+                                // TODO Check for Existing Element by Name?
+                                // if ( findGroupElementByName( group,
+                                //      element.name ) )
+                                // {
+                                // }
+                                // else
+                                // {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
                                 "[%i] %s \"%s\" - %s=[%s] %s=[%s] %s=[%s]",
-                                    g_pid,
+                                        g_pid,
                                     "STS Config Adding Element to Group",
-                                    group.name.c_str(),
-                                    "pattern", element.pattern.c_str(),
-                                    "name", element.name.c_str(),
-                                    "type", element.type.c_str() );
-                                usleep(30000); // give syslog a chance
+                                        group.name.c_str(),
+                                        "pattern", element.pattern.c_str(),
+                                        "name", element.name.c_str(),
+                                        "type", element.type.c_str() );
+                                    usleep(30000); // give syslog a chance
 
-                                group.elements.push_back( element );
+                                    group.elements.push_back( element );
+                                // }
                             }
                             else
                             {
