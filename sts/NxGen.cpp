@@ -2342,17 +2342,168 @@ NxGen::parseSTSConfigFile
 
         try
         {
-            for ( xmlNode *node = xmlDocGetRootElement(doc)->children;
-                    node; node = node->next )
+            xmlNode *root = xmlDocGetRootElement( doc );
+
+            tag = (char*)root->name;
+            getXmlNodeValue( root, value );
+
+            // REMOVE ME...
+            syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
+                g_pid, "Parsing STS Config File",
+                tag.c_str(), value.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            if ( xmlStrcmp( root->name,
+                    (const xmlChar*)"sts_config" ) != 0 )
             {
-                tag = (char*)node->name;
-                getXmlNodeValue( node, value );
+                syslog( LOG_ERR,
+                    "[%i] %s %s <%s>=[%s] in STS Config File - %s",
+                    g_pid, "STS Error:", "Unrecognized Root Tag",
+                    tag.c_str(), value.c_str(), "Bailing on Config..." );
+                usleep(30000); // give syslog a chance...
+                return;
+            }
+
+            for ( xmlNode *lev1 = root->children;
+                    lev1 != 0; lev1 = lev1->next )
+            {
+                tag = (char*)lev1->name;
+                getXmlNodeValue( lev1, value );
 
                 parsed = true;
 
-                syslog( LOG_INFO, "[%i] Parsing STS Config File <%s>=[%s]",
-                    g_pid, tag.c_str(), value.c_str() );
+                // REMOVE ME...
+                syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
+                    g_pid, "Parsing STS Config File",
+                    tag.c_str(), value.c_str() );
                 usleep(30000); // give syslog a chance...
+
+                if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"group" ) == 0 )
+                {
+                    // REMOVE ME...
+                    syslog( LOG_INFO, "[%i] %s Found Group [%s]",
+                        g_pid, "STS Config", value.c_str() );
+                    usleep(30000); // give syslog a chance...
+
+                    for ( xmlNode *lev2 = lev1->children;
+                            lev2 != 0; lev2 = lev2->next )
+                    {
+                        tag = (char*)lev2->name;
+                        getXmlNodeValue( lev2, value );
+
+                        // REMOVE ME...
+                        syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
+                            g_pid, "Parsing STS Config File",
+                            tag.c_str(), value.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"name" ) == 0 )
+                        {
+                            // REMOVE ME...
+                            syslog( LOG_INFO, "[%i] %s Group Name [%s]",
+                                g_pid, "STS Config", value.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"path" ) == 0 )
+                        {
+                            // REMOVE ME...
+                            syslog( LOG_INFO, "[%i] %s Group Path [%s]",
+                                g_pid, "STS Config", value.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"element" ) == 0 )
+                        {
+                            // REMOVE ME...
+                            syslog( LOG_INFO, "[%i] %s Group Element [%s]",
+                                g_pid, "STS Config", value.c_str() );
+                            usleep(30000); // give syslog a chance...
+
+                            for ( xmlNode *lev3 = lev2->children;
+                                    lev3 != 0; lev3 = lev3->next )
+                            {
+                                tag = (char*)lev3->name;
+                                getXmlNodeValue( lev3, value );
+
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Level 3 <%s>=[%s]",
+                                    g_pid, "Parsing STS Config File",
+                                    tag.c_str(), value.c_str() );
+                                usleep(30000); // give syslog a chance...
+
+                                if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"pattern" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Element Pattern [%s]",
+                                        g_pid, "STS Config",
+                                        value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Element Name [%s]",
+                                        g_pid, "STS Config",
+                                        value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"type" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Element Type [%s]",
+                                        g_pid, "STS Config",
+                                        value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"text" ) != 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s at Level 3 <%s>=[%s]",
+                                        g_pid, "STS Error:",
+                                        "Unknown Tag in STS Config",
+                                        tag.c_str(), value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"text" ) != 0 )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s at Level 2 <%s>=[%s]",
+                                g_pid, "STS Error:",
+                                "Unknown Tag in STS Config",
+                                tag.c_str(), value.c_str() );
+                            usleep(30000); // give syslog a chance
+                        }
+                    }
+                }
+
+                else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"text" ) != 0 )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s at Level 1 <%s>=[%s]",
+                        g_pid, "STS Error:", "Unknown Tag in STS Config",
+                        tag.c_str(), value.c_str() );
+                    usleep(30000); // give syslog a chance
+                }
             }
         }
         catch( std::exception &e )
