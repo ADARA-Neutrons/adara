@@ -835,6 +835,26 @@ private:
         MT_RESUME     = 4
     };
 
+    // (STS Config) Element Structure to store information about
+    // Linked Entities in a Group Container...
+    struct ElementInfo
+    {
+        std::string     pattern;
+        std::string     name;
+        std::string     type;
+    };
+
+    // (STS Config) Group Container Structure to store information about
+    // collections of NeXus/DASlogs data elements to be collected together
+    // and Linked into a Group, at a specific location in the NeXus File.
+    struct GroupInfo
+    {
+        std::string     name;
+        std::string     path;
+        std::vector<struct ElementInfo>
+                        elements;
+    };
+
 public:
 
     NxGen(
@@ -1032,6 +1052,8 @@ private:
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     std::string         m_nexus_filename;       ///< Name of Nexus file
     std::string         m_config_file;          ///< Name of STS Config file
+    std::vector<struct GroupInfo>
+                        m_config_groups;        ///< Vector of STS Config Group Containers
     std::string         m_entry_path;           ///< Path to Nexus NXentry
     std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
