@@ -2381,6 +2381,8 @@ NxGen::parseSTSConfigFile
                 if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"group" ) == 0 )
                 {
+                    struct GroupInfo group;
+
                     // REMOVE ME...
                     syslog( LOG_INFO, "[%i] %s Found Group [%s]",
                         g_pid, "STS Config", value.c_str() );
@@ -2405,6 +2407,8 @@ NxGen::parseSTSConfigFile
                             syslog( LOG_INFO, "[%i] %s Group Name [%s]",
                                 g_pid, "STS Config", value.c_str() );
                             usleep(30000); // give syslog a chance...
+
+                            group.name = value;
                         }
 
                         else if ( xmlStrcmp( lev2->name,
@@ -2414,11 +2418,15 @@ NxGen::parseSTSConfigFile
                             syslog( LOG_INFO, "[%i] %s Group Path [%s]",
                                 g_pid, "STS Config", value.c_str() );
                             usleep(30000); // give syslog a chance...
+
+                            group.path = value;
                         }
 
                         else if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"element" ) == 0 )
                         {
+                            struct ElementInfo element;
+
                             // REMOVE ME...
                             syslog( LOG_INFO, "[%i] %s Group Element [%s]",
                                 g_pid, "STS Config", value.c_str() );
@@ -2446,6 +2454,8 @@ NxGen::parseSTSConfigFile
                                         g_pid, "STS Config",
                                         value.c_str() );
                                     usleep(30000); // give syslog a chance
+
+                                    element.pattern = value;
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
@@ -2457,6 +2467,8 @@ NxGen::parseSTSConfigFile
                                         g_pid, "STS Config",
                                         value.c_str() );
                                     usleep(30000); // give syslog a chance
+
+                                    element.name = value;
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
@@ -2468,6 +2480,8 @@ NxGen::parseSTSConfigFile
                                         g_pid, "STS Config",
                                         value.c_str() );
                                     usleep(30000); // give syslog a chance
+
+                                    element.type = value;
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
@@ -2481,6 +2495,40 @@ NxGen::parseSTSConfigFile
                                     usleep(30000); // give syslog a chance
                                 }
                             }
+
+                            // Add Element to Group Container...
+                            // (If Required Fields are Present, Else Error)
+                            if ( element.pattern.size()
+                                    && element.name.size()
+                                    && element.type.size() )
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                "[%i] %s \"%s\" - %s=[%s] %s=[%s] %s=[%s]",
+                                    g_pid,
+                                    "STS Config Adding Element to Group",
+                                    group.name.c_str(),
+                                    "pattern", element.pattern.c_str(),
+                                    "name", element.name.c_str(),
+                                    "type", element.type.c_str() );
+                                usleep(30000); // give syslog a chance
+
+                                group.elements.push_back( element );
+                            }
+                            else
+                            {
+                                std::string err = "Incomplete Element";
+                                err += " in STS Config Group \""
+                                    + group.name + "\"";
+                                syslog( LOG_ERR,
+                                "[%i] %s %s - %s %s=[%s] %s=[%s] %s=[%s]",
+                                    g_pid, "STS Error:", err.c_str(),
+                                    "Ignoring",
+                                    "pattern", element.pattern.c_str(),
+                                    "name", element.name.c_str(),
+                                    "type", element.type.c_str() );
+                                usleep(30000); // give syslog a chance
+                            }
                         }
 
                         else if ( xmlStrcmp( lev2->name,
@@ -2493,6 +2541,37 @@ NxGen::parseSTSConfigFile
                                 tag.c_str(), value.c_str() );
                             usleep(30000); // give syslog a chance
                         }
+                    }
+
+                    // Add Group Container to STS Config...
+                    // (If Required Fields are Present, Else Error)
+                    if ( group.name.size()
+                            && group.path.size()
+                            && group.elements.size() )
+                    {
+                        // REMOVE ME...
+                        syslog( LOG_INFO,
+                            "[%i] %s \"%s\" %s - %s=[%s] (%lu %s)",
+                            g_pid, "Adding Group Container",
+                            group.name.c_str(), "to STS Config",
+                            "path", group.path.c_str(),
+                            group.elements.size(), "elements" );
+                        usleep(30000); // give syslog a chance
+
+                        m_config_groups.push_back( group );
+                    }
+                    else
+                    {
+                        std::string err = "Incomplete Group Container \""
+                            + group.name
+                            + "\" in STS Config";
+                        syslog( LOG_ERR,
+                            "[%i] %s %s - %s %s=[%s] (%lu %s)",
+                            g_pid, "STS Error:", err.c_str(),
+                            "Ignoring",
+                            "path", group.path.c_str(),
+                            group.elements.size(), "elements" );
+                        usleep(30000); // give syslog a chance
                     }
                 }
 
@@ -2528,6 +2607,11 @@ NxGen::parseSTSConfigFile
                 "No Valid XML Tags Parsed!" );
             usleep(30000); // give syslog a chance...
         }
+
+        syslog( LOG_INFO, "[%i] Parsed STS Config File: %s - %lu %s",
+            g_pid, a_config_file.c_str(),
+            m_config_groups.size(), "Valid Groups Found" );
+        usleep(30000); // give syslog a chance...
 
         xmlFreeDoc( doc );
     }
