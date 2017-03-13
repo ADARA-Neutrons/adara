@@ -2348,10 +2348,10 @@ NxGen::parseSTSConfigFile
             getXmlNodeValue( root, value );
 
             // REMOVE ME...
-            syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
-                g_pid, "Parsing STS Config File",
-                tag.c_str(), value.c_str() );
-            usleep(30000); // give syslog a chance...
+            //syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
+                //g_pid, "Parsing STS Config File",
+                //tag.c_str(), value.c_str() );
+            //usleep(30000); // give syslog a chance...
 
             if ( xmlStrcmp( root->name,
                     (const xmlChar*)"sts_config" ) != 0 )
@@ -2373,15 +2373,17 @@ NxGen::parseSTSConfigFile
                 parsed = true;
 
                 // REMOVE ME...
-                syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
-                    g_pid, "Parsing STS Config File",
-                    tag.c_str(), value.c_str() );
-                usleep(30000); // give syslog a chance...
+                //syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
+                    //g_pid, "Parsing STS Config File",
+                    //tag.c_str(), value.c_str() );
+                //usleep(30000); // give syslog a chance...
 
                 if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"group" ) == 0 )
                 {
                     struct GroupInfo group;
+
+                    group.created = false;
 
                     // REMOVE ME...
                     syslog( LOG_INFO, "[%i] %s Found Group [%s]",
@@ -2395,10 +2397,10 @@ NxGen::parseSTSConfigFile
                         getXmlNodeValue( lev2, value );
 
                         // REMOVE ME...
-                        syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
-                            g_pid, "Parsing STS Config File",
-                            tag.c_str(), value.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        //syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
+                            //g_pid, "Parsing STS Config File",
+                            //tag.c_str(), value.c_str() );
+                        //usleep(30000); // give syslog a chance...
 
                         if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"name" ) == 0 )
@@ -2453,9 +2455,37 @@ NxGen::parseSTSConfigFile
                         }
 
                         else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"type" ) == 0 )
+                        {
+                            // Already Got A Group Type...?
+                            if ( group.type.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Type",
+                                    group.type.c_str(), value.c_str(),
+                                    "Using New Group Type..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Type [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            group.type = value;
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"element" ) == 0 )
                         {
                             struct ElementInfo element;
+
+                            element.lastIndex = 0;
 
                             // REMOVE ME...
                             syslog( LOG_INFO, "[%i] %s Group Element [%s]",
@@ -2469,11 +2499,11 @@ NxGen::parseSTSConfigFile
                                 getXmlNodeValue( lev3, value );
 
                                 // REMOVE ME...
-                                syslog( LOG_INFO,
-                                    "[%i] %s Level 3 <%s>=[%s]",
-                                    g_pid, "Parsing STS Config File",
-                                    tag.c_str(), value.c_str() );
-                                usleep(30000); // give syslog a chance...
+                                //syslog( LOG_INFO,
+                                    //"[%i] %s Level 3 <%s>=[%s]",
+                                    //g_pid, "Parsing STS Config File",
+                                    //tag.c_str(), value.c_str() );
+                                //usleep(30000); // give syslog a chance...
 
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
@@ -2640,14 +2670,16 @@ NxGen::parseSTSConfigFile
                     // (If Required Fields are Present, Else Error)
                     if ( group.name.size()
                             && group.path.size()
+                            && group.type.size()
                             && group.elements.size() )
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO,
-                            "[%i] %s \"%s\" %s - %s=[%s] (%lu %s)",
+                            "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s)",
                             g_pid, "Adding Group Container",
                             group.name.c_str(), "to STS Config",
                             "path", group.path.c_str(),
+                            "type", group.type.c_str(),
                             group.elements.size(), "elements" );
                         usleep(30000); // give syslog a chance
 
@@ -2659,10 +2691,11 @@ NxGen::parseSTSConfigFile
                             + group.name
                             + "\" in STS Config";
                         syslog( LOG_ERR,
-                            "[%i] %s %s - %s %s=[%s] (%lu %s)",
+                            "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s)",
                             g_pid, "STS Error:", err.c_str(),
                             "Ignoring",
                             "path", group.path.c_str(),
+                            "type", group.type.c_str(),
                             group.elements.size(), "elements" );
                         usleep(30000); // give syslog a chance
                     }
