@@ -2378,7 +2378,16 @@ NxGen::parseSTSConfigFile
                     //tag.c_str(), value.c_str() );
                 //usleep(30000); // give syslog a chance...
 
+                // Log STS Config File Version...
                 if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"version" ) == 0 )
+                {
+                    syslog( LOG_INFO, "[%i] %s Version: %s",
+                        g_pid, "Parsing STS Config File", value.c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
+
+                else if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"group" ) == 0 )
                 {
                     struct GroupInfo group;
@@ -2600,7 +2609,9 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
-                                        (const xmlChar*)"text" ) != 0 )
+                                        (const xmlChar*)"text" ) != 0
+                                    && xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"comment" ) != 0 )
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s %s at Level 3 <%s>=[%s]",
@@ -2655,7 +2666,9 @@ NxGen::parseSTSConfigFile
                         }
 
                         else if ( xmlStrcmp( lev2->name,
-                                (const xmlChar*)"text" ) != 0 )
+                                (const xmlChar*)"text" ) != 0
+                            && xmlStrcmp( lev2->name,
+                                (const xmlChar*)"comment" ) != 0 )
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s %s at Level 2 <%s>=[%s]",
@@ -2702,7 +2715,9 @@ NxGen::parseSTSConfigFile
                 }
 
                 else if ( xmlStrcmp( lev1->name,
-                        (const xmlChar*)"text" ) != 0 )
+                        (const xmlChar*)"text" ) != 0
+                    && xmlStrcmp( lev1->name,
+                        (const xmlChar*)"comment" ) != 0 )
                 {
                     syslog( LOG_ERR, "[%i] %s %s at Level 1 <%s>=[%s]",
                         g_pid, "STS Error:", "Unknown Tag in STS Config",
