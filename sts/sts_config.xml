@@ -1,0 +1,217 @@
+
+<!--
+	STS Configuration File
+
+	Stored in Git Repository at: git+ssh://trac.sns.gov/var/repos/config
+		- in the "sts-config" branch
+
+	Deployed to /SNS/lustre/stsdata/sts_config.xml
+
+	Please Commit Any Changes to Git...! Thanks! :-D
+-->
+
+<sts_config>
+
+	<version>0.1.0</version>
+
+	<!-- EPICS-based Chopper Groups -->
+	<group>
+		<name>chopper1</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>:Chop:Skf1:DriveError</pattern>
+			<name>drive_error</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf1:MotorSpeed</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf1:PhaseAccuracy</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf1:PhaseLocked</pattern>
+			<name>phase_locked</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf1:SpeedSet</pattern>
+			<name>speed_set</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf1:SpeedUserReq</pattern>
+			<name>speed_user_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+	<group>
+		<name>chopper2</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>:Chop:Skf2:DriveError</pattern>
+			<name>drive_error</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf2:MotorSpeed</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf2:PhaseAccuracy</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf2:PhaseLocked</pattern>
+			<name>phase_locked</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf2:SpeedSet</pattern>
+			<name>speed_set</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf2:SpeedUserReq</pattern>
+			<name>speed_user_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+	<group>
+		<name>chopper3</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>:Chop:Skf3:DriveError</pattern>
+			<name>drive_error</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf3:MotorSpeed</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf3:PhaseAccuracy</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf3:PhaseLocked</pattern>
+			<name>phase_locked</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf3:SpeedSet</pattern>
+			<name>speed_set</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>:Chop:Skf3:SpeedUserReq</pattern>
+			<name>speed_user_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+
+	<!-- Legacy Chopper Groups (for ADARA Test Harness) -->
+	<group>
+		<name>chopper1</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>ChopperStatus1</pattern>
+			<name>status</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Speed1</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Phase1</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>PhaseRequest1</pattern>
+			<name>phase_request</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>SpeedRequest1</pattern>
+			<name>speed_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+	<group>
+		<name>chopper2</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>ChopperStatus2</pattern>
+			<name>status</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Speed2</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Phase2</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>PhaseRequest2</pattern>
+			<name>phase_request</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>SpeedRequest2</pattern>
+			<name>speed_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+	<group>
+		<name>chopper3</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>ChopperStatus3</pattern>
+			<name>status</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Speed3</pattern>
+			<name>rotation_speed</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>Phase3</pattern>
+			<name>phase</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>PhaseRequest3</pattern>
+			<name>phase_request</name>
+			<type>NXlog</type>
+		</element>
+		<element>
+			<pattern>SpeedRequest3</pattern>
+			<name>speed_request</name>
+			<type>NXlog</type>
+		</element>
+	</group>
+
+</sts_config>
+
