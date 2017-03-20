@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <string.h>
+#include <sstream>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
@@ -2517,33 +2518,16 @@ NxGen::parseSTSConfigFile
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    // Already Got An Element Pattern...?
-                                    if ( element.pattern.size() )
-                                    {
-                                        syslog( LOG_ERR,
-                                        "[%i] %s %s %s [%s] -> [%s] - %s",
-                                            g_pid, "STS Error:",
-                                            "STS Config DUPLICATE",
-                                            "Element Pattern",
-                                            element.pattern.c_str(),
-                                            value.c_str(),
-                                            "Using New Element Pattern..."
-                                        );
-                                        // give syslog a chance...
-                                        usleep(30000);
-                                    }
-                                    else
-                                    {
-                                        // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s Element Pattern [%s]",
-                                            g_pid, "STS Config",
-                                            value.c_str() );
-                                        // give syslog a chance
-                                        usleep(30000);
-                                    }
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                    "[%i] %s Element Pattern #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        element.patterns.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
 
-                                    element.pattern = value;
+                                    element.patterns.push_back( value );
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
@@ -2624,7 +2608,7 @@ NxGen::parseSTSConfigFile
 
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
-                            if ( element.pattern.size()
+                            if ( element.patterns.size()
                                     && element.name.size()
                                     && element.type.size() )
                             {
@@ -2636,12 +2620,20 @@ NxGen::parseSTSConfigFile
                                 // else
                                 // {
                                     // REMOVE ME...
+                                    std::stringstream ss;
+                                    for ( uint32_t i=0 ;
+                                            i < element.patterns.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.patterns[i];
+                                    }
                                     syslog( LOG_INFO,
                                 "[%i] %s \"%s\" - %s=[%s] %s=[%s] %s=[%s]",
                                         g_pid,
                                     "STS Config Adding Element to Group",
                                         group.name.c_str(),
-                                        "pattern", element.pattern.c_str(),
+                                        "patterns", ss.str().c_str(),
                                         "name", element.name.c_str(),
                                         "type", element.type.c_str() );
                                     usleep(30000); // give syslog a chance
@@ -2654,11 +2646,18 @@ NxGen::parseSTSConfigFile
                                 std::string err = "Incomplete Element";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
+                                std::stringstream ss;
+                                for ( uint32_t i=0 ;
+                                        i < element.patterns.size(); i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << element.patterns[i];
+                                }
                                 syslog( LOG_ERR,
                                 "[%i] %s %s - %s %s=[%s] %s=[%s] %s=[%s]",
                                     g_pid, "STS Error:", err.c_str(),
                                     "Ignoring",
-                                    "pattern", element.pattern.c_str(),
+                                    "patterns", ss.str().c_str(),
                                     "name", element.name.c_str(),
                                     "type", element.type.c_str() );
                                 usleep(30000); // give syslog a chance

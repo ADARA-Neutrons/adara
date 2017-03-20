@@ -818,132 +818,7 @@ private:
 
                         // Search STS Config for Associated Groups
                         if ( m_nxgen.m_config_groups.size() )
-                        {
-                            // REMOVE ME...
-                            //syslog( LOG_INFO,
-                                //"[%i] Checking %s %s for %s",
-                                //g_pid, device_str.c_str(),
-                                //pv_str.c_str(),
-                                //"Config Group Membership..." );
-                            //usleep(30000); // give syslog a chance...
-
-                            // Check Each Config Group in Turn
-                            // for a Pattern Match on This PV...
-                            for ( uint32_t i=0 ;
-                                    i < m_nxgen.m_config_groups.size() ;
-                                    i++ )
-                            {
-                                GroupInfo *G =
-                                    &(m_nxgen.m_config_groups[i]);
-
-                                // REMOVE ME...
-                                //syslog( LOG_INFO,
-                                    //"[%i] Checking for Group %s...",
-                                    //g_pid, G->name.c_str() );
-                                //usleep(30000); // give syslog a chance...
-
-                                for ( uint32_t j=0 ;
-                                        j < G->elements.size() ; j++ )
-                                {
-                                    ElementInfo *E = &(G->elements[j]);
-
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Pattern Match (%s)",
-                                        //g_pid, "Checking for Element",
-                                        //E->pattern.c_str() );
-                                    // give syslog a chance...
-                                    //usleep(30000);
-
-                                    // Does PV Match This Group's Pattern?
-                                    if ( this->m_internal_name
-                                            .find( E->pattern )
-                                                != std::string::npos
-                                        || this->m_internal_connection
-                                            .find( E->pattern )
-                                                != std::string::npos )
-                                    {
-                                        // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s %s %s in %s %s %s %s",
-                                            g_pid, "Pattern Match for",
-                                            device_str.c_str(),
-                                            pv_str.c_str(),
-                                            "Group", G->name.c_str(),
-                                            "Element", E->pattern.c_str());
-                                        // give syslog a chance...
-                                        usleep(30000);
-
-                                        std::string group_path =
-                                            G->path + "/" + G->name;
-
-                                        // Create Group if Not Yet Created
-                                        if ( !(G->created) )
-                                        {
-                                            syslog( LOG_INFO,
-                                            "[%i] %s %s, %s=[%s] %s=[%s]",
-                                                g_pid, "Creating Group",
-                                                G->name.c_str(),
-                                                "path", group_path.c_str(),
-                                                "type", G->type.c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
-
-                                            m_nxgen.makeGroup( group_path,
-                                                G->type );
-
-                                            G->created = true;
-                                        }
-
-                                        // Link PV Log into Group...
-                                        std::string elem_link_path =
-                                            group_path + "/" + E->name;
-
-                                        syslog( LOG_INFO,
-                                            "[%i] %s %s to Group in %s",
-                                            g_pid, "Linking PV Channel",
-                                            m_log_path.c_str(),
-                                            elem_link_path.c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
-
-                                        // Only Create "Target" String
-                                        // for Group Links if we haven't
-                                        // already done so... ;-D
-                                        if ( !m_has_link )
-                                        {
-                                            // Manually Create "Target"
-                                            // String for Group Link
-                                            // (as per makeGroupLink usage)
-                                            m_nxgen.writeString(
-                                                m_log_path, "target",
-                                                m_log_path );
-
-                                            // Mark This PV as Having
-                                            // Created the "Target" String
-                                            // for Group Links!
-                                            // (so we only do it _Once_!)
-                                            m_has_link = true;
-                                        }
-                                        else
-                                        {
-                                            syslog( LOG_INFO,
-                                                "[%i] %s %s %s %s - %s",
-                                                g_pid, "PV Channel",
-                                                m_log_path.c_str(),
-                                                "Already Has Target",
-                                                "Group Link String",
-                                                "Skipping..." );
-                                            // give syslog a chance...
-                                            usleep(30000);
-                                        }
-
-                                        m_nxgen.makeGroupLink(
-                                            m_log_path, elem_link_path );
-                                    }
-                                }
-                            }
-                        }
+                            createSTSConfigGroups( device_str, pv_str );
                     }
                 }
                 else if ( this->m_ignore )
@@ -962,6 +837,130 @@ private:
 
             this->m_value_buffer.clear();
             this->m_time_buffer.clear();
+        }
+
+        /// Search STS Config for Associated Groups & Create...
+        void createSTSConfigGroups( std::string device_str,
+                std::string pv_str )
+        {
+            // REMOVE ME...
+            //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
+                //g_pid, device_str.c_str(), pv_str.c_str(),
+                //"Config Group Membership..." );
+            //usleep(30000); // give syslog a chance...
+
+            // Check Each Config Group in Turn
+            // for a Pattern Match on This PV...
+            for ( uint32_t i=0 ; i < m_nxgen.m_config_groups.size() ; i++ )
+            {
+                GroupInfo *G = &(m_nxgen.m_config_groups[i]);
+
+                // REMOVE ME...
+                //syslog( LOG_INFO, "[%i] Checking for Group %s...",
+                    //g_pid, G->name.c_str() );
+                //usleep(30000); // give syslog a chance...
+
+                for ( uint32_t j=0 ; j < G->elements.size() ; j++ )
+                {
+                    ElementInfo *E = &(G->elements[j]);
+
+                    bool matched = false;
+
+                    for ( uint32_t k=0 ;
+                            k < E->patterns.size() && !matched ; k++ )
+                    {
+                        std::string &P = E->patterns[k];
+
+                        // REMOVE ME...
+                        //syslog( LOG_INFO, "[%i] %s Pattern Match (%s)",
+                            //g_pid, "Checking for Element Pattern",
+                            //P.c_str() );
+                        // give syslog a chance...
+                        //usleep(30000);
+
+                        // Does PV Match This Group's Pattern?
+                        if ( this->m_internal_name.find( P )
+                                != std::string::npos
+                            || this->m_internal_connection.find( P )
+                                != std::string::npos )
+                        {
+                            // REMOVE ME...
+                            syslog( LOG_INFO,
+                                "[%i] %s %s %s in %s %s %s %s",
+                                g_pid, "Pattern Match for",
+                                device_str.c_str(), pv_str.c_str(),
+                                "Group", G->name.c_str(),
+                                "Element Pattern", P.c_str());
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            std::string group_path =
+                                G->path + "/" + G->name;
+
+                            // Create Group if Not Yet Created
+                            if ( !(G->created) )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s %s, %s=[%s] %s=[%s]",
+                                    g_pid,
+                                    "Creating Group", G->name.c_str(),
+                                    "path", group_path.c_str(),
+                                    "type", G->type.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+
+                                m_nxgen.makeGroup( group_path, G->type );
+
+                                G->created = true;
+                            }
+
+                            // Link PV Log into Group...
+                            std::string elem_link_path =
+                                group_path + "/" + E->name;
+
+                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
+                                g_pid, "Linking PV Channel",
+                                m_log_path.c_str(),
+                                elem_link_path.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            // Only Create "Target" String
+                            // for Group Links if we haven't
+                            // already done so... ;-D
+                            if ( !m_has_link )
+                            {
+                                // Manually Create "Target"
+                                // String for Group Link
+                                // (as per makeGroupLink usage)
+                                m_nxgen.writeString( m_log_path, "target",
+                                    m_log_path );
+
+                                // Mark This PV as Having
+                                // Created the "Target" String
+                                // for Group Links!
+                                // (so we only do it _Once_!)
+                                m_has_link = true;
+                            }
+                            else
+                            {
+                                syslog( LOG_INFO, "[%i] %s %s %s - %s",
+                                    g_pid, "PV Channel",
+                                    m_log_path.c_str(),
+                                    "Already Has Target Group Link String",
+                                    "Skipping..." );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
+
+                            m_nxgen.makeGroupLink(
+                                m_log_path, elem_link_path );
+
+                            matched = true;
+                        }
+                    }
+                }
+            }
         }
 
         NxGen          &m_nxgen;        ///< NxGen instance used for Nexus ouput
@@ -994,10 +993,10 @@ private:
     // Linked Entities in a Group Container...
     struct ElementInfo
     {
-        std::string     pattern;
-        std::string     name;
-        std::string     type;
-        uint32_t        lastIndex;
+        std::vector<std::string>    patterns;
+        std::string                 name;
+        std::string                 type;
+        uint32_t                    lastIndex;
     };
 
     // (STS Config) Group Container Structure to store information about
