@@ -2562,37 +2562,6 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
-                                        (const xmlChar*)"type" ) == 0 )
-                                {
-                                    // Already Got An Element Type...?
-                                    if ( element.type.size() )
-                                    {
-                                        syslog( LOG_ERR,
-                                        "[%i] %s %s %s [%s] -> [%s] - %s",
-                                            g_pid, "STS Error:",
-                                            "STS Config DUPLICATE",
-                                            "Element Type",
-                                            element.type.c_str(),
-                                            value.c_str(),
-                                            "Using New Element Type..." );
-                                        // give syslog a chance...
-                                        usleep(30000);
-                                    }
-                                    else
-                                    {
-                                        // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s Element Type [%s]",
-                                            g_pid, "STS Config",
-                                            value.c_str() );
-                                        // give syslog a chance
-                                        usleep(30000);
-                                    }
-
-                                    element.type = value;
-                                }
-
-                                else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"text" ) != 0
                                     && xmlStrcmp( lev3->name,
                                         (const xmlChar*)"comment" ) != 0 )
@@ -2609,8 +2578,7 @@ NxGen::parseSTSConfigFile
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( element.patterns.size()
-                                    && element.name.size()
-                                    && element.type.size() )
+                                    && element.name.size() )
                             {
                                 // TODO Check for Existing Element by Name?
                                 // if ( findGroupElementByName( group,
@@ -2629,13 +2597,12 @@ NxGen::parseSTSConfigFile
                                         ss << element.patterns[i];
                                     }
                                     syslog( LOG_INFO,
-                                "[%i] %s \"%s\" - %s=[%s] %s=[%s] %s=[%s]",
+                                        "[%i] %s \"%s\" - %s=[%s] %s=[%s]",
                                         g_pid,
                                     "STS Config Adding Element to Group",
                                         group.name.c_str(),
                                         "patterns", ss.str().c_str(),
-                                        "name", element.name.c_str(),
-                                        "type", element.type.c_str() );
+                                        "name", element.name.c_str() );
                                     usleep(30000); // give syslog a chance
 
                                     group.elements.push_back( element );
@@ -2654,12 +2621,11 @@ NxGen::parseSTSConfigFile
                                     ss << element.patterns[i];
                                 }
                                 syslog( LOG_ERR,
-                                "[%i] %s %s - %s %s=[%s] %s=[%s] %s=[%s]",
+                                    "[%i] %s %s - %s %s=[%s] %s=[%s]",
                                     g_pid, "STS Error:", err.c_str(),
                                     "Ignoring",
                                     "patterns", ss.str().c_str(),
-                                    "name", element.name.c_str(),
-                                    "type", element.type.c_str() );
+                                    "name", element.name.c_str() );
                                 usleep(30000); // give syslog a chance
                             }
                         }

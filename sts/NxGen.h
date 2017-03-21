@@ -995,7 +995,6 @@ private:
     {
         std::vector<std::string>    patterns;
         std::string                 name;
-        std::string                 type;
         uint32_t                    lastIndex;
     };
 
