@@ -23,46 +23,38 @@
 		<element>
 			<pattern>:Chop:Skf1:DriveError</pattern>
 			<name>drive_error</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf1:MotorSpeed</pattern>
 			<pattern>Speed1</pattern>
 			<name>rotation_speed</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf1:PhaseAccuracy</pattern>
 			<pattern>Phase1</pattern>
 			<name>phase</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf1:PhaseLocked</pattern>
 			<name>phase_locked</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf1:SpeedSet</pattern>
 			<name>speed_set</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf1:SpeedUserReq</pattern>
 			<pattern>SpeedRequest1</pattern>
 			<name>speed_request</name>
-			<type>NXlog</type>
 		</element>
 		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
 			<pattern>ChopperStatus1</pattern>
 			<name>status</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>PhaseRequest1</pattern>
 			<name>phase_request</name>
-			<type>NXlog</type>
 		</element>
 	</group>
 	<group>
@@ -73,46 +65,38 @@
 		<element>
 			<pattern>:Chop:Skf2:DriveError</pattern>
 			<name>drive_error</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf2:MotorSpeed</pattern>
 			<pattern>Speed2</pattern>
 			<name>rotation_speed</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf2:PhaseAccuracy</pattern>
 			<pattern>Phase2</pattern>
 			<name>phase</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf2:PhaseLocked</pattern>
 			<name>phase_locked</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf2:SpeedSet</pattern>
 			<name>speed_set</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf2:SpeedUserReq</pattern>
 			<pattern>SpeedRequest2</pattern>
 			<name>speed_request</name>
-			<type>NXlog</type>
 		</element>
 		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
 			<pattern>ChopperStatus2</pattern>
 			<name>status</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>PhaseRequest2</pattern>
 			<name>phase_request</name>
-			<type>NXlog</type>
 		</element>
 	</group>
 	<group>
@@ -123,46 +107,38 @@
 		<element>
 			<pattern>:Chop:Skf3:DriveError</pattern>
 			<name>drive_error</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf3:MotorSpeed</pattern>
 			<pattern>Speed3</pattern>
 			<name>rotation_speed</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf3:PhaseAccuracy</pattern>
 			<pattern>Phase3</pattern>
 			<name>phase</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf3:PhaseLocked</pattern>
 			<name>phase_locked</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf3:SpeedSet</pattern>
 			<name>speed_set</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>:Chop:Skf3:SpeedUserReq</pattern>
 			<pattern>SpeedRequest3</pattern>
 			<name>speed_request</name>
-			<type>NXlog</type>
 		</element>
 		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
 			<pattern>ChopperStatus3</pattern>
 			<name>status</name>
-			<type>NXlog</type>
 		</element>
 		<element>
 			<pattern>PhaseRequest3</pattern>
 			<name>phase_request</name>
-			<type>NXlog</type>
 		</element>
 	</group>
 
