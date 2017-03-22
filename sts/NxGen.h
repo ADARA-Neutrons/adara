@@ -998,16 +998,31 @@ private:
         uint32_t                    lastIndex;
     };
 
+    // (STS Config) Conditional Structure to store information about
+    // Conditionally-Included Elements in a Group Container...
+    // (Contains a Vector of ElementInfo structures to be included...)
+    struct ConditionInfo
+    {
+        std::string                     name;
+        std::vector<std::string>        patterns;
+        std::vector<std::string>        value_strings;
+        std::vector<std::string>        values;
+        std::vector<std::string>        not_value_strings;
+        std::vector<std::string>        not_values;
+        std::vector<struct ElementInfo> elements;
+    };
+
     // (STS Config) Group Container Structure to store information about
     // collections of NeXus/DASlogs data elements to be collected together
     // and Linked into a Group, at a specific location in the NeXus File.
     struct GroupInfo
     {
-        std::string                     name;
-        std::string                     path;
-        std::string                     type;
-        std::vector<struct ElementInfo> elements;
-        bool                            created;
+        std::string                         name;
+        std::string                         path;
+        std::string                         type;
+        std::vector<struct ElementInfo>     elements;
+        std::vector<struct ConditionInfo>   conditions;
+        bool                                created;
     };
 
 public:
