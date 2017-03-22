@@ -12,7 +12,7 @@
 
 <sts_config>
 
-	<version>0.1.0</version>
+	<version>0.1.1</version>
 
 	<!-- Chopper Groups -->
 	<group>
@@ -140,6 +140,64 @@
 			<pattern>PhaseRequest3</pattern>
 			<name>phase_request</name>
 		</element>
+	</group>
+
+	<!-- Focus Array Group (HYSPEC) -->
+	<group>
+		<name>focus_array</name>
+		<path>/entry/instrument</path>
+		<type>NXcrystal</type>
+		<!-- EPICS-based Focus Array PV Elements -->
+		<element>
+			<pattern>:Mot:vmel:Position</pattern>
+			<name>position</name>
+		</element>
+		<!-- "PG" Mode Conditional Focus Array PV Elements -->
+		<condition>
+			<name>PG Position Condition</name>
+			<pattern>:Mot:vmel:Position</pattern>
+			<value_string>PG</value_string><!-- 1 -->
+			<element>
+				<pattern>:Mot:mfpg</pattern>
+				<name>mfpg</name>
+			</element>
+			<element>
+				<pattern>:Mot:mgpg</pattern>
+				<name>mgpg</name>
+			</element>
+			<element>
+				<pattern>:Mot:mtpg</pattern>
+				<name>mtpg</name>
+			</element>
+			<element>
+				<pattern>:Mot:m1pg</pattern>
+				<name>m1pg</name>
+			</element>
+		</condition>
+		<!-- "HU" Mode Conditional Focus Array PV Elements -->
+		<condition>
+			<name>HU Position Condition</name>
+			<pattern>:Mot:vmel:Position</pattern>
+			<value>0</value><!-- HU -->
+			<value>2</value><!-- HU -->
+			<!-- or we could do a "not_value" tag of "1" here... -->
+			<element>
+				<pattern>:Mot:mfhu</pattern>
+				<name>mfhu</name>
+			</element>
+			<element>
+				<pattern>:Mot:mghu</pattern>
+				<name>mghu</name>
+			</element>
+			<element>
+				<pattern>:Mot:mthu</pattern>
+				<name>mthu</name>
+			</element>
+			<element>
+				<pattern>:Mot:m1hu</pattern>
+				<name>m1hu</name>
+			</element>
+		</condition>
 	</group>
 
 </sts_config>
