@@ -2641,6 +2641,8 @@ NxGen::parseSTSConfigFile
                         {
                             struct ConditionInfo condition;
 
+                            condition.is_set = false;
+
                             // REMOVE ME...
                             syslog( LOG_INFO,
                                 "[%i] %s Group Condition [%s]",

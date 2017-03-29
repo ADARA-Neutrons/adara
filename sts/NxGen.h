@@ -171,6 +171,43 @@ private:
         NxGen                  &m_nxgen;            ///< NxGen parent class
     };
 
+    // (STS Config) Element Structure to store information about
+    // Linked Entities in a Group Container...
+    struct ElementInfo
+    {
+        std::vector<std::string>    patterns;
+        std::string                 name;
+        uint32_t                    lastIndex;
+    };
+
+    // (STS Config) Conditional Structure to store information about
+    // Conditionally-Included Elements in a Group Container...
+    // (Contains a Vector of ElementInfo structures to be included...)
+    struct ConditionInfo
+    {
+        std::string                     name;
+        std::vector<std::string>        patterns;
+        std::vector<std::string>        value_strings;
+        std::vector<std::string>        values;
+        std::vector<std::string>        not_value_strings;
+        std::vector<std::string>        not_values;
+        std::vector<struct ElementInfo> elements;
+        bool                            is_set;
+    };
+
+    // (STS Config) Group Container Structure to store information about
+    // collections of NeXus/DASlogs data elements to be collected together
+    // and Linked into a Group, at a specific location in the NeXus File.
+    struct GroupInfo
+    {
+        std::string                         name;
+        std::string                         path;
+        std::string                         type;
+        std::vector<struct ElementInfo>     elements;
+        std::vector<struct ConditionInfo>   conditions;
+        bool                                created;
+    };
+
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
     template<class T>
     class NxPVInfo : public STS::PVInfo<T>
@@ -288,6 +325,10 @@ private:
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
 
+            // Save Last Value for Conditional STS Config Groups
+            this->m_last_value = value_buffer.back();
+            this->m_last_value_set = true;
+
             // Capture Value Strings for Enumerated Type PVs...
             // (IFF Everything Works...! ;-D)
             if ( this->m_type == STS::PVT_ENUM
@@ -354,6 +395,10 @@ private:
                             m_value_enum_strings_not_found++;
                         }
                     }
+
+                    // Save Last Value Enum String
+                    // for Conditional STS Config Groups...
+                    this->m_last_enum_string = m_value_enum_strings.back();
                 }
             }
         }
@@ -368,6 +413,10 @@ private:
             // when fast metadata is supported
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
+
+            // Save Last Value for Conditional STS Config Groups
+            this->m_last_value = value_buffer.back();
+            this->m_last_value_set = true;
         }
 
         /// Writes Buffered String PV Values to Nexus File 
@@ -414,6 +463,10 @@ private:
                 }
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
+
+                // Save Last Value for Conditional STS Config Groups
+                this->m_last_value = value_buffer.back();
+                this->m_last_value_set = true;
             }
             else
             {
@@ -475,6 +528,10 @@ private:
                 }
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
+
+                // Save Last Value for Conditional STS Config Groups
+                this->m_last_value = value_buffer.back();
+                this->m_last_value_set = true;
             }
             else
             {
@@ -536,6 +593,10 @@ private:
                 }
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
+
+                // Save Last Value for Conditional STS Config Groups
+                this->m_last_value = value_buffer.back();
+                this->m_last_value_set = true;
             }
             else
             {
@@ -839,9 +900,458 @@ private:
             this->m_time_buffer.clear();
         }
 
+        /// Compare Uint32 PV Value to Conditional STS Config Group Strings
+        bool matchValues
+        (
+            uint32_t value,                 ///< Uint32 Value to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
+                if ( val == value )
+                {
+                    syslog( LOG_INFO, "[%i] Value Match (%u)",
+                        g_pid, value );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Compare Double PV Value to Conditional STS Config Group Strings
+        bool matchValues
+        (
+            double value,                   ///< Double Value to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                double val = boost::lexical_cast<double>( values[i] );
+                if ( val == value )
+                {
+                    syslog( LOG_INFO, "[%i] Value Match (%lf)",
+                        g_pid, value );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Compare String PV Value to Conditional STS Config Group Strings
+        bool matchValues
+        (
+            std::string value,              ///< String Value to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                if ( !(value.compare( values[i] )) )
+                {
+                    syslog( LOG_INFO, "[%i] Value Match (%s)",
+                        g_pid, value.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Compare Uint32 PV Array to Conditional STS Config Group Strings
+        bool matchValues
+        (
+            std::vector<uint32_t> value,    ///< Uint32 Array to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
+
+                // Compare _Each_ PV Array Value to the
+                // Conditional STS Config Group Values...
+                // (Meh, it's something... ;-b)
+                for ( uint32_t j=0 ; j < value.size() ; j++ )
+                {
+                    if ( val == value[j] )
+                    {
+                        syslog( LOG_INFO, "[%i] Value[%d] Match (%u)",
+                            g_pid, j, value[j] );
+                        usleep(30000); // give syslog a chance...
+                        return( true );
+                    }
+                }
+            }
+            return( false );
+        }
+
+        /// Compare Double PV Array to Conditional STS Config Group Strings
+        bool matchValues
+        (
+            std::vector<double> value,      ///< Double Array to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                double val = boost::lexical_cast<double>( values[i] );
+
+                // Compare _Each_ PV Array Value to the
+                // Conditional STS Config Group Values...
+                // (Meh, it's something... ;-b)
+                for ( uint32_t j=0 ; j < value.size() ; j++ )
+                {
+                    if ( val == value[j] )
+                    {
+                        syslog( LOG_INFO, "[%i] Value[%d] Match (%lf)",
+                            g_pid, j, value[j] );
+                        usleep(30000); // give syslog a chance...
+                        return( true );
+                    }
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare Uint32 PV Value to Conditional Config Group Strings
+        bool notMatchValues
+        (
+            uint32_t value,                 ///< Uint32 Value to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
+                if ( val != value )
+                {
+                    syslog( LOG_INFO, "[%i] Value Not-Match (%u)",
+                        g_pid, value );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare Double PV Value to Conditional Config Group Strings
+        bool notMatchValues
+        (
+            double value,                   ///< Double Value to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                double val = boost::lexical_cast<double>( values[i] );
+                if ( val != value )
+                {
+                    syslog( LOG_INFO, "[%i] Value Not-Match (%lf)",
+                        g_pid, value );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare String PV Value to Conditional Config Group Strings
+        bool notMatchValues
+        (
+            std::string value,              ///< String Value to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                if ( value.compare( values[i] ) )
+                {
+                    syslog( LOG_INFO, "[%i] Value Not-Match (%s)",
+                        g_pid, value.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare Uint32 PV Array to Conditional Config Group Strings
+        bool notMatchValues
+        (
+            std::vector<uint32_t> value,    ///< Uint32 Array to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
+
+                // Not-Compare _Each_ PV Array Value to the
+                // Conditional STS Config Group Values...
+                // (Meh, this is really terrible... ;-b)
+                for ( uint32_t j=0 ; j < value.size() ; j++ )
+                {
+                    if ( val != value[j] )
+                    {
+                        syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%u)",
+                            g_pid, j, value[j] );
+                        usleep(30000); // give syslog a chance...
+                        return( true );
+                    }
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare Double PV Array to Conditional Config Group Strings
+        bool notMatchValues
+        (
+            std::vector<double> value,      ///< Double Array to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Value to Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                double val = boost::lexical_cast<double>( values[i] );
+
+                // Not-Compare _Each_ PV Array Value to the
+                // Conditional STS Config Group Values...
+                // (Meh, this is really terrible... ;-b)
+                for ( uint32_t j=0 ; j < value.size() ; j++ )
+                {
+                    if ( val != value[j] )
+                    {
+                        syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%lf)",
+                            g_pid, j, value[j] );
+                        usleep(30000); // give syslog a chance...
+                        return( true );
+                    }
+                }
+            }
+            return( false );
+        }
+
+        /// Compare PV Enum String to Conditional STS Config Group Strings
+        bool matchValueStrings
+        (
+            std::string enum_string,        ///< Enum String to Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Compare PV Enum String to
+            // Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                if ( !(enum_string.compare( values[i] )) )
+                {
+                    syslog( LOG_INFO, "[%i] Value String Match (%s)",
+                        g_pid, enum_string.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
+        /// Not-Compare PV Enum String to Conditional Config Group Strings
+        bool notMatchValueStrings
+        (
+            std::string enum_string,        ///< Enum String to Not-Match
+            std::vector<std::string> values ///< Conditional Values
+        )
+        {
+            // Did We Have a "Last Value" for This PV...?
+            if ( !(this->m_last_value_set) )
+                return( false );
+
+            // Not-Compare PV Enum String to
+            // Conditional STS Config Group Values
+            for ( uint32_t i=0 ; i < values.size() ; i++ )
+            {
+                if ( enum_string.compare( values[i] ) )
+                {
+                    syslog( LOG_INFO, "[%i] Value String Not-Match (%s)",
+                        g_pid, enum_string.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( true );
+                }
+            }
+            return( false );
+        }
+
         /// Search STS Config for Associated Groups & Create...
-        void createSTSConfigGroups( std::string device_str,
-                std::string pv_str )
+        void createSTSConfigGroupMatchingElements
+        (
+            struct GroupInfo *G,                        ///< Config Group
+            std::vector<struct ElementInfo> elements,   ///< Elements
+            std::string device_str,                     ///< Device String
+            std::string pv_str                          ///< PV String
+        )
+        {
+            // REMOVE ME...
+            //syslog( LOG_INFO, "[%i] Checking for Group %s...",
+                //g_pid, G->name.c_str() );
+            //usleep(30000); // give syslog a chance...
+
+            for ( uint32_t e=0 ; e < elements.size() ; e++ )
+            {
+                struct ElementInfo *E = &(elements[e]);
+
+                bool matched = false;
+
+                for ( uint32_t p=0 ;
+                        p < E->patterns.size() && !matched ; p++ )
+                {
+                    std::string &P = E->patterns[p];
+
+                    // REMOVE ME...
+                    //syslog( LOG_INFO, "[%i] %s Pattern Match (%s)",
+                        //g_pid, "Checking for Element", P.c_str() );
+                    // give syslog a chance...
+                    //usleep(30000);
+
+                    // Does PV Match This Group's Pattern?
+                    if ( this->m_internal_name.find( P )
+                            != std::string::npos
+                        || this->m_internal_connection.find( P )
+                            != std::string::npos )
+                    {
+                        // REMOVE ME...
+                        syslog( LOG_INFO, "[%i] %s %s %s in %s %s %s %s",
+                            g_pid, "Pattern Match for",
+                            device_str.c_str(), pv_str.c_str(),
+                            "Group", G->name.c_str(),
+                            "Element Pattern", P.c_str());
+                        // give syslog a chance...
+                        usleep(30000);
+
+                        std::string group_path = G->path + "/" + G->name;
+
+                        // Create Group if Not Yet Created
+                        if ( !(G->created) )
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s, %s=[%s] %s=[%s]", g_pid,
+                                "Creating Group", G->name.c_str(),
+                                "path", group_path.c_str(),
+                                "type", G->type.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            m_nxgen.makeGroup( group_path, G->type );
+
+                            G->created = true;
+                        }
+
+                        // Link PV Log into Group...
+                        std::string elem_link_path =
+                            group_path + "/" + E->name;
+
+                        syslog( LOG_INFO, "[%i] %s %s to Group in %s",
+                            g_pid, "Linking PV Channel",
+                            m_log_path.c_str(),
+                            elem_link_path.c_str() );
+                        // give syslog a chance...
+                        usleep(30000);
+
+                        // Only Create "Target" String for Group Links
+                        // if we haven't already done so... ;-D
+                        if ( !m_has_link )
+                        {
+                            // Manually Create "Target" String
+                            // for Group Link (as per makeGroupLink usage)
+                            m_nxgen.writeString( m_log_path, "target",
+                                m_log_path );
+
+                            // Mark This PV as Having Created the
+                            // "Target" String for Group Links!
+                            // (so we only do it _Once_!)
+                            m_has_link = true;
+                        }
+                        else
+                        {
+                            syslog( LOG_INFO, "[%i] %s %s %s - %s", g_pid,
+                                "PV Channel", m_log_path.c_str(),
+                                "Already Has Target Group Link String",
+                                "Skipping..." );
+                            // give syslog a chance...
+                            usleep(30000);
+                        }
+
+                        m_nxgen.makeGroupLink(
+                            m_log_path, elem_link_path );
+
+                        matched = true;
+                    }
+                }
+            }
+        }
+
+        /// Search STS Config for Associated Groups & Create...
+        void createSTSConfigGroups
+        (
+            std::string device_str, ///< Device String
+            std::string pv_str      ///< PV String
+        )
         {
             // REMOVE ME...
             //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
@@ -851,34 +1361,41 @@ private:
 
             // Check Each Config Group in Turn
             // for a Pattern Match on This PV...
-            for ( uint32_t i=0 ; i < m_nxgen.m_config_groups.size() ; i++ )
+            for ( uint32_t g=0 ; g < m_nxgen.m_config_groups.size() ; g++ )
             {
-                GroupInfo *G = &(m_nxgen.m_config_groups[i]);
+                struct GroupInfo *G = &(m_nxgen.m_config_groups[g]);
 
-                // REMOVE ME...
-                //syslog( LOG_INFO, "[%i] Checking for Group %s...",
-                    //g_pid, G->name.c_str() );
-                //usleep(30000); // give syslog a chance...
+                // Check for Element Pattern Matches...
+                createSTSConfigGroupMatchingElements(
+                    G, G->elements, device_str, pv_str );
 
-                for ( uint32_t j=0 ; j < G->elements.size() ; j++ )
+                // Skip Conditional Value Checks if No PV Values Set...
+                if ( !(this->m_last_value_set) )
+                    continue;
+
+                // Check for Conditional Pattern Matches...
+                for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
                 {
-                    ElementInfo *E = &(G->elements[j]);
+                    struct ConditionInfo *C = &(G->conditions[c]);
 
-                    bool matched = false;
+                    // Skip If This Condition is Already Set/Satisfied...
+                    if ( C->is_set )
+                        continue;
 
-                    for ( uint32_t k=0 ;
-                            k < E->patterns.size() && !matched ; k++ )
+                    // Check All Conditional Patterns (Until Set...)
+                    for ( uint32_t p=0 ;
+                            p < C->patterns.size() && !(C->is_set) ; p++ )
                     {
-                        std::string &P = E->patterns[k];
+                        std::string &P = C->patterns[p];
 
                         // REMOVE ME...
                         //syslog( LOG_INFO, "[%i] %s Pattern Match (%s)",
-                            //g_pid, "Checking for Element Pattern",
+                            //g_pid, "Checking for Conditional",
                             //P.c_str() );
                         // give syslog a chance...
                         //usleep(30000);
 
-                        // Does PV Match This Group's Pattern?
+                        // Does PV Match This Group's Conditional Pattern?
                         if ( this->m_internal_name.find( P )
                                 != std::string::npos
                             || this->m_internal_connection.find( P )
@@ -890,80 +1407,109 @@ private:
                                 g_pid, "Pattern Match for",
                                 device_str.c_str(), pv_str.c_str(),
                                 "Group", G->name.c_str(),
-                                "Element Pattern", P.c_str());
+                                "Conditional Pattern", P.c_str());
                             // give syslog a chance...
                             usleep(30000);
 
-                            std::string group_path =
-                                G->path + "/" + G->name;
-
-                            // Create Group if Not Yet Created
-                            if ( !(G->created) )
+                            // Check PV Value Against Condition Values...
+                            if ( matchValues( this->m_last_value,
+                                    C->values )
+                                || notMatchValues( this->m_last_value,
+                                    C->not_values )
+                                || matchValueStrings(
+                                    this->m_last_enum_string,
+                                    C->value_strings )
+                                || notMatchValueStrings(
+                                    this->m_last_enum_string,
+                                    C->not_value_strings ) )
                             {
+                                // Condition Has Been Satisfied...! :-D
+                                C->is_set = true;
+
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s, %s=[%s] %s=[%s]",
-                                    g_pid,
-                                    "Creating Group", G->name.c_str(),
-                                    "path", group_path.c_str(),
-                                    "type", G->type.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
-
-                                m_nxgen.makeGroup( group_path, G->type );
-
-                                G->created = true;
-                            }
-
-                            // Link PV Log into Group...
-                            std::string elem_link_path =
-                                group_path + "/" + E->name;
-
-                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
-                                g_pid, "Linking PV Channel",
-                                m_log_path.c_str(),
-                                elem_link_path.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
-
-                            // Only Create "Target" String
-                            // for Group Links if we haven't
-                            // already done so... ;-D
-                            if ( !m_has_link )
-                            {
-                                // Manually Create "Target"
-                                // String for Group Link
-                                // (as per makeGroupLink usage)
-                                m_nxgen.writeString( m_log_path, "target",
-                                    m_log_path );
-
-                                // Mark This PV as Having
-                                // Created the "Target" String
-                                // for Group Links!
-                                // (so we only do it _Once_!)
-                                m_has_link = true;
-                            }
-                            else
-                            {
-                                syslog( LOG_INFO, "[%i] %s %s %s - %s",
-                                    g_pid, "PV Channel",
-                                    m_log_path.c_str(),
-                                    "Already Has Target Group Link String",
-                                    "Skipping..." );
+                                    "[%i] %s %s %s in %s %s %s %s",
+                                    g_pid, "Condition Set True for",
+                                    device_str.c_str(), pv_str.c_str(),
+                                    "Group", G->name.c_str(),
+                                    "Conditional Pattern", P.c_str());
                                 // give syslog a chance...
                                 usleep(30000);
                             }
-
-                            m_nxgen.makeGroupLink(
-                                m_log_path, elem_link_path );
-
-                            matched = true;
                         }
                     }
                 }
             }
         }
 
-        NxGen          &m_nxgen;        ///< NxGen instance used for Nexus ouput
+        /// Search STS Config for Conditional Groups & Create...
+        void createSTSConfigConditionalGroups(void)
+        {
+            // Skip This If We're Not Writing to NeXus
+            // or If We Don't Care About This PV (Ignored),
+            // or We Don't Have Any STS Config Groups...! ;-D
+            if ( !(m_nxgen.m_gen_nexus) || this->m_ignore
+                    || !(m_nxgen.m_config_groups.size()) )
+            {
+                return;
+            }
+
+            try
+            {
+                std::stringstream device_ss;
+                device_ss << "Device " << this->m_device_name
+                    << " (id=" << this->m_device_id << ")";
+                std::string device_str = device_ss.str();
+
+                std::string pv_str = "PV ";
+                pv_str += this->m_internal_name.c_str();
+
+                // Search for Activated STS Config Conditional Groups
+
+                // REMOVE ME...
+                syslog( LOG_INFO, "[%i] Checking %s %s for %s",
+                    g_pid, device_str.c_str(), pv_str.c_str(),
+                    "Config Conditional Group Membership..." );
+                usleep(30000); // give syslog a chance...
+
+                // Check Each Config Group in Turn for a
+                // Conditional Pattern Match on This PV...
+                for ( uint32_t g=0 ;
+                        g < m_nxgen.m_config_groups.size() ; g++ )
+                {
+                    struct GroupInfo *G = &(m_nxgen.m_config_groups[g]);
+
+                    // Skip Any Groups Without Conditions...
+                    if ( !(G->conditions.size()) )
+                        continue;
+
+                    // REMOVE ME...
+                    syslog( LOG_INFO,
+                        "[%i] Checking for Conditional Group %s...",
+                        g_pid, G->name.c_str() );
+                    usleep(30000); // give syslog a chance...
+
+                    for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
+                    {
+                        struct ConditionInfo *C = &(G->conditions[c]);
+
+                        if ( C->is_set )
+                        {
+                            createSTSConfigGroupMatchingElements(
+                                G, C->elements, device_str, pv_str );
+                        }
+                    }
+                }
+            }
+            catch( TraceException &e )
+            {
+                RETHROW_TRACE( e,
+                    "NxPVInfo::createSTSConfigConditionalGroups (pv: "
+                    << this->m_device_id << "." << this->m_pv_id
+                    << ") failed." )
+            }
+        }
+
+        NxGen          &m_nxgen;        ///< NxGen instance used for Nexus output
         std::string     m_internal_name;///< Internal Nexus name of variable
         std::string     m_internal_connection;///< Internal Nexus connection string of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
@@ -987,42 +1533,6 @@ private:
         MT_SCAN_STOP  = 2,
         MT_PAUSE      = 3,
         MT_RESUME     = 4
-    };
-
-    // (STS Config) Element Structure to store information about
-    // Linked Entities in a Group Container...
-    struct ElementInfo
-    {
-        std::vector<std::string>    patterns;
-        std::string                 name;
-        uint32_t                    lastIndex;
-    };
-
-    // (STS Config) Conditional Structure to store information about
-    // Conditionally-Included Elements in a Group Container...
-    // (Contains a Vector of ElementInfo structures to be included...)
-    struct ConditionInfo
-    {
-        std::string                     name;
-        std::vector<std::string>        patterns;
-        std::vector<std::string>        value_strings;
-        std::vector<std::string>        values;
-        std::vector<std::string>        not_value_strings;
-        std::vector<std::string>        not_values;
-        std::vector<struct ElementInfo> elements;
-    };
-
-    // (STS Config) Group Container Structure to store information about
-    // collections of NeXus/DASlogs data elements to be collected together
-    // and Linked into a Group, at a specific location in the NeXus File.
-    struct GroupInfo
-    {
-        std::string                         name;
-        std::string                         path;
-        std::string                         type;
-        std::vector<struct ElementInfo>     elements;
-        std::vector<struct ConditionInfo>   conditions;
-        bool                                created;
     };
 
 public:
