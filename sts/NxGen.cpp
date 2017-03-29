@@ -2401,9 +2401,9 @@ NxGen::parseSTSConfigFile
                     conditionIndex = 0;
 
                     // REMOVE ME...
-                    syslog( LOG_INFO, "[%i] %s Found Group [%s]",
-                        g_pid, "STS Config", value.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    //syslog( LOG_INFO, "[%i] %s Found Group [%s]",
+                        //g_pid, "STS Config", value.c_str() );
+                    //usleep(30000); // give syslog a chance...
 
                     for ( xmlNode *lev2 = lev1->children;
                             lev2 != 0; lev2 = lev2->next )
@@ -2503,9 +2503,10 @@ NxGen::parseSTSConfigFile
                             element.lastIndex = 0;
 
                             // REMOVE ME...
-                            syslog( LOG_INFO, "[%i] %s Group Element [%s]",
-                                g_pid, "STS Config", value.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            //syslog( LOG_INFO,
+                                //"[%i] %s Group Element [%s]",
+                                //g_pid, "STS Config", value.c_str() );
+                            //usleep(30000); // give syslog a chance...
 
                             for ( xmlNode *lev3 = lev2->children;
                                     lev3 != 0; lev3 = lev3->next )
