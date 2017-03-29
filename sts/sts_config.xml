@@ -158,19 +158,19 @@
 			<pattern>:Mot:vmel:Position</pattern>
 			<value_string>PG</value_string><!-- 1 -->
 			<element>
-				<pattern>:Mot:mfpg</pattern>
+				<pattern>:Mot:mfpg.RBV</pattern>
 				<name>mfpg</name>
 			</element>
 			<element>
-				<pattern>:Mot:mgpg</pattern>
+				<pattern>:Mot:mgpg.RBV</pattern>
 				<name>mgpg</name>
 			</element>
 			<element>
-				<pattern>:Mot:mtpg</pattern>
+				<pattern>:Mot:mtpg.RBV</pattern>
 				<name>mtpg</name>
 			</element>
 			<element>
-				<pattern>:Mot:m1pg</pattern>
+				<pattern>:Mot:m1pg.RBV</pattern>
 				<name>m1pg</name>
 			</element>
 		</condition>
@@ -182,19 +182,19 @@
 			<value>2</value><!-- HU -->
 			<!-- or we could do a "not_value" tag of "1" here... -->
 			<element>
-				<pattern>:Mot:mfhu</pattern>
+				<pattern>:Mot:mfhu.RBV</pattern>
 				<name>mfhu</name>
 			</element>
 			<element>
-				<pattern>:Mot:mghu</pattern>
+				<pattern>:Mot:mghu.RBV</pattern>
 				<name>mghu</name>
 			</element>
 			<element>
-				<pattern>:Mot:mthu</pattern>
+				<pattern>:Mot:mthu.RBV</pattern>
 				<name>mthu</name>
 			</element>
 			<element>
-				<pattern>:Mot:m1hu</pattern>
+				<pattern>:Mot:m1hu.RBV</pattern>
 				<name>m1hu</name>
 			</element>
 		</condition>
