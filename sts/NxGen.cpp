@@ -2600,7 +2600,7 @@ NxGen::parseSTSConfigFile
                                         group.elements ) )
                                 {
                                     std::string err =
-                                        "Duplicate Element Name";
+                                        "Duplicate Element Name ";
                                     err += "\"" + element.name + "\"";
                                     err += " in STS Config Group \""
                                         + group.name + "\"";
@@ -2912,7 +2912,7 @@ NxGen::parseSTSConfigFile
                                                 group.elements ) )
                                         {
                                             std::string err =
-                                                "Duplicate Element Name";
+                                                "Duplicate Element Name ";
                                             err += "\"" + element.name
                                                 + "\"";
                                             err +=
@@ -2936,7 +2936,7 @@ NxGen::parseSTSConfigFile
                                                 condition.elements ) )
                                         {
                                             std::string err =
-                                                "Duplicate Element Name";
+                                                "Duplicate Element Name ";
                                             err += "\"" + element.name
                                                 + "\"";
                                             err +=
