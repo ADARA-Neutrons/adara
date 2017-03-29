@@ -12,6 +12,7 @@
 #include "StreamParser.h"
 #include "ADARAUtils.h"
 #include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
 
 
 #define CHARGE_UNITS "picoCoulombs"
@@ -1284,11 +1285,13 @@ private:
                     // give syslog a chance...
                     //usleep(30000);
 
-                    // Does PV Match This Group's Pattern?
-                    if ( this->m_internal_name.find( P )
-                            != std::string::npos
-                        || this->m_internal_connection.find( P )
-                            != std::string::npos )
+                    // Does PV Match This Group's Regex Pattern?
+                    boost::regex expr( P );
+                    boost::smatch subs;
+                    if ( boost::regex_search(
+                            this->m_internal_name, subs, expr )
+                        || boost::regex_search(
+                            this->m_internal_connection, subs, expr ) )
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO,
@@ -1413,10 +1416,12 @@ private:
                         //usleep(30000);
 
                         // Does PV Match This Group's Conditional Pattern?
-                        if ( this->m_internal_name.find( P )
-                                != std::string::npos
-                            || this->m_internal_connection.find( P )
-                                != std::string::npos )
+                        boost::regex expr( P );
+                        boost::smatch subs;
+                        if ( boost::regex_search(
+                                this->m_internal_name, subs, expr )
+                            || boost::regex_search(
+                                this->m_internal_connection, subs, expr ) )
                         {
                             // REMOVE ME...
                             syslog( LOG_INFO,
