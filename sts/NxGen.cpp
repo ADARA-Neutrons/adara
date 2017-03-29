@@ -2581,27 +2581,40 @@ NxGen::parseSTSConfigFile
                                 }
                             }
 
+                            // For Element Pattern Logging...
+                            std::stringstream ss;
+                            for ( uint32_t i=0 ;
+                                    i < element.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.patterns[i];
+                            }
+
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( element.patterns.size()
                                     && element.name.size() )
                             {
-                                // TODO Check for Existing Element by Name?
-                                // if ( findGroupElementByName( group,
-                                //      element.name ) )
-                                // {
-                                // }
-                                // else
-                                // {
+                                // Check for Existing Element by Name...
+                                if ( findGroupElementByName( element.name,
+                                        group.elements ) )
+                                {
+                                    std::string err =
+                                        "Duplicate Element Name";
+                                    err += "\"" + element.name + "\"";
+                                    err += " in STS Config Group \""
+                                        + group.name + "\"";
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                        g_pid, "STS Error:", err.c_str(),
+                                        "Ignoring",
+                                        "patterns", ss.str().c_str(),
+                                        "name", element.name.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                                else
+                                {
                                     // REMOVE ME...
-                                    std::stringstream ss;
-                                    for ( uint32_t i=0 ;
-                                            i < element.patterns.size();
-                                            i++ )
-                                    {
-                                        if ( i ) ss << ", ";
-                                        ss << element.patterns[i];
-                                    }
                                     syslog( LOG_INFO,
                                         "[%i] %s \"%s\" - %s=[%s] %s=[%s]",
                                         g_pid,
@@ -2612,20 +2625,13 @@ NxGen::parseSTSConfigFile
                                     usleep(30000); // give syslog a chance
 
                                     group.elements.push_back( element );
-                                // }
+                                }
                             }
                             else
                             {
                                 std::string err = "Incomplete Element";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
-                                std::stringstream ss;
-                                for ( uint32_t i=0 ;
-                                        i < element.patterns.size(); i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << element.patterns[i];
-                                }
                                 syslog( LOG_ERR,
                                     "[%i] %s %s - %s %s=[%s] %s=[%s]",
                                     g_pid, "STS Error:", err.c_str(),
@@ -2883,36 +2889,85 @@ NxGen::parseSTSConfigFile
                                         }
                                     }
 
+                                    // For Element Pattern Logging...
+                                    std::stringstream ss;
+                                    for ( uint32_t i=0 ;
+                                            i < element.patterns.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.patterns[i];
+                                    }
+
                                     // Add Element to Group Condition...
                                     // (If Required Fields are Present,
                                     // Else Error)
                                     if ( element.patterns.size()
                                             && element.name.size() )
                                     {
-                                        // TODO Check for Existing Element
-                                        // by Name?
-                                        // if ( findGroupElementByName(
-                                        //     group, element.name ) )
-                                        // {
-                                        // }
-                                        // else
-                                        // {
+                                        // Check for Existing Element
+                                        // in Group by Name?
+                                        if ( findGroupElementByName(
+                                                element.name,
+                                                group.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STS Config Group \""
+                                                + group.name + "\"";
+                                            syslog( LOG_ERR,
+                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                                g_pid, "STS Error:",
+                                                err.c_str(), "Ignoring",
+                                                "patterns",
+                                                ss.str().c_str(),
+                                                "name",
+                                                element.name.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        // Check for Existing Element
+                                        // in Condition by Name?
+                                        else if ( findGroupElementByName(
+                                                element.name,
+                                                condition.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STS Config Group \""
+                                                + group.name + "\"";
+                                            err += " Condition \""
+                                                + condition.name + "\"";
+                                            syslog( LOG_ERR,
+                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                                g_pid, "STS Error:",
+                                                err.c_str(), "Ignoring",
+                                                "patterns",
+                                                ss.str().c_str(),
+                                                "name",
+                                                element.name.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        else
+                                        {
                                             // REMOVE ME...
-                                            std::stringstream ss;
-                                            for ( uint32_t i=0 ;
-                                                    i < element.patterns
-                                                        .size();
-                                                    i++ )
-                                            {
-                                                if ( i ) ss << ", ";
-                                                ss << element.patterns[i];
-                                            }
+                                            std::string info =
+                                                "STS Config Adding";
+                                            info += " Element";
+                                            info += " to Condition \""
+                                                + condition.name + "\"";
+                                            info += " for Group \""
+                                                + group.name + "\"";
                                             syslog( LOG_INFO,
-                                    "[%i] %s %s \"%s\" - %s=[%s] %s=[%s]",
-                                                g_pid,
-                                            "STS Config Adding Element",
-                                                "to Condition for Group",
-                                                group.name.c_str(),
+                                            "[%i] %s - %s=[%s] %s=[%s]",
+                                                g_pid, info.c_str(),
                                                 "patterns",
                                                 ss.str().c_str(),
                                                 "name",
@@ -2922,23 +2977,16 @@ NxGen::parseSTSConfigFile
 
                                             condition.elements.push_back(
                                                 element );
-                                        // }
+                                        }
                                     }
                                     else
                                     {
-                                        std::string err =
-                                            "Incomplete Condition Element";
-                                        err += " in STS Config Group \""
+                                        std::string err = "Incomplete";
+                                        err += " Condition \""
+                                            + condition.name + "\"";
+                                        err += " Element in STS Config";
+                                        err += " Group \""
                                             + group.name + "\"";
-                                        std::stringstream ss;
-                                        for ( uint32_t i=0 ;
-                                                i < element.patterns
-                                                    .size();
-                                                i++ )
-                                        {
-                                            if ( i ) ss << ", ";
-                                            ss << element.patterns[i];
-                                        }
                                         syslog( LOG_ERR,
                                         "[%i] %s %s - %s %s=[%s] %s=[%s]",
                                             g_pid, "STS Error:",

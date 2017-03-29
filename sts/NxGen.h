@@ -180,6 +180,18 @@ private:
         uint32_t                    lastIndex;
     };
 
+    // Look for an ElementInfo Struct by Name in an Existing Vector...
+    struct ElementInfo *findGroupElementByName( std::string name,
+            std::vector<struct ElementInfo> elements )
+    {
+        for ( uint32_t i=0 ; i < elements.size() ; i++ )
+        {
+            if ( !(name.compare( elements[i].name )) )
+                return( &(elements[i]) );
+        }
+        return( (struct ElementInfo *) NULL );
+    }
+
     // (STS Config) Conditional Structure to store information about
     // Conditionally-Included Elements in a Group Container...
     // (Contains a Vector of ElementInfo structures to be included...)
@@ -1244,11 +1256,12 @@ private:
             struct GroupInfo *G,                        ///< Config Group
             std::vector<struct ElementInfo> elements,   ///< Elements
             std::string device_str,                     ///< Device String
-            std::string pv_str                          ///< PV String
+            std::string pv_str,                         ///< PV String
+            std::string label                           ///< Logging Label
         )
         {
             // REMOVE ME...
-            //syslog( LOG_INFO, "[%i] Checking for Group %s...",
+            //syslog( LOG_INFO, "[%i] Checking for Group \"%s\"...",
                 //g_pid, G->name.c_str() );
             //usleep(30000); // give syslog a chance...
 
@@ -1264,8 +1277,10 @@ private:
                     std::string &P = E->patterns[p];
 
                     // REMOVE ME...
-                    //syslog( LOG_INFO, "[%i] %s Pattern Match (%s)",
-                        //g_pid, "Checking for Element", P.c_str() );
+                    //syslog( LOG_INFO,
+                        //"[%i] %s %sElement Pattern Match (%s)",
+                        //g_pid, "Checking for", label.c_str(),
+                        //P.c_str() );
                     // give syslog a chance...
                     //usleep(30000);
 
@@ -1276,11 +1291,12 @@ private:
                             != std::string::npos )
                     {
                         // REMOVE ME...
-                        syslog( LOG_INFO, "[%i] %s %s %s in %s %s %s %s",
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s in %s \"%s\" %s%s \"%s\"",
                             g_pid, "Pattern Match for",
                             device_str.c_str(), pv_str.c_str(),
                             "Group", G->name.c_str(),
-                            "Element Pattern", P.c_str());
+                            label.c_str(), "Element Pattern", P.c_str());
                         // give syslog a chance...
                         usleep(30000);
 
@@ -1290,7 +1306,7 @@ private:
                         if ( !(G->created) )
                         {
                             syslog( LOG_INFO,
-                                "[%i] %s %s, %s=[%s] %s=[%s]", g_pid,
+                                "[%i] %s \"%s\", %s=[%s] %s=[%s]", g_pid,
                                 "Creating Group", G->name.c_str(),
                                 "path", group_path.c_str(),
                                 "type", G->type.c_str() );
@@ -1367,7 +1383,7 @@ private:
 
                 // Check for Element Pattern Matches...
                 createSTSConfigGroupMatchingElements(
-                    G, G->elements, device_str, pv_str );
+                    G, G->elements, device_str, pv_str, "" );
 
                 // Skip Conditional Value Checks if No PV Values Set...
                 if ( !(this->m_last_value_set) )
@@ -1389,9 +1405,10 @@ private:
                         std::string &P = C->patterns[p];
 
                         // REMOVE ME...
-                        //syslog( LOG_INFO, "[%i] %s Pattern Match (%s)",
+                        //syslog( LOG_INFO,
+                            //"[%i] %s \"%s\" Pattern Match (%s)",
                             //g_pid, "Checking for Conditional",
-                            //P.c_str() );
+                            //C->name.c_str(), P.c_str() );
                         // give syslog a chance...
                         //usleep(30000);
 
@@ -1403,11 +1420,12 @@ private:
                         {
                             // REMOVE ME...
                             syslog( LOG_INFO,
-                                "[%i] %s %s %s in %s %s %s %s",
+                        "[%i] %s %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
                                 g_pid, "Pattern Match for",
                                 device_str.c_str(), pv_str.c_str(),
                                 "Group", G->name.c_str(),
-                                "Conditional Pattern", P.c_str());
+                                "Conditional", C->name.c_str(),
+                                "Pattern", P.c_str());
                             // give syslog a chance...
                             usleep(30000);
 
@@ -1426,9 +1444,12 @@ private:
                                 // Condition Has Been Satisfied...! :-D
                                 C->is_set = true;
 
+                                std::string info = "Condition ";
+                                info += "\"" + C->name + "\"";
+                                info += " Set to True for";
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s %s in %s %s %s %s",
-                                    g_pid, "Condition Set True for",
+                                    "[%i] %s %s %s in %s \"%s\" %s \"%s\"",
+                                    g_pid, info.c_str(),
                                     device_str.c_str(), pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     "Conditional Pattern", P.c_str());
@@ -1468,7 +1489,7 @@ private:
                 // REMOVE ME...
                 //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
                     //g_pid, device_str.c_str(), pv_str.c_str(),
-                    //"Config Conditional Group Membership..." );
+                    //"STS Config Conditional Group Membership..." );
                 //usleep(30000); // give syslog a chance...
 
                 // Check Each Config Group in Turn for a
@@ -1494,15 +1515,11 @@ private:
 
                         if ( C->is_set )
                         {
-                            syslog( LOG_INFO,
-                                "[%i] %s %s %s into Group %s...",
-                                g_pid, "Conditional Linking",
-                                device_str.c_str(), pv_str.c_str(),
-                                G->name.c_str() );
-                            usleep(30000); // give syslog a chance...
-
+                            std::string label = "Condition ";
+                            label += "\"" + C->name + "\" ";
                             createSTSConfigGroupMatchingElements(
-                                G, C->elements, device_str, pv_str );
+                                G, C->elements, device_str, pv_str,
+                                label );
                         }
                     }
                 }
