@@ -752,6 +752,8 @@ public:
     /// Virtual method to allow subclasses to write buffered PV values and time axis
     virtual void flushBuffers( struct RunMetrics *a_run_metrics = 0 ) = 0;
 
+    virtual void createSTSConfigConditionalGroups(void) = 0;
+
     std::string         m_device_name;  ///< Name of device that owns the PV
     std::string         m_name;         ///< Name of PV
     std::string         m_connection;   ///< PV Connection String
@@ -800,6 +802,10 @@ public:
     virtual void addToStats( T a_value ) = 0;
 
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
+
+    std::string m_last_enum_string; ///< Enum for Last Recorded PV Value
+    T   m_last_value;   ///< Last Recorded Value for PV (Conditional Groups)
+    bool    m_last_value_set;   ///< Has there been a "Last Value"...? ;-D
 };
 
 
