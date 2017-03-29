@@ -1466,10 +1466,10 @@ private:
                 // Search for Activated STS Config Conditional Groups
 
                 // REMOVE ME...
-                syslog( LOG_INFO, "[%i] Checking %s %s for %s",
-                    g_pid, device_str.c_str(), pv_str.c_str(),
-                    "Config Conditional Group Membership..." );
-                usleep(30000); // give syslog a chance...
+                //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
+                    //g_pid, device_str.c_str(), pv_str.c_str(),
+                    //"Config Conditional Group Membership..." );
+                //usleep(30000); // give syslog a chance...
 
                 // Check Each Config Group in Turn for a
                 // Conditional Pattern Match on This PV...
@@ -1483,10 +1483,10 @@ private:
                         continue;
 
                     // REMOVE ME...
-                    syslog( LOG_INFO,
-                        "[%i] Checking for Conditional Group %s...",
-                        g_pid, G->name.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    //syslog( LOG_INFO,
+                        //"[%i] Checking for Conditional Group %s...",
+                        //g_pid, G->name.c_str() );
+                    //usleep(30000); // give syslog a chance...
 
                     for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
                     {
@@ -1494,6 +1494,13 @@ private:
 
                         if ( C->is_set )
                         {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s %s into Group %s...",
+                                g_pid, "Conditional Linking",
+                                device_str.c_str(), pv_str.c_str(),
+                                G->name.c_str() );
+                            usleep(30000); // give syslog a chance...
+
                             createSTSConfigGroupMatchingElements(
                                 G, C->elements, device_str, pv_str );
                         }
