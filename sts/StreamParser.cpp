@@ -3290,7 +3290,7 @@ StreamParser::receivedInfo( InfoBit a_bit )
 
 /*! \brief This method performs final stream processing.
  *
- * This method is called after the internal processing state progreses
+ * This method is called after the internal processing state progresses
  * to "DONE_PROCESSING" and permits a variety of final processing tasks
  * to be performed (primarily flushing data buffers). This method also
  * calls the virtual finalize() method to allow the stream adapter to
@@ -3390,13 +3390,23 @@ StreamParser::finalizeStreamProcessing()
         writeDeviceEnums( ienum->first, ienum->second );
     }
 
-    // Write any remaining data in PV buffers
+    // Write Any Remaining Data in PV Buffers
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
             ipv != m_pvs_by_key.end(); ++ipv )
     {
         // *Always* Flush Buffers at End, to Get Run Metrics for PVs...!
         ipv->second->flushBuffers( &m_run_metrics );
+    }
+
+    // Write Any Conditional STS Config Group Elements,
+    // Now that All the PV Buffers have been Processed,
+    // and Any Conditional Flags have been Set... :-D
+
+    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
+            ipv != m_pvs_by_key.end(); ++ipv )
+    {
+        ipv->second->createSTSConfigConditionalGroups();
     }
 
     // Let adapter do anything else it wants to
