@@ -1023,7 +1023,10 @@ DeviceAgent::epicsConnectionHandler(
                             &epicsEventCallback, this,
                             &ich->second.m_evid ) == ECA_NORMAL )
                     {
-                        syslog( LOG_INFO, "%s: Subscription created%s%s",
+                        // Log as "Error" to Trigger Email Notification
+                        // (as an Accompaniment to Subscription Down...)
+                        syslog( LOG_ERR, "%s %s: Subscription created%s%s",
+                            "PVSD ERROR:",
                             "DeviceAgent::epicsConnectionHandler()",
                             deviceStr.c_str(), pvStr.c_str() );
                         usleep(33333); // give syslog a chance...
