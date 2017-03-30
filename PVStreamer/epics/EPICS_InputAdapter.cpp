@@ -28,10 +28,11 @@ void ca_exception_handler( struct exception_handler_args args )
     const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
 
     syslog( LOG_ERR,
-        "%s %s: %s! %s=[%s] - %s %s=[%s] %s=%ld %s=[%s] %s=%ld [%s]",
+        "%s %s: %s! %s=[%s] - %s %s=[%s] %s=%ld %s=%ld %s=[%s] %s=%ld [%s]",
         "PVSD ERROR:", "EPICSInputAdapter::ca_exception_handler()",
         "Caught EPICS Exception", "Context", args.ctx,
-        "with Request", "ChannelId", pName, "Operation", args.op,
+        "with Request", "ChannelId", pName,
+        "Stat", args.stat, "Operation", args.op,
         "DataType", dbr_type_to_text( args.type ), "Count", args.count,
         "Continuing...!" );
     usleep(33333); // give syslog a chance...
