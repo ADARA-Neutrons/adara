@@ -26,7 +26,7 @@ prog=smsd
 lockfile=/var/lock/subsys/$prog
 
 # Get Base EPICS Executable Path (for potential caRepeater startup)
-export EPICS_BASE="/home/controls/epics/base/master"
+export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
 if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
 	export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
 else
