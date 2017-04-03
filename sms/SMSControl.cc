@@ -485,7 +485,7 @@ SMSControl::SMSControl() :
 
 	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 
-	// Notify the IPTS-ITEMS IOC that "We're Alive", and request that
+	// Notify the IPTS-ITEMS IOC that "We're Alive", and request that it
 	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
 }
 
