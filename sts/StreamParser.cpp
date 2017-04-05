@@ -14,6 +14,11 @@ using namespace std;
 
 namespace STS {
 
+RateLimitedLogging::History RLLHistory_StreamParserH;
+
+// Rate-Limited Logging IDs...
+#define RLL_PV_VALUE_UPDATE_SAWTOOTH  0
+
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x1000000
 
@@ -3051,9 +3056,146 @@ StreamParser::rxPacket
 }
 
 
-//---------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------
 // ADARA Variable (uint32) packet processing
-//---------------------------------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------
+// StreamParser Inline / Template Method Implementations
+//------------------------------------------------------------------------
+
+/*! \brief Processes a process variable value update from the input stream.
+ *  \param a_device_id - Device ID of process variable
+ *  \param a_pv_id - Process variable ID
+ *  \param a_value - Value of process variable
+ *  \param a_timestamp - Timestamp of value update from stream
+ *
+ * This method processes value updates for process variables (PVs) from the
+ * input ADARA stream. If the PV has been defined by a device descriptor
+ * packet (DDP), then an entry will be present in the StreamParser PV
+ * container - allowing the specified value to be stored in the associated
+ * value buffer of the PV. This buffer will be flushed to the stream
+ * adapter when full. Statistics for the PV are also updated when this
+ * method is called.
+ */
+template<class T>
+void
+StreamParser::pvValueUpdate
+(
+    Identifier      a_device_id,
+    Identifier      a_pv_id,
+    T               a_value,
+    const timespec &a_timestamp
+)
+{
+    PVKey   key(a_device_id,a_pv_id);
+
+    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find(key);
+    if ( ipv == m_pvs_by_key.end() )
+    {
+        THROW_TRACE( ERR_PV_NOT_DEFINED,
+            "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id
+                << " not defined." )
+    }
+
+    PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );
+    if ( !pvinfo )
+    {
+        THROW_TRACE( ERR_CAST_FAILED,
+            "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id
+                << " not of correct type." )
+    }
+
+    uint64_t ts_nano = timespec_to_nsec( a_timestamp );
+
+    // Only process this update if the timestamp is newer than the
+    // last time. (m_last_time is initialized to 0, so first real update
+    // will succeed.) This will reject PV updates that are at negative time
+    // displacements and filter-out duplicate updates caused by
+    // SMS file boundary crossings.
+    if ( ts_nano > pvinfo->m_last_time )
+    {
+        // Relative time of update in seconds from first pulse of run
+        double t = 0;
+
+        // Note: if first pulse has not arrived, truncate all PV times to 0
+        if ( m_pulse_info.start_time )
+        {
+            // Truncate negative time offsets to 0
+            if ( ts_nano > m_pulse_info.start_time )
+            {
+                t = ( ts_nano - m_pulse_info.start_time )
+                    / NANO_PER_SECOND_D;
+            }
+            else if ( pvinfo->m_value_buffer.size() )
+            {
+                // Because the time value is 0, erase any values recvd
+                // before now to avoid duplicate time entries.
+                pvinfo->m_value_buffer.clear();
+                pvinfo->m_time_buffer.clear();
+                pvinfo->m_stats.reset();
+            }
+        }
+        else if ( pvinfo->m_value_buffer.size() )
+        {
+            // If we recv multiple value updates before first pulse,
+            // keep only latest
+            pvinfo->m_value_buffer.clear();
+            pvinfo->m_time_buffer.clear();
+            pvinfo->m_stats.reset();
+        }
+
+        pvinfo->m_last_time = ts_nano;
+        pvinfo->m_value_buffer.push_back(a_value);
+        pvinfo->m_time_buffer.push_back(t);
+        pvinfo->addToStats(a_value);
+
+        // Check for buffer write
+        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+            pvinfo->flushBuffers(0);
+    }
+
+    // Log Value Update if Time Stamp Goes into the Past...! ;-D
+    // (Ignore the "Time Stamp Equals" case, as this happens All the Time
+    // on New SMS File boundaries...! ;-)
+    else if ( ts_nano < pvinfo->m_last_time )
+    {
+        /* Rate-limited logging of duplicate pulses */
+        std::stringstream ss;
+        ss << a_device_id << "." << a_pv_id;
+        std::string log_info;
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_PV_VALUE_UPDATE_SAWTOOTH, ss.str(),
+                60, 10, 500, log_info ) ) {
+            syslog( LOG_ERR,
+            "[%i] %s %s: %s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu",
+                g_pid, "STS Error:", log_info.c_str(),
+                "StreamParser::pvValueUpdate()",
+                "Variable Value Update SAWTOOTH",
+                a_device_id, a_pv_id,
+                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
+                (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL)
+            );
+            // give syslog a chance...
+            usleep(30000);
+        }
+    }
+}
+
+template void StreamParser::pvValueUpdate<uint32_t>(
+    Identifier a_device_id, Identifier a_pv_id,
+    uint32_t a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate<double>(
+    Identifier a_device_id, Identifier a_pv_id,
+    double a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate< std::vector<uint32_t> >(
+    Identifier a_device_id, Identifier a_pv_id,
+    std::vector<uint32_t> a_value, const timespec &a_timestamp );
+template void StreamParser::pvValueUpdate< std::vector<double> >(
+    Identifier a_device_id, Identifier a_pv_id,
+    std::vector<double> a_value, const timespec &a_timestamp );
 
 
 /*! \brief This method processes unsigned integer Variable Update ADARA packets
@@ -3529,6 +3671,7 @@ StreamParser::toPVType
     THROW_TRACE( ERR_UNEXPECTED_INPUT, err )
 }
 
+
 /*! \brief Method to retrieve an XML node's value with whitespace trimmed
  *  \param a_node - The xml node containing the value to retrieve
  *  \param a_value - A string to receive the value (empty if no value defined)
@@ -3544,6 +3687,54 @@ StreamParser::getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const
     else
         a_value = "";
 }
+
+
+/*! \brief Resets "In Use" Portion of Critical Path Data Buffer Vectors.
+ *  \param a_buffer - Data buffer vector
+ *  \param a_buffer_size - "In Use" size of data buffer vector
+ *
+ * This method quickly resets the currently "In Use" data elements
+ * in a Critical Path data buffer vector, by spewing in "-1"s
+ * to overwrite any potentially existing data values.
+ * (This method isn't strictly required, if we do our "size" bookkeeping
+ * correctly, but it's a sure-fire indicator if we do screw things up! :-)
+ */
+template<class T>
+void
+StreamParser::resetInUseVector
+(
+    std::vector<T>   a_buffer,
+    uint64_t         a_buffer_size
+)
+{
+    T *ptr = &a_buffer[0];
+
+    memset( (void *) ptr, 0xff, a_buffer_size * sizeof( T ) );
+}
+
+
+/*! \brief Gathers statistics from the specified ADARA packet.
+ *  \param a_pkt - An ADARA packet to analyze
+ *
+ * If stream statistics gathering is enabled, this method collects a number
+ * of metrics for the stream and each packet type (total packet count, min/
+ * max packet size with payload, total byte count for each packet type.
+ */
+inline void
+StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
+{
+    PktStats &stats = m_stats[a_pkt.type()];
+    ++stats.count;
+    if ( a_pkt.packet_length() < stats.min_pkt_size
+            || !stats.min_pkt_size )
+    {
+        stats.min_pkt_size = a_pkt.packet_length();
+    }
+    if ( a_pkt.packet_length() > stats.max_pkt_size )
+        stats.max_pkt_size = a_pkt.packet_length();
+    stats.total_size += a_pkt.packet_length();
+}
+
 
 } // End namespace STS
 
