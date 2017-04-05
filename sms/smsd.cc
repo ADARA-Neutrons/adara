@@ -465,7 +465,7 @@ int main(int argc, char **argv)
 
 	try {
 		release_parent(CHILD_INIT_SUCCESS);
-		for ( ;; ) {
+		for (;;) {
 			fileDescriptorManager.process(1000.0);
 		}
 	} catch (...) {
