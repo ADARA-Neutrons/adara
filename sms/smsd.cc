@@ -207,7 +207,7 @@ static void block_signals(void)
 	 * we handle them properly.
 	 */
 	sigset_t all;
-	sigfillset(&all);  // includes SIGPIPE, for write()/sendfile()... Whew!
+	sigfillset(&all); // includes SIGPIPE, for write()/sendfile()... Whew!
 	sigdelset(&all, SIGCONT);
 
 	/* Don't block error conditions */
