@@ -19,8 +19,16 @@ public:
 
 	virtual ~Parser();
 
+	struct timespec last_start_read_time;
+	struct timespec last_last_start_read_time;
+
+	struct timespec last_end_read_time;
+	struct timespec last_last_end_read_time;
+
 	ssize_t last_bytes_read;
 	ssize_t last_last_bytes_read;
+	ssize_t last_read_errno;
+	ssize_t last_last_read_errno;
 	ssize_t last_pkts_parsed;
 	ssize_t last_last_pkts_parsed;
 	unsigned long last_total_bytes;
