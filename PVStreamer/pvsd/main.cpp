@@ -236,6 +236,8 @@ int main(int argc, char *argv[])
     bool            track_logged = false;
     bool            daemon = false;
     ::ADARA::ComBus::Connection *combus = 0;
+    PVS::ADARA::OutputAdapter *output = 0;
+    PVS::EPICS::InputAdapter *input = 0;
 
     // Parse program options
 
@@ -304,11 +306,11 @@ int main(int argc, char *argv[])
         StreamService   streamer( 100, offset );
 
         // Attach ADARA output adapter
-        new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
+        output = new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
 
         // Create and attach EPICS input adapter
-        new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged,
-            timeout );
+        input = new PVS::EPICS::InputAdapter( streamer, epics_cfg,
+            track_logged, timeout );
 
         // If we mad it here as a daemon, signal parent that all is well
         if ( daemon )
@@ -317,10 +319,20 @@ int main(int argc, char *argv[])
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;
 
-        while( g_active )
+        while ( g_active )
         {
-            if (!(++count % 5))
+            if ( !( ++count % 5 ) )
+            {
                 combus->status( ::ADARA::ComBus::STATUS_OK );
+            }
+
+            if ( !( count % 60 ) )
+            {
+                syslog( LOG_INFO, "PVSD is Alive at %s - %u %s, %u %s.",
+                    output->serverAddr().c_str(),
+                    output->numConnected(), "Output Adapters Connected",
+                    output->numDevices(), "Output Devices Defined" );
+            }
 
             sleep(1);
         }
@@ -347,10 +359,15 @@ int main(int argc, char *argv[])
     if ( daemon && ret_code )
         signalParent( ret_code );
 
+    // Cleanup...
     if ( combus )
         delete combus;
+    if ( output )
+        delete output;
+    if ( input )
+        delete input;
 
-    syslog( LOG_INFO, "pvsd stopping." );
+    syslog( LOG_INFO, "PVSD Stopping..." );
     closelog();
 
     return ret_code;
