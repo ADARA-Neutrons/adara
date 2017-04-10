@@ -328,8 +328,11 @@ int main(int argc, char *argv[])
 
             if ( !( count % 60 ) )
             {
-                syslog( LOG_INFO, "PVSD is Alive at %s - %u %s, %u %s.",
+                syslog( LOG_INFO,
+                    "PVSD is Alive at %s - %u %s, %u %s, %u %s, %u %s.",
                     output->serverAddr().c_str(),
+                    input->numActiveDevices(), "Active Input Devices",
+                    input->numInactiveDevices(), "Inactive Input Devices",
                     output->numConnected(), "Output Adapters Connected",
                     output->numDevices(), "Output Devices Defined" );
             }
