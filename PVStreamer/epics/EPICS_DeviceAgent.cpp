@@ -723,7 +723,7 @@ DeviceAgent::controlThread()
             {
                 if ( ready == m_dev_desc->m_pvs.size() )
                 {
-                    // Defined device with ConfigManager - this will return
+                    // Define Device with ConfigManager - this will return
                     // the "real" DeviceDescriptor record
                     device_changed = false;
                     DeviceRecordPtr new_rec =
@@ -771,19 +771,20 @@ DeviceAgent::controlThread()
                         deviceStr = "Device ["
                             + m_dev_desc->m_name + "] - ";
 
-                    syslog( LOG_INFO, "%s: %sWaiting for %ld Pending PVs",
-                        "DeviceAgent::controlThread()", deviceStr.c_str(),
-                        m_dev_desc->m_pvs.size() - ready );
-                    usleep(33333); // give syslog a chance...
-
+                    // Collect Pending PV Names for _Single_ Log Message!
+                    stringstream ss;
                     for ( uint32_t i=0 ; i < pendingPVs.size() ; i++ )
                     {
-                        syslog( LOG_INFO,
-                            "%s: %sPending PV Connection <%s>",
-                            "DeviceAgent::controlThread()",
-                            deviceStr.c_str(), pendingPVs[i].c_str() );
-                        usleep(33333); // give syslog a chance...
+                        if ( i ) ss << " ";
+                        ss << "<" << pendingPVs[i] << ">";
                     }
+
+                    syslog( LOG_INFO,
+                        "%s: %sWaiting for %ld Pending PV Connections: %s",
+                        "DeviceAgent::controlThread()", deviceStr.c_str(),
+                        m_dev_desc->m_pvs.size() - ready,
+                        ss.str().c_str() );
+                    usleep(33333); // give syslog a chance...
 
                     // Save Number of "Ready" PVs, in case Device Hangs
                     // on Initialization (include pending count in signal)
