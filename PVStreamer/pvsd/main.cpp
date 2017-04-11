@@ -326,12 +326,25 @@ int main(int argc, char *argv[])
                 combus->status( ::ADARA::ComBus::STATUS_OK );
             }
 
-            if ( !( count % 60 ) )
+            if ( !( count % 300 ) )
             {
-                syslog( LOG_INFO,
-                    "PVSD is Alive at %s - %u %s, %u %s, %u %s, %u %s.",
-                    output->serverAddr().c_str(),
+                uint32_t partialCount, hungCount;
+                input->getDevicesStatus( partialCount, hungCount );
+
+                std::string logPrefix = "";
+                int logType = LOG_INFO;
+                if ( partialCount || hungCount )
+                {
+                    logPrefix = "PVSD ERROR: ";
+                    logType = LOG_ERR;
+                }
+
+                syslog( logType,
+                    "%s%s %s - %u %s (%u %s, %u %s), %u %s, %u %s, %u %s.",
+                    logPrefix.c_str(),
+                    "PVSD is Alive at", output->serverAddr().c_str(),
                     input->numActiveDevices(), "Active Input Devices",
+                    partialCount, "Partial", hungCount, "Hung",
                     input->numInactiveDevices(), "Inactive Input Devices",
                     output->numConnected(), "Output Adapters Connected",
                     output->numDevices(), "Output Devices Defined" );
