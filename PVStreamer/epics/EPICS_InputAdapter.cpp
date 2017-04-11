@@ -106,6 +106,34 @@ InputAdapter::numInactiveDevices()
 }
 
 
+/** \brief Method to return Device Status Counts
+  */
+void
+InputAdapter::getDevicesStatus( uint32_t &a_partialCount,
+        uint32_t &a_hungCount )
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    a_partialCount = 0;
+    a_hungCount = 0;
+
+    for ( map<string,DeviceAgent*>::iterator idev = m_dev_agents.begin();
+            idev != m_dev_agents.end(); ++idev )
+    {
+        uint32_t ready_pvs, total_pvs;
+        bool hung;
+
+        idev->second->deviceStatus( ready_pvs, total_pvs, hung );
+
+        if ( hung )
+            a_hungCount++;
+
+        else if ( ready_pvs < total_pvs )
+            a_partialCount++;
+    }
+}
+
+
 //=============================================================================
 //----- Private Methods -------------------------------------------------------
 

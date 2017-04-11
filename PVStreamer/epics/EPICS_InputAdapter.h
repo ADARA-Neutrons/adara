@@ -46,6 +46,8 @@ public:
     uint32_t        numActiveDevices();
     uint32_t        numInactiveDevices();
 
+    void            getDevicesStatus( uint32_t &a_partialCount,
+                        uint32_t &a_hungCount );
 private:
     void            configFileMonitorThread();
     void            startDevice( DeviceDescriptor *a_device );
