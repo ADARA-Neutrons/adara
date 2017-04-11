@@ -36,7 +36,8 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
         DeviceDescriptor *a_device,
         struct ca_client_context *a_epics_context,
         time_t a_device_init_timeout )
-    : m_stream_api(a_stream_api), m_dev_desc(0), m_defined(false),
+    : m_stream_api(a_stream_api), m_dev_desc(0),
+      m_defined(false), m_hung(false),
       m_state_changed(false), m_active(true),
       m_epics_context(a_epics_context),
       m_device_init_timeout(a_device_init_timeout)
@@ -112,7 +113,8 @@ DeviceAgent::update( DeviceDescriptor *a_device )
     m_defined = false;
 
     // Use transient descriptor first, then configured device second
-    DeviceDescriptor *old_desc = m_dev_desc?m_dev_desc:m_dev_record.get();
+    DeviceDescriptor *old_desc =
+        m_dev_desc ? m_dev_desc : m_dev_record.get();
 
     if ( old_desc )
     {
@@ -418,6 +420,26 @@ DeviceAgent::stopped(void)
 {
     boost::unique_lock<boost::mutex> lock(m_mutex);
     return m_chan_info.size() == 0;
+}
+
+
+/**
+ * @brief Method returns DeviceAgent status (Ready/Total PVs & Hung State)
+ * @param a_ready_pvs - Output number of "Ready" PVs for this Device
+ * @param a_total_pvs - Output Total number of PVs for this Device
+ * @param a_hung - Output whether this Device is Hung in Initialization
+ */
+void
+DeviceAgent::deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
+        bool &a_hung )
+{
+    // Return Number of "Ready" PVs and Total PVs Defined for Device...
+    DeviceDescriptor *dev = m_dev_desc ? m_dev_desc : m_dev_record.get();
+    a_ready_pvs = dev->m_ready;
+    a_total_pvs = dev->m_pvs.size();
+
+    // Return Device Hung Status
+    a_hung = m_hung;
 }
 
 
@@ -756,6 +778,9 @@ DeviceAgent::controlThread()
                     if ( device_changed )
                         sendCurrentValues();
 
+                    // Start with a Full House, Then Track for Status
+                    m_dev_record->m_ready = ready;
+
                     m_defined = true;
 
                     // Delete temporary device descriptor
@@ -869,6 +894,7 @@ DeviceAgent::monitorThread()
         switch( state )
         {
             case DSS_INITIALIZING: // Timer running - device not ready yet
+            {
                 // Is device ready? If so, stop timer and go to READY
                 if ( m_defined )
                 {
@@ -909,12 +935,16 @@ DeviceAgent::monitorThread()
                             m_dev_record.reset();
                         }
 
+                        m_hung = true;
+
                         // Change state
                         state = DSS_FAULT;
                     }
                 }
                 break;
+            }
             case DSS_FAULT: // Timer stopped - device not ready
+            {
                 // Is device ready?
                 // If so, retract signal and go to state READY
                 if ( m_defined )
@@ -932,11 +962,15 @@ DeviceAgent::monitorThread()
                     syslog( LOG_ERR, message.c_str() );
                     usleep(33333); // give syslog a chance...
 
+                    m_hung = false;
+
                     // Change state
                     state = DSS_READY;
                 }
                 break;
+            }
             case DSS_READY: // Timer stopped - device ready
+            {
                 // Did device get updated
                 if ( !m_defined )
                 {
@@ -949,6 +983,7 @@ DeviceAgent::monitorThread()
                     state = DSS_INITIALIZING;
                 }
                 break;
+            }
         }
     }
 
@@ -1044,6 +1079,10 @@ DeviceAgent::epicsConnectionHandler(
                         usleep(33333); // give syslog a chance...
                     }
 
+                    // Update Pseudo "Ready" Counter for Status Logging...
+                    if ( ich->second.m_device != NULL )
+                        (ich->second.m_device->m_ready)++;
+
                     ca_flush_io();
 
                     // Note: there is no way to know if the metadata
@@ -1105,6 +1144,10 @@ DeviceAgent::epicsConnectionHandler(
 
                     ich->second.m_subscribed = false;
                 }
+
+                // Update Pseudo "Ready" Counter for Status Logging...
+                if ( ich->second.m_device != NULL )
+                    (ich->second.m_device->m_ready)--;
 
                 // Set var state to disconnected
                 ich->second.m_pv_state.m_status = epicsAlarmComm;
