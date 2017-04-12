@@ -29,6 +29,8 @@
 #include <boost/make_shared.hpp>
 #include <stdint.h>
 
+#include <cadef.h>
+
 static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
 RateLimitedLogging::History RLLHistory_SMSControl;
@@ -487,6 +489,78 @@ SMSControl::SMSControl() :
 
 	// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
 	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
+
+	int ca_status;
+	if ( !( (ca_status =
+			ca_context_create( ca_disable_preemptive_callback ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_context_create( ca_disable_preemptive_callback ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Context Successfully Created");
+
+	std::string resendPVName = m_beamlineId + ":CS:IPTS_ITEMS:SMS:Resend";
+	chid resend_chid;
+	if ( !( (ca_status =
+			ca_create_channel( (const char *) resendPVName.c_str(),
+					0, 0, 0, &resend_chid ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_create_channel( " << resendPVName << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Channel for PV \""
+		<< resendPVName << "\" Successfully Created");
+
+	double timeout = 3.0; // Channel Access Pending I/O Timeout (seconds)
+	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in Channel Connect "
+			<< "ca_pend_io( timeout=" << timeout << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Pending I/O Successful for Channel Connect");
+
+	uint32_t resend = 1; // "Resend"... (tho value seems to not matter :-)
+	if ( !( (ca_status = ca_put( DBR_ENUM, resend_chid, &resend ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_put( DBR_ENUM, resend_chid=" << resend_chid
+				<< ", resend=" << resend << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend Channel Access Put Request Successful");
+
+	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in Put Request "
+			<< "ca_pend_io( timeout=" << timeout << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Pending I/O Successful, Resend Request Sent!");
 }
 
 SMSControl::~SMSControl()
