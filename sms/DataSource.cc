@@ -1371,7 +1371,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::DATA_DONE_TYPE:
 		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We don't care about these packets, just drop them */
-			return false;
+			/* (We still have to call their rxPacket() method
+			 * to increment the Discarded Packet counts tho...! ;-D) */
+			return Parser::rxPacket(pkt);
 
 		case ADARA::PacketType::RAW_EVENT_TYPE:
 		case ADARA::PacketType::MAPPED_EVENT_TYPE:
