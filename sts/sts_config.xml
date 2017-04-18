@@ -159,19 +159,19 @@
 			<value_string>PG</value_string><!-- 1 -->
 			<element>
 				<pattern>:Mot:mfpg$</pattern>
-				<name>mfpg</name>
+				<name>mf</name>
 			</element>
 			<element>
 				<pattern>:Mot:mgpg$</pattern>
-				<name>mgpg</name>
+				<name>mg</name>
 			</element>
 			<element>
 				<pattern>:Mot:mtpg$</pattern>
-				<name>mtpg</name>
+				<name>mt</name>
 			</element>
 			<element>
 				<pattern>:Mot:m1pg$</pattern>
-				<name>m1pg</name>
+				<name>m1</name>
 			</element>
 		</condition>
 		<!-- "HU" Mode Conditional Focus Array PV Elements -->
@@ -183,19 +183,19 @@
 			<!-- or we could do a "not_value" tag of "1" here... -->
 			<element>
 				<pattern>:Mot:mfhu$</pattern>
-				<name>mfhu</name>
+				<name>mf</name>
 			</element>
 			<element>
 				<pattern>:Mot:mghu$</pattern>
-				<name>mghu</name>
+				<name>mg</name>
 			</element>
 			<element>
 				<pattern>:Mot:mthu$</pattern>
-				<name>mthu</name>
+				<name>mt</name>
 			</element>
 			<element>
 				<pattern>:Mot:m1hu$</pattern>
-				<name>m1hu</name>
+				<name>m1</name>
 			</element>
 		</condition>
 	</group>
