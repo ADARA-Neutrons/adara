@@ -14,130 +14,57 @@
 
 	<version>0.1.1</version>
 
-	<!-- Chopper Groups -->
+	<!-- (Indexed) Chopper Groups -->
 	<group>
-		<name>chopper1</name>
+		<name>chopper[XXX_INDEX_XXX]</name>
 		<path>/entry/instrument</path>
 		<type>NXdisk_chopper</type>
 		<!-- EPICS-based Chopper PV Elements -->
 		<element>
-			<pattern>:Chop:Skf1:DriveError</pattern>
+			<pattern>:Chop:Skf\d+:DriveError</pattern>
+			<index>%*[^:]:Chop:Skf%d:DriveError</index>
 			<name>drive_error</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf1:MotorSpeed</pattern>
-			<pattern>Speed1</pattern>
+			<pattern>:Chop:Skf\d+:MotorSpeed</pattern>
+			<index>%*[^:]:Chop:Skf%d:MotorSpeed</index>
+			<pattern>Speed\d+</pattern>
+			<index>Speed%d</index>
 			<name>rotation_speed</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf1:PhaseAccuracy</pattern>
-			<pattern>Phase1</pattern>
+			<pattern>:Chop:Skf\d+:PhaseAccuracy</pattern>
+			<index>%*[^:]:Chop:Skf%d:PhaseAccuracy</index>
+			<pattern>Phase\d+</pattern>
+			<index>Phase%d</index>
 			<name>phase</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf1:PhaseLocked</pattern>
+			<pattern>:Chop:Skf\d+:PhaseLocked</pattern>
+			<index>%*[^:]:Chop:Skf%d:PhaseLocked</index>
 			<name>phase_locked</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf1:SpeedSet</pattern>
+			<pattern>:Chop:Skf\d+:SpeedSet</pattern>
+			<index>%*[^:]:Chop:Skf%d:SpeedSet</index>
 			<name>speed_set</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf1:SpeedUserReq</pattern>
-			<pattern>SpeedRequest1</pattern>
+			<pattern>:Chop:Skf\d+:SpeedUserReq</pattern>
+			<index>%*[^:]:Chop:Skf%d:SpeedUserReq</index>
+			<pattern>SpeedRequest\d+</pattern>
+			<index>SpeedRequest%d</index>
 			<name>speed_request</name>
 		</element>
 		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
-			<pattern>ChopperStatus1</pattern>
+			<pattern>ChopperStatus\d+</pattern>
+			<index>ChopperStatus%d</index>
 			<name>status</name>
 		</element>
 		<element>
-			<pattern>PhaseRequest1</pattern>
-			<name>phase_request</name>
-		</element>
-	</group>
-	<group>
-		<name>chopper2</name>
-		<path>/entry/instrument</path>
-		<type>NXdisk_chopper</type>
-		<!-- EPICS-based Chopper PV Elements -->
-		<element>
-			<pattern>:Chop:Skf2:DriveError</pattern>
-			<name>drive_error</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf2:MotorSpeed</pattern>
-			<pattern>Speed2</pattern>
-			<name>rotation_speed</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf2:PhaseAccuracy</pattern>
-			<pattern>Phase2</pattern>
-			<name>phase</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf2:PhaseLocked</pattern>
-			<name>phase_locked</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf2:SpeedSet</pattern>
-			<name>speed_set</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf2:SpeedUserReq</pattern>
-			<pattern>SpeedRequest2</pattern>
-			<name>speed_request</name>
-		</element>
-		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
-		<element>
-			<pattern>ChopperStatus2</pattern>
-			<name>status</name>
-		</element>
-		<element>
-			<pattern>PhaseRequest2</pattern>
-			<name>phase_request</name>
-		</element>
-	</group>
-	<group>
-		<name>chopper3</name>
-		<path>/entry/instrument</path>
-		<type>NXdisk_chopper</type>
-		<!-- EPICS-based Chopper PV Elements -->
-		<element>
-			<pattern>:Chop:Skf3:DriveError</pattern>
-			<name>drive_error</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf3:MotorSpeed</pattern>
-			<pattern>Speed3</pattern>
-			<name>rotation_speed</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf3:PhaseAccuracy</pattern>
-			<pattern>Phase3</pattern>
-			<name>phase</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf3:PhaseLocked</pattern>
-			<name>phase_locked</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf3:SpeedSet</pattern>
-			<name>speed_set</name>
-		</element>
-		<element>
-			<pattern>:Chop:Skf3:SpeedUserReq</pattern>
-			<pattern>SpeedRequest3</pattern>
-			<name>speed_request</name>
-		</element>
-		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
-		<element>
-			<pattern>ChopperStatus3</pattern>
-			<name>status</name>
-		</element>
-		<element>
-			<pattern>PhaseRequest3</pattern>
+			<pattern>PhaseRequest\d+</pattern>
+			<index>PhaseRequest%d</index>
 			<name>phase_request</name>
 		</element>
 	</group>
