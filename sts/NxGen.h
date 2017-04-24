@@ -177,6 +177,7 @@ private:
     struct ElementInfo
     {
         std::vector<std::string>    patterns;
+        std::vector<std::string>    indices;
         std::string                 name;
         uint32_t                    lastIndex;
     };
@@ -208,6 +209,9 @@ private:
         bool                            is_set;
     };
 
+    // (STS Config) Group Name Embedded Index Specifier...
+    static std::string GroupNameIndex;
+
     // (STS Config) Group Container Structure to store information about
     // collections of NeXus/DASlogs data elements to be collected together
     // and Linked into a Group, at a specific location in the NeXus File.
@@ -218,7 +222,9 @@ private:
         std::string                         type;
         std::vector<struct ElementInfo>     elements;
         std::vector<struct ConditionInfo>   conditions;
+        std::set<std::string>               createdIndices;
         bool                                created;
+        bool                                hasIndex;
     };
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
@@ -1261,6 +1267,8 @@ private:
             std::string label                           ///< Logging Label
         )
         {
+            std::string dev_pv_str = device_str + " " + pv_str;
+
             // REMOVE ME...
             //syslog( LOG_INFO, "[%i] Checking for Group \"%s\"...",
                 //g_pid, G->name.c_str() );
@@ -1277,11 +1285,12 @@ private:
                 {
                     std::string &P = E->patterns[p];
 
+                    std::string patt_str = label.c_str();
+                    patt_str += "Element Pattern \"" + P + "\"";
+
                     // REMOVE ME...
-                    //syslog( LOG_INFO,
-                        //"[%i] %s %sElement Pattern Match (%s)",
-                        //g_pid, "Checking for", label.c_str(),
-                        //P.c_str() );
+                    //syslog( LOG_INFO, "[%i] %s %s Match",
+                        //g_pid, "Checking for", patt_str.c_str() );
                     // give syslog a chance...
                     //usleep(30000);
 
@@ -1295,30 +1304,160 @@ private:
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO,
-                            "[%i] %s %s %s in %s \"%s\" %s%s \"%s\"",
-                            g_pid, "Pattern Match for",
-                            device_str.c_str(), pv_str.c_str(),
-                            "Group", G->name.c_str(),
-                            label.c_str(), "Element Pattern", P.c_str());
+                            "[%i] %s %s in %s \"%s\" %s",
+                            g_pid, "Pattern Match for", dev_pv_str.c_str(),
+                            "Group", G->name.c_str(), patt_str.c_str() );
                         // give syslog a chance...
                         usleep(30000);
 
-                        std::string group_path = G->path + "/" + G->name;
+                        std::string group_path;
 
-                        // Create Group if Not Yet Created
-                        if ( !(G->created) )
+                        // Indexed Groups...
+                        if ( G->hasIndex )
                         {
-                            syslog( LOG_INFO,
-                                "[%i] %s \"%s\", %s=[%s] %s=[%s]", g_pid,
-                                "Creating Group", G->name.c_str(),
-                                "path", group_path.c_str(),
-                                "type", G->type.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            std::string indexedName;
 
-                            m_nxgen.makeGroup( group_path, G->type );
+                            uint32_t index = -1;
 
-                            G->created = true;
+                            bool gotIndex = false;
+
+                            for ( uint32_t i=0 ;
+                                    i < E->indices.size() && !gotIndex ;
+                                    i++ )
+                            {
+                                std::string &I = E->indices[i];
+
+                                if ( sscanf( this->m_internal_name.c_str(),
+                                        I.c_str(), &index ) == 1 )
+                                {
+                                    syslog( LOG_INFO,
+                                    "[%i] Index \"%s\" %s \"%s\" as %d",
+                                        g_pid, I.c_str(),
+                                        "Matched Internal Name",
+                                        this->m_internal_name.c_str(),
+                                        index );
+
+                                    gotIndex = true;
+                                }
+
+                                else if ( sscanf(
+                                        this->m_internal_connection
+                                            .c_str(),
+                                        I.c_str(), &index ) == 1 )
+                                {
+                                    syslog( LOG_INFO,
+                                    "[%i] Index \"%s\" %s \"%s\" as %d",
+                                        g_pid, I.c_str(),
+                                        "Matched Internal Connection",
+                                        this->m_internal_connection
+                                            .c_str(), index );
+
+                                    gotIndex = true;
+                                }
+                            }
+
+                            if ( gotIndex )
+                            {
+                                size_t start =
+                                    G->name.find( GroupNameIndex );
+
+                                if ( start == std::string::npos )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s \"%s\" for %s (%s)",
+                                        g_pid, "STS Error:",
+                                        "Index Not Found in Group Name",
+                                        G->name.c_str(),
+                                        dev_pv_str.c_str(),
+                                        patt_str.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    continue;
+                                }
+
+                                else
+                                {
+                                    std::stringstream ss;
+                                    ss << index;
+
+                                    indexedName = G->name;
+                                    indexedName.replace( start,
+                                        GroupNameIndex.length(),
+                                        ss.str() );
+
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s as %s \"%s\" %s",
+                                        g_pid,
+                                        "Indexed Group Name Found for",
+                                        dev_pv_str.c_str(),
+                                        "Group", indexedName.c_str(),
+                                        patt_str.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    group_path =
+                                        G->path + "/" + indexedName;
+                                }
+                            }
+
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s %s in %s \"%s\" %s",
+                                    g_pid, "STS Error:",
+                                    "No Index Found for",
+                                    dev_pv_str.c_str(),
+                                    "Group", G->name.c_str(),
+                                    patt_str.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+
+                                continue;
+                            }
+
+                            // Create Group if Not Yet Created...
+                            if ( G->createdIndices.find( indexedName )
+                                    == G->createdIndices.end() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                    g_pid,
+                                    "Creating Indexed Group",
+                                    indexedName.c_str(),
+                                    "path", group_path.c_str(),
+                                    "type", G->type.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+
+                                m_nxgen.makeGroup( group_path, G->type );
+
+                                G->createdIndices.insert( indexedName );
+                            }
+                        }
+
+                        // Non-Indexed Groups...
+                        else
+                        {
+                            group_path = G->path + "/" + G->name;
+
+                            // Create Group if Not Yet Created
+                            if ( !(G->created) )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                    g_pid,
+                                    "Creating Group", G->name.c_str(),
+                                    "path", group_path.c_str(),
+                                    "type", G->type.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+
+                                m_nxgen.makeGroup( group_path, G->type );
+
+                                G->created = true;
+                            }
                         }
 
                         // Link PV Log into Group...

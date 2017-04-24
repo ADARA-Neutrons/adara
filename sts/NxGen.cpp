@@ -17,6 +17,8 @@
 
 using namespace std;
 
+std::string NxGen::GroupNameIndex = "[XXX_INDEX_XXX]";
+
 /*! \brief Constructor for NxGen class.
  *
  * This constructor builds an NxGen instance using the options specified. If the nexus filename is empty, then no
@@ -2398,6 +2400,8 @@ NxGen::parseSTSConfigFile
 
                     group.created = false;
 
+                    group.hasIndex = false;
+
                     conditionIndex = 0;
 
                     // REMOVE ME...
@@ -2441,6 +2445,17 @@ NxGen::parseSTSConfigFile
                             }
 
                             group.name = value;
+
+                            if ( group.name.find( NxGen::GroupNameIndex )
+                                    != std::string::npos )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group is Indexed! [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+
+                                group.hasIndex = true;
+                            }
                         }
 
                         else if ( xmlStrcmp( lev2->name,
@@ -2537,6 +2552,21 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"index" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                    "[%i] %s Element Index #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        element.indices.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    element.indices.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"name" ) == 0 )
                                 {
                                     // Already Got An Element Name...?
@@ -2584,16 +2614,30 @@ NxGen::parseSTSConfigFile
 
                             // For Element Pattern Logging...
                             std::stringstream ss;
+                            ss << "patterns=[";
                             for ( uint32_t i=0 ;
                                     i < element.patterns.size(); i++ )
                             {
                                 if ( i ) ss << ", ";
                                 ss << element.patterns[i];
                             }
+                            ss << "]";
+
+                            // For Element Index Logging...
+                            ss << " indices=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.indices.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.indices[i];
+                            }
+                            ss << "]";
 
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( element.patterns.size()
+                                    && ( !(group.hasIndex)
+                                        || element.indices.size() )
                                     && element.name.size() )
                             {
                                 // Check for Existing Element by Name...
@@ -2606,10 +2650,9 @@ NxGen::parseSTSConfigFile
                                     err += " in STS Config Group \""
                                         + group.name + "\"";
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                        "[%i] %s %s - %s %s %s=[%s]",
                                         g_pid, "STS Error:", err.c_str(),
-                                        "Ignoring",
-                                        "patterns", ss.str().c_str(),
+                                        "Ignoring", ss.str().c_str(),
                                         "name", element.name.c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
@@ -2617,11 +2660,11 @@ NxGen::parseSTSConfigFile
                                 {
                                     // REMOVE ME...
                                     syslog( LOG_INFO,
-                                        "[%i] %s \"%s\" - %s=[%s] %s=[%s]",
-                                        g_pid,
-                                    "STS Config Adding Element to Group",
+                                        "[%i] %s %s \"%s\" - %s %s=[%s]",
+                                        g_pid, "STS Config",
+                                        "Adding Element to Group",
                                         group.name.c_str(),
-                                        "patterns", ss.str().c_str(),
+                                        ss.str().c_str(),
                                         "name", element.name.c_str() );
                                     usleep(30000); // give syslog a chance
 
@@ -2634,10 +2677,9 @@ NxGen::parseSTSConfigFile
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
                                 syslog( LOG_ERR,
-                                    "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                    "[%i] %s %s - %s %s %s=[%s]",
                                     g_pid, "STS Error:", err.c_str(),
-                                    "Ignoring",
-                                    "patterns", ss.str().c_str(),
+                                    "Ignoring", ss.str().c_str(),
                                     "name", element.name.c_str() );
                                 usleep(30000); // give syslog a chance
                             }
@@ -2838,6 +2880,25 @@ NxGen::parseSTSConfigFile
                                         }
 
                                         else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"index" )
+                                                    == 0 )
+                                        {
+                                            // REMOVE ME...
+                                            syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                g_pid, "STS Config",
+                                                "Condition Element",
+                                                "Index",
+                                                element.indices.size() + 1,
+                                                value.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            element.indices.push_back(
+                                                value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
                                                 (const xmlChar*)"name" )
                                                     == 0 )
                                         {
@@ -2892,6 +2953,7 @@ NxGen::parseSTSConfigFile
 
                                     // For Element Pattern Logging...
                                     std::stringstream ss;
+                                    ss << "patterns=[";
                                     for ( uint32_t i=0 ;
                                             i < element.patterns.size();
                                             i++ )
@@ -2899,11 +2961,25 @@ NxGen::parseSTSConfigFile
                                         if ( i ) ss << ", ";
                                         ss << element.patterns[i];
                                     }
+                                    ss << "]";
+
+                                    // For Element Index Logging...
+                                    ss << " indices=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.indices.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.indices[i];
+                                    }
+                                    ss << "]";
 
                                     // Add Element to Group Condition...
                                     // (If Required Fields are Present,
                                     // Else Error)
                                     if ( element.patterns.size()
+                                            && ( !(group.hasIndex)
+                                                || element.indices.size() )
                                             && element.name.size() )
                                     {
                                         // Check for Existing Element
@@ -2920,10 +2996,9 @@ NxGen::parseSTSConfigFile
                                                 " in STS Config Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                            "[%i] %s %s - %s %s %s=[%s]",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                "patterns",
                                                 ss.str().c_str(),
                                                 "name",
                                                 element.name.c_str() );
@@ -2946,10 +3021,9 @@ NxGen::parseSTSConfigFile
                                             err += " Condition \""
                                                 + condition.name + "\"";
                                             syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                            "[%i] %s %s - %s %s %s=[%s]",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                "patterns",
                                                 ss.str().c_str(),
                                                 "name",
                                                 element.name.c_str() );
@@ -2967,9 +3041,8 @@ NxGen::parseSTSConfigFile
                                             info += " for Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_INFO,
-                                            "[%i] %s - %s=[%s] %s=[%s]",
+                                                "[%i] %s - %s %s=[%s]",
                                                 g_pid, info.c_str(),
-                                                "patterns",
                                                 ss.str().c_str(),
                                                 "name",
                                                 element.name.c_str() );
@@ -2989,11 +3062,10 @@ NxGen::parseSTSConfigFile
                                         err += " Group \""
                                             + group.name + "\"";
                                         syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s=[%s] %s=[%s]",
+                                            "[%i] %s %s - %s %s %s=[%s]",
                                             g_pid, "STS Error:",
-                                            err.c_str(),
-                                            "Ignoring",
-                                            "patterns", ss.str().c_str(),
+                                            err.c_str(), "Ignoring",
+                                            ss.str().c_str(),
                                             "name", element.name.c_str() );
                                         // give syslog a chance
                                         usleep(30000);
