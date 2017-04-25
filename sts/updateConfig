@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#
+# Production-Deployed STS Configuration Files
+#    - on sns-sts1.sns.gov
+#    - on sns-sts2.sns.gov
+#
+
+STS_PROD="/SNS/lustre/stsdata/sts_config.xml"
+STS_TEST="/SNS/lustre/stsdata_test/sts_config.xml"
+STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
+
+if [[ $# < 1 ]]; then
+	echo "usage: updateConfig [ --prod | --test | --dummy | --all ]"
+	exit -1
+fi
+
+CONFIGS=""
+
+for opt in $@ ; do
+
+	if [[ $opt == "--prod" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_PROD"
+	fi
+	if [[ $opt == "--test" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_TEST"
+	fi
+	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_DUMMY"
+	fi
+
+done
+
+echo "Processing STS Configs in:"
+echo "$CONFIGS" | sed "s/ /\n/g"
+echo
+
