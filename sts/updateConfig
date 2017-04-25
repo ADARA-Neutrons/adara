@@ -49,7 +49,7 @@ echo -e "\nUsing Temporary STS Config File as:\n\t$config_temp\n"
 
 for config in $CONFIGS ; do
 
-	echo -e "Updating STS Config in:\n\t$config\n"
+	echo -e "Updating STS Config in:\n\n\t$config\n"
 
 	cp $config $config_temp
 
