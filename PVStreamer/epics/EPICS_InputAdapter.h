@@ -43,6 +43,11 @@ public:
         time_t a_device_init_timeout = 60 );
     ~InputAdapter();
 
+    uint32_t        numActiveDevices();
+    uint32_t        numInactiveDevices();
+
+    void            getDevicesStatus( uint32_t &a_partialCount,
+                        uint32_t &a_hungCount );
 private:
     void            configFileMonitorThread();
     void            startDevice( DeviceDescriptor *a_device );
@@ -66,7 +71,8 @@ private:
     boost::thread                      *m_cfg_mon_thread;   ///< Configuration file monitoring thread handle
     std::vector<char>                   m_config_buffer;    ///< Configuration file buffer
     std::string                         m_source;           ///< Source "host" (not really used for EPICS adapter)
-    std::set<std::string>               m_cur_devices;      ///< Currently configured devices (by name)
+    std::set<std::string>               m_cur_device_names; ///< Currently configured devices (by name)
+    std::vector<Identifier>             m_inactive_device_ids; ///< Inactive Device Ids
     std::map<std::string,DeviceAgent*>  m_dev_agents;       ///< Active DeviceAgent instances (by name)
     std::list<DeviceAgent*>             m_garbage;          ///< Decommissioned DeviceAgent instanced
     boost::thread                      *m_gc_thread;        ///< Garbage collection thread handle

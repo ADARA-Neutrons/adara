@@ -520,9 +520,8 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
 
         for ( i=0 ; i < elemCount ; i++ )
         {
-            syslog( LOG_ERR, "%s: %s: uint_array[%u] = %u",
-                "PVSD ERROR", "OutputAdapter::buildVVP()",
-                i, uint_array[i] );
+            syslog( LOG_INFO, "%s: uint_array[%u] = %u",
+                "OutputAdapter::buildVVP()", i, uint_array[i] );
             usleep(33333); // give syslog a chance...
         }
         a_adara_pkt.vvp_array.elemCount = elemCount;
@@ -574,9 +573,8 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
 
         for ( i=0 ; i < elemCount ; i++ )
         {
-            syslog( LOG_ERR, "%s: %s: double_array[%u] = %lf",
-                "PVSD ERROR", "OutputAdapter::buildVVP()",
-                i, double_array[i] );
+            syslog( LOG_INFO, "%s: double_array[%u] = %lf",
+                "OutputAdapter::buildVVP()", i, double_array[i] );
             usleep(33333); // give syslog a chance...
         }
         a_adara_pkt.vvp_array.elemCount = elemCount;
@@ -869,6 +867,38 @@ OutputAdapter::connected()
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     return m_client_info.size() != 0;
+}
+
+
+/** \brief Method to return PVSD Server Listen IP/Port "Address".
+  */
+std::string
+OutputAdapter::serverAddr()
+{
+    std::string server = m_addr;
+    server += ":" + boost::lexical_cast<string>( m_port );
+    return server;
+}
+
+/** \brief Method to return number of clients that are currently connected.
+  */
+uint32_t
+OutputAdapter::numConnected()
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    return m_client_info.size();
+}
+
+
+/** \brief Method to return number of devices that are currently defined.
+  */
+uint32_t
+OutputAdapter::numDevices()
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    return m_devices.size();
 }
 
 

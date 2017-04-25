@@ -28,10 +28,11 @@ void ca_exception_handler( struct exception_handler_args args )
     const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
 
     syslog( LOG_ERR,
-        "%s %s: %s! %s=[%s] - %s %s=[%s] %s=%ld %s=[%s] %s=%ld [%s]",
+        "%s %s: %s! %s=[%s] - %s %s=[%s] %s=%ld %s=%ld %s=[%s] %s=%ld [%s]",
         "PVSD ERROR:", "EPICSInputAdapter::ca_exception_handler()",
         "Caught EPICS Exception", "Context", args.ctx,
-        "with Request", "ChannelId", pName, "Operation", args.op,
+        "with Request", "ChannelId", pName,
+        "Stat", args.stat, "Operation", args.op,
         "DataType", dbr_type_to_text( args.type ), "Count", args.count,
         "Continuing...!" );
     usleep(33333); // give syslog a chance...
@@ -80,6 +81,56 @@ InputAdapter::~InputAdapter()
 
     m_gc_thread->join();
     m_cfg_mon_thread->join();
+}
+
+
+/** \brief Method to return number of Active Devices (Running Device Agents)
+  */
+uint32_t
+InputAdapter::numActiveDevices()
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    return m_dev_agents.size();
+}
+
+
+/** \brief Method to return number of Inactive Devices (in Config File)
+  */
+uint32_t
+InputAdapter::numInactiveDevices()
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    return m_inactive_device_ids.size();
+}
+
+
+/** \brief Method to return Device Status Counts
+  */
+void
+InputAdapter::getDevicesStatus( uint32_t &a_partialCount,
+        uint32_t &a_hungCount )
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    a_partialCount = 0;
+    a_hungCount = 0;
+
+    for ( map<string,DeviceAgent*>::iterator idev = m_dev_agents.begin();
+            idev != m_dev_agents.end(); ++idev )
+    {
+        uint32_t ready_pvs, total_pvs;
+        bool hung;
+
+        idev->second->deviceStatus( ready_pvs, total_pvs, hung );
+
+        if ( hung )
+            a_hungCount++;
+
+        else if ( ready_pvs < total_pvs )
+            a_partialCount++;
+    }
 }
 
 
@@ -322,11 +373,11 @@ InputAdapter::configFileMonitorThread()
                             usleep(33333); // give syslog a chance...
 
                             // Keep track of new device names
-                            set<string> new_devices;
+                            set<string> new_device_names;
                             for ( idev = devices.begin();
                                     idev != devices.end(); ++idev )
                             {
-                                new_devices.insert( (*idev)->m_name );
+                                new_device_names.insert( (*idev)->m_name );
                             }
 
                             // Stop device agents that are
@@ -334,11 +385,12 @@ InputAdapter::configFileMonitorThread()
                             // (Do This *Before* Starting New Devices,
                             // to Avoid Any PV Name Clashes from
                             // Device Re-Naming/Shuffling... ;-D)
-                            for ( icur = m_cur_devices.begin();
-                                    icur != m_cur_devices.end(); ++icur )
+                            for ( icur = m_cur_device_names.begin();
+                                    icur != m_cur_device_names.end();
+                                    ++icur )
                             {
-                                if ( new_devices.find( *icur )
-                                        == new_devices.end() )
+                                if ( new_device_names.find( *icur )
+                                        == new_device_names.end() )
                                 {
                                     stopDevice( *icur );
                                 }
@@ -377,7 +429,10 @@ InputAdapter::configFileMonitorThread()
                             }
 
                             // Save new device names
-                            m_cur_devices = new_devices;
+                            m_cur_device_names = new_device_names;
+
+                            // Save inactive device ids
+                            m_inactive_device_ids = inactive_device_ids;
 
                             // Start device agent for all configured devices
                             // It's OK if agents are already running

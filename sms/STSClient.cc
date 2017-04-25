@@ -140,7 +140,7 @@ void STSClient::writable(void)
 				goto more;
 
 			if (errno == EPIPE || errno == ECONNRESET) {
-				WARN("Lost connection to STS for run "
+				ERROR("Lost connection to STS for run "
 				     << m_run->runNumber());
 			} else {
 				int e = errno;
@@ -288,14 +288,14 @@ void STSClient::readable(void)
 			 * unexpected connection loss.
 			 * Take care of that case here.
 			 */
-			WARN("Lost connection to STS for run " << m_run->runNumber()
+			ERROR("Lost connection to STS for run " << m_run->runNumber()
 				 << " log_info=(" << log_info << ")");
 		}
 	}
 	catch (ADARA::invalid_packet e) {
 		std::stringstream ss;
 		ss << "Got invalid packet from STS: " << e.what();
-		WARN( ss.str() );
+		ERROR( ss.str() );
 		m_disp = STSClientMgr::INVALID_PROTOCOL;
 		m_reason = ss.str();
 		ok = false;
@@ -332,7 +332,7 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 	std::stringstream ss;
 	ss << "Received unexpected packet type 0x"
 		<< std::hex << pkt.type() << std::dec;
-	WARN( ss.str() );
+	ERROR( ss.str() );
 	m_disp = STSClientMgr::TRANSIENT_FAIL;
 	m_reason = ss.str();
 	return true;
@@ -393,7 +393,7 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 				"failure, status 0x" << std::hex
 				<< pkt.status() << std::dec;
 		}
-		WARN( ss.str() );
+		ERROR( ss.str() );
 		m_disp = STSClientMgr::TRANSIENT_FAIL;
 		m_reason = ss.str();
 	} else {

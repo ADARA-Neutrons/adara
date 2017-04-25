@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <string.h>
+#include <sstream>
 #include <syslog.h>
 #include <time.h>
 #include <unistd.h>
@@ -16,6 +17,8 @@
 
 using namespace std;
 
+std::string NxGen::GroupNameIndex = "[XXX_INDEX_XXX]";
+
 /*! \brief Constructor for NxGen class.
  *
  * This constructor builds an NxGen instance using the options specified. If the nexus filename is empty, then no
@@ -28,6 +31,7 @@ NxGen::NxGen
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
+    string         &a_config_file,              ///< [in] Filename of STS Config file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
@@ -42,6 +46,7 @@ NxGen::NxGen
         a_chunk_size * a_anc_buf_chunk_count ), // number of elements
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
+    m_config_file(a_config_file),
     m_entry_path(string("/entry")),
     m_instrument_path(m_entry_path + string("/instrument")),
     m_daslogs_path(m_entry_path + string("/DASlogs")),
@@ -69,6 +74,10 @@ NxGen::NxGen
         m_gen_nexus = true;
         m_h5nx.H5NXset_cache_size( a_cache_size );
     }
+
+    // Parse STS Config File
+    if ( !m_config_file.empty() )
+        parseSTSConfigFile( m_config_file );
 
     // Reserve internal buffer for veto pulse times (in Dataset Elements!)
     m_pulse_vetoes.reserve( a_chunk_size );
@@ -2311,6 +2320,1008 @@ NxGen::writeMultidimDataset
                 "H5NXmake_attribute_string() failed for path: " << a_path
                      << ", name: " << a_name )
         }
+    }
+}
+
+
+/*! \brief Parses External STS Config File
+ *
+ * This method parses an External STS Config File
+ * to generate a Custom NeXus File Group/Mapping Set.
+ */
+void
+NxGen::parseSTSConfigFile
+(
+    const string &a_config_file     ///< [in] STS Config File Path
+)
+{
+    xmlDocPtr doc = xmlReadFile( a_config_file.c_str(), 0, 0 );
+
+    if ( doc )
+    {
+        string tag;
+        string value;
+
+        uint32_t conditionIndex = 0;
+
+        bool parsed = false;
+
+        try
+        {
+            xmlNode *root = xmlDocGetRootElement( doc );
+
+            tag = (char*)root->name;
+            getXmlNodeValue( root, value );
+
+            // REMOVE ME...
+            //syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
+                //g_pid, "Parsing STS Config File",
+                //tag.c_str(), value.c_str() );
+            //usleep(30000); // give syslog a chance...
+
+            if ( xmlStrcmp( root->name,
+                    (const xmlChar*)"sts_config" ) != 0 )
+            {
+                syslog( LOG_ERR,
+                    "[%i] %s %s <%s>=[%s] in STS Config File - %s",
+                    g_pid, "STS Error:", "Unrecognized Root Tag",
+                    tag.c_str(), value.c_str(), "Bailing on Config..." );
+                usleep(30000); // give syslog a chance...
+                return;
+            }
+
+            for ( xmlNode *lev1 = root->children;
+                    lev1 != 0; lev1 = lev1->next )
+            {
+                tag = (char*)lev1->name;
+                getXmlNodeValue( lev1, value );
+
+                parsed = true;
+
+                // REMOVE ME...
+                //syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
+                    //g_pid, "Parsing STS Config File",
+                    //tag.c_str(), value.c_str() );
+                //usleep(30000); // give syslog a chance...
+
+                // Log STS Config File Version...
+                if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"version" ) == 0 )
+                {
+                    syslog( LOG_INFO, "[%i] %s Version: %s",
+                        g_pid, "Parsing STS Config File", value.c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
+
+                else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"group" ) == 0 )
+                {
+                    struct GroupInfo group;
+
+                    group.created = false;
+
+                    group.hasIndex = false;
+
+                    conditionIndex = 0;
+
+                    // REMOVE ME...
+                    //syslog( LOG_INFO, "[%i] %s Found Group [%s]",
+                        //g_pid, "STS Config", value.c_str() );
+                    //usleep(30000); // give syslog a chance...
+
+                    for ( xmlNode *lev2 = lev1->children;
+                            lev2 != 0; lev2 = lev2->next )
+                    {
+                        tag = (char*)lev2->name;
+                        getXmlNodeValue( lev2, value );
+
+                        // REMOVE ME...
+                        //syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
+                            //g_pid, "Parsing STS Config File",
+                            //tag.c_str(), value.c_str() );
+                        //usleep(30000); // give syslog a chance...
+
+                        if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"name" ) == 0 )
+                        {
+                            // Already Got A Group Name...?
+                            if ( group.name.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Name",
+                                    group.name.c_str(), value.c_str(),
+                                    "Using New Group Name..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Name [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            group.name = value;
+
+                            if ( group.name.find( NxGen::GroupNameIndex )
+                                    != std::string::npos )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group is Indexed! [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+
+                                group.hasIndex = true;
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"path" ) == 0 )
+                        {
+                            // Already Got A Group Path...?
+                            if ( group.path.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Path",
+                                    group.path.c_str(), value.c_str(),
+                                    "Using New Group Path..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Path [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            group.path = value;
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"type" ) == 0 )
+                        {
+                            // Already Got A Group Type...?
+                            if ( group.type.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STS Error:",
+                                    "STS Config DUPLICATE Group Type",
+                                    group.type.c_str(), value.c_str(),
+                                    "Using New Group Type..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                // REMOVE ME...
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Type [%s]",
+                                    g_pid, "STS Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            group.type = value;
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"element" ) == 0 )
+                        {
+                            struct ElementInfo element;
+
+                            element.lastIndex = 0;
+
+                            // REMOVE ME...
+                            //syslog( LOG_INFO,
+                                //"[%i] %s Group Element [%s]",
+                                //g_pid, "STS Config", value.c_str() );
+                            //usleep(30000); // give syslog a chance...
+
+                            for ( xmlNode *lev3 = lev2->children;
+                                    lev3 != 0; lev3 = lev3->next )
+                            {
+                                tag = (char*)lev3->name;
+                                getXmlNodeValue( lev3, value );
+
+                                // REMOVE ME...
+                                //syslog( LOG_INFO,
+                                    //"[%i] %s Element Level 3 <%s>=[%s]",
+                                    //g_pid, "Parsing STS Config File",
+                                    //tag.c_str(), value.c_str() );
+                                //usleep(30000); // give syslog a chance...
+
+                                if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"pattern" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                    "[%i] %s Element Pattern #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        element.patterns.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    element.patterns.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"index" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                    "[%i] %s Element Index #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        element.indices.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    element.indices.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    // Already Got An Element Name...?
+                                    if ( element.name.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Name",
+                                            element.name.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Name..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Name [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.name = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"text" ) != 0
+                                    && xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"comment" ) != 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s at %s <%s>=[%s]",
+                                        g_pid, "STS Error:",
+                                        "Unknown Tag in STS Config",
+                                        "Element Level 3",
+                                        tag.c_str(), value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                            }
+
+                            // For Element Pattern Logging...
+                            std::stringstream ss;
+                            ss << "patterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.patterns[i];
+                            }
+                            ss << "]";
+
+                            // For Element Index Logging...
+                            ss << " indices=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.indices.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.indices[i];
+                            }
+                            ss << "]";
+
+                            // Add Element to Group Container...
+                            // (If Required Fields are Present, Else Error)
+                            if ( element.patterns.size()
+                                    && ( !(group.hasIndex)
+                                        || element.indices.size() )
+                                    && element.name.size() )
+                            {
+                                // Check for Existing Element by Name...
+                                if ( findGroupElementByName( element.name,
+                                        group.elements ) )
+                                {
+                                    std::string err =
+                                        "Duplicate Element Name ";
+                                    err += "\"" + element.name + "\"";
+                                    err += " in STS Config Group \""
+                                        + group.name + "\"";
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s - %s %s %s=[%s]",
+                                        g_pid, "STS Error:", err.c_str(),
+                                        "Ignoring", ss.str().c_str(),
+                                        "name", element.name.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                                else
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s \"%s\" - %s %s=[%s]",
+                                        g_pid, "STS Config",
+                                        "Adding Element to Group",
+                                        group.name.c_str(),
+                                        ss.str().c_str(),
+                                        "name", element.name.c_str() );
+                                    usleep(30000); // give syslog a chance
+
+                                    group.elements.push_back( element );
+                                }
+                            }
+                            else
+                            {
+                                std::string err = "Incomplete Element";
+                                err += " in STS Config Group \""
+                                    + group.name + "\"";
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s - %s %s %s=[%s]",
+                                    g_pid, "STS Error:", err.c_str(),
+                                    "Ignoring", ss.str().c_str(),
+                                    "name", element.name.c_str() );
+                                usleep(30000); // give syslog a chance
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"condition" ) == 0 )
+                        {
+                            struct ConditionInfo condition;
+
+                            condition.is_set = false;
+
+                            // REMOVE ME...
+                            syslog( LOG_INFO,
+                                "[%i] %s Group Condition [%s]",
+                                g_pid, "STS Config", value.c_str() );
+                            usleep(30000); // give syslog a chance...
+
+                            for ( xmlNode *lev3 = lev2->children;
+                                    lev3 != 0; lev3 = lev3->next )
+                            {
+                                tag = (char*)lev3->name;
+                                getXmlNodeValue( lev3, value );
+
+                                // REMOVE ME...
+                                //syslog( LOG_INFO,
+                                    //"[%i] %s %s Level 3 <%s>=[%s]",
+                                    //g_pid, "Parsing STS Config File",
+                                    //"Condition",
+                                    //tag.c_str(), value.c_str() );
+                                //usleep(30000); // give syslog a chance...
+
+                                if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    // Already Got A Condition Name...?
+                                    if ( condition.name.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Condition Name",
+                                            condition.name.c_str(),
+                                            value.c_str(),
+                                            "Using New Condition Name..."
+                                        );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Condition Name [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.name = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"pattern" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Condition %s #%ld [%s]",
+                                        g_pid, "STS Config", "Pattern",
+                                        condition.patterns.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    condition.patterns.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"value_string" )
+                                            == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Condition %s #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        "Value String",
+                                        condition.value_strings.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    condition.value_strings.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"value" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Condition %s #%ld [%s]",
+                                        g_pid, "STS Config", "Value",
+                                        condition.values.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    condition.values.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"not_value_string"
+                                            ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Condition %s #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        "NOT Value String",
+                                        condition.not_value_strings.size()
+                                            + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    condition.not_value_strings.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"not_value" )
+                                            == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s Condition %s #%ld [%s]",
+                                        g_pid, "STS Config", "NOT Value",
+                                        condition.not_values.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    condition.not_values.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"element" ) == 0 )
+                                {
+                                    struct ElementInfo element;
+
+                                    element.lastIndex = 0;
+
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO, "[%i] %s %s [%s]",
+                                        g_pid, "STS Config",
+                                        "Group Condition Element",
+                                        value.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    for ( xmlNode *lev4 = lev3->children;
+                                            lev4 != 0; lev4 = lev4->next )
+                                    {
+                                        tag = (char*)lev4->name;
+                                        getXmlNodeValue( lev4, value );
+
+                                        // REMOVE ME...
+                                        //syslog( LOG_INFO,
+                                            //"[%i] %s %s <%s>=[%s]",
+                                            //g_pid,
+                                            //"Parsing STS Config File",
+                                            //"Condition Element Level 3",
+                                            //tag.c_str(), value.c_str() );
+                                        // give syslog a chance...
+                                        //usleep(30000);
+
+                                        if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"pattern" )
+                                                    == 0 )
+                                        {
+                                            // REMOVE ME...
+                                            syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                g_pid, "STS Config",
+                                                "Condition Element",
+                                                "Pattern",
+                                                element.patterns.size()
+                                                    + 1,
+                                                value.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            element.patterns.push_back(
+                                                value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"index" )
+                                                    == 0 )
+                                        {
+                                            // REMOVE ME...
+                                            syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                g_pid, "STS Config",
+                                                "Condition Element",
+                                                "Index",
+                                                element.indices.size() + 1,
+                                                value.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            element.indices.push_back(
+                                                value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"name" )
+                                                    == 0 )
+                                        {
+                                            // Already Got An Element Name?
+                                            if ( element.name.size() )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                                    g_pid, "STS Error:",
+                                                    "STS Config DUPLICATE",
+                                                "Condition Element Name",
+                                                    element.name.c_str(),
+                                                    value.c_str(),
+                                                "Using New Element Name..."
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
+                                            else
+                                            {
+                                                // REMOVE ME...
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s %s [%s]",
+                                                    g_pid, "STS Config",
+                                                "Condition Element Name",
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.name = value;
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"text" )
+                                                    != 0
+                                            && xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"comment" )
+                                                    != 0 )
+                                        {
+                                            syslog( LOG_ERR,
+                                            "[%i] %s %s at %s <%s>=[%s]",
+                                                g_pid, "STS Error:",
+                                            "Unknown Tag in STS Config",
+                                            "Condition Element Level 4",
+                                                tag.c_str(), value.c_str()
+                                            );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                    }
+
+                                    // For Element Pattern Logging...
+                                    std::stringstream ss;
+                                    ss << "patterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.patterns.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.patterns[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Index Logging...
+                                    ss << " indices=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.indices.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.indices[i];
+                                    }
+                                    ss << "]";
+
+                                    // Add Element to Group Condition...
+                                    // (If Required Fields are Present,
+                                    // Else Error)
+                                    if ( element.patterns.size()
+                                            && ( !(group.hasIndex)
+                                                || element.indices.size() )
+                                            && element.name.size() )
+                                    {
+                                        // Check for Existing Element
+                                        // in Group by Name?
+                                        if ( findGroupElementByName(
+                                                element.name,
+                                                group.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name ";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STS Config Group \""
+                                                + group.name + "\"";
+                                            syslog( LOG_ERR,
+                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                g_pid, "STS Error:",
+                                                err.c_str(), "Ignoring",
+                                                ss.str().c_str(),
+                                                "name",
+                                                element.name.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        // Check for Existing Element
+                                        // in Condition by Name?
+                                        else if ( findGroupElementByName(
+                                                element.name,
+                                                condition.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name ";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STS Config Group \""
+                                                + group.name + "\"";
+                                            err += " Condition \""
+                                                + condition.name + "\"";
+                                            syslog( LOG_ERR,
+                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                g_pid, "STS Error:",
+                                                err.c_str(), "Ignoring",
+                                                ss.str().c_str(),
+                                                "name",
+                                                element.name.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        else
+                                        {
+                                            // REMOVE ME...
+                                            std::string info =
+                                                "STS Config Adding";
+                                            info += " Element";
+                                            info += " to Condition \""
+                                                + condition.name + "\"";
+                                            info += " for Group \""
+                                                + group.name + "\"";
+                                            syslog( LOG_INFO,
+                                                "[%i] %s - %s %s=[%s]",
+                                                g_pid, info.c_str(),
+                                                ss.str().c_str(),
+                                                "name",
+                                                element.name.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            condition.elements.push_back(
+                                                element );
+                                        }
+                                    }
+                                    else
+                                    {
+                                        std::string err = "Incomplete";
+                                        err += " Condition \""
+                                            + condition.name + "\"";
+                                        err += " Element in STS Config";
+                                        err += " Group \""
+                                            + group.name + "\"";
+                                        syslog( LOG_ERR,
+                                            "[%i] %s %s - %s %s %s=[%s]",
+                                            g_pid, "STS Error:",
+                                            err.c_str(), "Ignoring",
+                                            ss.str().c_str(),
+                                            "name", element.name.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"text" ) != 0
+                                    && xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"comment" ) != 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s at %s <%s>=[%s]",
+                                        g_pid, "STS Error:",
+                                        "Unknown Tag in STS Config",
+                                        "Condition Level 3",
+                                        tag.c_str(), value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                            }
+
+                            // Note: the Condition Name is optional, it's
+                            // really only for human readability... ;-D
+                            // So if this Condition doesn't have a Name,
+                            // just assign it the next Unnamed Index...
+                            if ( condition.name.size() == 0 )
+                            {
+                                stringstream ss;
+                                ss << "UnnamedCondition"
+                                    << ++conditionIndex;
+                                condition.name = ss.str();
+                            }
+
+                            // Add Condition to Group Container...
+                            // (If Required Fields are Present, Else Error)
+                            if ( condition.patterns.size()
+                                && ( condition.value_strings.size()
+                                    || condition.values.size()
+                                    || condition.not_value_strings.size()
+                                    || condition.not_values.size() ) )
+                            {
+                                // REMOVE ME...
+                                std::stringstream ss;
+                                ss << "patterns=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.patterns.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.patterns[i];
+                                }
+                                ss << "] ";
+                                ss << "value_strings=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.value_strings.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.value_strings[i];
+                                }
+                                ss << "] ";
+                                ss << "values=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.values.size(); i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.values[i];
+                                }
+                                ss << "] ";
+                                ss << "not_value_strings=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.not_value_strings
+                                            .size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.not_value_strings[i];
+                                }
+                                ss << "] ";
+                                ss << "values=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.not_values.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.not_values[i];
+                                }
+                                ss << "]";
+                                syslog( LOG_INFO,
+                                    "[%i] %s \"%s\" %s \"%s\" - %s",
+                                    g_pid,
+                                    "STS Config Adding Condition",
+                                    condition.name.c_str(),
+                                    "to Group", group.name.c_str(),
+                                    ss.str().c_str() );
+                                usleep(30000); // give syslog a chance
+
+                                group.conditions.push_back( condition );
+                            }
+                            else
+                            {
+                                std::string err = "Incomplete Condition";
+                                err += " \"" + condition.name + "\"";
+                                err += " in STS Config Group \""
+                                    + group.name + "\"";
+                                std::stringstream ss;
+                                ss << "patterns=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.patterns.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.patterns[i];
+                                }
+                                ss << "] ";
+                                ss << "value_strings=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.value_strings.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.value_strings[i];
+                                }
+                                ss << "] ";
+                                ss << "values=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.values.size(); i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.values[i];
+                                }
+                                ss << "] ";
+                                ss << "not_value_strings=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.not_value_strings
+                                            .size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.not_value_strings[i];
+                                }
+                                ss << "] ";
+                                ss << "values=[";
+                                for ( uint32_t i=0 ;
+                                        i < condition.not_values.size();
+                                        i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << condition.not_values[i];
+                                }
+                                ss << "]";
+                                syslog( LOG_ERR, "[%i] %s %s - %s %s",
+                                    g_pid, "STS Error:", err.c_str(),
+                                    "Ignoring", ss.str().c_str() );
+                                usleep(30000); // give syslog a chance
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"text" ) != 0
+                            && xmlStrcmp( lev2->name,
+                                (const xmlChar*)"comment" ) != 0 )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s at Level 2 <%s>=[%s]",
+                                g_pid, "STS Error:",
+                                "Unknown Tag in STS Config",
+                                tag.c_str(), value.c_str() );
+                            usleep(30000); // give syslog a chance
+                        }
+                    }
+
+                    // Add Group Container to STS Config...
+                    // (If Required Fields are Present, Else Error)
+                    if ( group.name.size()
+                            && group.path.size()
+                            && group.type.size()
+                            && group.elements.size() )
+                    {
+                        // REMOVE ME...
+                        syslog( LOG_INFO,
+                            "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s)",
+                            g_pid, "Adding Group Container",
+                            group.name.c_str(), "to STS Config",
+                            "path", group.path.c_str(),
+                            "type", group.type.c_str(),
+                            group.elements.size(), "elements" );
+                        usleep(30000); // give syslog a chance
+
+                        m_config_groups.push_back( group );
+                    }
+                    else
+                    {
+                        std::string err = "Incomplete Group Container \""
+                            + group.name
+                            + "\" in STS Config";
+                        syslog( LOG_ERR,
+                            "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s)",
+                            g_pid, "STS Error:", err.c_str(),
+                            "Ignoring",
+                            "path", group.path.c_str(),
+                            "type", group.type.c_str(),
+                            group.elements.size(), "elements" );
+                        usleep(30000); // give syslog a chance
+                    }
+                }
+
+                else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"text" ) != 0
+                    && xmlStrcmp( lev1->name,
+                        (const xmlChar*)"comment" ) != 0 )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s at Level 1 <%s>=[%s]",
+                        g_pid, "STS Error:", "Unknown Tag in STS Config",
+                        tag.c_str(), value.c_str() );
+                    usleep(30000); // give syslog a chance
+                }
+            }
+        }
+        catch( std::exception &e )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s Exception Parsing STS Config File: %s - %s",
+                g_pid, "STS Error:", a_config_file.c_str(), e.what() );
+            usleep(30000); // give syslog a chance...
+        }
+        catch( ... )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s Unknown Exception Parsing STS Config File: %s",
+                g_pid, "STS Error:", a_config_file.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+
+        if ( !parsed )
+        {
+            syslog( LOG_ERR, "[%i] %s Parsing STS Config File: %s - %s",
+                g_pid, "STS Error:", a_config_file.c_str(),
+                "No Valid XML Tags Parsed!" );
+            usleep(30000); // give syslog a chance...
+        }
+
+        syslog( LOG_INFO, "[%i] Parsed STS Config File: %s - %lu %s",
+            g_pid, a_config_file.c_str(),
+            m_config_groups.size(), "Valid Groups Found" );
+        usleep(30000); // give syslog a chance...
+
+        xmlFreeDoc( doc );
+    }
+
+    else
+    {
+        syslog( LOG_ERR, "[%i] %s Reading STS Config File: %s - %s",
+            g_pid, "STS Error:", a_config_file.c_str(),
+            "Empty or Invalid XML Document?" );
+        usleep(30000); // give syslog a chance...
     }
 }
 

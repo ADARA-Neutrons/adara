@@ -1,0 +1,97 @@
+#!/bin/bash
+
+#
+# Production-Deployed STS Configuration Files
+#    - on sns-sts1.sns.gov
+#    - on sns-sts2.sns.gov
+#
+
+STS_DIR="/SNS/users/y8y"
+
+STS_SSH="ssh -AY sns-sts1.sns.gov"
+#STS_SSH="ssh -AY sns-sts2.sns.gov"
+
+STS_PROD="/SNS/lustre/stsdata/sts_config.xml"
+STS_TEST="/SNS/lustre/stsdata_test/sts_config.xml"
+STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
+STS_JENKINS="/TESTING/JENKINS/SNS/stsdata/sts_config.xml"
+STS_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stsdata_devel/sts_config.xml"
+
+if [[ $# < 1 ]]; then
+	echo "usage: updateConfig \\"
+	echo \
+	"   [ --prod | --test | --dummy | --jenkins | --jenkins-devel | --all ]"
+	exit -1
+fi
+
+CONFIGS=""
+
+for opt in $@ ; do
+
+	if [[ $opt == "--prod" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_PROD"
+	fi
+	if [[ $opt == "--test" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_TEST"
+	fi
+	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_DUMMY"
+	fi
+	if [[ $opt == "--jenkins" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_JENKINS"
+	fi
+	if [[ $opt == "--jenkins-devel" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_JENKINS_DEVEL"
+	fi
+
+done
+
+echo -e "\nProcessing STS Configs in:"
+echo "$CONFIGS" | sed "s/ /\n/g"
+
+config_temp="$STS_DIR/sts_config_update-$$.xml"
+echo -e "\nUsing Temporary STS Config File as:\n\t$config_temp\n"
+
+for config in $CONFIGS ; do
+
+	echo -e "Updating STS Config in:\n\n\t$config\n"
+
+	cp $config $config_temp
+
+	xxdiff ./sts_config.xml $config_temp
+
+	# Check for File Differences...
+	diff $config_temp $config > /dev/null 2>&1
+	ckdiff=$?
+
+	if [[ $ckdiff != 0 ]]; then
+
+		diff $config_temp $config | less -x4
+
+		echo -en "Deploy Updated Config to:\n\n\t$config\n\n(yes/No/quit)? "
+
+		read deploy_ck
+		deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+		if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
+			$STS_SSH cp $config_temp $config
+		elif [[ "#$deploy_ck#" == '#q#' \
+				|| "#$deploy_ck#" == '#quit#' ]]; then
+			echo -e "\nExiting Update Config Script at User's Request.\n"
+			/bin/rm $config_temp
+			exit 0
+		else
+			echo -e "\nOk, Leaving Deployed STS Config Script As Is...\n"
+		fi
+	
+	else
+
+		echo -e "No Change to Config File:\n\n\t$config\n"
+
+	fi
+
+done
+
+# Clean Up...
+/bin/rm $config_temp
+

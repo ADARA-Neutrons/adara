@@ -45,6 +45,9 @@ public:
     void    undefine(void);
     bool    stopped(void);
 
+    void    deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
+                bool &a_hung );
+
 private:
     enum ChanState
     {
@@ -103,6 +106,7 @@ private:
     DeviceRecordPtr             m_dev_record;
     DeviceDescriptor           *m_dev_desc;
     bool                        m_defined;
+    bool                        m_hung;
     std::map<chid,ChanInfo>     m_chan_info;        ///< PV channel ID to channel info map
     std::map<std::string,chid>  m_pv_index;         ///< PV connection to channel id map
     boost::thread              *m_ctrl_thread;

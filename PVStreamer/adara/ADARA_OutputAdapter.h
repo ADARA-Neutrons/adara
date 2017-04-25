@@ -24,6 +24,11 @@ public:
     OutputAdapter( StreamService &a_stream_serv, unsigned short a_port = 31416, unsigned long a_heartbeat = 2000 );
     ~OutputAdapter();
 
+    std::string     serverAddr();
+
+    uint32_t        numConnected();
+    uint32_t        numDevices();
+
 private:
     // Force visual studio to pack on 4 byte boundaries instead of default 8
     #pragma pack(push,4)

@@ -13,8 +13,20 @@ Parser::Parser(unsigned int initial_buffer_size, unsigned int max_pkt_size) :
 {
 	m_buffer = new uint8_t[initial_buffer_size];
 
+	last_start_read_time.tv_sec = -1;
+	last_start_read_time.tv_nsec = -1;
+	last_last_start_read_time.tv_sec = -1;
+	last_last_start_read_time.tv_nsec = -1;
+
+	last_end_read_time.tv_sec = -1;
+	last_end_read_time.tv_nsec = -1;
+	last_last_end_read_time.tv_sec = -1;
+	last_last_end_read_time.tv_nsec = -1;
+
 	last_bytes_read = -1;
 	last_last_bytes_read = -1;
+	last_read_errno = -1;
+	last_last_read_errno = -1;
 	last_pkts_parsed = -1;
 	last_last_pkts_parsed = -1;
 	last_total_bytes = -1;

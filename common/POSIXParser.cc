@@ -59,9 +59,13 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			last_last_read_count = last_read_count;
 			last_read_count = read_count;
 			clock_gettime(CLOCK_REALTIME, &start_read_time);
+			last_last_start_read_time = last_start_read_time;
+			last_start_read_time = start_read_time;
 			// NOTE: This is Standard C Library read()... ;-o
 			rc = ::read(fd, bufferFillAddress(), len);
 			clock_gettime(CLOCK_REALTIME, &end_read_time);
+			last_last_end_read_time = last_end_read_time;
+			last_end_read_time = end_read_time;
 			last_last_read_elapsed = last_read_elapsed;
 			last_read_elapsed =
 				calcDiffSeconds( end_read_time, start_read_time );
@@ -69,6 +73,8 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			last_last_bytes_read = last_bytes_read;
 			last_bytes_read = rc;
 			if (rc < 0) {
+				last_last_read_errno = last_read_errno;
+				last_read_errno = errno;
 				switch (errno) {
 				case EINTR:
 				case EAGAIN:
@@ -98,6 +104,10 @@ bool POSIXParser::read(int fd, std::string & log_info,
 					msg += strerror(err);
 					throw std::runtime_error(msg);
 				}
+			}
+			else {
+				last_last_read_errno = last_read_errno;
+				last_read_errno = 0;
 			}
 
 			if (rc == 0) {

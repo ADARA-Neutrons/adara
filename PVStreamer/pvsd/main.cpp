@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.6.4"
+#define PVSD_VERSION "1.6.5"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -236,6 +236,8 @@ int main(int argc, char *argv[])
     bool            track_logged = false;
     bool            daemon = false;
     ::ADARA::ComBus::Connection *combus = 0;
+    PVS::ADARA::OutputAdapter *output = 0;
+    PVS::EPICS::InputAdapter *input = 0;
 
     // Parse program options
 
@@ -304,11 +306,11 @@ int main(int argc, char *argv[])
         StreamService   streamer( 100, offset );
 
         // Attach ADARA output adapter
-        new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
+        output = new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
 
         // Create and attach EPICS input adapter
-        new PVS::EPICS::InputAdapter( streamer, epics_cfg, track_logged,
-            timeout );
+        input = new PVS::EPICS::InputAdapter( streamer, epics_cfg,
+            track_logged, timeout );
 
         // If we mad it here as a daemon, signal parent that all is well
         if ( daemon )
@@ -317,10 +319,36 @@ int main(int argc, char *argv[])
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;
 
-        while( g_active )
+        while ( g_active )
         {
-            if (!(++count % 5))
+            if ( !( ++count % 5 ) )
+            {
                 combus->status( ::ADARA::ComBus::STATUS_OK );
+            }
+
+            if ( !( count % 300 ) )
+            {
+                uint32_t partialCount, hungCount;
+                input->getDevicesStatus( partialCount, hungCount );
+
+                std::string logPrefix = "";
+                int logType = LOG_INFO;
+                if ( partialCount || hungCount )
+                {
+                    logPrefix = "PVSD ERROR: ";
+                    logType = LOG_ERR;
+                }
+
+                syslog( logType,
+                    "%s%s %s - %u %s (%u %s, %u %s), %u %s, %u %s, %u %s.",
+                    logPrefix.c_str(),
+                    "PVSD is Alive at", output->serverAddr().c_str(),
+                    input->numActiveDevices(), "Active Input Devices",
+                    partialCount, "Partial", hungCount, "Hung",
+                    input->numInactiveDevices(), "Inactive Input Devices",
+                    output->numConnected(), "Output Adapters Connected",
+                    output->numDevices(), "Output Devices Defined" );
+            }
 
             sleep(1);
         }
@@ -347,10 +375,15 @@ int main(int argc, char *argv[])
     if ( daemon && ret_code )
         signalParent( ret_code );
 
+    // Cleanup...
     if ( combus )
         delete combus;
+    if ( output )
+        delete output;
+    if ( input )
+        delete input;
 
-    syslog( LOG_INFO, "pvsd stopping." );
+    syslog( LOG_INFO, "PVSD Stopping..." );
     closelog();
 
     return ret_code;

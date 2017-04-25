@@ -1,0 +1,131 @@
+
+<!--
+	STS Configuration File
+
+	Stored in Git Repository at: git+ssh://trac.sns.gov/var/repos/config
+		- in the "sts-config" branch
+
+	Deployed to /SNS/lustre/stsdata/sts_config.xml
+
+	Please Commit Any Changes to Git...! Thanks! :-D
+-->
+
+<sts_config>
+
+	<version>1.0.0</version>
+
+	<!-- (Indexed) Chopper Groups -->
+	<group>
+		<name>chopper[XXX_INDEX_XXX]</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<!-- EPICS-based Chopper PV Elements -->
+		<element>
+			<pattern>:Chop:Skf\d+:DriveError</pattern>
+			<index>%*[^:]:Chop:Skf%d:DriveError</index>
+			<name>drive_error</name>
+		</element>
+		<element>
+			<pattern>:Chop:Skf\d+:MotorSpeed</pattern>
+			<index>%*[^:]:Chop:Skf%d:MotorSpeed</index>
+			<pattern>Speed\d+</pattern>
+			<index>Speed%d</index>
+			<name>rotation_speed</name>
+		</element>
+		<element>
+			<pattern>:Chop:Skf\d+:PhaseAccuracy</pattern>
+			<index>%*[^:]:Chop:Skf%d:PhaseAccuracy</index>
+			<pattern>Phase\d+</pattern>
+			<index>Phase%d</index>
+			<name>phase</name>
+		</element>
+		<element>
+			<pattern>:Chop:Skf\d+:PhaseLocked</pattern>
+			<index>%*[^:]:Chop:Skf%d:PhaseLocked</index>
+			<name>phase_locked</name>
+		</element>
+		<element>
+			<pattern>:Chop:Skf\d+:SpeedSet</pattern>
+			<index>%*[^:]:Chop:Skf%d:SpeedSet</index>
+			<name>speed_set</name>
+		</element>
+		<element>
+			<pattern>:Chop:Skf\d+:SpeedUserReq</pattern>
+			<index>%*[^:]:Chop:Skf%d:SpeedUserReq</index>
+			<pattern>SpeedRequest\d+</pattern>
+			<index>SpeedRequest%d</index>
+			<name>speed_request</name>
+		</element>
+		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
+		<element>
+			<pattern>ChopperStatus\d+</pattern>
+			<index>ChopperStatus%d</index>
+			<name>status</name>
+		</element>
+		<element>
+			<pattern>PhaseRequest\d+</pattern>
+			<index>PhaseRequest%d</index>
+			<name>phase_request</name>
+		</element>
+	</group>
+
+	<!-- Focus Array Group (HYSPEC) -->
+	<group>
+		<name>focus_array</name>
+		<path>/entry/instrument</path>
+		<type>NXcrystal</type>
+		<!-- EPICS-based Focus Array PV Elements -->
+		<element>
+			<pattern>:Mot:vmel:Position</pattern>
+			<name>position</name>
+		</element>
+		<!-- "PG" Mode Conditional Focus Array PV Elements -->
+		<condition>
+			<name>PG Position Condition</name>
+			<pattern>:Mot:vmel:Position</pattern>
+			<value_string>PG</value_string><!-- 1 -->
+			<element>
+				<pattern>:Mot:mfpg$</pattern>
+				<name>mf</name>
+			</element>
+			<element>
+				<pattern>:Mot:mgpg$</pattern>
+				<name>mg</name>
+			</element>
+			<element>
+				<pattern>:Mot:mtpg$</pattern>
+				<name>mt</name>
+			</element>
+			<element>
+				<pattern>:Mot:m1pg$</pattern>
+				<name>m1</name>
+			</element>
+		</condition>
+		<!-- "HU" Mode Conditional Focus Array PV Elements -->
+		<condition>
+			<name>HU Position Condition</name>
+			<pattern>:Mot:vmel:Position</pattern>
+			<value>0</value><!-- HU -->
+			<value>2</value><!-- HU -->
+			<!-- or we could do a "not_value" tag of "1" here... -->
+			<element>
+				<pattern>:Mot:mfhu$</pattern>
+				<name>mf</name>
+			</element>
+			<element>
+				<pattern>:Mot:mghu$</pattern>
+				<name>mg</name>
+			</element>
+			<element>
+				<pattern>:Mot:mthu$</pattern>
+				<name>mt</name>
+			</element>
+			<element>
+				<pattern>:Mot:m1hu$</pattern>
+				<name>m1</name>
+			</element>
+		</condition>
+	</group>
+
+</sts_config>
+

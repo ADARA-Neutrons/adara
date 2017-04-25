@@ -26,13 +26,21 @@ prog=smsd
 lockfile=/var/lock/subsys/$prog
 
 # Get Base EPICS Executable Path (for potential caRepeater startup)
-export EPICS_BASE="/home/controls/epics/base/master"
+export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
 if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
 	export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
 else
 	export EPICS_HOST_ARCH="none"
 fi
-source "${EPICS_BASE}/setup.profile"
+export PATH="${EPICS_BASE}/bin/${EPICS_HOST_ARCH}:${PATH}"
+
+# Other EPICS Environment Settings
+export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+export EPICS_CA_AUTO_ADDR_LIST="NO"
+export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+export EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+# NOTE: Resolve "XXX" Per Beamline Subnet
 
 export PATH=/usr/local/bin:$PATH
 

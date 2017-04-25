@@ -567,9 +567,9 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	{
 		saved_size = fileSize( path );
 		
-		DEBUG("Ignoring ADARA Data Source " << sourceId
-			<< " Saved Input Stream " << save_type << " file: " << p
-			<< " (" << saved_size << " bytes)");
+		// DEBUG("Ignoring ADARA Data Source " << sourceId
+			// << " Saved Input Stream " << save_type << " file: " << p
+			// << " (" << saved_size << " bytes)");
 
 		return StorageFile::SharedPtr();
 	}

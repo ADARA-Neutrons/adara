@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
+#include <string.h>
 #include <string>
 #include <sstream>
 #include <netdb.h>
@@ -785,7 +786,15 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " sec=" << m_last_pkt_sec
 		<< " nsec=" << m_last_pkt_nsec
 		<< " len=" << m_last_pkt_len
+		<< " last_start_read_time="
+		<< Parser::last_start_read_time.tv_sec << "."
+		<< Parser::last_start_read_time.tv_nsec
 		<< " last_bytes_read=" << Parser::last_bytes_read
+		<< " last_read_errno=" << Parser::last_read_errno
+		<< " (" << strerror( Parser::last_read_errno ) << ")"
+		<< " last_end_read_time="
+		<< Parser::last_end_read_time.tv_sec << "."
+		<< Parser::last_end_read_time.tv_nsec
 		<< " last_pkts_parsed=" << Parser::last_pkts_parsed
 		<< " last_total_bytes=" << Parser::last_total_bytes
 		<< " last_total_packets=" << Parser::last_total_packets
@@ -796,7 +805,16 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " last_read_elapsed_total=" << Parser::last_read_elapsed_total
 		<< " last_parse_elapsed=" << Parser::last_parse_elapsed
 		<< " last_parse_elapsed_total=" << Parser::last_parse_elapsed_total
+		<< " ;"
+		<< " last_last_start_read_time="
+		<< Parser::last_last_start_read_time.tv_sec << "."
+		<< Parser::last_last_start_read_time.tv_nsec
 		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
+		<< " last_last_read_errno=" << Parser::last_last_read_errno
+		<< " (" << strerror( Parser::last_last_read_errno ) << ")"
+		<< " last_last_end_read_time="
+		<< Parser::last_last_end_read_time.tv_sec << "."
+		<< Parser::last_last_end_read_time.tv_nsec
 		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
 		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
@@ -1351,8 +1369,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 		case ADARA::PacketType::SYNC_TYPE:
 		case ADARA::PacketType::DATA_DONE_TYPE:
+		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We don't care about these packets, just drop them */
-			return false;
+			/* (We still have to call their rxPacket() method
+			 * to increment the Discarded Packet counts tho...! ;-D) */
+			return Parser::rxPacket(pkt);
 
 		case ADARA::PacketType::RAW_EVENT_TYPE:
 		case ADARA::PacketType::MAPPED_EVENT_TYPE:
