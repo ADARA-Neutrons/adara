@@ -6,6 +6,11 @@
 #    - on sns-sts2.sns.gov
 #
 
+STS_DIR="/SNS/users/y8y"
+
+STS_SSH="ssh -AY sns-sts1.sns.gov"
+#STS_SSH="ssh -AY sns-sts2.sns.gov"
+
 STS_PROD="/SNS/lustre/stsdata/sts_config.xml"
 STS_TEST="/SNS/lustre/stsdata_test/sts_config.xml"
 STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
@@ -31,7 +36,39 @@ for opt in $@ ; do
 
 done
 
-echo "Processing STS Configs in:"
+echo -e "\nProcessing STS Configs in:"
 echo "$CONFIGS" | sed "s/ /\n/g"
-echo
+
+config_temp="$STS_DIR/sts_config_update-$$.xml"
+echo -e "\nUsing Temporary STS Config File as:\n\t$config_temp\n"
+
+for config in $CONFIGS ; do
+
+	echo -e "Updating STS Config in:\n\t$config\n"
+
+	cp $config $config_temp
+
+	xxdiff ./sts_config.xml $config_temp
+
+	diff $config_temp $config | less -x4
+
+	echo -e -n "Deploy Updated Config to:\n\n\t$config\n\n(yes/No/quit)? "
+
+	read deploy_ck
+	deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
+		$STS_SSH cp $config_temp $config
+	elif [[ "#$deploy_ck#" == '#q#' || "#$deploy_ck#" == '#quit#' ]]; then
+		echo -e "\nExiting Update Config Script at User's Request.\n"
+		/bin/rm $config_temp
+		exit 0
+	else
+		echo -e "\nOk, Leaving Deployed STS Config Script As Is...\n"
+	fi
+
+done
+
+# Clean Up...
+/bin/rm $config_temp
 
