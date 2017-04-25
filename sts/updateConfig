@@ -55,21 +55,34 @@ for config in $CONFIGS ; do
 
 	xxdiff ./sts_config.xml $config_temp
 
-	diff $config_temp $config | less -x4
+	# Check for File Differences...
+	diff $config_temp $config > /dev/null 2>&1
+	ckdiff=$?
 
-	echo -e -n "Deploy Updated Config to:\n\n\t$config\n\n(yes/No/quit)? "
+	if [[ $ckdiff != 0 ]]; then
 
-	read deploy_ck
-	deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+		diff $config_temp $config | less -x4
 
-	if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
-		$STS_SSH cp $config_temp $config
-	elif [[ "#$deploy_ck#" == '#q#' || "#$deploy_ck#" == '#quit#' ]]; then
-		echo -e "\nExiting Update Config Script at User's Request.\n"
-		/bin/rm $config_temp
-		exit 0
+		echo -en "Deploy Updated Config to:\n\n\t$config\n\n(yes/No/quit)? "
+
+		read deploy_ck
+		deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+		if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
+			$STS_SSH cp $config_temp $config
+		elif [[ "#$deploy_ck#" == '#q#' \
+				|| "#$deploy_ck#" == '#quit#' ]]; then
+			echo -e "\nExiting Update Config Script at User's Request.\n"
+			/bin/rm $config_temp
+			exit 0
+		else
+			echo -e "\nOk, Leaving Deployed STS Config Script As Is...\n"
+		fi
+	
 	else
-		echo -e "\nOk, Leaving Deployed STS Config Script As Is...\n"
+
+		echo -e "No Change to Config File:\n\n\t$config\n"
+
 	fi
 
 done
