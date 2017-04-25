@@ -14,9 +14,11 @@ STS_SSH="ssh -AY sns-sts1.sns.gov"
 STS_PROD="/SNS/lustre/stsdata/sts_config.xml"
 STS_TEST="/SNS/lustre/stsdata_test/sts_config.xml"
 STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
+STS_JENKINS="/TESTING/JENKINS/SNS/stsdata_devel/sts_config.xml"
 
 if [[ $# < 1 ]]; then
-	echo "usage: updateConfig [ --prod | --test | --dummy | --all ]"
+	echo \
+	"usage: updateConfig [ --prod | --test | --dummy | --jenkins | --all ]"
 	exit -1
 fi
 
@@ -32,6 +34,9 @@ for opt in $@ ; do
 	fi
 	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_DUMMY"
+	fi
+	if [[ $opt == "--jenkins" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS $STS_JENKINS"
 	fi
 
 done
