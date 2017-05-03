@@ -1023,14 +1023,30 @@ OutputAdapter::sendCurrentData( int a_socket )
     }
 
     // Send value updates for configured devices
+    stringstream sentloghdr;
+    sentloghdr << "OutputAdapter::sendCurrentData():"
+        << " Sent PV Variable Value Update List to"
+        << " ADARA SMS Client (socket=" << a_socket << ") -";
     stringstream pvlist;
     for ( map<PVDescriptor*,PVState>::iterator ipv = m_pv_state.begin();
             ipv != m_pv_state.end(); ++ipv )
     {
         // Construct Logging List of PV Names/Connection Strings...
-        pvlist << " <" << ipv->first->m_name << ">";
+        string pvstr = " <" + ipv->first->m_name + ">";
         if ( ipv->first->m_connection.compare( ipv->first->m_name ) )
-            pvlist << "(" << ipv->first->m_connection << ")";
+            pvstr += "(" + ipv->first->m_connection + ")";
+        if ( sentloghdr.str().size() + pvlist.str().size() + pvstr.size()
+                > 2000 )
+        {
+            syslog( LOG_INFO,
+                "%s: Sent PV %s List to %s (socket=%d) -%s...",
+                "OutputAdapter::sendCurrentData()",
+                "Variable Value Update", "ADARA SMS Client", a_socket,
+                pvlist.str().c_str() );
+            usleep(33333); // give syslog a chance...
+            pvlist.str("");
+        }
+        pvlist << pvstr;
 
         payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
