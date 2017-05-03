@@ -109,13 +109,17 @@ InputAdapter::numInactiveDevices()
 /** \brief Method to return Device Status Counts
   */
 void
-InputAdapter::getDevicesStatus( uint32_t &a_partialCount,
-        uint32_t &a_hungCount )
+InputAdapter::getDevicesStatus(
+        uint32_t &a_partialDeviceCount, uint32_t &a_hungDeviceCount,
+        uint32_t &a_readyPVCount, uint32_t &a_totalPVCount )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
-    a_partialCount = 0;
-    a_hungCount = 0;
+    a_partialDeviceCount = 0;
+    a_hungDeviceCount = 0;
+
+    a_readyPVCount = 0;
+    a_totalPVCount = 0;
 
     for ( map<string,DeviceAgent*>::iterator idev = m_dev_agents.begin();
             idev != m_dev_agents.end(); ++idev )
@@ -126,10 +130,13 @@ InputAdapter::getDevicesStatus( uint32_t &a_partialCount,
         idev->second->deviceStatus( ready_pvs, total_pvs, hung );
 
         if ( hung )
-            a_hungCount++;
+            a_hungDeviceCount++;
 
         else if ( ready_pvs < total_pvs )
-            a_partialCount++;
+            a_partialDeviceCount++;
+
+        a_readyPVCount += ready_pvs;
+        a_totalPVCount += total_pvs;
     }
 }
 
