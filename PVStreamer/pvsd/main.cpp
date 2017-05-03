@@ -328,26 +328,46 @@ int main(int argc, char *argv[])
 
             if ( !( count % 300 ) )
             {
-                uint32_t partialCount, hungCount;
-                input->getDevicesStatus( partialCount, hungCount );
+                uint32_t partialDeviceCount, hungDeviceCount;
+                uint32_t readyPVCount, totalPVCount;
+
+                input->getDevicesStatus(
+                    partialDeviceCount, hungDeviceCount,
+                    readyPVCount, totalPVCount );
 
                 std::string logPrefix = "";
                 int logType = LOG_INFO;
-                if ( partialCount || hungCount )
+                if ( partialDeviceCount || hungDeviceCount )
                 {
                     logPrefix = "PVSD ERROR: ";
                     logType = LOG_ERR;
                 }
 
-                syslog( logType,
-                    "%s%s %s - %u %s (%u %s, %u %s), %u %s, %u %s, %u %s.",
+                stringstream ss;
+                ss << input->numActiveDevices();
+                ss << " Active Input Devices";
+                ss << " (";
+                ss << partialDeviceCount;
+                ss << " Partial, ";
+                ss << hungDeviceCount;
+                ss << " Hung), ";
+                ss << readyPVCount;
+                ss << " Ready PVs, ";
+                ss << totalPVCount;
+                ss << " Total PVs, ";
+                ss << input->numInactiveDevices();
+                ss << " Inactive Input Devices, ";
+                ss << output->numConnected();
+                ss << " Output Adapters Connected, ";
+                ss << output->numDevices();
+                ss << " Output Devices Defined, ";
+                ss << output->numPVs();
+                ss << " Output PVs Defined";
+
+                syslog( logType, "%s%s %s - %s.",
                     logPrefix.c_str(),
                     "PVSD is Alive at", output->serverAddr().c_str(),
-                    input->numActiveDevices(), "Active Input Devices",
-                    partialCount, "Partial", hungCount, "Hung",
-                    input->numInactiveDevices(), "Inactive Input Devices",
-                    output->numConnected(), "Output Adapters Connected",
-                    output->numDevices(), "Output Devices Defined" );
+                    ss.str().c_str() );
             }
 
             sleep(1);
