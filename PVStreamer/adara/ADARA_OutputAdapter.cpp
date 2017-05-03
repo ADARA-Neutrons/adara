@@ -403,6 +403,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
     vector<double> double_array;
     uint8_t *bytes;
 
+    stringstream arrayElems;
     uint32_t elemCount;
     uint32_t i;
     int rem;
@@ -518,12 +519,17 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
             elemCount = 0;
         }
 
+        // (For Now) Log Array Elements...
+        arrayElems << "[";
         for ( i=0 ; i < elemCount ; i++ )
         {
-            syslog( LOG_INFO, "%s: uint_array[%u] = %u",
-                "OutputAdapter::buildVVP()", i, uint_array[i] );
-            usleep(33333); // give syslog a chance...
+            arrayElems << " " << uint_array[i];
         }
+        arrayElems << " ]";
+        syslog( LOG_INFO, "%s: uint_array = %s",
+            "OutputAdapter::buildVVP()", arrayElems.str().c_str() );
+        usleep(33333); // give syslog a chance...
+
         a_adara_pkt.vvp_array.elemCount = elemCount;
         a_payload = vector<uint8_t>( elemCount * sizeof(uint32_t) );
         bytes = a_payload.data();
@@ -571,12 +577,17 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
             elemCount = 0;
         }
 
+        // (For Now) Log Array Elements...
+        arrayElems << "[";
         for ( i=0 ; i < elemCount ; i++ )
         {
-            syslog( LOG_INFO, "%s: double_array[%u] = %lf",
-                "OutputAdapter::buildVVP()", i, double_array[i] );
-            usleep(33333); // give syslog a chance...
+            arrayElems << " " << double_array[i];
         }
+        arrayElems << " ]";
+        syslog( LOG_INFO, "%s: double_array = %s",
+            "OutputAdapter::buildVVP()", arrayElems.str().c_str() );
+        usleep(33333); // give syslog a chance...
+
         a_adara_pkt.vvp_array.elemCount = elemCount;
         a_payload = vector<uint8_t>( elemCount * sizeof(double) );
         bytes = a_payload.data();
@@ -1001,20 +1012,24 @@ OutputAdapter::sendCurrentData( int a_socket )
     }
 
     // Send value updates for configured devices
+    stringstream pvlist;
     for ( map<PVDescriptor*,PVState>::iterator ipv = m_pv_state.begin();
             ipv != m_pv_state.end(); ++ipv )
     {
-        syslog( LOG_INFO,
-            "%s: Sending PV <%s> (%s) %s to %s (socket=%d)",
-            "OutputAdapter::sendCurrentData()",
-            ipv->first->m_name.c_str(), ipv->first->m_connection.c_str(),
-            "Variable Value Update", "ADARA SMS Client", a_socket );
-        usleep(33333); // give syslog a chance...
+        // Construct Logging List of PV Names/Connection Strings...
+        pvlist << " <" << ipv->first->m_name << ">";
+        if ( ipv->first->m_connection.compare( ipv->first->m_name ) )
+            pvlist << "(" << ipv->first->m_connection << ")";
 
         payload.clear();
         buildVVP( adara_pkt, ipv->first, ipv->second, payload );
         sendPacket( adara_pkt, payload, a_socket );
     }
+
+    syslog( LOG_INFO, "%s: Sent PV %s List to %s (socket=%d) -%s.",
+        "OutputAdapter::sendCurrentData()", "Variable Value Update",
+        "ADARA SMS Client", a_socket, pvlist.str().c_str() );
+    usleep(33333); // give syslog a chance...
 }
 
 
