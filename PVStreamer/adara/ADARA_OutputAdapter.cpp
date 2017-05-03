@@ -913,6 +913,17 @@ OutputAdapter::numDevices()
 }
 
 
+/** \brief Method to return number of PVs that are currently defined.
+  */
+uint32_t
+OutputAdapter::numPVs()
+{
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    return m_pv_state.size();
+}
+
+
 void
 OutputAdapter::socketListenThread()
 {

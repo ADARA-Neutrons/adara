@@ -28,6 +28,7 @@ public:
 
     uint32_t        numConnected();
     uint32_t        numDevices();
+    uint32_t        numPVs();
 
 private:
     // Force visual studio to pack on 4 byte boundaries instead of default 8
