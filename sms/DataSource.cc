@@ -1283,7 +1283,7 @@ void DataSource::dataReady(void)
 			std::string log_info;
 			bool dumpStats = false;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
+					RLL_READ_DELAY, m_name, 60, 20, 5, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"
