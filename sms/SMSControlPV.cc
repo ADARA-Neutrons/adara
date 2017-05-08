@@ -1027,7 +1027,7 @@ void smsConnectedPV::connected() {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_CONNPV_CONNECTED, m_pv_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info << "smsConnectedPV::connected() m_pv_name="
 			<< m_pv_name << " (0)");
 	}
@@ -1043,7 +1043,7 @@ void smsConnectedPV::disconnected() {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_CONNPV_DISCONNECTED, m_pv_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info << "smsConnectedPV::disconnected() m_pv_name="
 			<< m_pv_name << " (1)");
 	}
@@ -1059,7 +1059,7 @@ void smsConnectedPV::failed() {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_CONNPV_FAILED, m_pv_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info << "smsConnectedPV::failed() m_pv_name="
 			<< m_pv_name << " (2)");
 	}
@@ -1075,7 +1075,7 @@ void smsConnectedPV::trying_to_connect() {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_CONNPV_TRYING, m_pv_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info << "smsConnectedPV::trying_to_connect() m_pv_name="
 			<< m_pv_name << " (3)");
 	}
@@ -1091,7 +1091,7 @@ void smsConnectedPV::waiting_for_connect_ack() {
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_CONNPV_WAITING, m_pv_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		DEBUG(log_info
 			<< "smsConnectedPV::waiting_for_connect_ack() m_pv_name="
 			<< m_pv_name << " (4)");

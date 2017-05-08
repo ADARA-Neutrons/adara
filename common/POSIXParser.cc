@@ -30,34 +30,41 @@ bool POSIXParser::read(int fd, std::string & log_info,
 	unsigned long len, to_read = max_read ?: ~0UL;
 	unsigned int max_parse = ~0U;
 	unsigned long to_parse = max_packets ?: max_parse;
-	unsigned long total_bytes = 0;
-	unsigned int total_packets = 0;
-	unsigned int read_count = 0;
-	unsigned int loop_count = 0;
 	ssize_t rc;
 
 	last_last_parse_elapsed_total = last_parse_elapsed_total;
-	last_last_read_elapsed_total = last_read_elapsed_total;
-
 	last_parse_elapsed_total = 0;
+
+	last_last_read_elapsed_total = last_read_elapsed_total;
 	last_read_elapsed_total = 0;
+
+	last_last_loop_count = last_loop_count;
+	last_loop_count = 0;
+
+	last_last_read_count = last_read_count;
+	last_read_count = 0;
+
+	last_last_total_bytes = last_total_bytes;
+	last_total_bytes = 0;
+
+	last_last_total_packets = last_total_packets;
+	last_total_packets = 0;
+
+	last_last_elapsed = last_elapsed;
 
 	// *No Memory Leaks* if POSIX::read() is called in a *Loop*...! ;-b
 	log_info.clear();
 
 	// DEBUG("read() to_read=" << to_read << " to_parse=" << to_parse);
 
-	while (to_read && total_packets < to_parse && read_count < 10) {
-		loop_count++;
-		last_last_loop_count = last_loop_count;
-		last_loop_count = loop_count;
+	while (to_read && last_total_packets < to_parse && last_read_count < 10)
+	{
+		last_loop_count++;
 		len = bufferFillLength();
 		if (len > to_read)
 			len = to_read;
 		if (len) {
-			read_count++;
-			last_last_read_count = last_read_count;
-			last_read_count = read_count;
+			last_read_count++;
 			clock_gettime(CLOCK_REALTIME, &start_read_time);
 			last_last_start_read_time = last_start_read_time;
 			last_start_read_time = start_read_time;
@@ -81,7 +88,6 @@ bool POSIXParser::read(int fd, std::string & log_info,
 					/* We didn't get any data, but we're OK */
 					log_info.append("read() no data but OK exit; ");
 					clock_gettime(CLOCK_REALTIME, &end_time);
-					last_last_elapsed = last_elapsed;
 					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return true;
 				case EPIPE:
@@ -92,7 +98,6 @@ bool POSIXParser::read(int fd, std::string & log_info,
 					/* The host went away, but that shouldn't be fatal. */
 					log_info.append("read() host went away exit; ");
 					clock_gettime(CLOCK_REALTIME, &end_time);
-					last_last_elapsed = last_elapsed;
 					last_elapsed = calcDiffSeconds( end_time, start_time );
 					return false;
 				default:
@@ -113,7 +118,6 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			if (rc == 0) {
 				log_info.append("read() read returned 0 exit; ");
 				clock_gettime(CLOCK_REALTIME, &end_time);
-				last_last_elapsed = last_elapsed;
 				last_elapsed = calcDiffSeconds( end_time, start_time );
 				return false;
 			}
@@ -126,12 +130,10 @@ bool POSIXParser::read(int fd, std::string & log_info,
 			bufferBytesAppended((unsigned int) rc);
 			to_read -= rc;
 
-			total_bytes += rc;
-			last_last_total_bytes = last_total_bytes;
-			last_total_bytes = total_bytes;
+			last_total_bytes += rc;
 			// DEBUG("read() Read " << rc << " Bytes"
 				// << " to_read=" << to_read
-				// << " total_bytes=" << total_bytes);
+				// << " last_total_bytes=" << last_total_bytes);
 		}
 
 		// Always parse as many packets as possible, don't leave any behind.
@@ -147,7 +149,6 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		if (rc < 0) {
 			log_info.append("read() bufferParse() error exit; ");
 			clock_gettime(CLOCK_REALTIME, &end_time);
-			last_last_elapsed = last_elapsed;
 			last_elapsed = calcDiffSeconds( end_time, start_time );
 			return false;
 		}
@@ -156,21 +157,18 @@ bool POSIXParser::read(int fd, std::string & log_info,
 		 * fit 2^21 packets in a buffer smaller than 32 GB, so we're
 		 * safe to cast away the warning here.
 		 */
-		total_packets += (unsigned int) rc;
-		last_last_total_packets = last_total_packets;
-		last_total_packets = total_packets;
+		last_total_packets += (unsigned int) rc;
 		// DEBUG("read() Parsed " << rc << " Packets"
-			// << " total_packets=" << total_packets);
+			// << " last_total_packets=" << last_total_packets);
 	}
 
 	log_info.append("read() true exit; ");
-	// DEBUG("read() true exit" << " total_bytes=" << total_bytes
-		// << " total_packets=" << total_packets
-		// << " read_count=" << read_count
-		// << " loop_count=" << loop_count);
+	// DEBUG("read() true exit" << " last_total_bytes=" << last_total_bytes
+		// << " last_total_packets=" << last_total_packets
+		// << " last_read_count=" << last_read_count
+		// << " last_loop_count=" << last_loop_count);
 
 	clock_gettime(CLOCK_REALTIME, &end_time);
-	last_last_elapsed = last_elapsed;
 	last_elapsed = calcDiffSeconds( end_time, start_time );
 
 	return true;

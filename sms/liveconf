@@ -670,7 +670,7 @@ config_blnum=`echo "$config_host" | sed 's/-.*//'`
 
 if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
 	addToIntroOutput \
-		"\nWarning: This is _Not_ a Beamline SMS Computer!\n\n"
+		"Warning: This is _Not_ a Beamline SMS Computer!\n\n"
 	not_a_beamline_computer=1
 	config_host=`hostname`
 	config_blnum="bl99"
@@ -736,10 +736,6 @@ fi
 addToIntroOutput "Git Config Repository: [${CONFIG_REPO}].\n\n"
 
 addToIntroOutput "Git Config Repository Branch: [${config_branch}].\n\n"
-
-if [[ $quiet == 0 ]]; then
-	echo -e -n "$introOutput"
-fi
 
 awkLineBreak=" \
 	{ \
@@ -2094,7 +2090,7 @@ UPDATE_CONFIG_FILE()
 			if [[ "$ckrepl" == "" || "$ckrepl" == "n" \
 					|| "$ckrepl" == "no" ]]; then
 				echo -e \
-					"\nSkipping Config File Update at User's Request!\n"
+					"\nSkipping Config File Update at User's Request!"
 				do_git_config=0
 			else
 
@@ -2424,6 +2420,9 @@ elif [[ "$command" == "confck" ]]; then
 # and Choose Whether to Spew It when in a Cron Job... ;-D
 CONFCK()
 {
+	# Dump Intro Output Now, "Quiet" Mode is Handled by Function Caller...
+	echo -e -n "$introOutput"
+
 	echo -e "ADARA SMS LiveConf Configuration Check - Live vs. File:\n"
 
 	# Function to Collect Error Summary Output
@@ -2730,7 +2729,6 @@ CONFCK()
 		doConfCk=`CONFCK`
 		_ckconfck=$?
 		if [[ ${_ckconfck} != 0 ]]; then
-			echo -e -n "$introOutput"
 			echo -e "$doConfCk\n"
 			exit ${_ckconfck}
 		fi

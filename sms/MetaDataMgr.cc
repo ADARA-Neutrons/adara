@@ -111,7 +111,7 @@ void MetaDataMgr::dropSourceTag( uint32_t srcTag )
 	ss << srcTag;
 	if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 			RLL_DROP_DEVICES_FOR_TAG, ss.str(),
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		SMSControl *ctrl = SMSControl::getInstance();
 		DEBUG( log_info
 			<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
@@ -166,7 +166,7 @@ void MetaDataMgr::dropSourceTag( uint32_t srcTag )
 		log_info.clear();
 		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
 				RLL_NO_DEVICES_TO_DROP, ss.str(),
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			DEBUG( log_info
 				<< "dropSourceTag():"
 				<< " Warning No Devices Found! srcTag=" << srcTag );

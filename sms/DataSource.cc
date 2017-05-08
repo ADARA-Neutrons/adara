@@ -1010,7 +1010,7 @@ void DataSource::startConnect(void)
 	if ( m_addrinfo == NULL ) {
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 				RLL_WONT_CONN, m_name,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "startConnect():"
@@ -1023,7 +1023,7 @@ void DataSource::startConnect(void)
 	// Ready to Connect...
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 			RLL_TRYING_CONN, m_name,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		INFO(log_info
 			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Trying connection to " << m_name);
@@ -1060,7 +1060,7 @@ void DataSource::startConnect(void)
 			/* Rate-limited logging of refused connection */
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_CONN_REFUSED, m_name,
-					600, 3, 10, log_info ) ) {
+					60, 3, 10, log_info ) ) {
 				WARN(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Connection refused by " << m_name);
@@ -1084,7 +1084,7 @@ void DataSource::startConnect(void)
 		default:
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_CONN_REQUEST_ERROR, m_name,
-					600, 3, 10, log_info ) ) {
+					60, 3, 10, log_info ) ) {
 				WARN(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Unknown connection request error for " << m_name
@@ -1164,7 +1164,7 @@ void DataSource::connectComplete(void)
 	/* Rate-limited logging of connection issue */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-			RLL_CONN_FAILED, m_name, 600, 3, 10, log_info ) ) {
+			RLL_CONN_FAILED, m_name, 60, 3, 10, log_info ) ) {
 		WARN(log_info
 			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Connection request to " << m_name
@@ -1220,7 +1220,7 @@ void DataSource::dataReady(void)
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_PARSE_MAX_READ_CHUNK, m_name,
-					60, 3, 5000, log_info ) ) {
+					60, 3, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): " << msg << " - Revert to Original"
@@ -1283,7 +1283,7 @@ void DataSource::dataReady(void)
 			std::string log_info;
 			bool dumpStats = false;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_READ_DELAY, m_name, 600, 10, 30, log_info ) ) {
+					RLL_READ_DELAY, m_name, 60, 20, 5, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"

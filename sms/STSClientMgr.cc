@@ -302,7 +302,7 @@ void STSClientMgr::startConnect(void)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info
 				<< "Asynchronous Lookup Failed to Enqueue for STS at "
 				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
@@ -325,7 +325,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_BOGUS_LOOKUP_SIGNAL, "none",
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info
 				<< "Unexpected Asynchronous Lookup Complete Signal for STS?"
 				<< " Ignoring."
@@ -347,7 +347,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		/* Rate-limited lookup error (or just once per failure type?) */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CLIENT_LOOKUP_FAILED, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Asynchronous Lookup Failed for STS at "
 				<< m_node << ":" << m_service << " - " << gai_strerror(rc));
 		}
@@ -390,7 +390,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		/* Rate-limited logging of refused connection */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CONNECTION_REFUSED, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Connection Refused for STS at "
 				<< m_node << ":" << m_service);
 		}
@@ -399,7 +399,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		/* [PARANOID] Rate-limited logging of interrupted connection */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CONNECTION_INTR, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Connection Interrupted for STS at "
 				<< m_node << ":" << m_service << " - Ignoring...");
 		}
@@ -408,7 +408,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		/* [PARANOID] Rate-limited logging of already-in-progress connect */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_CONNECTION_INPROGRESS, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			// Apparently, This Happens A Lot... ;-Q  Make it just "Info"!
 			INFO(log_info << "Connection In Progress for STS at "
 				<< m_node << ":" << m_service << " - Ignoring...");
@@ -422,7 +422,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		/* Rate-limited logging of unexpected connection error */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 				RLL_STS_UNEXPECTED_CONN_ERROR, m_node + ":" + m_service,
-				600, 3, 10, log_info ) ) {
+				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Unexpected Error from Connect to STS at "
 				<< m_node << ":" << m_service << " - " << strerror(rc));
 		}
@@ -448,7 +448,7 @@ error:
 	/* Rate-limited connection failure message */
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_FAILED_TO_CONNECT, m_node + ":" + m_service,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		ERROR(log_info << "Failed to Initiate Connection to STS at "
 			<< m_node << ":" << m_service);
 	}
@@ -486,7 +486,7 @@ void STSClientMgr::connectComplete(void)
 			/* Rate-limited logging of connection issue */
 			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
-					600, 3, 10, log_info ) ) {
+					60, 3, 10, log_info ) ) {
 				ERROR(log_info << "Connection Failed to STS at "
 					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
@@ -503,7 +503,7 @@ void STSClientMgr::connectComplete(void)
 			/* Rate-limited logging of connection issue */
 			if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 					RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
-					600, 3, 10, log_info ) ) {
+					60, 3, 10, log_info ) ) {
 				ERROR(log_info << "Connection Failed to STS at "
 					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
@@ -537,7 +537,7 @@ void STSClientMgr::connectComplete(void)
 	/* Rate-limited logging of connection issue */
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_CONNECTION_FAILED, m_node + ":" + m_service,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		ERROR(log_info << "Connection Failed to STS at "
 			<< m_node << ":" << m_service << " - "
 			<< strerror(err) << " (" << err << ")");
@@ -565,7 +565,7 @@ bool STSClientMgr::connectTimeout(void)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_CONNECTION_TIMED_OUT, m_node + ":" + m_service,
-			600, 3, 10, log_info ) ) {
+			60, 3, 10, log_info ) ) {
 		ERROR(log_info << "Timed Out Connecting to STS at "
 			<< m_node << ":" << m_service);
 	}
