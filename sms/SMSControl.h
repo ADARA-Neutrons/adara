@@ -215,7 +215,11 @@ private:
 			bool major = false);
 
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
+
 	SourceSet m_eventSources;
+	bool m_noRegisteredEventSources;
+	uint32_t m_noRegisteredEventSourcesCount;
+
 	SourceSet m_liveClients;
 
 	PulseMap m_pulses;

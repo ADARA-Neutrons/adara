@@ -41,12 +41,11 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
-#define RLL_RTDL_NO_DATA                 5
-#define RLL_PULSE_PCHG_UNCORRECTED       6
-#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
-#define RLL_NO_RTDL_FOR_PULSE            8
-#define RLL_CHOPPER_SYNC_ISSUE           9
-#define RLL_CHOPPER_GLITCH_ISSUE        10
+#define RLL_PULSE_PCHG_UNCORRECTED       5
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      6
+#define RLL_NO_RTDL_FOR_PULSE            7
+#define RLL_CHOPPER_SYNC_ISSUE           8
+#define RLL_CHOPPER_GLITCH_ISSUE         9
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -351,6 +350,7 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
+	m_noRegisteredEventSources(true), m_noRegisteredEventSourcesCount(0),
 	m_lastPulseId(0), m_lastRingPeriod(0),
 	m_monitorReserve(1024), m_bankReserve(4096),
 	m_chopperReserve(128), m_fastMetaReserve(16),
@@ -1069,7 +1069,7 @@ void SMSControl::setSummaryReason( bool setBase, bool changedValid,
 uint32_t SMSControl::registerEventSource(uint32_t hwId)
 {
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "registerEventSource hwId=" << hwId);
+		<< "registerEventSource(): hwId=" << hwId);
 
 	/* We're called when a data source discovers a new hardware
 	 * source id and needs to allocate a bit position for completing
@@ -1077,14 +1077,36 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	 */
 	size_t i, max = m_eventSources.size();
 	for (i = 0; i < max; i++) {
-		if (!m_eventSources[i]) {
+		// Found an Available Event Source Index...
+		if ( !m_eventSources[i] ) {
+			// Reset "No Registered Event Sources Flags (We Got One! :-)
+			if ( m_noRegisteredEventSources ) {
+				if ( m_noRegisteredEventSourcesCount ) {
+					// Make Sure We Log/Notify This State Change...
+					ERROR("registerEventSource():"
+						<< " First New Event Source Registered!"
+						<< " Resetting No Registered Event Source Count "
+						<< m_noRegisteredEventSourcesCount << " -> 0");
+					m_noRegisteredEventSourcesCount = 0;
+				}
+				// Gently Log the State Change if it doesn't really matter.
+				else {
+					DEBUG("registerEventSource():"
+						<< " First New Event Source Registered,"
+						<< " No Registered Event Source Count Still = "
+						<< m_noRegisteredEventSourcesCount);
+				}
+				m_noRegisteredEventSources = false;
+			}
+			// Set New Event Source Bit & Return Index...
 			m_eventSources.set(i);
-			DEBUG("registerEventSource returning smsId=" << i);
+			DEBUG("registerEventSource(): returning smsId=" << i);
 			return i;
 		}
 	}
 
-	DEBUG("registerEventSource Out of Event Source (smsIds)!");
+	// Oops... Out of Event Source Indices...?! Wow, Lotta Data Sources?!!
+	DEBUG("registerEventSource(): Out of Event Source (smsIds)!");
 	throw std::runtime_error("No more event sources available");
 }
 
@@ -1175,8 +1197,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 							DEBUG("unregisterEventSource():"
 								<< " Ran Out of Pulses to Buffer - Done");
 							/* D-Oh Before Returning, Mark Id for Re-Use */
-							m_eventSources.reset(smsId);
-							return;
+							goto done;
 						}
 					}
 				}
@@ -1185,8 +1206,7 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 					DEBUG("unregisterEventSource():"
 						<< " No Pulses to Record, Buffer Not Full - Done");
 					/* D-Oh... Before Returning, Mark This Id for Re-Use */
-					m_eventSources.reset(smsId);
-					return;
+					goto done;
 				}
 				// Keep Counting...
 				rit++;
@@ -1268,8 +1288,20 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 			<< " (recorded=" << recorded << ")" );
 	}
 
-	/* Mark This Id for Re-Use. */
+done:
+
+	// Mark This Id for Re-Use...
 	m_eventSources.reset(smsId);
+
+	// Check for "No Registered Event Sources" State Change...
+	if ( m_eventSources.none() ) {
+		// Log/Notify on State Change...
+		ERROR("unregisterEventSource():"
+			<< " Last Event Source Unregistered!"
+			<< " Resetting No Registered Event Sources Count to 0.");
+		m_noRegisteredEventSources = true;
+		m_noRegisteredEventSourcesCount = 0;
+	}
 }
 
 void SMSControl::popPulseBuffer(int32_t pulse_index)
@@ -1597,7 +1629,7 @@ void SMSControl::setSourcesReadDelay(void)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 			RLL_SET_SOURCES_READ_DELAY, "none",
-			600, 10, 30, log_info ) ) {
+			60, 10, 30, log_info ) ) {
 		if ( m_pulses.begin() != m_pulses.end() ) {
 			DEBUG(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
@@ -2087,16 +2119,22 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	pulse->m_rtdl = boost::make_shared<ADARA::RTDLPkt>(pkt);
 
 	// Is pulse pending from any data sources...?
-	if (!pulse->m_pending.any()) {
-		std::string log_info;
-		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-				RLL_RTDL_NO_DATA, "none",
-				2, 10, 216000, log_info ) ) {   // about once per hour...
-			ERROR(log_info
-				<< ( m_recording ? "[RECORDING] " : "" )
+	if ( !pulse->m_pending.any() ) {
+
+		// ***Periodically*** Log Pulse with No Registered Event Sources!!!
+		// (E.g. _Not_ Every 216000 Occurrences using Rate-Limited Logging)
+		// - Always Log If We're _Not_ in No Registered Event Source State
+		// - Otherwise, Only Log Every 36000 Occurrences (Every 10 Mins)
+		if ( !m_noRegisteredEventSources
+				|| !(m_noRegisteredEventSourcesCount++ % 36000) ) {
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
 				<< "pulseRTDL: Pulse with No Registered Event Sources!"
+				<< " (m_noRegisteredEventSources="
+				<< ( m_noRegisteredEventSources ? "true" : "false" )
+				<< ", count=" << m_noRegisteredEventSourcesCount << ")"
 				<< " Marking Partial...");
 		}
+
 		// Mark Pulse "Partial" Because there's No Event Data,
 		// but then go ahead and mark it "Complete" to record it, lol...!
 		pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
@@ -2722,7 +2760,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_SYNC_ISSUE, ss.str(),
-									9999, 10, 999, log_info ) ) {
+									60, 10, 100, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )
@@ -2752,7 +2790,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 							if ( RateLimitedLogging::checkLog(
 									RLLHistory_SMSControl,
 									RLL_CHOPPER_GLITCH_ISSUE, ss.str(),
-									9999, 10, 999, log_info ) ) {
+									60, 10, 100, log_info ) ) {
 								ERROR(log_info
 									<< ( m_recording
 										? "[RECORDING] " : "" )
