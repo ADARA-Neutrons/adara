@@ -98,6 +98,8 @@ USAGE()
 	echo "           [--config=[${SMSD_CONFIG}]] \\"
 	echo "           [--sms-data=[${SMSD_DATA}]] \\"
 	echo "           [--sms-log=[${SMSD_LOG}]] \\"
+	echo "           [--send-paused-data] \\"
+	echo "           [--no-send-paused-data] \\"
 	echo "           [--help]"
 	echo
 
@@ -110,6 +112,8 @@ USAGE()
 	echo "   --config=.../smsd.conf  = specify custom SMSD Config file"
 	echo "   --sms-data=.../data     = specify custom SMSD Data directory"
 	echo "   --sms-log=.../smsd.log  = specify custom SMSD Log file"
+	echo "   --send-paused-data      = force sending of paused data"
+	echo "   --no-send-paused-data   = force NOT sending of paused data"
 	echo "   --help                  = display this help/usage information"
 	echo
 }
@@ -120,7 +124,13 @@ if [ $# == 0 ]; then
 	exit -1
 fi
 
+# Send Paused Data Options:
+AutoSendPausedData=0
+AlwaysSendPausedData=1
+NeverSendPausedData=2
+
 # Parse Command Line Options...
+SendPausedData=$AutoSendPausedData
 RunDirectory=""
 RunNumber=-1
 for arg in "$@" ; do
@@ -151,6 +161,12 @@ for arg in "$@" ; do
 		SMSD_LOG="$value"
 		echo -e "Using SMS Log File in:\n" \
 			"   [${SMSD_LOG}]\n" 1>&2
+	elif [ "#$key#" == '#--send-paused-data#' ]; then
+		SendPausedData=$AlwaysSendPausedData
+		echo -e "Manually Forcing *Always* Sending Paused Data." 1>&2
+	elif [ "#$key#" == '#--no-send-paused-data#' ]; then
+		SendPausedData=$NeverSendPausedData
+		echo -e "Manually Forcing *Never* Sending Paused Data." 1>&2
 	else # --help or nothing...
 		USAGE 1>&2
 		exit -1
@@ -210,4 +226,93 @@ fi
 echo "Run Directory: ${RunDirectory}" 1>&2
 echo "Run Number: ${RunNumber}" 1>&2
 echo 1>&2
+
+# Collect Set of Raw Data Files for the Run...
+
+rawFilesCmd="/bin/ls \"${RunDirectory}\"/f*-run-${RunNumber}.adara"
+
+ckRaw=`eval $rawFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+
+if [[ $ckRaw -lt 1 ]]; then
+	echo -e \
+	"Error Finding Raw Data Files for Run Number ${RunNumber}!\n" 1>&2
+	eval $rawFilesCmd 1>&2
+	echo 1>&2
+	exit -20
+fi
+
+pausedFilesCmd="/bin/ls \"${RunDirectory}\"/f*-p*-run-${RunNumber}.adara"
+
+ckPaused=`eval $pausedFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+
+echo -e "Found $ckRaw Raw Data Files ($ckPaused Paused)" \
+	"for Run Number ${RunNumber}.\n" 1>&2
+
+rawFiles=`eval $rawFilesCmd`
+
+# If Automatically Determining Whether to Send Paused Data, Determine It!
+if [[ $SendPausedData == $AutoSendPausedData ]]; then
+
+	# Note: an SMS "STSClient" reads the "SendPausedData" settings
+	# _Exactly Once_ at the Beginning of a New Translation...! ;-D
+	# So we only need to check that one "Initiating Translation" log msg!
+
+	stsInitLog="Initiating Translation of ${RunNumber} SendPausedData="
+
+	ckSendPaused=`grep "$stsInitLog" $SMSD_LOG`
+
+	if [[ $ckSendPaused == "" ]]; then
+
+		echo -e \
+		"Error Finding Translation Initiation Log for ${RunNumber} in:\n" \
+			1>&2
+		echo -e "   [$SMSD_LOG]\n" 1>&2
+		echo -e "Erring on the Side of Caution - Sending Paused Data!\n" \
+			1>&2
+
+		SendPausedData=$AlwaysSendPausedData
+
+	else
+
+		# Parse Translation Initiation Log Message for SendPausedData...
+
+		sendPaused=`echo "$ckSendPaused" | awk -F = '{print $2}'`
+
+		if [[ $sendPaused == $AlwaysSendPausedData ]]; then
+
+			echo -e "Run ${RunNumber} Set to *Send Paused Data*...!\n" 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		elif [[ $sendPaused == $NeverSendPausedData ]]; then
+
+			echo -e "Run ${RunNumber} Set to *Not Send Paused Data*...!\n" \
+				1>&2
+
+			SendPausedData=$NeverSendPausedData
+
+		else
+
+			echo -e \
+			"Error: Unknown SendPausedData Value [${sendPaused}]...!\n" 1>&2
+			echo -e "Erring on the Side of Caution - Sending Paused Data!" \
+				1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		fi
+
+	fi
+
+fi
+
+if [ $SendPausedData == $AlwaysSendPausedData ]; then
+	echo -e "Sending Paused Data for Run ${RunNumber}.\n" 1>&2
+elif [ $SendPausedData == $NeverSendPausedData ]; then
+	echo -e "Not Sending Paused Data for Run ${RunNumber}.\n" 1>&2
+else
+	echo -e "Internal Error: Unknown Send Paused Data Setting...!\n" 1>&2
+	echo -e "   SendPausedData = [${SendPausedData}]\n" 1>&2
+	exit -30
+fi
 
