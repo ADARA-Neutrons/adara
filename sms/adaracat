@@ -163,10 +163,10 @@ for arg in "$@" ; do
 			"   [${SMSD_LOG}]\n" 1>&2
 	elif [ "#$key#" == '#--send-paused-data#' ]; then
 		SendPausedData=$AlwaysSendPausedData
-		echo -e "Manually Forcing *Always* Sending Paused Data." 1>&2
+		echo -e "Manually Forcing *Always* Sending Paused Data.\n" 1>&2
 	elif [ "#$key#" == '#--no-send-paused-data#' ]; then
 		SendPausedData=$NeverSendPausedData
-		echo -e "Manually Forcing *Never* Sending Paused Data." 1>&2
+		echo -e "Manually Forcing *Never* Sending Paused Data.\n" 1>&2
 	else # --help or nothing...
 		USAGE 1>&2
 		exit -1
@@ -227,29 +227,6 @@ echo "Run Directory: ${RunDirectory}" 1>&2
 echo "Run Number: ${RunNumber}" 1>&2
 echo 1>&2
 
-# Collect Set of Raw Data Files for the Run...
-
-rawFilesCmd="/bin/ls \"${RunDirectory}\"/f*-run-${RunNumber}.adara"
-
-ckRaw=`eval $rawFilesCmd 2>/dev/null | wc | awk '{print $1}'`
-
-if [[ $ckRaw -lt 1 ]]; then
-	echo -e \
-	"Error Finding Raw Data Files for Run Number ${RunNumber}!\n" 1>&2
-	eval $rawFilesCmd 1>&2
-	echo 1>&2
-	exit -20
-fi
-
-pausedFilesCmd="/bin/ls \"${RunDirectory}\"/f*-p*-run-${RunNumber}.adara"
-
-ckPaused=`eval $pausedFilesCmd 2>/dev/null | wc | awk '{print $1}'`
-
-echo -e "Found $ckRaw Raw Data Files ($ckPaused Paused)" \
-	"for Run Number ${RunNumber}.\n" 1>&2
-
-rawFiles=`eval $rawFilesCmd`
-
 # If Automatically Determining Whether to Send Paused Data, Determine It!
 if [[ $SendPausedData == $AutoSendPausedData ]]; then
 
@@ -307,12 +284,76 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 fi
 
 if [ $SendPausedData == $AlwaysSendPausedData ]; then
-	echo -e "Sending Paused Data for Run ${RunNumber}.\n" 1>&2
+	echo -e "Set to Send Paused Data for Run ${RunNumber}.\n" 1>&2
 elif [ $SendPausedData == $NeverSendPausedData ]; then
-	echo -e "Not Sending Paused Data for Run ${RunNumber}.\n" 1>&2
+	echo -e "Set to Not Send Paused Data for Run ${RunNumber}.\n" 1>&2
 else
 	echo -e "Internal Error: Unknown Send Paused Data Setting...!\n" 1>&2
 	echo -e "   SendPausedData = [${SendPausedData}]\n" 1>&2
+	exit -20
+fi
+
+# Now Collect the Set of Raw Data Files for the Run... (_Without_ Paused!)
+
+# Turn On ExtGlob (as Needed) for Extended Globbing Syntax
+# (to surgically _Exclude_ the Paused Data Files, as needed... :-)
+saveExtGlob=`shopt extglob | awk '{print $2}'`
+if [[ $saveExtGlob == "off" ]]; then
+	echo -e "Setting Shell for Extended Globbing Syntax..." 1>&2
+	shopt -s extglob
+	shopt extglob 1>&2
+	echo 1>&2
+fi
+
+rawFilesCmd="/bin/ls \"${RunDirectory}\"/f+([0-9])-run-${RunNumber}.adara"
+
+ckRaw=`eval $rawFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+
+if [[ $ckRaw -lt 1 ]]; then
+	echo -e \
+	"Error Finding Raw Data Files for Run Number ${RunNumber}!\n" 1>&2
+	eval $rawFilesCmd 1>&2
+	echo 1>&2
 	exit -30
+fi
+
+rawFiles=`eval $rawFilesCmd`
+
+echo -e "Found $ckRaw Raw Data Files for Run Number ${RunNumber}.\n" 1>&2
+
+###
+echo -e "rawFiles = [$rawFiles]\n" 1>&2
+###
+
+# Now Collect Paused Data Files, As Needed...
+
+pausedFiles=""
+
+if [ $SendPausedData == $AlwaysSendPausedData ]; then
+
+	pausedFilePattern="f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
+
+	pausedFilesCmd="/bin/ls ${RunDirectory}/${pausedFilePattern}"
+
+	ckPaused=`eval $pausedFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+
+	pausedFiles=`eval $pausedFilesCmd`
+
+	echo -e \
+		"Found $ckPaused Paused Data Files for Run Number ${RunNumber}.\n" \
+		1>&2
+
+	###
+	echo -e "pausedFiles = [$pausedFiles]\n" 1>&2
+	###
+
+fi
+
+# Turn ExtGlob Back Off Again, as Needed (Extended Globbing Syntax)
+if [[ $saveExtGlob == "off" ]]; then
+	echo -e "Resetting Shell to Deactivate Extended Globbing Syntax..." 1>&2
+	shopt -u extglob
+	shopt extglob 1>&2
+	echo 1>&2
 fi
 
