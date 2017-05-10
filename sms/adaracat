@@ -1,0 +1,213 @@
+#!/bin/bash
+#
+# ADARA SMS LiveConf - Live Configuration and Status Script
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+# default settings
+SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+SMSD_DATA="/SNSlocal/sms/data"
+SMSD_LOG="/var/log/smsd.log"
+PRE="[NotSet]"
+WAIT="-w 9"
+
+# Make Sure we found the EPICS utilities... ;-b
+epicsck=`which caget 2>&1`
+if [ $? != 0 ]; then
+    echo "Error: EPICS Utilities Not Found...! Check EPICS Path..." 1>&2
+    exit -999
+fi
+
+#
+# Determine the Beamline Host, and thereby the EPICS PV Prefix...
+#
+
+not_a_beamline_computer=0
+
+sms_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+sms_blnum=`echo "$sms_host" | sed 's/-.*//'`
+
+if [[ "$sms_host" == "" || "$sms_blnum" == "" ]]; then
+	echo -e "\nWarning: This is _Not_ a Beamline SMS Computer!" 1>&2
+	not_a_beamline_computer=1
+	sms_host=`hostname`
+	sms_blnum="bl99"
+fi
+
+echo -e "\nConcatenating SMS Data on Host ${sms_host} [$sms_blnum].\n" 1>&2
+
+if [ ${PRE} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n" 1>&2
+		echo -e "   $SMSD_CONFIG\n" 1>&2
+		exit -90
+	fi
+
+	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+	if [[ "#$bid_ck#" != '#1#' ]]; then
+		echo -e "Error: Invalid Beamline Id in SMSD Config File!\n" 1>&2
+		ls -l $SMSD_CONFIG 1>&2
+		echo 1>&2
+		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';' 1>&2
+		exit -91
+	fi
+
+	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| awk '{print $1$2$3}'`
+
+	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+		echo -e "Error Parsing Beamline Id in SMSD Config File!\n" 1>&2
+		ls -l $SMSD_CONFIG 1>&2
+		echo -e "\n   $bid_clean\n" 1>&2
+		exit -92
+	fi
+
+	PRE="$bid_value"
+
+	echo -e "Setting EPICS PV Prefix from SMSD Config File:\n" \
+		"   $SMSD_CONFIG\n" \
+		"      -> $bid_key = $bid_value\n" \
+		"         => [${PRE}].\n" 1>&2
+
+fi
+
+daq_ck=`echo "$sms_host" | grep "daq" | wc | awk '{print $1}'`
+if [ "#$daq_ck#" == '#1#' ]; then
+	echo -e "[DAQ Beamline Host.]\n\n" 1>&2
+fi
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo "usage:  adaracat \\"
+	echo "           [--run=<RunNumber>] \\"
+	echo "           [--dir=<RunDirectory>] \\"
+	echo "           [--beamline=[${PRE}]] \\"
+	echo "           [--config=[${SMSD_CONFIG}]] \\"
+	echo "           [--sms-data=[${SMSD_DATA}]] \\"
+	echo "           [--sms-log=[${SMSD_LOG}]] \\"
+	echo "           [--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   --run=<RunNumber>       = concatenate SMS files for RunNumber"
+	echo "   --dir=<RunDirectory>    = concatenate SMS RunDirectory files"
+	echo "   --beamline=BLXXX        = explicitly set Beamline PV Prefix"
+	echo "   --config=.../smsd.conf  = specify custom SMSD Config file"
+	echo "   --sms-data=.../data     = specify custom SMSD Data directory"
+	echo "   --sms-log=.../smsd.log  = specify custom SMSD Log file"
+	echo "   --help                  = display this help/usage information"
+	echo
+}
+
+# Check for required command line option (else 'usage')
+if [ $# == 0 ]; then
+	USAGE 1>&2
+	exit -1
+fi
+
+# Parse Command Line Options...
+RunDirectory=""
+RunNumber=-1
+for arg in "$@" ; do
+	# echo "arg=$arg" 1>&2
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key" 1>&2
+    # echo "value=$value" 1>&2
+	if [ "#$key#" == '#--run#' ]; then
+		RunNumber="$value"
+		echo -e "Setting Run Number to [${RunNumber}]\n" 1>&2
+	elif [ "#$key#" == '#--dir#' ]; then
+		RunDirectory="$value"
+		echo -e "Setting Run Directory to:\n" \
+			"    [${RunDirectory}]\n" 1>&2
+	elif [ "#$key#" == '#--beamline#' ]; then
+		PRE="$value"
+		echo -e "Setting EPICS PV Prefix to [${PRE}]\n" 1>&2
+	elif [ "#$key#" == '#--config#' ]; then
+		SMSD_CONFIG="$value"
+		echo -e "Using SMS Daemon Config File in:\n" \
+			"   [${SMSD_CONFIG}]\n" 1>&2
+	elif [ "#$key#" == '#--sms-data#' ]; then
+		SMSD_DATA="$value"
+		echo -e "Using SMS Data Files in:\n" \
+			"   [${SMSD_DATA}]\n" 1>&2
+	elif [ "#$key#" == '#--sms-log#' ]; then
+		SMSD_LOG="$value"
+		echo -e "Using SMS Log File in:\n" \
+			"   [${SMSD_LOG}]\n" 1>&2
+	else # --help or nothing...
+		USAGE 1>&2
+		exit -1
+	fi
+done
+
+# Make Sure Some Run Information is Set...! ;-D
+if [[ $RunNumber == -1 && $RunDirectory == "" ]]; then
+
+	echo -e "Error: No Run Information Specified...!\n" 1>&2
+	echo -e "Please use the \"--run=<RunNumber>\" or" \
+		" \"--dir=<RunDirectory>\" options:\n" 1>&2
+	USAGE
+	exit -11
+
+# Determine Run Directory from Run Number...
+elif [[ $RunNumber != -1 && $RunDirectory == "" ]]; then
+
+	findDirCmd="/bin/ls -d ${SMSD_DATA}/*/*-run-${RunNumber}"
+
+	ckDir=`eval $findDirCmd 2>/dev/null | wc | awk '{print $1}'`
+
+	if [[ $ckDir != 1 ]]; then
+		echo -e \
+		"Error Finding Run Directory from Run Number ${RunNumber}!\n" 1>&2
+		eval $findDirCmd 1>&2
+		echo 1>&2
+		exit -10
+	fi
+
+	RunDirectory=`eval $findDirCmd`
+
+# Determine Run Number from Run Directory...
+elif [[ $RunDirectory != "" && $RunNumber == -1 ]]; then
+
+	if [ ! -d $RunDirectory ]; then
+		echo -e "Error: Run Directory Does Not Exist!\n" 1>&2
+		echo -e "   [$RunDirectory]\n" 1>&2
+		/bin/ls -ld "$RunDirectory" 1>&2
+		echo 1>&2
+		exit -13
+	fi
+
+	baseDir=`/bin/basename ${RunDirectory}`
+
+	RunNumber=`echo "${baseDir}" | awk -F "-" '{print $4}'`
+
+	if [[ $RunNumber == "" || ! $RunNumber =~ [0-9]+ ]]; then
+		echo -e "Error Parsing Run Number" \
+			" from Run Directory ${RunDirectory}!\n" 1>&2
+		echo -e "   RunNumber = [${RunNumber}]\n" 1>&2
+		exit -12
+	fi
+
+fi
+
+echo "Run Directory: ${RunDirectory}" 1>&2
+echo "Run Number: ${RunNumber}" 1>&2
+echo 1>&2
+
