@@ -335,8 +335,6 @@ else
 	exit -20
 fi
 
-# Now Collect the Set of Raw Data Files for the Run... (_Without_ Paused!)
-
 # Turn On ExtGlob (as Needed) for Extended Globbing Syntax
 # (to surgically _Exclude_ the Paused Data Files, as needed... :-)
 saveExtGlob=`shopt extglob | awk '{print $2}'`
@@ -347,11 +345,29 @@ if [[ $saveExtGlob == "off" ]]; then
 	echo 1>&2
 fi
 
+DUMP_ARRAY()
+{
+	local _label="$1"
+	shift
+
+	echo "${_label}:"
+
+	for i in $@ ; do
+		echo "   $i"
+	done
+
+	echo
+}
+
+# Collect the Set of Raw Data Files for the Run... (_Without_ Paused!)
+
+declare -a rawFiles
+
 rawFilesCmd="/bin/ls \"${RunDirectory}\"/f+([0-9])-run-${RunNumber}.adara"
 
-ckRaw=`eval $rawFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+rawFiles=( `eval $rawFilesCmd 2>/dev/null` )
 
-if [[ $ckRaw -lt 1 ]]; then
+if [[ ${#rawFiles[@]} -lt 1 ]]; then
 	echo -e \
 	"Error Finding Raw Data Files for Run Number ${RunNumber}!\n" 1>&2
 	eval $rawFilesCmd 1>&2
@@ -359,35 +375,107 @@ if [[ $ckRaw -lt 1 ]]; then
 	exit -30
 fi
 
-rawFiles=`eval $rawFilesCmd`
+echo -e "Found ${#rawFiles[@]} Raw Data Files" \
+	"for Run Number ${RunNumber}.\n" 1>&2
 
-echo -e "Found $ckRaw Raw Data Files for Run Number ${RunNumber}.\n" 1>&2
+DUMP_ARRAY "rawFiles" ${rawFiles[@]} 1>&2
 
-###
-echo -e "rawFiles = [$rawFiles]\n" 1>&2
-###
+# Now Collect Any Paused Data Files, As Needed, and Intermingle with Raw...
 
-# Now Collect Paused Data Files, As Needed...
+declare -a dataFiles
 
-pausedFiles=""
+dataFiles=""
 
 if [ $SendPausedData == $AlwaysSendPausedData ]; then
 
+	declare -a pausedFiles
+
 	pausedFilePattern="f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
 
-	pausedFilesCmd="/bin/ls ${RunDirectory}/${pausedFilePattern}"
+	pausedFilesCmd="/bin/ls \"${RunDirectory}\"/${pausedFilePattern}"
 
-	ckPaused=`eval $pausedFilesCmd 2>/dev/null | wc | awk '{print $1}'`
+	pausedFiles=( `eval $pausedFilesCmd 2>/dev/null` )
 
-	pausedFiles=`eval $pausedFilesCmd`
+	echo -e "Found ${#pausedFiles[@]} Paused Data Files" \
+		"for Run Number ${RunNumber}.\n" 1>&2
 
-	echo -e \
-		"Found $ckPaused Paused Data Files for Run Number ${RunNumber}.\n" \
-		1>&2
+	DUMP_ARRAY "pausedFiles" ${pausedFiles[@]} 1>&2
 
-	###
-	echo -e "pausedFiles = [$pausedFiles]\n" 1>&2
-	###
+	#
+	# Intermingle/Sort Raw and Paused Data Files into Properly Ordered List
+	#
+	# Note: Alas, we _Can't_ just rely on the File Timestamps here, as we
+	# sometimes insert other "Addendum" files after the fact... ;-D
+	#
+	# So we have to _Manually_ sort the 2 Lists together:
+	#    -> For a Given Raw Data File, Its Paused Data Files Go *After* It!
+	#    (this is _Not_ in Alphabetical Order, unfortunately... ;-)
+	#
+
+	numPaused=${#pausedFiles[@]}
+	numRaw=${#rawFiles[@]}
+
+	p=0
+	r=0
+	d=0
+
+	# Prime the Pump! Get Next Paused Data File's File Number...
+	if [[ $p -lt $numPaused ]]; then
+		pausedFile=`basename ${pausedFiles[$p]}`
+		pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+	else
+		pausedFile=""
+		pausedFileNo="XXX_DONE_XXX"
+	fi
+
+	# Process Each Raw Data File...
+	while [[ $r -lt $numRaw ]]; do
+
+		# Go Ahead and Append This Next Raw Data File to Overall List...
+		# (Any Paused Data Files Go *After* Their Associated Raw Data... :-)
+		dataFiles[$d]="${rawFiles[$r]}"
+		d=$(( d + 1 ))
+
+		# Are there any Paused Data Files left to Insert...?
+		if [[ $p -lt $numPaused ]]; then
+
+			# Get This Raw Data File's File Number...
+			rawFile=`basename ${rawFiles[$r]}`
+			fileNo=`echo $rawFile | awk -F - '{print $1}'`
+
+			# Is the Next Paused Data File Associated with This Raw File?
+			while [[ $pausedFileNo == $fileNo ]]; do
+
+				# Append This Associated Paused Data File to Overall List...
+				# (Paused Data Files Go *After* Their Associated Raw Data)
+				dataFiles[$d]="${pausedFiles[$p]}"
+				d=$(( d + 1 ))
+
+				# Next Raw Data File...
+				p=$(( p + 1 ))
+
+				# Get Next Paused Data File's File Number...
+				if [[ $p -lt $numPaused ]]; then
+					pausedFile=`basename ${pausedFiles[$p]}`
+					pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+				else
+					pausedFile=""
+					pausedFileNo="XXX_DONE_XXX"
+				fi
+
+			done
+
+		fi
+
+		# Next Raw Data File...
+		r=$(( r + 1 ))
+
+	done
+
+else
+
+	# _Not_ Using Paused Data Files, Just Pass Thru Regular Non-Paused Files
+	dataFiles=( ${rawFiles[@]} )
 
 fi
 
@@ -398,4 +486,18 @@ if [[ $saveExtGlob == "off" ]]; then
 	shopt extglob 1>&2
 	echo 1>&2
 fi
+
+# NOW, Actually Go Through the Data File List and Dump them to Stdout...!
+
+DUMP_ARRAY "dataFiles" ${dataFiles[@]} 1>&2
+
+echo \
+"--------------------------- START OF DATA ---------------------------" \
+	1>&2
+
+for dataFile in ${dataFiles[@]} ; do
+
+	/bin/cat $dataFile
+
+done
 
