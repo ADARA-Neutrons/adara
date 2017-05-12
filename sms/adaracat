@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# ADARA SMS LiveConf - Live Configuration and Status Script
+# ADARACat - SMS Raw Data File Concatenator Utility
 #
 
 # For Cron Usage - Source Home Shell Environment:
@@ -125,9 +125,9 @@ if [ $# == 0 ]; then
 fi
 
 # Send Paused Data Options:
-AutoSendPausedData=0
+NeverSendPausedData=0
 AlwaysSendPausedData=1
-NeverSendPausedData=2
+AutoSendPausedData=2
 
 # Parse Command Line Options...
 SendPausedData=$AutoSendPausedData
@@ -177,8 +177,8 @@ done
 if [[ $RunNumber == -1 && $RunDirectory == "" ]]; then
 
 	echo -e "Error: No Run Information Specified...!\n" 1>&2
-	echo -e "Please use the \"--run=<RunNumber>\" or" \
-		" \"--dir=<RunDirectory>\" options:\n" 1>&2
+	echo -e "Please use the \"--run=<RunNumber>\"" \
+		"or \"--dir=<RunDirectory>\" options:\n" 1>&2
 	USAGE
 	exit -11
 
@@ -216,7 +216,7 @@ elif [[ $RunDirectory != "" && $RunNumber == -1 ]]; then
 
 	if [[ $RunNumber == "" || ! $RunNumber =~ [0-9]+ ]]; then
 		echo -e "Error Parsing Run Number" \
-			" from Run Directory ${RunDirectory}!\n" 1>&2
+			"from Run Directory ${RunDirectory}!\n" 1>&2
 		echo -e "   RunNumber = [${RunNumber}]\n" 1>&2
 		exit -12
 	fi
@@ -234,6 +234,9 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 	# _Exactly Once_ at the Beginning of a New Translation...! ;-D
 	# So we only need to check that one "Initiating Translation" log msg!
 
+	echo -e "Checking Send Paused Data Setting for ${RunNumber} in:\n" 1>&2
+	echo -e "   [$SMSD_LOG]\n" 1>&2
+
 	stsInitLog="Initiating Translation of ${RunNumber} SendPausedData="
 
 	ckSendPaused=`grep "$stsInitLog" $SMSD_LOG`
@@ -244,14 +247,51 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 		"Error Finding Translation Initiation Log for ${RunNumber} in:\n" \
 			1>&2
 		echo -e "   [$SMSD_LOG]\n" 1>&2
-		echo -e "Erring on the Side of Caution - Sending Paused Data!\n" \
-			1>&2
 
-		SendPausedData=$AlwaysSendPausedData
+		echo -e "Trying Live SMS PV Setting...\n" 1>&2
+
+		# Try Latest Live PV Settings...
+		liveSendPausedCmd="caget $WAIT ${PRE}:SMS:STSClient:SendPausedData"
+		liveSendPaused=`eval $liveSendPausedCmd | awk '{print $2}'`
+
+		if [[ $liveSendPaused == "true" ]]; then
+
+			echo -e "Using Live SMS PV" \
+				"- Sending Paused Data!\n" 1>&2
+
+			eval $liveSendPausedCmd
+
+			SendPausedData=$AlwaysSendPausedData
+
+		elif [[ $liveSendPaused == "false" ]]; then
+
+			echo -e "Using Live SMS PV" \
+				"- NOT Sending Paused Data!\n" 1>&2
+
+			eval $liveSendPausedCmd
+
+			SendPausedData=$NeverSendPausedData
+
+		else
+
+			echo -e "\nError Accessing Live SMS PV...!\n" 1>&2
+			echo -e "Erring on the Side of Caution" \
+				"- Sending Paused Data!\n" 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		fi
+
+		echo -e "(Override with \"--send-paused-data\"" \
+			"or \"--no-send-paused-data\" options...)\n" 1>&2
 
 	else
 
 		# Parse Translation Initiation Log Message for SendPausedData...
+
+		ckSendPausedTrim=`echo $ckSendPaused | awk -F : '{print $4}' \
+			| sed "s/^ //g"`
+		echo -e "$ckSendPausedTrim\n" 1>&2
 
 		sendPaused=`echo "$ckSendPaused" | awk -F = '{print $2}'`
 
@@ -272,8 +312,10 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 
 			echo -e \
 			"Error: Unknown SendPausedData Value [${sendPaused}]...!\n" 1>&2
-			echo -e "Erring on the Side of Caution - Sending Paused Data!" \
-				1>&2
+			echo -e "Erring on the Side of Caution" \
+				"- Sending Paused Data!\n" 1>&2
+			echo -e "(Override with \"--send-paused-data\"" \
+				"or \"--no-send-paused-data\" options...)\n" 1>&2
 
 			SendPausedData=$AlwaysSendPausedData
 
