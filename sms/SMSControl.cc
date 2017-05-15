@@ -70,6 +70,8 @@ uint64_t SMSControl::m_interPulseTimeMax;
 bool SMSControl::m_doPulsePchgCorrect;
 bool SMSControl::m_doPulseVetoCorrect;
 
+bool SMSControl::m_sendSampleInRunInfo;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -179,6 +181,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.do_pulse_veto_correction", true);
 	INFO("Setting Do Pulse Veto Flags Correction to "
 		<< m_doPulseVetoCorrect << ".");
+
+	m_sendSampleInRunInfo =
+			conf.get<bool>("sms.send_sample_in_run_info", true);
+	INFO("Setting Send Sample in Run Info to "
+		<< m_sendSampleInRunInfo << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -481,7 +488,8 @@ SMSControl::SMSControl() :
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
-	m_runInfo.reset(new RunInfo(m_beamlineId, this));
+	m_runInfo.reset(new RunInfo(m_beamlineId, this,
+		m_sendSampleInRunInfo));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
 

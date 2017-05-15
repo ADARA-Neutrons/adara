@@ -278,6 +278,8 @@ private:
 	static bool m_doPulsePchgCorrect;
 	static bool m_doPulseVetoCorrect;
 
+	static bool m_sendSampleInRunInfo;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
