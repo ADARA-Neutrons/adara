@@ -325,7 +325,8 @@ int main( int argc, char** argv )
             monitor->start( *nxgen,
                 broker_uri, broker_user, broker_pass, domain );
 
-            // Begin ADARA stream processing - does not return until recording ends
+            // Begin ADARA stream processing
+            //    - does not return until recording ends
             nxgen->processStream();
 
             syslog( LOG_INFO, "[%i] Stream processing completed", g_pid );
@@ -341,16 +342,31 @@ int main( int argc, char** argv )
                 else if ( base_path[base_path.length()-1] != '/')
                     base_path += "/";
 
-                string cat_path = base_path + nxgen->getFacilityName() + "/" + nxgen->getBeamShortName() + "/" + nxgen->getProposalID() + "/";
-                string cat_name = nxgen->getBeamShortName() + "_" + boost::lexical_cast<string>(nxgen->getRunNumber());
+                string cat_path = base_path + nxgen->getFacilityName()
+                    + "/" + nxgen->getBeamShortName()
+                    + "/" + nxgen->getProposalID() + "/";
+
+                string cat_name = nxgen->getBeamShortName() + "_"
+                    + boost::lexical_cast<string>(nxgen->getRunNumber());
+
+                string cat_nexus_file = cat_path + "nexus/"
+                    + cat_name + ".nxs.h5";
 
                 // Try to move files
-                moveFile( adara_outfile, cat_path + "adara", cat_name + ".adara" );
-                moveFile( nexus_outfile, cat_path + "nexus", cat_name + ".nxs.h5" );
+                if ( !adara_outfile.empty() )
+                {
+                    moveFile( adara_outfile,
+                        cat_path + "adara", cat_name + ".adara" );
+                }
+                if ( !nexus_outfile.empty() )
+                {
+                    moveFile( nexus_outfile,
+                        cat_path + "nexus", cat_name + ".nxs.h5" );
 
-                string cat_nexus_file = cat_path + "nexus/" + cat_name + ".nxs.h5";
-
-                syslog( LOG_INFO, "[%i] Successfully moved Nexus file to: %s", g_pid, cat_nexus_file.c_str() );
+                    syslog( LOG_INFO,
+                        "[%i] Successfully moved Nexus file to: %s",
+                        g_pid, cat_nexus_file.c_str() );
+                }
 
                 // Send finished messages to ComBus AND workflow manager
                 if ( monitor )
@@ -362,7 +378,6 @@ int main( int argc, char** argv )
                 if ( monitor )
                     monitor->success( false, nexus_outfile );
             }
-
 
             // Disable temp file deletion if translation / move succeeded
             keep_temp = true;
