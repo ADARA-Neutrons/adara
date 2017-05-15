@@ -203,6 +203,14 @@ option_default[$num_options]="true"
 option_label[$num_options]="[Do Pulse Veto Flags Correction]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="runinfo"
+option_name[$num_options]="send_sample_in_run_info"
+option_pv[$num_options]="SMS:RunInfo:SendSampleInRunInfo"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Send Sample In Run Info]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -1199,6 +1207,10 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status"
 			|| "$command" == "sample_status" ]]; then
+
+		caget $WAIT ${PRE}:SMS:RunInfo:SendSampleInRunInfo
+
+		echo
 
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
