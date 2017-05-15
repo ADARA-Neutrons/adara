@@ -373,8 +373,10 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 	}
 }
 
-RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
+RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl,
+		bool sendSampleInRunInfo ) :
 	m_beamline(beamline), m_ctrl(ctrl),
+	m_sendSampleInRunInfo(sendSampleInRunInfo),
 	m_runNumber(0), m_packetValid(false),
 	m_packet(NULL), m_packetSize(0)
 {
@@ -393,6 +395,15 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	/* These fields are optional */
 	addPV(prefix, "ProposalTitle", "proposal_title", m_optional);
 	addPV(prefix, "RunTitle", "run_title", m_optional);
+
+	// Send Sample Info in RunInfo...?
+	m_sendSampleInRunInfoPV.reset(new smsBooleanPV(prefix
+		+ "SendSampleInRunInfo"));
+	m_ctrl->addPV(m_sendSampleInRunInfoPV);
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_sendSampleInRunInfoPV->update( m_sendSampleInRunInfo, &now );
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
@@ -664,7 +675,14 @@ void RunInfo::generatePacket(void)
 
 	addElements(xml, m_required);
 	addElements(xml, m_optional);
-	addElements(xml, m_sample, "sample");
+
+	// Get Latest "Send Sample In RunInfo" Value from PV...
+	m_sendSampleInRunInfo = m_sendSampleInRunInfoPV->value();
+	if ( m_sendSampleInRunInfo ) {
+		addElements(xml, m_sample, "sample");
+	} else {
+		xml += "   <no_sample_info/>\n";
+	}
 
 	xml += "</runinfo>";
 
