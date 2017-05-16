@@ -36,12 +36,12 @@
 			<name>chemical_formula</name>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:Mass</pattern>
+			<pattern>SMS:RunInfo:Sample:Mass$</pattern>
 			<name>mass</name>
 			<units_value>SMS:RunInfo:Sample:MassUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:Density</pattern>
+			<pattern>SMS:RunInfo:Sample:Density$</pattern>
 			<name>mass_density</name>
 			<units_value>SMS:RunInfo:Sample:DensityUnits</units_value>
 		</element>
@@ -79,52 +79,52 @@
 			<name>comments</name>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:HeightInContainer</pattern>
+			<pattern>SMS:RunInfo:Sample:HeightInContainer$</pattern>
 			<name>height_in_container</name>
 			<units_value>SMS:RunInfo:Sample:HeightInContainerUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:InteriorDiameter</pattern>
+			<pattern>SMS:RunInfo:Sample:InteriorDiameter$</pattern>
 			<name>interior_diameter</name>
 			<units_value>SMS:RunInfo:Sample:InteriorDiameterUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:InteriorHeight</pattern>
+			<pattern>SMS:RunInfo:Sample:InteriorHeight$</pattern>
 			<name>interior_height</name>
 			<units_value>SMS:RunInfo:Sample:InteriorHeightUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:InteriorWidth</pattern>
+			<pattern>SMS:RunInfo:Sample:InteriorWidth$</pattern>
 			<name>interior_width</name>
 			<units_value>SMS:RunInfo:Sample:InteriorWidthUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:InteriorDepth</pattern>
+			<pattern>SMS:RunInfo:Sample:InteriorDepth$</pattern>
 			<name>interior_depth</name>
 			<units_value>SMS:RunInfo:Sample:InteriorDepthUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:OuterDiameter</pattern>
+			<pattern>SMS:RunInfo:Sample:OuterDiameter$</pattern>
 			<name>outer_diameter</name>
 			<units_value>SMS:RunInfo:Sample:OuterDiameterUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:OuterHeight</pattern>
+			<pattern>SMS:RunInfo:Sample:OuterHeight$</pattern>
 			<name>outer_height</name>
 			<units_value>SMS:RunInfo:Sample:OuterHeightUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:OuterWidth</pattern>
+			<pattern>SMS:RunInfo:Sample:OuterWidth$</pattern>
 			<name>outer_width</name>
 			<units_value>SMS:RunInfo:Sample:OuterWidthUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:OuterDepth</pattern>
+			<pattern>SMS:RunInfo:Sample:OuterDepth$</pattern>
 			<name>outer_depth</name>
 			<units_value>SMS:RunInfo:Sample:OuterDepthUnits</units_value>
 		</element>
 		<element>
-			<pattern>SMS:RunInfo:Sample:VolumeCubic</pattern>
+			<pattern>SMS:RunInfo:Sample:VolumeCubic$</pattern>
 			<name>volume_cubic</name>
 			<units_value>SMS:RunInfo:Sample:VolumeCubicUnits</units_value>
 		</element>
