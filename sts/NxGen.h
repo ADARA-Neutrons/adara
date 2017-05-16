@@ -1421,6 +1421,32 @@ private:
                             if ( G->createdIndices.find( indexedName )
                                     == G->createdIndices.end() )
                             {
+                                // If Config Group Matches "/entry/sample"
+                                // and We're Receiving Sample Meta-Data
+                                // via the RunInfo Structure, Skip It! ;-D
+                                if ( ! m_nxgen.getNoSampleInfo()
+                                        && ! group_path.compare(
+                                            "/entry/sample") )
+                                {
+                                    std::stringstream ss;
+                                    ss << "*** Sample Meta-Data Already"
+                                        << " Provided in RunInfo"
+                                        << " - Skipping Indexed Group"
+                                        << " \"" << indexedName << "\""
+                                        << " for " << device_str
+                                        << " " << pv_str;
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s, %s=[%s] %s=[%s]",
+                                        g_pid, "STS Error:",
+                                        ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    continue;
+                                }
+
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\", %s=[%s] %s=[%s]",
                                     g_pid,
@@ -1445,6 +1471,32 @@ private:
                             // Create Group if Not Yet Created
                             if ( !(G->created) )
                             {
+                                // If Config Group Matches "/entry/sample"
+                                // and We're Receiving Sample Meta-Data
+                                // via the RunInfo Structure, Skip It! ;-D
+                                if ( ! m_nxgen.getNoSampleInfo()
+                                        && ! group_path.compare(
+                                            "/entry/sample") )
+                                {
+                                    std::stringstream ss;
+                                    ss << "*** Sample Meta-Data Already"
+                                        << " Provided in RunInfo"
+                                        << " - Skipping Group"
+                                        << " \"" << G->name << "\""
+                                        << " for " << device_str
+                                        << " " << pv_str;
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s, %s=[%s] %s=[%s]",
+                                        g_pid, "STS Error:",
+                                        ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    continue;
+                                }
+
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\", %s=[%s] %s=[%s]",
                                     g_pid,
