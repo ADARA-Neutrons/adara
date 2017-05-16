@@ -3169,7 +3169,7 @@ StreamParser::pvValueUpdate
                 RLL_PV_VALUE_UPDATE_SAWTOOTH, ss.str(),
                 60, 10, 100, log_info ) ) {
             syslog( LOG_ERR,
-            "[%i] %s %s: %s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu",
+                "[%i] %s %s%s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
