@@ -500,7 +500,9 @@ struct UserInfo
 /// RunInformation extracted from RunInfo packet xml payload
 struct RunInfo
 {
-    RunInfo() : target_station_number(1), run_number(0), run_title("NONE")
+    RunInfo()
+        : target_station_number(1), run_number(0), run_title("NONE"),
+        no_sample_info(false)
     {}
 
     uint32_t                target_station_number;
@@ -511,6 +513,7 @@ struct RunInfo
     std::string             run_title;
     std::string             proposal_id;
     std::string             facility_name;
+    bool                    no_sample_info;
     std::string             sample_id;
     std::string             sample_name;
     std::string             sample_nature;
