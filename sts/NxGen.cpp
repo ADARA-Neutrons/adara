@@ -789,84 +789,89 @@ NxGen::processRunInfo
             a_run_info.proposal_id );
         writeString( m_entry_path, "title", a_run_info.run_title );
 
-        string sample_path = m_entry_path + "/sample";
-        makeGroup( sample_path, "NXsample" );
+        if ( ! a_run_info.no_sample_info )
+        {
+            string sample_path = m_entry_path + "/sample";
+            makeGroup( sample_path, "NXsample" );
 
-        writeString( sample_path, "identifier", a_run_info.sample_id );
-        writeString( sample_path, "name", a_run_info.sample_name );
-        writeString( sample_path, "nature", a_run_info.sample_nature );
-        writeString( sample_path, "chemical_formula",
-            a_run_info.sample_formula );
+            writeString( sample_path, "identifier", a_run_info.sample_id );
+            writeString( sample_path, "name", a_run_info.sample_name );
+            writeString( sample_path, "nature", a_run_info.sample_nature );
+            writeString( sample_path, "chemical_formula",
+                a_run_info.sample_formula );
 
-        writeScalar( sample_path, "mass",
-            a_run_info.sample_mass, a_run_info.sample_mass_units );
+            writeScalar( sample_path, "mass",
+                a_run_info.sample_mass, a_run_info.sample_mass_units );
 
-        writeScalar( sample_path, "mass_density",
-            a_run_info.sample_mass_density,
-            a_run_info.sample_mass_density_units );
+            writeScalar( sample_path, "mass_density",
+                a_run_info.sample_mass_density,
+                a_run_info.sample_mass_density_units );
 
-        writeString( sample_path, "component", // no container in NXsample
-            a_run_info.sample_container_id + ": "
-                + a_run_info.sample_container_name );
+            // no "container" in NXsample
+            writeString( sample_path, "component",
+                a_run_info.sample_container_id + ": "
+                    + a_run_info.sample_container_name );
 
-        writeString( sample_path, "container_id",
-            a_run_info.sample_container_id );
-        writeString( sample_path, "container_name",
-            a_run_info.sample_container_name );
+            writeString( sample_path, "container_id",
+                a_run_info.sample_container_id );
+            writeString( sample_path, "container_name",
+                a_run_info.sample_container_name );
 
-        writeString( sample_path, "can_indicator",
-            a_run_info.sample_can_indicator );
-        writeString( sample_path, "can_barcode",
-            a_run_info.sample_can_barcode );
-        writeString( sample_path, "can_name",
-            a_run_info.sample_can_name );
-        writeString( sample_path, "can_materials",
-            a_run_info.sample_can_materials );
+            writeString( sample_path, "can_indicator",
+                a_run_info.sample_can_indicator );
+            writeString( sample_path, "can_barcode",
+                a_run_info.sample_can_barcode );
+            writeString( sample_path, "can_name",
+                a_run_info.sample_can_name );
+            writeString( sample_path, "can_materials",
+                a_run_info.sample_can_materials );
 
-        writeString( sample_path, "description",
-            a_run_info.sample_description );
+            writeString( sample_path, "description",
+                a_run_info.sample_description );
 
-        writeString( sample_path, "comments", a_run_info.sample_comments );
+            writeString( sample_path, "comments",
+                a_run_info.sample_comments );
 
-        writeScalar( sample_path, "height_in_container",
-            a_run_info.sample_height_in_container,
-            a_run_info.sample_height_in_container_units );
+            writeScalar( sample_path, "height_in_container",
+                a_run_info.sample_height_in_container,
+                a_run_info.sample_height_in_container_units );
 
-        writeScalar( sample_path, "interior_diameter",
-            a_run_info.sample_interior_diameter,
-            a_run_info.sample_interior_diameter_units );
+            writeScalar( sample_path, "interior_diameter",
+                a_run_info.sample_interior_diameter,
+                a_run_info.sample_interior_diameter_units );
 
-        writeScalar( sample_path, "interior_height",
-            a_run_info.sample_interior_height,
-            a_run_info.sample_interior_height_units );
+            writeScalar( sample_path, "interior_height",
+                a_run_info.sample_interior_height,
+                a_run_info.sample_interior_height_units );
 
-        writeScalar( sample_path, "interior_width",
-            a_run_info.sample_interior_width,
-            a_run_info.sample_interior_width_units );
+            writeScalar( sample_path, "interior_width",
+                a_run_info.sample_interior_width,
+                a_run_info.sample_interior_width_units );
 
-        writeScalar( sample_path, "interior_depth",
-            a_run_info.sample_interior_depth,
-            a_run_info.sample_interior_depth_units );
+            writeScalar( sample_path, "interior_depth",
+                a_run_info.sample_interior_depth,
+                a_run_info.sample_interior_depth_units );
 
-        writeScalar( sample_path, "outer_diameter",
-            a_run_info.sample_outer_diameter,
-            a_run_info.sample_outer_diameter_units );
+            writeScalar( sample_path, "outer_diameter",
+                a_run_info.sample_outer_diameter,
+                a_run_info.sample_outer_diameter_units );
 
-        writeScalar( sample_path, "outer_height",
-            a_run_info.sample_outer_height,
-            a_run_info.sample_outer_height_units );
+            writeScalar( sample_path, "outer_height",
+                a_run_info.sample_outer_height,
+                a_run_info.sample_outer_height_units );
 
-        writeScalar( sample_path, "outer_width",
-            a_run_info.sample_outer_width,
-            a_run_info.sample_outer_width_units );
+            writeScalar( sample_path, "outer_width",
+                a_run_info.sample_outer_width,
+                a_run_info.sample_outer_width_units );
 
-        writeScalar( sample_path, "outer_depth",
-            a_run_info.sample_outer_depth,
-            a_run_info.sample_outer_depth_units );
+            writeScalar( sample_path, "outer_depth",
+                a_run_info.sample_outer_depth,
+                a_run_info.sample_outer_depth_units );
 
-        writeScalar( sample_path, "volume_cubic",
-            a_run_info.sample_volume_cubic,
-            a_run_info.sample_volume_cubic_units );
+            writeScalar( sample_path, "volume_cubic",
+                a_run_info.sample_volume_cubic,
+                a_run_info.sample_volume_cubic_units );
+        }
 
         bool ldap_lookup = false;
         size_t user_count = 0;
