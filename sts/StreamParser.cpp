@@ -1440,6 +1440,11 @@ StreamParser::rxPacket
                 {
                     m_run_info.facility_name = value;
                 }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "no_sample_info") == 0 )
+                {
+                    m_run_info.no_sample_info = true;
+                }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
                 {
