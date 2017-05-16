@@ -52,7 +52,7 @@
 		</element>
 		<element>
 			<pattern>SMS:RunInfo:Sample:ContainerName</pattern>
-			<name>component_name</name>
+			<name>container_name</name>
 		</element>
 		<element>
 			<pattern>SMS:RunInfo:Sample:CanIndicator</pattern>
