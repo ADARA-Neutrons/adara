@@ -179,6 +179,7 @@ private:
         std::vector<std::string>    patterns;
         std::vector<std::string>    indices;
         std::string                 name;
+        bool                        linkValue;
         uint32_t                    lastIndex;
     };
 
@@ -1512,43 +1513,64 @@ private:
                             }
                         }
 
-                        // Link PV Log into Group...
                         std::string elem_link_path =
                             group_path + "/" + E->name;
 
-                        syslog( LOG_INFO, "[%i] %s %s to Group in %s",
-                            g_pid, "Linking PV Channel",
-                            m_log_path.c_str(),
-                            elem_link_path.c_str() );
-                        // give syslog a chance...
-                        usleep(30000);
-
-                        // Only Create "Target" String for Group Links
-                        // if we haven't already done so... ;-D
-                        if ( !m_has_link )
+                        // Link PV *Value* Only into Group...
+                        if ( E->linkValue )
                         {
-                            // Manually Create "Target" String
-                            // for Group Link (as per makeGroupLink usage)
-                            m_nxgen.writeString( m_log_path, "target",
-                                m_log_path );
+                            std::string pv_value_path =
+                                m_log_path + "/" + "value";
 
-                            // Mark This PV as Having Created the
-                            // "Target" String for Group Links!
-                            // (so we only do it _Once_!)
-                            m_has_link = true;
-                        }
-                        else
-                        {
-                            syslog( LOG_INFO, "[%i] %s %s %s - %s", g_pid,
-                                "PV Channel", m_log_path.c_str(),
-                                "Already Has Target Group Link String",
-                                "Skipping..." );
+                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
+                                g_pid, "Linking PV Value",
+                                pv_value_path.c_str(),
+                                elem_link_path.c_str() );
                             // give syslog a chance...
                             usleep(30000);
+
+                            m_nxgen.makeLink(
+                                pv_value_path, elem_link_path );
                         }
 
-                        m_nxgen.makeGroupLink(
-                            m_log_path, elem_link_path );
+                        // Link PV Log into Group...
+                        else
+                        {
+                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
+                                g_pid, "Linking PV Channel",
+                                m_log_path.c_str(),
+                                elem_link_path.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            // Only Create "Target" String for Group Links
+                            // if we haven't already done so... ;-D
+                            if ( !m_has_link )
+                            {
+                                // Manually Create "Target" String for
+                                // Group Link (as per makeGroupLink usage)
+                                m_nxgen.writeString( m_log_path, "target",
+                                    m_log_path );
+
+                                // Mark This PV as Having Created the
+                                // "Target" String for Group Links!
+                                // (so we only do it _Once_!)
+                                m_has_link = true;
+                            }
+                            else
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s %s %s - %s", g_pid,
+                                    "PV Channel", m_log_path.c_str(),
+                                    "Already Has Target Group Link String",
+                                    "Skipping..." );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
+
+                            m_nxgen.makeGroupLink(
+                                m_log_path, elem_link_path );
+                        }
 
                         matched = true;
                     }

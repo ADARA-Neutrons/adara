@@ -2516,9 +2516,19 @@ NxGen::parseSTSConfigFile
                         }
 
                         else if ( xmlStrcmp( lev2->name,
-                                (const xmlChar*)"element" ) == 0 )
+                                    (const xmlChar*)
+                                        "element" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0 )
                         {
                             struct ElementInfo element;
+
+                            element.linkValue =
+                                ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0 )
+                                            ? true : false;
 
                             element.lastIndex = 0;
 
@@ -2834,9 +2844,19 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
-                                        (const xmlChar*)"element" ) == 0 )
+                                            (const xmlChar*)
+                                                "element" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0 )
                                 {
                                     struct ElementInfo element;
+
+                                    element.linkValue =
+                                        ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0 )
+                                                    ? true : false;
 
                                     element.lastIndex = 0;
 
