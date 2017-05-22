@@ -3422,7 +3422,8 @@ NxGen::writeString
 
 /*! \brief Writes a string attribute to the specified Nexus path
  *
- * This method writes a string attribute value to the specified path in the output Nexus file.
+ * This method writes a string attribute value to the specified path
+ * in the output Nexus file.
  */
 void
 NxGen::writeStringAttribute
@@ -3437,6 +3438,33 @@ NxGen::writeStringAttribute
         THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: "
                      << a_attrib << ", value: " << a_value )
     }
+}
+
+
+/*! \brief Checks the value of a string attribute at specified Nexus path
+ *
+ * This method writes a string attribute value to the specified path
+ * in the output Nexus file IFF it does not already exist.
+ *
+ * Returns true/false whether Attribute was updated or not, resp.
+ */
+bool
+NxGen::checkStringAttribute
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write attribute
+    const string &a_attrib,     ///< [in] Name of the attribute
+    const string &a_value,      ///< [in] Value of the attribute
+    string &a_attr_value        ///< [out] Any Existing Attribute Value...
+)
+{
+    bool wasSet = false;
+    if ( m_h5nx.H5NXcheck_attribute_string( a_path, a_attrib, a_value,
+            a_attr_value, wasSet ) != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcheck_attribute_string() failed for path: " << a_path << ", attrib: "
+                     << a_attrib << ", value: " << a_value )
+    }
+    return( !wasSet );
 }
 
 

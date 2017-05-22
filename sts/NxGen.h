@@ -1885,6 +1885,10 @@ private:
     void                writeStringAttribute( const std::string &a_path,
                             const std::string &a_attrib,
                             const std::string &a_value );
+    bool                checkStringAttribute( const std::string &a_path,
+                            const std::string &a_attrib,
+                            const std::string &a_value,
+                            std::string &a_attr_value );
 
     /// Writes data values to a Nexus (HDF5) one-dimension dataset
     template<class T>
