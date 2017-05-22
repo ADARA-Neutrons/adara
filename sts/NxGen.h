@@ -179,6 +179,9 @@ private:
         std::vector<std::string>    patterns;
         std::vector<std::string>    indices;
         std::string                 name;
+        std::vector<std::string>    unitsPatterns;
+        std::string                 unitsValue;
+        std::string                 units;
         bool                        linkValue;
         uint32_t                    lastIndex;
     };
@@ -1522,7 +1525,7 @@ private:
                             std::string pv_value_path =
                                 m_log_path + "/" + "value";
 
-                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
+                            syslog( LOG_INFO, "[%i] %s %s to Group as %s",
                                 g_pid, "Linking PV Value",
                                 pv_value_path.c_str(),
                                 elem_link_path.c_str() );
@@ -1531,6 +1534,45 @@ private:
 
                             m_nxgen.makeLink(
                                 pv_value_path, elem_link_path );
+
+                            // IFF Units Attribute Not Already Set,
+                            // then Set Units Attribute from ElementInfo
+                            // (_If_ we captured a "Units Value" PV Value
+                            // or Explicit Units were Specified!)
+                            if ( E->unitsValue.size() || E->units.size() )
+                            {
+                                std::string label;
+                                std::string units;
+                                // PV Units Value Supercedes Explicit Units
+                                if ( E->unitsValue.size() )
+                                {
+                                    label = "PV Value Units";
+                                    units = E->unitsValue;
+                                }
+                                else
+                                {
+                                    label = "Explicit Config Units";
+                                    units = E->units;
+                                }
+
+                                std::string existing_attr_value;
+                                bool attrWasSet =
+                                    m_nxgen.checkStringAttribute(
+                                        elem_link_path,
+                                        "units", units,
+                                        existing_attr_value );
+
+                                syslog( LOG_INFO,
+                                "[%i] %s %s to %s %s=[%s] %s=[%s] %s=%d",
+                                    g_pid, "Setting PV Units Attribute",
+                                    pv_value_path.c_str(),
+                                    label.c_str(), "units", units.c_str(),
+                                    "existing_attr_value",
+                                    existing_attr_value.c_str(),
+                                    "attrWasSet", attrWasSet );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
                         }
 
                         // Link PV Log into Group...
