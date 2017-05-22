@@ -2613,6 +2613,55 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)
+                                            "units_value" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        "Units Value Pattern",
+                                        element.unitsPatterns.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    element.unitsPatterns.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"units" ) == 0 )
+                                {
+                                    // Already Got Explicit Element Units?
+                                    if ( element.units.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Units",
+                                            element.units.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Units..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.units = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"text" ) != 0
                                     && xmlStrcmp( lev3->name,
                                         (const xmlChar*)"comment" ) != 0 )
@@ -2647,6 +2696,19 @@ NxGen::parseSTSConfigFile
                                 ss << element.indices[i];
                             }
                             ss << "]";
+
+                            // For Element Units Pattern Logging...
+                            ss << " unitsPatterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.unitsPatterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.unitsPatterns[i];
+                            }
+                            ss << "]";
+
+                            // For Element Explicit Units Logging...
+                            ss << " units=[" << element.units << "]";
 
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
@@ -2958,6 +3020,59 @@ NxGen::parseSTSConfigFile
                                         }
 
                                         else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units_value" ) == 0 )
+                                        {
+                                            // REMOVE ME...
+                                            syslog( LOG_INFO,
+                                                "[%i] %s %s #%ld [%s]",
+                                                g_pid, "STS Config",
+                                                "Units Value Pattern",
+                                                element.unitsPatterns
+                                                    .size() + 1,
+                                                value.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            element.unitsPatterns
+                                                .push_back( value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units" ) == 0 )
+                                        {
+                                            // Already Got Explicit
+                                            // Element Units?
+                                            if ( element.units.size() )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                                    g_pid, "STS Error:",
+                                                    "STS Config DUPLICATE",
+                                                    "Element Units",
+                                                    element.units.c_str(),
+                                                    value.c_str(),
+                                               "Using New Element Units..."
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
+                                            else
+                                            {
+                                                // REMOVE ME...
+                                                syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                                    g_pid, "STS Config",
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.units = value;
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
                                                 (const xmlChar*)"text" )
                                                     != 0
                                             && xmlStrcmp( lev4->name,
@@ -2998,6 +3113,21 @@ NxGen::parseSTSConfigFile
                                         ss << element.indices[i];
                                     }
                                     ss << "]";
+
+                                    // For Element Units Pattern Logging...
+                                    ss << " unitsPatterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.unitsPatterns
+                                                .size(); i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.unitsPatterns[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Explicit Units Logging
+                                    ss << " units=["
+                                        << element.units << "]";
 
                                     // Add Element to Group Condition...
                                     // (If Required Fields are Present,
