@@ -656,6 +656,33 @@ for arg in "$@" ; do
 	fi
 done
 
+# Determine if Running on SNS or HFIR facility computer system...
+HOST_PREFIX=""
+IS_HFIR=0
+IS_SNS=0
+
+hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
+	| wc | awk '{print $1}'`
+hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
+	| wc | awk '{print $1}'`
+
+if [[ $hfir_hb_ck != 0 ]]; then
+	addToIntroOutput \
+		"HFIR (HB) Facility Computer System.\n\n"
+	IS_HFIR=1
+	HOST_PREFIX="hb"
+elif [[ $hfir_cg_ck != 0 ]]; then
+	addToIntroOutput \
+		"HFIR (CG) Facility Computer System.\n\n"
+	IS_HFIR=1
+	HOST_PREFIX="cg"
+else
+	addToIntroOutput \
+		"Assuming SNS Facility Computer System.\n\n"
+	IS_SNS=1
+	HOST_PREFIX="bl"
+fi
+
 #
 # Determine the Beamline Host, and thereby
 # the EPICS PV Prefix and Git Config Repo Branch...
@@ -665,7 +692,7 @@ not_a_beamline_computer=0
 do_git_config=1
 do_config=1
 
-config_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+config_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}"`
 config_blnum=`echo "$config_host" | sed 's/-.*//'`
 
 if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
