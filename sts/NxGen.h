@@ -1573,6 +1573,30 @@ private:
                                 // give syslog a chance...
                                 usleep(30000);
                             }
+
+                            // Hmmm... Had Some Units PVs Patterns
+                            // But Didn't Match Anything... Better Log It!
+                            else if ( E->unitsPatterns.size() )
+                            {
+                                std::stringstream ss;
+                                ss << "unitsPatterns=[";
+                                for ( uint32_t i=0 ;
+                                        i < E->unitsPatterns.size(); i++ )
+                                {
+                                    if ( i ) ss << ", ";
+                                    ss << E->unitsPatterns[i];
+                                }
+                                ss << "]";
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s %s - %s %s",
+                                    g_pid, "STS Error:",
+                                    "No Matching Units PV Found for",
+                                    pv_value_path.c_str(),
+                                    "Missing PV Value or Config...?",
+                                    ss.str().c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
                         }
 
                         // Link PV Log into Group...
