@@ -2620,7 +2620,7 @@ NxGen::parseSTSConfigFile
                                     syslog( LOG_INFO,
                                         "[%i] %s %s #%ld [%s]",
                                         g_pid, "STS Config",
-                                        "Units Value Pattern",
+                                        "Element Units Value Pattern",
                                         element.unitsPatterns.size() + 1,
                                         value.c_str() );
                                     // give syslog a chance
@@ -2678,7 +2678,9 @@ NxGen::parseSTSConfigFile
 
                             // For Element Pattern Logging...
                             std::stringstream ss;
-                            ss << "patterns=[";
+                            ss << "name=[" << element.name << "]";
+
+                            ss << " patterns=[";
                             for ( uint32_t i=0 ;
                                     i < element.patterns.size(); i++ )
                             {
@@ -2726,23 +2728,20 @@ NxGen::parseSTSConfigFile
                                     err += "\"" + element.name + "\"";
                                     err += " in STS Config Group \""
                                         + group.name + "\"";
-                                    syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s %s=[%s]",
+                                    syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                         g_pid, "STS Error:", err.c_str(),
-                                        "Ignoring", ss.str().c_str(),
-                                        "name", element.name.c_str() );
+                                        "Ignoring", ss.str().c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
                                 else
                                 {
                                     // REMOVE ME...
                                     syslog( LOG_INFO,
-                                        "[%i] %s %s \"%s\" - %s %s=[%s]",
+                                        "[%i] %s %s \"%s\" - %s",
                                         g_pid, "STS Config",
                                         "Adding Element to Group",
                                         group.name.c_str(),
-                                        ss.str().c_str(),
-                                        "name", element.name.c_str() );
+                                        ss.str().c_str() );
                                     usleep(30000); // give syslog a chance
 
                                     group.elements.push_back( element );
@@ -2753,11 +2752,9 @@ NxGen::parseSTSConfigFile
                                 std::string err = "Incomplete Element";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
-                                syslog( LOG_ERR,
-                                    "[%i] %s %s - %s %s %s=[%s]",
+                                syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                     g_pid, "STS Error:", err.c_str(),
-                                    "Ignoring", ss.str().c_str(),
-                                    "name", element.name.c_str() );
+                                    "Ignoring", ss.str().c_str() );
                                 usleep(30000); // give syslog a chance
                             }
                         }
@@ -3027,7 +3024,7 @@ NxGen::parseSTSConfigFile
                                             syslog( LOG_INFO,
                                                 "[%i] %s %s #%ld [%s]",
                                                 g_pid, "STS Config",
-                                                "Units Value Pattern",
+                                            "Element Units Value Pattern",
                                                 element.unitsPatterns
                                                     .size() + 1,
                                                 value.c_str() );
@@ -3093,7 +3090,9 @@ NxGen::parseSTSConfigFile
 
                                     // For Element Pattern Logging...
                                     std::stringstream ss;
-                                    ss << "patterns=[";
+                                    ss << "name=[" << element.name << "]";
+
+                                    ss << " patterns=[";
                                     for ( uint32_t i=0 ;
                                             i < element.patterns.size();
                                             i++ )
@@ -3151,12 +3150,10 @@ NxGen::parseSTSConfigFile
                                                 " in STS Config Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                "[%i] %s %s - %s %s",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
                                         }
@@ -3176,12 +3173,10 @@ NxGen::parseSTSConfigFile
                                             err += " Condition \""
                                                 + condition.name + "\"";
                                             syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                "[%i] %s %s - %s %s",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
                                         }
@@ -3196,11 +3191,9 @@ NxGen::parseSTSConfigFile
                                             info += " for Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_INFO,
-                                                "[%i] %s - %s %s=[%s]",
+                                                "[%i] %s - %s",
                                                 g_pid, info.c_str(),
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
 
@@ -3217,11 +3210,10 @@ NxGen::parseSTSConfigFile
                                         err += " Group \""
                                             + group.name + "\"";
                                         syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                            "[%i] %s %s - %s %s",
                                             g_pid, "STS Error:",
                                             err.c_str(), "Ignoring",
-                                            ss.str().c_str(),
-                                            "name", element.name.c_str() );
+                                            ss.str().c_str() );
                                         // give syslog a chance
                                         usleep(30000);
                                     }
@@ -3254,6 +3246,51 @@ NxGen::parseSTSConfigFile
                                 condition.name = ss.str();
                             }
 
+                            // Construct Logging String...
+                            std::stringstream ss;
+                            ss << "patterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.patterns[i];
+                            }
+                            ss << "] ";
+                            ss << "value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.values[i];
+                            }
+                            ss << "] ";
+                            ss << "not_value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_values[i];
+                            }
+                            ss << "]";
+
                             // Add Condition to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( condition.patterns.size()
@@ -3263,52 +3300,6 @@ NxGen::parseSTSConfigFile
                                     || condition.not_values.size() ) )
                             {
                                 // REMOVE ME...
-                                std::stringstream ss;
-                                ss << "patterns=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.patterns.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.patterns[i];
-                                }
-                                ss << "] ";
-                                ss << "value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.value_strings.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.values.size(); i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.values[i];
-                                }
-                                ss << "] ";
-                                ss << "not_value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_value_strings
-                                            .size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_values.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_values[i];
-                                }
-                                ss << "]";
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\" %s \"%s\" - %s",
                                     g_pid,
@@ -3326,52 +3317,6 @@ NxGen::parseSTSConfigFile
                                 err += " \"" + condition.name + "\"";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
-                                std::stringstream ss;
-                                ss << "patterns=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.patterns.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.patterns[i];
-                                }
-                                ss << "] ";
-                                ss << "value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.value_strings.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.values.size(); i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.values[i];
-                                }
-                                ss << "] ";
-                                ss << "not_value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_value_strings
-                                            .size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_values.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_values[i];
-                                }
-                                ss << "]";
                                 syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                     g_pid, "STS Error:", err.c_str(),
                                     "Ignoring", ss.str().c_str() );
