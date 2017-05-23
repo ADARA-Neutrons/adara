@@ -82,7 +82,7 @@ else
 	exit -1
 fi
 
-echo -e "\nDeploying ADARA $PROG Target.\n"
+echo -e "\nDeploying ADARA $PROG Target."
 
 #
 # Install Defaults
@@ -121,6 +121,19 @@ gcos=`echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
 
 echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
+# Determine if Installing on SNS or HFIR facility computer system...
+IS_HFIR=`hostname -A | sed 's/ /\n/g' | grep '^hb' | wc | awk '{print $1}'`
+HOST_PREFIX=""
+if [[ $IS_HFIR != 0 ]]; then
+	echo -e "\nInstalling on a HFIR Facility Computer System." \
+		| tee -a $LOG
+	HOST_PREFIX="hb"
+else
+	echo -e "\nAssuming Installing on an SNS Facility Computer System." \
+		| tee -a $LOG
+	HOST_PREFIX="bl"
+fi
+
 # Determine the Beamline/STS Branch associated with this computer system
 
 CONFIG="config"
@@ -130,9 +143,11 @@ if [ $IS_STS == 1 ]; then
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
 	HOST_TYPE="STS"
 elif [ $IS_PVSD == 1 ]; then
-	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl' | tail -1`
+	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+		| tail -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
-	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
+	install_suffix=`echo "$install_host" | sed 's/\..*//' \
+		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
 		install_host=`hostname`
@@ -161,9 +176,11 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	fi
 	HOST_TYPE="DASMON"
 else
-	install_host=`hostname -A | sed 's/ /\n/g' | grep '^bl' | tail -1`
+	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+		| tail -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
-	install_suffix=`echo "$install_host" | sed 's/\..*//' |sed 's/bl.*-//'`
+	install_suffix=`echo "$install_host" | sed 's/\..*//' \
+		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
 		install_host=`hostname`
