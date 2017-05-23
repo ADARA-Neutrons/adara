@@ -122,15 +122,29 @@ gcos=`echo '($n,$p,$u,$g,$q,$c,$gcos,$d,$s)=getpwnam(getpwuid($<)); \
 echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
 # Determine if Installing on SNS or HFIR facility computer system...
-IS_HFIR=`hostname -A | sed 's/ /\n/g' | grep '^hb' | wc | awk '{print $1}'`
 HOST_PREFIX=""
-if [[ $IS_HFIR != 0 ]]; then
-	echo -e "\nInstalling on a HFIR Facility Computer System." \
+IS_HFIR=0
+IS_SNS=0
+
+hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
+	| wc | awk '{print $1}'`
+hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
+	| wc | awk '{print $1}'`
+
+if [[ $hfir_hb_ck != 0 ]]; then
+	echo -e "\nInstalling on a HFIR (HB) Facility Computer System." \
 		| tee -a $LOG
+	IS_HFIR=1
 	HOST_PREFIX="hb"
+elif [[ $hfir_cg_ck != 0 ]]; then
+	echo -e "\nInstalling on a HFIR (CG) Facility Computer System." \
+		| tee -a $LOG
+	IS_HFIR=1
+	HOST_PREFIX="cg"
 else
 	echo -e "\nAssuming Installing on an SNS Facility Computer System." \
 		| tee -a $LOG
+	IS_SNS=1
 	HOST_PREFIX="bl"
 fi
 
