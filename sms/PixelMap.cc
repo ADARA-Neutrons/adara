@@ -13,6 +13,9 @@
 #include "ADARA.h"
 #include "PixelMap.h"
 #include "StorageManager.h"
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 
 std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 {
@@ -30,6 +33,8 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		msg += path;
 		throw std::runtime_error(msg);
 	}
+
+	INFO("readMap(): Opened Pixel Map File...");
 
 	for (;;) {
 		lineno++;
@@ -105,6 +110,8 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		output_pixels.insert(logical);
 		map->insert(make_pair(phys, std::make_pair(logical, bank)));
 	}
+
+	INFO("readMap(): Done Reading Pixel Map File.");
 
 	if (!f.eof()) {
 		std::string msg("Read Error in Pixel Map File ");
@@ -224,17 +231,27 @@ PixelMap::PixelMap(const std::string &path,
 	uint32_t max_phys = 0;
 	uint32_t i;
 
+	INFO("Entry PixelMap(): m_allowNonOneToOnePixelMapping="
+		<< m_allowNonOneToOnePixelMapping);
+
 	map = readMap(path);
 
 	end = map->end();
 	for (it = map->begin(); it != end; ++it) {
 		if (it->first > max_phys)
 			max_phys = it->first;
-		if (it->second.first > max_logical)
+		if (it->second.first != ((uint32_t) -1)
+				&& it->second.first > max_logical) {
 			max_logical = it->second.first;
+		}
 		if (it->second.second > m_numBanks)
 			m_numBanks = it->second.second;
 	}
+
+	INFO("Pixel Map Stats:"
+		<< " max_phys=" << max_phys
+		<< " max_logical=" << max_logical
+		<< " m_numBanks=" << m_numBanks);
 
 	/* Count from zero to the largest bank, that's how many slots will
 	 * be needed.
@@ -263,7 +280,9 @@ PixelMap::PixelMap(const std::string &path,
 
 	for (it = map->begin(); it != end; ++it) {
 		m_table[it->first] = it->second;
-		m_banks[it->second.first] = it->second.second;
+		if ( it->second.first != ((uint32_t) -1) ) {
+			m_banks[it->second.first] = it->second.second;
+		}
 	}
 
 	m_packet = genPacket(map.get(), m_packetSize);
@@ -271,6 +290,7 @@ PixelMap::PixelMap(const std::string &path,
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&PixelMap::onPrologue, this));
 
+	INFO("Done with Pixel Map.");
 }
 
 PixelMap::~PixelMap()
