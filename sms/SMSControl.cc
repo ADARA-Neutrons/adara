@@ -73,6 +73,8 @@ bool SMSControl::m_doPulseVetoCorrect;
 
 bool SMSControl::m_sendSampleInRunInfo;
 
+bool SMSControl::m_allowNonOneToOnePixelMapping;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -190,6 +192,12 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.send_sample_in_run_info", true);
 	INFO("Setting Send Sample in Run Info to "
 		<< m_sendSampleInRunInfo << ".");
+
+	m_allowNonOneToOnePixelMapping =
+			conf.get<bool>("sms.allow_non_one_to_one_pixel_mappings",
+				false);
+	INFO("Setting Allow Non-One-to-One Pixel Mapping to "
+		<< m_allowNonOneToOnePixelMapping << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -495,7 +503,8 @@ SMSControl::SMSControl() :
 	m_runInfo.reset(new RunInfo(m_facility, m_beamlineId, this,
 		m_sendSampleInRunInfo));
 	m_geometry.reset(new Geometry(m_geometryPath));
-	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
+	m_pixelMap.reset(new PixelMap(m_pixelMapPath,
+		m_allowNonOneToOnePixelMapping));
 
 	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 
