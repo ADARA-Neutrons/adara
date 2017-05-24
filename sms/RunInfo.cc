@@ -373,9 +373,9 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 	}
 }
 
-RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl,
-		bool sendSampleInRunInfo ) :
-	m_beamline(beamline), m_ctrl(ctrl),
+RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
+		SMSControl *ctrl, bool sendSampleInRunInfo ) :
+	m_facility(facility), m_beamline(beamline), m_ctrl(ctrl),
 	m_sendSampleInRunInfo(sendSampleInRunInfo),
 	m_runNumber(0), m_packetValid(false),
 	m_packet(NULL), m_packetSize(0)
@@ -662,7 +662,9 @@ void RunInfo::generatePacket(void)
 		"xsi:schemaLocation=\"http://public.sns.gov/schema/runinfo.xsd "
 		"http://public.sns.gov/schema/runinfo.xsd\">\n";
 	xml += "   <das_version>ADARA v0.1</das_version>\n";
-	xml += "   <facility_name>SNS</facility_name>\n";
+	xml += "   <facility_name>";
+	xml += m_facility;
+	xml += "</facility_name>\n";
 	xml += "   <instrument_name>";
 	xml += m_beamline;
 	xml += "</instrument_name>\n";

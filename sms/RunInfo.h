@@ -26,8 +26,8 @@ public:
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
-	RunInfo(const std::string &beamline, SMSControl *ctrl,
-		bool sendSampleInRunInfo);
+	RunInfo(const std::string &facility, const std::string &beamline,
+		SMSControl *ctrl, bool sendSampleInRunInfo);
 	~RunInfo();
 
 	void lock(void);
@@ -48,6 +48,7 @@ public:
 	void invalidateCache(void) { m_packetValid = false; }
 
 private:
+	std::string m_facility;
 	std::string m_beamline;
 	SMSControl *m_ctrl;
 
