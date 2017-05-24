@@ -15,6 +15,7 @@ class PixelMap : boost::noncopyable {
 public:
 	typedef std::pair<uint32_t, uint16_t> Entry;
 	typedef std::vector<Entry> Table;
+	typedef std::map<uint32_t, PixelMap::Entry> TempMap;
 
 	PixelMap(const std::string &path, bool allowNonOneToOnePixelMapping);
 	~PixelMap();
@@ -56,8 +57,6 @@ public:
 	}
 
 private:
-	typedef std::map<uint32_t, PixelMap::Entry> TempMap;
-
 	std::auto_ptr<TempMap> readMap(const std::string &path);
 
 	boost::shared_array<uint8_t> genPacket(TempMap *map,
