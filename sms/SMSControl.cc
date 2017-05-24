@@ -50,6 +50,7 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 uint32_t SMSControl::m_targetStationNumber;
 
 std::string SMSControl::m_version;
+std::string SMSControl::m_facility;
 std::string SMSControl::m_beamlineId;
 std::string SMSControl::m_beamlineShortName;
 std::string SMSControl::m_beamlineLongName;
@@ -143,6 +144,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_pixelMapPath = conf.get<std::string>("sms.pixelmap_file", "");
 	if (!m_pixelMapPath.length())
 		m_pixelMapPath = base + "/pixelmap";
+
+	m_facility = conf.get<std::string>("sms.facility", "SNS");
+	INFO("Experimental Facility " << m_facility << ".");
 
 	m_targetStationNumber = conf.get<uint32_t>("sms.target_station", 1);
 	INFO("Operating on Neutron Facility Target Station "
@@ -488,7 +492,7 @@ SMSControl::SMSControl() :
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
-	m_runInfo.reset(new RunInfo(m_beamlineId, this,
+	m_runInfo.reset(new RunInfo(m_facility, m_beamlineId, this,
 		m_sendSampleInRunInfo));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath));
