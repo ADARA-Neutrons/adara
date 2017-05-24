@@ -14,9 +14,7 @@
 #include "PixelMap.h"
 #include "StorageManager.h"
 
-typedef std::map<uint32_t, PixelMap::Entry> TempMap;
-
-static std::auto_ptr<TempMap> readMap(const std::string &path)
+std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 {
 	std::auto_ptr<TempMap> map(new TempMap);
 	std::set<uint32_t> output_pixels;
@@ -71,7 +69,8 @@ static std::auto_ptr<TempMap> readMap(const std::string &path)
 			throw std::runtime_error(msg);
 		}
 
-		if (output_pixels.count(logical)) {
+		if (!m_allowNonOneToOnePixelMapping
+				&& output_pixels.count(logical)) {
 			std::string msg("Duplicate Logical PixelId ");
 			msg += boost::lexical_cast<std::string>(logical);
 			msg += " in Pixel Map File, line ";
@@ -122,7 +121,7 @@ static std::auto_ptr<TempMap> readMap(const std::string &path)
 	return map;
 }
 
-static boost::shared_array<uint8_t> genPacket(TempMap *map,
+boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 					      uint32_t &packetSize)
 {
 	std::queue<uint16_t> sections;
@@ -213,7 +212,10 @@ static boost::shared_array<uint8_t> genPacket(TempMap *map,
 	return pkt;
 }
 
-PixelMap::PixelMap(const std::string &path) : m_numBanks(0)
+PixelMap::PixelMap(const std::string &path,
+		bool allowNonOneToOnePixelMapping)
+	: m_allowNonOneToOnePixelMapping(allowNonOneToOnePixelMapping),
+	m_numBanks(0)
 {
 	std::auto_ptr<TempMap> map;
 	TempMap::iterator it, end;

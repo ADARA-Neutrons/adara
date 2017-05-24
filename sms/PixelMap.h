@@ -16,7 +16,7 @@ public:
 	typedef std::pair<uint32_t, uint16_t> Entry;
 	typedef std::vector<Entry> Table;
 
-	PixelMap(const std::string &path);
+	PixelMap(const std::string &path, bool allowNonOneToOnePixelMapping);
 	~PixelMap();
 
 	uint32_t numBanks(void) const { return m_numBanks; }
@@ -56,10 +56,18 @@ public:
 	}
 
 private:
+	typedef std::map<uint32_t, PixelMap::Entry> TempMap;
+
+	std::auto_ptr<TempMap> readMap(const std::string &path);
+
+	boost::shared_array<uint8_t> genPacket(TempMap *map,
+		uint32_t &packetSize);
+
 	Table m_table;
 	std::vector<uint16_t> m_banks;
 	boost::shared_array<uint8_t> m_packet;
 	uint32_t m_packetSize;
+	bool m_allowNonOneToOnePixelMapping;
 	uint32_t m_numBanks;
 	boost::signals2::connection m_connection;
 
