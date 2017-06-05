@@ -184,6 +184,8 @@ private:
         std::string                 units;
         bool                        linkValue;
         uint32_t                    lastIndex;
+        std::map<std::string, std::string>
+                                    createdLinks;
     };
 
     // Look for an ElementInfo Struct by Name in an Existing Vector...
@@ -1265,7 +1267,7 @@ private:
         void createSTSConfigGroupMatchingElements
         (
             struct GroupInfo *G,                        ///< Config Group
-            std::vector<struct ElementInfo> elements,   ///< Elements
+            std::vector<struct ElementInfo> &elements,  ///< Elements
             std::string device_str,                     ///< Device String
             std::string pv_str,                         ///< PV String
             std::string label                           ///< Logging Label
@@ -1519,123 +1521,162 @@ private:
                         std::string elem_link_path =
                             group_path + "/" + E->name;
 
-                        // Link PV *Value* Only into Group...
-                        if ( E->linkValue )
+                        // Create Element Link if Not Yet Created...!
+                        std::map<std::string, std::string>::iterator it;
+                        if ( (it = E->createdLinks.find( elem_link_path ))
+                                == E->createdLinks.end() )
                         {
-                            std::string pv_value_path =
-                                m_log_path + "/" + "value";
-
-                            syslog( LOG_INFO, "[%i] %s %s to Group as %s",
-                                g_pid, "Linking PV Value",
-                                pv_value_path.c_str(),
-                                elem_link_path.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
-
-                            m_nxgen.makeLink(
-                                pv_value_path, elem_link_path );
-
-                            // IFF Units Attribute Not Already Set,
-                            // then Set Units Attribute from ElementInfo
-                            // (_If_ we captured a "Units Value" PV Value
-                            // or Explicit Units were Specified!)
-                            if ( E->unitsValue.size() || E->units.size() )
+                            // Link PV *Value* Only into Group...
+                            if ( E->linkValue )
                             {
-                                std::string label;
-                                std::string units;
-                                // PV Units Value Supercedes Explicit Units
-                                if ( E->unitsValue.size() )
-                                {
-                                    label = "PV Value Units";
-                                    units = E->unitsValue;
-                                }
-                                else
-                                {
-                                    label = "Explicit Config Units";
-                                    units = E->units;
-                                }
-
-                                std::string existing_attr_value;
-                                bool attrWasSet =
-                                    m_nxgen.checkStringAttribute(
-                                        elem_link_path,
-                                        "units", units,
-                                        existing_attr_value );
+                                std::string pv_value_path =
+                                    m_log_path + "/" + "value";
 
                                 syslog( LOG_INFO,
-                                "[%i] %s %s to %s %s=[%s] %s=[%s] %s=%d",
-                                    g_pid, "Setting PV Units Attribute",
+                                    "[%i] %s %s to Group as %s",
+                                    g_pid, "Linking PV Value",
                                     pv_value_path.c_str(),
-                                    label.c_str(), "units", units.c_str(),
-                                    "existing_attr_value",
-                                    existing_attr_value.c_str(),
-                                    "attrWasSet", attrWasSet );
+                                    elem_link_path.c_str() );
                                 // give syslog a chance...
                                 usleep(30000);
-                            }
 
-                            // Hmmm... Had Some Units PVs Patterns
-                            // But Didn't Match Anything... Better Log It!
-                            else if ( E->unitsPatterns.size() )
-                            {
-                                std::stringstream ss;
-                                ss << "unitsPatterns=[";
-                                for ( uint32_t i=0 ;
-                                        i < E->unitsPatterns.size(); i++ )
+                                m_nxgen.makeLink(
+                                    pv_value_path, elem_link_path );
+
+                                E->createdLinks.insert(
+                                    std::pair<std::string, std::string>(
+                                        elem_link_path, pv_value_path ) );
+
+                                // IFF Units Attribute Not Already Set,
+                                // Set Units Attribute from ElementInfo
+                                // (If we captured a "Units Value" PV Value
+                                // or Explicit Units were Specified!)
+                                if ( E->unitsValue.size()
+                                        || E->units.size() )
                                 {
-                                    if ( i ) ss << ", ";
-                                    ss << E->unitsPatterns[i];
+                                    std::string label;
+                                    std::string units;
+                                    // PV Units Value Supersedes
+                                    // Explicit Units
+                                    if ( E->unitsValue.size() )
+                                    {
+                                        label = "PV Value Units";
+                                        units = E->unitsValue;
+                                    }
+                                    else
+                                    {
+                                        label = "Explicit Config Units";
+                                        units = E->units;
+                                    }
+
+                                    std::string existing_attr_value;
+                                    bool attrWasSet =
+                                        m_nxgen.checkStringAttribute(
+                                            elem_link_path,
+                                            "units", units,
+                                            existing_attr_value );
+
+                                    syslog( LOG_INFO,
+                                  "[%i] %s %s to %s %s=[%s] %s=[%s] %s=%d",
+                                        g_pid,
+                                        "Setting PV Units Attribute",
+                                        pv_value_path.c_str(),
+                                        label.c_str(),
+                                        "units", units.c_str(),
+                                        "existing_attr_value",
+                                        existing_attr_value.c_str(),
+                                        "attrWasSet", attrWasSet );
+                                    // give syslog a chance...
+                                    usleep(30000);
                                 }
-                                ss << "]";
-                                syslog( LOG_ERR,
-                                    "[%i] %s %s %s - %s %s",
-                                    g_pid, "STS Error:",
-                                    "No Matching Units PV Found for",
-                                    pv_value_path.c_str(),
-                                    "Missing PV Value or Config...?",
-                                    ss.str().c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+
+                                // Hmmm... Had Some Units PVs Patterns
+                                // But Didn't Match Anything...
+                                // Better Log It!
+                                else if ( E->unitsPatterns.size() )
+                                {
+                                    std::stringstream ss;
+                                    ss << "unitsPatterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < E->unitsPatterns.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << E->unitsPatterns[i];
+                                    }
+                                    ss << "]";
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s %s - %s %s",
+                                        g_pid, "STS Error:",
+                                        "No Matching Units PV Found for",
+                                        pv_value_path.c_str(),
+                                        "Missing PV Value or Config...?",
+                                        ss.str().c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
                             }
-                        }
 
-                        // Link PV Log into Group...
-                        else
-                        {
-                            syslog( LOG_INFO, "[%i] %s %s to Group in %s",
-                                g_pid, "Linking PV Channel",
-                                m_log_path.c_str(),
-                                elem_link_path.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
-
-                            // Only Create "Target" String for Group Links
-                            // if we haven't already done so... ;-D
-                            if ( !m_has_link )
-                            {
-                                // Manually Create "Target" String for
-                                // Group Link (as per makeGroupLink usage)
-                                m_nxgen.writeString( m_log_path, "target",
-                                    m_log_path );
-
-                                // Mark This PV as Having Created the
-                                // "Target" String for Group Links!
-                                // (so we only do it _Once_!)
-                                m_has_link = true;
-                            }
+                            // Link PV Log into Group...
                             else
                             {
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s %s - %s", g_pid,
-                                    "PV Channel", m_log_path.c_str(),
-                                    "Already Has Target Group Link String",
-                                    "Skipping..." );
+                                    "[%i] %s %s to Group in %s",
+                                    g_pid, "Linking PV Channel",
+                                    m_log_path.c_str(),
+                                    elem_link_path.c_str() );
                                 // give syslog a chance...
                                 usleep(30000);
-                            }
 
-                            m_nxgen.makeGroupLink(
-                                m_log_path, elem_link_path );
+                                // Only Create "Target" String for
+                                // Group Links if we haven't already
+                                // done so... ;-D
+                                if ( !m_has_link )
+                                {
+                                    // Manually Create "Target" String for
+                                    // Group Link (as per makeGroupLink)
+                                    m_nxgen.writeString( m_log_path,
+                                        "target", m_log_path );
+
+                                    // Mark This PV as Having Created the
+                                    // "Target" String for Group Links!
+                                    // (so we only do it _Once_!)
+                                    m_has_link = true;
+                                }
+                                else
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s %s %s - %s", g_pid,
+                                        "PV Channel", m_log_path.c_str(),
+                                        "Already Has",
+                                        "Target Group Link String",
+                                        "Skipping..." );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
+
+                                m_nxgen.makeGroupLink(
+                                    m_log_path, elem_link_path );
+
+                                E->createdLinks.insert(
+                                    std::pair<std::string, std::string>(
+                                        elem_link_path, m_log_path ) );
+                            }
+                        }
+
+                        // Log Error for Duplicate Element Link Attempt!
+                        else
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s %s \"%s\" %s \"%s\" - %s",
+                                g_pid, "STS Error:",
+                                "*** DUPLICATE Element Link Attempt!",
+                                "PV/Log Path", it->second.c_str(),
+                                "Already Linked to Element Path",
+                                elem_link_path.c_str(),
+                                "Skipping..." );
+                            // give syslog a chance...
+                            usleep(30000);
                         }
 
                         matched = true;
