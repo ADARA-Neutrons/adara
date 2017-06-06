@@ -182,10 +182,12 @@ private:
         std::vector<std::string>    unitsPatterns;
         std::string                 unitsValue;
         std::string                 units;
+        std::map<std::string, std::string>
+                                    unitsPaths;
         bool                        linkValue;
-        uint32_t                    lastIndex;
         std::map<std::string, std::string>
                                     createdLinks;
+        uint32_t                    lastIndex;
     };
 
     // Look for an ElementInfo Struct by Name in an Existing Vector...
@@ -1263,6 +1265,71 @@ private:
             return( false );
         }
 
+        /// Convert Uint32 PV Value to String
+        std::string valueToString
+        (
+            uint32_t value                 ///< Uint32 Value
+        )
+        {
+            std::stringstream ss;
+            ss << value;
+            return( ss.str() );
+        }
+
+        /// Convert Double PV Value to String
+        std::string valueToString
+        (
+            double value                   ///< Double Value
+        )
+        {
+            std::stringstream ss;
+            ss << value;
+            return( ss.str() );
+        }
+
+        /// Convert String PV Value to String (Lol... ;-D)
+        std::string valueToString
+        (
+            std::string value              ///< String Value
+        )
+        {
+            return( value );
+        }
+
+        /// Convert Uint32 PV Array to String
+        std::string valueToString
+        (
+            std::vector<uint32_t> value    ///< Uint32 Array
+        )
+        {
+            std::stringstream ss;
+            ss << "[";
+            for ( uint32_t j=0 ; j < value.size() ; j++ )
+            {
+                if ( j ) ss << ", ";
+                ss << value[j];
+            }
+            ss << "]";
+            return( ss.str() );
+        }
+
+        /// Convert Double PV Array to String
+        std::string valueToString
+        (
+            std::vector<double> value      ///< Double Array
+        )
+        {
+            std::stringstream ss;
+            ss << "[";
+            for ( uint32_t j=0 ; j < value.size() ; j++ )
+            {
+                if ( j ) ss << ", ";
+                ss << value[j];
+            }
+            ss << "]";
+            return( ss.str() );
+        }
+
         /// Search STS Config for Associated Groups & Create...
         void createSTSConfigGroupMatchingElements
         (
@@ -1286,6 +1353,7 @@ private:
 
                 bool matched = false;
 
+                // Check for Matching Elements to Link...
                 for ( uint32_t p=0 ;
                         p < E->patterns.size() && !matched ; p++ )
                 {
@@ -1309,8 +1377,7 @@ private:
                             this->m_internal_connection, subs, expr ) )
                     {
                         // REMOVE ME...
-                        syslog( LOG_INFO,
-                            "[%i] %s %s in %s \"%s\" %s",
+                        syslog( LOG_INFO, "[%i] %s %s in %s \"%s\" %s",
                             g_pid, "Pattern Match for", dev_pv_str.c_str(),
                             "Group", G->name.c_str(), patt_str.c_str() );
                         // give syslog a chance...
@@ -1543,77 +1610,21 @@ private:
                                 m_nxgen.makeLink(
                                     pv_value_path, elem_link_path );
 
-                                E->createdLinks.insert(
-                                    std::pair<std::string, std::string>(
-                                        elem_link_path, pv_value_path ) );
+                                std::pair<std::string, std::string>
+                                    path_link_pair(
+                                        elem_link_path, pv_value_path );
 
-                                // IFF Units Attribute Not Already Set,
-                                // Set Units Attribute from ElementInfo
-                                // (If we captured a "Units Value" PV Value
-                                // or Explicit Units were Specified!)
-                                if ( E->unitsValue.size()
+                                E->createdLinks.insert( path_link_pair );
+
+                                // IF We Have a Chance of Capturing a
+                                // Units Value from some PV(s), then
+                                // Save ElementInfo Link Path Now for
+                                // Setting the Units Attribute Later...!
+                                // (_After_ We've Gone Thru All the PVs!)
+                                if ( E->unitsPatterns.size()
                                         || E->units.size() )
                                 {
-                                    std::string label;
-                                    std::string units;
-                                    // PV Units Value Supersedes
-                                    // Explicit Units
-                                    if ( E->unitsValue.size() )
-                                    {
-                                        label = "PV Value Units";
-                                        units = E->unitsValue;
-                                    }
-                                    else
-                                    {
-                                        label = "Explicit Config Units";
-                                        units = E->units;
-                                    }
-
-                                    std::string existing_attr_value;
-                                    bool attrWasSet =
-                                        m_nxgen.checkStringAttribute(
-                                            elem_link_path,
-                                            "units", units,
-                                            existing_attr_value );
-
-                                    syslog( LOG_INFO,
-                                  "[%i] %s %s to %s %s=[%s] %s=[%s] %s=%d",
-                                        g_pid,
-                                        "Setting PV Units Attribute",
-                                        pv_value_path.c_str(),
-                                        label.c_str(),
-                                        "units", units.c_str(),
-                                        "existing_attr_value",
-                                        existing_attr_value.c_str(),
-                                        "attrWasSet", attrWasSet );
-                                    // give syslog a chance...
-                                    usleep(30000);
-                                }
-
-                                // Hmmm... Had Some Units PVs Patterns
-                                // But Didn't Match Anything...
-                                // Better Log It!
-                                else if ( E->unitsPatterns.size() )
-                                {
-                                    std::stringstream ss;
-                                    ss << "unitsPatterns=[";
-                                    for ( uint32_t i=0 ;
-                                            i < E->unitsPatterns.size();
-                                            i++ )
-                                    {
-                                        if ( i ) ss << ", ";
-                                        ss << E->unitsPatterns[i];
-                                    }
-                                    ss << "]";
-                                    syslog( LOG_ERR,
-                                        "[%i] %s %s %s - %s %s",
-                                        g_pid, "STS Error:",
-                                        "No Matching Units PV Found for",
-                                        pv_value_path.c_str(),
-                                        "Missing PV Value or Config...?",
-                                        ss.str().c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    E->unitsPaths.insert( path_link_pair );
                                 }
                             }
 
@@ -1668,18 +1679,81 @@ private:
                         else
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s %s %s \"%s\" %s \"%s\" - %s",
+                                "[%i] %s %s %s - %s %s %s - %s %s",
                                 g_pid, "STS Error:",
-                                "*** DUPLICATE Element Link Attempt!",
+                                "*** DUPLICATE Element Link Attempt for",
+                                elem_link_path.c_str(),
                                 "PV/Log Path", it->second.c_str(),
                                 "Already Linked to Element Path",
-                                elem_link_path.c_str(),
-                                "Skipping..." );
+                                "Skipping", m_log_path.c_str() );
                             // give syslog a chance...
                             usleep(30000);
                         }
 
                         matched = true;
+                    }
+                }
+
+                // Don't Bother Checking for Matching Units Patterns
+                // If the PV's Value Hasn't Been Set Anyway... ;-D
+                if ( !(this->m_last_value_set) )
+                    continue;
+
+                // Also Check for Matching Units Patterns...
+                for ( uint32_t u=0 ;
+                        u < E->unitsPatterns.size() ; u++ )
+                {
+                    std::string &U = E->unitsPatterns[u];
+
+                    std::string units_patt_str = label.c_str();
+                    units_patt_str += "Element Units Pattern \""
+                        + U + "\"";
+
+                    // REMOVE ME...
+                    //syslog( LOG_INFO, "[%i] %s %s Units Match",
+                        //g_pid, "Checking for", units_patt_str.c_str() );
+                    // give syslog a chance...
+                    //usleep(30000);
+
+                    // Does PV Match This Element Units Regex Pattern?
+                    boost::regex expr( U );
+                    boost::smatch subs;
+                    if ( boost::regex_search(
+                            this->m_internal_name, subs, expr )
+                        || boost::regex_search(
+                            this->m_internal_connection, subs, expr ) )
+                    {
+                        if ( ! E->unitsValue.size() )
+                        {
+                            std::stringstream ss;
+                            ss << valueToString( this->m_last_value );
+
+                            // REMOVE ME...
+                            syslog( LOG_INFO,
+                                "[%i] %s %s in %s \"%s\" %s, %s \"%s\"",
+                                g_pid, "Pattern Match for",
+                                dev_pv_str.c_str(),
+                                "Group", G->name.c_str(),
+                                units_patt_str.c_str(),
+                                "Capturing Units Value as",
+                                ss.str().c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            E->unitsValue = ss.str();
+                        }
+
+                        else
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s %s - %s %s...",
+                                g_pid, "STS Error:",
+                                "*** DUPLICATE Element Units Value for",
+                                units_patt_str.c_str(),
+                                "Ignoring", dev_pv_str.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+                        }
                     }
                 }
             }
@@ -1904,7 +1978,7 @@ public:
 
 protected:
 
-    void                initialize();
+    void                initialize(void);
     void                finalize( const STS::RunMetrics &a_run_metrics );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
                             const std::string &a_name,
@@ -1960,11 +2034,15 @@ protected:
     void                writeDeviceEnums( STS::Identifier a_devId,
                             std::vector<STS::PVEnumeratedType>
                                 &a_enumVec );
+    void                checkSTSConfigElementUnitsPaths(void);
+    void                writeSTSConfigUnitsAttributes(
+                            struct GroupInfo *G,
+                            std::vector<struct ElementInfo> &elements );
 
 private:
-    void                flushPauseData();
-    void                flushScanData();
-    void                flushCommentData();
+    void                flushPauseData(void);
+    void                flushScanData(void);
+    void                flushCommentData(void);
     NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
     void                makeGroup( const std::string &a_path,
                             const std::string &a_type );
