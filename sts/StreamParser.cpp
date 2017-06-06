@@ -3556,6 +3556,11 @@ StreamParser::finalizeStreamProcessing()
         ipv->second->createSTSConfigConditionalGroups();
     }
 
+    // Now Globally Write Any Captured PV Units Attributes,
+    // Using All Saved "Units Paths" String Sets & Units Values,
+    // Now That All PV Values have been Processed...
+    checkSTSConfigElementUnitsPaths();
+
     // Let adapter do anything else it wants to
     finalize( m_run_metrics );
 }
