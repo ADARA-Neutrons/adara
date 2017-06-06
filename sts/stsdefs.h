@@ -881,6 +881,7 @@ public:
     virtual void            writeDeviceEnums( Identifier a_devId,
                                 std::vector<STS::PVEnumeratedType>
                                     &a_enumVec ) = 0;
+    virtual void            checkSTSConfigElementUnitsPaths(void) = 0;
 };
 
 
