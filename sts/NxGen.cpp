@@ -680,6 +680,128 @@ NxGen::finalize
 }
 
 
+/*! \brief Globally Check for Any Captured PV Units Paths/Attributes
+ *
+ * This method Globally Checks for Any Captured PV Units Attributes,
+ * using All Saved "Units Paths" & Units Values,
+ * now that All PV Values have been processed...
+ */
+void
+NxGen::checkSTSConfigElementUnitsPaths(void)
+{
+    // Check Each Config Group in Turn
+    // for Any Saved ElementInfo Units Paths...
+    for ( uint32_t g=0 ; g < m_config_groups.size() ; g++ )
+    {
+        struct GroupInfo *G = &(m_config_groups[g]);
+
+        writeSTSConfigUnitsAttributes( G, G->elements );
+
+        // Check for Conditional Elements as Well...
+        for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
+        {
+            struct ConditionInfo *C = &(G->conditions[c]);
+
+            if ( C->is_set )
+            {
+                writeSTSConfigUnitsAttributes( G, C->elements );
+            }
+        }
+    }
+}
+
+
+/*! \brief Write PV Units Attributes for Any Captured Units Paths
+ *
+ * This method Writes Any PV Units Attributes
+ * using All Saved "Units Paths" & Units Values,
+ * now that All PV Values have been processed...
+ */
+void
+NxGen::writeSTSConfigUnitsAttributes(
+        struct GroupInfo *G, std::vector<struct ElementInfo> &elements )
+{
+    std::map<std::string, std::string>::iterator it;
+
+    // Check Each Element in Turn for Any Captured Units Attributes...
+    for ( uint32_t e=0 ; e < elements.size() ; e++ )
+    {
+        struct ElementInfo *E = &(elements[e]);
+
+        // IFF Units Attribute Not Already Set
+        // (checked in NxGen::checkStringAttribute()),
+        // then Set Units Attribute from ElementInfo
+        // (If we captured a "Units Value" PV Value,
+        // or else Explicit Units were Specified!)
+        if ( E->unitsValue.size() || E->units.size() )
+        {
+            // Add Given Units Attribute for Every Saved Element Path...
+            for ( it = E->unitsPaths.begin() ;
+                    it != E->unitsPaths.end() ; ++it )
+            {
+                std::string label;
+                std::string units;
+
+                // PV Units Value Supersedes Explicit Units
+                if ( E->unitsValue.size() )
+                {
+                    label = "PV Value Units";
+                    units = E->unitsValue;
+                }
+                else
+                {
+                    label = "Explicit Config Units";
+                    units = E->units;
+                }
+
+                std::string existing_attr_value;
+                bool attrWasSet = checkStringAttribute(
+                        it->first, // elem_link_path
+                        "units", units, existing_attr_value );
+
+                syslog( LOG_INFO,
+                    "[%i] Group %s: %s %s to %s %s=[%s] %s=[%s] %s=%d",
+                    g_pid, G->name.c_str(), "Setting PV Units Attribute",
+                    it->second.c_str(), // pv_value_path
+                    label.c_str(), "units", units.c_str(),
+                    "existing_attr_value", existing_attr_value.c_str(),
+                    "attrWasSet", attrWasSet );
+                // give syslog a chance...
+                usleep(30000);
+            }
+        }
+
+        // Hmmm... Had Some Units PVs Patterns But Didn't Match Anything...
+        // Better Log It!
+        else if ( E->unitsPatterns.size() )
+        {
+            std::stringstream ss;
+            ss << "unitsPatterns=[";
+            for ( uint32_t i=0 ; i < E->unitsPatterns.size(); i++ )
+            {
+                if ( i ) ss << ", ";
+                ss << E->unitsPatterns[i];
+            }
+            ss << "]";
+            ss << " unitsPaths=[";
+            for ( it = E->unitsPaths.begin() ;
+                    it != E->unitsPaths.end() ; ++it )
+            {
+                if ( it != E->unitsPaths.begin() ) ss << ", ";
+                ss << "(" << it->first << " -> " << it->second << ")";
+            }
+            ss << "]";
+            syslog( LOG_ERR, "[%i] %s Group %s: %s - %s %s",
+                g_pid, "STS Error:",
+                G->name.c_str(), "No Matching Units PV Found",
+                "Missing PV Value or Config...?", ss.str().c_str() );
+            // give syslog a chance...
+            usleep(30000);
+        }
+    }
+}
+
+
 /*! \brief Dump Overall STS Processing Statistics
  *
  * This method dump the overall processing time/event bandwidth
