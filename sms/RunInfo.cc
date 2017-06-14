@@ -429,8 +429,14 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	// For Minor Backwards Compat - "Container Name"... (Temporary)
 	addPV(prefix, "Container", "container", m_sample);
 
-	addPV(prefix, "ContainerId", "container_id", m_sample);
-	addPV(prefix, "ContainerName", "container_name", m_sample);
+	m_containerIdPV = addPV(prefix, "ContainerId",
+		"container_id", m_sample);
+	m_containerNamePV = addPV(prefix, "ContainerName",
+		"container_name", m_sample);
+
+	// Create Container Concatenation "Component" PV...
+	// (value is: container_id + ":" + container_name, lol... ;-D
+	m_componentPV = addPV(prefix, "Component", "component", m_sample);
 
 	addPV(prefix, "CanIndicator", "can_indicator", m_sample);
 	addPV(prefix, "CanBarcode", "can_barcode", m_sample);
@@ -617,6 +623,19 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 {
 	// Invalidate Cache...
 	invalidateCache();
+
+	// Update Container "Component" PV, As Needed...
+	if ( pv->label().compare("container_id")
+			|| pv->label().compare("container_name") )
+	{
+		// Concatenate Container Id and Name to Get "Component"... ;-D
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		std::stringstream ss;
+		ss << m_containerIdPV->value()
+			<< ": " << m_containerNamePV->value();
+		m_componentPV->update( ss.str(), &now );
+	}
 
 	// Check for Change in "Required" PV Status...
 	if ( pv->isRequired() )

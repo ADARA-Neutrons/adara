@@ -71,6 +71,10 @@ private:
 	RunInfoPVSharedPtr m_densityPV;
 	RunInfoFloat64PVSharedPtr m_densityFloat64PV;
 
+	RunInfoPVSharedPtr m_containerIdPV;
+	RunInfoPVSharedPtr m_containerNamePV;
+	RunInfoPVSharedPtr m_componentPV;
+
 	RunInfoPVSharedPtr m_heightInContainerPV;
 	RunInfoFloat64PVSharedPtr m_heightInContainerFloat64PV;
 
