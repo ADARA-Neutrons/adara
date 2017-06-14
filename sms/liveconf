@@ -1251,6 +1251,7 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
+		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
 		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
