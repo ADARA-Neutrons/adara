@@ -663,9 +663,12 @@ Connection::reconnectThread()
         }
         catch(...)
         {
-            exceptionLog(
-                "reconnectThread(): Error Creating ActiveMQ Connection!",
-                ERR_LOG);
+            std::stringstream ss;
+            ss << "reconnectThread(): Error Creating ActiveMQ Connection!"
+                << " domain=[" << m_domain << "]"
+                << " broker_uri=[" << m_broker_uri << "]"
+                << " broker_user=[" << m_broker_user << "]";
+            exceptionLog(ss.str(), ERR_LOG);
 
             try
             {
@@ -687,9 +690,13 @@ Connection::reconnectThread()
             }
             catch(...)
             {
-                exceptionLog(
-              "reconnectThread(): Exception Freeing ActiveMQ Connection!",
-                    ERR_LOG);
+                std::stringstream ss;
+                ss << "reconnectThread():"
+                    << " Exception Freeing ActiveMQ Connection!"
+                    << " domain=[" << m_domain << "]"
+                    << " broker_uri=[" << m_broker_uri << "]"
+                    << " broker_user=[" << m_broker_user << "]";
+                exceptionLog(ss.str(), ERR_LOG);
 
                 // We Couldn't Close Connection/Session Gracefully,
                 // So Just Clear Them Out... ;-b
@@ -990,8 +997,12 @@ Connection::broadcast( MessageBase &a_msg )
         }
         catch(...)
         {
-            exceptionLog(
-                "broadcast(): Error Broadcasting Message!", ERR_LOG);
+            std::stringstream ss;
+            ss << "broadcast(): Error Broadcasting Message!"
+                << " domain=[" << m_domain << "]"
+                << " broker_uri=[" << m_broker_uri << "]"
+                << " broker_user=[" << m_broker_user << "]";
+            exceptionLog(ss.str(), ERR_LOG);
 
             // An exception indicates a loss of connection
             delete cmsmsg;
@@ -1076,8 +1087,12 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id,
             }
             catch(...)
             {
-                exceptionLog(
-                    "send(): Error Sending Message!", ERR_LOG);
+                std::stringstream ss;
+                ss << "send(): Error Sending Message!"
+                    << " domain=[" << m_domain << "]"
+                    << " broker_uri=[" << m_broker_uri << "]"
+                    << " broker_user=[" << m_broker_user << "]";
+                exceptionLog(ss.str(), ERR_LOG);
 
                 // An exception indicates a loss of connection
                 delete cmsmsg;
