@@ -175,6 +175,8 @@ private:
     uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
 
     uint16_t                                m_pulse_flag;
+
+    struct timespec                         m_default_start_time;       ///< Default Run Start Time (No Neutron Pulses)...
 };
 
 
