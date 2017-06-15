@@ -45,7 +45,11 @@
 			<name>mass_density</name>
 			<units_value>SMS:RunInfo:Sample:DensityUnits</units_value>
 		</element_value>
-		<!-- Need to Concatenate These Two, with a ":" for "component"! -->
+		<element_value>
+			<!-- Just a Concatenation of Container Id & Name... ;-b -->
+			<pattern>SMS:RunInfo:Sample:Component</pattern>
+			<name>component</name>
+		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:ContainerId</pattern>
 			<name>container_id</name>
