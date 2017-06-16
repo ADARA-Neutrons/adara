@@ -1,34 +1,76 @@
 
 To make dasmon machines ADARA-buildable:
 
+	sudo yum install git.x86_64 gcc.x86_64 gcc-c++.x86_64
 	sudo mkdir /home/controls
 	(chown controls /home/controls)
 	sudo chgrp slowcontrols_developers /home/controls
 	sudo chmod g+ws /home/controls/
 	cd /home/controls/
-	mkdir share epics
+	mkdir -p share epics/base epics/basev4 epics/extensions
 	cd share/
 	git clone git+ssh://trac.sns.gov/var/repos/share master
-	cd master/scripts/git/
-	git-branch.sh --epics base master
-	git-branch.sh --epics basev4 master
-	git-branch.sh --epics extensions master
+
+	# Old Way...
+	# cd master/scripts/git/
+	# git-branch.sh --epics base master
+	# git-branch.sh --epics basev4 master
+	# git-branch.sh --epics extensions master
+	# cd /home/controls/epics/base/master/
+	# peg EPICS
+	# sc
+	# peg EPICS
+
+	# New Way... :-D
+	cd /home/controls/epics/base
+	git clone git+ssh://trac.sns.gov/var/repos/base master
+	cd ../basev4
+	git clone git+ssh://trac.sns.gov/var/repos/basev4 master
+	cd ../extensions/
+	git clone git+ssh://trac.sns.gov/ var/repos/extensions master
+
+	mkdir /home/controls/prod/ADARA
+	pushd /home/controls/prod/ADARA
+	ln -s /home/controls/epics/base/master EpicsBaseLink
+	popd ; source ~/.bashrc ; printenv | grep EPICS
+
 	cd /home/controls/epics/base/master/
-	peg EPICS
-	sc
-	peg EPICS
 	sudo yum install readline-devel.x86_64
 	make
 	make install
+	mkdir -p /home/controls/prod/epics/base
+	cd ..
+	cp -rp master /home/controls/prod/epics/base/rel3.14.12.6_20170616
+	rm /home/controls/prod/ADARA/EpicsBaseLink
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170616 \
+		/home/controls/prod/ADARA/EpicsBaseLink
+	ll /home/controls/prod/ADARA/
+
 	cd ../../extensions/master/
 	make
 	make install
+	mkdir -p /home/controls/prod/epics/extensions
+	cd ..
+	cp -rp master /home/controls/prod/epics/extensions/rel3.14-20170616
+	ln -s /home/controls/prod/epics/extensions/rel3.14-20170616 \
+		/home/controls/prod/ADARA/EpicsExtensionsLink
+	ll /home/controls/prod/ADARA/
+
 	cd ../../basev4/master/
-	./make_setup_release.sh `pwd`
 	sudo yum install python-devel.x86_64
+	sudo yum install autoconf.noarch automake.noarch
+	./make_setup_release.sh `pwd`
 	make
+	mkdir -p /home/controls/prod/epics/basev4
+	cd ..
+	cp -rp master /home/controls/prod/epics/basev4/rel4.5-20170616
+	ln -s /home/controls/prod/epics/basev4/rel4.5-20170616 \
+		/home/controls/prod/ADARA/EpicsBaseV4Link
+	ll /home/controls/prod/ADARA/
+
 	cd /home/controls
 	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
+
 	cd ~/gitsrc/ADARA
 	make distclean
 	./bootstrap
@@ -37,6 +79,7 @@ To make dasmon machines ADARA-buildable:
 	sudo yum install nexus.x86_64 nexus-devel.x86_64
 	sudo yum install nexus-tools.x86_64 nexus-python.x86_64
 	sudo yum install log4cxx-devel.x86_64
+	sudo yum install openldap-devel.x86_64
 	doconf
 	make
 	cd dasmon/client/
