@@ -20,117 +20,117 @@
 		<path>/entry</path>
 		<type>NXsample</type>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Id</pattern>
+			<pattern>SMS:RunInfo:Sample:Id$</pattern>
 			<name>identifier</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Name</pattern>
+			<pattern>SMS:RunInfo:Sample:Name$</pattern>
 			<name>name</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Nature</pattern>
+			<pattern>SMS:RunInfo:Sample:Nature$</pattern>
 			<name>nature</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Formula</pattern>
+			<pattern>SMS:RunInfo:Sample:Formula$</pattern>
 			<name>chemical_formula</name>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:Mass$</pattern>
 			<name>mass</name>
-			<units_value>SMS:RunInfo:Sample:MassUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:MassUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:Density$</pattern>
 			<name>mass_density</name>
-			<units_value>SMS:RunInfo:Sample:DensityUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:DensityUnits$</units_value>
 		</element_value>
 		<element_value>
 			<!-- Just a Concatenation of Container Id & Name... ;-b -->
-			<pattern>SMS:RunInfo:Sample:Component</pattern>
+			<pattern>SMS:RunInfo:Sample:Component$</pattern>
 			<name>component</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:ContainerId</pattern>
+			<pattern>SMS:RunInfo:Sample:ContainerId$</pattern>
 			<name>container_id</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:ContainerName</pattern>
+			<pattern>SMS:RunInfo:Sample:ContainerName$</pattern>
 			<name>container_name</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:CanIndicator</pattern>
+			<pattern>SMS:RunInfo:Sample:CanIndicator$</pattern>
 			<name>can_indicator</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:CanBarcode</pattern>
+			<pattern>SMS:RunInfo:Sample:CanBarcode$</pattern>
 			<name>can_barcode</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:CanName</pattern>
+			<pattern>SMS:RunInfo:Sample:CanName$</pattern>
 			<name>can_name</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:CanMaterials</pattern>
+			<pattern>SMS:RunInfo:Sample:CanMaterials$</pattern>
 			<name>can_materials</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Description</pattern>
+			<pattern>SMS:RunInfo:Sample:Description$</pattern>
 			<name>description</name>
 		</element_value>
 		<element_value>
-			<pattern>SMS:RunInfo:Sample:Comments</pattern>
+			<pattern>SMS:RunInfo:Sample:Comments$</pattern>
 			<name>comments</name>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:HeightInContainer$</pattern>
 			<name>height_in_container</name>
-			<units_value>SMS:RunInfo:Sample:HeightInContainerUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:HeightInContainerUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:InteriorDiameter$</pattern>
 			<name>interior_diameter</name>
-			<units_value>SMS:RunInfo:Sample:InteriorDiameterUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:InteriorDiameterUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:InteriorHeight$</pattern>
 			<name>interior_height</name>
-			<units_value>SMS:RunInfo:Sample:InteriorHeightUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:InteriorHeightUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:InteriorWidth$</pattern>
 			<name>interior_width</name>
-			<units_value>SMS:RunInfo:Sample:InteriorWidthUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:InteriorWidthUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:InteriorDepth$</pattern>
 			<name>interior_depth</name>
-			<units_value>SMS:RunInfo:Sample:InteriorDepthUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:InteriorDepthUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:OuterDiameter$</pattern>
 			<name>outer_diameter</name>
-			<units_value>SMS:RunInfo:Sample:OuterDiameterUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:OuterDiameterUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:OuterHeight$</pattern>
 			<name>outer_height</name>
-			<units_value>SMS:RunInfo:Sample:OuterHeightUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:OuterHeightUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:OuterWidth$</pattern>
 			<name>outer_width</name>
-			<units_value>SMS:RunInfo:Sample:OuterWidthUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:OuterWidthUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:OuterDepth$</pattern>
 			<name>outer_depth</name>
-			<units_value>SMS:RunInfo:Sample:OuterDepthUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:OuterDepthUnits$</units_value>
 		</element_value>
 		<element_value>
 			<pattern>SMS:RunInfo:Sample:VolumeCubic$</pattern>
 			<name>volume_cubic</name>
-			<units_value>SMS:RunInfo:Sample:VolumeCubicUnits</units_value>
+			<units_value>SMS:RunInfo:Sample:VolumeCubicUnits$</units_value>
 		</element_value>
 	</group>
 
@@ -141,51 +141,212 @@
 		<type>NXdisk_chopper</type>
 		<!-- EPICS-based Chopper PV Elements -->
 		<element>
-			<pattern>:Chop:Skf\d+:DriveError</pattern>
+			<pattern>:Chop:Skf\d+:DriveError$</pattern>
 			<index>%*[^:]:Chop:Skf%d:DriveError</index>
 			<name>drive_error</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf\d+:MotorSpeed</pattern>
+			<pattern>:Chop:Skf\d+:MotorSpeed$</pattern>
 			<index>%*[^:]:Chop:Skf%d:MotorSpeed</index>
-			<pattern>Speed\d+</pattern>
+			<pattern>^Speed\d+$</pattern>
 			<index>Speed%d</index>
 			<name>rotation_speed</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf\d+:PhaseAccuracy</pattern>
+			<pattern>:Chop:Skf\d+:PhaseAccuracy$</pattern>
 			<index>%*[^:]:Chop:Skf%d:PhaseAccuracy</index>
-			<pattern>Phase\d+</pattern>
+			<pattern>^Phase\d+$</pattern>
 			<index>Phase%d</index>
 			<name>phase</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf\d+:PhaseLocked</pattern>
+			<pattern>:Chop:Skf\d+:PhaseLocked$</pattern>
 			<index>%*[^:]:Chop:Skf%d:PhaseLocked</index>
 			<name>phase_locked</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf\d+:SpeedSet</pattern>
+			<pattern>:Chop:Skf\d+:SpeedSet$</pattern>
 			<index>%*[^:]:Chop:Skf%d:SpeedSet</index>
 			<name>speed_set</name>
 		</element>
 		<element>
-			<pattern>:Chop:Skf\d+:SpeedUserReq</pattern>
+			<pattern>:Chop:Skf\d+:SpeedUserReq$</pattern>
 			<index>%*[^:]:Chop:Skf%d:SpeedUserReq</index>
-			<pattern>SpeedRequest\d+</pattern>
+			<pattern>^SpeedRequest\d+$</pattern>
 			<index>SpeedRequest%d</index>
 			<name>speed_request</name>
 		</element>
 		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
-			<pattern>ChopperStatus\d+</pattern>
+			<pattern>^ChopperStatus\d+$</pattern>
 			<index>ChopperStatus%d</index>
 			<name>status</name>
 		</element>
 		<element>
-			<pattern>PhaseRequest\d+</pattern>
+			<pattern>^PhaseRequest\d+$</pattern>
 			<index>PhaseRequest%d</index>
 			<name>phase_request</name>
+		</element>
+	</group>
+
+	<!-- (Indexed) Aperture Groups -->
+	<group>
+		<name>aperture[XXX_INDEX_XXX]</name>
+		<path>/entry/instrument</path>
+		<type>NXaperture</type>
+		<element>
+			<pattern>:Mot:a\d+b$</pattern>
+			<index>%*[^:]:Mot:a%db</index>
+			<pattern>^a\d+bRequest$</pattern>
+			<index>a%dbRequest</index>
+			<name>abRequest</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+b.RBV$</pattern>
+			<index>%*[^:]:Mot:a%db.RBV</index>
+			<pattern>^a\d+b$</pattern>
+			<index>a%db</index>
+			<name>ab</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+b:Status$</pattern>
+			<index>%*[^:]:Mot:a%db:Status</index>
+			<pattern>^a\d+bStatus$</pattern>
+			<index>a%dbStatus</index>
+			<name>abStatus</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+t$</pattern>
+			<index>%*[^:]:Mot:a%dt</index>
+			<pattern>^a\d+tRequest$</pattern>
+			<index>a%dtRequest</index>
+			<name>atRequest</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+t.RBV$</pattern>
+			<index>%*[^:]:Mot:a%dt.RBV</index>
+			<pattern>^a\d+t$</pattern>
+			<index>a%dt</index>
+			<name>at</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+t:Status$</pattern>
+			<index>%*[^:]:Mot:a%dt:Status</index>
+			<pattern>^a\d+tStatus$</pattern>
+			<index>a%dtStatus</index>
+			<name>atStatus</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+l$</pattern>
+			<index>%*[^:]:Mot:a%dl</index>
+			<pattern>^a\d+lRequest$</pattern>
+			<index>a%dlRequest</index>
+			<name>alRequest</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+l.RBV$</pattern>
+			<index>%*[^:]:Mot:a%dl.RBV</index>
+			<pattern>^a\d+l$</pattern>
+			<index>a%dl</index>
+			<name>al</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+l:Status$</pattern>
+			<index>%*[^:]:Mot:a%dl:Status</index>
+			<pattern>^a\d+lStatus$</pattern>
+			<index>a%dlStatus</index>
+			<name>alStatus</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+r$</pattern>
+			<index>%*[^:]:Mot:a%dr</index>
+			<pattern>^a\d+rRequest$</pattern>
+			<index>a%drRequest</index>
+			<name>arRequest</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+r.RBV$</pattern>
+			<index>%*[^:]:Mot:a%dr.RBV</index>
+			<pattern>^a\d+r$</pattern>
+			<index>a%dr</index>
+			<name>ar</name>
+		</element>
+		<element>
+			<pattern>:Mot:a\d+r:Status$</pattern>
+			<index>%*[^:]:Mot:a%dr:Status</index>
+			<pattern>^a\d+rStatus$</pattern>
+			<index>a%drStatus</index>
+			<name>arStatus</name>
+		</element>
+		<element>
+			<pattern>^A\d+HCenter$</pattern>
+			<index>A%dHCenter</index>
+			<name>AHCenter</name>
+		</element>
+		<element>
+			<pattern>^A\d+HCenterOffset$</pattern>
+			<index>A%dHCenterOffset</index>
+			<name>AHCenterOffset</name>
+		</element>
+		<element>
+			<pattern>^A\d+HCenterOffsetRequest$</pattern>
+			<index>A%dHCenterOffsetRequest</index>
+			<name>AHCenterOffsetRequest</name>
+		</element>
+		<element>
+			<pattern>^A\d+HCenterRequest$</pattern>
+			<index>A%dHCenterRequest</index>
+			<name>AHCenterRequest</name>
+		</element>
+		<element>
+			<pattern>^A\d+HStatus$</pattern>
+			<index>A%dHStatus</index>
+			<name>AHStatus</name>
+		</element>
+		<element>
+			<pattern>^A\d+HWidth$</pattern>
+			<index>A%dHWidth</index>
+			<name>AHWidth</name>
+		</element>
+		<element>
+			<pattern>^A\d+HWidthRequest$</pattern>
+			<index>A%dHWidthRequest</index>
+			<name>AHWidthRequest</name>
+		</element>
+		<element>
+			<pattern>^A\d+VCenter$</pattern>
+			<index>A%dVCenter</index>
+			<name>AVCenter</name>
+		</element>
+		<element>
+			<pattern>^A\d+VCenterOffset$</pattern>
+			<index>A%dVCenterOffset</index>
+			<name>AVCenterOffset</name>
+		</element>
+		<element>
+			<pattern>^A\d+VCenterOffsetRequest$</pattern>
+			<index>A%dVCenterOffsetRequest</index>
+			<name>AVCenterOffsetRequest</name>
+		</element>
+		<element>
+			<pattern>^A\d+VCenterRequest$</pattern>
+			<index>A%dVCenterRequest</index>
+			<name>AVCenterRequest</name>
+		</element>
+		<element>
+			<pattern>^A\d+VStatus$</pattern>
+			<index>A%dVStatus</index>
+			<name>AVStatus</name>
+		</element>
+		<element>
+			<pattern>^A\d+VHeight$</pattern>
+			<index>A%dVHeight</index>
+			<name>AVHeight</name>
+		</element>
+		<element>
+			<pattern>^A\d+VHeightRequest$</pattern>
+			<index>A%dVHeightRequest</index>
+			<name>AVHeightRequest</name>
 		</element>
 	</group>
 
@@ -196,13 +357,13 @@
 		<type>NXcrystal</type>
 		<!-- EPICS-based Focus Array PV Elements -->
 		<element>
-			<pattern>:Mot:vmel:Position</pattern>
+			<pattern>:Mot:vmel:Position$</pattern>
 			<name>position</name>
 		</element>
 		<!-- "PG" Mode Conditional Focus Array PV Elements -->
 		<condition>
 			<name>PG Position Condition</name>
-			<pattern>:Mot:vmel:Position</pattern>
+			<pattern>:Mot:vmel:Position$</pattern>
 			<value_string>PG</value_string><!-- 1 -->
 			<element>
 				<pattern>:Mot:mfpg$</pattern>
@@ -224,7 +385,7 @@
 		<!-- "HU" Mode Conditional Focus Array PV Elements -->
 		<condition>
 			<name>HU Position Condition</name>
-			<pattern>:Mot:vmel:Position</pattern>
+			<pattern>:Mot:vmel:Position$</pattern>
 			<value>0</value><!-- HU -->
 			<value>2</value><!-- HU -->
 			<!-- or we could do a "not_value" tag of "1" here... -->
