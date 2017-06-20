@@ -17,10 +17,16 @@ STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
 STS_JENKINS="/TESTING/JENKINS/SNS/stsdata/sts_config.xml"
 STS_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stsdata_devel/sts_config.xml"
 
-if [[ $# < 1 ]]; then
-	echo "usage: updateConfig \\"
+USAGE()
+{
+	echo -e "\nusage: updateConfig \\"
 	echo \
 	"   [ --prod | --test | --dummy | --jenkins | --jenkins-devel | --all ]"
+	echo
+}
+
+if [[ $# < 1 ]]; then
+	USAGE
 	exit -1
 fi
 
@@ -28,20 +34,48 @@ CONFIGS=""
 
 for opt in $@ ; do
 
+	if [[ $opt == "--all" ]]; then
+		echo -e "\nAre you _Sure_ you want to Update 'All' STS Configs...?"
+		echo -e "\nThis could Break Production and/or Master Jenkins Tests!"
+		echo -en "\nContinue Updating Configs (yes/No/quit)? "
+
+		read cont_ck
+		cont_ck=`echo "$cont_ck" | tr '[:upper:]' '[:lower:]'`
+
+		if [[ "#$cont_ck#" == '#y#' || "#$cont_ck#" == '#yes#' ]]; then
+			echo -e "\nOk, Continuing to Deploy All STS Config Scripts...\n"
+		else 
+			echo -e "\nExiting Update Config Script at User's Request.\n"
+			exit 0
+		fi
+	fi
+
+	found=0
 	if [[ $opt == "--prod" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_PROD"
+		found=1
 	fi
 	if [[ $opt == "--test" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_TEST"
+		found=1
 	fi
 	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_DUMMY"
+		found=1
 	fi
 	if [[ $opt == "--jenkins" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_JENKINS"
+		found=1
 	fi
 	if [[ $opt == "--jenkins-devel" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS $STS_JENKINS_DEVEL"
+		found=1
+	fi
+
+	if [[ $found == 0 ]]; then
+		echo -e "\nError: Unknown Option \"$opt\"... Bailing out..."
+		USAGE
+		exit -2
 	fi
 
 done
