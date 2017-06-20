@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.6.6"
+#define PVSD_VERSION "1.6.7"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -225,6 +225,7 @@ int main(int argc, char *argv[])
 
     uint32_t        port;
     uint32_t        heartbeat;
+    bool            no_heartbeat_pv;
     string          broker_uri;
     string          broker_user;
     string          broker_pass;
@@ -248,6 +249,7 @@ int main(int argc, char *argv[])
             ("version,v", "show version number")
             ("port,p", po::value<uint32_t>( &port )->default_value( 31416 ), "set client port")
             ("hb", po::value<uint32_t>( &heartbeat )->default_value( 2000 ), "set ADARA heartbeat period (msec)")
+            ("no_heartbeat_pv", po::value<bool>( &no_heartbeat_pv )->default_value( false ), "turn off PVSD Heartbeat Device/PV (bool)")
             ("domain,d", po::value<string>( &domain )->default_value( "" ), "set communication domain prefix (EPICS/ComBus)")
             ("pid", po::value<uint32_t>( &pid )->default_value( 0 ), "set combus process identifier")
             ("broker_uri,b", po::value<string>( &broker_uri )->default_value( "localhost" ), "set AMQP broker URI/IP address")
@@ -266,10 +268,10 @@ int main(int argc, char *argv[])
 
     // Process options
 
-    if ( opt_map.count( "track_log" ))
+    if ( opt_map.count( "track_log" ) )
         track_logged = true;
 
-    if ( opt_map.count( "daemon" ))
+    if ( opt_map.count( "daemon" ) )
         daemon = true;
 
     if ( opt_map.count( "help" ) && !daemon )
@@ -284,10 +286,17 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if ( !opt_map.count( "domain" ))
+    if ( !opt_map.count( "domain" ) )
     {
         syslog( LOG_WARNING,
             "%s %s: No communication domain specified - probably an error.",
+            "PVSD ERROR:", "main()" );
+    }
+
+    if ( no_heartbeat_pv )
+    {
+        syslog( LOG_WARNING,
+            "%s %s: PVSD Heartbeat Device/PV Deactivated on Command Line!",
             "PVSD ERROR:", "main()" );
     }
 
@@ -306,7 +315,8 @@ int main(int argc, char *argv[])
         StreamService   streamer( 100, offset );
 
         // Attach ADARA output adapter
-        output = new PVS::ADARA::OutputAdapter( streamer, port, heartbeat );
+        output = new PVS::ADARA::OutputAdapter( streamer, port,
+            heartbeat, no_heartbeat_pv );
 
         // Create and attach EPICS input adapter
         input = new PVS::EPICS::InputAdapter( streamer, epics_cfg,

@@ -21,7 +21,7 @@ namespace ADARA {
 class OutputAdapter : public IOutputAdapter
 {
 public:
-    OutputAdapter( StreamService &a_stream_serv, unsigned short a_port = 31416, unsigned long a_heartbeat = 2000 );
+    OutputAdapter( StreamService &a_stream_serv, unsigned short a_port = 31416, unsigned long a_heartbeat = 2000, bool a_no_heartbeat_pv = false );
     ~OutputAdapter();
 
     std::string     serverAddr();
@@ -125,6 +125,7 @@ private:
     std::string                         m_addr;                     ///< Tcp address of ADARA service
     uint16_t                            m_port;                     ///< Tcp port number of ADARA service
     uint32_t                            m_heartbeat;                ///< Heartbeat packet period
+    bool                                m_no_heartbeat_pv;          ///< Turn Off PVSD Heartbeat Device/PV
     int                                 m_listen_socket;            ///< WinSock listener socket
     boost::recursive_mutex              m_mutex;                    ///< Mutex to protect internal data
     std::list<ClientInfo>               m_client_info;              ///< Container of active client connections

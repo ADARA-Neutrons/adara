@@ -16,6 +16,7 @@ class RunUserInfoPV;
 class RunInfoResetPV;
 class RunInfoFloat64PV;
 class RunInfoPV;
+class smsBooleanPV;
 
 class RunInfo : boost::noncopyable {
 public:
@@ -25,7 +26,8 @@ public:
 	typedef boost::shared_ptr<RunInfoPV> RunInfoPVSharedPtr;
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
-	RunInfo(const std::string &beamline, SMSControl *ctrl);
+	RunInfo(const std::string &facility, const std::string &beamline,
+		SMSControl *ctrl, bool sendSampleInRunInfo);
 	~RunInfo();
 
 	void lock(void);
@@ -46,20 +48,32 @@ public:
 	void invalidateCache(void) { m_packetValid = false; }
 
 private:
+	std::string m_facility;
 	std::string m_beamline;
 	SMSControl *m_ctrl;
+
+	bool m_sendSampleInRunInfo;
+
 	RunInfoPVSharedPtr m_propId;
+
 	RunInfoMap m_required;
 	RunInfoMap m_optional;
 	RunInfoMap m_sample;
+
 	RunInfoResetPVSharedPtr m_resetPV;
 	RunUserInfoPVSharedPtr m_userPV;
+
+	boost::shared_ptr<smsBooleanPV> m_sendSampleInRunInfoPV;
 
 	RunInfoPVSharedPtr m_massPV;
 	RunInfoFloat64PVSharedPtr m_massFloat64PV;
 
 	RunInfoPVSharedPtr m_densityPV;
 	RunInfoFloat64PVSharedPtr m_densityFloat64PV;
+
+	RunInfoPVSharedPtr m_containerIdPV;
+	RunInfoPVSharedPtr m_containerNamePV;
+	RunInfoPVSharedPtr m_componentPV;
 
 	RunInfoPVSharedPtr m_heightInContainerPV;
 	RunInfoFloat64PVSharedPtr m_heightInContainerFloat64PV;

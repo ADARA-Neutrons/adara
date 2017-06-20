@@ -643,7 +643,8 @@ void StorageManager::lateInit(void)
 	/* start the monitor thread so that it will be available from
 	 * backgroundIo thread
 	 */
-	m_combus = new ComBusSMSMon(ctrl->getBeamlineId(), std::string("SNS"));
+	m_combus = new ComBusSMSMon(
+		ctrl->getBeamlineId(), ctrl->getFacility() );
 	m_combus->start();
 
 	boost::thread io(backgroundIo);

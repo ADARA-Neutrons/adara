@@ -88,15 +88,24 @@ void ComBusSMSMon::sendOriginal(
 	try
 	{
 		if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
-			ERROR("ComBusSMSMon::SendOriginal() failed");
+			ERROR("ComBusSMSMon::SendOriginal() failed"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
 	}
 	catch ( std::exception &e )
 	{
-		ERROR("ComBusSMSMon::SendOriginal() Exception - " << e.what());
+		ERROR("ComBusSMSMon::SendOriginal() Exception [" << e.what() << "]"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
 	}
 	catch (...)
 	{
-		ERROR("ComBusSMSMon::SendOriginal() Unknown Exception!");
+		ERROR("ComBusSMSMon::SendOriginal() Unknown Exception"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
 	}
 }
 
@@ -110,15 +119,24 @@ void ComBusSMSMon::sendUpdate(
 	try
 	{
 		if ( m_inqueue->trySend( &outp, sizeof(SMSRunStatus *) ) )
-			ERROR("ComBusSMSMon::SendUpdate() failed");
+			ERROR("ComBusSMSMon::SendUpdate() failed"
+				<< " for Domain " << m_domain
+				<< " to URI " << m_broker_uri
+				<< " as User " << m_broker_user);
 	}
 	catch ( std::exception &e )
 	{
-		ERROR("ComBusSMSMon::SendUpdate() Exception - " << e.what());
+		ERROR("ComBusSMSMon::SendUpdate() Exception [" << e.what() << "]"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
 	}
 	catch (...)
 	{
-		ERROR("ComBusSMSMon::SendUpdate() Unknown Exception!");
+		ERROR("ComBusSMSMon::SendUpdate() Unknown Exception"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
 	}
 }
 

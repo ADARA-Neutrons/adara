@@ -373,8 +373,10 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 	}
 }
 
-RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
-	m_beamline(beamline), m_ctrl(ctrl),
+RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
+		SMSControl *ctrl, bool sendSampleInRunInfo ) :
+	m_facility(facility), m_beamline(beamline), m_ctrl(ctrl),
+	m_sendSampleInRunInfo(sendSampleInRunInfo),
 	m_runNumber(0), m_packetValid(false),
 	m_packet(NULL), m_packetSize(0)
 {
@@ -393,6 +395,15 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	/* These fields are optional */
 	addPV(prefix, "ProposalTitle", "proposal_title", m_optional);
 	addPV(prefix, "RunTitle", "run_title", m_optional);
+
+	// Send Sample Info in RunInfo...?
+	m_sendSampleInRunInfoPV.reset(new smsBooleanPV(prefix
+		+ "SendSampleInRunInfo"));
+	m_ctrl->addPV(m_sendSampleInRunInfoPV);
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_sendSampleInRunInfoPV->update( m_sendSampleInRunInfo, &now );
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
@@ -418,8 +429,14 @@ RunInfo::RunInfo(const std::string &beamline, SMSControl *ctrl) :
 	// For Minor Backwards Compat - "Container Name"... (Temporary)
 	addPV(prefix, "Container", "container", m_sample);
 
-	addPV(prefix, "ContainerId", "container_id", m_sample);
-	addPV(prefix, "ContainerName", "container_name", m_sample);
+	m_containerIdPV = addPV(prefix, "ContainerId",
+		"container_id", m_sample);
+	m_containerNamePV = addPV(prefix, "ContainerName",
+		"container_name", m_sample);
+
+	// Create Container Concatenation "Component" PV...
+	// (value is: container_id + ":" + container_name, lol... ;-D
+	m_componentPV = addPV(prefix, "Component", "component", m_sample);
 
 	addPV(prefix, "CanIndicator", "can_indicator", m_sample);
 	addPV(prefix, "CanBarcode", "can_barcode", m_sample);
@@ -607,6 +624,19 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 	// Invalidate Cache...
 	invalidateCache();
 
+	// Update Container "Component" PV, As Needed...
+	if ( pv->label().compare("container_id")
+			|| pv->label().compare("container_name") )
+	{
+		// Concatenate Container Id and Name to Get "Component"... ;-D
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		std::stringstream ss;
+		ss << m_containerIdPV->value()
+			<< ": " << m_containerNamePV->value();
+		m_componentPV->update( ss.str(), &now );
+	}
+
 	// Check for Change in "Required" PV Status...
 	if ( pv->isRequired() )
 	{
@@ -651,7 +681,9 @@ void RunInfo::generatePacket(void)
 		"xsi:schemaLocation=\"http://public.sns.gov/schema/runinfo.xsd "
 		"http://public.sns.gov/schema/runinfo.xsd\">\n";
 	xml += "   <das_version>ADARA v0.1</das_version>\n";
-	xml += "   <facility_name>SNS</facility_name>\n";
+	xml += "   <facility_name>";
+	xml += m_facility;
+	xml += "</facility_name>\n";
 	xml += "   <instrument_name>";
 	xml += m_beamline;
 	xml += "</instrument_name>\n";
@@ -664,7 +696,14 @@ void RunInfo::generatePacket(void)
 
 	addElements(xml, m_required);
 	addElements(xml, m_optional);
-	addElements(xml, m_sample, "sample");
+
+	// Get Latest "Send Sample In RunInfo" Value from PV...
+	m_sendSampleInRunInfo = m_sendSampleInRunInfoPV->value();
+	if ( m_sendSampleInRunInfo ) {
+		addElements(xml, m_sample, "sample");
+	} else {
+		xml += "   <no_sample_info/>\n";
+	}
 
 	xml += "</runinfo>";
 

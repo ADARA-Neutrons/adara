@@ -59,6 +59,11 @@ public:
     int H5NXmake_attribute_string( const std::string &dataset_path,
         const std::string &attr_name, const std::string &attr_value  );
 
+    //create/write a STRING attribute IFF doesn't already exist
+    int H5NXcheck_attribute_string( const std::string &dataset_path,
+        const std::string &attr_name, const std::string &attr_value,
+		std::string &existing_attr_value, bool &wasSet );
+
     //create/write a STRING dataset
     int H5NXmake_dataset_string(const std::string &group_path,
         const std::string &dataset_name, const std::string &data );

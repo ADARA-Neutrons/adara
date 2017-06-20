@@ -26,19 +26,22 @@ namespace ADARA {
  * @param a_stream_serv - Owning StreamService instance
  * @param a_port - TCP port to listen on
  * @param a_heartbeat - ADARA heartbeat period in milliseconds
+ * @param a_no_heartbeat_pv - turn off PVSD Heartbeat Device/PV
  *
  * This constructor produces an ADARA OutputAdapter owned by the specified StreamService instance. The
  * StreamService will delete this OutputAdapter when it is destroyed. The ADARA OuputAdapter class
  * starts two threads: one for handling in-coming TCP client connection requests, and another for
  * processing, translating, and broadcasting packets from the internal data stream.
  */
-OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat )
+OutputAdapter::OutputAdapter( StreamService &a_stream_serv, unsigned short a_port, unsigned long a_heartbeat, bool a_no_heartbeat_pv )
     : IOutputAdapter(a_stream_serv), m_active(true), m_socket_listen_thread(0), m_stream_proc_thread(0), m_port(a_port),
-      m_heartbeat(a_heartbeat), m_listen_socket(-1)
+      m_heartbeat(a_heartbeat), m_no_heartbeat_pv(a_no_heartbeat_pv),
+      m_listen_socket(-1)
 {
     initSockets();
 
-    makeHeartbeatDevice();
+    if ( !m_no_heartbeat_pv )
+        makeHeartbeatDevice();
 
     m_socket_listen_thread = new boost::thread( boost::bind( &OutputAdapter::socketListenThread, this ));
     m_stream_proc_thread = new boost::thread( boost::bind( &OutputAdapter::streamProcessingThread, this ));
@@ -119,24 +122,27 @@ OutputAdapter::streamProcessingThread()
                     sendPacket( heartbeat_pkt, payload );
 
                     // Send Heartbeat PV Update...
+                    if ( !m_no_heartbeat_pv )
+                    {
+                        m_heartbeat_pv_value++;
 
-                    m_heartbeat_pv_value++;
+                        PVState state = PVState(
+                            ::ADARA::VariableStatus::OK,
+                            ::ADARA::VariableSeverity::OK );
 
-                    PVState state = PVState(
-                        ::ADARA::VariableStatus::OK,
-                        ::ADARA::VariableSeverity::OK );
+                        state.m_uint_val = m_heartbeat_pv_value;
+                        state.m_elem_count = 1;
+                        state.m_time.sec =
+                            (uint32_t)time(0) - EPICS_TIME_OFFSET;
+                        state.m_time.nsec = 0;
 
-                    state.m_uint_val = m_heartbeat_pv_value;
-                    state.m_elem_count = 1;
-                    state.m_time.sec =
-                        (uint32_t)time(0) - EPICS_TIME_OFFSET;
-                    state.m_time.nsec = 0;
+                        updatePV( m_heartbeat_pv, state );
 
-                    updatePV( m_heartbeat_pv, state );
-
-                    payload.clear();
-                    buildVVP( adara_pkt, m_heartbeat_pv, state, payload );
-                    sendPacket( adara_pkt, payload );
+                        payload.clear();
+                        buildVVP( adara_pkt,
+                            m_heartbeat_pv, state, payload );
+                        sendPacket( adara_pkt, payload );
+                    }
                 }
             }
             else

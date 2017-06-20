@@ -50,7 +50,7 @@ public:
 
 	static SMSControl *getInstance(void) { return m_singleton; }
 
-	uint32_t getTargetStationNumber(void) { return m_targetStationNumber; }
+	std::string getFacility(void) { return m_facility; }
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
@@ -251,6 +251,7 @@ private:
 	static uint32_t m_targetStationNumber;
 
 	static std::string m_version;
+	static std::string m_facility;
 	static std::string m_beamlineId;
 	static std::string m_beamlineShortName;
 	static std::string m_beamlineLongName;
@@ -277,6 +278,10 @@ private:
 	static uint64_t m_interPulseTimeMax;
 	static bool m_doPulsePchgCorrect;
 	static bool m_doPulseVetoCorrect;
+
+	static bool m_sendSampleInRunInfo;
+
+	static bool m_allowNonOneToOnePixelMapping;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 

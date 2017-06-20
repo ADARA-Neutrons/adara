@@ -69,7 +69,7 @@
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.6.17";
+const std::string SMSD_VERSION = "1.6.18";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
@@ -439,10 +439,10 @@ int main(int argc, char **argv)
 
 		SMSControl::late_config(conf);
 	} catch (std::runtime_error e) {
-		ERROR("failed to start: " << e.what());
+		ERROR("failed to start (init): " << e.what());
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start -- unknown exception");
+		ERROR("failed to start (init) -- unknown exception");
 		exit(1);
 	}
 
@@ -454,11 +454,11 @@ int main(int argc, char **argv)
 		close_std_files();
 		remove_temp_logger();
 	} catch (std::runtime_error e) {
-		ERROR("failed to start: " << e.what());
+		ERROR("failed to start (late init): " << e.what());
 		release_parent(CHILD_INIT_FAILED);
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start; unknown exception");
+		ERROR("failed to start (late init); unknown exception");
 		release_parent(CHILD_INIT_FAILED);
 		throw;
 	}

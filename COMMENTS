@@ -1,0 +1,44 @@
+
+ADARA Comments, Notes and Annotations
+-------------------------------------
+
+I've completely overhauled how all this stuff works. :-D
+
+You can set:
+
+   - Annotation Comments (BLXXX:SMS:Marker:AnnotationComment)
+      -> can add as many comments as you'd like...
+      -> all show up in the NeXus under "/entry/DASlogs/comments"
+      -> comments are prefixed with "[PRE-RUN]" or "[PAUSED]" as appropriate
+
+   - Scan Comments (BLXXX:SMS:Marker:ScanComment)
+      -> can add as many comments as you'd like...
+      -> all show up in the NeXus under "/entry/DASlogs/comments"
+      -> each comment is automatically prefixed with "Scan <number>: "
+      -> comments also prefixed with "[PRE-RUN]" or "[PAUSED]" as appropriate
+
+   - Run "Notes" (BLXXX:SMS:Marker:NotesComment)
+      -> can only set *Exactly Once* per run...
+      -> shows up in the NeXus under "/entry/notes"
+      -> any "additional" Run Notes are ignored, but automatically appended
+      to the set of Annotation comments in "/entry/DASlogs/comments"...
+      (we don't throw anything away... :-)
+
+These various annotations can be set at any time _Before_ the Run Starts
+or _During_ the Run... (Everything gets reset on Run Stop... :-)
+
+Fyi, the "BLXXX:SMS:Marker:NotesComment" and "BLXXX::SMS:Marker:Comment" PVs
+will still work, but it's the old gruesome "trigger-based" commenting approach,
+which is now deprecated... :-)
+
+It's possible that the CSS screens for your beamline don't yet provide
+access/entries to all these annotation types, but there are "available",
+if you want them.
+
+Please let us know! :-)
+
+Enjoy!
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+ 
+[Last Updated: June 6, 2017]
+

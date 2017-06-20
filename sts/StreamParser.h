@@ -41,11 +41,19 @@ public:
     void    printStats( std::ostream &a_os ) const;
     void    getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
 
-    std::string getFacilityName() const { return m_run_info.facility_name; }
-    std::string getBeamShortName() const { return m_run_info.instr_shortname; }
-    std::string getProposalID() const { return m_run_info.proposal_id; }
-    uint32_t    getRunNumber() const { return m_run_info.run_number; }
-    bool        infoReady() const { return (m_info_rcvd & INFO_SENT); }
+    std::string getFacilityName() const
+        { return m_run_info.facility_name; }
+    std::string getBeamShortName() const
+        { return m_run_info.instr_shortname; }
+    std::string getProposalID() const
+        { return m_run_info.proposal_id; }
+    uint32_t getRunNumber() const
+        { return m_run_info.run_number; }
+    bool getNoSampleInfo() const
+        { return m_run_info.no_sample_info; }
+
+    bool infoReady() const
+        { return (m_info_rcvd & INFO_SENT); }
 
 private:
     /// Defines internal stream processing states of StreamParser class
@@ -167,6 +175,8 @@ private:
     uint64_t                                m_skipped_pkt_count;        ///< Count of ADARA packets that were ignored
 
     uint16_t                                m_pulse_flag;
+
+    struct timespec                         m_default_start_time;       ///< Default Run Start Time (No Neutron Pulses)...
 };
 
 

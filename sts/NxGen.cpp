@@ -680,6 +680,128 @@ NxGen::finalize
 }
 
 
+/*! \brief Globally Check for Any Captured PV Units Paths/Attributes
+ *
+ * This method Globally Checks for Any Captured PV Units Attributes,
+ * using All Saved "Units Paths" & Units Values,
+ * now that All PV Values have been processed...
+ */
+void
+NxGen::checkSTSConfigElementUnitsPaths(void)
+{
+    // Check Each Config Group in Turn
+    // for Any Saved ElementInfo Units Paths...
+    for ( uint32_t g=0 ; g < m_config_groups.size() ; g++ )
+    {
+        struct GroupInfo *G = &(m_config_groups[g]);
+
+        writeSTSConfigUnitsAttributes( G, G->elements );
+
+        // Check for Conditional Elements as Well...
+        for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
+        {
+            struct ConditionInfo *C = &(G->conditions[c]);
+
+            if ( C->is_set )
+            {
+                writeSTSConfigUnitsAttributes( G, C->elements );
+            }
+        }
+    }
+}
+
+
+/*! \brief Write PV Units Attributes for Any Captured Units Paths
+ *
+ * This method Writes Any PV Units Attributes
+ * using All Saved "Units Paths" & Units Values,
+ * now that All PV Values have been processed...
+ */
+void
+NxGen::writeSTSConfigUnitsAttributes(
+        struct GroupInfo *G, std::vector<struct ElementInfo> &elements )
+{
+    std::map<std::string, std::string>::iterator it;
+
+    // Check Each Element in Turn for Any Captured Units Attributes...
+    for ( uint32_t e=0 ; e < elements.size() ; e++ )
+    {
+        struct ElementInfo *E = &(elements[e]);
+
+        // IFF Units Attribute Not Already Set
+        // (checked in NxGen::checkStringAttribute()),
+        // then Set Units Attribute from ElementInfo
+        // (If we captured a "Units Value" PV Value,
+        // or else Explicit Units were Specified!)
+        if ( E->unitsValue.size() || E->units.size() )
+        {
+            // Add Given Units Attribute for Every Saved Element Path...
+            for ( it = E->unitsPaths.begin() ;
+                    it != E->unitsPaths.end() ; ++it )
+            {
+                std::string label;
+                std::string units;
+
+                // PV Units Value Supersedes Explicit Units
+                if ( E->unitsValue.size() )
+                {
+                    label = "PV Value Units";
+                    units = E->unitsValue;
+                }
+                else
+                {
+                    label = "Explicit Config Units";
+                    units = E->units;
+                }
+
+                std::string existing_attr_value;
+                bool attrWasSet = checkStringAttribute(
+                        it->first, // elem_link_path
+                        "units", units, existing_attr_value );
+
+                syslog( LOG_INFO,
+                    "[%i] Group %s: %s %s to %s %s=[%s] %s=[%s] %s=%d",
+                    g_pid, G->name.c_str(), "Setting PV Units Attribute",
+                    it->second.c_str(), // pv_value_path
+                    label.c_str(), "units", units.c_str(),
+                    "existing_attr_value", existing_attr_value.c_str(),
+                    "attrWasSet", attrWasSet );
+                // give syslog a chance...
+                usleep(30000);
+            }
+        }
+
+        // Hmmm... Had Some Units PVs Patterns But Didn't Match Anything...
+        // Better Log It!
+        else if ( E->unitsPatterns.size() )
+        {
+            std::stringstream ss;
+            ss << "unitsPatterns=[";
+            for ( uint32_t i=0 ; i < E->unitsPatterns.size(); i++ )
+            {
+                if ( i ) ss << ", ";
+                ss << E->unitsPatterns[i];
+            }
+            ss << "]";
+            ss << " unitsPaths=[";
+            for ( it = E->unitsPaths.begin() ;
+                    it != E->unitsPaths.end() ; ++it )
+            {
+                if ( it != E->unitsPaths.begin() ) ss << ", ";
+                ss << "(" << it->first << " -> " << it->second << ")";
+            }
+            ss << "]";
+            syslog( LOG_ERR, "[%i] %s Group %s: %s - %s %s",
+                g_pid, "STS Error:",
+                G->name.c_str(), "No Matching Units PV Found",
+                "Missing PV Value or Config...?", ss.str().c_str() );
+            // give syslog a chance...
+            usleep(30000);
+        }
+    }
+}
+
+
 /*! \brief Dump Overall STS Processing Statistics
  *
  * This method dump the overall processing time/event bandwidth
@@ -789,84 +911,89 @@ NxGen::processRunInfo
             a_run_info.proposal_id );
         writeString( m_entry_path, "title", a_run_info.run_title );
 
-        string sample_path = m_entry_path + "/sample";
-        makeGroup( sample_path, "NXsample" );
+        if ( ! a_run_info.no_sample_info )
+        {
+            string sample_path = m_entry_path + "/sample";
+            makeGroup( sample_path, "NXsample" );
 
-        writeString( sample_path, "identifier", a_run_info.sample_id );
-        writeString( sample_path, "name", a_run_info.sample_name );
-        writeString( sample_path, "nature", a_run_info.sample_nature );
-        writeString( sample_path, "chemical_formula",
-            a_run_info.sample_formula );
+            writeString( sample_path, "identifier", a_run_info.sample_id );
+            writeString( sample_path, "name", a_run_info.sample_name );
+            writeString( sample_path, "nature", a_run_info.sample_nature );
+            writeString( sample_path, "chemical_formula",
+                a_run_info.sample_formula );
 
-        writeScalar( sample_path, "mass",
-            a_run_info.sample_mass, a_run_info.sample_mass_units );
+            writeScalar( sample_path, "mass",
+                a_run_info.sample_mass, a_run_info.sample_mass_units );
 
-        writeScalar( sample_path, "mass_density",
-            a_run_info.sample_mass_density,
-            a_run_info.sample_mass_density_units );
+            writeScalar( sample_path, "mass_density",
+                a_run_info.sample_mass_density,
+                a_run_info.sample_mass_density_units );
 
-        writeString( sample_path, "component", // no container in NXsample
-            a_run_info.sample_container_id + ": "
-                + a_run_info.sample_container_name );
+            // no "container" in NXsample
+            writeString( sample_path, "component",
+                a_run_info.sample_container_id + ": "
+                    + a_run_info.sample_container_name );
 
-        writeString( sample_path, "container_id",
-            a_run_info.sample_container_id );
-        writeString( sample_path, "container_name",
-            a_run_info.sample_container_name );
+            writeString( sample_path, "container_id",
+                a_run_info.sample_container_id );
+            writeString( sample_path, "container_name",
+                a_run_info.sample_container_name );
 
-        writeString( sample_path, "can_indicator",
-            a_run_info.sample_can_indicator );
-        writeString( sample_path, "can_barcode",
-            a_run_info.sample_can_barcode );
-        writeString( sample_path, "can_name",
-            a_run_info.sample_can_name );
-        writeString( sample_path, "can_materials",
-            a_run_info.sample_can_materials );
+            writeString( sample_path, "can_indicator",
+                a_run_info.sample_can_indicator );
+            writeString( sample_path, "can_barcode",
+                a_run_info.sample_can_barcode );
+            writeString( sample_path, "can_name",
+                a_run_info.sample_can_name );
+            writeString( sample_path, "can_materials",
+                a_run_info.sample_can_materials );
 
-        writeString( sample_path, "description",
-            a_run_info.sample_description );
+            writeString( sample_path, "description",
+                a_run_info.sample_description );
 
-        writeString( sample_path, "comments", a_run_info.sample_comments );
+            writeString( sample_path, "comments",
+                a_run_info.sample_comments );
 
-        writeScalar( sample_path, "height_in_container",
-            a_run_info.sample_height_in_container,
-            a_run_info.sample_height_in_container_units );
+            writeScalar( sample_path, "height_in_container",
+                a_run_info.sample_height_in_container,
+                a_run_info.sample_height_in_container_units );
 
-        writeScalar( sample_path, "interior_diameter",
-            a_run_info.sample_interior_diameter,
-            a_run_info.sample_interior_diameter_units );
+            writeScalar( sample_path, "interior_diameter",
+                a_run_info.sample_interior_diameter,
+                a_run_info.sample_interior_diameter_units );
 
-        writeScalar( sample_path, "interior_height",
-            a_run_info.sample_interior_height,
-            a_run_info.sample_interior_height_units );
+            writeScalar( sample_path, "interior_height",
+                a_run_info.sample_interior_height,
+                a_run_info.sample_interior_height_units );
 
-        writeScalar( sample_path, "interior_width",
-            a_run_info.sample_interior_width,
-            a_run_info.sample_interior_width_units );
+            writeScalar( sample_path, "interior_width",
+                a_run_info.sample_interior_width,
+                a_run_info.sample_interior_width_units );
 
-        writeScalar( sample_path, "interior_depth",
-            a_run_info.sample_interior_depth,
-            a_run_info.sample_interior_depth_units );
+            writeScalar( sample_path, "interior_depth",
+                a_run_info.sample_interior_depth,
+                a_run_info.sample_interior_depth_units );
 
-        writeScalar( sample_path, "outer_diameter",
-            a_run_info.sample_outer_diameter,
-            a_run_info.sample_outer_diameter_units );
+            writeScalar( sample_path, "outer_diameter",
+                a_run_info.sample_outer_diameter,
+                a_run_info.sample_outer_diameter_units );
 
-        writeScalar( sample_path, "outer_height",
-            a_run_info.sample_outer_height,
-            a_run_info.sample_outer_height_units );
+            writeScalar( sample_path, "outer_height",
+                a_run_info.sample_outer_height,
+                a_run_info.sample_outer_height_units );
 
-        writeScalar( sample_path, "outer_width",
-            a_run_info.sample_outer_width,
-            a_run_info.sample_outer_width_units );
+            writeScalar( sample_path, "outer_width",
+                a_run_info.sample_outer_width,
+                a_run_info.sample_outer_width_units );
 
-        writeScalar( sample_path, "outer_depth",
-            a_run_info.sample_outer_depth,
-            a_run_info.sample_outer_depth_units );
+            writeScalar( sample_path, "outer_depth",
+                a_run_info.sample_outer_depth,
+                a_run_info.sample_outer_depth_units );
 
-        writeScalar( sample_path, "volume_cubic",
-            a_run_info.sample_volume_cubic,
-            a_run_info.sample_volume_cubic_units );
+            writeScalar( sample_path, "volume_cubic",
+                a_run_info.sample_volume_cubic,
+                a_run_info.sample_volume_cubic_units );
+        }
 
         bool ldap_lookup = false;
         size_t user_count = 0;
@@ -2511,9 +2638,19 @@ NxGen::parseSTSConfigFile
                         }
 
                         else if ( xmlStrcmp( lev2->name,
-                                (const xmlChar*)"element" ) == 0 )
+                                    (const xmlChar*)
+                                        "element" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0 )
                         {
                             struct ElementInfo element;
+
+                            element.linkValue =
+                                ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0 )
+                                            ? true : false;
 
                             element.lastIndex = 0;
 
@@ -2598,6 +2735,55 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)
+                                            "units_value" ) == 0 )
+                                {
+                                    // REMOVE ME...
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s #%ld [%s]",
+                                        g_pid, "STS Config",
+                                        "Element Units Value Pattern",
+                                        element.unitsPatterns.size() + 1,
+                                        value.c_str() );
+                                    // give syslog a chance
+                                    usleep(30000);
+
+                                    element.unitsPatterns.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"units" ) == 0 )
+                                {
+                                    // Already Got Explicit Element Units?
+                                    if ( element.units.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STS Error:",
+                                            "STS Config DUPLICATE",
+                                            "Element Units",
+                                            element.units.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Units..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else
+                                    {
+                                        // REMOVE ME...
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                            g_pid, "STS Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.units = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"text" ) != 0
                                     && xmlStrcmp( lev3->name,
                                         (const xmlChar*)"comment" ) != 0 )
@@ -2614,7 +2800,9 @@ NxGen::parseSTSConfigFile
 
                             // For Element Pattern Logging...
                             std::stringstream ss;
-                            ss << "patterns=[";
+                            ss << "name=[" << element.name << "]";
+
+                            ss << " patterns=[";
                             for ( uint32_t i=0 ;
                                     i < element.patterns.size(); i++ )
                             {
@@ -2633,6 +2821,19 @@ NxGen::parseSTSConfigFile
                             }
                             ss << "]";
 
+                            // For Element Units Pattern Logging...
+                            ss << " unitsPatterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.unitsPatterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.unitsPatterns[i];
+                            }
+                            ss << "]";
+
+                            // For Element Explicit Units Logging...
+                            ss << " units=[" << element.units << "]";
+
                             // Add Element to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( element.patterns.size()
@@ -2649,23 +2850,20 @@ NxGen::parseSTSConfigFile
                                     err += "\"" + element.name + "\"";
                                     err += " in STS Config Group \""
                                         + group.name + "\"";
-                                    syslog( LOG_ERR,
-                                        "[%i] %s %s - %s %s %s=[%s]",
+                                    syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                         g_pid, "STS Error:", err.c_str(),
-                                        "Ignoring", ss.str().c_str(),
-                                        "name", element.name.c_str() );
+                                        "Ignoring", ss.str().c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
                                 else
                                 {
                                     // REMOVE ME...
                                     syslog( LOG_INFO,
-                                        "[%i] %s %s \"%s\" - %s %s=[%s]",
+                                        "[%i] %s %s \"%s\" - %s",
                                         g_pid, "STS Config",
                                         "Adding Element to Group",
                                         group.name.c_str(),
-                                        ss.str().c_str(),
-                                        "name", element.name.c_str() );
+                                        ss.str().c_str() );
                                     usleep(30000); // give syslog a chance
 
                                     group.elements.push_back( element );
@@ -2676,11 +2874,9 @@ NxGen::parseSTSConfigFile
                                 std::string err = "Incomplete Element";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
-                                syslog( LOG_ERR,
-                                    "[%i] %s %s - %s %s %s=[%s]",
+                                syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                     g_pid, "STS Error:", err.c_str(),
-                                    "Ignoring", ss.str().c_str(),
-                                    "name", element.name.c_str() );
+                                    "Ignoring", ss.str().c_str() );
                                 usleep(30000); // give syslog a chance
                             }
                         }
@@ -2829,9 +3025,19 @@ NxGen::parseSTSConfigFile
                                 }
 
                                 else if ( xmlStrcmp( lev3->name,
-                                        (const xmlChar*)"element" ) == 0 )
+                                            (const xmlChar*)
+                                                "element" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0 )
                                 {
                                     struct ElementInfo element;
+
+                                    element.linkValue =
+                                        ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0 )
+                                                    ? true : false;
 
                                     element.lastIndex = 0;
 
@@ -2933,6 +3139,59 @@ NxGen::parseSTSConfigFile
                                         }
 
                                         else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units_value" ) == 0 )
+                                        {
+                                            // REMOVE ME...
+                                            syslog( LOG_INFO,
+                                                "[%i] %s %s #%ld [%s]",
+                                                g_pid, "STS Config",
+                                            "Element Units Value Pattern",
+                                                element.unitsPatterns
+                                                    .size() + 1,
+                                                value.c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+
+                                            element.unitsPatterns
+                                                .push_back( value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units" ) == 0 )
+                                        {
+                                            // Already Got Explicit
+                                            // Element Units?
+                                            if ( element.units.size() )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                                    g_pid, "STS Error:",
+                                                    "STS Config DUPLICATE",
+                                                    "Element Units",
+                                                    element.units.c_str(),
+                                                    value.c_str(),
+                                               "Using New Element Units..."
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
+                                            else
+                                            {
+                                                // REMOVE ME...
+                                                syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                                    g_pid, "STS Config",
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.units = value;
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
                                                 (const xmlChar*)"text" )
                                                     != 0
                                             && xmlStrcmp( lev4->name,
@@ -2953,7 +3212,9 @@ NxGen::parseSTSConfigFile
 
                                     // For Element Pattern Logging...
                                     std::stringstream ss;
-                                    ss << "patterns=[";
+                                    ss << "name=[" << element.name << "]";
+
+                                    ss << " patterns=[";
                                     for ( uint32_t i=0 ;
                                             i < element.patterns.size();
                                             i++ )
@@ -2973,6 +3234,21 @@ NxGen::parseSTSConfigFile
                                         ss << element.indices[i];
                                     }
                                     ss << "]";
+
+                                    // For Element Units Pattern Logging...
+                                    ss << " unitsPatterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.unitsPatterns
+                                                .size(); i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.unitsPatterns[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Explicit Units Logging
+                                    ss << " units=["
+                                        << element.units << "]";
 
                                     // Add Element to Group Condition...
                                     // (If Required Fields are Present,
@@ -2996,12 +3272,10 @@ NxGen::parseSTSConfigFile
                                                 " in STS Config Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                "[%i] %s %s - %s %s",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
                                         }
@@ -3021,12 +3295,10 @@ NxGen::parseSTSConfigFile
                                             err += " Condition \""
                                                 + condition.name + "\"";
                                             syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                                "[%i] %s %s - %s %s",
                                                 g_pid, "STS Error:",
                                                 err.c_str(), "Ignoring",
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
                                         }
@@ -3041,11 +3313,9 @@ NxGen::parseSTSConfigFile
                                             info += " for Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_INFO,
-                                                "[%i] %s - %s %s=[%s]",
+                                                "[%i] %s - %s",
                                                 g_pid, info.c_str(),
-                                                ss.str().c_str(),
-                                                "name",
-                                                element.name.c_str() );
+                                                ss.str().c_str() );
                                             // give syslog a chance
                                             usleep(30000);
 
@@ -3062,11 +3332,10 @@ NxGen::parseSTSConfigFile
                                         err += " Group \""
                                             + group.name + "\"";
                                         syslog( LOG_ERR,
-                                            "[%i] %s %s - %s %s %s=[%s]",
+                                            "[%i] %s %s - %s %s",
                                             g_pid, "STS Error:",
                                             err.c_str(), "Ignoring",
-                                            ss.str().c_str(),
-                                            "name", element.name.c_str() );
+                                            ss.str().c_str() );
                                         // give syslog a chance
                                         usleep(30000);
                                     }
@@ -3099,6 +3368,51 @@ NxGen::parseSTSConfigFile
                                 condition.name = ss.str();
                             }
 
+                            // Construct Logging String...
+                            std::stringstream ss;
+                            ss << "patterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.patterns[i];
+                            }
+                            ss << "] ";
+                            ss << "value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.values[i];
+                            }
+                            ss << "] ";
+                            ss << "not_value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_values[i];
+                            }
+                            ss << "]";
+
                             // Add Condition to Group Container...
                             // (If Required Fields are Present, Else Error)
                             if ( condition.patterns.size()
@@ -3108,52 +3422,6 @@ NxGen::parseSTSConfigFile
                                     || condition.not_values.size() ) )
                             {
                                 // REMOVE ME...
-                                std::stringstream ss;
-                                ss << "patterns=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.patterns.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.patterns[i];
-                                }
-                                ss << "] ";
-                                ss << "value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.value_strings.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.values.size(); i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.values[i];
-                                }
-                                ss << "] ";
-                                ss << "not_value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_value_strings
-                                            .size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_values.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_values[i];
-                                }
-                                ss << "]";
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\" %s \"%s\" - %s",
                                     g_pid,
@@ -3171,52 +3439,6 @@ NxGen::parseSTSConfigFile
                                 err += " \"" + condition.name + "\"";
                                 err += " in STS Config Group \""
                                     + group.name + "\"";
-                                std::stringstream ss;
-                                ss << "patterns=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.patterns.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.patterns[i];
-                                }
-                                ss << "] ";
-                                ss << "value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.value_strings.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.values.size(); i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.values[i];
-                                }
-                                ss << "] ";
-                                ss << "not_value_strings=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_value_strings
-                                            .size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_value_strings[i];
-                                }
-                                ss << "] ";
-                                ss << "values=[";
-                                for ( uint32_t i=0 ;
-                                        i < condition.not_values.size();
-                                        i++ )
-                                {
-                                    if ( i ) ss << ", ";
-                                    ss << condition.not_values[i];
-                                }
-                                ss << "]";
                                 syslog( LOG_ERR, "[%i] %s %s - %s %s",
                                     g_pid, "STS Error:", err.c_str(),
                                     "Ignoring", ss.str().c_str() );
@@ -3397,7 +3619,8 @@ NxGen::writeString
 
 /*! \brief Writes a string attribute to the specified Nexus path
  *
- * This method writes a string attribute value to the specified path in the output Nexus file.
+ * This method writes a string attribute value to the specified path
+ * in the output Nexus file.
  */
 void
 NxGen::writeStringAttribute
@@ -3412,6 +3635,33 @@ NxGen::writeStringAttribute
         THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: "
                      << a_attrib << ", value: " << a_value )
     }
+}
+
+
+/*! \brief Checks the value of a string attribute at specified Nexus path
+ *
+ * This method writes a string attribute value to the specified path
+ * in the output Nexus file IFF it does not already exist.
+ *
+ * Returns true/false whether Attribute was updated or not, resp.
+ */
+bool
+NxGen::checkStringAttribute
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write attribute
+    const string &a_attrib,     ///< [in] Name of the attribute
+    const string &a_value,      ///< [in] Value of the attribute
+    string &a_attr_value        ///< [out] Any Existing Attribute Value...
+)
+{
+    bool wasSet = false;
+    if ( m_h5nx.H5NXcheck_attribute_string( a_path, a_attrib, a_value,
+            a_attr_value, wasSet ) != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcheck_attribute_string() failed for path: " << a_path << ", attrib: "
+                     << a_attrib << ", value: " << a_value )
+    }
+    return( !wasSet );
 }
 
 
