@@ -745,24 +745,29 @@ pwd
 
 	/bin/ls -l "$tag_archive/liveconf" |& tee -a $LOG
 
-	# SMS ADARACat Script
+	# SMS ADARACat Script (if present, added in 20170620/v1.6.18...)
 
-	echo -e "\nCopying SMS ADARACat Script into Archive Release Tag:\n" \
-		| tee -a $LOG
+	if [[ -e sms/adaracat && -x sms/adaracat ]]; then
 
-	cp -i -p sms/adaracat "$tag_archive" |& tee -a $LOG
-
-	copy_ok=$?
-
-	if [ $copy_ok != 0 ]; then
 		echo -e \
-	"\nError Copying ADARACat into Release Tag Directory! ($copy_ok)\n" \
+			"\nCopying SMS ADARACat Script into Archive Release Tag:\n" \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -21
-	fi
 
-	/bin/ls -l "$tag_archive/adaracat" |& tee -a $LOG
+		cp -i -p sms/adaracat "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e \
+	"\nError Copying ADARACat into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adaracat" |& tee -a $LOG
+
+	fi
 
 	# STS Client
 
