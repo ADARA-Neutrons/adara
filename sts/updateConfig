@@ -22,10 +22,23 @@ STS_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stsdata_devel/sts_config.xml"
 
 USAGE()
 {
-	echo -e "\nusage: updateConfig \\"
+	echo -e "\nusage: updateConfig [--diff] \\"
 	echo "   [ --prod | --test | --dummy | \\"
 	echo "      --devel | --master | --testing | \\"
 	echo "      --jenkins | --jenkins-devel | --all ]"
+	echo
+	echo "where:"
+	echo
+	echo " --diff           = don't actually update STS Configs, Diff Only"
+	echo
+	echo " --prod           = update Production STS Config"
+	echo " --test           = update Production TEST STS Config"
+	echo " --dummy          = update Production DUMMY STS Config"
+	echo " --devel          = update ADARA Test Harness Devel STS Config"
+	echo " --master         = update ADARA Test Harness Master STS Config"
+	echo " --testing        = update ADARA Test Harness Generic STS Config"
+	echo " --jenkins        = update Jenkins Testing Master STS Config"
+	echo " --jenkins-devel  = update Jenkins Testing Devel STS Config"
 	echo
 }
 
@@ -36,9 +49,11 @@ fi
 
 CONFIGS=""
 
+DIFFONLY=0
+
 for opt in $@ ; do
 
-	if [[ $opt == "--all" ]]; then
+	if [[ $opt == "--all" && $DIFFONLY == 0 ]]; then
 		echo -e "\nAre you _Sure_ you want to Update 'All' STS Configs...?"
 		echo -e "\nThis could Break Production and/or Master Jenkins Tests!"
 		echo -en "\nContinue Updating Configs (yes/No/quit)? "
@@ -55,6 +70,12 @@ for opt in $@ ; do
 	fi
 
 	found=0
+
+	if [[ $opt == "--diff" ]]; then
+		DIFFONLY=1
+		found=1
+	fi
+
 	if [[ $opt == "--prod" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS PROD=$STS_PROD"
 		found=1
@@ -104,34 +125,43 @@ echo -e "\nUsing Temporary STS Config File as:\n\t$config_temp\n"
 
 for config in $CONFIGS ; do
 
-	echo "Config: [$config]"
-
 	label=`echo "$config" | awk -F '=' '{print $1}'`
-	dir=`echo "$config" | awk -F '=' '{print $2}'`
-	echo "label=[$label]"
-	echo "dir=[$dir]"
+	path=`echo "$config" | awk -F '=' '{print $2}'`
 
-	echo -e "Updating $label STS Config in:\n\n\t$dir\n"
+	if [[ $DIFFONLY == 1 ]]; then
 
-	cp $dir $config_temp
+		echo -e "Comparing to $label STS Config in:\n\n\t$path\n"
 
-	xxdiff --title2 "[For ${label}: ${dir}]" ./sts_config.xml $config_temp
+		( echo -e "\n$path\n" ; diff ./sts_config.xml "$path" ; echo ) \
+			| less -x4
+
+		echo
+
+		continue
+
+	fi
+
+	echo -e "Updating $label STS Config in:\n\n\t$path\n"
+
+	cp "$path" $config_temp
+
+	xxdiff --title2 "[For ${label}: ${path}]" ./sts_config.xml $config_temp
 
 	# Check for File Differences...
-	diff $config_temp $dir > /dev/null 2>&1
+	diff $config_temp "$path" > /dev/null 2>&1
 	ckdiff=$?
 
 	if [[ $ckdiff != 0 ]]; then
 
-		diff $config_temp $dir | less -x4
+		diff $config_temp "$path" | less -x4
 
-		echo -en "Deploy Updated Config to:\n\n\t$dir\n\n(yes/No/quit)? "
+		echo -en "Deploy Updated Config to:\n\n\t$path\n\n(yes/No/quit)? "
 
 		read deploy_ck
 		deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
 
 		if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
-			$STS_SSH cp $config_temp $dir
+			$STS_SSH cp $config_temp "$path"
 		elif [[ "#$deploy_ck#" == '#q#' \
 				|| "#$deploy_ck#" == '#quit#' ]]; then
 			echo -e "\nExiting Update Config Script at User's Request.\n"
@@ -143,12 +173,14 @@ for config in $CONFIGS ; do
 	
 	else
 
-		echo -e "No Change to Config File:\n\n\t$dir\n"
+		echo -e "No Change to Config File:\n\n\t$path\n"
 
 	fi
 
 done
 
 # Clean Up...
-/bin/rm $config_temp
+if [[ $DIFFONLY == 0 ]]; then
+	/bin/rm $config_temp
+fi
 
