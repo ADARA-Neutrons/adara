@@ -132,6 +132,34 @@
 			<name>volume_cubic</name>
 			<units_value>SMS:RunInfo:Sample:VolumeCubicUnits$</units_value>
 		</element_value>
+		<element_value>
+			<pattern>CS:IPTS:Resources$</pattern>
+			<name>sample_env_devices</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeA$</pattern>
+			<name>lattice_a</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeB$</pattern>
+			<name>lattice_b</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeC$</pattern>
+			<name>lattice_c</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeAlpha$</pattern>
+			<name>lattice_alpha</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeBeta$</pattern>
+			<name>lattice_beta</name>
+		</element_value>
+		<element_value>
+			<pattern>CS:ITEMS:LatticeGamma$</pattern>
+			<name>lattice_gamma</name>
+		</element_value>
 	</group>
 
 	<!-- (Indexed) Chopper Groups -->
