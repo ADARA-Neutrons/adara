@@ -244,8 +244,10 @@ PixelMap::PixelMap(const std::string &path,
 				&& it->second.first > max_logical) {
 			max_logical = it->second.first;
 		}
-		if (it->second.second > m_numBanks)
+		if (it->second.second != ((uint16_t) -1)
+				&& it->second.second > m_numBanks) {
 			m_numBanks = it->second.second;
+		}
 	}
 
 	INFO("Pixel Map Stats:"
