@@ -1807,7 +1807,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		 */
 		MonitorMap::iterator allMon = m_allMonitors.find(monId);
 		if (allMon == m_allMonitors.end()) {
-			INFO( ( m_recording ? "[RECORDING] " : "" )
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
 				<< "New Monitor id=" << monId
 				<< " (pixelId=0x" << std::hex << pixel
 				<< " sourceID=0x" << pkt.sourceID()
@@ -1823,7 +1823,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 	mon->second.m_eventTof.push_back(tof);
 }
 
-void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
+void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt,
 		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
 	uint32_t cid = pixel & ~0xf0000000;
@@ -1875,6 +1875,11 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &UNUSED(pkt),
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		m_meta->addFastMetaDDP(now, cid_dev, ddp);
+
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "New Chopper id=" << cid
+			<< " (pixelId=0x" << std::hex << pixel
+			<< " sourceID=0x" << pkt.sourceID() << std::dec << ")");
 
 		m_choppers.insert(cid);
 	}
