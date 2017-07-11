@@ -1807,7 +1807,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		 */
 		MonitorMap::iterator allMon = m_allMonitors.find(monId);
 		if (allMon == m_allMonitors.end()) {
-			ERROR( ( m_recording ? "[RECORDING] " : "" )
+			INFO( ( m_recording ? "[RECORDING] " : "" )
 				<< "New Monitor id=" << monId
 				<< " (pixelId=0x" << std::hex << pixel
 				<< " sourceID=0x" << pkt.sourceID()
