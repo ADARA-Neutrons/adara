@@ -143,9 +143,11 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 	/* A physical->logical map is better for parsing and for building
 	 * the lookup table used for normal operations, but going logical
 	 * to physical is better for generating the pixel map packet.
-	 * Since we guarantee a one-to-one mapping  during load, we don't
+	 * Since we guarantee a one-to-one mapping during load, we don't
 	 * have to worry about duplicate keys here.
 	 */
+	// TODO Handle the "m_allowNonOneToOnePixelMapping == true" case...!
+	// -> needed for HFIR WAND...
 	for (it = map->begin(), end = map->end(); it != end; ++it) {
 		phys = it->first;
 		logical = it->second.first;
@@ -268,8 +270,9 @@ PixelMap::PixelMap(const std::string &path,
 	 */
 	m_table.reserve(max_phys + 1);
 	for (i = 0; i <= max_phys; ++i) {
-		m_table.push_back(std::make_pair(i | 0x80000000,
-						 (uint16_t) ~0));
+		m_table.push_back(
+			std::make_pair( i | 0x80000000,
+				(uint16_t) PixelMap::UNMAPPED_BANK ) );
 	}
 
 	/* While we're at it, _Also_ create a "Logical-to-Bank" lookup vector,
@@ -277,7 +280,7 @@ PixelMap::PixelMap(const std::string &path,
 	 */
 	m_banks.reserve(max_logical + 1);
 	for (i = 0; i <= max_logical; ++i) {
-		m_banks.push_back((uint16_t) ~0);
+		m_banks.push_back( PixelMap::UNMAPPED_BANK );
 	}
 
 	for (it = map->begin(); it != end; ++it) {
