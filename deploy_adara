@@ -88,7 +88,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.4.0"
+DEPLOY_VERSION="1.5.0"
 
 TMP_DIR="/tmp"
 
@@ -469,7 +469,8 @@ elif [[ -e "$tag_archive/$prog" && -x "$tag_archive/$prog" ]]; then
 			"\nRe-Building Release Tag $release_tag at User's Request." \
 			| tee -a $LOG
 
-	elif [ "#$rebuild_ck#" == '#quit#' ]; then
+	elif [[ "#$rebuild_ck#" == '#q#' || "#$rebuild_ck#" == '#quit#' ]]; \
+	then
 
 		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
 		exit 0
@@ -1011,14 +1012,17 @@ if [ $tag_ok != 0 ]; then
 		read proceed_ck
 		proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
 
-		if [[ "$proceed_ck" == "" || "$proceed_ck" == "n"
-				|| "$proceed_ck" == "no" ]]; then
+		if [[ "$proceed_ck" == ""
+				|| "$proceed_ck" == "n" || "$proceed_ck" == "no" \
+				|| "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
 			echo -e "\nExiting Deploy Script at User's Request." \
 				| tee -a $LOG
 			exit 0
 		fi
 
-	elif [ "#$mkbranch_ck#" == '#quit#' ]; then
+	elif [[ "#$mkbranch_ck#" == '#n#' || "#$mkbranch_ck#" == '#no#' \
+		|| "#$mkbranch_ck#" == '#q#' || "#$mkbranch_ck#" == '#quit#' ]]; \
+	then
 		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
 		exit 0
 

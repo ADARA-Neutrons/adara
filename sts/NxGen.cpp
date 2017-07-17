@@ -2677,13 +2677,13 @@ NxGen::parseSTSConfigFile
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                    "[%i] %s Element Pattern #%ld [%s]",
-                                        g_pid, "STS Config",
-                                        element.patterns.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                    //"[%i] %s Element Pattern #%ld [%s]",
+                                        //g_pid, "STS Config",
+                                        //element.patterns.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     element.patterns.push_back( value );
                                 }
@@ -2692,13 +2692,13 @@ NxGen::parseSTSConfigFile
                                         (const xmlChar*)"index" ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                    "[%i] %s Element Index #%ld [%s]",
-                                        g_pid, "STS Config",
-                                        element.indices.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                    //"[%i] %s Element Index #%ld [%s]",
+                                        //g_pid, "STS Config",
+                                        //element.indices.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     element.indices.push_back( value );
                                 }
@@ -2720,16 +2720,16 @@ NxGen::parseSTSConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else
-                                    {
+                                    //else
+                                    //{
                                         // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s Element Name [%s]",
-                                            g_pid, "STS Config",
-                                            value.c_str() );
+                                        //syslog( LOG_INFO,
+                                            //"[%i] %s Element Name [%s]",
+                                            //g_pid, "STS Config",
+                                            //value.c_str() );
                                         // give syslog a chance
-                                        usleep(30000);
-                                    }
+                                        //usleep(30000);
+                                    //}
 
                                     element.name = value;
                                 }
@@ -2739,14 +2739,14 @@ NxGen::parseSTSConfigFile
                                             "units_value" ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s %s #%ld [%s]",
-                                        g_pid, "STS Config",
-                                        "Element Units Value Pattern",
-                                        element.unitsPatterns.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s %s #%ld [%s]",
+                                        //g_pid, "STS Config",
+                                        //"Element Units Value Pattern",
+                                        //element.unitsPatterns.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     element.unitsPatterns.push_back(
                                         value );
@@ -2769,16 +2769,16 @@ NxGen::parseSTSConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else
-                                    {
+                                    //else
+                                    //{
                                         // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s Element Units [%s]",
-                                            g_pid, "STS Config",
-                                            value.c_str() );
+                                        //syslog( LOG_INFO,
+                                            //"[%i] %s Element Units [%s]",
+                                            //g_pid, "STS Config",
+                                            //value.c_str() );
                                         // give syslog a chance
-                                        usleep(30000);
-                                    }
+                                        //usleep(30000);
+                                    //}
 
                                     element.units = value;
                                 }
@@ -2926,16 +2926,16 @@ NxGen::parseSTSConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else
-                                    {
+                                    //else
+                                    //{
                                         // REMOVE ME...
-                                        syslog( LOG_INFO,
-                                            "[%i] %s Condition Name [%s]",
-                                            g_pid, "STS Config",
-                                            value.c_str() );
+                                        //syslog( LOG_INFO,
+                                           //"[%i] %s Condition Name [%s]",
+                                            //g_pid, "STS Config",
+                                            //value.c_str() );
                                         // give syslog a chance
-                                        usleep(30000);
-                                    }
+                                        //usleep(30000);
+                                    //}
 
                                     condition.name = value;
                                 }
@@ -2944,13 +2944,13 @@ NxGen::parseSTSConfigFile
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Condition %s #%ld [%s]",
-                                        g_pid, "STS Config", "Pattern",
-                                        condition.patterns.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s Condition %s #%ld [%s]",
+                                        //g_pid, "STS Config", "Pattern",
+                                        //condition.patterns.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     condition.patterns.push_back( value );
                                 }
@@ -2960,14 +2960,14 @@ NxGen::parseSTSConfigFile
                                             == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Condition %s #%ld [%s]",
-                                        g_pid, "STS Config",
-                                        "Value String",
-                                        condition.value_strings.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s Condition %s #%ld [%s]",
+                                        //g_pid, "STS Config",
+                                        //"Value String",
+                                      //condition.value_strings.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     condition.value_strings.push_back(
                                         value );
@@ -2977,13 +2977,13 @@ NxGen::parseSTSConfigFile
                                         (const xmlChar*)"value" ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Condition %s #%ld [%s]",
-                                        g_pid, "STS Config", "Value",
-                                        condition.values.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s Condition %s #%ld [%s]",
+                                        //g_pid, "STS Config", "Value",
+                                        //condition.values.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     condition.values.push_back( value );
                                 }
@@ -2993,15 +2993,15 @@ NxGen::parseSTSConfigFile
                                             ) == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Condition %s #%ld [%s]",
-                                        g_pid, "STS Config",
-                                        "NOT Value String",
-                                        condition.not_value_strings.size()
-                                            + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s Condition %s #%ld [%s]",
+                                        //g_pid, "STS Config",
+                                        //"NOT Value String",
+                                       //condition.not_value_strings.size()
+                                            //+ 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     condition.not_value_strings.push_back(
                                         value );
@@ -3012,13 +3012,13 @@ NxGen::parseSTSConfigFile
                                             == 0 )
                                 {
                                     // REMOVE ME...
-                                    syslog( LOG_INFO,
-                                        "[%i] %s Condition %s #%ld [%s]",
-                                        g_pid, "STS Config", "NOT Value",
-                                        condition.not_values.size() + 1,
-                                        value.c_str() );
+                                    //syslog( LOG_INFO,
+                                        //"[%i] %s Condition %s #%ld [%s]",
+                                        //g_pid, "STS Config", "NOT Value",
+                                        //condition.not_values.size() + 1,
+                                        //value.c_str() );
                                     // give syslog a chance
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     condition.not_values.push_back(
                                         value );
@@ -3042,12 +3042,12 @@ NxGen::parseSTSConfigFile
                                     element.lastIndex = 0;
 
                                     // REMOVE ME...
-                                    syslog( LOG_INFO, "[%i] %s %s [%s]",
-                                        g_pid, "STS Config",
-                                        "Group Condition Element",
-                                        value.c_str() );
+                                    //syslog( LOG_INFO, "[%i] %s %s [%s]",
+                                        //g_pid, "STS Config",
+                                        //"Group Condition Element",
+                                        //value.c_str() );
                                     // give syslog a chance...
-                                    usleep(30000);
+                                    //usleep(30000);
 
                                     for ( xmlNode *lev4 = lev3->children;
                                             lev4 != 0; lev4 = lev4->next )
@@ -3070,16 +3070,16 @@ NxGen::parseSTSConfigFile
                                                     == 0 )
                                         {
                                             // REMOVE ME...
-                                            syslog( LOG_INFO,
-                                                "[%i] %s %s %s #%ld [%s]",
-                                                g_pid, "STS Config",
-                                                "Condition Element",
-                                                "Pattern",
-                                                element.patterns.size()
-                                                    + 1,
-                                                value.c_str() );
+                                            //syslog( LOG_INFO,
+                                               //"[%i] %s %s %s #%ld [%s]",
+                                                //g_pid, "STS Config",
+                                                //"Condition Element",
+                                                //"Pattern",
+                                                //element.patterns.size()
+                                                    //+ 1,
+                                                //value.c_str() );
                                             // give syslog a chance
-                                            usleep(30000);
+                                            //usleep(30000);
 
                                             element.patterns.push_back(
                                                 value );
@@ -3090,15 +3090,15 @@ NxGen::parseSTSConfigFile
                                                     == 0 )
                                         {
                                             // REMOVE ME...
-                                            syslog( LOG_INFO,
-                                                "[%i] %s %s %s #%ld [%s]",
-                                                g_pid, "STS Config",
-                                                "Condition Element",
-                                                "Index",
-                                                element.indices.size() + 1,
-                                                value.c_str() );
+                                            //syslog( LOG_INFO,
+                                               //"[%i] %s %s %s #%ld [%s]",
+                                                //g_pid, "STS Config",
+                                                //"Condition Element",
+                                                //"Index",
+                                              //element.indices.size() + 1,
+                                                //value.c_str() );
                                             // give syslog a chance
-                                            usleep(30000);
+                                            //usleep(30000);
 
                                             element.indices.push_back(
                                                 value );
@@ -3123,17 +3123,17 @@ NxGen::parseSTSConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else
-                                            {
+                                            //else
+                                            //{
                                                 // REMOVE ME...
-                                                syslog( LOG_INFO,
-                                                    "[%i] %s %s [%s]",
-                                                    g_pid, "STS Config",
-                                                "Condition Element Name",
-                                                    value.c_str() );
+                                                //syslog( LOG_INFO,
+                                                    //"[%i] %s %s [%s]",
+                                                    //g_pid, "STS Config",
+                                                //"Condition Element Name",
+                                                    //value.c_str() );
                                                 // give syslog a chance
-                                                usleep(30000);
-                                            }
+                                                //usleep(30000);
+                                            //}
 
                                             element.name = value;
                                         }
@@ -3143,15 +3143,15 @@ NxGen::parseSTSConfigFile
                                                     "units_value" ) == 0 )
                                         {
                                             // REMOVE ME...
-                                            syslog( LOG_INFO,
-                                                "[%i] %s %s #%ld [%s]",
-                                                g_pid, "STS Config",
-                                            "Element Units Value Pattern",
-                                                element.unitsPatterns
-                                                    .size() + 1,
-                                                value.c_str() );
+                                            //syslog( LOG_INFO,
+                                                //"[%i] %s %s #%ld [%s]",
+                                                //g_pid, "STS Config",
+                                           //"Element Units Value Pattern",
+                                                //element.unitsPatterns
+                                                    //.size() + 1,
+                                                //value.c_str() );
                                             // give syslog a chance
-                                            usleep(30000);
+                                            //usleep(30000);
 
                                             element.unitsPatterns
                                                 .push_back( value );
@@ -3177,16 +3177,16 @@ NxGen::parseSTSConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else
-                                            {
+                                            //else
+                                            //{
                                                 // REMOVE ME...
-                                                syslog( LOG_INFO,
-                                            "[%i] %s Element Units [%s]",
-                                                    g_pid, "STS Config",
-                                                    value.c_str() );
+                                                //syslog( LOG_INFO,
+                                            //"[%i] %s Element Units [%s]",
+                                                    //g_pid, "STS Config",
+                                                    //value.c_str() );
                                                 // give syslog a chance
-                                                usleep(30000);
-                                            }
+                                                //usleep(30000);
+                                            //}
 
                                             element.units = value;
                                         }

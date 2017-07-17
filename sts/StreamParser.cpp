@@ -2669,6 +2669,17 @@ StreamParser::rxPacket
                                     // make a new one
                                     if ( create )
                                     {
+                                        stringstream ss;
+                                        ss << "[Device "
+                                            << dev_name
+                                            << ": " << pv_name
+                                            << " ("
+                                            << pv_connection
+                                            << ")]"
+                                            << " devId="
+                                            << a_pkt.devId()
+                                            << " pvId=" << pv_id;
+
                                         // If adapter doesn't support
                                         // PV type, makePVInfo will
                                         // return NULL
@@ -2684,11 +2695,28 @@ StreamParser::rxPacket
                                                 pv_ignore );
                                         if ( info )
                                         {
+                                            // REMOVE ME
+                                            //syslog( LOG_INFO,
+                                                //"[%i] %s %s", g_pid,
+                                                //"New PV",
+                                                //ss.str().c_str() );
+                                            // give syslog a chance...
+                                            //usleep(30000);
+
                                             m_pvs_by_key[key] = info;
                                             m_pv_name_xref[
                                                 dev_name + ":" + pv_name
                                                     + ":" + pv_connection ]
                                                 = key;
+                                        }
+                                        else
+                                        {
+                                            syslog( LOG_ERR,
+                                                "[%i] %s %s", g_pid,
+                                                "Failed to Create New PV",
+                                                ss.str().c_str() );
+                                            // give syslog a chance...
+                                            usleep(30000);
                                         }
                                     }
                                 }
@@ -2814,6 +2842,24 @@ StreamParser::rxPacket
                                         }
                                         else
                                         {
+                                            stringstream ss;
+                                            ss << "[Device "
+                                                << dev_name
+                                                << ": " << pv_name
+                                                << " ("
+                                                << pv_connection
+                                                << ")]"
+                                                << " devId="
+                                                << a_pkt.devId()
+                                                << " pvId=" << pv_id;
+
+                                            syslog( LOG_ERR,
+                                                "[%i] %s %s", g_pid,
+                                                "Failed to Create New PV",
+                                                ss.str().c_str() );
+                                            // give syslog a chance...
+                                            usleep(30000);
+
                                             m_pvs_by_key.erase( ipv );
                                         }
                                     }
@@ -3060,6 +3106,13 @@ StreamParser::rxPacket
         }
 
         xmlFreeDoc( doc );
+    }
+    else
+    {
+        syslog( LOG_ERR, "[%i] %s %s [%s]", g_pid, "STS Error:",
+            "Error Parsing Device Descriptor", xml.c_str() );
+        // give syslog a chance...
+        usleep(30000);
     }
 
     return false;

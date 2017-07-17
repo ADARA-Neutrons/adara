@@ -487,10 +487,10 @@ InputAdapter::configFileMonitorThread()
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
                 << " Exception Parsing"
-                << " EPICS beamline.xml Config File!";
+                << " EPICS beamline.xml Config File!"
+                << "[" << e.what() << "]";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
-            syslog( LOG_ERR, e.what() );
 
             ADARA::ComBus::SignalAssertMessage msg(
                 "SID_EPICS_CFG_ERROR", "CONFIG", ss.str(), ADARA::ERROR );
@@ -787,6 +787,14 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                     }
                 }
             }
+        }
+        catch( std::exception &e )
+        {
+            syslog( LOG_ERR,
+                "%s %s: Exception While Parsing EPICS beamline XML - %s",
+                "PVSD ERROR:", "InputAdapter::parseConfigBuffer()",
+                e.what() );
+            res = false;
         }
         catch(...)
         {

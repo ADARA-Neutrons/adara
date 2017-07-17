@@ -263,7 +263,7 @@ DeviceDescriptor::definePV(
         EnumDescriptor *a_enum, const string &a_units )
 {
     if ( getPvByName( a_name ))
-        throw runtime_error("Can not define PV with duplicate name");
+        throw runtime_error("Cannot define PV with duplicate name (alias)");
 
     m_pvs.push_back( new PVDescriptor( this, a_name, a_connection,
         a_type, a_elem_count, a_enum, a_units ) );
