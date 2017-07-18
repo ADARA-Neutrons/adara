@@ -152,10 +152,10 @@ int main( int argc, char** argv )
 
     openlog( "sts", 0, LOG_DAEMON );
     syslog( LOG_INFO,
-        "[%i] %s. STS ver: %s, %s ver: %s, ComBus ver: %s, tag: %s",
-        g_pid, "Started", STS_VERSION,
+        "[%i] %s. %s Version %s, %s Version %s, %s Version %s, Tag: %s",
+        g_pid, "Started", "STS", STS_VERSION,
         "ADARA Common", ADARA::VERSION.c_str(),
-        ADARA::ComBus::VERSION.c_str(),
+        "ComBus", ADARA::ComBus::VERSION.c_str(),
         ADARA::TAG_NAME.c_str() );
 
     try
