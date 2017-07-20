@@ -496,7 +496,7 @@ SMSControl::SMSControl() :
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
-		throw std::runtime_error("Unable to get next run number");
+		throw std::runtime_error("Unable to Get Next Run Number");
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
@@ -711,7 +711,7 @@ bool SMSControl::setRecording( bool v )
 		// We've Updated the Run Number on disk,
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
-		INFO("Starting run " << m_currentRunNumber);
+		INFO("Starting Run " << m_currentRunNumber);
 		m_runInfo->lock();
 		m_runInfo->setRunNumber( m_currentRunNumber );
 
@@ -831,7 +831,7 @@ bool SMSControl::setRecording( bool v )
 
 		// Stopping Run, Clear Run Number
 		// and "Unlock" RunInfo for PV Updates...
-		INFO("Stopping run " << m_currentRunNumber);
+		INFO("Stopping Run " << m_currentRunNumber);
 		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
@@ -954,9 +954,9 @@ bool SMSControl::getRecording(void)
 void SMSControl::pauseRecording(void)
 {
 	if ( m_currentRunNumber )
-		INFO("Pausing run " << m_currentRunNumber);
+		INFO("Pausing Run " << m_currentRunNumber);
 	else
-		INFO("Pausing data collection (not currently recording)");
+		INFO("Pausing Data Collection (Not Currently Recording)");
 
 	StorageManager::pauseRecording();
 }
@@ -964,9 +964,9 @@ void SMSControl::pauseRecording(void)
 void SMSControl::resumeRecording(void)
 {
 	if ( m_currentRunNumber )
-		INFO("Resuming run " << m_currentRunNumber);
+		INFO("Resuming Run " << m_currentRunNumber);
 	else
-		INFO("Resuming data collection (not currently recording)");
+		INFO("Resuming Data Collection (Not Currently Recording)");
 
 	StorageManager::resumeRecording();
 }
