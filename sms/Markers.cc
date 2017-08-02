@@ -180,6 +180,13 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	annotationCommentQueue.push_back(
 		std::pair<struct timespec, std::string>( now, ss.str() ) );
 
+	// If Run Notes Comment Persists Since the Last Run Ended,
+	// And No Other Run Notes have been Queued as Yet, Then Re-Use It Now!
+	// (Will Get Run Notes Queued, Set/Dumped on First Run Prologue...)
+	if ( m_notesCommentPV->valid() && !notesCommentQueue.size() ) {
+		addNotesComment();
+	}
+
 	// Run is About to Start Now...
 	m_inRun = true;
 }
@@ -244,13 +251,14 @@ void Markers::runStop(void)
 	// Clear All Comment PVs on Run Stop...
 	m_commentPV->unset(); // DEPRECATED
 	m_scanCommentPV->unset();
-	m_notesCommentPV->unset();
+	// m_notesCommentPV->unset(); *Don't* Reset Run Notes Between Runs!
+									// (Often Convenient to Re-Use... ;-)
 	m_annotationCommentPV->unset();
 
 	// No Longer in a Run Now...
 	m_inRun = false;
 
-	// Reset Run Notes Flag, Allow Set Again for Next Run...
+	// Reset Run Notes Set Flag, Allow Set Again for Next Run...
 	m_notesCommentSet = false;
 }
 
@@ -893,7 +901,6 @@ void Markers::onPrologue(void)
 
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments();
-
 
 	if ( m_scanIndex )
 	{
