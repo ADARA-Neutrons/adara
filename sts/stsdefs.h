@@ -488,6 +488,20 @@ public:
 };
 
 
+/// BeamlineInformation extracted from BeamlineInfo packet payload
+struct BeamlineInfo
+{
+    BeamlineInfo()
+        : target_station_number(1)
+    {}
+
+    uint32_t                target_station_number;
+    std::string             instr_id;
+    std::string             instr_shortname;
+    std::string             instr_longname;
+};
+
+
 /// User information (part of RunInfo)
 struct UserInfo
 {
@@ -501,14 +515,9 @@ struct UserInfo
 struct RunInfo
 {
     RunInfo()
-        : target_station_number(1), run_number(0), run_title("NONE"),
-        no_sample_info(false)
+        : run_number(0), run_title("NONE"), no_sample_info(false)
     {}
 
-    uint32_t                target_station_number;
-    std::string             instr_id;
-    std::string             instr_shortname;
-    std::string             instr_longname;
     uint32_t                run_number;
     std::string             run_title;
     std::string             proposal_id;
@@ -842,6 +851,8 @@ public:
                                 uint32_t a_idx_buf_reserve,
                                 STS::BeamMonitorConfig *a_config,
                                 bool a_known_monitor ) = 0;
+    virtual void            processBeamlineInfo(
+                                const BeamlineInfo &a_beamline_info ) = 0;
     virtual void            processRunInfo(
                                 const RunInfo &a_run_info ) = 0;
     virtual void            processGeometry(
