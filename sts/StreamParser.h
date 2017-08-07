@@ -41,10 +41,10 @@ public:
     void    printStats( std::ostream &a_os ) const;
     void    getXmlNodeValue( xmlNode *a_node, std::string & a_value ) const;
 
+    std::string getBeamShortName() const
+        { return m_beamline_info.instr_shortname; }
     std::string getFacilityName() const
         { return m_run_info.facility_name; }
-    std::string getBeamShortName() const
-        { return m_run_info.instr_shortname; }
     std::string getProposalID() const
         { return m_run_info.proposal_id; }
     uint32_t getRunNumber() const
@@ -166,7 +166,8 @@ private:
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors; number of elements)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc; number of elements)
     unsigned short                          m_info_rcvd;                ///< Tracks ADARA informational packets are received
-    RunInfo                                 m_run_info;                 ///< Run (and instrument) information
+    BeamlineInfo                            m_beamline_info;            ///< Beamline (instrument) information
+    RunInfo                                 m_run_info;                 ///< Run information
     RunMetrics                              m_run_metrics;              ///< Run metrics
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
