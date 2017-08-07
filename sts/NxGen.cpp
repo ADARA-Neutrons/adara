@@ -871,6 +871,46 @@ NxGen::dumpProcessingStatistics(void)
 }
 
 
+/*! \brief Processes beamline information
+ *
+ * This method translates beamline information to the output Nexus file.
+ */
+void
+NxGen::processBeamlineInfo
+(
+    const STS::BeamlineInfo & a_beamline_info   ///< [in] Beamline information object
+)
+{
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
+        writeScalar( m_instrument_path, "target_station_number",
+            a_beamline_info.target_station_number, "" );
+
+        writeString( m_instrument_path, "beamline",
+            a_beamline_info.instr_id );
+
+        if ( a_beamline_info.instr_longname.size())
+        {
+            writeString( m_instrument_path, "name",
+                a_beamline_info.instr_longname );
+
+            if ( a_beamline_info.instr_shortname.size())
+            {
+                writeStringAttribute( m_instrument_path + "/name",
+                    "short_name", a_beamline_info.instr_shortname );
+            }
+        }
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "processBeamlineInfo() failed." )
+    }
+}
+
+
 /*! \brief Processes run information
  *
  * This method translates run information to the output Nexus file.
@@ -886,23 +926,6 @@ NxGen::processRunInfo
 
     try
     {
-        writeScalar( m_instrument_path, "target_station_number",
-            a_run_info.target_station_number, "" );
-
-        writeString( m_instrument_path, "beamline", a_run_info.instr_id );
-
-        if ( a_run_info.instr_longname.size())
-        {
-            writeString( m_instrument_path, "name",
-                a_run_info.instr_longname );
-
-            if ( a_run_info.instr_shortname.size())
-            {
-                writeStringAttribute( m_instrument_path + "/name",
-                    "short_name", a_run_info.instr_shortname );
-            }
-        }
-
         string tmp = boost::lexical_cast<string>(a_run_info.run_number);
         writeString( m_entry_path, "run_number", tmp );
         writeString( m_entry_path, "entry_identifier", tmp );
