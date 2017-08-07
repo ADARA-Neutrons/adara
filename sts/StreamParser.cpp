@@ -300,9 +300,9 @@ StreamParser::rxPacket
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
                 PKT_BIT_PIXELMAP)
 
+        // Allow & Process Multiple RunInfoPkt Per Run Now...! :-O
         case ADARA::PacketType::RUN_INFO_TYPE:
-            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
-                PKT_BIT_RUNINFO)
+            PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
         case ADARA::PacketType::GEOMETRY_TYPE:
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
@@ -1413,6 +1413,10 @@ StreamParser::rxPacket
 
     if ( doc )
     {
+        // Temporary RunInfo Holder...
+        // (to Enable Duplicate RunInfoPkt Comparisons... ;-D)
+        RunInfo tmp_run_info;
+
         string tag;
         string value;
 
@@ -1427,28 +1431,28 @@ StreamParser::rxPacket
                 if ( xmlStrcmp( node->name,
                         (const xmlChar*)"run_number" ) == 0 )
                 {
-                    m_run_info.run_number =
+                    tmp_run_info.run_number =
                         boost::lexical_cast<uint32_t>( value );
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"proposal_id" ) == 0 )
                 {
-                    m_run_info.proposal_id = value;
+                    tmp_run_info.proposal_id = value;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"run_title" ) == 0 )
                 {
-                    m_run_info.run_title = value;
+                    tmp_run_info.run_title = value;
                 }
                 else if (xmlStrcmp( node->name,
                         (const xmlChar*) "facility_name") == 0 )
                 {
-                    m_run_info.facility_name = value;
+                    tmp_run_info.facility_name = value;
                 }
                 else if (xmlStrcmp( node->name,
                         (const xmlChar*) "no_sample_info") == 0 )
                 {
-                    m_run_info.no_sample_info = true;
+                    tmp_run_info.no_sample_info = true;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
@@ -1462,40 +1466,40 @@ StreamParser::rxPacket
                         if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"id" ) == 0 )
                         {
-                            m_run_info.sample_id = value;
+                            tmp_run_info.sample_id = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"name" ) == 0 )
                         {
-                            m_run_info.sample_name = value;
+                            tmp_run_info.sample_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"nature" ) == 0 )
                         {
-                            m_run_info.sample_nature = value;
+                            tmp_run_info.sample_nature = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"chemical_formula" ) == 0 )
                         {
-                            m_run_info.sample_formula = value;
+                            tmp_run_info.sample_formula = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass" ) == 0 )
                         {
-                            m_run_info.sample_mass =
+                            tmp_run_info.sample_mass =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_units" ) == 0 )
                         {
-                            m_run_info.sample_mass_units = value;
+                            tmp_run_info.sample_mass_units = value;
                         }
                         // TODO Delete When Phased Out... ;-Q
                         // ("Density" is really "Number Density"...!)
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete When Phased Out... ;-Q
@@ -1504,14 +1508,14 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         // TODO Delete Re-Name Leftover When Phased Out...
                         // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete Re-Name Leftover When Phased Out...
@@ -1520,24 +1524,24 @@ StreamParser::rxPacket
                                 (const xmlChar*)"number_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"container_id" ) == 0 )
                         {
-                            m_run_info.sample_container_id = value;
+                            tmp_run_info.sample_container_id = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                     (const xmlChar*)"container_name" ) == 0
@@ -1545,162 +1549,165 @@ StreamParser::rxPacket
                                 || xmlStrcmp( sample_node->name,
                                     (const xmlChar*)"container" ) == 0 )
                         {
-                            m_run_info.sample_container_name = value;
+                            tmp_run_info.sample_container_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_indicator" ) == 0 )
                         {
-                            m_run_info.sample_can_indicator = value;
+                            tmp_run_info.sample_can_indicator = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_barcode" ) == 0 )
                         {
-                            m_run_info.sample_can_barcode = value;
+                            tmp_run_info.sample_can_barcode = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_name" ) == 0 )
                         {
-                            m_run_info.sample_can_name = value;
+                            tmp_run_info.sample_can_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_materials" ) == 0 )
                         {
-                            m_run_info.sample_can_materials = value;
+                            tmp_run_info.sample_can_materials = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"description" ) == 0 )
                         {
-                            m_run_info.sample_description = value;
+                            tmp_run_info.sample_description = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"comments" ) == 0 )
                         {
-                            m_run_info.sample_comments = value;
+                            tmp_run_info.sample_comments = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "height_in_container" ) == 0 )
                         {
-                            m_run_info.sample_height_in_container =
+                            tmp_run_info.sample_height_in_container =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "height_in_container_units" ) == 0 )
                         {
-                            m_run_info.sample_height_in_container_units =
+                            tmp_run_info.sample_height_in_container_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_diameter" ) == 0 )
                         {
-                            m_run_info.sample_interior_diameter =
+                            tmp_run_info.sample_interior_diameter =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_diameter_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_diameter_units =
+                            tmp_run_info.sample_interior_diameter_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_height" ) == 0 )
                         {
-                            m_run_info.sample_interior_height =
+                            tmp_run_info.sample_interior_height =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_height_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_height_units =
+                            tmp_run_info.sample_interior_height_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_width" ) == 0 )
                         {
-                            m_run_info.sample_interior_width =
+                            tmp_run_info.sample_interior_width =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_width_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_width_units = value;
+                            tmp_run_info.sample_interior_width_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_depth" ) == 0 )
                         {
-                            m_run_info.sample_interior_depth =
+                            tmp_run_info.sample_interior_depth =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_depth_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_depth_units = value;
+                            tmp_run_info.sample_interior_depth_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_diameter" ) == 0 )
                         {
-                            m_run_info.sample_outer_diameter =
+                            tmp_run_info.sample_outer_diameter =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_diameter_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_diameter_units = value;
+                            tmp_run_info.sample_outer_diameter_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_height" ) == 0 )
                         {
-                            m_run_info.sample_outer_height =
+                            tmp_run_info.sample_outer_height =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_height_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_height_units = value;
+                            tmp_run_info.sample_outer_height_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_width" ) == 0 )
                         {
-                            m_run_info.sample_outer_width =
+                            tmp_run_info.sample_outer_width =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_width_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_width_units = value;
+                            tmp_run_info.sample_outer_width_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_depth" ) == 0 )
                         {
-                            m_run_info.sample_outer_depth =
+                            tmp_run_info.sample_outer_depth =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_depth_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_depth_units = value;
+                            tmp_run_info.sample_outer_depth_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"volume_cubic" ) == 0 )
                         {
-                            m_run_info.sample_volume_cubic =
+                            tmp_run_info.sample_volume_cubic =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "volume_cubic_units" ) == 0 )
                         {
-                            m_run_info.sample_volume_cubic_units = value;
+                            tmp_run_info.sample_volume_cubic_units = value;
                         }
                     }
                 }
@@ -1743,7 +1750,7 @@ StreamParser::rxPacket
                                 }
                             }
 
-                            m_run_info.users.push_back( ui );
+                            tmp_run_info.users.push_back( ui );
                         }
                     }
                 }
@@ -1763,6 +1770,26 @@ StreamParser::rxPacket
         }
 
         xmlFreeDoc( doc );
+
+        // First RunInfoPkt...
+        if ( !(m_pkt_recvd & (PKT_BIT_RUNINFO)) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: First RunInfoPkt - %s...",
+                g_pid, "STS Error:", "rxPacket(RunInfoPkt)",
+                "Utilizing Values" );
+
+            m_pkt_recvd |= (PKT_BIT_RUNINFO);
+
+            m_run_info = tmp_run_info;
+        }
+
+        // Duplicate RunInfoPkt...
+        else
+        {
+            syslog( LOG_ERR, "[%i] %s %s: Duplicate RunInfoPkt - %s...",
+                g_pid, "STS Error:", "rxPacket(RunInfoPkt)",
+                "Ignoring" );
+        }
     }
 
     if ( m_strict )
@@ -1827,11 +1854,11 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    m_run_info.target_station_number = a_pkt.targetStationNumber();
+    m_beamline_info.target_station_number = a_pkt.targetStationNumber();
 
-    m_run_info.instr_id = a_pkt.id();
-    m_run_info.instr_shortname = a_pkt.shortName();
-    m_run_info.instr_longname = a_pkt.longName();
+    m_beamline_info.instr_id = a_pkt.id();
+    m_beamline_info.instr_shortname = a_pkt.shortName();
+    m_beamline_info.instr_longname = a_pkt.longName();
 
     receivedInfo( INSTR_INFO_BIT );
 
@@ -3477,14 +3504,15 @@ StreamParser::receivedInfo( InfoBit a_bit )
     m_info_rcvd |= a_bit;
     if ( m_info_rcvd == ALL_INFO_RCVD )
     {
+        processBeamlineInfo( m_beamline_info );
         processRunInfo( m_run_info );
         m_info_rcvd |= INFO_SENT;
 
         syslog( LOG_INFO,
             "[%i] %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-            "Target Station", m_run_info.target_station_number,
+            "Target Station", m_beamline_info.target_station_number,
             "Beamline", m_run_info.facility_name.c_str(),
-            m_run_info.instr_shortname.c_str(),
+            m_beamline_info.instr_shortname.c_str(),
             "Proposal", m_run_info.proposal_id.c_str(),
             "Run", m_run_info.run_number );
         usleep(30000); // give syslog a chance...
@@ -3513,9 +3541,9 @@ StreamParser::finalizeStreamProcessing()
             syslog( LOG_ERR,
                 "[%i] %s %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
                 "STS Error:", "No Neutron Pulses Received in Stream",
-                "Target Station", m_run_info.target_station_number,
+                "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
-                m_run_info.instr_shortname.c_str(),
+                m_beamline_info.instr_shortname.c_str(),
                 "Proposal", m_run_info.proposal_id.c_str(),
                 "Run", m_run_info.run_number );
             usleep(30000); // give syslog a chance...
@@ -3525,9 +3553,9 @@ StreamParser::finalizeStreamProcessing()
             syslog( LOG_WARNING,
                 "[%i] %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
                 "No Neutron Pulses Received in Stream",
-                "Target Station", m_run_info.target_station_number,
+                "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
-                m_run_info.instr_shortname.c_str(),
+                m_beamline_info.instr_shortname.c_str(),
                 "Proposal", m_run_info.proposal_id.c_str(),
                 "Run", m_run_info.run_number );
             usleep(30000); // give syslog a chance...
