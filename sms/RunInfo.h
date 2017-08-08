@@ -10,6 +10,7 @@
 #include <string>
 #include <map>
 
+#include "StorageManager.h"
 #include "SMSControl.h"
 
 class RunUserInfoPV;
@@ -46,6 +47,13 @@ public:
 	void pvChanged(RunInfoPV* pv);
 
 	void invalidateCache(void) { m_packetValid = false; }
+
+	void checkPacket() {
+		if (m_runNumber) {
+			if (generatePacket())
+				StorageManager::addPacket(m_packet, m_packetSize);
+		}
+	}
 
 private:
 	std::string m_facility;
@@ -114,7 +122,7 @@ private:
 
 	RunInfoPVSharedPtr addPV(const std::string &prefix, const char *pv_name,
 		   const char *xml_name, RunInfoMap &map);
-	void generatePacket(void);
+	bool generatePacket(void);
 	void onPrologue(void);
 };
 
