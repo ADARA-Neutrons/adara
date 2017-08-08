@@ -668,5 +668,24 @@ genTempName()
 }
 
 
+/*! \brief Compares Two Double Floating Point Values
+ *
+ * Can't Go Wrong with "The Art of Computer Programming" by Don Knuth!
+ *
+ *  \return True if the Values are "Approximately" Equal, else False.
+ */
+inline bool
+approximatelyEqual
+(
+	const double a,			///< [in] A Double Floating Point Value
+	const double b,			///< [in] Another Double Floating Point Value
+	const double epsilon	///< [in] Epsilon to Measure the Difference
+)
+{
+	return( fabs( a - b )
+		<= ( ( fabs(a) < fabs(b) ? fabs(b) : fabs(a) ) * epsilon ) );
+}
+
+
 #endif	/* ADARA_UTILS_H */
 
