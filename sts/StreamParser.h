@@ -147,6 +147,7 @@ private:
     PVType      toPVType( const char *a_source ) const;
     inline void gatherStats( const ADARA::Packet &a_pkt ) const;
     const char* getPktName( uint32_t a_pkt_type ) const;
+    void        updateRunInfo( const RunInfo &a_run_info );
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
