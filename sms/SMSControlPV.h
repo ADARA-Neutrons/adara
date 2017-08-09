@@ -320,6 +320,7 @@ protected:
 	gddAppFuncTable<smsFloat64PV>    m_read_table;
 
 	gddAppFuncTableStatus defaultNumber(gdd &in);
+	gddAppFuncTableStatus defaultPrecision(gdd &in);
 	gddAppFuncTableStatus defaultString(gdd &in);
 	gddAppFuncTableStatus maximumNumber(gdd &in);
 	gddAppFuncTableStatus minimumNumber(gdd &in);
