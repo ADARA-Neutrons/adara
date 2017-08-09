@@ -117,7 +117,7 @@ private:
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		std::stringstream ss;
-		ss << value();
+		ss << std::setprecision(17) << value();
 		m_stringRunInfoPV->update( ss.str(), &now );
 		m_stringRunInfoPV->changed();
 	}
