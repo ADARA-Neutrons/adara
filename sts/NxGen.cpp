@@ -918,9 +918,25 @@ NxGen::processBeamlineInfo
 void
 NxGen::processRunInfo
 (
-    const STS::RunInfo & a_run_info     ///< [in] Run information object
+    const STS::RunInfo & a_run_info,    ///< [in] Run information object
+    const bool a_strict                 ///< [in] Strict Protocol Parsing
 )
 {
+    // Verify we received all required fields in Final Run Info pkt
+    if ( a_strict )
+    {
+        string msg;
+        if ( !a_run_info.facility_name.size() )
+            msg = "Required facility_name missing from RunInfo.";
+        else if ( !a_run_info.proposal_id.size() )
+            msg = "Required proposal_id missing from RunInfo.";
+        else if ( a_run_info.run_number == 0 )
+            msg = "Required run_number missing from RunInfo.";
+
+        if ( msg.size() )
+            THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, msg )
+    }
+
     if (!m_gen_nexus)
         return;
 
@@ -2372,7 +2388,8 @@ NxGen::toNxType
         break;
     }
 
-    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )
+    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
+        "toNxType() failed - invalid PV type: " << a_type )
 }
 
 

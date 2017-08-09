@@ -2003,7 +2003,8 @@ protected:
                             bool a_known_monitor );
     void                processBeamlineInfo(
                             const STS::BeamlineInfo &a_beamline_info );
-    void                processRunInfo( const STS::RunInfo &a_run_info );
+    void                processRunInfo( const STS::RunInfo &a_run_info,
+                            const bool a_strict );
     void                processGeometry( const std::string &a_xml );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
