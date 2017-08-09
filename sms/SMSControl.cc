@@ -712,7 +712,8 @@ bool SMSControl::setRecording( bool v )
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
 		INFO("Starting Run " << m_currentRunNumber);
-		m_runInfo->lock();
+		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+		// m_runInfo->lock();
 		m_runInfo->setRunNumber( m_currentRunNumber );
 
 		// Reset the Overall Monitor bookkeeping...
@@ -747,7 +748,8 @@ bool SMSControl::setRecording( bool v )
 				// and "Unlock" RunInfo for PV Updates...
 				m_currentRunNumber = 0;
 				m_runInfo->setRunNumber(0);
-				m_runInfo->unlock();
+				// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+				// m_runInfo->unlock();
 				// LOGIC Exception Starting Run...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Start Recording";
@@ -810,7 +812,8 @@ bool SMSControl::setRecording( bool v )
 			// and "Unlock" RunInfo for PV Updates...
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
-			m_runInfo->unlock();
+			// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+			// m_runInfo->unlock();
 			// Update Overall Summary and Reason [Set Severity/Alarm!]
 			// - "false": Don't Set Base Reason (we just set it :-)
 			// - "true": Do Log Status as Error
@@ -835,7 +838,8 @@ bool SMSControl::setRecording( bool v )
 		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
-		m_runInfo->unlock();
+		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+		// m_runInfo->unlock();
 
 		// Retry *3* Times for Any Transient Failures...
 		// (Then "Fail Big" and Set Summary Alarm Severity...)
