@@ -819,15 +819,22 @@ Dump_Non_Zero_PV()
 
 GET_LIVE_SETTING()
 {
+	local _truncPrec=""
+	if [[ "$1" == "--truncatePrecision" ]]; then
+		_truncPrec="-f 0"
+	fi
 	if [[ $terse == 0 ]]; then
 		echo "Getting Current Live SMS Daemon Setting (PV) for:"
 		echo "   ${optId}:${opt_label}"
 		echo "   ${PRE}:${PV}"
+		if [[ "${_truncPrec}" != "" ]]; then
+			echo "   [Truncating Precision]"
+		fi
 		echo
 	fi
 	local _live_current=""
 	local _live_ok=""
-	_live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
+	_live_current=`caget $opt_pv_opt $WAIT $_truncPrec ${PRE}:${PV} 2>&1`
 	_live_ok=$?
 	if [ ${_live_ok} != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
@@ -2565,7 +2572,7 @@ CONFCK()
 
 			echo
 
-			GET_LIVE_SETTING
+			GET_LIVE_SETTING --truncatePrecision
 			if [ $? != 0 ]; then
 				echo -n \
 					"Proceed with Live vs. File Config Check (yes/No)? "
