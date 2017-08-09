@@ -1776,9 +1776,8 @@ StreamParser::rxPacket
         // First RunInfoPkt...
         if ( !(m_pkt_recvd & (PKT_BIT_RUNINFO)) )
         {
-            syslog( LOG_ERR, "[%i] %s %s: First RunInfoPkt - %s...",
-                g_pid, "STS Error:", "rxPacket(RunInfoPkt)",
-                "Utilizing Values" );
+            syslog( LOG_INFO, "[%i] %s: First RunInfoPkt - %s...",
+                g_pid, "rxPacket(RunInfoPkt)", "Utilizing Values" );
             usleep(30000); // give syslog a chance...
 
             m_pkt_recvd |= (PKT_BIT_RUNINFO);
@@ -1789,9 +1788,8 @@ StreamParser::rxPacket
         // Duplicate RunInfoPkt...
         else
         {
-            syslog( LOG_ERR, "[%i] %s %s: Duplicate RunInfoPkt - %s...",
-                g_pid, "STS Error:", "rxPacket(RunInfoPkt)",
-                "Updating" );
+            syslog( LOG_INFO, "[%i] %s: Duplicate RunInfoPkt - %s...",
+                g_pid, "rxPacket(RunInfoPkt)", "Updating" );
             usleep(30000); // give syslog a chance...
 
             updateRunInfo( tmp_run_info );
