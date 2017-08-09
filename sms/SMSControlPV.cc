@@ -1606,7 +1606,7 @@ gddAppFuncTableStatus smsFloat64PV::defaultNumber(gdd &in)
 gddAppFuncTableStatus smsFloat64PV::defaultPrecision(gdd &in)
 {
 	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
-	val->put(8.0);
+	val->put(9.0);
 	in.put(val);
 	return S_cas_success;
 }
