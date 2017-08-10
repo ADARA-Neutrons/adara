@@ -821,7 +821,7 @@ GET_LIVE_SETTING()
 {
 	local _truncPrec=""
 	if [[ "$1" == "--truncatePrecision" ]]; then
-		_truncPrec="-f 0"
+		_truncPrec="-g 16"
 	fi
 	if [[ $terse == 0 ]]; then
 		echo "Getting Current Live SMS Daemon Setting (PV) for:"
