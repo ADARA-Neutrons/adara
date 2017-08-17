@@ -488,6 +488,11 @@ NxGen::finalize
     {
         writeString( m_entry_path, "definition", "NXsnsevent" );
 
+        // Make Sure We Have "Some" Overall Run Comment... ;-D
+        if ( !m_haveRunComment ) {
+            runComment( "" );
+        }
+
         writeScalar( m_daslogs_freq_path, "minimum_value",
             a_run_metrics.freq_stats.min(), FREQ_UNITS );
         writeScalar( m_daslogs_freq_path, "maximum_value",
