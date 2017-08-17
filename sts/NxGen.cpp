@@ -490,7 +490,13 @@ NxGen::finalize
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
         if ( !m_haveRunComment ) {
-            runComment( "" );
+            std::string dummy = "(unset)";
+            syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+                g_pid, "NxGen::finalize()",
+                "No Run Comment Has Been Set For This Run",
+                "Setting Dummy Empty Run Comment", dummy.c_str() );
+            usleep(30000); // give syslog a chance...
+            runComment( dummy );
         }
 
         writeScalar( m_daslogs_freq_path, "minimum_value",
