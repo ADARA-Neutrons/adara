@@ -1,0 +1,160 @@
+#!/bin/bash
+#
+# ADARA "Fix IPTS" Script...! ;-D
+#
+# Script to Automate Changing the IPTS Proposal Number for Run(s)
+# and Resubmitting Them Through the STS to Re-Catalog...! ;-D
+#
+# (Because it can happen that often... ;-)
+#
+
+SMS_DATA="/SNSlocal/sms/data"
+
+STS1="sns-sts1.sns.gov"
+STS2="sns-sts2.sns.gov"
+
+USAGE()
+{
+	echo -e "\nusage: adara_fix_ipts \\"
+	echo "         [--sts1|--sts2] [--sts|--sts_test|--sts_dummy] \\"
+	echo "         [--sms_data=<${SMS_DATA}>] \\"
+	echo "         [--run=<RunNumber1>] \\"
+	echo "         [--run=<RunNumber2,RunNumber3,...>] \\"
+	echo "         [--run=<RunNumber4-RunNumber5>] \\"
+	echo "         [--ipts=<IPTS-nnnnn>] [--help]"
+	echo
+}
+
+PARSE_RUN_NUMBERS()
+{
+	local _runlist="$1"
+
+	# Strip Off Any Comma Separators...
+	_runlist=`echo "${_runlist}" | sed 's/,/ /g'`
+
+	# Step Through Run Numbers Looking for Any Run Number Ranges
+	local _runlistall
+	local _run
+	for _run in ${_runlist} ; do
+		# Run Number Range
+		if [[ "${_run}" =~ - ]]; then
+			local _start
+			local _end
+			_start=`echo "${_run}" | awk -F "-" '{print $1}'`
+			_end=`echo "${_run}" | awk -F "-" '{print $2}'`
+			for (( i = _start ; i <= _end ; ++i )); do
+				if [[ -z "${_runlistall}" ]]; then
+					_runlistall="$i"
+				else
+					_runlistall="${_runlistall} $i"
+				fi
+			done
+		# Plain Run Number
+		else
+			if [[ -z "${_runlistall}" ]]; then
+				_runlistall="${_run}"
+			else
+				_runlistall="${_runlistall} ${_run}"
+			fi
+		fi
+	done
+
+	# Now Append Parsed Run Number List to Overall Run List
+	if [[ -z "${RUN_NUMBERS}" ]]; then
+		RUN_NUMBERS="${_runlistall}"
+	else
+		RUN_NUMBERS="${RUN_NUMBERS} ${_runlistall}"
+	fi
+	echo -e "\nAdding Run Number(s) ${_runlistall} to Run List."
+}
+
+CHECK_PROCEED()
+{
+	local _proceed_ck=""
+
+	echo -e -n "\nProceed (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		echo -e "\nExiting ADARA Fix IPTS at User's Request.\n"
+		exit -99
+	fi
+}
+
+#
+# Parse Command Line Arguments
+#
+
+STS_HOST="${STS1}"
+
+STS_SERVICE="sts_dummy"
+STS_PORT=""
+
+RUN_NUMBERS=""
+
+IPTS_NEW=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--sts1#' ]]; then
+		STS_HOST="${STS1}"
+		echo -e "\nSetting STS Host to: ${STS_HOST}"
+	elif [[ "#$key#" == '#--sts2#' ]]; then
+		STS_HOST="${STS2}"
+		echo -e "\nSetting STS Host to: ${STS_HOST}"
+	elif [[ "#$key#" == '#--sts#' ]]; then
+		STS_SERVICE="sts"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_test#' ]]; then
+		STS_SERVICE="sts_test"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_dummy#' ]]; then
+		STS_SERVICE="sts_dummy"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sms_data#' ]]; then
+		SMS_DATA="${value}"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--run#' ]]; then
+		PARSE_RUN_NUMBERS "${value}"
+	elif [[ "#$key#" == '#--ipts#' ]]; then
+		IPTS_NEW="${value}"
+		if [[ ! "${IPTS_NEW}" =~ ^IPTS- ]]; then
+			echo -e -n "\n*** WARNING: New Proposal \"${IPTS_NEW}\" "
+			echo "Does Not Have the \"IPTS-\" Prefix!"
+			CHECK_PROCEED
+		fi
+		echo -e "\nSetting New IPTS Proposal to: [${IPTS_NEW}]"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	else
+		echo -e "\nError: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit -1
+	fi
+
+done
+
+if [[ -z "${RUN_NUMBERS}" ]]; then
+	echo -e "\nError: No Run Numbers Specified!"
+	USAGE
+	exit -2
+fi
+
+if [[ -z "${IPTS_NEW}" ]]; then
+	echo -e "\nError: No Replacement IPTS Proposal Specified!"
+	USAGE
+	exit -3
+fi
+
+echo -e "\n*** Updating IPTS for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
+echo "to New Proposal [${IPTS_NEW}]."
+
+CHECK_PROCEED
+
