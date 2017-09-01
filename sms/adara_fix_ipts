@@ -118,7 +118,7 @@ for arg in "$@" ; do
 		STS_SERVICE="sts_dummy"
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
-		SMS_DATA="${value}"
+		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
 	elif [[ "#$key#" == '#--run#' ]]; then
 		PARSE_RUN_NUMBERS "${value}"
@@ -156,5 +156,69 @@ fi
 echo -e "\n*** Updating IPTS for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
 echo "to New Proposal [${IPTS_NEW}]."
 
+echo -e "\nUsing STS \"${STS_SERVICE}\" Service on ${STS_HOST}."
+
 CHECK_PROCEED
+
+#
+# Process Each Run Number in Turn...
+#
+
+for run in ${RUN_NUMBERS} ; do
+
+	echo -e "\nProcessing Run Number: ${run}"
+
+	#
+	# Find the SMS Raw Data Files for This Run...! ;-D
+	#
+
+	rundir=`/bin/ls -d ${SMS_DATA}/*/*-run-${run} 2>&1`
+	ckrundir=$?
+
+	if [[ $ckrundir != 0 ]]; then
+		echo -e "\nERROR Locating SMS Raw Data Directory for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e "\nFound SMS Raw Data Directory for Run ${run}:\n\t[${rundir}]"
+
+	#
+	# Locate & Backup the First ADARA Raw Output Stream File for This Run
+	#
+
+	datafile=`/bin/ls "${rundir}" | grep -E "^f0+1-run-${run}.adara$"`
+	ckdatafile=$?
+
+	if [[ $ckdatafile != 0 ]]; then
+		echo -e \
+		"\nERROR Locating 1st ADARA Raw Output Stream File for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Make Sure We Only Got *1* Data File...! ;-D
+	ckone=`echo "${datafile}" | wc | awk '{print $1}'`
+
+	if [[ ${ckone} != 1 ]]; then
+		echo -e \
+		"\nERROR: Multiple Raw Output Stream Files Found for Run ${run}!\n"
+		echo -e "${datafile}\n"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e "\nFound 1st ADARA Raw Output Stream File for Run ${run}:"
+	echo -e "\t[${datafile}]"
+
+done
+
+#
+# Done
+#
+
+echo -e "\nDone.\n"
 
