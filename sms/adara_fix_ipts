@@ -185,15 +185,15 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e "\nFound SMS Raw Data Directory for Run ${run}:\n\t[${rundir}]"
 
 	#
-	# Locate & Backup the First ADARA Raw Output Stream File for This Run
+	# Locate & Backup the First ADARA Output Stream File for This Run
 	#
 
 	datafile=`/bin/ls "${rundir}" | grep -E "^f0+1-run-${run}.adara$"`
 	ckdatafile=$?
 
 	if [[ $ckdatafile != 0 ]]; then
-		echo -e \
-		"\nERROR Locating 1st ADARA Raw Output Stream File for Run ${run}!"
+		echo -e -n "\nERROR Locating 1st ADARA Output Stream File "
+		echo "for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
@@ -203,16 +203,163 @@ for run in ${RUN_NUMBERS} ; do
 	ckone=`echo "${datafile}" | wc | awk '{print $1}'`
 
 	if [[ ${ckone} != 1 ]]; then
-		echo -e \
-		"\nERROR: Multiple Raw Output Stream Files Found for Run ${run}!\n"
+		echo -e -n "\nERROR: Multiple Output Stream Files Found "
+		echo -e "for Run ${run}!\n"
 		echo -e "${datafile}\n"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
 	fi
 
-	echo -e "\nFound 1st ADARA Raw Output Stream File for Run ${run}:"
+	echo -e "\nFound 1st ADARA Output Stream File for Run ${run}:"
 	echo -e "\t[${datafile}]"
+
+	# Make a Backup Copy of the Data File Before Proceeding...
+
+	/bin/cp -i "${rundir}/${datafile}" "${rundir}/${datafile}.BACKUP-$$"
+
+	echo -e "\nBackup Up 1st ADARA Output Stream File for Run ${run} to:"
+	echo -e "\t[${datafile}.BACKUP-$$]"
+
+	#
+	# Determine What the Current IPTS Proposal is for This Run...
+	#
+	# - Fortunately, the IPTS Proposal is Stored in the RunInfo Packet
+	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
+	#
+	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
+	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
+	# - This covers the case where the Original Proposal was _Not_ "IPTS-*".
+	#
+
+	ipts_old_line=`grep --text "<proposal_id>" "${rundir}/${datafile}"`
+	ckoldiptsline=$?
+
+	if [[ $ckoldiptsline != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old Proposal Line from Stream File "
+		echo -e "for Run ${run}!\n"
+		echo -e "\t[${ipts_old_line}]"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Make Sure We Only Got *1* Old Proposal Id Line...! ;-D
+	ckoneline=`echo "${ipts_old_line}" | wc | awk '{print $1}'`
+
+	if [[ ${ckoneline} != 1 ]]; then
+		echo -e -n "\nERROR: Multiple Proposal Id Lines Found "
+		echo -e "for Run ${run}!\n"
+		echo -e "${ipts_old_line}\n"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e "\nFound Old Proposal Id Line for Run ${run}:"
+	echo -e "\t[${ipts_old_line}]"
+
+	ipts_old=`echo "${ipts_old_line}" | awk -F "[<>]" '{print $3}'`
+	ckoldipts=$?
+
+	if [[ $ckoldipts != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old Proposal from Stream File "
+		echo "for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e "\nFound Old Proposal Id for Run ${run}: [${ipts_old}]"
+
+	#
+	# Compare the *Length* of the Old and New Proposal Ids,
+	# to Carefully Determine How We Handle the Substitution
+	# Without _Changing the Size_ of the XML Payload in the
+	# ADARA RunInfo Packet...! ;-D
+	#
+
+	# Starting Point for New Proposal Id Substitution Line...
+	ipts_new_line="${ipts_old_line}"
+
+	# New IPTS is _Shorter_ than Old IPTS, Just Pad with White Space...
+	if [[ ${#IPTS_NEW} -lt ${#ipts_old} ]]; then
+
+		len_diff=$(( ${#ipts_old} - ${#IPTS_NEW} ))
+
+		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
+		echo "_Shorter_ than Old [${ipts_old}]:"
+		echo -e -n "\t${#ipts_old} - ${#IPTS_NEW} = ${len_diff} "
+		echo "Spaces to Pad."
+
+		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+			IPTS_NEW="${IPTS_NEW} "
+		done
+
+		echo -e "\nResulting New Proposal Id is: [${IPTS_NEW}]"
+	
+	# New IPTS is _Longer_ than Old IPTS, Just Pad with White Space...
+	elif [[ ${#IPTS_NEW} -gt ${#ipts_old} ]]; then
+
+		len_diff=$(( ${#IPTS_NEW} - ${#ipts_old} ))
+
+		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
+		echo "_Longer_ than Old [${ipts_old}]:"
+		echo -e -n "\t${#IPTS_NEW} - ${#ipts_old} = ${len_diff} "
+		echo "Spaces to Remove from Line!"
+
+		# Try to Remove Sufficient Spaces from Old Proposal Id Line...!
+
+		skip_run=0
+
+		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+
+			ckspc=`echo "${ipts_new_line}" | grep -c " "`
+			if [[ "$ckspc" != "1" ]]; then
+				echo -e -n "\nERROR: Insufficient White Space to Remove "
+				echo "in Old Proposal Id Line!"
+				CHECK_PROCEED
+				echo -e "\nContinuing with Next Run Number..."
+				skip_run=1
+				break
+			fi
+
+			# Take Any Space We Can Get...! ;-D
+			ipts_new_line=`echo "${ipts_new_line}" | sed 's/ //'`
+
+		done
+
+		# Skip This Run, We Had a Failure...
+		if [[ $skip_run == 1 ]]; then
+			continue
+		fi
+
+		echo -e "\nResulting New/Old Proposal Id Line Template is:"
+		echo -e "\t[${ipts_new_line}]"
+
+	else
+
+		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
+		echo "_Same_ Length as Old [${ipts_old}]:"
+		echo -e "\t${#IPTS_NEW} = ${#ipts_old}"
+
+	fi
+
+	#
+	# Now Substitute Old IPTS for New IPTS in New Proposal Id Line...
+	#
+
+	ipts_new_line=`echo "${ipts_new_line}" \
+		| sed "s/${ipts_old}/${IPTS_NEW}/"`
+
+	echo -e "\nFinal Proposal Id Line Substitution:"
+	echo -e "\told: [${ipts_old_line}]"
+	echo -e "\tnew: [${ipts_new_line}]"
+
+	CHECK_PROCEED
+
+
+	# Re-Name the "proposal-*" Placeholder File in the Run Directory...!
 
 done
 
