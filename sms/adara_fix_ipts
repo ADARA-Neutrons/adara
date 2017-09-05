@@ -15,7 +15,10 @@ SMS_DATA="/SNSlocal/sms/data"
 STS1="sns-sts1.sns.gov"
 STS2="sns-sts2.sns.gov"
 
+TRUNCATE="/usr/bin/truncate"
+Editor="/usr/bin/vim"
 DIFF="/usr/bin/diff"
+CMP="/usr/bin/cmp"
 Less="/usr/bin/less"
 AWK="/usr/bin/awk"
 WC="/usr/bin/wc"
@@ -44,6 +47,13 @@ PARSE_RUN_NUMBERS()
 
 	# Strip Off Any Comma Separators...
 	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
+	cksed=$?
+
+	if [[ $cksed != 0 ]]; then
+		echo -e "\nERROR Parsing Comma-Separated Run Number List...!"
+		echo -e "\nBailing..."
+		exit 111
+	fi
 
 	# Step Through Run Numbers Looking for Any Run Number Ranges
 	local _runlistall
@@ -83,18 +93,34 @@ PARSE_RUN_NUMBERS()
 
 CHECK_PROCEED()
 {
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
 	local _proceed_ck=""
 
-	echo -e -n "\nProceed (yes/No)? "
+	echo -e -n "\n${_proceed_query} (yes/No)? "
 	read _proceed_ck
 
 	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
 
 	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
 			|| ${_proceed_ck} == "no" ]]; then
-		echo -e "\nExiting ADARA Fix IPTS at User's Request.\n"
-		exit -99
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Fix IPTS at User's Request.\n"
+			exit 99
+		fi
 	fi
+
+	return 0
 }
 
 #
@@ -152,7 +178,7 @@ for arg in "$@" ; do
 	else
 		echo -e "\nError: Unknown Command Line Option [${arg}]"
 		USAGE
-		exit -1
+		exit 1
 	fi
 
 done
@@ -160,13 +186,13 @@ done
 if [[ -z "${RUN_NUMBERS}" ]]; then
 	echo -e "\nError: No Run Numbers Specified!"
 	USAGE
-	exit -2
+	exit 2
 fi
 
 if [[ -z "${IPTS_NEW}" ]]; then
 	echo -e "\nError: No Replacement IPTS Proposal Specified!"
 	USAGE
-	exit -3
+	exit 3
 fi
 
 echo -e "\n*** Updating IPTS for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
@@ -175,6 +201,217 @@ echo "to New Proposal [${IPTS_NEW}]."
 echo -e "\nUsing STS \"${STS_SERVICE}\" Service on ${STS_HOST}."
 
 CHECK_PROCEED
+
+#
+# Install and Check the Validity of a Modified Data File...
+#
+# usage: INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
+#
+# - Assumes New/Modified Data File Exists, of form "${datafile}.NEW-$$"...
+# - Show File Differences to User...
+# - Make Sure File Still ADARA-Parses...!
+# - Copy Original Data File to Backup Copy Before Proceeding...
+# - Install New Data File... (Overwrite Original...)
+# - TO-DO Re-Name the "proposal-*" Placeholder File in the Run Directory...!
+# - TO-DO Re-Submit SMS Raw Data Files to STS for Translation...!
+#
+INSTALL_AND_CHECK_DATAFILE()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Install Check!"
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Install Check!"
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+	local _datafile="$1"
+	shift
+
+	# Show File Differences to User...
+
+	echo -e "\nFile Differences After Proposal Id Substitution:\n"
+
+	echo -e "<<< ${_datafile}"
+	echo -e ">>> ${_datafile}.NEW-$$"
+
+	${DIFF} --text \
+		"${_rundir}/${_datafile}" \
+		"${_rundir}/${_datafile}.NEW-$$"
+
+	# Make Sure File Still ADARA-Parses...!
+
+	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
+	echo -e "\n(Search for \"${IPTS_NEW}\" and Verify File Parses to End!)"
+
+	CHECK_PROCEED
+
+	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ | ${Less}
+
+	# Copy Original Data File to Backup Copy Before Proceeding...
+
+	echo -e "\nBacking Up 1st ADARA Output Stream File for Run ${run}:"
+	echo -e "\t[${_datafile}]"
+	echo -e "\t->[${_datafile}.BACKUP-$$]"
+
+	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
+	ckcp=$?
+
+	if [[ $ckcp != 0 ]]; then
+		echo -e -n "\nERROR Copying Original Stream File for Backup "
+		echo "of Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+
+	# Install New Data File... (Overwrite Original Now...)
+
+	echo -e "\nReady to Overwrite Original Data File with New One:"
+	echo -e "\t${_datafile}.NEW-$$"
+	echo -e "\t-> ${_datafile}"
+
+	CHECK_PROCEED
+
+	echo -e "\nMoving Substituted Data File into Place of Original:"
+	echo -e "\t${_datafile}.NEW-$$"
+	echo -e "\t-> ${_datafile}"
+
+	${MV} "${_rundir}/${_datafile}.NEW-$$" "${_rundir}/${_datafile}"
+	ckmv=$?
+
+	if [[ $ckmv != 0 ]]; then
+		echo -e -n "\nERROR Moving Modified Stream File Over Original "
+		echo "for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+
+	#
+	# Re-Name the "proposal-*" Placeholder File in the Run Directory...!
+	#
+
+	echo -e "\nRe-Naming Proposal Placeholder File in the Run Directory..."
+	echo "TO-DO!!!"
+
+	#
+	# Re-Submit SMS Raw Data Files to STS for Translation...!
+	#
+
+	echo -e "\nRe-Submit SMS Raw Data Files to STS for Translation..."
+	echo "TO-DO!!!"
+
+	#
+	# Done with This Run...
+	#
+
+	echo -e "\nDone Modifying/Updating Run ${run}."
+}
+
+#
+# Manually Edit a Datafile, With Proper Cleanup/Newline Truncation...
+#
+# usage: MANUAL_EDIT "${rundir}" "${datafile}"
+#
+MANUAL_EDIT()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Manual Editing!"
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Manual Editing!"
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
+	local _datafile="$1"
+	shift
+
+	# Prompt User for Manually Editing...
+	CHECK_PROCEED "Do You Want To Manually Edit the Data File"
+	local _ckmanedit=$?
+
+	if [[ ${_ckmanedit} != 0 ]]; then
+		return
+	fi
+
+	# Copy Original Data File to New Copy for Editing...
+
+	echo -e "\nCopying 1st ADARA Output Stream File for Editing Run ${run}:"
+	echo -e "\t[${_datafile}]"
+	echo -e "\t->[${_datafile}.NEW-$$]"
+
+	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
+	ckcp=$?
+
+	if [[ $ckcp != 0 ]]; then
+		echo -e -n "\nERROR Copying Original Stream File to Edit "
+		echo "for Run ${run}!"
+		return
+	fi
+
+	# Pre-Edit Prompt...
+	echo -e "\nReady to Manually Edit the Data File:"
+	echo -e "\t[${_datafile}.NEW-$$]"
+	echo -e "\tin [${_rundir}]"
+	echo "to Change Proposal to ${IPTS_NEW}."
+	CHECK_PROCEED "Proceed"
+	if [[ $? != 0 ]]; then
+		echo -e "\nOK, Skipping This Run Number."
+		return
+	fi
+
+	# Manually Edit the Data File...
+	${Editor} "+/proposal_id" "${_rundir}/${_datafile}.NEW-$$"
+	ckedit=$?
+
+	if [[ $ckedit != 0 ]]; then
+		echo -e "\nERROR Manually Editing Data File for Run ${run}!"
+		return
+	fi
+
+	# See If File Was Edited/Changed At All...
+
+	${CMP} "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
+	ckcmp=$?
+
+	if [[ $ckcmp == 0 ]]; then
+		echo -e -n "\nNo Changes Made to Original Stream File "
+		echo "for Run ${run}."
+		return
+	fi
+
+	# Truncate the Extra Newline that Gets Added When Manually Editing!
+
+	echo -e "\nTruncating Trailing Newline from Edited File:"
+	echo -e "\t[${_datafile}.NEW-$$]"
+
+	${TRUNCATE} --size=-1 "${_rundir}/${_datafile}.NEW-$$"
+	cktrunc=$?
+
+	if [[ $cktrunc != 0 ]]; then
+		echo -e -n "\nERROR Truncating Newline from "
+		echo -e "Manually Edited Data File for Run ${run}!"
+		return
+	fi
+
+	# Install and Check Modified Data File...
+	INSTALL_AND_CHECK_DATAFILE "${_rundir}" "${_datafile}"
+}
 
 #
 # Process Each Run Number in Turn...
@@ -248,6 +485,7 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e -n "\nERROR Extracting Old Proposal Line from Stream File "
 		echo -e "for Run ${run}!\n"
 		echo -e "\t[${ipts_old_line}]"
+		MANUAL_EDIT "${rundir}" "${datafile}"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
@@ -260,6 +498,7 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e -n "\nERROR: Multiple Proposal Id Lines Found "
 		echo -e "for Run ${run}!\n"
 		echo -e "${ipts_old_line}\n"
+		MANUAL_EDIT "${rundir}" "${datafile}"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
@@ -274,6 +513,7 @@ for run in ${RUN_NUMBERS} ; do
 	if [[ $ckoldipts != 0 ]]; then
 		echo -e -n "\nERROR Extracting Old Proposal from Stream File "
 		echo "for Run ${run}!"
+		MANUAL_EDIT "${rundir}" "${datafile}"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
@@ -327,6 +567,7 @@ for run in ${RUN_NUMBERS} ; do
 			if [[ "$ckspc" != "1" ]]; then
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old Proposal Id Line!"
+				MANUAL_EDIT "${rundir}" "${datafile}"
 				CHECK_PROCEED
 				echo -e "\nContinuing with Next Run Number..."
 				skip_run=1
@@ -335,6 +576,16 @@ for run in ${RUN_NUMBERS} ; do
 
 			# Take Any Space We Can Get...! ;-D
 			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
+			cksedspc=$?
+
+			if [[ $cksedspc != 0 ]]; then
+				echo -e "\nERROR Stripping White Space from IPTS Line...!"
+				MANUAL_EDIT "${rundir}" "${datafile}"
+				CHECK_PROCEED
+				echo -e "\nContinuing with Next Run Number..."
+				skip_run=1
+				break
+			fi
 
 		done
 
@@ -360,6 +611,15 @@ for run in ${RUN_NUMBERS} ; do
 
 	ipts_new_line=`echo "${ipts_new_line}" \
 		| ${SED} "s/${ipts_old}/${IPTS_NEW}/"`
+	cksedprop=$?
+
+	if [[ $cksedprop != 0 ]]; then
+		echo -e "\nERROR Substituting Proposal Ids in IPTS Line...!"
+		MANUAL_EDIT "${rundir}" "${datafile}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
 
 	echo -e "\nFinal Proposal Id Line Substitution:"
 	echo -e "\told: [${ipts_old_line}]"
@@ -371,15 +631,7 @@ for run in ${RUN_NUMBERS} ; do
 	# Actually Make the Data File Substitution...! ;-D
 	#
 
-	# Copy Original Data File to Backup Copy Before Proceeding...
-
-	echo -e "\nBacking Up 1st ADARA Output Stream File for Run ${run}:"
-	echo -e "\t[${datafile}]"
-	echo -e "\t->[${datafile}.BACKUP-$$]"
-
-	${CP} -i "${rundir}/${datafile}" "${rundir}/${datafile}.BACKUP-$$"
-
-	# Now Substitute from Original Data File into New Version... :-D
+	# Substitute from Original Data File into New Version... :-D
 
 	echo -e -n "\nSubstituting New Proposal Id [${IPTS_NEW}] "
 	echo "into New Data File:"
@@ -388,43 +640,18 @@ for run in ${RUN_NUMBERS} ; do
 
 	${SED} "s@${ipts_old_line}@${ipts_new_line}@" \
 		"${rundir}/${datafile}" > "${rundir}/${datafile}.NEW-$$"
+	ckseddata=$?
 
-	# Show File Differences to User...
+	if [[ $ckseddata != 0 ]]; then
+		echo -e "\nERROR Substituting New Proposal Id into Data File...!"
+		MANUAL_EDIT "${rundir}" "${datafile}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
 
-	echo -e "\nFile Differences After Proposal Id Substitution:\n"
-
-	echo -e "<<< ${datafile}"
-	echo -e ">>> ${datafile}.NEW-$$"
-
-	${DIFF} --text "${rundir}/${datafile}" "${rundir}/${datafile}.NEW-$$"
-
-	# Make Sure File Still ADARA-Parses...!
-
-	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
-	echo -e "\n(Search for \"${IPTS_NEW}\" and Verify File Parses to End!)"
-
-	CHECK_PROCEED
-
-	${ADARA_PARSER} --showrun ${rundir}/${datafile}.NEW-$$ | ${Less}
-
-	# Install New Data File... (Overwrite Original Now...)
-
-	echo -e "\nReady to Overwrite Original Data File with New One:"
-	echo -e "\t${datafile}.NEW-$$"
-	echo -e "\t-> ${datafile}"
-
-	CHECK_PROCEED
-
-	echo -e "\nMoving Substituted Data File into Place of Original:"
-	echo -e "\t${datafile}.NEW-$$"
-	echo -e "\t-> ${datafile}"
-
-	${MV} "${rundir}/${datafile}.NEW-$$" "${rundir}/${datafile}"
-
-	#
-	# Re-Name the "proposal-*" Placeholder File in the Run Directory...!
-	#
-
+	# Install and Check Modified Data File...
+	INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
 
 done
 
