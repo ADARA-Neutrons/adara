@@ -212,7 +212,7 @@ CHECK_PROCEED
 # - Make Sure File Still ADARA-Parses...!
 # - Copy Original Data File to Backup Copy Before Proceeding...
 # - Install New Data File... (Overwrite Original...)
-# - TO-DO Re-Name the "proposal-*" Placeholder File in the Run Directory...!
+# - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
 # - TO-DO Re-Submit SMS Raw Data Files to STS for Translation...!
 #
 INSTALL_AND_CHECK_DATAFILE()
@@ -275,19 +275,19 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Install New Data File... (Overwrite Original Now...)
 
 	echo -e "\nReady to Overwrite Original Data File with New One:"
-	echo -e "\t${_datafile}.NEW-$$"
-	echo -e "\t-> ${_datafile}"
+	echo -e "\t[${_datafile}.NEW-$$]"
+	echo -e "\t-> [${_datafile}]"
 
 	CHECK_PROCEED
 
 	echo -e "\nMoving Substituted Data File into Place of Original:"
-	echo -e "\t${_datafile}.NEW-$$"
-	echo -e "\t-> ${_datafile}"
+	echo -e "\t[${_datafile}.NEW-$$]"
+	echo -e "\t-> [${_datafile}]"
 
 	${MV} "${_rundir}/${_datafile}.NEW-$$" "${_rundir}/${_datafile}"
-	ckmv=$?
+	ckmvdata=$?
 
-	if [[ $ckmv != 0 ]]; then
+	if [[ $ckmvdata != 0 ]]; then
 		echo -e -n "\nERROR Moving Modified Stream File Over Original "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
@@ -299,8 +299,22 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Re-Name the "proposal-*" Placeholder File in the Run Directory...!
 	#
 
-	echo -e "\nRe-Naming Proposal Placeholder File in the Run Directory..."
-	echo "TO-DO!!!"
+	echo -e "\nRe-Naming Proposal Placeholder File in the Run Directory:"
+	echo -e "\t[proposal-${ipts_old}]"
+	echo -e "\t-> [proposal-${IPTS_NEW%%[[:space:]]*}]" # Strip Off Spaces
+
+	${MV} -i \
+		"${_rundir}/proposal-${ipts_old}" \
+		"${_rundir}/proposal-${IPTS_NEW%%[[:space:]]*}" # Strip Off Spaces
+	ckmvprop=$?
+
+	if [[ $ckmvprop != 0 ]]; then
+		echo -e -n "\nERROR Re-Naming Proposal Placeholder File "
+		echo "for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return
+	fi
 
 	#
 	# Re-Submit SMS Raw Data Files to STS for Translation...!
