@@ -221,7 +221,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Run Directory Specified for Install Check!"
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 11
 	fi
 	local _rundir="$1"
 	shift
@@ -230,7 +230,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Data File Specified for Install Check!"
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 12
 	fi
 	local _datafile="$1"
 	shift
@@ -269,7 +269,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo "of Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 13
 	fi
 
 	# Install New Data File... (Overwrite Original Now...)
@@ -292,7 +292,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo "for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 14
 	fi
 
 	#
@@ -312,8 +312,8 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo -e -n "\nERROR Re-Naming Proposal Placeholder File "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		return
+		echo -e "\nContinuing..."
+		# No Need to Give Up/Return Here, Just the Proposal Placeholder File
 	fi
 
 	#
@@ -328,6 +328,8 @@ INSTALL_AND_CHECK_DATAFILE()
 	#
 
 	echo -e "\nDone Modifying/Updating Run ${run}."
+
+	return 0
 }
 
 #
@@ -341,7 +343,7 @@ MANUAL_EDIT()
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Run Directory Specified for Manual Editing!"
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 20
 	fi
 	local _rundir="$1"
 	shift
@@ -350,7 +352,7 @@ MANUAL_EDIT()
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Data File Specified for Manual Editing!"
 		echo -e "\nContinuing with Next Run Number..."
-		return
+		return 21
 	fi
 	local _datafile="$1"
 	shift
@@ -360,7 +362,7 @@ MANUAL_EDIT()
 	local _ckmanedit=$?
 
 	if [[ ${_ckmanedit} != 0 ]]; then
-		return
+		return 22
 	fi
 
 	# Copy Original Data File to New Copy for Editing...
@@ -375,7 +377,7 @@ MANUAL_EDIT()
 	if [[ $ckcp != 0 ]]; then
 		echo -e -n "\nERROR Copying Original Stream File to Edit "
 		echo "for Run ${run}!"
-		return
+		return 23
 	fi
 
 	# Pre-Edit Prompt...
@@ -386,7 +388,7 @@ MANUAL_EDIT()
 	CHECK_PROCEED "Proceed"
 	if [[ $? != 0 ]]; then
 		echo -e "\nOK, Skipping This Run Number."
-		return
+		return 24
 	fi
 
 	# Manually Edit the Data File...
@@ -395,7 +397,7 @@ MANUAL_EDIT()
 
 	if [[ $ckedit != 0 ]]; then
 		echo -e "\nERROR Manually Editing Data File for Run ${run}!"
-		return
+		return 25
 	fi
 
 	# See If File Was Edited/Changed At All...
@@ -406,7 +408,7 @@ MANUAL_EDIT()
 	if [[ $ckcmp == 0 ]]; then
 		echo -e -n "\nNo Changes Made to Original Stream File "
 		echo "for Run ${run}."
-		return
+		return 26
 	fi
 
 	# Truncate the Extra Newline that Gets Added When Manually Editing!
@@ -420,11 +422,21 @@ MANUAL_EDIT()
 	if [[ $cktrunc != 0 ]]; then
 		echo -e -n "\nERROR Truncating Newline from "
 		echo -e "Manually Edited Data File for Run ${run}!"
-		return
+		return 27
 	fi
 
 	# Install and Check Modified Data File...
 	INSTALL_AND_CHECK_DATAFILE "${_rundir}" "${_datafile}"
+	ckinstall=$?
+
+	if [[ $ckinstall != 0 ]]; then
+		echo -e -n "\nERROR Installing and Checking "
+		echo -e "Manually Edited Data File for Run ${run}!"
+		return ${ckinstall}
+	fi
+
+	# Manual Edit Successful!
+	return 0
 }
 
 #
@@ -500,8 +512,10 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e "for Run ${run}!\n"
 		echo -e "\t[${ipts_old_line}]"
 		MANUAL_EDIT "${rundir}" "${datafile}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
 		continue
 	fi
 
@@ -513,8 +527,10 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e "for Run ${run}!\n"
 		echo -e "${ipts_old_line}\n"
 		MANUAL_EDIT "${rundir}" "${datafile}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
 		continue
 	fi
 
@@ -528,8 +544,10 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e -n "\nERROR Extracting Old Proposal from Stream File "
 		echo "for Run ${run}!"
 		MANUAL_EDIT "${rundir}" "${datafile}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
 		continue
 	fi
 
@@ -582,8 +600,10 @@ for run in ${RUN_NUMBERS} ; do
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old Proposal Id Line!"
 				MANUAL_EDIT "${rundir}" "${datafile}"
-				CHECK_PROCEED
-				echo -e "\nContinuing with Next Run Number..."
+				if [[ $? != 0 ]]; then
+					CHECK_PROCEED
+					echo -e "\nContinuing with Next Run Number..."
+				fi
 				skip_run=1
 				break
 			fi
@@ -595,8 +615,10 @@ for run in ${RUN_NUMBERS} ; do
 			if [[ $cksedspc != 0 ]]; then
 				echo -e "\nERROR Stripping White Space from IPTS Line...!"
 				MANUAL_EDIT "${rundir}" "${datafile}"
-				CHECK_PROCEED
-				echo -e "\nContinuing with Next Run Number..."
+				if [[ $? != 0 ]]; then
+					CHECK_PROCEED
+					echo -e "\nContinuing with Next Run Number..."
+				fi
 				skip_run=1
 				break
 			fi
@@ -630,8 +652,10 @@ for run in ${RUN_NUMBERS} ; do
 	if [[ $cksedprop != 0 ]]; then
 		echo -e "\nERROR Substituting Proposal Ids in IPTS Line...!"
 		MANUAL_EDIT "${rundir}" "${datafile}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
 		continue
 	fi
 
@@ -659,8 +683,10 @@ for run in ${RUN_NUMBERS} ; do
 	if [[ $ckseddata != 0 ]]; then
 		echo -e "\nERROR Substituting New Proposal Id into Data File...!"
 		MANUAL_EDIT "${rundir}" "${datafile}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
 		continue
 	fi
 
