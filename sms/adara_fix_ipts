@@ -10,7 +10,11 @@
 
 ADARA_PARSER="/usr/local/bin/adara-parser"
 
+ADARA_CAT="/usr/local/bin/adaracat"
+
 SMS_DATA="/SNSlocal/sms/data"
+
+XINETD_DIR="/etc/xinetd.d"
 
 STS1="sns-sts1.sns.gov"
 STS2="sns-sts2.sns.gov"
@@ -21,6 +25,8 @@ DIFF="/usr/bin/diff"
 CMP="/usr/bin/cmp"
 Less="/usr/bin/less"
 AWK="/usr/bin/awk"
+SSH="/usr/bin/ssh"
+NC="/usr/bin/nc"
 WC="/usr/bin/wc"
 GREP="/bin/grep"
 SED="/bin/sed"
@@ -32,6 +38,7 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "         [--sts1|--sts2] [--sts|--sts_test|--sts_dummy] \\"
+	echo "         [--sts_port=<STSPort>] \\"
 	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "         [--sms_data=<${SMS_DATA}>] \\"
 	echo "         [--run=<RunNumber1>] \\"
@@ -156,6 +163,9 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--sts_dummy#' ]]; then
 		STS_SERVICE="sts_dummy"
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_port#' ]]; then
+		STS_PORT="$value"
+		echo -e "\nSetting STS Port to: ${STS_PORT}"
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -195,10 +205,34 @@ if [[ -z "${IPTS_NEW}" ]]; then
 	exit 3
 fi
 
+#
+# Determine Proper STS Service Port...! ;-D
+#
+
+if [[ -z "${STS_PORT}" ]]; then
+
+	STS_PORT=`${SSH} ${STS_HOST} \
+		${GREP} "port" ${XINETD_DIR}/${STS_SERVICE} \
+		| ${AWK} '{print $3}'`
+	ckstsport=$?
+
+	if [[ $ckstsport != 0 ]]; then
+		echo -e -n "\nError Determining STS Port "
+		echo "for \"${STS_SERVICE}\" Service on ${STS_HOST}...!"
+		USAGE
+		exit 4
+	fi
+fi
+
+#
+# Ready to Begin...! :-D
+#
+
 echo -e "\n*** Updating IPTS for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
 echo "to New Proposal [${IPTS_NEW}]."
 
-echo -e "\nUsing STS \"${STS_SERVICE}\" Service on ${STS_HOST}."
+echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
+echo "on \"${STS_HOST}:${STS_PORT}\"."
 
 CHECK_PROCEED
 
@@ -213,7 +247,7 @@ CHECK_PROCEED
 # - Copy Original Data File to Backup Copy Before Proceeding...
 # - Install New Data File... (Overwrite Original...)
 # - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
-# - TO-DO Re-Submit SMS Raw Data Files to STS for Translation...!
+# - Re-Submit SMS Raw Data Files to STS for Re-Translation...!
 #
 INSTALL_AND_CHECK_DATAFILE()
 {
@@ -249,7 +283,8 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Make Sure File Still ADARA-Parses...!
 
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
-	echo -e "\n(Search for \"${IPTS_NEW}\" and Verify File Parses to End!)"
+	echo -e -n "\n(Search for \"${IPTS_NEW%%[[:space:]]*}\" "
+	echo "and Verify File Parses to End!)"
 
 	CHECK_PROCEED
 
@@ -317,11 +352,35 @@ INSTALL_AND_CHECK_DATAFILE()
 	fi
 
 	#
-	# Re-Submit SMS Raw Data Files to STS for Translation...!
+	# Re-Submit SMS Raw Data Files to STS for Re-Translation...!
+	#
+	# Use "ADARACat" to Account for Any Intervening/Sent Paused Data...
 	#
 
-	echo -e "\nRe-Submit SMS Raw Data Files to STS for Translation..."
-	echo "TO-DO!!!"
+	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
+	echo -e "for Run ${run} to STS for Re-Translation:"
+
+	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${ipts_old}\" "
+	echo -e "to \"${IPTS_NEW%%[[:space:]]*}\"..." # Strip Off Spaces
+
+	echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
+	echo "on \"${STS_HOST}:${STS_PORT}\"."
+
+	CHECK_PROCEED
+
+	${ADARA_CAT} --run="${run}" --dir="${rundir}" \
+		| ${NC} ${STS_HOST} ${STS_PORT}
+	cksts=$?
+
+	echo
+
+	if [[ $cksts != 0 ]]; then
+		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STS "
+		echo "for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 15
+	fi
 
 	#
 	# Done with This Run...
