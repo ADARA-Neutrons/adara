@@ -1183,15 +1183,6 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
 
-		// Determine How Many Sources are Registered
-		// (Including the One We are Unregistering)
-		size_t i, max = m_eventSources.size();
-		int num_sources = 0;
-		for (i = 0; i < max; i++) {
-			if (m_eventSources[i])
-				num_sources++;
-		}
-
 		// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
@@ -1200,8 +1191,10 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		uint32_t pcnt = 0;
 
 		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
+		// - Use the Number of Registered Event Sources to Decide,
+		// Including the One We are Unregistering!
 		// (Any Other Remaining Sources Could Still Spew Out-of-Order...)
-		if ( num_sources > 1 ) {
+		if ( m_eventSources.count() > 1 ) {
 			DEBUG("unregisterEventSource():"
 				<< " Buffering " << m_noEoPPulseBufferSize << " Pulses,"
 				<< " Last Pulse = 0x"
