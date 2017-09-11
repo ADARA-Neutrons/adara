@@ -157,7 +157,7 @@ private:
 
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
-				m_id(id), m_pending(srcs),
+				m_id(id), m_pending(srcs), m_numEventSources(srcs.count()),
 				m_numEvents(0), m_numBanks(0), m_numMonEvents(0),
 				m_charge(0), m_vetoFlags(0), m_cycle(0),
 				m_ringPeriod(0), m_flags(0)
@@ -165,6 +165,7 @@ private:
 
 		PulseIdentifier			m_id;
 		SourceSet				m_pending;
+		uint32_t				m_numEventSources;
 		boost::shared_ptr<ADARA::RTDLPkt>	m_rtdl;
 		SourceMap				m_pulseSources;
 		MonitorMap				m_monitors;
