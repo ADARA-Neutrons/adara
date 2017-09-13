@@ -211,6 +211,17 @@ fi
 
 if [[ -z "${STS_PORT}" ]]; then
 
+	echo -e "\nContacting STS Host \"${STS_HOST}\" via SSH"
+	echo "to Determine Port for STS \"${STS_SERVICE}\" Service..."
+
+	echo -e "\n${SSH} ${STS_HOST} ${GREP} port ${XINETD_DIR}/${STS_SERVICE}"
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | grep pipefail | awk '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
 	STS_PORT=`${SSH} ${STS_HOST} \
 		${GREP} "port" ${XINETD_DIR}/${STS_SERVICE} \
 		| ${AWK} '{print $3}'`
@@ -222,6 +233,13 @@ if [[ -z "${STS_PORT}" ]]; then
 		USAGE
 		exit 4
 	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	echo -e "\nGot STS Port ${STS_PORT} for STS \"${STS_SERVICE}\" Service."
 fi
 
 #
