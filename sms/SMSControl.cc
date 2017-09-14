@@ -41,11 +41,12 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
-#define RLL_PULSE_PCHG_UNCORRECTED       5
-#define RLL_PULSE_PCHG_BUFFER_EMPTY      6
-#define RLL_NO_RTDL_FOR_PULSE            7
-#define RLL_CHOPPER_SYNC_ISSUE           8
-#define RLL_CHOPPER_GLITCH_ISSUE         9
+#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  5
+#define RLL_PULSE_PCHG_UNCORRECTED       6
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
+#define RLL_NO_RTDL_FOR_PULSE            8
+#define RLL_CHOPPER_SYNC_ISSUE           9
+#define RLL_CHOPPER_GLITCH_ISSUE        10
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -2146,16 +2147,31 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 		// ***Periodically*** Log Pulse with No Registered Event Sources!!!
 		// (E.g. _Not_ Every 216000 Occurrences using Rate-Limited Logging)
-		// - Always Log If We're _Not_ in No Registered Event Source State
-		// - Otherwise, Only Log Every 36000 Occurrences (Every 10 Mins)
-		if ( !m_noRegisteredEventSources
-				|| !(m_noRegisteredEventSourcesCount++ % 36000) ) {
-			ERROR( ( m_recording ? "[RECORDING] " : "" )
-				<< "pulseRTDL: Pulse with No Registered Event Sources!"
-				<< " (m_noRegisteredEventSources="
-				<< ( m_noRegisteredEventSources ? "true" : "false" )
-				<< ", count=" << m_noRegisteredEventSourcesCount << ")"
-				<< " Marking Partial...");
+		// - Only Log If We're in "No Registered Event Source" State
+		// Every 36000 Occurrences (Every 10 Mins)...
+		if ( pulse->m_numEventSources == 0 ) {
+			if ( !(m_noRegisteredEventSourcesCount++ % 36000) ) {
+				ERROR( ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseRTDL: Pulse with No Registered Event Sources!"
+					<< " (m_noRegisteredEventSources="
+					<< ( m_noRegisteredEventSources ? "true" : "false" )
+					<< " numEventSources=" << pulse->m_numEventSources
+					<< " count=" << m_noRegisteredEventSourcesCount << ")"
+					<< " Marking Partial...");
+			}
+		}
+		else {
+			// Rate-Limited Log RTDL Out of Order with Raw Data/Packets...
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_RTDL_OUT_OF_ORDER_WITH_DATA, "none",
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseRTDL: RTDL Out of Order with Raw Data"
+					<< " - Pulse Not Pending...?"
+					<< " Marking Partial...");
+			}
 		}
 
 		// Mark Pulse "Partial" Because there's No Event Data,
