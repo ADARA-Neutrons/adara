@@ -431,7 +431,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Now Verify the Differences Between the Original and New NeXus Files
 	#
 
-	# Prompt User for Manually Editing...
+	# Prompt User for NeXus Diff Comparison...
 	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
 	local _ckdonxdiff=$?
 
@@ -503,7 +503,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Now Check FindNeXus and the Catalog to Ensure the Run Moved...
 	#
 
-	# Prompt User for Manually Editing...
+	# Prompt User for FindNeXus Catalog Check...
 	CHECK_PROCEED "Do You Want To Use FindNeXus to Verify the Proposal Move"
 	local _cknotify=$?
 
@@ -528,7 +528,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	# (So They can Remove Any *Duplicate* Database Records...)
 	#
 
-	# Prompt User for Manually Editing...
+	# Prompt User for Email Notification to Catalog Admins...
 	CHECK_PROCEED "Do You Want To Notify the Catalog Admins of the Change"
 	local _cknotify=$?
 
