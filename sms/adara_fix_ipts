@@ -8,13 +8,26 @@
 # (Because it can happen that often... ;-)
 #
 
+#NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
+NOTIFY_EMAIL_LIST="kohlja@ornl.gov"
+
+MAILER="/usr/bin/Mail"
+
 ADARA_PARSER="/usr/local/bin/adara-parser"
 
 ADARA_CAT="/usr/local/bin/adaracat"
 
+FINDNEXUS="/SNS/software/bin/findnexus"
+
+NXDIFF="/SNS/software/bin/nxDiff"
+
+SMS_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+
 SMS_DATA="/SNSlocal/sms/data"
 
 XINETD_DIR="/etc/xinetd.d"
+
+ARCHIVE_PATH="/"
 
 STS1="sns-sts1.sns.gov"
 STS2="sns-sts2.sns.gov"
@@ -37,10 +50,13 @@ LS="/bin/ls"
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
+	echo "         [--inst=<INST>] \\"
 	echo "         [--sts1|--sts2] [--sts|--sts_test|--sts_dummy] \\"
 	echo "         [--sts_port=<STSPort>] \\"
 	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "         [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "         [--sms_data=<${SMS_DATA}>] \\"
+	echo "         [--archive_path=<${ARCHIVE_PATH}>] \\"
 	echo "         [--run=<RunNumber1>] \\"
 	echo "         [--run=<RunNumber2,RunNumber3,...>] \\"
 	echo "         [--run=<RunNumber4-RunNumber5>] \\"
@@ -143,12 +159,17 @@ RUN_NUMBERS=""
 
 IPTS_NEW=""
 
+INST=""
+
 for arg in "$@" ; do
 
 	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
 	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
 
-	if [[ "#$key#" == '#--sts1#' ]]; then
+	if [[ "#$key#" == '#--inst#' ]]; then
+		INST="$value"
+		echo -e "\nSetting Beamline Short Name to: ${INST}"
+	elif [[ "#$key#" == '#--sts1#' ]]; then
 		STS_HOST="${STS1}"
 		echo -e "\nSetting STS Host to: ${STS_HOST}"
 	elif [[ "#$key#" == '#--sts2#' ]]; then
@@ -169,9 +190,15 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--sms_config#' ]]; then
+		SMS_CONFIG="${value%/}"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--archive_path#' ]]; then
+		ARCHIVE_PATH="${value%/}"
+		echo -e "\nSetting Archive Path Directory to:\n\t[${ARCHIVE_PATH}]"
 	elif [[ "#$key#" == '#--run#' ]]; then
 		PARSE_RUN_NUMBERS "${value}"
 	elif [[ "#$key#" == '#--ipts#' ]]; then
@@ -217,7 +244,7 @@ if [[ -z "${STS_PORT}" ]]; then
 	echo -e "\n${SSH} ${STS_HOST} ${GREP} port ${XINETD_DIR}/${STS_SERVICE}"
 
 	# Set Bash Pipefail Option as Needed...
-	pfck=`set -o | grep pipefail | awk '{print $2}'`
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
 	if [[ "$pfck" == "off" ]]; then
 		set -o pipefail
 	fi
@@ -398,6 +425,153 @@ INSTALL_AND_CHECK_DATAFILE()
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		return 15
+	fi
+
+	#
+	# Now Verify the Differences Between the Original and New NeXus Files
+	#
+
+	# Prompt User for Manually Editing...
+	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
+	local _ckdonxdiff=$?
+
+	if [[ ${_ckdonxdiff} != 0 ]]; then
+		return 16
+	fi
+
+	# Determine the Facility and Beamline (Short) Names...
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
+		| ${AWK} '{print $3}'`
+	ckfac=$?
+
+	if [[ $ckfac != 0 || -z ${FACILITY} ]]; then
+		echo -e -n "\nERROR Determining Facility from SMS Config "
+		echo "for Run ${run}!"
+		echo -e "\n\t${SMS_CONFIG}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 17
+	fi
+
+	# Only Retrieve the Beamline Short Name if Not Explicitly Specified...
+	if [[ -z "${INST}" ]]; then
+
+		INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} | ${GREP} -v ";" \
+			| ${AWK} '{print $3}'`
+		ckinst=$?
+
+		if [[ $ckinst != 0 || -z ${INST} ]]; then
+			echo -e -n "\nERROR Determining Beamline Short Name "
+			echo "from SMS Config for Run ${run}!"
+			echo -e "\n\t${SMS_CONFIG}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 18
+		fi
+
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	# NeXus Diff the Original and New NeXus Files...
+
+	local _archive="${ARCHIVE_PATH}"
+	if [[ ${_archive:${#_archive} - 1} == "/" ]]; then
+		_archive="${_archive}${FACILITY}/${INST}"
+	else
+		_archive="${_archive}/${FACILITY}/${INST}"
+	fi
+
+	local _nexus="nexus/${INST}_${run}.nxs.h5"
+
+	${NXDIFF} -L -S -l \
+		"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
+		"${_archive}/${ipts_old}/${_nexus}"
+		# Strip Off Spaces ($IPTS_NEW)
+
+	#
+	# Now Check FindNeXus and the Catalog to Ensure the Run Moved...
+	#
+
+	# Prompt User for Manually Editing...
+	CHECK_PROCEED "Do You Want To Use FindNeXus to Verify the Proposal Move"
+	local _cknotify=$?
+
+	if [[ ${_cknotify} != 0 ]]; then
+		return 19
+	fi
+
+	${FINDNEXUS} -i ${INST} ${run}
+	ckfindnexus=$?
+
+	if [[ $ckfindnexus != 0 ]]; then
+		echo -e -n "\nERROR Checking FindNeXus to Verify the Proposal Move "
+		echo "for Run ${run}!"
+		echo -e "\n\t${FINDNEXUS}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 20
+	fi
+
+	#
+	# Now Send Email Notification of Re-Translation to Catalog Admins
+	# (So They can Remove Any *Duplicate* Database Records...)
+	#
+
+	# Prompt User for Manually Editing...
+	CHECK_PROCEED "Do You Want To Notify the Catalog Admins of the Change"
+	local _cknotify=$?
+
+	if [[ ${_cknotify} != 0 ]]; then
+		return 21
+	fi
+
+	local _subject="[ADARA Fix IPTS]:"
+	_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
+	_subject="${_subject} Moved from ${ipts_old}"
+	_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}" # Strip Off Spaces
+
+	${MAILER} -s "${_subject}" ${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
+This is an Automated Email Notification from the "ADARA Fix IPTS" script.
+
+The ${FACILITY} ${INST} Run ${run} has been *Re-Translated*
+to Move the Run from the Former Proposal:
+		
+	${ipts_old}
+
+to the New Proposal:
+
+	${IPTS_NEW%%[[:space:]]*}
+
+Please Verify This Update to the ${FACILITY} Catalog Database,
+and Remove Any Duplicate Records referring to the Old Proposal.
+
+Thank You! :-D
+
+   - ADARA Fix IPTS
+
+NotifyEmailContent
+
+	ckmail=$?
+
+	if [[ $ckmail != 0 ]]; then
+		echo -e -n "\nERROR Sending Email Notification to Catalog Admins "
+		echo "for Run ${run}!"
+		echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
+		echo -e "\n\tSubject: ${_subject}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 22
 	fi
 
 	#
