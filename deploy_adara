@@ -770,6 +770,30 @@ pwd
 
 	fi
 
+	# SMS ADARA Fix IPTS Script (if present, added in v1.6.20...)
+
+	if [[ -e sms/adara_fix_ipts && -x sms/adara_fix_ipts ]]; then
+
+		echo -e \
+		"\nCopying SMS ADARA Fix IPTS Script into Archive Release Tag:\n" \
+			| tee -a $LOG
+
+		cp -i -p sms/adara_fix_ipts "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e \
+	"\nError Copying ADARA Fix IPTS Script into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_fix_ipts" |& tee -a $LOG
+
+	fi
+
 	# STS Client
 
 	echo -e "\nCopying STS Client Executable into Archive Release Tag:\n" \
