@@ -56,6 +56,7 @@ USAGE()
 	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "         [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "         [--sms_data=<${SMS_DATA}>] \\"
+	echo "         [--send-paused-data] [--no-send-paused-data] \\"
 	echo "         [--archive_path=<${ARCHIVE_PATH}>] \\"
 	echo "         [--run=<RunNumber1>] \\"
 	echo "         [--run=<RunNumber2,RunNumber3,...>] \\"
@@ -159,6 +160,8 @@ RUN_NUMBERS=""
 
 IPTS_NEW=""
 
+SEND_PAUSED_DATA=""
+
 FACILITY=""
 
 INST=""
@@ -201,6 +204,14 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--no-send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
 	elif [[ "#$key#" == '#--archive_path#' ]]; then
 		ARCHIVE_PATH="${value%/}"
 		echo -e "\nSetting Archive Path Directory to:\n\t[${ARCHIVE_PATH}]"
@@ -414,12 +425,17 @@ INSTALL_AND_CHECK_DATAFILE()
 	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${ipts_old}\" "
 	echo -e "to \"${IPTS_NEW%%[[:space:]]*}\"..." # Strip Off Spaces
 
+	if [[ -n ${SEND_PAUSED_DATA} ]]; then
+		echo -e -n "\nADARA Cat \"Send Paused Data\" Set to: "
+		echo "[${SEND_PAUSED_DATA}]"
+	fi
+
 	echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
 	echo "on \"${STS_HOST}:${STS_PORT}\"."
 
 	CHECK_PROCEED
 
-	${ADARA_CAT} --run="${run}" --dir="${rundir}" \
+	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
 		| ${NC} ${STS_HOST} ${STS_PORT}
 	cksts=$?
 
