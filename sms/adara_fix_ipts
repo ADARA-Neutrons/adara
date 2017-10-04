@@ -257,7 +257,8 @@ if [[ -z "${STS_PORT}" ]]; then
 	echo -e "\nContacting STS Host \"${STS_HOST}\" via SSH"
 	echo "to Determine Port for STS \"${STS_SERVICE}\" Service..."
 
-	echo -e "\n${SSH} ${STS_HOST} ${GREP} port ${XINETD_DIR}/${STS_SERVICE}"
+	echo -e \
+		"\n${SSH} ${STS_HOST} ${GREP} port ${XINETD_DIR}/${STS_SERVICE}"
 
 	# Set Bash Pipefail Option as Needed...
 	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
@@ -282,7 +283,8 @@ if [[ -z "${STS_PORT}" ]]; then
 		set +o pipefail
 	fi
 
-	echo -e "\nGot STS Port ${STS_PORT} for STS \"${STS_SERVICE}\" Service."
+	echo -e \
+		"\nGot STS Port ${STS_PORT} for STS \"${STS_SERVICE}\" Service."
 fi
 
 #
@@ -410,7 +412,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo "for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing..."
-		# No Need to Give Up/Return Here, Just the Proposal Placeholder File
+		# No Need to Give Up/Return Here, Just Proposal Placeholder File
 	fi
 
 	#
@@ -510,7 +512,8 @@ INSTALL_AND_CHECK_DATAFILE()
 	#
 
 	# Prompt User for NeXus Diff Comparison...
-	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
+	CHECK_PROCEED \
+		"Do You Want To Verify the Differences in the NeXus Files"
 	local _ckdonxdiff=$?
 
 	if [[ ${_ckdonxdiff} == 0 ]]; then
@@ -542,7 +545,8 @@ INSTALL_AND_CHECK_DATAFILE()
 	#
 
 	# Prompt User for FindNeXus Catalog Check...
-	CHECK_PROCEED "Do You Want To Use FindNeXus to Verify the Proposal Move"
+	CHECK_PROCEED \
+		"Do You Want To Use FindNeXus to Verify the Proposal Move"
 	local _cknotify=$?
 
 	if [[ ${_cknotify} == 0 ]]; then
@@ -585,7 +589,8 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo -e "   \"${_subject}\" \\"
 		echo -e "\t${NOTIFY_EMAIL_LIST}"
 
-		${MAILER} -s "${_subject}" ${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
+		${MAILER} -s "${_subject}" \
+			${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
 This is an Automated Email Notification from the "ADARA Fix IPTS" script.
 
 The ${FACILITY} ${INST} Run ${run} has been *Re-Translated*
@@ -667,7 +672,8 @@ MANUAL_EDIT()
 
 	# Copy Original Data File to New Copy for Editing...
 
-	echo -e "\nCopying 1st ADARA Output Stream File for Editing Run ${run}:"
+	echo -e \
+		"\nCopying 1st ADARA Output Stream File for Editing Run ${run}:"
 	echo -e "\t[${_datafile}]"
 	echo -e "\t->[${_datafile}.NEW-$$]"
 
@@ -801,7 +807,8 @@ for run in ${RUN_NUMBERS} ; do
 	#
 	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
 	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
-	# - This covers the case where the Original Proposal was _Not_ "IPTS-*".
+	# - This covers the case where the Original Proposal was
+	# _Not_ "IPTS-*"...
 	#
 
 	ipts_old_line=`${GREP} --text "<proposal_id>" "${rundir}/${datafile}"`
