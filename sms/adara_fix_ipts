@@ -399,11 +399,11 @@ INSTALL_AND_CHECK_DATAFILE()
 	#
 
 	echo -e "\nRe-Naming Proposal Placeholder File in the Run Directory:"
-	echo -e "\t[proposal-${ipts_old}]"
+	echo -e "\t[proposal-${IPTS_OLD}]"
 	echo -e "\t-> [proposal-${IPTS_NEW%%[[:space:]]*}]" # Strip Off Spaces
 
 	${MV} -i \
-		"${_rundir}/proposal-${ipts_old}" \
+		"${_rundir}/proposal-${IPTS_OLD}" \
 		"${_rundir}/proposal-${IPTS_NEW%%[[:space:]]*}" # Strip Off Spaces
 	ckmvprop=$?
 
@@ -424,7 +424,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
 	echo -e "for Run ${run} to STS for Re-Translation:"
 
-	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${ipts_old}\" "
+	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${IPTS_OLD}\" "
 	echo -e "to \"${IPTS_NEW%%[[:space:]]*}\"..." # Strip Off Spaces
 
 	if [[ -n ${SEND_PAUSED_DATA} ]]; then
@@ -531,11 +531,11 @@ INSTALL_AND_CHECK_DATAFILE()
 
 		echo -e "\n${NXDIFF} -L -S -l \\"
 		echo -e "\t${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus} \\"
-		echo -e "\t${_archive}/${ipts_old}/${_nexus}"
+		echo -e "\t${_archive}/${IPTS_OLD}/${_nexus}"
 
 		${NXDIFF} -L -S -l \
 			"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
-			"${_archive}/${ipts_old}/${_nexus}"
+			"${_archive}/${IPTS_OLD}/${_nexus}"
 			# Strip Off Spaces ($IPTS_NEW)
 
 	fi
@@ -581,7 +581,7 @@ INSTALL_AND_CHECK_DATAFILE()
 
 		local _subject="[ADARA Fix IPTS]:"
 		_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
-		_subject="${_subject} Moved from ${ipts_old}"
+		_subject="${_subject} Moved from ${IPTS_OLD}"
 		_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}"
 			# Strip Off Spaces
 
@@ -596,7 +596,7 @@ This is an Automated Email Notification from the "ADARA Fix IPTS" script.
 The ${FACILITY} ${INST} Run ${run} has been *Re-Translated*
 to Move the Run from the Former Proposal:
 		
-	${ipts_old}
+	${IPTS_OLD}
 
 to the New Proposal:
 
@@ -844,7 +844,7 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e "\nFound Old Proposal Id Line for Run ${run}:"
 	echo -e "\t[${ipts_old_line}]"
 
-	ipts_old=`echo "${ipts_old_line}" | ${AWK} -F "[<>]" '{print $3}'`
+	IPTS_OLD=`echo "${ipts_old_line}" | ${AWK} -F "[<>]" '{print $3}'`
 	ckoldipts=$?
 
 	if [[ $ckoldipts != 0 ]]; then
@@ -858,7 +858,7 @@ for run in ${RUN_NUMBERS} ; do
 		continue
 	fi
 
-	echo -e "\nFound Old Proposal Id for Run ${run}: [${ipts_old}]"
+	echo -e "\nFound Old Proposal Id for Run ${run}: [${IPTS_OLD}]"
 
 	#
 	# Compare the *Length* of the Old and New Proposal Ids,
@@ -871,13 +871,13 @@ for run in ${RUN_NUMBERS} ; do
 	ipts_new_line="${ipts_old_line}"
 
 	# New IPTS is _Shorter_ than Old IPTS, Just Pad with White Space...
-	if [[ ${#IPTS_NEW} -lt ${#ipts_old} ]]; then
+	if [[ ${#IPTS_NEW} -lt ${#IPTS_OLD} ]]; then
 
-		len_diff=$(( ${#ipts_old} - ${#IPTS_NEW} ))
+		len_diff=$(( ${#IPTS_OLD} - ${#IPTS_NEW} ))
 
 		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Shorter_ than Old [${ipts_old}]:"
-		echo -e -n "\t${#ipts_old} - ${#IPTS_NEW} = ${len_diff} "
+		echo "_Shorter_ than Old [${IPTS_OLD}]:"
+		echo -e -n "\t${#IPTS_OLD} - ${#IPTS_NEW} = ${len_diff} "
 		echo "Spaces to Pad."
 
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
@@ -887,13 +887,13 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e "\nResulting New Proposal Id is: [${IPTS_NEW}]"
 	
 	# New IPTS is _Longer_ than Old IPTS, Just Pad with White Space...
-	elif [[ ${#IPTS_NEW} -gt ${#ipts_old} ]]; then
+	elif [[ ${#IPTS_NEW} -gt ${#IPTS_OLD} ]]; then
 
-		len_diff=$(( ${#IPTS_NEW} - ${#ipts_old} ))
+		len_diff=$(( ${#IPTS_NEW} - ${#IPTS_OLD} ))
 
 		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Longer_ than Old [${ipts_old}]:"
-		echo -e -n "\t${#IPTS_NEW} - ${#ipts_old} = ${len_diff} "
+		echo "_Longer_ than Old [${IPTS_OLD}]:"
+		echo -e -n "\t${#IPTS_NEW} - ${#IPTS_OLD} = ${len_diff} "
 		echo "Spaces to Remove from Line!"
 
 		# Try to Remove Sufficient Spaces from Old Proposal Id Line...!
@@ -943,8 +943,8 @@ for run in ${RUN_NUMBERS} ; do
 	else
 
 		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Same_ Length as Old [${ipts_old}]:"
-		echo -e "\t${#IPTS_NEW} = ${#ipts_old}"
+		echo "_Same_ Length as Old [${IPTS_OLD}]:"
+		echo -e "\t${#IPTS_NEW} = ${#IPTS_OLD}"
 
 	fi
 
@@ -953,7 +953,7 @@ for run in ${RUN_NUMBERS} ; do
 	#
 
 	ipts_new_line=`echo "${ipts_new_line}" \
-		| ${SED} "s/${ipts_old}/${IPTS_NEW}/"`
+		| ${SED} "s/${IPTS_OLD}/${IPTS_NEW}/"`
 	cksedprop=$?
 
 	if [[ $cksedprop != 0 ]]; then
