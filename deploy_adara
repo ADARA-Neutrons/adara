@@ -637,8 +637,6 @@ if [ $need_build == 1 ]; then
 
 		echo -e "\nBuilding the DASMON GUI Client." | tee -a $LOG
 
-pwd
-
 		echo "pushd dasmon/client/" | tee -a $LOG
 		pushd dasmon/client/
 		pushd_dasmon_client_ok=$?
@@ -718,9 +716,8 @@ pwd
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-		"\nError Copying SMSD into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying SMSD " | tee -a $LOG
+		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -20
 	fi
@@ -737,9 +734,8 @@ pwd
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-	"\nError Copying LiveConf into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying LiveConf " | tee -a $LOG
+		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -21
 	fi
@@ -750,18 +746,16 @@ pwd
 
 	if [[ -e sms/adaracat && -x sms/adaracat ]]; then
 
-		echo -e \
-			"\nCopying SMS ADARACat Script into Archive Release Tag:\n" \
-			| tee -a $LOG
+		echo -e -n "\nCopying SMS ADARACat Script " | tee -a $LOG
+		echo "into Archive Release Tag:\n" | tee -a $LOG
 
 		cp -i -p sms/adaracat "$tag_archive" |& tee -a $LOG
 
 		copy_ok=$?
 
 		if [ $copy_ok != 0 ]; then
-			echo -e \
-	"\nError Copying ADARACat into Release Tag Directory! ($copy_ok)\n" \
-				| tee -a $LOG
+			echo -e -n "\nError Copying ADARACat " | tee -a $LOG
+			echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -21
 		fi
@@ -774,18 +768,17 @@ pwd
 
 	if [[ -e sms/adara_fix_ipts && -x sms/adara_fix_ipts ]]; then
 
-		echo -e \
-		"\nCopying SMS ADARA Fix IPTS Script into Archive Release Tag:\n" \
-			| tee -a $LOG
+		echo -e -n "\nCopying SMS ADARA Fix IPTS Script " | tee -a $LOG
+		echo "into Archive Release Tag:\n" | tee -a $LOG
 
 		cp -i -p sms/adara_fix_ipts "$tag_archive" |& tee -a $LOG
 
 		copy_ok=$?
 
 		if [ $copy_ok != 0 ]; then
-			echo -e \
-	"\nError Copying ADARA Fix IPTS Script into Release Tag Directory! ($copy_ok)\n" \
+			echo -e -n "\nError Copying ADARA Fix IPTS Script " \
 				| tee -a $LOG
+			echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -21
 		fi
@@ -804,9 +797,8 @@ pwd
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-		"\nError Copying STS into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying STS " | tee -a $LOG
+		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -22
 	fi
@@ -824,9 +816,8 @@ pwd
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-		"\nError Copying PVSD into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying PVSD " | tee -a $LOG
+		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -23
 	fi
@@ -863,9 +854,8 @@ pwd
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e \
-		"\nError Copying Tools into Release Tag Directory! ($copy_ok)\n" \
-			| tee -a $LOG
+		echo -e -n "\nError Copying Tools " | tee -a $LOG
+		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -25
 	fi
@@ -991,9 +981,9 @@ if [ $tag_ok != 0 ]; then
 			exit -28
 		fi
 
-		echo -e \
-		"\nChecking out New Config $HOST_TYPE Branch: $install_branch\n" \
+		echo -e -n "\nChecking out New Config $HOST_TYPE Branch: " \
 			| tee -a $LOG
+		echo "$install_branch\n" | tee -a $LOG
 
 		echo "git checkout $install_branch" | tee -a $LOG
 		git checkout "$install_branch" |& tee -a $LOG
@@ -1322,9 +1312,9 @@ if [ $need_sms_subdir == 1 ]; then
 		add_ok=$?
 
 		if [ $add_ok != 0 ]; then
-			echo -e \
-		"\nError Adding New SMS Config Sub-Directory to Git! ($add_ok)\n" \
+			echo -e -n "\nError Adding New SMS Config Sub-Directory " \
 				| tee -a $LOG
+			echo "to Git! ($add_ok)\n" | tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -38
 		fi
