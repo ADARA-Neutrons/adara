@@ -50,7 +50,7 @@ LS="/bin/ls"
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
-	echo "         [--inst=<INST>] \\"
+	echo "         [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
 	echo "         [--sts1|--sts2] [--sts|--sts_test|--sts_dummy] \\"
 	echo "         [--sts_port=<STSPort>] \\"
 	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
@@ -159,6 +159,8 @@ RUN_NUMBERS=""
 
 IPTS_NEW=""
 
+FACILITY=""
+
 INST=""
 
 for arg in "$@" ; do
@@ -169,6 +171,9 @@ for arg in "$@" ; do
 	if [[ "#$key#" == '#--inst#' ]]; then
 		INST="$value"
 		echo -e "\nSetting Beamline Short Name to: ${INST}"
+	elif [[ "#$key#" == '#--facility#' ]]; then
+		FACILITY="$value"
+		echo -e "\nSetting Facility Name to: ${FACILITY}"
 	elif [[ "#$key#" == '#--sts1#' ]]; then
 		STS_HOST="${STS1}"
 		echo -e "\nSetting STS Host to: ${STS_HOST}"
@@ -333,7 +338,8 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	CHECK_PROCEED
 
-	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ | ${Less}
+	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+		| ${Less} "+/proposal_id"
 
 	# Copy Original Data File to Backup Copy Before Proceeding...
 
@@ -428,22 +434,18 @@ INSTALL_AND_CHECK_DATAFILE()
 	fi
 
 	#
-	# Now Verify the Differences Between the Original and New NeXus Files
+	# Determine the Facility and Beamline (Short) Names
+	# for Post-Processing Options...
 	#
 
-	# Prompt User for NeXus Diff Comparison...
-	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
-	local _ckdonxdiff=$?
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
 
-	if [[ ${_ckdonxdiff} == 0 ]]; then
-
-		# Determine the Facility and Beamline (Short) Names...
-
-		# Set Bash Pipefail Option as Needed...
-		pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
-		if [[ "$pfck" == "off" ]]; then
-			set -o pipefail
-		fi
+	# Only Retrieve the Facility Name if Not Explicitly Specified
+	if [[ -z "${FACILITY}" ]]; then
 
 		FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
 			| ${AWK} '{print $3}'`
@@ -458,28 +460,44 @@ INSTALL_AND_CHECK_DATAFILE()
 			return 16
 		fi
 
-		# Only Retrieve the Beamline Short Name if Not Explicitly Specified
-		if [[ -z "${INST}" ]]; then
+		echo -e "\nFacility Name Determined to be: [${FACILITY}]"
 
-			INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} \
-				| ${GREP} -v ";" | ${AWK} '{print $3}'`
-			ckinst=$?
+	fi
 
-			if [[ $ckinst != 0 || -z ${INST} ]]; then
-				echo -e -n "\nERROR Determining Beamline Short Name "
-				echo "from SMS Config for Run ${run}!"
-				echo -e "\n\t${SMS_CONFIG}"
-				CHECK_PROCEED
-				echo -e "\nContinuing with Next Run Number..."
-				return 17
-			fi
+	# Only Retrieve the Beamline Short Name if Not Explicitly Specified
+	if [[ -z "${INST}" ]]; then
 
+		INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} \
+			| ${GREP} -v ";" | ${AWK} '{print $3}'`
+		ckinst=$?
+
+		if [[ $ckinst != 0 || -z ${INST} ]]; then
+			echo -e -n "\nERROR Determining Beamline Short Name "
+			echo "from SMS Config for Run ${run}!"
+			echo -e "\n\t${SMS_CONFIG}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 17
 		fi
 
-		# Reset Bash Pipefail Option as Needed...
-		if [[ "$pfck" == "off" ]]; then
-			set +o pipefail
-		fi
+		echo -e "\nBeamline Short Name Determined to be: [${INST}]"
+
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	#
+	# Now Verify the Differences Between the Original and New NeXus Files
+	#
+
+	# Prompt User for NeXus Diff Comparison...
+	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
+	local _ckdonxdiff=$?
+
+	if [[ ${_ckdonxdiff} == 0 ]]; then
 
 		# NeXus Diff the Original and New NeXus Files...
 
@@ -491,6 +509,10 @@ INSTALL_AND_CHECK_DATAFILE()
 		fi
 
 		local _nexus="nexus/${INST}_${run}.nxs.h5"
+
+		echo -e "\n${NXDIFF} -L -S -l \\"
+		echo -e "\t${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus} \\"
+		echo -e "\t${_archive}/${ipts_old}/${_nexus}"
 
 		${NXDIFF} -L -S -l \
 			"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
@@ -509,16 +531,19 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	if [[ ${_cknotify} == 0 ]]; then
 
+		echo -e "\n${FINDNEXUS} -i ${INST} ${run}"
+		echo
+
 		${FINDNEXUS} -i ${INST} ${run}
 		ckfindnexus=$?
 
 		if [[ $ckfindnexus != 0 ]]; then
 			echo -e -n "\nERROR Checking FindNeXus to Verify "
 			echo "the Proposal Move for Run ${run}!"
-			echo -e "\n\t${FINDNEXUS}"
+			echo -e "\n\t${FINDNEXUS} -i ${INST} ${run}"
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 18
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just FindNeXus Check...
 		fi
 
 	fi
@@ -539,6 +564,10 @@ INSTALL_AND_CHECK_DATAFILE()
 		_subject="${_subject} Moved from ${ipts_old}"
 		_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}"
 			# Strip Off Spaces
+
+		echo -e "\n${MAILER} -s \\"
+		echo -e "   \"${_subject}\" \\"
+		echo -e "\t${NOTIFY_EMAIL_LIST}"
 
 		${MAILER} -s "${_subject}" ${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
 This is an Automated Email Notification from the "ADARA Fix IPTS" script.
@@ -569,8 +598,8 @@ NotifyEmailContent
 			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
 			echo -e "\n\tSubject: ${_subject}"
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 19
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just Catalog Admins Notify...
 		fi
 
 		echo -e "\nEmail Notification Sent to Catalog Admins:"
