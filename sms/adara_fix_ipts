@@ -435,69 +435,69 @@ INSTALL_AND_CHECK_DATAFILE()
 	CHECK_PROCEED "Do You Want To Verify the Differences in the NeXus Files"
 	local _ckdonxdiff=$?
 
-	if [[ ${_ckdonxdiff} != 0 ]]; then
-		return 16
-	fi
+	if [[ ${_ckdonxdiff} == 0 ]]; then
 
-	# Determine the Facility and Beamline (Short) Names...
+		# Determine the Facility and Beamline (Short) Names...
 
-	# Set Bash Pipefail Option as Needed...
-	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
-	if [[ "$pfck" == "off" ]]; then
-		set -o pipefail
-	fi
+		# Set Bash Pipefail Option as Needed...
+		pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+		if [[ "$pfck" == "off" ]]; then
+			set -o pipefail
+		fi
 
-	FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
-		| ${AWK} '{print $3}'`
-	ckfac=$?
-
-	if [[ $ckfac != 0 || -z ${FACILITY} ]]; then
-		echo -e -n "\nERROR Determining Facility from SMS Config "
-		echo "for Run ${run}!"
-		echo -e "\n\t${SMS_CONFIG}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		return 17
-	fi
-
-	# Only Retrieve the Beamline Short Name if Not Explicitly Specified...
-	if [[ -z "${INST}" ]]; then
-
-		INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} | ${GREP} -v ";" \
+		FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
 			| ${AWK} '{print $3}'`
-		ckinst=$?
+		ckfac=$?
 
-		if [[ $ckinst != 0 || -z ${INST} ]]; then
-			echo -e -n "\nERROR Determining Beamline Short Name "
-			echo "from SMS Config for Run ${run}!"
+		if [[ $ckfac != 0 || -z ${FACILITY} ]]; then
+			echo -e -n "\nERROR Determining Facility from SMS Config "
+			echo "for Run ${run}!"
 			echo -e "\n\t${SMS_CONFIG}"
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
-			return 18
+			return 16
 		fi
 
+		# Only Retrieve the Beamline Short Name if Not Explicitly Specified
+		if [[ -z "${INST}" ]]; then
+
+			INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} \
+				| ${GREP} -v ";" | ${AWK} '{print $3}'`
+			ckinst=$?
+
+			if [[ $ckinst != 0 || -z ${INST} ]]; then
+				echo -e -n "\nERROR Determining Beamline Short Name "
+				echo "from SMS Config for Run ${run}!"
+				echo -e "\n\t${SMS_CONFIG}"
+				CHECK_PROCEED
+				echo -e "\nContinuing with Next Run Number..."
+				return 17
+			fi
+
+		fi
+
+		# Reset Bash Pipefail Option as Needed...
+		if [[ "$pfck" == "off" ]]; then
+			set +o pipefail
+		fi
+
+		# NeXus Diff the Original and New NeXus Files...
+
+		local _archive="${ARCHIVE_PATH}"
+		if [[ ${_archive:${#_archive} - 1} == "/" ]]; then
+			_archive="${_archive}${FACILITY}/${INST}"
+		else
+			_archive="${_archive}/${FACILITY}/${INST}"
+		fi
+
+		local _nexus="nexus/${INST}_${run}.nxs.h5"
+
+		${NXDIFF} -L -S -l \
+			"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
+			"${_archive}/${ipts_old}/${_nexus}"
+			# Strip Off Spaces ($IPTS_NEW)
+
 	fi
-
-	# Reset Bash Pipefail Option as Needed...
-	if [[ "$pfck" == "off" ]]; then
-		set +o pipefail
-	fi
-
-	# NeXus Diff the Original and New NeXus Files...
-
-	local _archive="${ARCHIVE_PATH}"
-	if [[ ${_archive:${#_archive} - 1} == "/" ]]; then
-		_archive="${_archive}${FACILITY}/${INST}"
-	else
-		_archive="${_archive}/${FACILITY}/${INST}"
-	fi
-
-	local _nexus="nexus/${INST}_${run}.nxs.h5"
-
-	${NXDIFF} -L -S -l \
-		"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
-		"${_archive}/${ipts_old}/${_nexus}"
-		# Strip Off Spaces ($IPTS_NEW)
 
 	#
 	# Now Check FindNeXus and the Catalog to Ensure the Run Moved...
@@ -507,20 +507,20 @@ INSTALL_AND_CHECK_DATAFILE()
 	CHECK_PROCEED "Do You Want To Use FindNeXus to Verify the Proposal Move"
 	local _cknotify=$?
 
-	if [[ ${_cknotify} != 0 ]]; then
-		return 19
-	fi
+	if [[ ${_cknotify} == 0 ]]; then
 
-	${FINDNEXUS} -i ${INST} ${run}
-	ckfindnexus=$?
+		${FINDNEXUS} -i ${INST} ${run}
+		ckfindnexus=$?
 
-	if [[ $ckfindnexus != 0 ]]; then
-		echo -e -n "\nERROR Checking FindNeXus to Verify the Proposal Move "
-		echo "for Run ${run}!"
-		echo -e "\n\t${FINDNEXUS}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		return 20
+		if [[ $ckfindnexus != 0 ]]; then
+			echo -e -n "\nERROR Checking FindNeXus to Verify "
+			echo "the Proposal Move for Run ${run}!"
+			echo -e "\n\t${FINDNEXUS}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 18
+		fi
+
 	fi
 
 	#
@@ -532,16 +532,15 @@ INSTALL_AND_CHECK_DATAFILE()
 	CHECK_PROCEED "Do You Want To Notify the Catalog Admins of the Change"
 	local _cknotify=$?
 
-	if [[ ${_cknotify} != 0 ]]; then
-		return 21
-	fi
+	if [[ ${_cknotify} == 0 ]]; then
 
-	local _subject="[ADARA Fix IPTS]:"
-	_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
-	_subject="${_subject} Moved from ${ipts_old}"
-	_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}" # Strip Off Spaces
+		local _subject="[ADARA Fix IPTS]:"
+		_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
+		_subject="${_subject} Moved from ${ipts_old}"
+		_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}"
+			# Strip Off Spaces
 
-	${MAILER} -s "${_subject}" ${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
+		${MAILER} -s "${_subject}" ${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
 This is an Automated Email Notification from the "ADARA Fix IPTS" script.
 
 The ${FACILITY} ${INST} Run ${run} has been *Re-Translated*
@@ -562,16 +561,18 @@ Thank You! :-D
 
 NotifyEmailContent
 
-	ckmail=$?
+		ckmail=$?
 
-	if [[ $ckmail != 0 ]]; then
-		echo -e -n "\nERROR Sending Email Notification to Catalog Admins "
-		echo "for Run ${run}!"
-		echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
-		echo -e "\n\tSubject: ${_subject}"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		return 22
+		if [[ $ckmail != 0 ]]; then
+			echo -e -n "\nERROR Sending Email Notification "
+			echo "to Catalog Admins for Run ${run}!"
+			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
+			echo -e "\n\tSubject: ${_subject}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 19
+		fi
+
 	fi
 
 	#
