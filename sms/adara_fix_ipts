@@ -573,6 +573,9 @@ NotifyEmailContent
 			return 19
 		fi
 
+		echo -e "\nEmail Notification Sent to Catalog Admins:"
+		echo -e "\n\t${NOTIFY_EMAIL_LIST}"
+
 	fi
 
 	#
