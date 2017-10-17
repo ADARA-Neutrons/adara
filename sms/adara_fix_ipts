@@ -346,13 +346,13 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Make Sure File Still ADARA-Parses...!
 
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
-	echo -e -n "\n(Search for \"${IPTS_NEW%%[[:space:]]*}\" "
+	echo -e -n "\n(Search for \"${IPTS_NEW}\" "
 	echo "and Verify File Parses to End!)"
 
 	CHECK_PROCEED
 
 	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+/proposal_id"
+		| ${Less} "+/proposal_"
 
 	# Copy Original Data File to Backup Copy Before Proceeding...
 
@@ -400,11 +400,11 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	echo -e "\nRe-Naming Proposal Placeholder File in the Run Directory:"
 	echo -e "\t[proposal-${IPTS_OLD}]"
-	echo -e "\t-> [proposal-${IPTS_NEW%%[[:space:]]*}]" # Strip Off Spaces
+	echo -e "\t-> [proposal-${IPTS_NEW}]"
 
 	${MV} -i \
 		"${_rundir}/proposal-${IPTS_OLD}" \
-		"${_rundir}/proposal-${IPTS_NEW%%[[:space:]]*}" # Strip Off Spaces
+		"${_rundir}/proposal-${IPTS_NEW}"
 	ckmvprop=$?
 
 	if [[ $ckmvprop != 0 ]]; then
@@ -425,7 +425,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	echo -e "for Run ${run} to STS for Re-Translation:"
 
 	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${IPTS_OLD}\" "
-	echo -e "to \"${IPTS_NEW%%[[:space:]]*}\"..." # Strip Off Spaces
+	echo -e "to \"${IPTS_NEW}\"..."
 
 	if [[ -n ${SEND_PAUSED_DATA} ]]; then
 		echo -e -n "\nADARA Cat \"Send Paused Data\" Set to: "
@@ -530,13 +530,12 @@ INSTALL_AND_CHECK_DATAFILE()
 		local _nexus="nexus/${INST}_${run}.nxs.h5"
 
 		echo -e "\n${NXDIFF} -L -S -l \\"
-		echo -e "\t${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus} \\"
+		echo -e "\t${_archive}/${IPTS_NEW}/${_nexus} \\"
 		echo -e "\t${_archive}/${IPTS_OLD}/${_nexus}"
 
 		${NXDIFF} -L -S -l \
-			"${_archive}/${IPTS_NEW%%[[:space:]]*}/${_nexus}" \
+			"${_archive}/${IPTS_NEW}/${_nexus}" \
 			"${_archive}/${IPTS_OLD}/${_nexus}"
-			# Strip Off Spaces ($IPTS_NEW)
 
 	fi
 
@@ -582,8 +581,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		local _subject="[ADARA Fix IPTS]:"
 		_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
 		_subject="${_subject} Moved from ${IPTS_OLD}"
-		_subject="${_subject} to ${IPTS_NEW%%[[:space:]]*}"
-			# Strip Off Spaces
+		_subject="${_subject} to ${IPTS_NEW}"
 
 		echo -e "\n${MAILER} -s \\"
 		echo -e "   \"${_subject}\" \\"
@@ -600,7 +598,7 @@ to Move the Run from the Former Proposal:
 
 to the New Proposal:
 
-	${IPTS_NEW%%[[:space:]]*}
+	${IPTS_NEW}
 
 Please Verify This Update to the ${FACILITY} Catalog Database,
 and Remove Any Duplicate Records referring to the Old Proposal.
@@ -662,6 +660,18 @@ MANUAL_EDIT()
 	local _datafile="$1"
 	shift
 
+	# RunInfo XML Tag
+	local _xml_tag="$1"
+	shift
+
+	# Meta-Data Name
+	local _meta_name="$1"
+	shift
+
+	# New Value
+	local _new_value="$1"
+	shift
+
 	# Prompt User for Manually Editing...
 	CHECK_PROCEED "Do You Want To Manually Edit the Data File"
 	local _ckmanedit=$?
@@ -690,7 +700,7 @@ MANUAL_EDIT()
 	echo -e "\nReady to Manually Edit the Data File:"
 	echo -e "\t[${_datafile}.NEW-$$]"
 	echo -e "\tin [${_rundir}]"
-	echo "to Change Proposal to ${IPTS_NEW}."
+	echo "to Change ${_meta_name} to ${_new_value}."
 	CHECK_PROCEED "Proceed"
 	if [[ $? != 0 ]]; then
 		echo -e "\nOK, Skipping This Run Number."
@@ -698,7 +708,7 @@ MANUAL_EDIT()
 	fi
 
 	# Manually Edit the Data File...
-	${Editor} "+/proposal_id" "${_rundir}/${_datafile}.NEW-$$"
+	${Editor} "+/${_xml_tag}" "${_rundir}/${_datafile}.NEW-$$"
 	ckedit=$?
 
 	if [[ $ckedit != 0 ]]; then
@@ -747,15 +757,225 @@ MANUAL_EDIT()
 
 UPDATE_PROPOSAL_METADATA()
 {
-	xml_tag="$1"
+	local _xml_tag="$1"
 	shift
 
-	meta_name="$1"
+	local _meta_name="$1"
 	shift
 
-	echo -e -n "\nUPDATE_PROPOSAL_METADATA(): XML Tag for ${meta_name} "
-	echo "= \"$xml_tag\""
+	local _new_value="$1"
+	shift
 
+	local _old_value_var="$1"
+	shift
+
+	echo -e -n "\nUPDATE_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
+	echo "= \"${_xml_tag}\""
+	echo -e "\t-> New Value: [${_new_value}]"
+
+	#
+	# Determine the Current Proposal Meta-Data for This Run...
+	#
+	# - Fortunately, the Proposal Meta-Data is Stored in the RunInfo Packet
+	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
+	#
+	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
+	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
+	# - Also, This Covers the Case where the Original Proposal was
+	# _Not_ of the form "IPTS-*"... ;-D
+	#
+
+	ipts_old_line=`${GREP} --text "<${_xml_tag}>" "${rundir}/${datafile}"`
+	ckoldiptsline=$?
+
+	if [[ $ckoldiptsline != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
+		echo -e "from Stream File for Run ${run}!\n"
+		echo -e "\t[${ipts_old_line}]"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${xml_tag}" "${meta_name}" "${new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
+		return 30
+	fi
+
+	# Make Sure We Only Got *1* Old Proposal Meta-Data Line...! ;-D
+	ckoneline=`echo "${ipts_old_line}" | ${WC} | ${AWK} '{print $1}'`
+
+	if [[ ${ckoneline} != 1 ]]; then
+		echo -e -n "\nERROR: Multiple ${_meta_name} Lines Found "
+		echo -e "for Run ${run}!\n"
+		echo -e "${ipts_old_line}\n"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${xml_tag}" "${meta_name}" "${new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
+		return 31
+	fi
+
+	echo -e "\nFound Old ${_meta_name} Line for Run ${run}:"
+	echo -e "\t[${ipts_old_line}]"
+
+	local _old_value=`echo "${ipts_old_line}" \
+		| ${AWK} -F "[<>]" '{print $3}'`
+	ckoldipts=$?
+
+	if [[ $ckoldipts != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} from Stream File "
+		echo "for Run ${run}!"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${xml_tag}" "${meta_name}" "${new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
+		return 32
+	fi
+
+	echo -e "\nFound Old ${_meta_name} for Run ${run}: [${_old_value}]"
+
+	#
+	# Compare the *Length* of the Old and New Proposal Meta-Data,
+	# to Carefully Determine How We Handle the Substitution
+	# Without _Changing the Size_ of the XML Payload in the
+	# ADARA RunInfo Packet...! ;-D
+	#
+
+	# Starting Point for New Proposal Meta-Data Substitution Line...
+	ipts_new_line="${ipts_old_line}"
+
+	# If New Meta-Data is _Shorter_ than Old Meta-Data,
+	# Just Pad with White Space...
+	if [[ ${#_new_value} -lt ${#_old_value} ]]; then
+
+		len_diff=$(( ${#_old_value} - ${#_new_value} ))
+
+		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
+		echo "_Shorter_ than Old [${_old_value}]:"
+		echo -e -n "\t${#_old_value} - ${#_new_value} = ${len_diff} "
+		echo "Spaces to Pad."
+
+		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+			_new_value="${_new_value} "
+		done
+
+		echo -e "\nResulting New ${_meta_name} is: [${_new_value}]"
+	
+	# If New Meta-Data is _Longer_ than Old Meta-Data,
+	# Just Pad with White Space...
+	elif [[ ${#_new_value} -gt ${#_old_value} ]]; then
+
+		len_diff=$(( ${#_new_value} - ${#_old_value} ))
+
+		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
+		echo "_Longer_ than Old [${_old_value}]:"
+		echo -e -n "\t${#_new_value} - ${#_old_value} = ${len_diff} "
+		echo "Spaces to Remove from Line!"
+
+		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
+
+		skip_run=0
+
+		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+
+			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " "`
+			if [[ "$ckspc" != "1" ]]; then
+				echo -e -n "\nERROR: Insufficient White Space to Remove "
+				echo "in Old ${_meta_name} Line!"
+				MANUAL_EDIT "${rundir}" "${datafile}" \
+					"${xml_tag}" "${meta_name}" "${new_value}"
+				if [[ $? != 0 ]]; then
+					CHECK_PROCEED
+					echo -e "\nContinuing with Next Run Number..."
+				fi
+				skip_run=1
+				break
+			fi
+
+			# Take Any Space We Can Get...! ;-D
+			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
+			cksedspc=$?
+
+			if [[ $cksedspc != 0 ]]; then
+				echo -e -n "\nERROR Stripping White Space "
+				echo "from Proposal Meta-Data Line...!"
+				MANUAL_EDIT "${rundir}" "${datafile}" \
+					"${xml_tag}" "${meta_name}" "${new_value}"
+				if [[ $? != 0 ]]; then
+					CHECK_PROCEED
+					echo -e "\nContinuing with Next Run Number..."
+				fi
+				skip_run=1
+				break
+			fi
+
+		done
+
+		# Skip This Run, We Had a Failure...
+		if [[ $skip_run == 1 ]]; then
+			return 33
+		fi
+
+		echo -e "\nResulting New/Old ${_meta_name} Line Template is:"
+		echo -e "\t[${ipts_new_line}]"
+
+	else
+
+		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
+		echo "_Same_ Length as Old [${_old_value}]:"
+		echo -e "\t${#_new_value} = ${#_old_value}"
+
+	fi
+
+	#
+	# Now Substitute Old Proposal Meta-Data for New,
+	# in New Proposal Meta-Data Line...
+	#
+
+	ipts_new_line=`echo "${ipts_new_line}" \
+		| ${SED} "s/${_old_value}/${_new_value}/"`
+	cksedprop=$?
+
+	if [[ $cksedprop != 0 ]]; then
+		echo -e "\nERROR Substituting ${_meta_name} in Meta-Data Line...!"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${xml_tag}" "${meta_name}" "${new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+		fi
+		return 34
+	fi
+
+	echo -e "\nFinal ${_meta_name} Line Substitution:"
+	echo -e "\told: [${ipts_old_line}]"
+	echo -e "\tnew: [${ipts_new_line}]"
+
+	CHECK_PROCEED
+
+	#
+	# Append Substitution to List
+	#
+
+	SUBST_EXPRS="$SUBST_EXPRS -e \"s@${ipts_old_line}@${ipts_new_line}@\""
+
+	#
+	# Set/Save Old Value Global, If Specified...
+	#
+
+	if [[ -n "${_old_value_var}" ]]; then
+		eval "${_old_value_var}=\"${_old_value}\""
+	fi
+
+	#
+	# Done with This Proposal Meta-Data Update.
+	#
+
+	return 0
 }
 
 #
@@ -822,194 +1042,21 @@ for run in ${RUN_NUMBERS} ; do
 	# Update the Proposal Id Meta-Data
 	#
 
-	UPDATE_PROPOSAL_METADATA "<proposal_id>" "Proposal Id"
+	UPDATE_PROPOSAL_METADATA "proposal_id" "Proposal Id" \
+		"${IPTS_NEW}" "IPTS_OLD"
+	ckupdate=$?
 
-	#
-	# Determine What the Current IPTS Proposal is for This Run...
-	#
-	# - Fortunately, the IPTS Proposal is Stored in the RunInfo Packet
-	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
-	#
-	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
-	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
-	# - This covers the case where the Original Proposal was
-	# _Not_ "IPTS-*"...
-	#
-
-	ipts_old_line=`${GREP} --text "<proposal_id>" "${rundir}/${datafile}"`
-	ckoldiptsline=$?
-
-	if [[ $ckoldiptsline != 0 ]]; then
-		echo -e -n "\nERROR Extracting Old Proposal Line from Stream File "
-		echo -e "for Run ${run}!\n"
-		echo -e "\t[${ipts_old_line}]"
-		MANUAL_EDIT "${rundir}" "${datafile}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-		fi
+	if [[ ${ckupdate} != 0 ]]; then
 		continue
 	fi
 
-	# Make Sure We Only Got *1* Old Proposal Id Line...! ;-D
-	ckoneline=`echo "${ipts_old_line}" | ${WC} | ${AWK} '{print $1}'`
-
-	if [[ ${ckoneline} != 1 ]]; then
-		echo -e -n "\nERROR: Multiple Proposal Id Lines Found "
-		echo -e "for Run ${run}!\n"
-		echo -e "${ipts_old_line}\n"
-		MANUAL_EDIT "${rundir}" "${datafile}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-		fi
-		continue
-	fi
-
-	echo -e "\nFound Old Proposal Id Line for Run ${run}:"
-	echo -e "\t[${ipts_old_line}]"
-
-	IPTS_OLD=`echo "${ipts_old_line}" | ${AWK} -F "[<>]" '{print $3}'`
-	ckoldipts=$?
-
-	if [[ $ckoldipts != 0 ]]; then
-		echo -e -n "\nERROR Extracting Old Proposal from Stream File "
-		echo "for Run ${run}!"
-		MANUAL_EDIT "${rundir}" "${datafile}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-		fi
-		continue
-	fi
-
-	echo -e "\nFound Old Proposal Id for Run ${run}: [${IPTS_OLD}]"
-
 	#
-	# Compare the *Length* of the Old and New Proposal Ids,
-	# to Carefully Determine How We Handle the Substitution
-	# Without _Changing the Size_ of the XML Payload in the
-	# ADARA RunInfo Packet...! ;-D
-	#
-
-	# Starting Point for New Proposal Id Substitution Line...
-	ipts_new_line="${ipts_old_line}"
-
-	# New IPTS is _Shorter_ than Old IPTS, Just Pad with White Space...
-	if [[ ${#IPTS_NEW} -lt ${#IPTS_OLD} ]]; then
-
-		len_diff=$(( ${#IPTS_OLD} - ${#IPTS_NEW} ))
-
-		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Shorter_ than Old [${IPTS_OLD}]:"
-		echo -e -n "\t${#IPTS_OLD} - ${#IPTS_NEW} = ${len_diff} "
-		echo "Spaces to Pad."
-
-		for (( i = 0 ; i < ${len_diff} ; ++i )); do
-			IPTS_NEW="${IPTS_NEW} "
-		done
-
-		echo -e "\nResulting New Proposal Id is: [${IPTS_NEW}]"
-	
-	# New IPTS is _Longer_ than Old IPTS, Just Pad with White Space...
-	elif [[ ${#IPTS_NEW} -gt ${#IPTS_OLD} ]]; then
-
-		len_diff=$(( ${#IPTS_NEW} - ${#IPTS_OLD} ))
-
-		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Longer_ than Old [${IPTS_OLD}]:"
-		echo -e -n "\t${#IPTS_NEW} - ${#IPTS_OLD} = ${len_diff} "
-		echo "Spaces to Remove from Line!"
-
-		# Try to Remove Sufficient Spaces from Old Proposal Id Line...!
-
-		skip_run=0
-
-		for (( i = 0 ; i < ${len_diff} ; ++i )); do
-
-			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " "`
-			if [[ "$ckspc" != "1" ]]; then
-				echo -e -n "\nERROR: Insufficient White Space to Remove "
-				echo "in Old Proposal Id Line!"
-				MANUAL_EDIT "${rundir}" "${datafile}"
-				if [[ $? != 0 ]]; then
-					CHECK_PROCEED
-					echo -e "\nContinuing with Next Run Number..."
-				fi
-				skip_run=1
-				break
-			fi
-
-			# Take Any Space We Can Get...! ;-D
-			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
-			cksedspc=$?
-
-			if [[ $cksedspc != 0 ]]; then
-				echo -e "\nERROR Stripping White Space from IPTS Line...!"
-				MANUAL_EDIT "${rundir}" "${datafile}"
-				if [[ $? != 0 ]]; then
-					CHECK_PROCEED
-					echo -e "\nContinuing with Next Run Number..."
-				fi
-				skip_run=1
-				break
-			fi
-
-		done
-
-		# Skip This Run, We Had a Failure...
-		if [[ $skip_run == 1 ]]; then
-			continue
-		fi
-
-		echo -e "\nResulting New/Old Proposal Id Line Template is:"
-		echo -e "\t[${ipts_new_line}]"
-
-	else
-
-		echo -e -n "\nNew Proposal Id [${IPTS_NEW}] is "
-		echo "_Same_ Length as Old [${IPTS_OLD}]:"
-		echo -e "\t${#IPTS_NEW} = ${#IPTS_OLD}"
-
-	fi
-
-	#
-	# Now Substitute Old IPTS for New IPTS in New Proposal Id Line...
-	#
-
-	ipts_new_line=`echo "${ipts_new_line}" \
-		| ${SED} "s/${IPTS_OLD}/${IPTS_NEW}/"`
-	cksedprop=$?
-
-	if [[ $cksedprop != 0 ]]; then
-		echo -e "\nERROR Substituting Proposal Ids in IPTS Line...!"
-		MANUAL_EDIT "${rundir}" "${datafile}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-		fi
-		continue
-	fi
-
-	echo -e "\nFinal Proposal Id Line Substitution:"
-	echo -e "\told: [${ipts_old_line}]"
-	echo -e "\tnew: [${ipts_new_line}]"
-
-	CHECK_PROCEED
-
-	#
-	# Append Substitution to List
-	#
-
-	SUBST_EXPRS="$SUBST_EXPRS -e \"s@${ipts_old_line}@${ipts_new_line}@\""
-
-	#
-	# Actually Make the Data File Substitution...! ;-D
+	# Actually Make the Data File Substitution(s)...! ;-D
 	#
 
 	# Substitute from Original Data File into New Version... :-D
 
-	echo -e -n "\nSubstituting New Proposal Id [${IPTS_NEW}] "
+	echo -e -n "\nSubstituting New Proposal Meta-Data for [${IPTS_NEW}] "
 	echo "into New Data File:"
 	echo -e "\t[${datafile}]"
 	echo -e "\t-> ${datafile}.NEW-$$"
@@ -1017,13 +1064,14 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e "\nSubstitution Expressions:"
 	echo -e "\t${SUBST_EXPRS}"
 
-	eval ${SED} ${SUBST_EXPRS} "${rundir}/${datafile}" \
+	eval "${SED}" "${SUBST_EXPRS}" "${rundir}/${datafile}" \
 		> "${rundir}/${datafile}.NEW-$$"
 	ckseddata=$?
 
 	if [[ $ckseddata != 0 ]]; then
 		echo -e "\nERROR Substituting New Proposal Id into Data File...!"
-		MANUAL_EDIT "${rundir}" "${datafile}"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"proposal_" "Proposal Meta-Data" "${IPTS_NEW}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
