@@ -745,6 +745,19 @@ MANUAL_EDIT()
 	return 0
 }
 
+UPDATE_PROPOSAL_METADATA()
+{
+	xml_tag="$1"
+	shift
+
+	meta_name="$1"
+	shift
+
+	echo -e -n "\nUPDATE_PROPOSAL_METADATA(): XML Tag for ${meta_name} "
+	echo "= \"$xml_tag\""
+
+}
+
 #
 # Process Each Run Number in Turn...
 #
@@ -798,6 +811,18 @@ for run in ${RUN_NUMBERS} ; do
 
 	echo -e "\nFound 1st ADARA Output Stream File for Run ${run}:"
 	echo -e "\t[${datafile}]"
+
+	#
+	# Initialize Substitute Expression List
+	#
+
+	SUBST_EXPRS=""
+
+	#
+	# Update the Proposal Id Meta-Data
+	#
+
+	UPDATE_PROPOSAL_METADATA "<proposal_id>" "Proposal Id"
 
 	#
 	# Determine What the Current IPTS Proposal is for This Run...
@@ -973,6 +998,12 @@ for run in ${RUN_NUMBERS} ; do
 	CHECK_PROCEED
 
 	#
+	# Append Substitution to List
+	#
+
+	SUBST_EXPRS="$SUBST_EXPRS -e \"s@${ipts_old_line}@${ipts_new_line}@\""
+
+	#
 	# Actually Make the Data File Substitution...! ;-D
 	#
 
@@ -983,8 +1014,11 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e "\t[${datafile}]"
 	echo -e "\t-> ${datafile}.NEW-$$"
 
-	${SED} "s@${ipts_old_line}@${ipts_new_line}@" \
-		"${rundir}/${datafile}" > "${rundir}/${datafile}.NEW-$$"
+	echo -e "\nSubstitution Expressions:"
+	echo -e "\t${SUBST_EXPRS}"
+
+	eval ${SED} ${SUBST_EXPRS} "${rundir}/${datafile}" \
+		> "${rundir}/${datafile}.NEW-$$"
 	ckseddata=$?
 
 	if [[ $ckseddata != 0 ]]; then
