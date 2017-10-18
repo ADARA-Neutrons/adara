@@ -8,6 +8,10 @@
 # (Because it can happen that often... ;-)
 #
 
+PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
+
+GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
+
 #NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
 NOTIFY_EMAIL_LIST="kohlja@ornl.gov"
 
@@ -34,6 +38,7 @@ STS2="sns-sts2.sns.gov"
 
 TRUNCATE="/usr/bin/truncate"
 Editor="/usr/bin/vim"
+CURL="/usr/bin/curl"
 DIFF="/usr/bin/diff"
 CMP="/usr/bin/cmp"
 Less="/usr/bin/less"
@@ -51,7 +56,8 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "         [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "         [--sts1|--sts2] [--sts|--sts_test|--sts_dummy] \\"
+	echo "         [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
+	echo "         [--sts|--sts_test|--sts_dummy] \\"
 	echo "         [--sts_port=<STSPort>] \\"
 	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "         [--sms_config=<${SMS_CONFIG}>] \\"
@@ -182,6 +188,9 @@ for arg in "$@" ; do
 		echo -e "\nSetting STS Host to: ${STS_HOST}"
 	elif [[ "#$key#" == '#--sts2#' ]]; then
 		STS_HOST="${STS2}"
+		echo -e "\nSetting STS Host to: ${STS_HOST}"
+	elif [[ "#$key#" == '#--sts_host#' ]]; then
+		STS_HOST="${value}"
 		echo -e "\nSetting STS Host to: ${STS_HOST}"
 	elif [[ "#$key#" == '#--sts#' ]]; then
 		STS_SERVICE="sts"
@@ -1048,6 +1057,121 @@ for run in ${RUN_NUMBERS} ; do
 
 	if [[ ${ckupdate} != 0 ]]; then
 		continue
+	fi
+
+	#
+	# Capture Proposal Meta-Data from ICAT
+	#
+	# Magically Parse Relevant Bits from Json Output
+	# into a Bash Array...! ;-D
+	#
+
+	# Parse Proposal Number from Proposal Id...
+	prop_num=`echo "${IPTS_NEW}" | sed -e "s/^IPTS-//"`
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	# Magic Incantation (to interpret all the quotes correctly!)... ;-D
+	prop_json=`${CURL} \
+		"${PROD_BASE_URL}/${GET_PROPOSAL_BY_ID}/${prop_num}" 2>&1 \
+		| ${AWK} -F "[][]" '{print $2}' \
+		| ${SED} -e "s/^{//" -e "s/}$//" -e "s/,\"/ \"/g" -e "s/:/ /g"`
+	ckpropmeta=$?
+
+	do_propmeta=1
+	if [[ $ckpropmeta != 0 || -z "${prop_json}" ]]; then
+		echo -e -n "\nError Looking Up Proposal Meta-Data "
+		echo "for \"${IPTS_NEW}\"...!"
+		echo -e "\nSkipping Title and User Substitution..."
+		do_propmeta=0
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	if [[ $do_propmeta == 1 ]]; then
+
+		eval prop_meta=( ${prop_json} )
+
+		echo -e "\nProposal Meta-Data:\n\t[${prop_meta[@]}]"
+
+		#
+		# Determine Proposal Title & Users for New IPTS Proposal...
+		#
+
+		echo -e "\nSearching Proposal Meta-Data for Title and Users:"
+
+		title=""
+		users=""
+
+		for (( i = 0 ; i < ${#prop_meta[@]} ; i += 2 )); do
+
+			key="${prop_meta[$i]}"
+			value="${prop_meta[$i + 1]}"
+
+			echo -e "\n[$key] = [${value}]"
+
+			if [[ "$key" == "title" ]]; then
+				title="${value}"
+				echo -e "\nFound Proposal Title:\n\t[${title}]"
+			elif [[ "$key" == "members" ]]; then
+				users="${value}"
+				echo -e "\nFound Proposal Users:\n\t[${users}]"
+			fi
+
+		done
+
+		#
+		# Substitute Proposal Title
+		#
+
+		if [[ -n "${title}" ]]; then
+
+			TITLE_OLD=""
+
+			UPDATE_PROPOSAL_METADATA "proposal_title" "Proposal Title" \
+				"${title}" "TITLE_OLD"
+			ckupdate=$?
+
+			if [[ ${ckupdate} != 0 ]]; then
+				echo -e "\nWARNING: Unable to Update Proposal Title...!"
+				echo -e "\nContinuing..."
+			fi
+
+		fi
+
+		#
+		# Substitute Proposal Members (Users)...
+		#
+
+		if [[ -n "${users}" ]]; then
+
+			# Separate User List...
+			user_list=`echo "${users}" | ${SED} "s/;/ /g"`
+
+			for user in ${user_list} ; do
+
+				USER_OLD=""
+
+				UPDATE_PROPOSAL_METADATA "id" "Proposal User" \
+					"${user}" "USER_OLD"
+				ckupdate=$?
+
+				if [[ ${ckupdate} != 0 ]]; then
+					echo -e "\nWARNING: Unable to Update Proposal User...!"
+					echo -e "\nContinuing..."
+				fi
+
+			done
+
+		fi
+
 	fi
 
 	#
