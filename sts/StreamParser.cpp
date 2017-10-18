@@ -1442,6 +1442,11 @@ StreamParser::rxPacket
                     tmp_run_info.proposal_id = value;
                 }
                 else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"proposal_title" ) == 0 )
+                {
+                    tmp_run_info.proposal_title = value;
+                }
+                else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"run_title" ) == 0 )
                 {
                     tmp_run_info.run_title = value;
@@ -3545,6 +3550,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.proposal_id.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.proposal_id = a_run_info.proposal_id;
+    }
+    if ( m_run_info.proposal_title.compare( a_run_info.proposal_title ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Proposal Title",
+            m_run_info.proposal_title.c_str(),
+            a_run_info.proposal_title.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.proposal_title = a_run_info.proposal_title;
     }
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
     if ( m_run_info.facility_name.compare( a_run_info.facility_name ) ) {

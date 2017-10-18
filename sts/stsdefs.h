@@ -534,6 +534,7 @@ struct RunInfo
     uint32_t                run_number;
     std::string             run_title;
     std::string             proposal_id;
+    std::string             proposal_title;
     std::string             facility_name;
     bool                    no_sample_info;
     std::string             sample_id;

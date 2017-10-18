@@ -959,6 +959,10 @@ NxGen::processRunInfo
 
         writeString( m_entry_path, "experiment_identifier",
             a_run_info.proposal_id );
+
+        writeString( m_entry_path, "experiment_title",
+            a_run_info.proposal_title );
+
         writeString( m_entry_path, "title", a_run_info.run_title );
 
         if ( ! a_run_info.no_sample_info )
