@@ -103,7 +103,7 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
-	INFO("client " << m_clientName << " ready to connect"
+	ERROR("client " << m_clientName << " ready to connect"
 		<< " SendPausedData=" << m_send_paused_data);
 
 	try {
@@ -123,12 +123,12 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		throw;
 	}
 
-	INFO("client " << m_clientName << " connected");
+	ERROR("client " << m_clientName << " connected");
 }
 
 LiveClient::~LiveClient()
 {
-	INFO("client " << m_clientName << " disconnected");
+	ERROR("client " << m_clientName << " disconnected");
 
 	if ( m_clientId >= 0 ) {
 		m_pvStatus->disconnected();
@@ -254,7 +254,7 @@ void LiveClient::writable(void)
 				      << strerror(e));
 			}
 			else {
-				INFO("client " << m_clientName << " connection broken: "
+				ERROR("client " << m_clientName << " connection broken: "
 					<< strerror(e));
 			}
 
@@ -364,7 +364,7 @@ void LiveClient::readable(void)
 			 * handlers, as ADARA::Parser::read() will modify
 			 * member variables after calling the handlers.
 			 */
-			DEBUG("client " << m_clientName
+			ERROR("client " << m_clientName
 				<< " error reading stream log_info=(" << log_info << ")");
 			delete this;
 		}
@@ -449,7 +449,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 		ss << "PAUSE_AGNOSTIC";
 	ss << "]";
 
-	INFO("LiveClient Hello V" << pkt.version()
+	ERROR("LiveClient Hello V" << pkt.version()
 		<< " Received from " << m_clientName
 		<< ", Requested Start Time = " << pkt.requestedStartTime()
 		<< ", Client Flags = 0x" << std::hex << m_client_flags << std::dec
