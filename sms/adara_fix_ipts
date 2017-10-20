@@ -325,21 +325,19 @@ CHECK_PROCEED
 # Install and Check the Validity of a Modified Data File...
 #
 # usage: INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
+#    "${xml_tag}" "${meta_name}" "${new_value}"
 #
 # - Assumes New/Modified Data File Exists, of form "${datafile}.NEW-$$"...
 # - Show File Differences to User...
 # - Make Sure File Still ADARA-Parses...!
 # - Copy Original Data File to Backup Copy Before Proceeding...
 # - Install New Data File... (Overwrite Original...)
-# - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
-# - Re-Submit SMS Raw Data Files to STS for Re-Translation...!
 #
 INSTALL_AND_CHECK_DATAFILE()
 {
 	# Run Directory
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Run Directory Specified for Install Check!"
-		echo -e "\nContinuing with Next Run Number..."
 		return 11
 	fi
 	local _rundir="$1"
@@ -348,15 +346,26 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Data File
 	if [[ "#$1#" == '##' ]]; then
 		echo -e "\nError: No Data File Specified for Install Check!"
-		echo -e "\nContinuing with Next Run Number..."
 		return 12
 	fi
 	local _datafile="$1"
 	shift
 
+	# RunInfo XML Tag
+	local _xml_tag="$1"
+	shift
+
+	# Meta-Data Name
+	local _meta_name="$1"
+	shift
+
+	# New Value
+	local _new_value="$1"
+	shift
+
 	# Show File Differences to User...
 
-	echo -e "\nFile Differences After Proposal Id Substitution:\n"
+	echo -e "\nFile Differences After ${_meta_name} Substitution:\n"
 
 	echo -e "<<< ${_datafile}"
 	echo -e ">>> ${_datafile}.NEW-$$"
@@ -368,36 +377,51 @@ INSTALL_AND_CHECK_DATAFILE()
 	# Make Sure File Still ADARA-Parses...!
 
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
-	echo -e -n "\n(Search for \"${IPTS_NEW}\" "
-	echo -n "and Verify File Parses to End!"
+	echo -e "\n\t-> Search for New ${_meta_name} Value(s):"
+	echo -e "\t\t\"${_new_value}\""
+	echo -e -n "\n\t-> Verify File Parses to End!"
 	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
 		echo -n " [_Not_ End of Run]"
 	else
 		echo -n " [End of Run]"
 	fi
-	echo ")"
+	echo
 
 	CHECK_PROCEED
 
 	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+/proposal_"
+		| ${Less} "+/${_xml_tag}"
 
+	#
 	# Copy Original Data File to Backup Copy Before Proceeding...
+	# (_If_ We Haven't Already Created a Backup Copy for This IPTS Fix!)
+	#
 
-	echo -e -n "\nBacking Up ${SMS_WHICH_DATA_FILE} ADARA Output "
-	echo "Stream File for Run ${run}:"
-	echo -e "\t[${_datafile}]"
-	echo -e "\t->[${_datafile}.BACKUP-$$]"
+	if [[ -e "${_rundir}/${_datafile}.BACKUP-$$" ]]; then
 
-	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
-	ckcp=$?
-
-	if [[ $ckcp != 0 ]]; then
-		echo -e -n "\nERROR Copying ${SMS_WHICH_DATA_FILE} Original "
-		echo "Stream File for Backup of Run ${run}!"
+		echo -e -n "\nBackup for ${SMS_WHICH_DATA_FILE} ADARA Output "
+		echo -e "Stream File Already Exists for This IPTS Fix:\n"
+		${LS} -l "${_rundir}/${_datafile}.BACKUP-$$"
 		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		return 13
+		echo -e "\nOk, Continuing with Data File Install and Check..."
+
+	else
+
+		echo -e -n "\nBacking Up ${SMS_WHICH_DATA_FILE} ADARA Output "
+		echo "Stream File for Run ${run}:"
+		echo -e "\t[${_datafile}]"
+		echo -e "\t->[${_datafile}.BACKUP-$$]"
+
+		${CP} -i \
+			"${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
+		ckcp=$?
+
+		if [[ $ckcp != 0 ]]; then
+			echo -e -n "\nERROR Copying ${SMS_WHICH_DATA_FILE} Original "
+			echo "Stream File for Backup of Run ${run}!"
+			CHECK_PROCEED
+			return 13
+		fi
 	fi
 
 	# Install New Data File... (Overwrite Original Now...)
@@ -422,9 +446,46 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo -n "${SMS_WHICH_DATA_FILE} Original Stream File "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
 		return 14
 	fi
+
+	#
+	# Done Installing & Checking the Modified Data File for This Run...
+	#
+
+	echo -e "\nDone Installing/Checking the Modified Data File"
+	echo "for ${_meta_name} in Run ${run}."
+
+	return 0
+}
+
+#
+# Prepare Raw Data Run Directory and Re-Submit Run for Translation to NeXus
+#
+# usage: RESUBMIT_RUN "${rundir}" "${datafile}"
+#
+# - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
+# - Re-Submit SMS Raw Data Files to STS for Re-Translation...!
+#
+RESUBMIT_RUN()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Re-Submit Run!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 15
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Re-Submit Run!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 16
+	fi
+	local _datafile="$1"
+	shift
 
 	#
 	# Re-Name the "proposal-*" Placeholder File in the Run Directory...!
@@ -480,7 +541,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo "for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
-		return 15
+		return 17
 	fi
 
 	#
@@ -507,7 +568,7 @@ INSTALL_AND_CHECK_DATAFILE()
 			echo -e "\n\t${SMS_CONFIG}"
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
-			return 16
+			return 18
 		fi
 
 		echo -e "\nFacility Name Determined to be: [${FACILITY}]"
@@ -527,7 +588,7 @@ INSTALL_AND_CHECK_DATAFILE()
 			echo -e "\n\t${SMS_CONFIG}"
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
-			return 17
+			return 19
 		fi
 
 		echo -e "\nBeamline Short Name Determined to be: [${INST}]"
@@ -662,7 +723,7 @@ NotifyEmailContent
 	# Done with This Run...
 	#
 
-	echo -e "\nDone Modifying/Updating Run ${run}."
+	echo -e "\nDone Re-Submitting/Updating Run ${run}."
 
 	return 0
 }
@@ -670,7 +731,8 @@ NotifyEmailContent
 #
 # Manually Edit a Datafile, With Proper Cleanup/Newline Truncation...
 #
-# usage: MANUAL_EDIT "${rundir}" "${datafile}"
+# usage: MANUAL_EDIT "${rundir}" "${datafile}" \
+#    "${xml_tag}" "${meta_name}" "${new_value}"
 #
 MANUAL_EDIT()
 {
@@ -730,9 +792,9 @@ MANUAL_EDIT()
 
 	# Pre-Edit Prompt...
 	echo -e "\nReady to Manually Edit the Data File:"
-	echo -e "\t[${_datafile}.NEW-$$]"
-	echo -e "\tin [${_rundir}]"
-	echo "to Change ${_meta_name} to ${_new_value}."
+	echo -e "\n\t[${_datafile}.NEW-$$]"
+	echo -e "\n\tin [${_rundir}]"
+	echo -e "\nto Change ${_meta_name} to \"${_new_value}\"."
 	CHECK_PROCEED "Proceed"
 	if [[ $? != 0 ]]; then
 		echo -e "\nOK, Skipping This Run Number."
@@ -749,6 +811,8 @@ MANUAL_EDIT()
 	fi
 
 	# See If File Was Edited/Changed At All...
+
+	echo -e "\nVerifying Whether Data File was Modified:"
 
 	${CMP} "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
 	ckcmp=$?
@@ -774,17 +838,19 @@ MANUAL_EDIT()
 	fi
 
 	# Install and Check Modified Data File...
-	INSTALL_AND_CHECK_DATAFILE "${_rundir}" "${_datafile}"
+	INSTALL_AND_CHECK_DATAFILE "${_rundir}" "${_datafile}" \
+		"${_xml_tag}" "${_meta_name}" "${_new_value}"
 	ckinstall=$?
 
 	if [[ $ckinstall != 0 ]]; then
 		echo -e -n "\nERROR Installing and Checking "
 		echo -e "Manually Edited Data File for Run ${run}!"
-		return ${ckinstall}
+	else
+		echo -e -n "\nManual Edit of Data File Successful "
+		echo "for Run ${run}."
 	fi
 
-	# Manual Edit Successful!
-	return 0
+	return ${ckinstall}
 }
 
 UPDATE_PROPOSAL_METADATA()
@@ -825,12 +891,14 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e "from Stream File for Run ${run}!\n"
 		echo -e "\t[${ipts_old_line}]"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${xml_tag}" "${meta_name}" "${new_value}"
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
+			return 30
+		else
+			return 0
 		fi
-		return 30
 	fi
 
 	# Make Sure We Only Got *1* Old Proposal Meta-Data Line...! ;-D
@@ -839,14 +907,16 @@ UPDATE_PROPOSAL_METADATA()
 	if [[ ${ckoneline} != 1 ]]; then
 		echo -e -n "\nERROR: Multiple ${_meta_name} Lines Found "
 		echo -e "for Run ${run}!\n"
-		echo -e "${ipts_old_line}\n"
+		echo -e "${ipts_old_line}"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${xml_tag}" "${meta_name}" "${new_value}"
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
+			return 31
+		else
+			return 0
 		fi
-		return 31
 	fi
 
 	echo -e "\nFound Old ${_meta_name} Line for Run ${run}:"
@@ -860,12 +930,14 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e -n "\nERROR Extracting Old ${_meta_name} from Stream File "
 		echo "for Run ${run}!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${xml_tag}" "${meta_name}" "${new_value}"
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
+			return 32
+		else
+			return 0
 		fi
-		return 32
 	fi
 
 	echo -e "\nFound Old ${_meta_name} for Run ${run}: [${_old_value}]"
@@ -919,13 +991,15 @@ UPDATE_PROPOSAL_METADATA()
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old ${_meta_name} Line!"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
-					"${xml_tag}" "${meta_name}" "${new_value}"
+					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
+					skip_run=1
+					break
+				else
+					continue
 				fi
-				skip_run=1
-				break
 			fi
 
 			# Take Any Space We Can Get...! ;-D
@@ -936,13 +1010,15 @@ UPDATE_PROPOSAL_METADATA()
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
-					"${xml_tag}" "${meta_name}" "${new_value}"
+					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
+					skip_run=1
+					break
+				else
+					continue
 				fi
-				skip_run=1
-				break
 			fi
 
 		done
@@ -975,12 +1051,14 @@ UPDATE_PROPOSAL_METADATA()
 	if [[ $cksedprop != 0 ]]; then
 		echo -e "\nERROR Substituting ${_meta_name} in Meta-Data Line...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${xml_tag}" "${meta_name}" "${new_value}"
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
+			return 34
+		else
+			return 0
 		fi
-		return 34
 	fi
 
 	echo -e "\nFinal ${_meta_name} Line Substitution:"
@@ -1230,9 +1308,10 @@ for run in ${RUN_NUMBERS} ; do
 	ckseddata=$?
 
 	if [[ $ckseddata != 0 ]]; then
-		echo -e "\nERROR Substituting New Proposal Id into Data File...!"
+		echo -e -n "\nERROR Substituting New Proposal Meta-Data "
+		echo "into Data File...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"proposal_" "Proposal Meta-Data" "${IPTS_NEW}"
+			"run_number" "Proposal Meta-Data" "${IPTS_NEW}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
@@ -1241,7 +1320,19 @@ for run in ${RUN_NUMBERS} ; do
 	fi
 
 	# Install and Check Modified Data File...
-	INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
+	INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}" \
+		"run_number" "Proposal Meta-Data" "${IPTS_NEW}"
+	ckinstall=$?
+
+	if [[ $ckinstall != 0 ]]; then
+		echo -e -n "\nERROR Installing and Checking "
+		echo -e "Modified Data File for Run ${run}!"
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Re-Submit Modified Run for Translation to NeXus...
+	RESUBMIT_RUN "${rundir}" "${datafile}"
 
 done
 
