@@ -82,7 +82,7 @@ PARSE_RUN_NUMBERS()
 	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
 	cksed=$?
 
-	if [[ $cksed != 0 ]]; then
+	if [[ ${cksed} != 0 ]]; then
 		echo -e "\nERROR Parsing Comma-Separated Run Number List...!"
 		echo -e "\nBailing..."
 		exit 111
@@ -293,7 +293,7 @@ if [[ -z "${STS_PORT}" ]]; then
 		| ${AWK} '{print $3}'`
 	ckstsport=$?
 
-	if [[ $ckstsport != 0 ]]; then
+	if [[ ${ckstsport} != 0 ]]; then
 		echo -e -n "\nError Determining STS Port "
 		echo "for \"${STS_SERVICE}\" Service on ${STS_HOST}...!"
 		USAGE
@@ -416,7 +416,7 @@ INSTALL_AND_CHECK_DATAFILE()
 			"${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
 		ckcp=$?
 
-		if [[ $ckcp != 0 ]]; then
+		if [[ ${ckcp} != 0 ]]; then
 			echo -e -n "\nERROR Copying ${SMS_WHICH_DATA_FILE} Original "
 			echo "Stream File for Backup of Run ${run}!"
 			CHECK_PROCEED
@@ -441,7 +441,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	${MV} "${_rundir}/${_datafile}.NEW-$$" "${_rundir}/${_datafile}"
 	ckmvdata=$?
 
-	if [[ $ckmvdata != 0 ]]; then
+	if [[ ${ckmvdata} != 0 ]]; then
 		echo -e -n "\nERROR Moving Modified Stream File Over "
 		echo -n "${SMS_WHICH_DATA_FILE} Original Stream File "
 		echo "for Run ${run}!"
@@ -500,7 +500,7 @@ RESUBMIT_RUN()
 		"${_rundir}/proposal-${IPTS_NEW}"
 	ckmvprop=$?
 
-	if [[ $ckmvprop != 0 ]]; then
+	if [[ ${ckmvprop} != 0 ]]; then
 		echo -e -n "\nERROR Re-Naming Proposal Placeholder File "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
@@ -536,7 +536,7 @@ RESUBMIT_RUN()
 
 	echo
 
-	if [[ $cksts != 0 ]]; then
+	if [[ ${cksts} != 0 ]]; then
 		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STS "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
@@ -562,7 +562,7 @@ RESUBMIT_RUN()
 			| ${AWK} '{print $3}'`
 		ckfac=$?
 
-		if [[ $ckfac != 0 || -z ${FACILITY} ]]; then
+		if [[ ${ckfac} != 0 || -z ${FACILITY} ]]; then
 			echo -e -n "\nERROR Determining Facility from SMS Config "
 			echo "for Run ${run}!"
 			echo -e "\n\t${SMS_CONFIG}"
@@ -582,7 +582,7 @@ RESUBMIT_RUN()
 			| ${GREP} -v ";" | ${AWK} '{print $3}'`
 		ckinst=$?
 
-		if [[ $ckinst != 0 || -z ${INST} ]]; then
+		if [[ ${ckinst} != 0 || -z ${INST} ]]; then
 			echo -e -n "\nERROR Determining Beamline Short Name "
 			echo "from SMS Config for Run ${run}!"
 			echo -e "\n\t${SMS_CONFIG}"
@@ -649,7 +649,7 @@ RESUBMIT_RUN()
 		${FINDNEXUS} -i ${INST} ${run}
 		ckfindnexus=$?
 
-		if [[ $ckfindnexus != 0 ]]; then
+		if [[ ${ckfindnexus} != 0 ]]; then
 			echo -e -n "\nERROR Checking FindNeXus to Verify "
 			echo "the Proposal Move for Run ${run}!"
 			echo -e "\n\t${FINDNEXUS} -i ${INST} ${run}"
@@ -704,7 +704,7 @@ NotifyEmailContent
 
 		ckmail=$?
 
-		if [[ $ckmail != 0 ]]; then
+		if [[ ${ckmail} != 0 ]]; then
 			echo -e -n "\nERROR Sending Email Notification "
 			echo "to Catalog Admins for Run ${run}!"
 			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
@@ -784,7 +784,7 @@ MANUAL_EDIT()
 	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
 	ckcp=$?
 
-	if [[ $ckcp != 0 ]]; then
+	if [[ ${ckcp} != 0 ]]; then
 		echo -e -n "\nERROR Copying ${SMS_WHICH_DATA_FILE} Original "
 		echo "Stream File to Edit for Run ${run}!"
 		return 23
@@ -805,7 +805,7 @@ MANUAL_EDIT()
 	${Editor} "+/${_xml_tag}" "${_rundir}/${_datafile}.NEW-$$"
 	ckedit=$?
 
-	if [[ $ckedit != 0 ]]; then
+	if [[ ${ckedit} != 0 ]]; then
 		echo -e "\nERROR Manually Editing Data File for Run ${run}!"
 		return 25
 	fi
@@ -817,7 +817,7 @@ MANUAL_EDIT()
 	${CMP} "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
 	ckcmp=$?
 
-	if [[ $ckcmp == 0 ]]; then
+	if [[ ${ckcmp} == 0 ]]; then
 		echo -e -n "\nNo Changes Made to ${SMS_WHICH_DATA_FILE} Original "
 		echo "Stream File for Run ${run}."
 		return 26
@@ -831,7 +831,7 @@ MANUAL_EDIT()
 	${TRUNCATE} --size=-1 "${_rundir}/${_datafile}.NEW-$$"
 	cktrunc=$?
 
-	if [[ $cktrunc != 0 ]]; then
+	if [[ ${cktrunc} != 0 ]]; then
 		echo -e -n "\nERROR Truncating Newline from "
 		echo -e "Manually Edited Data File for Run ${run}!"
 		return 27
@@ -842,7 +842,7 @@ MANUAL_EDIT()
 		"${_xml_tag}" "${_meta_name}" "${_new_value}"
 	ckinstall=$?
 
-	if [[ $ckinstall != 0 ]]; then
+	if [[ ${ckinstall} != 0 ]]; then
 		echo -e -n "\nERROR Installing and Checking "
 		echo -e "Manually Edited Data File for Run ${run}!"
 	else
@@ -851,6 +851,120 @@ MANUAL_EDIT()
 	fi
 
 	return ${ckinstall}
+}
+
+LOOKUP_PROPOSAL_METADATA()
+{
+	local _xml_tag="$1"
+	shift
+
+	local _meta_name="$1"
+	shift
+
+	local _new_value="$1"
+	shift
+
+	local _old_value_var="$1"
+	shift
+
+	local _allow_multi="NoMulti"
+	if [[ "$1" == "AllowMulti" ]]; then
+		_allow_multi="$1"
+		shift
+	fi
+
+	echo -e -n "\nLOOKUP_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
+	echo "= \"${_xml_tag}\""
+
+	if [[ "${_allow_multi}" == "AllowMulti" ]]; then
+		echo -e "\t[Allow Multiple Lookup Results!]"
+	fi
+
+	#
+	# Determine the Current Proposal Meta-Data for This Run...
+	#
+	# - Fortunately, the Proposal Meta-Data is Stored in the RunInfo Packet
+	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
+	#
+	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
+	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
+	# - Also, This Covers the Case where the Original Proposal was
+	# _Not_ of the form "IPTS-*"... ;-D
+	#
+
+	# Note: Global Reference to "$ipts_old_line"...! ;-D
+	ipts_old_line=`${GREP} --text "<${_xml_tag}>" "${rundir}/${datafile}"`
+	ckoldiptsline=$?
+
+	if [[ ${ckoldiptsline} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
+		echo -e "from Stream File for Run ${run}!\n"
+		echo -e "\t[${ipts_old_line}]"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 30
+		else
+			return 255   # Pass-Thru Return...!
+		fi
+	fi
+
+	# Make Sure We Only Got *1* Old Proposal Meta-Data Line...! ;-D
+	ckoneline=`echo "${ipts_old_line}" | ${WC} | ${AWK} '{print $1}'`
+
+	if [[ "${_allow_multi}" == "NoMulti" ]]; then
+		if [[ ${ckoneline} != 1 ]]; then
+			echo -e -n "\nERROR: Multiple ${_meta_name} Lines Found "
+			echo -e "for Run ${run}!\n"
+			echo -e "${ipts_old_line}"
+			MANUAL_EDIT "${rundir}" "${datafile}" \
+				"${_xml_tag}" "${_meta_name}" "${_new_value}"
+			if [[ $? != 0 ]]; then
+				CHECK_PROCEED
+				echo -e "\nContinuing with Next Run Number..."
+				return 31
+			else
+				return 255   # Pass-Thru Return...!
+			fi
+		fi
+	else
+		echo -e "\nLookup Found ${ckoneline} Results."
+	fi
+
+	echo -e "\nFound Old ${_meta_name} Line(s) for Run ${run}:"
+	echo -e "\t[${ipts_old_line}]"
+
+	local _old_value=`echo "${ipts_old_line}" \
+		| ${AWK} -F "[<>]" '{print $3}'`
+	ckoldipts=$?
+
+	if [[ ${ckoldipts} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} from Stream File "
+		echo "for Run ${run}!"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 32
+		else
+			return 255   # Pass-Thru Return...!
+		fi
+	fi
+
+	echo -e "\nFound Old ${_meta_name} for Run ${run}: [${_old_value}]"
+
+	#
+	# Set/Save Old Value Global, If Specified...
+	#
+
+	if [[ -n "${_old_value_var}" ]]; then
+		eval "${_old_value_var}=\"${_old_value}\""
+	fi
+
+	return 0
 }
 
 UPDATE_PROPOSAL_METADATA()
@@ -871,76 +985,20 @@ UPDATE_PROPOSAL_METADATA()
 	echo "= \"${_xml_tag}\""
 	echo -e "\t-> New Value: [${_new_value}]"
 
-	#
-	# Determine the Current Proposal Meta-Data for This Run...
-	#
-	# - Fortunately, the Proposal Meta-Data is Stored in the RunInfo Packet
-	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
-	#
-	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
-	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
-	# - Also, This Covers the Case where the Original Proposal was
-	# _Not_ of the form "IPTS-*"... ;-D
-	#
+	update_old_value=""
 
-	ipts_old_line=`${GREP} --text "<${_xml_tag}>" "${rundir}/${datafile}"`
-	ckoldiptsline=$?
+	LOOKUP_PROPOSAL_METADATA \
+		"${_xml_tag}" "${_meta_name}" "${_new_value}" \
+		"update_old_value"
+	cklookup=$?
 
-	if [[ $ckoldiptsline != 0 ]]; then
-		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
-		echo -e "from Stream File for Run ${run}!\n"
-		echo -e "\t[${ipts_old_line}]"
-		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${_xml_tag}" "${_meta_name}" "${_new_value}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 30
-		else
-			return 0
-		fi
+	# Pass-Thru Return...
+	if [[ ${cklookup} == 255 ]]; then
+		return 0
+	# Error Return...
+	elif [[ ${cklookup} != 0 ]]; then
+		return ${cklookup}
 	fi
-
-	# Make Sure We Only Got *1* Old Proposal Meta-Data Line...! ;-D
-	ckoneline=`echo "${ipts_old_line}" | ${WC} | ${AWK} '{print $1}'`
-
-	if [[ ${ckoneline} != 1 ]]; then
-		echo -e -n "\nERROR: Multiple ${_meta_name} Lines Found "
-		echo -e "for Run ${run}!\n"
-		echo -e "${ipts_old_line}"
-		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${_xml_tag}" "${_meta_name}" "${_new_value}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 31
-		else
-			return 0
-		fi
-	fi
-
-	echo -e "\nFound Old ${_meta_name} Line for Run ${run}:"
-	echo -e "\t[${ipts_old_line}]"
-
-	local _old_value=`echo "${ipts_old_line}" \
-		| ${AWK} -F "[<>]" '{print $3}'`
-	ckoldipts=$?
-
-	if [[ $ckoldipts != 0 ]]; then
-		echo -e -n "\nERROR Extracting Old ${_meta_name} from Stream File "
-		echo "for Run ${run}!"
-		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${_xml_tag}" "${_meta_name}" "${_new_value}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 32
-		else
-			return 0
-		fi
-	fi
-
-	echo -e "\nFound Old ${_meta_name} for Run ${run}: [${_old_value}]"
 
 	#
 	# Compare the *Length* of the Old and New Proposal Meta-Data,
@@ -954,13 +1012,13 @@ UPDATE_PROPOSAL_METADATA()
 
 	# If New Meta-Data is _Shorter_ than Old Meta-Data,
 	# Just Pad with White Space...
-	if [[ ${#_new_value} -lt ${#_old_value} ]]; then
+	if [[ ${#_new_value} -lt ${#update_old_value} ]]; then
 
-		len_diff=$(( ${#_old_value} - ${#_new_value} ))
+		len_diff=$(( ${#update_old_value} - ${#_new_value} ))
 
 		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Shorter_ than Old [${_old_value}]:"
-		echo -e -n "\t${#_old_value} - ${#_new_value} = ${len_diff} "
+		echo "_Shorter_ than Old [${update_old_value}]:"
+		echo -e -n "\t${#update_old_value} - ${#_new_value} = ${len_diff} "
 		echo "Spaces to Pad."
 
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
@@ -971,13 +1029,13 @@ UPDATE_PROPOSAL_METADATA()
 	
 	# If New Meta-Data is _Longer_ than Old Meta-Data,
 	# Just Pad with White Space...
-	elif [[ ${#_new_value} -gt ${#_old_value} ]]; then
+	elif [[ ${#_new_value} -gt ${#update_old_value} ]]; then
 
-		len_diff=$(( ${#_new_value} - ${#_old_value} ))
+		len_diff=$(( ${#_new_value} - ${#update_old_value} ))
 
 		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Longer_ than Old [${_old_value}]:"
-		echo -e -n "\t${#_new_value} - ${#_old_value} = ${len_diff} "
+		echo "_Longer_ than Old [${update_old_value}]:"
+		echo -e -n "\t${#_new_value} - ${#update_old_value} = ${len_diff} "
 		echo "Spaces to Remove from Line!"
 
 		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
@@ -987,7 +1045,7 @@ UPDATE_PROPOSAL_METADATA()
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
 
 			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " "`
-			if [[ "$ckspc" != "1" ]]; then
+			if [[ "${ckspc}" != "1" ]]; then
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old ${_meta_name} Line!"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1006,7 +1064,7 @@ UPDATE_PROPOSAL_METADATA()
 			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
 			cksedspc=$?
 
-			if [[ $cksedspc != 0 ]]; then
+			if [[ ${cksedspc} != 0 ]]; then
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1034,8 +1092,8 @@ UPDATE_PROPOSAL_METADATA()
 	else
 
 		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Same_ Length as Old [${_old_value}]:"
-		echo -e "\t${#_new_value} = ${#_old_value}"
+		echo "_Same_ Length as Old [${update_old_value}]:"
+		echo -e "\t${#_new_value} = ${#update_old_value}"
 
 	fi
 
@@ -1045,10 +1103,10 @@ UPDATE_PROPOSAL_METADATA()
 	#
 
 	ipts_new_line=`echo "${ipts_new_line}" \
-		| ${SED} "s/${_old_value}/${_new_value}/"`
+		| ${SED} "s/${update_old_value}/${_new_value}/"`
 	cksedprop=$?
 
-	if [[ $cksedprop != 0 ]]; then
+	if [[ ${cksedprop} != 0 ]]; then
 		echo -e "\nERROR Substituting ${_meta_name} in Meta-Data Line...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
@@ -1078,7 +1136,7 @@ UPDATE_PROPOSAL_METADATA()
 	#
 
 	if [[ -n "${_old_value_var}" ]]; then
-		eval "${_old_value_var}=\"${_old_value}\""
+		eval "${_old_value_var}=\"${update_old_value}\""
 	fi
 
 	#
@@ -1103,7 +1161,7 @@ for run in ${RUN_NUMBERS} ; do
 	rundir=`${LS} -d ${SMS_DATA}/*/*-run-${run} 2>&1`
 	ckrundir=$?
 
-	if [[ $ckrundir != 0 ]]; then
+	if [[ ${ckrundir} != 0 ]]; then
 		echo -e "\nERROR Locating SMS Raw Data Directory for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
@@ -1131,7 +1189,7 @@ for run in ${RUN_NUMBERS} ; do
 	fi
 	ckdatafile=$?
 
-	if [[ $ckdatafile != 0 ]]; then
+	if [[ ${ckdatafile} != 0 ]]; then
 		echo -e -n "\nERROR Locating ${SMS_WHICH_DATA_FILE} ADARA Output "
 		echo "Stream File for Run ${run}!"
 		CHECK_PROCEED
@@ -1197,7 +1255,7 @@ for run in ${RUN_NUMBERS} ; do
 	ckpropmeta=$?
 
 	do_propmeta=1
-	if [[ $ckpropmeta != 0 || -z "${prop_json}" ]]; then
+	if [[ ${ckpropmeta} != 0 || -z "${prop_json}" ]]; then
 		echo -e -n "\nError Looking Up Proposal Meta-Data "
 		echo "for \"${IPTS_NEW}\"...!"
 		echo -e "\nSkipping Title and User Substitution..."
@@ -1227,6 +1285,8 @@ for run in ${RUN_NUMBERS} ; do
 
 		echo -e "\nSearching Proposal Meta-Data for Title and Users:"
 
+		echo -e "\n---------"
+
 		for (( i = 0 ; i < ${#prop_meta[@]} ; i += 2 )); do
 
 			key="${prop_meta[$i]}"
@@ -1243,6 +1303,8 @@ for run in ${RUN_NUMBERS} ; do
 			fi
 
 		done
+
+		echo -e "\n---------"
 
 		#
 		# Substitute Proposal Title
@@ -1307,7 +1369,7 @@ for run in ${RUN_NUMBERS} ; do
 		> "${rundir}/${datafile}.NEW-$$"
 	ckseddata=$?
 
-	if [[ $ckseddata != 0 ]]; then
+	if [[ ${ckseddata} != 0 ]]; then
 		echo -e -n "\nERROR Substituting New Proposal Meta-Data "
 		echo "into Data File...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1324,7 +1386,7 @@ for run in ${RUN_NUMBERS} ; do
 		"run_number" "Proposal Meta-Data" "${IPTS_NEW}"
 	ckinstall=$?
 
-	if [[ $ckinstall != 0 ]]; then
+	if [[ ${ckinstall} != 0 ]]; then
 		echo -e -n "\nERROR Installing and Checking "
 		echo -e "Modified Data File for Run ${run}!"
 		echo -e "\nContinuing with Next Run Number..."
