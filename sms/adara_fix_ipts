@@ -934,7 +934,7 @@ LOOKUP_PROPOSAL_METADATA()
 	fi
 
 	echo -e "\nFound Old ${_meta_name} Line(s) for Run ${run}:"
-	echo -e "\t[${ipts_old_line}]"
+	echo -e "\n${ipts_old_line}"   # Allow Self-Indenting from XML Line(s)
 
 	local _old_value=`echo "${ipts_old_line}" \
 		| ${AWK} -F "[<>]" '{print $3}'`
@@ -954,7 +954,8 @@ LOOKUP_PROPOSAL_METADATA()
 		fi
 	fi
 
-	echo -e "\nFound Old ${_meta_name} for Run ${run}: [${_old_value}]"
+	echo -e "\nFound Old ${_meta_name} for Run ${run}:"
+	echo -e "\n\t["${_old_value}"]"   # Collapse Multi-Line Values
 
 	#
 	# Set/Save Old Value Global, If Specified...
@@ -1329,23 +1330,145 @@ for run in ${RUN_NUMBERS} ; do
 
 		if [[ -n "${USERS_NEW}" ]]; then
 
-			# Separate User List...
-			user_list=`echo "${USERS_NEW}" | ${SED} "s/;/ /g"`
+			# Extract New User List...
+			new_user_list=`echo "${USERS_NEW}" | ${SED} "s/;/ /g"`
 
-			for user in ${user_list} ; do
+			old_user_list=""
 
-				USER_OLD=""
+			LOOKUP_PROPOSAL_METADATA \
+				"id" "Proposal Users" "${new_user_list}" \
+				"old_user_list" "AllowMulti"
+			cklookup=$?
 
-				UPDATE_PROPOSAL_METADATA "id" "Proposal User" \
-					"${user}" "USERS_OLD"
-				ckupdate=$?
+			# Something Happened During Lookup...
+			if [[ ${cklookup} != 0 ]]; then
 
-				if [[ ${ckupdate} != 0 ]]; then
+				# [Not] Pass-Thru Return... (Already Manually Edited)
+				if [[ ${cklookup} != 255 ]]; then
+					# Error Return...
 					echo -e "\nWARNING: Unable to Update Proposal User...!"
 					echo -e "\nContinuing..."
 				fi
 
-			done
+			# Lookup Succeeded, Reconcile New vs. Old User Lists...! ;-D
+			else
+
+				echo -e "\nNew User List to Reconcile:"
+				echo -e "\n\t[${new_user_list}]"
+
+				# Collapse Multi-Line Old User List... (Easier Later! ;-D)
+				tmp=""
+				for old_user in ${old_user_list} ; do
+					tmp="${tmp} ${old_user}"
+				done
+				old_user_list="${tmp}"
+
+				# Check Each New User in Turn, It May Already Be There! :-D
+
+				for new_user in ${new_user_list} ; do
+
+					echo -e -n "\nLooking for New User [${new_user}] "
+					echo "in Old User List..."
+
+					found=0
+
+					for old_user in ${old_user_list} ; do
+
+						if [[ "${old_user}" == "${new_user}" ]]; then
+
+							echo -e -n "\n\tFound New User [${new_user}] "
+							echo "in Old User List!"
+
+							echo -e -n "\n\tRemoving User [${new_user}] "
+							echo "from Both Lists - Ok As Is!"
+
+							new_user_list=`echo "$new_user_list" \
+								| ${SED} -e "s/${new_user}//"`
+
+							old_user_list=`echo "$old_user_list" \
+								| ${SED} -e "s/${old_user}//"`
+
+							found=1
+
+							break
+
+						fi
+
+					done
+
+					if [[ $found == 1 ]]; then
+						continue
+					else
+						echo -e -n "\n*** User [${new_user}] Not Found... "
+						echo "[Needs Adding]"
+					fi
+
+				done
+
+				# Now Substitute In Any Omitted New Users
+				# In Place of Any Unnecessary Old Users...! ;-D
+
+				echo -e "\nRemaining New User List:"
+				echo -e -n "\n\t["
+				echo ${new_user_list}"]" # Collapse Extraneous White Space
+
+				echo -e "\nRemaining Old User List:"
+				echo -e -n "\n\t["
+				echo ${old_user_list}"]" # Collapse Extraneous White Space
+
+				for new_user in ${new_user_list} ; do
+
+					# Are There Any Old Users Left to Substitute?
+					if [[ -n ${old_user_list} ]]; then
+
+						# Get Next Unused/Unneeded Old Proposal User...
+						old_user=`echo "${old_user_list}" \
+							| ${AWK} '{print $1}'`
+
+						### ERROR CHECK HERE...? ;-Q
+
+						# Remove This New User from the List...
+						new_user_list=`echo "$new_user_list" \
+							| ${SED} -e "s/${new_user}//"`
+
+						# Remove This Old User from the List...
+						old_user_list=`echo "$old_user_list" \
+							| ${SED} -e "s/${old_user}//"`
+
+						echo -e -n "\nSubstituting New User [${new_user}] "
+						echo "for Old User [${old_user}]."
+
+						USER_OLD=""
+
+						UPDATE_PROPOSAL_METADATA \
+							"id>${old_user}</id" "Proposal User" \
+							"${new_user}" "USER_OLD"
+						ckupdate=$?
+
+						if [[ ${ckupdate} != 0 ]]; then
+							echo -e -n "\nWARNING: Unable to Substitute "
+							echo -n "New Proposal User [${new_user}] "
+							echo "for Old User [${old_user}]...!"
+							echo -e "\nContinuing..."
+						fi
+
+						### ERROR CHECK $USER_OLD == $old_user HERE...? ;-Q
+
+					else
+
+						echo -e -n "\nWARNING: Unable to Substitute "
+						echo -n "New Proposal User [${new_user}] "
+						echo "for Any Old Users - List Depleted...!"
+						echo -e "\nGiving Up on Remaining New User List:"
+						echo -e "\n\t[${new_user_list}]"
+
+						break
+
+					fi
+
+				done
+
+			fi
 
 		fi
 
