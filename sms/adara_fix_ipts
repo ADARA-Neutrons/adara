@@ -982,9 +982,19 @@ UPDATE_PROPOSAL_METADATA()
 	local _old_value_var="$1"
 	shift
 
+	local _delete_value="NoDelete"
+	if [[ "$1" == "DeleteValue" ]]; then
+		_delete_value="$1"
+		shift
+	fi
+
 	echo -e -n "\nUPDATE_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
 	echo "= \"${_xml_tag}\""
 	echo -e "\t-> New Value: [${_new_value}]"
+
+	if [[ "${_delete_value}" == "DeleteValue" ]]; then
+		echo -e "\t\t[DELETE VALUE!!!]"
+	fi
 
 	update_old_value=""
 
@@ -1011,9 +1021,26 @@ UPDATE_PROPOSAL_METADATA()
 	# Starting Point for New Proposal Meta-Data Substitution Line...
 	ipts_new_line="${ipts_old_line}"
 
+	# If DELETING This Value, Perform Alternate Space-Preserving Substitute
+	if [[ "${_delete_value}" == "DeleteValue" ]]; then
+
+		len_diff=$(( ${#ipts_new_line} ))
+
+		echo -e -n "\nDeleting This Old ${_meta_name} "
+		echo "Value [${update_old_value}]:"
+		echo -e "\t${len_diff} Spaces to Post-Pad."
+
+		ipts_new_line=""
+		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+			ipts_new_line="${ipts_new_line} "
+		done
+
+		echo -e "\nModified New ${_meta_name} Line is:"
+		echo -e "\t[${ipts_new_line}]"
+
 	# If New Meta-Data is _Shorter_ than Old Meta-Data,
 	# Just Pad with White Space...
-	if [[ ${#_new_value} -lt ${#update_old_value} ]]; then
+	elif [[ ${#_new_value} -lt ${#update_old_value} ]]; then
 
 		len_diff=$(( ${#update_old_value} - ${#_new_value} ))
 
@@ -1027,7 +1054,7 @@ UPDATE_PROPOSAL_METADATA()
 		done
 
 		echo -e "\nResulting New ${_meta_name} is: [${_new_value}]"
-	
+
 	# If New Meta-Data is _Longer_ than Old Meta-Data,
 	# Just Pad with White Space...
 	elif [[ ${#_new_value} -gt ${#update_old_value} ]]; then
@@ -1445,14 +1472,15 @@ for run in ${RUN_NUMBERS} ; do
 							"${new_user}" "USER_OLD"
 						ckupdate=$?
 
-						if [[ ${ckupdate} != 0 ]]; then
+						if [[ ${ckupdate} != 0
+								|| "${USER_OLD}" != "${old_user}" ]]; then
 							echo -e -n "\nWARNING: Unable to Substitute "
 							echo -n "New Proposal User [${new_user}] "
 							echo "for Old User [${old_user}]...!"
+							echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
+							echo "vs. [${old_user}]"
 							echo -e "\nContinuing..."
 						fi
-
-						### ERROR CHECK $USER_OLD == $old_user HERE...? ;-Q
 
 					else
 
@@ -1464,6 +1492,36 @@ for run in ${RUN_NUMBERS} ; do
 
 						break
 
+					fi
+
+				done
+
+				#
+				# Now Clear Out Any Unnecessary Old User Slots...
+				#
+
+				echo -e "\nRemaining Unused Old User List:"
+				echo -e -n "\n\t["
+				echo ${old_user_list}"]" # Collapse Extraneous White Space
+
+				for old_user in ${old_user_list} ; do
+
+					echo -e "\nClearing Old User [${old_user}]..."
+
+					USER_OLD=""
+
+					UPDATE_PROPOSAL_METADATA \
+						"id>${old_user}</id" "Proposal User" \
+						"" "USER_OLD" "DeleteValue"
+					ckupdate=$?
+
+					if [[ ${ckupdate} != 0
+							|| "${USER_OLD}" != "${old_user}" ]]; then
+						echo -e -n "\nWARNING: Unable to Clear "
+						echo "Old Proposal User [${old_user}]...!"
+						echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
+						echo "vs. [${old_user}]"
+						echo -e "\nContinuing..."
 					fi
 
 				done
