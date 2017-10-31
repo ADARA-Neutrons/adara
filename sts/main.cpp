@@ -119,6 +119,48 @@ moveFile( const string &a_source, const string &a_dest_path, const string &a_des
     }
 }
 
+/**
+ * @brief long_syslog - Split a Long Log Message into Multiple Pieces
+ * @param a_label - Text Label for Each Log Message
+ * @param a_msg - Full Log Message Text
+ *
+ * This method Splits a Long Log Message into Multiple Pieces,
+ * so that (R)Syslog doesn't just Truncate some Long Output
+ * at 8K Octets (2048 characters), by default.
+ */
+void
+long_syslog( const string &a_label, const string &a_msg )
+{
+    size_t msg_len = a_msg.length();
+    size_t msg_index = 0;
+    size_t msg_chunk = 1536; // Leave Room for Special Characters... ;-b
+    bool done = false;
+    bool cont = false;
+
+    while ( !done )
+    {
+        // Compute (Possibly) "Partial" Length for Next Log Message...
+        size_t len = msg_len;
+        if ( len > msg_chunk ) {
+            len = msg_chunk;
+            msg_len -= msg_chunk;
+        }
+        else {
+            done = true;
+        }
+
+        syslog( LOG_INFO, "[%i] %s%s%s%s", g_pid,
+            a_label.c_str(),
+            ( ( cont ) ? " (Cont.) ..." : " " ),
+            a_msg.substr( msg_index, len ).c_str(),
+            ( ( done ) ? "" : "..." ) );
+        usleep(30000); // give syslog a chance...
+
+        msg_index += len;
+
+        cont = true;
+    }
+}
 
 /**
  * @brief main - Entry point of STS process
@@ -397,8 +439,7 @@ int main( int argc, char** argv )
 
         sms_reason = e.toString( true, true );
 
-        syslog( LOG_INFO,
-            "[%i] STS failed: %s", g_pid, sms_reason.c_str() );
+        long_syslog( "STS failed:", sms_reason );
     }
     catch( exception &e )
     {
@@ -406,8 +447,7 @@ int main( int argc, char** argv )
         sms_code = STS::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        syslog( LOG_INFO,
-            "[%i] STS failed: Exception: %s", g_pid, sms_reason.c_str() );
+        long_syslog( "STS failed: Exception:", sms_reason );
     }
     catch( ... )
     {
