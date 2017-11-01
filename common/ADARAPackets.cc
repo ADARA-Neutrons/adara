@@ -1,6 +1,7 @@
-#include <boost/lexical_cast.hpp>
 
 #include <string.h>
+#include <string>
+#include <sstream>
 
 #include "ADARAPackets.h"
 
@@ -81,7 +82,7 @@ Packet::~Packet()
 		delete [] m_data;
 }
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 RawDataPkt::RawDataPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -99,7 +100,7 @@ RawDataPkt::RawDataPkt(const RawDataPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
 	RawDataPkt(data, len)
@@ -117,7 +118,7 @@ MappedDataPkt::MappedDataPkt(const MappedDataPkt &pkt) :
 	RawDataPkt(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len),
@@ -133,8 +134,47 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 			&& m_payload_len < 120)
 		throw invalid_packet("Newer RTDL Packet is too short");
 
-	if ((m_fields[4] >> 24) != 4)
-		throw invalid_packet("Missing ring period");
+	// "Missing Ring Period" - General RTDL Error...
+	//   - Log RTDL Packet Contents for Diagnostics
+	if ((m_fields[4] >> 24) != 4) {
+		std::stringstream ss;
+		ss << "RTDL Packet";
+		ss << " (0x" << std::hex << m_base_type << std::dec;
+		ss << ",v" << m_version << ")";
+		ss << " [" << ( m_payload_len + 16 ) << " bytes]";
+		ss << " - Missing ring period: ";
+		ss << ( (uint32_t) ( m_pulseId >> 32 ) );
+		ss << "." << ( (uint32_t) m_pulseId );
+		ss << " cycle=" << ( m_fields[1] & 0x3ff );
+		ss << " badCycle=" << ( !!(m_fields[1] & 0x40000000) );
+		ss << " vetoFlags=0x"
+			<< std::hex << ( (m_fields[1] >> 10) & 0xfff ) << std::dec;
+		ss << " badVeto=" << ( !!(m_fields[1] & 0x80000000) );
+		ss << " timing=0x"
+			<< std::hex << ( (m_fields[1] >> 22) & 0xff ) << std::dec;
+		ss << " dataFlags="
+			<< ( ( m_version >= 0x01 ) ? "true" : "false" );
+		ss << " 0x"
+			<< std::hex << ( (m_fields[0] >> 27) & 0x1f ) << std::dec;
+		ss << " flavor="
+			<< static_cast<PulseFlavor::Enum>( (m_fields[0] >> 24) & 0x7 );
+		ss << " intrapulse="
+			<< ( (uint64_t) m_fields[2] * 100 ) << "ns";
+		ss << " tofOffset="
+			<< ( (uint64_t) (m_fields[3] & 0x7fffffff) * 100 ) << "ns";
+		ss << " tofCorrected="
+			<< ( ( !!(m_fields[3] & 0x80000000) ) ? "corrected" : "raw" );
+		ss << " charge="
+			<< ( (uint64_t) ( m_fields[0] & 0x00ffffff ) ) << "pC";
+		ss << " ringPeriod=" << ( m_fields[4] & 0xffffff ) << "ps";
+		for ( uint32_t i=0 ; i < 25 ; i++ ) {
+			ss << " FNA" << i << "="
+				<< ( (m_fields[ 5 + i ] >> 24) & 0xff )
+				<< "/" << ( m_fields[ 5 + i ] & 0xffffff );
+		}
+		ss << ".";
+		throw invalid_packet(ss.str());
+	}
 }
 
 RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
@@ -144,7 +184,7 @@ RTDLPkt::RTDLPkt(const RTDLPkt &pkt) :
 	// Note: RTDLPkt m_fields can't be "const", as we Modify Pulse Charge!
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 SourceListPkt::SourceListPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -154,7 +194,7 @@ SourceListPkt::SourceListPkt(const SourceListPkt &pkt) :
 	Packet(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -172,7 +212,7 @@ BankedEventPkt::BankedEventPkt(const BankedEventPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 BeamMonitorPkt::BeamMonitorPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -190,7 +230,7 @@ BeamMonitorPkt::BeamMonitorPkt(const BeamMonitorPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 PixelMappingPkt::PixelMappingPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -200,7 +240,7 @@ PixelMappingPkt::PixelMappingPkt(const PixelMappingPkt &pkt) :
 	Packet(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -220,7 +260,7 @@ RunStatusPkt::RunStatusPkt(const RunStatusPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -234,12 +274,36 @@ RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 			&& m_payload_len < sizeof(uint32_t))
 		throw invalid_packet("Newer RunInfo packet is too short");
 
-	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t)))
-		throw invalid_packet("RunInfo V0 packet has Undersize XML string");
+	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << "RunInfo V0 packet has Undersize XML string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(xml + i)) )
+				ss << "#000";
+			else
+				ss << *(xml + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
+	}
 	else if (m_version > ADARA::PacketType::RUN_INFO_VERSION
 			&& m_payload_len < (size + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"Newer RunInfo packet has Undersize XML string");
+		std::stringstream ss;
+		ss << "Newer RunInfo packet has Undersize XML string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(xml + i)) )
+				ss << "#000";
+			else
+				ss << *(xml + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the string on access
@@ -252,7 +316,7 @@ RunInfoPkt::RunInfoPkt(const RunInfoPkt &pkt) :
 	Packet(pkt), m_xml(pkt.m_xml)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -269,13 +333,35 @@ TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 	m_status = (uint16_t) (size >> 16);
 	size &= 0xffff;
 	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"TransComplete V0 packet has Undersize Reason string");
+		std::stringstream ss;
+		ss << "TransComplete V0 packet has Undersize Reason string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(reason + i)) )
+				ss << "#000";
+			else
+				ss << *(reason + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::TRANS_COMPLETE_VERSION
 			&& m_payload_len < (size + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"Newer TransComplete packet has Undersize Reason string");
+		std::stringstream ss;
+		ss << "Newer TransComplete packet has Undersize Reason string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(reason + i)) )
+				ss << "#000";
+			else
+				ss << *(reason + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the string on access
@@ -288,7 +374,7 @@ TransCompletePkt::TransCompletePkt(const TransCompletePkt &pkt) :
 	Packet(pkt), m_reason(pkt.m_reason)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -313,7 +399,7 @@ ClientHelloPkt::ClientHelloPkt(const ClientHelloPkt &pkt) :
 	m_clientFlags(pkt.m_clientFlags)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -327,15 +413,41 @@ AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 	}
 
 	uint16_t size = m_fields[0] & 0xffff;
+	const char *comment = (const char *) &m_fields[2];
 	if (m_version == 0x00
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
-		throw invalid_packet(
-			"AnnotationPkt V0 packet has Undersize Annotation string");
+		std::stringstream ss;
+		ss << "AnnotationPkt V0 packet has Undersize Annotation string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - (2 * sizeof(uint32_t)));
+		ss << " [";
+		for ( uint32_t i=0 ;
+				i < m_payload_len - (2 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(comment + i)) )
+				ss << "#000";
+			else
+				ss << *(comment + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::STREAM_ANNOTATION_VERSION
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
-		throw invalid_packet(
-			"Newer AnnotationPkt packet has Undersize Annotation string");
+		std::stringstream ss;
+		ss << "Newer AnnotationPkt packet"
+			<< " has Undersize Annotation string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - (2 * sizeof(uint32_t)));
+		ss << " [";
+		for ( uint32_t i=0 ; 
+				i < m_payload_len - (2 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(comment + i)) )
+				ss << "#000";
+			else
+				ss << *(comment + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -343,10 +455,10 @@ AnnotationPkt::AnnotationPkt(const AnnotationPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len)
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_version == 0x00 && m_payload_len < 28)
 		throw invalid_packet("Sync V0 packet is too small");
@@ -354,21 +466,52 @@ SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
 			&& m_payload_len < 28)
 		throw invalid_packet("Newer Sync packet is too small");
 
-	uint32_t size = *(const uint32_t *)(payload() + 24);
-	if (m_version == 0x00 && m_payload_len < (size + 28))
-		throw invalid_packet("Sync V0 packet has Undersize Sync string");
+	const char *signature = (const char *) &m_fields[0];
+	m_signature.assign(signature, 16);
+
+	m_offset = *((uint64_t *) &m_fields[4]);
+
+	uint32_t size = m_fields[6];
+	const char *comment = (const char *) &m_fields[7];
+	if (m_version == 0x00 && m_payload_len < (size + 28)) {
+		std::stringstream ss;
+		ss << "Sync V0 packet has Undersize Sync Comment string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - 28);
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - 28 ; i++ ) {
+			if ( ! ((uint8_t) *(comment + i)) )
+				ss << "#000";
+			else
+				ss << *(comment + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
+	}
 	else if (m_version > ADARA::PacketType::SYNC_VERSION
 			&& m_payload_len < (size + 28)) {
-		throw invalid_packet(
-			"Newer Sync packet has Undersize Sync string");
+		std::stringstream ss;
+		ss << "Newer Sync packet has Undersize Sync Comment string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - 28);
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - 28 ; i++ ) {
+			if ( ! ((uint8_t) *(comment + i)) )
+				ss << "#000";
+			else
+				ss << *(comment + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
+	m_comment.assign(comment, size);
 }
 
 SyncPkt::SyncPkt(const SyncPkt &pkt) :
 	Packet(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 HeartbeatPkt::HeartbeatPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -385,7 +528,7 @@ HeartbeatPkt::HeartbeatPkt(const HeartbeatPkt &pkt) :
 	Packet(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -397,20 +540,42 @@ GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 		throw invalid_packet("Newer Geometry packet is too short");
 
 	uint32_t size = *(const uint32_t *) payload();
+	const char *xml = (const char *) payload() + sizeof(uint32_t);
 	if (m_version == 0x00 && m_payload_len < (size + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"Geometry V0 packet has Undersize Geometry string");
+		std::stringstream ss;
+		ss << "Geometry V0 packet has Undersize Geometry string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(xml + i)) )
+				ss << "#000";
+			else
+				ss << *(xml + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::GEOMETRY_VERSION
 			&& m_payload_len < (size + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"Newer Geometry packet has Undersize Geometry string");
+		std::stringstream ss;
+		ss << "Newer Geometry packet has Undersize Geometry string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(xml + i)) )
+				ss << "#000";
+			else
+				ss << *(xml + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the string on access
 	 * rather than object construction; the user may not care.
 	 */
-	const char *xml = (const char *) payload() + sizeof(uint32_t);
 	m_xml.assign(xml, size);
 }
 
@@ -418,7 +583,7 @@ GeometryPkt::GeometryPkt(const GeometryPkt &pkt) :
 	Packet(pkt), m_xml(pkt.m_xml)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -438,7 +603,7 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 	longName_len = sizes & 0xff;
 	shortName_len = (sizes >> 8) & 0xff;
 	id_len = (sizes >> 16) & 0xff;
-	m_targetStationNumber = (sizes >> 24) & 0xff; // formerly "Unused" in V0
+	m_targetStationNumber = (sizes >> 24) & 0xff; // Formerly Unused in V0
 
 	// Unspecified (Version 0 Packet) Target Station Number Defaults to 1.
 	if ( m_targetStationNumber == 0 )
@@ -448,19 +613,53 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 
 	if (m_version == 0x00 && m_payload_len < (info_len + sizeof(uint32_t)))
 	{
-		throw invalid_packet(
-			"Beamline Info V0 packet has Undersize Beamline Info data");
+		std::stringstream ss;
+		ss << "Beamline Info V0 packet has Undersize Beamline Info data";
+		ss << " info_len=" << info_len << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(info + i)) )
+				ss << "#000";
+			else
+				ss << *(info + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01
 			&& m_payload_len < (info_len + sizeof(uint32_t)))
 	{
-		throw invalid_packet(
-			"Beamline Info V1 packet has Undersize Beamline Info data");
+		std::stringstream ss;
+		ss << "Beamline Info V1 packet has Undersize Beamline Info data";
+		ss << " info_len=" << info_len << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(info + i)) )
+				ss << "#000";
+			else
+				ss << *(info + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::BEAMLINE_INFO_VERSION
 			&& m_payload_len < (info_len + sizeof(uint32_t))) {
-		throw invalid_packet(
-			"Newer Beamline Info packet has Undersize Beamline Info data");
+		std::stringstream ss;
+		ss << "Newer Beamline Info packet"
+			<< " has Undersize Beamline Info data";
+		ss << " info_len=" << info_len << " vs. available payload="
+			<< (m_payload_len - sizeof(uint32_t));
+		ss << " [";
+		for ( uint32_t i=0 ; i < m_payload_len - sizeof(uint32_t) ; i++ ) {
+			if ( ! ((uint8_t) *(info + i)) )
+				ss << "#000";
+			else
+				ss << *(info + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 
 	m_id.assign(info, id_len);
@@ -472,10 +671,11 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 
 BeamlineInfoPkt::BeamlineInfoPkt(const BeamlineInfoPkt &pkt) :
 	Packet(pkt), m_targetStationNumber(pkt.m_targetStationNumber),
-	m_id(pkt.m_id), m_shortName(pkt.m_shortName), m_longName(pkt.m_longName)
+	m_id(pkt.m_id), m_shortName(pkt.m_shortName),
+	m_longName(pkt.m_longName)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 BeamMonitorConfigPkt::BeamMonitorConfigPkt(const uint8_t *data,
 		uint32_t len) :
@@ -485,18 +685,18 @@ BeamMonitorConfigPkt::BeamMonitorConfigPkt(const uint8_t *data,
 
 	if ( m_version == 0x00 && m_payload_len !=
 			( sizeof(uint32_t) + ( beamMonCount() * sectionSize ) ) ) {
-		std::string msg(
-			"BeamMonitorConfig V0 packet is incorrect length: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "BeamMonitorConfig V0 packet is incorrect length: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if ( m_version > ADARA::PacketType::BEAM_MONITOR_CONFIG_VERSION
 			&& m_payload_len <
 				( sizeof(uint32_t) + ( beamMonCount() * sectionSize ) ) ) {
-		std::string msg(
-			"Newer BeamMonitorConfig packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer BeamMonitorConfig packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -505,7 +705,7 @@ BeamMonitorConfigPkt::BeamMonitorConfigPkt(
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 		uint32_t len) :
@@ -516,17 +716,17 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 	//    - Basic Packet Size Sanity Check
 
 	if ( m_version == 0x00 && m_payload_len < sizeof(uint32_t) ) {
-		std::string msg(
-			"DetectorBankSets V0 packet is too short for Count! ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "DetectorBankSets V0 packet is too short for Count! "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if ( m_version > ADARA::PacketType::DETECTOR_BANK_SETS_VERSION
 			&& m_payload_len < sizeof(uint32_t) ) {
-		std::string msg(
-			"Newer DetectorBankSets packet is too short for Count! ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer DetectorBankSets packet is too short for Count! "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	uint32_t numSets = detBankSetCount();
@@ -557,6 +757,7 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 	// Running Section Offset (in number of uint32_t elements)
 	uint32_t sectionOffset = 1;   // for Detector Bank Set Count...
 
+// XXX TEST ME...!
 	for ( uint32_t i=0 ; i < numSets ; i++ )
 	{
 		// Section Offset
@@ -565,45 +766,33 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 		if ( m_version == 0x00 && m_payload_len <
 				( ( sectionOffset + baseSectionOffsetNoBanks )
 					* sizeof(uint32_t) ) ) {
-			std::string msg(
-				"DetectorBankSets V0 packet: too short for Set ");
-			msg += boost::lexical_cast<std::string>( i + 1 );
-			msg += " of ";
-			msg += boost::lexical_cast<std::string>(numSets);
-			msg += " sectionOffset=";
-			msg += boost::lexical_cast<std::string>(sectionOffset);
-			msg += " baseSectionOffsetNoBanks=";
-			msg += boost::lexical_cast<std::string>(
-				baseSectionOffsetNoBanks);
-			msg += " payload_len=";
-			msg += boost::lexical_cast<std::string>(m_payload_len);
+			std::stringstream ss;
+			ss << "DetectorBankSets V0 packet: too short for Set "
+				<< ( i + 1 ) << " of " << numSets;
+			ss << " sectionOffset=" << sectionOffset;
+			ss << " baseSectionOffsetNoBanks=" << baseSectionOffsetNoBanks;
+			ss << " payload_len=" << m_payload_len;
 			delete[] m_sectionOffsets;
 			m_sectionOffsets = (uint32_t *) NULL;
 			delete[] m_after_banks_offset;
 			m_after_banks_offset = (uint32_t *) NULL;
-			throw invalid_packet(msg);
+			throw invalid_packet(ss.str());
 		}
 		else if ( m_version > ADARA::PacketType::DETECTOR_BANK_SETS_VERSION
 				&& m_payload_len <
 					( ( sectionOffset + baseSectionOffsetNoBanks )
 						* sizeof(uint32_t) ) ) {
-			std::string msg(
-				"Newer DetectorBankSets packet: too short for Set ");
-			msg += boost::lexical_cast<std::string>( i + 1 );
-			msg += " of ";
-			msg += boost::lexical_cast<std::string>(numSets);
-			msg += " sectionOffset=";
-			msg += boost::lexical_cast<std::string>(sectionOffset);
-			msg += " baseSectionOffsetNoBanks=";
-			msg += boost::lexical_cast<std::string>(
-				baseSectionOffsetNoBanks);
-			msg += " payload_len=";
-			msg += boost::lexical_cast<std::string>(m_payload_len);
+			std::stringstream ss;
+			ss << "Newer DetectorBankSets packet: too short for Set "
+				<< ( i + 1 ) << " of " << numSets;
+			ss << " sectionOffset=" << sectionOffset;
+			ss << " baseSectionOffsetNoBanks=" << baseSectionOffsetNoBanks;
+			ss << " payload_len=" << m_payload_len;
 			delete[] m_sectionOffsets;
 			m_sectionOffsets = (uint32_t *) NULL;
 			delete[] m_after_banks_offset;
 			m_after_banks_offset = (uint32_t *) NULL;
-			throw invalid_packet(msg);
+			throw invalid_packet(ss.str());
 		}
 
 		// Offset thru end of Bank Ids list...
@@ -620,40 +809,31 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 	// Final Payload Size Check... ;-D
 	if ( m_version == 0x00
 			&& m_payload_len < ( sectionOffset * sizeof(uint32_t) ) ) {
-		std::string msg("DetectorBankSets V0 packet: overall too short ");
-		msg += " numSets=";
-		msg += boost::lexical_cast<std::string>(numSets);
-		msg += " baseSectionOffsetNoBanks=";
-		msg += boost::lexical_cast<std::string>(
-			baseSectionOffsetNoBanks);
-		msg += " final sectionOffset=";
-		msg += boost::lexical_cast<std::string>(sectionOffset);
-		msg += " payload_len=";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
+		std::stringstream ss;
+		ss << "DetectorBankSets V0 packet: overall too short "
+			<< " numSets=" << numSets;
+		ss << " baseSectionOffsetNoBanks=" << baseSectionOffsetNoBanks;
+		ss << " final sectionOffset=" << sectionOffset;
+		ss << " payload_len=" << m_payload_len;
 		delete[] m_sectionOffsets;
 		m_sectionOffsets = (uint32_t *) NULL;
 		delete[] m_after_banks_offset;
 		m_after_banks_offset = (uint32_t *) NULL;
-		throw invalid_packet(msg);
+		throw invalid_packet(ss.str());
 	}
 	else if ( m_version > ADARA::PacketType::DETECTOR_BANK_SETS_VERSION
 			&& m_payload_len < ( sectionOffset * sizeof(uint32_t) ) ) {
-		std::string msg(
-			"Newer DetectorBankSets packet: overall too short ");
-		msg += " numSets=";
-		msg += boost::lexical_cast<std::string>(numSets);
-		msg += " baseSectionOffsetNoBanks=";
-		msg += boost::lexical_cast<std::string>(
-			baseSectionOffsetNoBanks);
-		msg += " final sectionOffset=";
-		msg += boost::lexical_cast<std::string>(sectionOffset);
-		msg += " payload_len=";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
+		std::stringstream ss;
+		ss << "Newer DetectorBankSets packet: overall too short "
+			<< " numSets=" << numSets;
+		ss << " baseSectionOffsetNoBanks=" << baseSectionOffsetNoBanks;
+		ss << " final sectionOffset=" << sectionOffset;
+		ss << " payload_len=" << m_payload_len;
 		delete[] m_sectionOffsets;
 		m_sectionOffsets = (uint32_t *) NULL;
 		delete[] m_after_banks_offset;
 		m_after_banks_offset = (uint32_t *) NULL;
-		throw invalid_packet(msg);
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -683,7 +863,7 @@ DetectorBankSetsPkt::~DetectorBankSetsPkt()
 	delete[] m_after_banks_offset;
 }
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len)
@@ -700,9 +880,10 @@ DataDonePkt::DataDonePkt(const DataDonePkt &pkt) :
 	Packet(pkt)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
-DeviceDescriptorPkt::DeviceDescriptorPkt(const uint8_t *data, uint32_t len) :
+DeviceDescriptorPkt::DeviceDescriptorPkt(
+	const uint8_t *data, uint32_t len) :
 	Packet(data, len)
 {
 	const uint32_t *fields = (const uint32_t *) payload();
@@ -715,15 +896,41 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(const uint8_t *data, uint32_t len) :
 		throw invalid_packet("Newer DeviceDescriptor packet is too short");
 
 	size = fields[1];
+	const char *desc = (const char *) &fields[2];
 	if (m_version == 0x00
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
-		throw invalid_packet(
-			"DeviceDescriptor V0 packet has Undersize Descriptor string");
+		std::stringstream ss;
+		ss << "DeviceDescriptor V0 packet"
+			<< " has Undersize Descriptor string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - (2 * sizeof(uint32_t)));
+		ss << " [";
+		for ( uint32_t i=0 ;
+				i < m_payload_len - (2 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(desc + i)) )
+				ss << "#000";
+			else
+				ss << *(desc + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::DEVICE_DESC_VERSION
 			&& m_payload_len < (size + (2 * sizeof(uint32_t)))) {
-		throw invalid_packet(
-		  "Newer DeviceDescriptor packet has Undersize Descriptor string");
+		std::stringstream ss;
+		ss << "Newer DeviceDescriptor packet"
+			<< " has Undersize Descriptor string";
+		ss << " size=" << size << " vs. available payload="
+			<< (m_payload_len - (2 * sizeof(uint32_t)));
+		ss << " [";
+		for ( uint32_t i=0 ;
+				i < m_payload_len - (2 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(desc + i)) )
+				ss << "#000";
+			else
+				ss << *(desc + i);
+		}
+		ss << "]";
 	}
 
 	/* TODO it would be better to create the string on access
@@ -737,37 +944,37 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(const DeviceDescriptorPkt &pkt) :
 	Packet(pkt), m_devId(pkt.m_devId), m_desc(pkt.m_desc)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 VariableU32Pkt::VariableU32Pkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_version == 0x00 && m_payload_len != (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"VariableValue (U32) V0 packet is incorrect length: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32) V0 packet is incorrect length: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_VERSION
 			&& m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"Newer VariableValue (U32) packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (U32) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (U32) packet has invalid "
-				"status: ");
-		msg += boost::lexical_cast<std::string>(status());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (U32) packet has invalid "
-				"severity: ");
-		msg += boost::lexical_cast<std::string>(severity());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -775,38 +982,39 @@ VariableU32Pkt::VariableU32Pkt(const VariableU32Pkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 VariableDoublePkt::VariableDoublePkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
 	if (m_version == 0x00
-			&& m_payload_len != (sizeof(double) + (3 * sizeof(uint32_t)))) {
-		std::string msg(
-			"VariableValue (Double) V0 packet is incorrect length: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+			&& m_payload_len
+				!= (sizeof(double) + (3 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << "VariableValue (Double) V0 packet is incorrect length: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_VERSION
 			&& m_payload_len < (sizeof(double) + (3 * sizeof(uint32_t)))) {
-		std::string msg(
-			"Newer VariableValue (Double) packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (Double) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (Double) packet has invalid "
-				"status: ");
-		msg += boost::lexical_cast<std::string>(status());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (Double) packet has invalid "
-				"severity: ");
-		msg += boost::lexical_cast<std::string>(severity());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -814,7 +1022,7 @@ VariableDoublePkt::VariableDoublePkt(const VariableDoublePkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
@@ -822,52 +1030,70 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 	uint32_t size;
 
 	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg("VariableValue (String) V0 packet is too short ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (String) V0 packet is too short "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_STRING_VERSION
 			&& m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"Newer VariableValue (String) packet is too short ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (String) packet is too short "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	size = m_fields[3];
+	const char *str = (const char *) &m_fields[4];
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-		  "VariableValue (String) V0 packet has Undersize Value string: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (String) V0 packet"
+			<< " has Undersize Value string: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		ss << " [";
+		for ( uint32_t i=0 ;
+				i < m_payload_len - (4 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(str + i)) )
+				ss << "#000";
+			else
+				ss << *(str + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_STRING_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-	  "Newer VariableValue (String) packet has Undersize Value string: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (String) packet"
+			<< " has Undersize Value string: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		ss << " [";
+		for ( uint32_t i=0 ;
+				i < m_payload_len - (4 * sizeof(uint32_t)) ; i++ ) {
+			if ( ! ((uint8_t) *(str + i)) )
+				ss << "#000";
+			else
+				ss << *(str + i);
+		}
+		ss << "]";
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (string) packet has invalid "
-				"status: ");
-		msg += boost::lexical_cast<std::string>(status());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (string) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (string) packet has invalid "
-				"severity: ");
-		msg += boost::lexical_cast<std::string>(severity());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (string) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the string on access
@@ -880,7 +1106,7 @@ VariableStringPkt::VariableStringPkt(const VariableStringPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 VariableU32ArrayPkt::VariableU32ArrayPkt(
 		const uint8_t *data, uint32_t len ) :
@@ -890,54 +1116,52 @@ VariableU32ArrayPkt::VariableU32ArrayPkt(
 	size_t size;
 
 	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"VariableValue (U32 Array) V0 packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32 Array) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION
 			&& m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"Newer VariableValue (U32 Array) packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (U32 Array) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	count = m_fields[3];
 	size = count * sizeof(uint32_t);
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-		  "VariableValue (U32 Array) V0 packet has Undersize U32 array: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32 Array) V0 packet"
+			<< " has Undersize U32 array: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-	  "Newer VariableValue (U32 Array) packet has Undersize U32 array: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (U32 Array) packet"
+			<< " has Undersize U32 array: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (U32 Array) packet has invalid "
-				"status: ");
-		msg += boost::lexical_cast<std::string>(status());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32 Array) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (U32 Array) packet has invalid "
-				"severity: ");
-		msg += boost::lexical_cast<std::string>(severity());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (U32 Array) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the array on access
@@ -952,7 +1176,7 @@ VariableU32ArrayPkt::VariableU32ArrayPkt(const VariableU32ArrayPkt &pkt) :
 	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
 {}
 
-/* ------------------------------------------------------------------------ */
+/* -------------------------------------------------------------------- */
 
 VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 		const uint8_t *data, uint32_t len ) :
@@ -962,56 +1186,52 @@ VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 	size_t size;
 
 	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"VariableValue (Double Array) V0 packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double Array) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION
 			&& m_payload_len < (4 * sizeof(uint32_t))) {
-		std::string msg(
-			"Newer VariableValue (Double Array) packet is too short: ");
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (Double Array) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
 	}
 
 	count = m_fields[3];
 	size = count * sizeof(double);
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-			"VariableValue (Double Array) V0 packet has Undersize ");
-		msg += std::string("Double array: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double Array) V0 packet has Undersize "
+			<< "Double array: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
-		std::string msg(
-			"Newer VariableValue (Double Array) packet has Undersize ");
-		msg += std::string("Double array: ");
-		msg += boost::lexical_cast<std::string>(
-			size + (4 * sizeof(uint32_t)) );
-		msg += " vs payload ";
-		msg += boost::lexical_cast<std::string>(m_payload_len);
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "Newer VariableValue (Double Array) packet has Undersize "
+			<< "Double array: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_status(status())) {
-		std::string msg("VariableValue (Double Array) packet has invalid "
-				"status: ");
-		msg += boost::lexical_cast<std::string>(status());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double Array) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
 	}
 
 	if (validate_severity(severity())) {
-		std::string msg("VariableValue (Double Array) packet has invalid "
-				"severity: ");
-		msg += boost::lexical_cast<std::string>(severity());
-		throw invalid_packet(msg);
+		std::stringstream ss;
+		ss << "VariableValue (Double Array) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
 	}
 
 	/* TODO it would be better to create the array on access
