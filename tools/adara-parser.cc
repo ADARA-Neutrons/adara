@@ -728,10 +728,12 @@ bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 bool Parser::rxPacket(const ADARA::SyncPkt &pkt)
 {
 	if ( !m_terse ) {
-		// TODO display more fields
 		printf("%u.%09u SYNC (0x%x,v%u) [%u bytes]\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length());
+		printf("    Signature [%s], File Offset %lu, Comment [%s]\n",
+			pkt.signature().c_str(), pkt.fileOffset(),
+			pkt.comment().c_str() );
 	}
 
 	return false;
