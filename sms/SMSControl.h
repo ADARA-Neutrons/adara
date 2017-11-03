@@ -284,6 +284,8 @@ private:
 
 	static bool m_allowNonOneToOnePixelMapping;
 
+	static bool m_notesCommentAutoReset;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;

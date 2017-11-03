@@ -76,6 +76,8 @@ bool SMSControl::m_sendSampleInRunInfo;
 
 bool SMSControl::m_allowNonOneToOnePixelMapping;
 
+bool SMSControl::m_notesCommentAutoReset;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -199,6 +201,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 				false);
 	INFO("Setting Allow Non-One-to-One Pixel Mapping to "
 		<< m_allowNonOneToOnePixelMapping << ".");
+
+	m_notesCommentAutoReset =
+			conf.get<bool>("sms.run_notes_auto_reset", true);
+	INFO("Setting Run Notes Auto Reset to "
+		<< m_notesCommentAutoReset << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -389,7 +396,7 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 
 	m_markers = boost::shared_ptr<Markers>(new
-						Markers(this));
+						Markers(this, m_notesCommentAutoReset));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
