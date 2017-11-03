@@ -64,9 +64,11 @@ private:
 	}
 };
 
-Markers::Markers( SMSControl *ctrl ) :
+Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	m_ctrl(ctrl), m_inRun(false), m_isPaused(false),
-	m_notesCommentSet(false), m_useFirstNotesComment(false),
+	m_notesCommentSet(false),
+	m_notesCommentAutoReset(notesCommentAutoReset),
+	m_useFirstNotesComment(false),
 	m_runNumber(0), m_scanIndex(0)
 {
 	std::string prefix(ctrl->getBeamlineId());
@@ -107,6 +109,10 @@ Markers::Markers( SMSControl *ctrl ) :
 			boost::bind( &Markers::addNotesComment, this ) ) );
 	ctrl->addPV(m_notesCommentPV);
 
+	m_notesCommentAutoResetPV.reset( new smsBooleanPV(
+			prefix + "NotesCommentAutoReset" ) );
+	ctrl->addPV(m_notesCommentAutoResetPV);
+
 	m_annotationCommentPV.reset(
 		new MarkerCommentPV( prefix + "AnnotationComment",
 			boost::bind( &Markers::addAnnotationComment, this ) ) );
@@ -114,6 +120,11 @@ Markers::Markers( SMSControl *ctrl ) :
 
 	m_connection = StorageManager::onPrologue(
 				boost::bind( &Markers::onPrologue, this ) );
+
+	// Initialize Notes Comment Auto Reset PV...
+	struct timespec now;
+	clock_gettime( CLOCK_REALTIME, &now );
+	m_notesCommentAutoResetPV->update(m_notesCommentAutoReset, &now);
 }
 
 Markers::~Markers()
@@ -251,9 +262,14 @@ void Markers::runStop(void)
 	// Clear All Comment PVs on Run Stop...
 	m_commentPV->unset(); // DEPRECATED
 	m_scanCommentPV->unset();
-	// m_notesCommentPV->unset(); *Don't* Reset Run Notes Between Runs!
-									// (Often Convenient to Re-Use... ;-)
 	m_annotationCommentPV->unset();
+
+	// Optionally Auto-Reset the Run Notes Between Runs
+	// (Don't Always Reset, Often Convenient to Re-Use... ;-)
+	m_notesCommentAutoReset = m_notesCommentAutoResetPV->value();
+	if ( m_notesCommentAutoReset ) {
+		m_notesCommentPV->unset();
+	}
 
 	// No Longer in a Run Now...
 	m_inRun = false;
