@@ -7,6 +7,7 @@
 #include <boost/lexical_cast.hpp>
 #include <unistd.h>
 #include <cctype>
+#include <string>
 #include <time.h>
 #include "ComBus.h"
 #include "ComBusMessages.h"
@@ -285,6 +286,8 @@ Connection::Connection( std::string &a_domain,
     m_connection(0), m_session(0),
     m_reconnect_thread(0), m_status_thread(0)
 {
+    exceptionLog("ComBus Connection() Entry", INFO_LOG);
+
     if ( g_inst )
     {
         throw std::runtime_error(
@@ -304,7 +307,14 @@ Connection::Connection( std::string &a_domain,
 
     try
     {
+        exceptionLog(
+            "ComBus Connection(): Initializing ActiveMQ Library...",
+            INFO_LOG);
+
         activemq::library::ActiveMQCPP::initializeLibrary();
+
+        exceptionLog( "ComBus Connection(): ActiveMQ Library Initialized.",
+            INFO_LOG);
     }
     catch(...)
     {
@@ -784,6 +794,11 @@ Connection::connectionStatusNotifyThread()
         // Notify listeners of any connection status change
         if ( last_connection_state != m_connected )
         {
+            string msg =
+                "connectionStatusNotifyThread(): Connection Change";
+
+            exceptionLog(msg + " Identified", INFO_LOG);
+
             boost::lock_guard<boost::mutex> lock(m_mutex);
 
             try
@@ -797,18 +812,23 @@ Connection::connectionStatusNotifyThread()
             }
             catch(...)
             {
-                exceptionLog(
-                    "Error Notifying Listeners of Connection Change!",
+                exceptionLog(msg + " - Error Notifying Listeners!",
                     ERR_LOG);
             }
 
             last_connection_state = m_connected;
+
+            exceptionLog(msg + " - Done Notifying Listeners", INFO_LOG);
         }
 
         // If not connected, and reconnect thread is not running,
         // start reconnect thread
         if ( !m_connected && !m_reconnect_thread )
         {
+            exceptionLog(
+            "connectionStatusNotifyThread(): Starting Reconnect Thread...",
+                INFO_LOG);
+
             m_reconnect_thread = new boost::thread( boost::bind(
                 &Connection::reconnectThread, this ));
         }
@@ -887,6 +907,10 @@ Connection::disconnect()
                 "Error Disconnecting Message Producers/Consumers!",
                 ERR_LOG);
         }
+
+        exceptionLog(
+            "disconnect(): Done Disconnecting ComBus/ActiveMQ Connection",
+            INFO_LOG);
 
         // Wake up status notify thread
         m_status_cond.notify_one();
