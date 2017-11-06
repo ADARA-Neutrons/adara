@@ -91,14 +91,16 @@ RawDataPkt::RawDataPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RawDataPacket V0 is too short";
+		ss << " RawDataPacket V0 is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len < (6 * sizeof(uint32_t))) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RawDataPacket V1 is too short";
+		ss << " RawDataPacket V1 is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::RAW_EVENT_VERSION
@@ -106,7 +108,8 @@ RawDataPkt::RawDataPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer RawDataPacket is too short";
+		ss << " Newer RawDataPacket is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
@@ -124,14 +127,16 @@ MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " MappedDataPacket V0 is too short";
+		ss << " MappedDataPacket V0 is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len < (6 * sizeof(uint32_t))) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " MappedDataPacket V1 is too short";
+		ss << " MappedDataPacket V1 is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::MAPPED_EVENT_VERSION
@@ -139,7 +144,8 @@ MappedDataPkt::MappedDataPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer MappedDataPacket is too short";
+		ss << " Newer MappedDataPacket is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
@@ -160,14 +166,16 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RTDL V0 Packet is incorrect length";
+		ss << " RTDL V0 Packet is incorrect length: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len != 120) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RTDL V1 Packet is incorrect length";
+		ss << " RTDL V1 Packet is incorrect length: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::RTDL_VERSION
@@ -175,7 +183,8 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer RTDL Packet is too short";
+		ss << " Newer RTDL Packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -248,14 +257,16 @@ BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " BankedEvent V0 packet is too short";
+		ss << " BankedEvent V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len < (4 * sizeof(uint32_t))) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " BankedEvent V1 packet is too short";
+		ss << " BankedEvent V1 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::BANKED_EVENT_VERSION
@@ -263,7 +274,8 @@ BankedEventPkt::BankedEventPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer BankedEvent packet is too short";
+		ss << " Newer BankedEvent packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
@@ -281,14 +293,16 @@ BeamMonitorPkt::BeamMonitorPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " BeamMonitor V0 packet is too short";
+		ss << " BeamMonitor V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len < (4 * sizeof(uint32_t))) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " BeamMonitor V1 packet is too short";
+		ss << " BeamMonitor V1 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::BEAM_MONITOR_EVENT_VERSION
@@ -296,7 +310,8 @@ BeamMonitorPkt::BeamMonitorPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer BeamMonitor packet is too short";
+		ss << " Newer BeamMonitor packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
@@ -324,7 +339,8 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RunStatus V0 packet is incorrect length";
+		ss << " RunStatus V0 packet is incorrect length: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 #if 0
@@ -333,7 +349,8 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RunStatus V1 packet is incorrect length";
+		ss << " RunStatus V1 packet is incorrect length: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 #endif
@@ -342,7 +359,8 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer RunStatus packet is too short";
+		ss << " Newer RunStatus packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
@@ -363,7 +381,8 @@ RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " RunInfo V0 packet is too short";
+		ss << " RunInfo V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::RUN_INFO_VERSION
@@ -371,7 +390,8 @@ RunInfoPkt::RunInfoPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer RunInfo packet is too short";
+		ss << " Newer RunInfo packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -433,7 +453,8 @@ TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " TransComplete V0 packet is too short";
+		ss << " TransComplete V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::TRANS_COMPLETE_VERSION
@@ -441,7 +462,8 @@ TransCompletePkt::TransCompletePkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer TransComplete packet is too short";
+		ss << " Newer TransComplete packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -502,7 +524,8 @@ ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " ClientHello V0 packet is incorrect size";
+		ss << " ClientHello V0 packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01
@@ -510,7 +533,8 @@ ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " ClientHello V1 packet is incorrect size";
+		ss << " ClientHello V1 packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::CLIENT_HELLO_VERSION
@@ -518,7 +542,8 @@ ClientHelloPkt::ClientHelloPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer ClientHello packet is too short";
+		ss << " Newer ClientHello packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -543,7 +568,8 @@ AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " AnnotationPkt V0 packet is incorrect size";
+		ss << " AnnotationPkt V0 packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::STREAM_ANNOTATION_VERSION
@@ -551,8 +577,8 @@ AnnotationPkt::AnnotationPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		throw invalid_packet(
-			"Newer AnnotationPkt packet is incorrect size");
+		ss << " Newer AnnotationPkt packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -612,7 +638,8 @@ SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Sync V0 packet is too small";
+		ss << " Sync V0 packet is too small: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::SYNC_VERSION
@@ -620,7 +647,8 @@ SyncPkt::SyncPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer Sync packet is too small";
+		ss << " Newer Sync packet is too small: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -682,7 +710,8 @@ HeartbeatPkt::HeartbeatPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Heartbeat V0 packet is incorrect size";
+		ss << " Heartbeat V0 packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::HEARTBEAT_VERSION
@@ -690,9 +719,10 @@ HeartbeatPkt::HeartbeatPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer ClientHello packet is too short";
-		throw invalid_packet(ss.str());
+		ss << " Newer ClientHello packet is too short: "
+			<< m_payload_len;
 		// ...any newer version would have to grow, lol...? ;-D
+		throw invalid_packet(ss.str());
 	}
 }
 
@@ -709,7 +739,8 @@ GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Geometry V0 packet is too short";
+		ss << " Geometry V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::GEOMETRY_VERSION
@@ -717,7 +748,8 @@ GeometryPkt::GeometryPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer Geometry packet is too short";
+		ss << " Newer Geometry packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -782,14 +814,16 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Beamline Info V0 packet is too short";
+		ss << " Beamline Info V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version == 0x01 && m_payload_len < sizeof(uint32_t)) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Beamline Info V1 packet is too short";
+		ss << " Beamline Info V1 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::BEAMLINE_INFO_VERSION
@@ -797,7 +831,8 @@ BeamlineInfoPkt::BeamlineInfoPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer Beamline Info packet is too short";
+		ss << " Newer Beamline Info packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
@@ -1095,7 +1130,8 @@ DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " DataDone V0 packet is incorrect size";
+		ss << " DataDone V0 packet is incorrect size: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::DATA_DONE_VERSION
@@ -1103,7 +1139,8 @@ DataDonePkt::DataDonePkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer DataDone packet is too short";
+		ss << " Newer DataDone packet is too short: "
+			<< m_payload_len;
 		// ...any newer version would have to grow, lol...? ;-D
 		throw invalid_packet(ss.str());
 	}
@@ -1126,7 +1163,8 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " DeviceDescriptor V0 packet is too short";
+		ss << " DeviceDescriptor V0 packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if (m_version > ADARA::PacketType::DEVICE_DESC_VERSION
@@ -1134,7 +1172,8 @@ DeviceDescriptorPkt::DeviceDescriptorPkt(
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " Newer DeviceDescriptor packet is too short";
+		ss << " Newer DeviceDescriptor packet is too short: "
+			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
 
