@@ -199,6 +199,18 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 		ss << ",v" << m_version << ")";
 		ss << " [" << ( m_payload_len + 16 ) << " bytes]";
 		ss << " - Missing ring period:";
+		// m_fields[0]
+		ss << " [0]=[0x" << std::hex << m_fields[0] << std::dec << "]";
+		ss << " dataFlags="
+			<< ( ( m_version >= 0x01 ) ? "true" : "false" );
+		ss << " 0x"
+			<< std::hex << ( (m_fields[0] >> 27) & 0x1f ) << std::dec;
+		ss << " flavor="
+			<< static_cast<PulseFlavor::Enum>( (m_fields[0] >> 24) & 0x7 );
+		ss << " charge="
+			<< ( (uint64_t) ( m_fields[0] & 0x00ffffff ) ) << "pC";
+		// m_fields[1]
+		ss << " [1]=[0x" << std::hex << m_fields[1] << std::dec << "]";
 		ss << " cycle=" << ( m_fields[1] & 0x3ff );
 		ss << " badCycle=" << ( !!(m_fields[1] & 0x40000000) );
 		ss << " vetoFlags=0x"
@@ -206,21 +218,20 @@ RTDLPkt::RTDLPkt(const uint8_t *data, uint32_t len) :
 		ss << " badVeto=" << ( !!(m_fields[1] & 0x80000000) );
 		ss << " timing=0x"
 			<< std::hex << ( (m_fields[1] >> 22) & 0xff ) << std::dec;
-		ss << " dataFlags="
-			<< ( ( m_version >= 0x01 ) ? "true" : "false" );
-		ss << " 0x"
-			<< std::hex << ( (m_fields[0] >> 27) & 0x1f ) << std::dec;
-		ss << " flavor="
-			<< static_cast<PulseFlavor::Enum>( (m_fields[0] >> 24) & 0x7 );
+		// m_fields[2]
+		ss << " [2]=[0x" << std::hex << m_fields[2] << std::dec << "]";
 		ss << " intrapulse="
 			<< ( (uint64_t) m_fields[2] * 100 ) << "ns";
+		// m_fields[3]
+		ss << " [3]=[0x" << std::hex << m_fields[3] << std::dec << "]";
 		ss << " tofOffset="
 			<< ( (uint64_t) (m_fields[3] & 0x7fffffff) * 100 ) << "ns";
 		ss << " tofCorrected="
 			<< ( ( !!(m_fields[3] & 0x80000000) ) ? "corrected" : "raw" );
-		ss << " charge="
-			<< ( (uint64_t) ( m_fields[0] & 0x00ffffff ) ) << "pC";
+		// m_fields[4]
+		ss << " [4]=[0x" << std::hex << m_fields[4] << std::dec << "]";
 		ss << " ringPeriod=" << ( m_fields[4] & 0xffffff ) << "ps";
+		// m_fields[5...]
 		for ( uint32_t i=0 ; i < 25 ; i++ ) {
 			ss << " FNA" << i << "="
 				<< ( (m_fields[ 5 + i ] >> 24) & 0xff )
