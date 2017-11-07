@@ -1018,7 +1018,6 @@ DetectorBankSetsPkt::DetectorBankSetsPkt(const uint8_t *data,
 	// Running Section Offset (in number of uint32_t elements)
 	uint32_t sectionOffset = 1;   // for Detector Bank Set Count...
 
-// XXX TEST ME...!
 	for ( uint32_t i=0 ; i < numSets ; i++ )
 	{
 		// Section Offset
