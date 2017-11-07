@@ -378,7 +378,7 @@ void ComBusSMSMon::commThread()
 	char inbuf[smsStringPV::MAX_LENGTH];
 	unsigned long spam_count = 0;
 
-	INFO("SMS ComBus thread started");
+	INFO("SMS ComBus commThread() started");
 
 	// The CA_ADDR_LIST is set to the local host "broadcast address",
 	// although local host would work. The broadcast address can be more
@@ -422,7 +422,11 @@ void ComBusSMSMon::commThread()
 			restartCallback, &m_restart_combus, 0), 
 			"monitor combus restart");
 
+	INFO("SMS ComBus commThread() Before ca_pend_io(1.0)...");
+
 	SMSSEVCHK(ca_pend_io(1.0), "Combus thread monitor");
+
+	INFO("SMS ComBus commThread() After ca_pend_io(1.0).");
 
 	while (!m_stop) {
 
