@@ -488,6 +488,17 @@ NxGen::finalize
     {
         writeString( m_entry_path, "definition", "NXsnsevent" );
 
+        // Make Sure We Have "Some" Overall Run Comment... ;-D
+        if ( !m_haveRunComment ) {
+            std::string dummy = "(unset)";
+            syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+                g_pid, "NxGen::finalize()",
+                "No Run Comment Has Been Set For This Run",
+                "Setting Dummy Empty Run Comment", dummy.c_str() );
+            usleep(30000); // give syslog a chance...
+            runComment( dummy );
+        }
+
         writeScalar( m_daslogs_freq_path, "minimum_value",
             a_run_metrics.freq_stats.min(), FREQ_UNITS );
         writeScalar( m_daslogs_freq_path, "maximum_value",
@@ -871,14 +882,14 @@ NxGen::dumpProcessingStatistics(void)
 }
 
 
-/*! \brief Processes run information
+/*! \brief Processes beamline information
  *
- * This method translates run information to the output Nexus file.
+ * This method translates beamline information to the output Nexus file.
  */
 void
-NxGen::processRunInfo
+NxGen::processBeamlineInfo
 (
-    const STS::RunInfo & a_run_info     ///< [in] Run information object
+    const STS::BeamlineInfo & a_beamline_info   ///< [in] Beamline information object
 )
 {
     if (!m_gen_nexus)
@@ -887,28 +898,71 @@ NxGen::processRunInfo
     try
     {
         writeScalar( m_instrument_path, "target_station_number",
-            a_run_info.target_station_number, "" );
+            a_beamline_info.target_station_number, "" );
 
-        writeString( m_instrument_path, "beamline", a_run_info.instr_id );
+        writeString( m_instrument_path, "beamline",
+            a_beamline_info.instr_id );
 
-        if ( a_run_info.instr_longname.size())
+        if ( a_beamline_info.instr_longname.size())
         {
             writeString( m_instrument_path, "name",
-                a_run_info.instr_longname );
+                a_beamline_info.instr_longname );
 
-            if ( a_run_info.instr_shortname.size())
+            if ( a_beamline_info.instr_shortname.size())
             {
                 writeStringAttribute( m_instrument_path + "/name",
-                    "short_name", a_run_info.instr_shortname );
+                    "short_name", a_beamline_info.instr_shortname );
             }
         }
+    }
+    catch( TraceException &e )
+    {
+        RETHROW_TRACE( e, "processBeamlineInfo() failed." )
+    }
+}
 
+
+/*! \brief Processes run information
+ *
+ * This method translates run information to the output Nexus file.
+ */
+void
+NxGen::processRunInfo
+(
+    const STS::RunInfo & a_run_info,    ///< [in] Run information object
+    const bool a_strict                 ///< [in] Strict Protocol Parsing
+)
+{
+    // Verify we received all required fields in Final Run Info pkt
+    if ( a_strict )
+    {
+        string msg;
+        if ( !a_run_info.facility_name.size() )
+            msg = "Required facility_name missing from RunInfo.";
+        else if ( !a_run_info.proposal_id.size() )
+            msg = "Required proposal_id missing from RunInfo.";
+        else if ( a_run_info.run_number == 0 )
+            msg = "Required run_number missing from RunInfo.";
+
+        if ( msg.size() )
+            THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, msg )
+    }
+
+    if (!m_gen_nexus)
+        return;
+
+    try
+    {
         string tmp = boost::lexical_cast<string>(a_run_info.run_number);
         writeString( m_entry_path, "run_number", tmp );
         writeString( m_entry_path, "entry_identifier", tmp );
 
         writeString( m_entry_path, "experiment_identifier",
             a_run_info.proposal_id );
+
+        writeString( m_entry_path, "experiment_title",
+            a_run_info.proposal_title );
+
         writeString( m_entry_path, "title", a_run_info.run_title );
 
         if ( ! a_run_info.no_sample_info )
@@ -2349,7 +2403,8 @@ NxGen::toNxType
         break;
     }
 
-    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, "toNxType() failed - invalid PV type: " << a_type )
+    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
+        "toNxType() failed - invalid PV type: " << a_type )
 }
 
 

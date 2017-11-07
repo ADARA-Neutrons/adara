@@ -25,6 +25,21 @@
 prog=smsd
 lockfile=/var/lock/subsys/$prog
 
+# Make Sure the "Home Controls" Mount is Present Before Proceeding...!
+HOME_CONTROLS="/home/controls/config-daq1"
+retry_count=0
+while [[ ! -d ${HOME_CONTROLS} ]]; do
+	echo "SMSD Init: Waiting for Home Controls to Mount...!"
+	/bin/ls -l "${HOME_CONTROLS}"
+	sleep 3
+	retry_count=$(( retry_count + 1 ))
+	if [[ ${retry_count} -gt 30 ]]; then
+		echo "SMSD Init: Giving Up on the Home Controls Mount...!"
+		echo "Someone Call Jeeeeeeeeeeeeeeeeeeeeeeem...!"
+		exit 90
+	fi
+done
+
 # Get Base EPICS Executable Path (for potential caRepeater startup)
 export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
 if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then

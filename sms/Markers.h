@@ -14,6 +14,7 @@ class MarkerTriggerPV;
 class MarkerCommentPV;
 class smsStringPV;
 class smsUint32PV;
+class smsBooleanPV;
 
 class Markers : boost::noncopyable {
 public:
@@ -22,7 +23,7 @@ public:
 	typedef std::vector< std::pair<struct timespec, std::string> >
 		MarkerQueue;
 
-	Markers( SMSControl *ctrl );
+	Markers( SMSControl *ctrl, bool notesCommentAutoReset );
 	~Markers();
 
 	void beforeNewRun( uint32_t runNumber );
@@ -41,6 +42,7 @@ private:
 
 	boost::shared_ptr<MarkerCommentPV> m_scanCommentPV;
 	boost::shared_ptr<MarkerCommentPV> m_notesCommentPV;
+	boost::shared_ptr<smsBooleanPV> m_notesCommentAutoResetPV;
 	boost::shared_ptr<MarkerCommentPV> m_annotationCommentPV;
 
 	boost::signals2::connection m_connection;
@@ -50,6 +52,7 @@ private:
 	bool m_inRun;
 	bool m_isPaused;
 	bool m_notesCommentSet;
+	bool m_notesCommentAutoReset;
 	bool m_useFirstNotesComment;
 
 	uint32_t m_runNumber;

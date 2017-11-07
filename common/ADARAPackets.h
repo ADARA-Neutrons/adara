@@ -396,9 +396,17 @@ private:
 class SyncPkt : public Packet {
 public:
 	SyncPkt(const SyncPkt &pkt);
-	// TODO implement accessors for fields
+
+	const std::string signature(void) const { return m_signature; }
+	uint64_t fileOffset(void) const { return m_offset; }
+	const std::string comment(void) const { return m_comment; }
 
 private:
+	const uint32_t *m_fields;
+	std::string m_signature;
+	uint64_t m_offset;
+	std::string m_comment;
+
 	SyncPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;

@@ -160,7 +160,7 @@ public:
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
 		m_showVars(true), m_showDDP(false), m_lowRate(false ),
 		m_showRunInfo(false), m_showGeom(false), m_showFrame(false),
-		m_posixRead(false), m_terse(false)
+		m_posixRead(false), m_terse(false), m_catch(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -220,11 +220,40 @@ private:
 	bool m_showFrame;
 	bool m_posixRead;
 	bool m_terse;
+	bool m_catch;
 };
 
 bool Parser::rxPacket(const ADARA::Packet &pkt)
 {
-	bool ret = ADARA::POSIXParser::rxPacket(pkt);
+	bool ret = false;
+
+	try {
+		ret = ADARA::POSIXParser::rxPacket(pkt);
+	}
+	catch ( std::exception &e ) {
+		std::cerr << "ADARA-Parser: Caught Exception"
+			<< " in ADARA::POSIXParser::rxPacket():"
+			<< " [" << e.what() << "]" << std::endl;
+		if ( !m_catch ) {
+			std::cerr << "Exiting..." << std::endl;
+			exit(99);
+		}
+		else {
+			std::cerr << "Continuing..." << std::endl;
+		}
+	}
+	catch ( ... )
+	{
+		std::cerr << "ADARA-Parser: Caught Unknown Exception"
+			<< " in ADARA::POSIXParser::rxPacket()." << std::endl;
+		if ( !m_catch ) {
+			std::cerr << "Exiting..." << std::endl;
+			exit(99);
+		}
+		else {
+			std::cerr << "Continuing..." << std::endl;
+		}
+	}
 
 	if ( m_hexDump ) {
 		const uint8_t *p = pkt.packet();
@@ -728,10 +757,12 @@ bool Parser::rxPacket(const ADARA::AnnotationPkt &pkt)
 bool Parser::rxPacket(const ADARA::SyncPkt &pkt)
 {
 	if ( !m_terse ) {
-		// TODO display more fields
 		printf("%u.%09u SYNC (0x%x,v%u) [%u bytes]\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length());
+		printf("    Signature [%s], File Offset %lu, Comment [%s]\n",
+			pkt.signature().c_str(), pkt.fileOffset(),
+			pkt.comment().c_str() );
 	}
 
 	return false;
@@ -1036,7 +1067,8 @@ void Parser::parse(int argc, char **argv)
 		("showgeom,G", "Show payload of Geometry packets")
 		("showframe,F", "Show FNA/Frame Data of RTDL packets")
 		("posixread,P", "Use POSIX read() to parse incoming stream")
-		("terse,T", "Terse Mode, Produce no output (except as requested)");
+		("terse,T", "Terse Mode, Produce no output (except as requested)")
+		("catch,C", "Catch Exceptions, Try to parse past bad packets");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -1075,6 +1107,7 @@ void Parser::parse(int argc, char **argv)
 	m_showFrame = vm.count("showframe");
 	m_posixRead = vm.count("posixread");
 	m_terse = vm.count("terse");
+	m_catch = vm.count("catch");
 
 	if (!vm.count("file")) {
 		try {

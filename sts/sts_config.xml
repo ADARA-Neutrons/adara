@@ -162,6 +162,45 @@
 		</element_value>
 	</group>
 
+	<!-- TZero Chopper Group -->
+	<group>
+		<name>chopper_tzero</name>
+		<path>/entry/instrument</path>
+		<type>NXdisk_chopper</type>
+		<element>
+			<pattern>:Chop:Tz:Phase:ActualDelay$</pattern>
+			<name>phase</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Phase:ReqDelaySet$</pattern>
+			<name>phase_request</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Phase:Locked$</pattern>
+			<name>phase_locked</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Mot:ActualSpd$</pattern>
+			<name>rotation_speed</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Mot:SpeedSet$</pattern>
+			<name>speed_set</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Mot:ReqSpeed$</pattern>
+			<name>speed_request</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Mot:RunActive$</pattern>
+			<name>status</name>
+		</element>
+		<element>
+			<pattern>:Chop:Tz:Drv:RotorError$</pattern>
+			<name>drive_error</name>
+		</element>
+	</group>
+
 	<!-- (Indexed) Chopper Groups -->
 	<group>
 		<name>chopper[XXX_INDEX_XXX]</name>
@@ -188,6 +227,13 @@
 			<name>phase</name>
 		</element>
 		<element>
+			<pattern>:Chop:Skf\d+:PhaseTimeDelaySet$</pattern>
+			<index>%*[^:]:Chop:Skf%d:PhaseTimeDelaySet</index>
+			<pattern>^PhaseRequest\d+$</pattern>
+			<index>PhaseRequest%d</index>
+			<name>phase_request</name>
+		</element>
+		<element>
 			<pattern>:Chop:Skf\d+:PhaseLocked$</pattern>
 			<index>%*[^:]:Chop:Skf%d:PhaseLocked</index>
 			<name>phase_locked</name>
@@ -204,16 +250,12 @@
 			<index>SpeedRequest%d</index>
 			<name>speed_request</name>
 		</element>
-		<!-- Chopper Element Aliases (and Legacy for ADARA Test Harness) -->
 		<element>
+			<pattern>:Chop:Skf\d+:StatusRun$</pattern>
+			<index>%*[^:]:Chop:Skf%d:StatusRun</index>
 			<pattern>^ChopperStatus\d+$</pattern>
 			<index>ChopperStatus%d</index>
 			<name>status</name>
-		</element>
-		<element>
-			<pattern>^PhaseRequest\d+$</pattern>
-			<index>PhaseRequest%d</index>
-			<name>phase_request</name>
 		</element>
 	</group>
 

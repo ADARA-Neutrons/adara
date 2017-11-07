@@ -27,7 +27,7 @@ private:
 	{
 		// On Any Change to the LiveServer Listener URI/Service PVs,
 		// Reset the Listener Setup... :-D
-		DEBUG("ListenStringPV: " << m_pv_name
+		ERROR("ListenStringPV: " << m_pv_name
 			<< " PV value changed, Reset Listener Setup...");
 		m_liveServer->setupListener();
 	}

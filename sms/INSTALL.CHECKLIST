@@ -1,0 +1,160 @@
+
+ADARA SMS Install Checklist
+
+	- for a New or Upgraded DAQ1 Host...
+
+1. Verify State of Any Existing Git Config Repository:
+
+	pushd /home/controls/config-daq1/ ; git pull ; git diff ; git status
+
+	./confck
+
+	sudo cp ./sms/smsd.initscript /etc/init.d/smsd
+
+	sudo cp ./sms/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /etc/init.d/smsd /etc/rsyslog.d/adaraMailer.conf
+
+		-rwxr-xr-x 1 root root 4890 Apr  7  2017 /etc/init.d/smsd*
+
+		-rw-r--r-- 1 root root 513 Apr 13  2017
+			/etc/rsyslog.d/adaraMailer.conf
+
+2. RSyslog Setup:
+
+	sudo vi /etc/rsyslog.conf
+
+		#### RULES ####
+
+		# smsd log
+		if $programname == 'smsd' then /var/log/smsd.log
+		& ~
+
+	sudo touch /var/log/smsd.log
+
+	sudo chgrp users /var/log/smsd.log
+
+	sudo chmod g+w /var/log/smsd.log
+
+	ls -l /var/log/smsd.log
+
+	sudo /sbin/service rsyslog status
+
+	sudo /sbin/service rsyslog restart
+
+3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
+
+	ls -l /etc/rsyslog.pipes
+
+	sudo mkdir /etc/rsyslog.pipes
+
+	sudo mknod /etc/rsyslog.pipes/criticalMessages p
+
+	sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+
+	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+
+	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
+
+	sudo vi /etc/crontab
+
+		*/5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+4. Administrator Crontab Setup:
+
+	crontab -l
+
+	crontab -e
+
+		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
+		0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon
+		0 8,17 * * * /home/controls/config-daq1/confck --quiet
+		0 8,17 * * * /usr/local/bin/liveconf-1.6.20-devel --terse --quiet confck
+
+	crontab -l
+
+5. User Local Bin Soft Link Setup:
+
+	sudo ln -s /home/controls/config-daq1/deploy/adaracat \
+		/usr/local/bin/adaracat
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-dump \
+		/usr/local/bin/adara-dump
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara_fix_ipts \
+		/usr/local/bin/adara_fix_ipts
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-gen \
+		/usr/local/bin/adara-gen
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-parser \
+		/usr/local/bin/adara-parser
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-pvgen \
+		/usr/local/bin/adara-pvgen
+
+	sudo ln -s /home/controls/config-daq1/deploy/liveconf \
+		/usr/local/bin/liveconf
+
+	sudo ln -s /home/controls/config-daq1/deploy/smsd \
+		/usr/local/bin/smsd
+
+6. ADARA Production EPICS Soft Links Setup:
+
+	(rm EpicsBaseLink)
+
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
+		EpicsBaseLink
+
+	(rm EpicsBaseV4Link)
+
+	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
+		EpicsBaseV4Link
+
+	(rm EpicsExtensionsLink)
+
+	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
+		EpicsExtensionsLink
+
+7. Deploy SMS Daemon:
+
+	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+	(ls -l /home/controls/config-daq1/deploy/smsd)
+
+		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 12:46
+			/home/controls/config-daq1/deploy/smsd ->
+				/home/controls/prod/ADARA/20170717/v1.6.19/smsd*
+
+	./deploy_adara sms
+
+8. Start SMS Daemon:
+
+	sudo /sbin/service smsd status
+
+	sudo /sbin/service smsd start
+
+	smslog
+
+	liveconf status
+
+	caput -S BL17:SMS:RunInfo:ProposalId IPTS-0000
+
+	liveconf status
+
+9. Add SMS to Local Run Levels
+
+	chkconfig --list smsd
+
+	sudo chkconfig --add smsd
+
+	chkconfig --list smsd
+
+	sudo chkconfig smsd on
+
+	chkconfig --list smsd
+
+DONE!!! :-D
+
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+

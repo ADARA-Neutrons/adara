@@ -1590,7 +1590,7 @@ void smsFloat64PV::initReadTable(void)
 	m_read_table.installReadFunc("graphicLow",
 		&smsFloat64PV::minimumNumber);
 	m_read_table.installReadFunc("precision",
-		&smsFloat64PV::defaultNumber);
+		&smsFloat64PV::defaultPrecision);
 	m_read_table.installReadFunc("units",
 		&smsFloat64PV::defaultString);
 }
@@ -1599,6 +1599,14 @@ gddAppFuncTableStatus smsFloat64PV::defaultNumber(gdd &in)
 {
 	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
 	val->put(0.0);
+	in.put(val);
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsFloat64PV::defaultPrecision(gdd &in)
+{
+	gdd *val = new gddScalar(gddAppType_value, aitEnumFloat64);
+	val->put(9.0);
 	in.put(val);
 	return S_cas_success;
 }

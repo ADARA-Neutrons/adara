@@ -211,6 +211,14 @@ option_default[$num_options]="true"
 option_label[$num_options]="[Send Sample In Run Info]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="run_notes_auto_reset"
+option_pv[$num_options]="SMS:Marker:NotesCommentAutoReset"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Auto-Reset the Run Notes Between Runs]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -819,15 +827,22 @@ Dump_Non_Zero_PV()
 
 GET_LIVE_SETTING()
 {
+	local _truncPrec=""
+	if [[ "$1" == "--truncatePrecision" ]]; then
+		_truncPrec="-g 16"
+	fi
 	if [[ $terse == 0 ]]; then
 		echo "Getting Current Live SMS Daemon Setting (PV) for:"
 		echo "   ${optId}:${opt_label}"
 		echo "   ${PRE}:${PV}"
+		if [[ "${_truncPrec}" != "" ]]; then
+			echo "   [Truncating Precision]"
+		fi
 		echo
 	fi
 	local _live_current=""
 	local _live_ok=""
-	_live_current=`caget $opt_pv_opt $WAIT ${PRE}:${PV} 2>&1`
+	_live_current=`caget $opt_pv_opt $WAIT $_truncPrec ${PRE}:${PV} 2>&1`
 	_live_ok=$?
 	if [ ${_live_ok} != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
@@ -1326,6 +1341,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Marker:RunComment
 		caget $WAIT -S ${PRE}:SMS:Marker:ScanComment
 		caget $WAIT -S ${PRE}:SMS:Marker:NotesComment
+		caget $WAIT ${PRE}:SMS:Marker:NotesCommentAutoReset
 		caget $WAIT -S ${PRE}:SMS:Marker:AnnotationComment
 
 		echo
@@ -2565,7 +2581,7 @@ CONFCK()
 
 			echo
 
-			GET_LIVE_SETTING
+			GET_LIVE_SETTING --truncatePrecision
 			if [ $? != 0 ]; then
 				echo -n \
 					"Proceed with Live vs. File Config Check (yes/No)? "

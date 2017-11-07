@@ -40,10 +40,52 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_beam_sname(a_beam_sname),
 	m_facility(a_facility),
 	m_comm_thread(0),
-	m_stop(false),
-	m_inqueue(new epicsMessageQueue(100, sizeof(SMSRunStatus *)))
+	m_stop(false)
 {
 	// Install Channel Access Exception Handler in commThread() now... :-D
+
+	try
+	{
+		// Make Sure We Got A Message Queue...!
+		m_inqueue = new epicsMessageQueue(100, sizeof(SMSRunStatus *));
+		if ( !m_inqueue ) {
+			ERROR("ComBusSMSMon(): Failed to Create EPICS Message Queue...!"
+				<< " Facility=" << m_facility
+				<< " Beamline=" << m_beam_sname
+				<< " Count=" << 100
+				<< " MaxMsgSize=" << sizeof(SMSRunStatus *));
+			return;
+		}
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon() Exception"
+			<< " Trying to Create EPICS Message Queue...!"
+			<< " [" << e.what() << "]"
+			<< " Facility=" << m_facility
+			<< " Beamline=" << m_beam_sname
+			<< " Count=" << 100
+			<< " MaxMsgSize=" << sizeof(SMSRunStatus *));
+		m_inqueue = 0;   // just to be safe...?
+		return;
+	}
+	catch (...)
+	{
+		ERROR("ComBusSMSMon::SendOriginal() Unknown Exception"
+			<< " Trying to Create EPICS Message Queue...!"
+			<< " Facility=" << m_facility
+			<< " Beamline=" << m_beam_sname
+			<< " Count=" << 100
+			<< " MaxMsgSize=" << sizeof(SMSRunStatus *));
+		m_inqueue = 0;   // just to be safe...?
+		return;
+	}
+
+	DEBUG("ComBusSMSMon(): Created EPICS Message Queue..."
+		<< " Facility=" << m_facility
+		<< " Beamline=" << m_beam_sname
+		<< " Count=" << 100
+		<< " MaxMsgSize=" << sizeof(SMSRunStatus *));
 }
 
 ComBusSMSMon::~ComBusSMSMon()
@@ -53,6 +95,11 @@ ComBusSMSMon::~ComBusSMSMon()
 		m_comm_thread->join();
 		delete m_comm_thread;
 		m_comm_thread = 0;
+	}
+
+	if ( m_inqueue ) {
+		delete m_inqueue;
+		m_inqueue = 0;
 	}
 }
 
@@ -82,6 +129,16 @@ void ComBusSMSMon::sendOriginal(
 		std::string a_run_state,
 		const struct timespec &a_start_time )
 {
+	// Make Sure We Have a Queue...
+	if ( !m_inqueue ) {
+		ERROR("ComBusSMSMon::SendOriginal()"
+			<< " NO QUEUE to Send Message"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
+		return;
+	}
+
 	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
 		a_run_state, a_start_time );
 
@@ -113,6 +170,16 @@ void ComBusSMSMon::sendUpdate(
 		uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state )
 {
+	// Make Sure We Have a Queue...
+	if ( !m_inqueue ) {
+		ERROR("ComBusSMSMon::SendUpdate()"
+			<< " NO QUEUE to Send Message"
+			<< " for Domain " << m_domain
+			<< " to URI " << m_broker_uri
+			<< " as User " << m_broker_user);
+		return;
+	}
+
 	SMSRunStatus *outp = new SMSRunStatus( a_run_num, a_proposal_id,
 		a_run_state );
 
@@ -143,8 +210,13 @@ void ComBusSMSMon::sendUpdate(
 void
 ComBusSMSMon::start(void)
 {
+	DEBUG("ComBusSMSMon::start() Entry");
+
 	if ( !m_comm_thread )
 	{
+		DEBUG("ComBusSMSMon::start(): Comm Thread Not Found"
+			<< " - Initializing...");
+
 		SMSControl *ctrl = SMSControl::getInstance();
 		if (!ctrl) {
 			throw std::logic_error(
@@ -186,6 +258,11 @@ ComBusSMSMon::start(void)
 
 void ComBusSMSMon::openComm()
 {
+	DEBUG("ComBusSMSMon::openComm(): Opening Connection"
+		<< " for Domain " << m_domain
+		<< " to URI " << m_broker_uri
+		<< " as User " << m_broker_user);
+
 	try
 	{
 		m_combus = new ADARA::ComBus::Connection(
@@ -227,6 +304,11 @@ void ComBusSMSMon::openComm()
 
 void ComBusSMSMon::reOpenComm()
 {
+	DEBUG("ComBusSMSMon::reOpenComm(): Re-Opening Connection"
+		<< " for Domain " << m_domain
+		<< " to URI " << m_broker_uri
+		<< " as User " << m_broker_user);
+
 	try
 	{
 		m_combus->setConnection(m_domain, m_broker_uri, m_broker_user,
@@ -294,8 +376,9 @@ void ComBusSMSMon::commThread()
 	int bytesrec = 0;
 	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
 	char inbuf[smsStringPV::MAX_LENGTH];
+	unsigned long spam_count = 0;
 
-	INFO("SMS ComBus thread started");
+	INFO("SMS ComBus commThread() started");
 
 	// The CA_ADDR_LIST is set to the local host "broadcast address",
 	// although local host would work. The broadcast address can be more
@@ -339,7 +422,11 @@ void ComBusSMSMon::commThread()
 			restartCallback, &m_restart_combus, 0), 
 			"monitor combus restart");
 
+	INFO("SMS ComBus commThread() Before ca_pend_io(1.0)...");
+
 	SMSSEVCHK(ca_pend_io(1.0), "Combus thread monitor");
+
+	INFO("SMS ComBus commThread() After ca_pend_io(1.0).");
 
 	while (!m_stop) {
 
@@ -406,6 +493,19 @@ void ComBusSMSMon::commThread()
 			continue;
 		}
 
+		// Make Sure We Have a Queue...
+		// (Also Make Sure This Never Spams Us... ;-D)
+		if ( !m_inqueue ) {
+			if ( !( (spam_count++) % 3600 ) ) {
+				ERROR("ComBusSMSMon::commThread()"
+					<< " NO QUEUE to Receive Message"
+					<< " for Domain " << m_domain
+					<< " to URI " << m_broker_uri
+					<< " as User " << m_broker_user);
+			}
+			continue;
+		}
+
 		try
 		{
 			bytesrec = m_inqueue->receive( &inpu,
@@ -413,11 +513,15 @@ void ComBusSMSMon::commThread()
 			if ( bytesrec == -1 || !inpu ) {
 				hb++;
 				if (hb > 5) {
+					// Naw... DEBUG("Sending ComBus Heartbeat...");
 					m_combus->status( ADARA::ComBus::STATUS_OK );
 					hb = 0;
 				}
 				continue;
 			}
+
+			DEBUG("ComBusSMSMon::commThread()"
+				<< " Received Next Input from Message Queue...");
 
 			if ( m_run_dict.count( inpu->m_run_num ) ) {
 				lookup = m_run_dict[ inpu->m_run_num ];

@@ -69,6 +69,7 @@ private:
 	{
 		m_runInfo->pvChanged(this);
 		m_lastValid = this->valid();
+		m_runInfo->checkPacket();
 	}
 
 	friend class RunInfoFloat64PV;
@@ -116,8 +117,9 @@ private:
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		std::stringstream ss;
-		ss << value();
+		ss << std::setprecision(17) << value();
 		m_stringRunInfoPV->update( ss.str(), &now );
+		m_stringRunInfoPV->changed();
 	}
 };
 
@@ -216,7 +218,10 @@ private:
 			return( true );
 	}
 
-	void changed(void) { m_runInfo->invalidateCache(); }
+	void changed(void) {
+		m_runInfo->invalidateCache();
+		m_runInfo->checkPacket();
+	}
 };
 
 static void xmlEncodeTo(std::string &out, const std::string &in,
@@ -341,8 +346,6 @@ static void addUserInfo(std::string &out, const std::string &info)
 	}
 
 	out += "   </users>\n";
-
-	DEBUG("addUserInfo() out=[" << out << "]");
 }
 
 static void addElements(std::string &out, RunInfo::RunInfoMap &map,
@@ -668,10 +671,10 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 	}
 }
 
-void RunInfo::generatePacket(void)
+bool RunInfo::generatePacket(void)
 {
 	if (m_packetValid)
-		return;
+		return(false);
 
 	std::string xml;
 	xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -707,6 +710,8 @@ void RunInfo::generatePacket(void)
 
 	xml += "</runinfo>";
 
+	DEBUG("generatePacket() xml=[" << xml << "]");
+
 	/* Now that we've generated the new XML content, rebuild our packet.
 	 */
 	delete [] m_packet;
@@ -738,18 +743,15 @@ void RunInfo::generatePacket(void)
 	memcpy(fields + 5, xml.c_str(), xml.size());
 
 	m_packetValid = true;
+
+	return(true);
 }
 
 void RunInfo::onPrologue(void)
 {
-	/* TODO we generate this for the beginning of a data file, but should
-	 * we also update this mid-file if the user sets our PVs?
-	 * I think we probably shouldn't, as this info is primarily for
-	 * STS. But it may not be a bad idea to give this to live viewers
-	 * as well.
-	 */
 	if (m_runNumber) {
 		generatePacket();
 		StorageManager::addPrologue(m_packet, m_packetSize);
 	}
 }
+

@@ -1,0 +1,138 @@
+
+ADARA PVSD Install Checklist
+
+	- for a New or Upgraded DASSRV1 Host...
+
+1. Verify State of Any Existing Git Config Repository:
+
+	pushd /home/controls/config-dassrv1/ ; git pull ; git diff ; git status
+
+	./confck
+
+	sudo cp pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
+
+	sudo cp pvsd/pvsd.initscript /etc/init.d/pvsd
+
+	sudo cp pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /usr/local/bin/pvsd /etc/init.d/pvsd \
+		/etc/rsyslog.d/adaraMailer.conf   
+
+		-rwxr-xr-x 1 root root 2146 Mar 31  2017 /etc/init.d/pvsd*
+
+		-rw-r--r-- 1 root root  513 Mar 27  2017
+			/etc/rsyslog.d/adaraMailer.conf
+
+		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
+
+2. RSyslog Setup:
+
+	sudo vi /etc/rsyslog.conf
+
+		#### RULES ####
+
+		# pvsd log
+		if $programname == 'pvsd' then /var/log/pvsd.log
+		& ~
+
+	sudo touch /var/log/pvsd.log
+
+	sudo chgrp users /var/log/pvsd.log
+
+	sudo chmod g+w /var/log/pvsd.log
+
+	ls -l /var/log/pvsd.log
+
+	sudo /sbin/service rsyslog status
+
+	sudo /sbin/service rsyslog restart
+
+3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
+
+	ls -l /etc/rsyslog.pipes
+
+	sudo mkdir /etc/rsyslog.pipes
+
+	sudo mknod /etc/rsyslog.pipes/criticalMessages p
+
+	sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+
+	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+
+	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
+
+	sudo vi /etc/crontab
+
+		*/5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+4. Administrator Crontab Setup:
+
+	crontab -l
+
+	crontab -e
+
+		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
+		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
+		0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon
+		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
+		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
+
+	crontab -l
+
+5. User Local Bin Soft Link Setup:
+
+	sudo ln -s /home/controls/config-dassrv1/deploy/pvsd /usr/sbin/pvsd
+
+6. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+
+	(rm EpicsBaseLink)
+
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
+		EpicsBaseLink
+
+	(rm EpicsBaseV4Link)
+
+	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
+		EpicsBaseV4Link
+
+	(rm EpicsExtensionsLink)
+
+	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
+		EpicsExtensionsLink
+
+7. Deploy PVSD Daemon:
+
+	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+	(ls -l /home/controls/config-dassrv1/deploy/pvsd)
+
+		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
+			/home/controls/config-dassrv1/deploy/pvsd ->
+				/home/controls/prod/ADARA/20170717/v1.6.19/pvsd*
+
+	./deploy_adara pvsd
+
+8. Start PVSD Daemon:
+
+	sudo /sbin/service pvsd status
+
+	sudo /sbin/service pvsd start
+
+	pvsdlog
+
+9. Add SMS to Local Run Levels
+
+	chkconfig --list pvsd
+
+	sudo chkconfig --add pvsd
+
+	chkconfig --list pvsd
+
+	sudo chkconfig pvsd on
+
+	chkconfig --list pvsd
+
+DONE!!! :-D
+
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+

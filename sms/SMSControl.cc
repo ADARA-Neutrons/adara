@@ -41,11 +41,12 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
-#define RLL_PULSE_PCHG_UNCORRECTED       5
-#define RLL_PULSE_PCHG_BUFFER_EMPTY      6
-#define RLL_NO_RTDL_FOR_PULSE            7
-#define RLL_CHOPPER_SYNC_ISSUE           8
-#define RLL_CHOPPER_GLITCH_ISSUE         9
+#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  5
+#define RLL_PULSE_PCHG_UNCORRECTED       6
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
+#define RLL_NO_RTDL_FOR_PULSE            8
+#define RLL_CHOPPER_SYNC_ISSUE           9
+#define RLL_CHOPPER_GLITCH_ISSUE        10
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -74,6 +75,8 @@ bool SMSControl::m_doPulseVetoCorrect;
 bool SMSControl::m_sendSampleInRunInfo;
 
 bool SMSControl::m_allowNonOneToOnePixelMapping;
+
+bool SMSControl::m_notesCommentAutoReset;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -198,6 +201,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 				false);
 	INFO("Setting Allow Non-One-to-One Pixel Mapping to "
 		<< m_allowNonOneToOnePixelMapping << ".");
+
+	m_notesCommentAutoReset =
+			conf.get<bool>("sms.run_notes_auto_reset", true);
+	INFO("Setting Run Notes Auto Reset to "
+		<< m_notesCommentAutoReset << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -388,7 +396,7 @@ SMSControl::SMSControl() :
 						smsRunNumberPV(prefix));
 
 	m_markers = boost::shared_ptr<Markers>(new
-						Markers(this));
+						Markers(this, m_notesCommentAutoReset));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
 						smsErrorPV(prefix + ":Summary"));
@@ -496,7 +504,7 @@ SMSControl::SMSControl() :
 
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
-		throw std::runtime_error("Unable to get next run number");
+		throw std::runtime_error("Unable to Get Next Run Number");
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
@@ -711,8 +719,9 @@ bool SMSControl::setRecording( bool v )
 		// We've Updated the Run Number on disk,
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
-		INFO("Starting run " << m_currentRunNumber);
-		m_runInfo->lock();
+		INFO("Starting Run " << m_currentRunNumber);
+		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+		// m_runInfo->lock();
 		m_runInfo->setRunNumber( m_currentRunNumber );
 
 		// Reset the Overall Monitor bookkeeping...
@@ -747,7 +756,8 @@ bool SMSControl::setRecording( bool v )
 				// and "Unlock" RunInfo for PV Updates...
 				m_currentRunNumber = 0;
 				m_runInfo->setRunNumber(0);
-				m_runInfo->unlock();
+				// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+				// m_runInfo->unlock();
 				// LOGIC Exception Starting Run...!
 				m_summaryOther = false;
 				m_reasonBase = "Unable to Start Recording";
@@ -810,7 +820,8 @@ bool SMSControl::setRecording( bool v )
 			// and "Unlock" RunInfo for PV Updates...
 			m_currentRunNumber = 0;
 			m_runInfo->setRunNumber(0);
-			m_runInfo->unlock();
+			// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+			// m_runInfo->unlock();
 			// Update Overall Summary and Reason [Set Severity/Alarm!]
 			// - "false": Don't Set Base Reason (we just set it :-)
 			// - "true": Do Log Status as Error
@@ -831,11 +842,12 @@ bool SMSControl::setRecording( bool v )
 
 		// Stopping Run, Clear Run Number
 		// and "Unlock" RunInfo for PV Updates...
-		INFO("Stopping run " << m_currentRunNumber);
+		INFO("Stopping Run " << m_currentRunNumber);
 		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
-		m_runInfo->unlock();
+		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
+		// m_runInfo->unlock();
 
 		// Retry *3* Times for Any Transient Failures...
 		// (Then "Fail Big" and Set Summary Alarm Severity...)
@@ -954,9 +966,9 @@ bool SMSControl::getRecording(void)
 void SMSControl::pauseRecording(void)
 {
 	if ( m_currentRunNumber )
-		INFO("Pausing run " << m_currentRunNumber);
+		INFO("Pausing Run " << m_currentRunNumber);
 	else
-		INFO("Pausing data collection (not currently recording)");
+		INFO("Pausing Data Collection (Not Currently Recording)");
 
 	StorageManager::pauseRecording();
 }
@@ -964,9 +976,9 @@ void SMSControl::pauseRecording(void)
 void SMSControl::resumeRecording(void)
 {
 	if ( m_currentRunNumber )
-		INFO("Resuming run " << m_currentRunNumber);
+		INFO("Resuming Run " << m_currentRunNumber);
 	else
-		INFO("Resuming data collection (not currently recording)");
+		INFO("Resuming Data Collection (Not Currently Recording)");
 
 	StorageManager::resumeRecording();
 }
@@ -1179,15 +1191,6 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		 * (Note: this could leave some partial pulse data hanging here.)
 		 */
 
-		// Determine How Many Sources are Registered
-		// (Including the One We are Unregistering)
-		size_t i, max = m_eventSources.size();
-		int num_sources = 0;
-		for (i = 0; i < max; i++) {
-			if (m_eventSources[i])
-				num_sources++;
-		}
-
 		// Get Latest "No End-of-Pulse Buffer Size" Value from PV...
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 
@@ -1196,8 +1199,10 @@ void SMSControl::unregisterEventSource(uint32_t smsId)
 		uint32_t pcnt = 0;
 
 		// Skip Past Any Buffering Level, Unless We're the Last to Unreg
+		// - Use the Number of Registered Event Sources to Decide,
+		// Including the One We are Unregistering!
 		// (Any Other Remaining Sources Could Still Spew Out-of-Order...)
-		if ( num_sources > 1 ) {
+		if ( m_eventSources.count() > 1 ) {
 			DEBUG("unregisterEventSource():"
 				<< " Buffering " << m_noEoPPulseBufferSize << " Pulses,"
 				<< " Last Pulse = 0x"
@@ -2149,16 +2154,31 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 		// ***Periodically*** Log Pulse with No Registered Event Sources!!!
 		// (E.g. _Not_ Every 216000 Occurrences using Rate-Limited Logging)
-		// - Always Log If We're _Not_ in No Registered Event Source State
-		// - Otherwise, Only Log Every 36000 Occurrences (Every 10 Mins)
-		if ( !m_noRegisteredEventSources
-				|| !(m_noRegisteredEventSourcesCount++ % 36000) ) {
-			ERROR( ( m_recording ? "[RECORDING] " : "" )
-				<< "pulseRTDL: Pulse with No Registered Event Sources!"
-				<< " (m_noRegisteredEventSources="
-				<< ( m_noRegisteredEventSources ? "true" : "false" )
-				<< ", count=" << m_noRegisteredEventSourcesCount << ")"
-				<< " Marking Partial...");
+		// - Only Log If We're in "No Registered Event Source" State
+		// Every 36000 Occurrences (Every 10 Mins)...
+		if ( pulse->m_numEventSources == 0 ) {
+			if ( !(m_noRegisteredEventSourcesCount++ % 36000) ) {
+				ERROR( ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseRTDL: Pulse with No Registered Event Sources!"
+					<< " (m_noRegisteredEventSources="
+					<< ( m_noRegisteredEventSources ? "true" : "false" )
+					<< " numEventSources=" << pulse->m_numEventSources
+					<< " count=" << m_noRegisteredEventSourcesCount << ")"
+					<< " Marking Partial...");
+			}
+		}
+		else {
+			// Rate-Limited Log RTDL Out of Order with Raw Data/Packets...
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+					RLL_RTDL_OUT_OF_ORDER_WITH_DATA, "none",
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseRTDL: RTDL Out of Order with Raw Data"
+					<< " - Pulse Not Pending...?"
+					<< " Marking Partial...");
+			}
 		}
 
 		// Mark Pulse "Partial" Because there's No Event Data,

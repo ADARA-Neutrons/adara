@@ -300,9 +300,9 @@ StreamParser::rxPacket
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
                 PKT_BIT_PIXELMAP)
 
+        // Allow & Process Multiple RunInfoPkt Per Run Now...! :-O
         case ADARA::PacketType::RUN_INFO_TYPE:
-            PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
-                PKT_BIT_RUNINFO)
+            PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
         case ADARA::PacketType::GEOMETRY_TYPE:
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
@@ -761,7 +761,8 @@ StreamParser::processPulseInfo
     {
         uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
 
-        // It is (or should be) considered a fatal error if pulse times are not monotonically increasing
+        // It is (or should be) considered a fatal error if
+        // pulse times are not monotonically increasing
         if ( pulse_time < m_pulse_info.start_time )
         {
             syslog( LOG_INFO,
@@ -769,6 +770,7 @@ StreamParser::processPulseInfo
                 g_pid, "Pulse time went backwards",
                 m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
+            usleep(30000); // give syslog a chance...
             pulse_time = 0;
         }
         else
@@ -1413,6 +1415,10 @@ StreamParser::rxPacket
 
     if ( doc )
     {
+        // Temporary RunInfo Holder...
+        // (to Enable Duplicate RunInfoPkt Comparisons... ;-D)
+        RunInfo tmp_run_info;
+
         string tag;
         string value;
 
@@ -1427,28 +1433,33 @@ StreamParser::rxPacket
                 if ( xmlStrcmp( node->name,
                         (const xmlChar*)"run_number" ) == 0 )
                 {
-                    m_run_info.run_number =
+                    tmp_run_info.run_number =
                         boost::lexical_cast<uint32_t>( value );
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"proposal_id" ) == 0 )
                 {
-                    m_run_info.proposal_id = value;
+                    tmp_run_info.proposal_id = value;
+                }
+                else if ( xmlStrcmp( node->name,
+                        (const xmlChar*)"proposal_title" ) == 0 )
+                {
+                    tmp_run_info.proposal_title = value;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"run_title" ) == 0 )
                 {
-                    m_run_info.run_title = value;
+                    tmp_run_info.run_title = value;
                 }
                 else if (xmlStrcmp( node->name,
                         (const xmlChar*) "facility_name") == 0 )
                 {
-                    m_run_info.facility_name = value;
+                    tmp_run_info.facility_name = value;
                 }
                 else if (xmlStrcmp( node->name,
                         (const xmlChar*) "no_sample_info") == 0 )
                 {
-                    m_run_info.no_sample_info = true;
+                    tmp_run_info.no_sample_info = true;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
@@ -1462,40 +1473,40 @@ StreamParser::rxPacket
                         if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"id" ) == 0 )
                         {
-                            m_run_info.sample_id = value;
+                            tmp_run_info.sample_id = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"name" ) == 0 )
                         {
-                            m_run_info.sample_name = value;
+                            tmp_run_info.sample_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"nature" ) == 0 )
                         {
-                            m_run_info.sample_nature = value;
+                            tmp_run_info.sample_nature = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"chemical_formula" ) == 0 )
                         {
-                            m_run_info.sample_formula = value;
+                            tmp_run_info.sample_formula = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass" ) == 0 )
                         {
-                            m_run_info.sample_mass =
+                            tmp_run_info.sample_mass =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_units" ) == 0 )
                         {
-                            m_run_info.sample_mass_units = value;
+                            tmp_run_info.sample_mass_units = value;
                         }
                         // TODO Delete When Phased Out... ;-Q
                         // ("Density" is really "Number Density"...!)
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete When Phased Out... ;-Q
@@ -1504,14 +1515,14 @@ StreamParser::rxPacket
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"density_units" ) == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         // TODO Delete Re-Name Leftover When Phased Out...
                         // They Changed Their Minds... Again... ;-Q
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"number_density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         // TODO Delete Re-Name Leftover When Phased Out...
@@ -1520,24 +1531,24 @@ StreamParser::rxPacket
                                 (const xmlChar*)"number_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_density" ) == 0 )
                         {
-                            m_run_info.sample_mass_density =
+                            tmp_run_info.sample_mass_density =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"mass_density_units" )
                                     == 0 )
                         {
-                            m_run_info.sample_mass_density_units = value;
+                            tmp_run_info.sample_mass_density_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"container_id" ) == 0 )
                         {
-                            m_run_info.sample_container_id = value;
+                            tmp_run_info.sample_container_id = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                     (const xmlChar*)"container_name" ) == 0
@@ -1545,162 +1556,165 @@ StreamParser::rxPacket
                                 || xmlStrcmp( sample_node->name,
                                     (const xmlChar*)"container" ) == 0 )
                         {
-                            m_run_info.sample_container_name = value;
+                            tmp_run_info.sample_container_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_indicator" ) == 0 )
                         {
-                            m_run_info.sample_can_indicator = value;
+                            tmp_run_info.sample_can_indicator = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_barcode" ) == 0 )
                         {
-                            m_run_info.sample_can_barcode = value;
+                            tmp_run_info.sample_can_barcode = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_name" ) == 0 )
                         {
-                            m_run_info.sample_can_name = value;
+                            tmp_run_info.sample_can_name = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"can_materials" ) == 0 )
                         {
-                            m_run_info.sample_can_materials = value;
+                            tmp_run_info.sample_can_materials = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"description" ) == 0 )
                         {
-                            m_run_info.sample_description = value;
+                            tmp_run_info.sample_description = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"comments" ) == 0 )
                         {
-                            m_run_info.sample_comments = value;
+                            tmp_run_info.sample_comments = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "height_in_container" ) == 0 )
                         {
-                            m_run_info.sample_height_in_container =
+                            tmp_run_info.sample_height_in_container =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "height_in_container_units" ) == 0 )
                         {
-                            m_run_info.sample_height_in_container_units =
+                            tmp_run_info.sample_height_in_container_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_diameter" ) == 0 )
                         {
-                            m_run_info.sample_interior_diameter =
+                            tmp_run_info.sample_interior_diameter =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_diameter_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_diameter_units =
+                            tmp_run_info.sample_interior_diameter_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_height" ) == 0 )
                         {
-                            m_run_info.sample_interior_height =
+                            tmp_run_info.sample_interior_height =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_height_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_height_units =
+                            tmp_run_info.sample_interior_height_units =
                                 value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_width" ) == 0 )
                         {
-                            m_run_info.sample_interior_width =
+                            tmp_run_info.sample_interior_width =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_width_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_width_units = value;
+                            tmp_run_info.sample_interior_width_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"interior_depth" ) == 0 )
                         {
-                            m_run_info.sample_interior_depth =
+                            tmp_run_info.sample_interior_depth =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "interior_depth_units" ) == 0 )
                         {
-                            m_run_info.sample_interior_depth_units = value;
+                            tmp_run_info.sample_interior_depth_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_diameter" ) == 0 )
                         {
-                            m_run_info.sample_outer_diameter =
+                            tmp_run_info.sample_outer_diameter =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_diameter_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_diameter_units = value;
+                            tmp_run_info.sample_outer_diameter_units =
+                                value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_height" ) == 0 )
                         {
-                            m_run_info.sample_outer_height =
+                            tmp_run_info.sample_outer_height =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_height_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_height_units = value;
+                            tmp_run_info.sample_outer_height_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_width" ) == 0 )
                         {
-                            m_run_info.sample_outer_width =
+                            tmp_run_info.sample_outer_width =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_width_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_width_units = value;
+                            tmp_run_info.sample_outer_width_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"outer_depth" ) == 0 )
                         {
-                            m_run_info.sample_outer_depth =
+                            tmp_run_info.sample_outer_depth =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "outer_depth_units" ) == 0 )
                         {
-                            m_run_info.sample_outer_depth_units = value;
+                            tmp_run_info.sample_outer_depth_units = value;
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)"volume_cubic" ) == 0 )
                         {
-                            m_run_info.sample_volume_cubic =
+                            tmp_run_info.sample_volume_cubic =
                                 boost::lexical_cast<double>( value );
                         }
                         else if ( xmlStrcmp( sample_node->name,
                                 (const xmlChar*)
                                     "volume_cubic_units" ) == 0 )
                         {
-                            m_run_info.sample_volume_cubic_units = value;
+                            tmp_run_info.sample_volume_cubic_units = value;
                         }
                     }
                 }
@@ -1743,7 +1757,7 @@ StreamParser::rxPacket
                                 }
                             }
 
-                            m_run_info.users.push_back( ui );
+                            tmp_run_info.users.push_back( ui );
                         }
                     }
                 }
@@ -1763,6 +1777,28 @@ StreamParser::rxPacket
         }
 
         xmlFreeDoc( doc );
+
+        // First RunInfoPkt...
+        if ( !(m_pkt_recvd & (PKT_BIT_RUNINFO)) )
+        {
+            syslog( LOG_INFO, "[%i] %s: First RunInfoPkt - %s...",
+                g_pid, "rxPacket(RunInfoPkt)", "Utilizing Values" );
+            usleep(30000); // give syslog a chance...
+
+            m_pkt_recvd |= (PKT_BIT_RUNINFO);
+
+            m_run_info = tmp_run_info;
+        }
+
+        // Duplicate RunInfoPkt...
+        else
+        {
+            syslog( LOG_INFO, "[%i] %s: Duplicate RunInfoPkt - %s...",
+                g_pid, "rxPacket(RunInfoPkt)", "Updating" );
+            usleep(30000); // give syslog a chance...
+
+            updateRunInfo( tmp_run_info );
+        }
     }
 
     if ( m_strict )
@@ -1777,8 +1813,16 @@ StreamParser::rxPacket
         else if ( m_run_info.run_number == 0 )
             msg = "Required run_number missing from RunInfo.";
 
-        if ( msg.size() )
-            THROW_TRACE( ERR_UNEXPECTED_INPUT, msg )
+        // *DON'T* Throw Exception Yet Here...
+        // - Give it a Chance to be Fixed Later in the Run
+        // with an Updated RunInfo...
+        // -> But Log It as an Error, so Maybe Someone Will See It in Time!
+        if ( msg.size() ) {
+            syslog( LOG_ERR,
+                "[%i] %s %s: Strictly Missing RunInfo - %s...",
+                g_pid, "STS Error:", "rxPacket(RunInfoPkt)", msg.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
     }
 
     receivedInfo( RUN_INFO_BIT );
@@ -1827,11 +1871,11 @@ StreamParser::rxPacket
     const ADARA::BeamlineInfoPkt &a_pkt     ///< [in] The ADARA Beamline Info Packet to process
 )
 {
-    m_run_info.target_station_number = a_pkt.targetStationNumber();
+    m_beamline_info.target_station_number = a_pkt.targetStationNumber();
 
-    m_run_info.instr_id = a_pkt.id();
-    m_run_info.instr_shortname = a_pkt.shortName();
-    m_run_info.instr_longname = a_pkt.longName();
+    m_beamline_info.instr_id = a_pkt.id();
+    m_beamline_info.instr_shortname = a_pkt.shortName();
+    m_beamline_info.instr_longname = a_pkt.longName();
 
     receivedInfo( INSTR_INFO_BIT );
 
@@ -3466,6 +3510,529 @@ StreamParser::processPulseID
 }
 */
 
+
+/*! \brief Compare and Update RunInfo from Duplicate RunInfoPkt Packets
+ *
+ * This method compares each Meta-Data Field of a Duplicate incoming
+ * RunInfoPkt Packet, and Updates the Saved RunInfo struct Meta-Data,
+ * to enable Multiple RunInfo Meta-Data Updates _During_ a Run...! ;-D
+ *
+ * Log Any Actual Changes to the RunInfo Meta-Data... ;-D
+ *
+ * (Note that we naturally get *Lots* of Duplicate RunInfoPkt Packets
+ * anyway, due to the redundancy at the start of each new SMS Data File.)
+ */
+#define EPSILON (0.00000000000001)
+void
+StreamParser::updateRunInfo( const RunInfo &a_run_info )
+{
+    bool re_dump_run_header = false;
+
+    // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
+    if ( a_run_info.run_number != m_run_info.run_number ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Illegal Attempt to Update RunInfo %s! (%u != %u)",
+            g_pid, "STS Error:", "updateRunInfo()", "Run Number",
+            a_run_info.run_number, m_run_info.run_number );
+        usleep(30000); // give syslog a chance...
+    }
+    if ( m_run_info.run_title.compare( a_run_info.run_title ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Run Title",
+            m_run_info.run_title.c_str(), a_run_info.run_title.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.run_title = a_run_info.run_title;
+    }
+    if ( m_run_info.proposal_id.compare( a_run_info.proposal_id ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Proposal Id",
+            m_run_info.proposal_id.c_str(),
+            a_run_info.proposal_id.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.proposal_id = a_run_info.proposal_id;
+    }
+    if ( m_run_info.proposal_title.compare( a_run_info.proposal_title ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Proposal Title",
+            m_run_info.proposal_title.c_str(),
+            a_run_info.proposal_title.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.proposal_title = a_run_info.proposal_title;
+    }
+    // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
+    if ( m_run_info.facility_name.compare( a_run_info.facility_name ) ) {
+        syslog( LOG_ERR,
+        "[%i] %s %s: Illegal Attempt to Update RunInfo %s! ([%s] != [%s])",
+            g_pid, "STS Error:", "updateRunInfo()", "Facility Name",
+            m_run_info.facility_name.c_str(),
+            a_run_info.facility_name.c_str() );
+        usleep(30000); // give syslog a chance...
+    }
+    if ( a_run_info.no_sample_info != m_run_info.no_sample_info ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "No Sample Info",
+            (m_run_info.no_sample_info) ? "True" : "False",
+            (a_run_info.no_sample_info) ? "True" : "False" );
+        usleep(30000); // give syslog a chance...
+        m_run_info.no_sample_info = a_run_info.no_sample_info;
+    }
+    if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Id",
+            m_run_info.sample_id.c_str(), a_run_info.sample_id.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_id = a_run_info.sample_id;
+    }
+    if ( m_run_info.sample_name.compare( a_run_info.sample_name ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Name",
+            m_run_info.sample_name.c_str(),
+            a_run_info.sample_name.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_name = a_run_info.sample_name;
+    }
+    if ( m_run_info.sample_nature.compare( a_run_info.sample_nature ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Nature",
+            m_run_info.sample_nature.c_str(),
+            a_run_info.sample_nature.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_nature = a_run_info.sample_nature;
+    }
+    if ( m_run_info.sample_formula.compare( a_run_info.sample_formula ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Formula",
+            m_run_info.sample_formula.c_str(),
+            a_run_info.sample_formula.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_formula = a_run_info.sample_formula;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_mass,
+            m_run_info.sample_mass, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass",
+            m_run_info.sample_mass, a_run_info.sample_mass );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_mass = a_run_info.sample_mass;
+    }
+    if ( m_run_info.sample_mass_units.compare(
+            a_run_info.sample_mass_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Units",
+            m_run_info.sample_mass_units.c_str(),
+            a_run_info.sample_mass_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_mass_units = a_run_info.sample_mass_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_mass_density,
+            m_run_info.sample_mass_density, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Density",
+            m_run_info.sample_mass_density,
+            a_run_info.sample_mass_density );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_mass_density = a_run_info.sample_mass_density;
+    }
+    if ( m_run_info.sample_mass_density_units.compare(
+            a_run_info.sample_mass_density_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Mass Density Units",
+            m_run_info.sample_mass_density_units.c_str(),
+            a_run_info.sample_mass_density_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_mass_density_units =
+            a_run_info.sample_mass_density_units;
+    }
+    if ( m_run_info.sample_container_id.compare(
+            a_run_info.sample_container_id ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Container Id",
+            m_run_info.sample_container_id.c_str(),
+            a_run_info.sample_container_id.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_container_id = a_run_info.sample_container_id;
+    }
+    if ( m_run_info.sample_container_name.compare(
+            a_run_info.sample_container_name ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Container Name",
+            m_run_info.sample_container_name.c_str(),
+            a_run_info.sample_container_name.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_container_name =
+            a_run_info.sample_container_name;
+    }
+    if ( m_run_info.sample_can_indicator.compare(
+            a_run_info.sample_can_indicator ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Indicator",
+            m_run_info.sample_can_indicator.c_str(),
+            a_run_info.sample_can_indicator.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_can_indicator =
+            a_run_info.sample_can_indicator;
+    }
+    if ( m_run_info.sample_can_barcode.compare(
+            a_run_info.sample_can_barcode ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Barcode",
+            m_run_info.sample_can_barcode.c_str(),
+            a_run_info.sample_can_barcode.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_can_barcode = a_run_info.sample_can_barcode;
+    }
+    if ( m_run_info.sample_can_name.compare(
+            a_run_info.sample_can_name ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Name",
+            m_run_info.sample_can_name.c_str(),
+            a_run_info.sample_can_name.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_can_name = a_run_info.sample_can_name;
+    }
+    if ( m_run_info.sample_can_materials.compare(
+            a_run_info.sample_can_materials ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Materials",
+            m_run_info.sample_can_materials.c_str(),
+            a_run_info.sample_can_materials.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_can_materials = a_run_info.sample_can_materials;
+    }
+    if ( m_run_info.sample_description.compare(
+            a_run_info.sample_description ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Description",
+            m_run_info.sample_description.c_str(),
+            a_run_info.sample_description.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_description = a_run_info.sample_description;
+    }
+    if ( m_run_info.sample_comments.compare(
+            a_run_info.sample_comments ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Comments",
+            m_run_info.sample_comments.c_str(),
+            a_run_info.sample_comments.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_comments = a_run_info.sample_comments;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_height_in_container,
+            m_run_info.sample_height_in_container, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Height In Container",
+            m_run_info.sample_height_in_container,
+            a_run_info.sample_height_in_container );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_height_in_container =
+            a_run_info.sample_height_in_container;
+    }
+    if ( m_run_info.sample_height_in_container_units.compare(
+            a_run_info.sample_height_in_container_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Height in Container Units",
+            m_run_info.sample_height_in_container_units.c_str(),
+            a_run_info.sample_height_in_container_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_height_in_container_units =
+            a_run_info.sample_height_in_container_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_interior_diameter,
+            m_run_info.sample_interior_diameter, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Diameter",
+            m_run_info.sample_interior_diameter,
+            a_run_info.sample_interior_diameter );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_diameter =
+            a_run_info.sample_interior_diameter;
+    }
+    if ( m_run_info.sample_interior_diameter_units.compare(
+            a_run_info.sample_interior_diameter_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Diameter Units",
+            m_run_info.sample_interior_diameter_units.c_str(),
+            a_run_info.sample_interior_diameter_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_diameter_units =
+            a_run_info.sample_interior_diameter_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_interior_height,
+            m_run_info.sample_interior_height, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Height",
+            m_run_info.sample_interior_height,
+            a_run_info.sample_interior_height );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_height =
+            a_run_info.sample_interior_height;
+    }
+    if ( m_run_info.sample_interior_height_units.compare(
+            a_run_info.sample_interior_height_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Height Units",
+            m_run_info.sample_interior_height_units.c_str(),
+            a_run_info.sample_interior_height_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_height_units =
+            a_run_info.sample_interior_height_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_interior_width,
+            m_run_info.sample_interior_width, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Width",
+            m_run_info.sample_interior_width,
+            a_run_info.sample_interior_width );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_width =
+            a_run_info.sample_interior_width;
+    }
+    if ( m_run_info.sample_interior_width_units.compare(
+            a_run_info.sample_interior_width_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Width Units",
+            m_run_info.sample_interior_width_units.c_str(),
+            a_run_info.sample_interior_width_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_width_units =
+            a_run_info.sample_interior_width_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_interior_depth,
+            m_run_info.sample_interior_depth, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Depth",
+            m_run_info.sample_interior_depth,
+            a_run_info.sample_interior_depth );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_depth =
+            a_run_info.sample_interior_depth;
+    }
+    if ( m_run_info.sample_interior_depth_units.compare(
+            a_run_info.sample_interior_depth_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Interior Depth Units",
+            m_run_info.sample_interior_depth_units.c_str(),
+            a_run_info.sample_interior_depth_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_interior_depth_units =
+            a_run_info.sample_interior_depth_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_outer_diameter,
+            m_run_info.sample_outer_diameter, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Outer Diameter",
+            m_run_info.sample_outer_diameter,
+            a_run_info.sample_outer_diameter );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_diameter =
+            a_run_info.sample_outer_diameter;
+    }
+    if ( m_run_info.sample_outer_diameter_units.compare(
+            a_run_info.sample_outer_diameter_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Outer Diameter Units",
+            m_run_info.sample_outer_diameter_units.c_str(),
+            a_run_info.sample_outer_diameter_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_diameter_units =
+            a_run_info.sample_outer_diameter_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_outer_height,
+            m_run_info.sample_outer_height, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Height",
+            m_run_info.sample_outer_height,
+            a_run_info.sample_outer_height );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_height = a_run_info.sample_outer_height;
+    }
+    if ( m_run_info.sample_outer_height_units.compare(
+            a_run_info.sample_outer_height_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Outer Height Units",
+            m_run_info.sample_outer_height_units.c_str(),
+            a_run_info.sample_outer_height_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_height_units =
+            a_run_info.sample_outer_height_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_outer_width,
+            m_run_info.sample_outer_width, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Width",
+            m_run_info.sample_outer_width,
+            a_run_info.sample_outer_width );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_width = a_run_info.sample_outer_width;
+    }
+    if ( m_run_info.sample_outer_width_units.compare(
+            a_run_info.sample_outer_width_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Outer Width Units",
+            m_run_info.sample_outer_width_units.c_str(),
+            a_run_info.sample_outer_width_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_width_units =
+            a_run_info.sample_outer_width_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_outer_depth,
+            m_run_info.sample_outer_depth, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Depth",
+            m_run_info.sample_outer_depth,
+            a_run_info.sample_outer_depth );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_depth = a_run_info.sample_outer_depth;
+    }
+    if ( m_run_info.sample_outer_depth_units.compare(
+            a_run_info.sample_outer_depth_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Outer Depth Units",
+            m_run_info.sample_outer_depth_units.c_str(),
+            a_run_info.sample_outer_depth_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_outer_depth_units =
+            a_run_info.sample_outer_depth_units;
+    }
+    if ( !approximatelyEqual( a_run_info.sample_volume_cubic,
+            m_run_info.sample_volume_cubic, EPSILON ) ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
+            g_pid, "STS Error:", "updateRunInfo()", "Sample Volume Cubic",
+            m_run_info.sample_volume_cubic,
+            a_run_info.sample_volume_cubic );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_volume_cubic = a_run_info.sample_volume_cubic;
+    }
+    if ( m_run_info.sample_volume_cubic_units.compare(
+            a_run_info.sample_volume_cubic_units ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Sample Volume Cubic Units",
+            m_run_info.sample_volume_cubic_units.c_str(),
+            a_run_info.sample_volume_cubic_units.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.sample_volume_cubic_units =
+            a_run_info.sample_volume_cubic_units;
+    }
+
+    bool update_users = false;
+    if ( a_run_info.users.size() != m_run_info.users.size() ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: %lu -> %lu",
+            g_pid, "STS Error:", "updateRunInfo()",
+            "Users Vector Size Changed",
+            m_run_info.users.size(),
+            a_run_info.users.size() );
+        usleep(30000); // give syslog a chance...
+        update_users = true;
+    }
+    else {
+        for ( uint32_t i=0 ; i < a_run_info.users.size() ; i++ ) {
+            if ( m_run_info.users[i].id.compare(
+                    a_run_info.users[i].id ) ) {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
+                    g_pid, "STS Error:", "updateRunInfo()",
+                    "User", i, "Id Changed",
+                    m_run_info.users[i].id.c_str(),
+                    a_run_info.users[i].id.c_str() );
+                usleep(30000); // give syslog a chance...
+                update_users = true;
+            }
+            if ( m_run_info.users[i].name.compare(
+                    a_run_info.users[i].name ) ) {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
+                    g_pid, "STS Error:", "updateRunInfo()",
+                    "User", i, "Name Changed",
+                    m_run_info.users[i].name.c_str(),
+                    a_run_info.users[i].name.c_str() );
+                usleep(30000); // give syslog a chance...
+                update_users = true;
+            }
+            if ( m_run_info.users[i].role.compare(
+                    a_run_info.users[i].role ) ) {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
+                    g_pid, "STS Error:", "updateRunInfo()",
+                    "User", i, "Role Changed",
+                    m_run_info.users[i].role.c_str(),
+                    a_run_info.users[i].role.c_str() );
+                usleep(30000); // give syslog a chance...
+                update_users = true;
+            }
+        }
+    }
+    if ( update_users ) {
+        // Old Users Info...
+        std::stringstream ss_old;
+        ss_old << "Old Users = [";
+        for ( uint32_t i=0 ; i < m_run_info.users.size() ; i++ ) {
+            if ( i ) ss_old << ", ";
+            ss_old << "(" << m_run_info.users[i].id
+                << "/" << m_run_info.users[i].name
+                << "/" << m_run_info.users[i].role << ")";
+        }
+        ss_old << "]";
+        // New Users Info...
+        std::stringstream ss_new;
+        ss_new << "New Users = [";
+        for ( uint32_t i=0 ; i < a_run_info.users.size() ; i++ ) {
+            if ( i ) ss_new << ", ";
+            ss_new << "(" << a_run_info.users[i].id
+                << "/" << a_run_info.users[i].name
+                << "/" << a_run_info.users[i].role << ")";
+        }
+        ss_new << "]";
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: %s -> %s",
+            g_pid, "STS Error:", "updateRunInfo()", "Users",
+            ss_old.str().c_str(), ss_new.str().c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.users = a_run_info.users;
+    }
+
+    if ( re_dump_run_header )
+    {
+        syslog( LOG_INFO,
+            "[%i] UPDATED %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
+            "Target Station", m_beamline_info.target_station_number,
+            "Beamline", m_run_info.facility_name.c_str(),
+            m_beamline_info.instr_shortname.c_str(),
+            "Proposal", m_run_info.proposal_id.c_str(),
+            "Run", m_run_info.run_number );
+        usleep(30000); // give syslog a chance...
+    }
+}
+
+
 /*! \brief Processes state of received informational packets
  *
  * This method tracks which ADARA informational packets have been received and issues a processRunInfo() call once all
@@ -3477,14 +4044,14 @@ StreamParser::receivedInfo( InfoBit a_bit )
     m_info_rcvd |= a_bit;
     if ( m_info_rcvd == ALL_INFO_RCVD )
     {
-        processRunInfo( m_run_info );
+        processBeamlineInfo( m_beamline_info );
         m_info_rcvd |= INFO_SENT;
 
         syslog( LOG_INFO,
             "[%i] %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-            "Target Station", m_run_info.target_station_number,
+            "Target Station", m_beamline_info.target_station_number,
             "Beamline", m_run_info.facility_name.c_str(),
-            m_run_info.instr_shortname.c_str(),
+            m_beamline_info.instr_shortname.c_str(),
             "Proposal", m_run_info.proposal_id.c_str(),
             "Run", m_run_info.run_number );
         usleep(30000); // give syslog a chance...
@@ -3503,6 +4070,10 @@ StreamParser::receivedInfo( InfoBit a_bit )
 void
 StreamParser::finalizeStreamProcessing()
 {
+    // NOW Dump RunInfo Meta-Data to NeXus...!
+    // - The Run is Over/Stopped, so there can be No More RunInfo Updates!
+    processRunInfo( m_run_info, m_strict );
+
     // Make sure neutron pulses were received
     // Just Log It, Don't Throw Exception... ;-b
     // (it happens all too much and is often annoying...)
@@ -3513,9 +4084,9 @@ StreamParser::finalizeStreamProcessing()
             syslog( LOG_ERR,
                 "[%i] %s %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
                 "STS Error:", "No Neutron Pulses Received in Stream",
-                "Target Station", m_run_info.target_station_number,
+                "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
-                m_run_info.instr_shortname.c_str(),
+                m_beamline_info.instr_shortname.c_str(),
                 "Proposal", m_run_info.proposal_id.c_str(),
                 "Run", m_run_info.run_number );
             usleep(30000); // give syslog a chance...
@@ -3525,9 +4096,9 @@ StreamParser::finalizeStreamProcessing()
             syslog( LOG_WARNING,
                 "[%i] %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
                 "No Neutron Pulses Received in Stream",
-                "Target Station", m_run_info.target_station_number,
+                "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
-                m_run_info.instr_shortname.c_str(),
+                m_beamline_info.instr_shortname.c_str(),
                 "Proposal", m_run_info.proposal_id.c_str(),
                 "Run", m_run_info.run_number );
             usleep(30000); // give syslog a chance...

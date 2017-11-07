@@ -9,7 +9,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.8.4"
+#define STS_VERSION "1.9.0"
 extern pid_t g_pid;
 
 namespace STS {
@@ -488,6 +488,20 @@ public:
 };
 
 
+/// BeamlineInformation extracted from BeamlineInfo packet payload
+struct BeamlineInfo
+{
+    BeamlineInfo()
+        : target_station_number(1)
+    {}
+
+    uint32_t                target_station_number;
+    std::string             instr_id;
+    std::string             instr_shortname;
+    std::string             instr_longname;
+};
+
+
 /// User information (part of RunInfo)
 struct UserInfo
 {
@@ -501,17 +515,26 @@ struct UserInfo
 struct RunInfo
 {
     RunInfo()
-        : target_station_number(1), run_number(0), run_title("NONE"),
-        no_sample_info(false)
+        : run_number(0), run_title("NONE"), no_sample_info(false),
+            // Initialize Double Values to Prevent Undue Randomization
+            // from Unset Values Later...! ;-Q
+            sample_mass(0.0), sample_mass_density(0.0),
+            sample_height_in_container(0.0),
+            sample_interior_diameter(0.0),
+            sample_interior_height(0.0),
+            sample_interior_width(0.0),
+            sample_interior_depth(0.0),
+            sample_outer_diameter(0.0),
+            sample_outer_height(0.0),
+            sample_outer_width(0.0),
+            sample_outer_depth(0.0),
+            sample_volume_cubic(0.0)
     {}
 
-    uint32_t                target_station_number;
-    std::string             instr_id;
-    std::string             instr_shortname;
-    std::string             instr_longname;
     uint32_t                run_number;
     std::string             run_title;
     std::string             proposal_id;
+    std::string             proposal_title;
     std::string             facility_name;
     bool                    no_sample_info;
     std::string             sample_id;
@@ -842,8 +865,13 @@ public:
                                 uint32_t a_idx_buf_reserve,
                                 STS::BeamMonitorConfig *a_config,
                                 bool a_known_monitor ) = 0;
-    virtual void            processRunInfo(
+    virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
+    virtual void            processBeamlineInfo(
+                                const BeamlineInfo &a_beamline_info ) = 0;
+    virtual void            processRunInfo(
+                                const RunInfo &a_run_info ,
+                                const bool a_strict ) = 0;
     virtual void            processGeometry(
                                 const std::string &a_xml ) = 0;
     virtual void            pulseBuffersReady(
