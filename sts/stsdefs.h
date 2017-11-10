@@ -832,6 +832,7 @@ public:
     std::string m_last_enum_string; ///< Enum for Last Recorded PV Value
     T   m_last_value;   ///< Last Recorded Value for PV (Conditional Groups)
     bool    m_last_value_set;   ///< Has there been a "Last Value"...? ;-D
+    bool    m_last_value_more;   ///< More than just a "Last Value"...? ;-O
 };
 
 

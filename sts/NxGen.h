@@ -357,6 +357,10 @@ private:
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
 
+            // Are There More Than One Value to This PV Time-Series?
+            if ( m_cur_size || value_buffer.size() > 1 )
+                this->m_last_value_more = true;
+
             // Capture Value Strings for Enumerated Type PVs...
             // (IFF Everything Works...! ;-D)
             if ( this->m_type == STS::PVT_ENUM
@@ -445,6 +449,10 @@ private:
             // Save Last Value for Conditional STS Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
+
+            // Are There More Than One Value to This PV Time-Series?
+            if ( m_cur_size || value_buffer.size() > 1 )
+                this->m_last_value_more = true;
         }
 
         /// Writes Buffered String PV Values to Nexus File 
@@ -495,6 +503,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -560,6 +572,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -625,6 +641,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -1636,16 +1656,30 @@ private:
                                         E->unitsPaths.insert(
                                             path_link_pair );
                                     }
+
+                                    // Log Error if There Were More Than 1
+                                    // Values in This PV Time-Series Log!
+                                    if ( this->m_last_value_more )
+                                    {
+                                        syslog( LOG_ERR,
+                                            "[%i] %s %s %s %s - %s %s",
+                                            g_pid, "STS Error:",
+                                            "More Than 1 PV Value for",
+                                            elem_link_path.c_str(),
+                                            "to Link to Element Path",
+                                            "Check", m_log_path.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
                                 }
 
                                 else
                                 {
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s %s - %s %s %s - %s %s",
+                                        "[%i] %s %s %s - %s - %s %s",
                                         g_pid, "STS Error:",
                                         "*** NO LAST PV VALUE for",
                                         elem_link_path.c_str(),
-                                        "PV/Log Path", it->second.c_str(),
                                         "Nothing to Link to Element Path",
                                         "Skipping", m_log_path.c_str() );
                                     // give syslog a chance...
