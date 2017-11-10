@@ -2697,15 +2697,32 @@ NxGen::parseSTSConfigFile
                                         "element" ) == 0
                                 || xmlStrcmp( lev2->name,
                                     (const xmlChar*)
-                                        "element_value" ) == 0 )
+                                        "element_value" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
                         {
                             struct ElementInfo element;
 
-                            element.linkValue =
-                                ( xmlStrcmp( lev2->name,
+                            if ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
+                            {
+                                element.linkLastValue = true;
+                                element.linkValue = false;
+                            }
+                            else if ( xmlStrcmp( lev2->name,
                                     (const xmlChar*)
                                         "element_value" ) == 0 )
-                                            ? true : false;
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = true;
+                            }
+                            else
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = false;
+                            }
 
                             element.lastIndex = 0;
 
@@ -3084,15 +3101,32 @@ NxGen::parseSTSConfigFile
                                                 "element" ) == 0
                                         || xmlStrcmp( lev3->name,
                                             (const xmlChar*)
-                                                "element_value" ) == 0 )
+                                                "element_value" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
                                 {
                                     struct ElementInfo element;
 
-                                    element.linkValue =
-                                        ( xmlStrcmp( lev3->name,
+                                    if ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
+                                    {
+                                        element.linkLastValue = true;
+                                        element.linkValue = false;
+                                    }
+                                    else if ( xmlStrcmp( lev3->name,
                                             (const xmlChar*)
                                                 "element_value" ) == 0 )
-                                                    ? true : false;
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = true;
+                                    }
+                                    else
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = false;
+                                    }
 
                                     element.lastIndex = 0;
 

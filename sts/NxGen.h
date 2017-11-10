@@ -185,6 +185,7 @@ private:
         std::map<std::string, std::string>
                                     unitsPaths;
         bool                        linkValue;
+        bool                        linkLastValue;
         std::map<std::string, std::string>
                                     createdLinks;
         uint32_t                    lastIndex;
@@ -1593,8 +1594,67 @@ private:
                         if ( (it = E->createdLinks.find( elem_link_path ))
                                 == E->createdLinks.end() )
                         {
+                            // Create Dataset with *Just Last PV Value*
+                            // in Group...
+                            if ( E->linkLastValue )
+                            {
+                                // Do We Have a "Last PV Value" to Use...?
+                                if ( this->m_last_value_set )
+                                {
+                                    std::string pv_value_path =
+                                        m_log_path + "/" + "value";
+
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s %s in Group as %s",
+                                        g_pid, "Create Data with",
+                                        "Last PV Value from",
+                                        pv_value_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    m_nxgen.writeString(
+                                        group_path, E->name, 
+                                        valueToString(
+                                            this->m_last_value ) );
+
+                                    std::pair<std::string, std::string>
+                                        path_link_pair(
+                                           elem_link_path, pv_value_path );
+
+                                    E->createdLinks.insert(
+                                        path_link_pair );
+
+                                    // IF We Have a Chance of Capturing a
+                                    // Units Value from some PV(s), then
+                                    // Save ElementInfo Link Path Now for
+                                    // Setting the Units Attribute Later...
+                                    // (After We've Gone Thru All the PVs)
+                                    if ( E->unitsPatterns.size()
+                                            || E->units.size() )
+                                    {
+                                        E->unitsPaths.insert(
+                                            path_link_pair );
+                                    }
+                                }
+
+                                else
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s %s - %s %s %s - %s %s",
+                                        g_pid, "STS Error:",
+                                        "*** NO LAST PV VALUE for",
+                                        elem_link_path.c_str(),
+                                        "PV/Log Path", it->second.c_str(),
+                                        "Nothing to Link to Element Path",
+                                        "Skipping", m_log_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
+                            }
+
                             // Link PV *Value* Only into Group...
-                            if ( E->linkValue )
+                            else if ( E->linkValue )
                             {
                                 std::string pv_value_path =
                                     m_log_path + "/" + "value";
@@ -1628,7 +1688,7 @@ private:
                                 }
                             }
 
-                            // Link PV Log into Group...
+                            // Link Whole PV Log into Group...
                             else
                             {
                                 syslog( LOG_INFO,
