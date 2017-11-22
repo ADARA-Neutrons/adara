@@ -236,7 +236,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 	}
 
 	// CNCS FitSam "Off-By-11-Minutes" Bug, November 2017...
-	// - correct timing by 677.997128601 seconds...
+	// - correct timing by 677.790806607 seconds...
 	if ( pkt.devId() == 2 )
 	{
 		std::cerr << "*** Found FitSam Device (2) Double Variable Update!"
@@ -244,7 +244,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		uint32_t sec = (uint32_t) (pkt.pulseId() >> 32);
 		uint32_t nsec = (uint32_t) pkt.pulseId();
 		sec += 677;
-		nsec += 997128601;
+		nsec += 790806607;
 		if ( nsec > NANO_PER_SECOND_LL )
 		{
 			sec++;
