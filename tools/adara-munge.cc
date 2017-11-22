@@ -236,15 +236,15 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 	}
 
 	// CNCS FitSam "Off-By-11-Minutes" Bug, November 2017...
-	// - correct timing by 677.790806607 seconds...
+	// - correct timing by 667.908933229 seconds...
 	if ( pkt.devId() == 2 )
 	{
 		std::cerr << "*** Found FitSam Device (2) Double Variable Update!"
 			<< std::endl;
 		uint32_t sec = (uint32_t) (pkt.pulseId() >> 32);
 		uint32_t nsec = (uint32_t) pkt.pulseId();
-		sec += 677;
-		nsec += 790806607;
+		sec += 667;
+		nsec += 908933229;
 		if ( nsec > NANO_PER_SECOND_LL )
 		{
 			sec++;
@@ -457,11 +457,8 @@ void MungeParser::parse(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-	std::cerr << "Entry ADARA Munge" << std::endl;
 	MungeParser mp;
-	std::cerr << "AAA" << std::endl;
 	mp.parse(argc, argv);
-	std::cerr << "BBB" << std::endl;
 	return 0;
 }
 
