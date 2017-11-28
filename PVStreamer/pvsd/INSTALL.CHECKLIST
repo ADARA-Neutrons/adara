@@ -64,8 +64,7 @@ ADARA PVSD Install Checklist
 
 	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 
-	cp /etc/rsyslog.d/adaraMailer.conf \
-		/home/controls/config-dassrv1/pvsd/adaraMailer.conf
+	cp /etc/rsyslog.d/adaraMailer.conf pvsd/adaraMailer.conf
 
 	git add pvsd
 	git commit pvsd
