@@ -25,6 +25,51 @@ ADARA PVSD Install Checklist
 
 		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
 
+-OR-
+
+1. Create Initial PVSD Configuration on New Beamline/Host:
+
+	cd /home/controls/config-dassrv1/
+
+	cp /SNS/users/y8y/confck.pvsd confck
+	git add confck
+	git commit confck
+
+	./confck
+
+	mkdir pvsd
+
+	# PVSD Init Script
+
+	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/pvsd.initscript /etc/init.d/pvsd
+
+	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.130]
+
+	sudo vi /etc/init.d/pvsd
+		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+
+	cp /etc/init.d/pvsd pvsd/pvsd.initscript
+
+	# PVSD Wrapper Script
+
+	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/pvsd.wrapper /usr/local/bin/pvsd
+
+	sudo vi /usr/local/bin/pvsd
+		- replace "bl999" with beamline number
+		- replace "XXX" with beamline short name
+
+	cp /usr/local/bin/pvsd pvsd/usr.local.bin.pvsd
+
+	# ADARA Mailer Config
+
+	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	cp /etc/rsyslog.d/adaraMailer.conf \
+		/home/controls/config-dassrv1/pvsd/adaraMailer.conf
+
+	git add pvsd
+	git commit pvsd
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
@@ -46,6 +91,8 @@ ADARA PVSD Install Checklist
 	sudo /sbin/service rsyslog status
 
 	sudo /sbin/service rsyslog restart
+
+	sudo tail /var/log/messages
 
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
