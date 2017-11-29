@@ -14,6 +14,8 @@ STS_SSH="ssh -AY sns-sts1.sns.gov"
 STS_PROD="/SNS/lustre/stsdata/sts_config.xml"
 STS_TEST="/SNS/lustre/stsdata_test/sts_config.xml"
 STS_DUMMY="/TESTING/SNS/stsdata_dummy/sts_config.xml"
+STS_HFIR="/HFIR/stsdata_hfir/sts_config.xml"
+STS_HFIR_TEST="/HFIR/stsdata_hfir_test/sts_config.xml"
 STS_DEVEL="/TESTING/SNS/stsdata_devel/sts_config.xml"
 STS_MASTER="/TESTING/SNS/stsdata_master/sts_config.xml"
 STS_TESTING="/TESTING/SNS/stsdata/sts_config.xml"
@@ -24,6 +26,7 @@ USAGE()
 {
 	echo -e "\nusage: updateConfig [--diff] \\"
 	echo "   [ --prod | --test | --dummy | \\"
+	echo "      --hfir | --hfir-test | \\"
 	echo "      --devel | --master | --testing | \\"
 	echo "      --jenkins | --jenkins-devel | --all ]"
 	echo
@@ -34,6 +37,8 @@ USAGE()
 	echo " --prod           = update Production STS Config"
 	echo " --test           = update Production TEST STS Config"
 	echo " --dummy          = update Production DUMMY STS Config"
+	echo " --hfir           = update Production HFIR STS Config"
+	echo " --hfir-test      = update Production HFIR TEST STS Config"
 	echo " --devel          = update ADARA Test Harness Devel STS Config"
 	echo " --master         = update ADARA Test Harness Master STS Config"
 	echo " --testing        = update ADARA Test Harness Generic STS Config"
@@ -86,6 +91,14 @@ for opt in $@ ; do
 	fi
 	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
 		CONFIGS="$CONFIGS DUMMY=$STS_DUMMY"
+		found=1
+	fi
+	if [[ $opt == "--hfir" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS HFIR=$STS_HFIR"
+		found=1
+	fi
+	if [[ $opt == "--hfir-test" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS HFIR-TEST=$STS_HFIR_TEST"
 		found=1
 	fi
 	if [[ $opt == "--devel" || $opt == "--all" ]]; then
