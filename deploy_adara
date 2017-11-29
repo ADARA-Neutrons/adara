@@ -26,8 +26,9 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-usage=\
-"   usage: deploy_adara [ sms | sts | sts_test | pvsd | dasmon | dasmond ]"
+usage="   usage: deploy_adara \\ \n            "
+usage="$usage [ sms | sts | sts_test | sts_hfir | sts_hfir_test \\ \n"
+usage="$usage                 | pvsd | dasmon | dasmond ]"
 
 if [ $# != 1 ]; then
 	echo -e "\n$usage\n"
@@ -58,6 +59,16 @@ elif [ "$1" == "sts" ]; then
 	IS_STS=1
 elif [ "$1" == "sts_test" ]; then
 	PROG="STS_TEST"
+	prog="sts"
+	service=""
+	IS_STS=1
+elif [ "$1" == "sts_hfir" ]; then
+	PROG="STS_HFIR"
+	prog="sts"
+	service=""
+	IS_STS=1
+elif [ "$1" == "sts_hfir_test" ]; then
+	PROG="STS_HFIR_TEST"
 	prog="sts"
 	service=""
 	IS_STS=1
@@ -1103,6 +1114,17 @@ for exe_path in "$tag_archive"/* ; do
 		echo -e "\nModifying STS Executable $exe for Test Deployment." \
 			| tee -a $LOG
 		exe="${exe}_test"
+	# Handle Special STS HFIR Version Deployment...
+	elif [[ $PROG == "STS_HFIR" && $exe == $prog ]]; then
+		echo -e "\nModifying STS Executable $exe for HFIR Deployment." \
+			| tee -a $LOG
+		exe="${exe}_hfir"
+	# Handle Special STS HFIR "Test" Version Deployment...
+	elif [[ $PROG == "STS_HFIR_TEST" && $exe == $prog ]]; then
+		echo -e \
+			"\nModifying STS Executable $exe for HFIR Test Deployment." \
+			| tee -a $LOG
+		exe="${exe}_hfir_test"
 	fi
 
 	echo -e "\nLinking ${exe}:" | tee -a $LOG
