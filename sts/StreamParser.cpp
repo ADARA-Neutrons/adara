@@ -42,7 +42,8 @@ StreamParser::StreamParser
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
-    uint32_t        a_anc_buf_write_thresh      ///< [in] Ancillary buffer write threshold (number of elements)
+    uint32_t        a_anc_buf_write_thresh,     ///< [in] Ancillary buffer write threshold (number of elements)
+    bool            a_verbose                   ///< [in] STS Verbosity
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
@@ -58,7 +59,8 @@ StreamParser::StreamParser
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
     m_skipped_pkt_count(0),
-    m_pulse_flag(0)
+    m_pulse_flag(0),
+    m_verbose(a_verbose)
 {
     // Capture Default Run "Start Time"...
     // (In case there are No Neutron Pulses, for Faking It...! ;-D)
@@ -80,7 +82,7 @@ StreamParser::StreamParser
  */
 StreamParser::~StreamParser()
 {
-    if ( m_ofs_adara.is_open())
+    if ( m_ofs_adara.is_open() )
         m_ofs_adara.close();
 
     for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
@@ -105,8 +107,20 @@ StreamParser::~StreamParser()
 
     for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
             ipv != m_pvs_by_key.end(); ++ipv ) {
-        if ( ipv->second )
+        if ( ipv->second ) {
+            if ( m_verbose ) {
+                syslog( LOG_ERR,
+                    "[%i] %s: Erasing %d.%d - Device %s: %s (%s)",
+                    g_pid, "~StreamParser()",
+                    ipv->first.first, ipv->first.second,
+                    ipv->second->m_device_name.c_str(),
+                    ipv->second->m_name.c_str(),
+                    ipv->second->m_connection.c_str() );
+                // give syslog a chance...
+                usleep(30000);
+            }
             delete ipv->second;
+        }
     }
 }
 
@@ -138,7 +152,7 @@ StreamParser::processStream()
         while ( m_processing_state < DONE_PROCESSING )
         {
             // NOTE: This is POSIXParser::read()... ;-o
-            if ( !read( m_fd, log_info ))
+            if ( !read( m_fd, log_info ) )
             {
                 if ( m_processing_state != DONE_PROCESSING )
                 {
@@ -242,7 +256,7 @@ StreamParser::printStats
 #define PKT_BIT_DETECTOR_BANK_SETS      0x0020
 
 #define PROCESS_IN_STATES(s)            \
-    if ( m_processing_state & (s))      \
+    if ( m_processing_state & (s) )     \
     {                                   \
         return Parser::rxPacket(a_pkt); \
     }                                   \
@@ -254,7 +268,7 @@ StreamParser::printStats
     }
 
 #define PROCESS_IN_STATES_ONCE(s,x)     \
-    if (( m_processing_state & (s)) && !(m_pkt_recvd & (x)))    \
+    if ( ( m_processing_state & (s) ) && !( m_pkt_recvd & (x) ) )    \
     {                                   \
         m_pkt_recvd |= (x);             \
         return Parser::rxPacket(a_pkt); \
@@ -283,7 +297,7 @@ StreamParser::rxPacket
         gatherStats( a_pkt );
 
     if ( m_gen_adara )
-        m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length());
+        m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length() );
 
     switch (a_pkt.base_type())
     {
@@ -839,7 +853,7 @@ StreamParser::processBankEvents
         if ( bi->m_has_event )
         {
             // Detect gaps in event data and fill event index if present
-            if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ))
+            if ( bi->m_last_pulse_with_data < ( m_pulse_count - 1 ) )
             {
                 handleBankPulseGap( *bi,
                     ( m_pulse_count - 1 ) - bi->m_last_pulse_with_data );
@@ -1208,7 +1222,7 @@ StreamParser::processMonitorEvents
 {
     map<Identifier,MonitorInfo*>::iterator imi =
         m_monitors.find( a_monitor_id );
-    if ( imi == m_monitors.end())
+    if ( imi == m_monitors.end() )
     {
         bool known_monitor = true;
         STS::BeamMonitorConfig *config =
@@ -1779,7 +1793,7 @@ StreamParser::rxPacket
         xmlFreeDoc( doc );
 
         // First RunInfoPkt...
-        if ( !(m_pkt_recvd & (PKT_BIT_RUNINFO)) )
+        if ( !( m_pkt_recvd & (PKT_BIT_RUNINFO) ) )
         {
             syslog( LOG_INFO, "[%i] %s: First RunInfoPkt - %s...",
                 g_pid, "rxPacket(RunInfoPkt)", "Utilizing Values" );
@@ -2570,7 +2584,7 @@ StreamParser::rxPacket
                                     {
                                         ipv = m_pvs_by_key.find(
                                             xref->second );
-                                        if ( ipv != m_pvs_by_key.end())
+                                        if ( ipv != m_pvs_by_key.end() )
                                         {
                                             if ( ipv->second->
                                                 sameDefinition( dev_name,
@@ -2614,6 +2628,34 @@ StreamParser::rxPacket
                                                 // Re-use this entry
                                                 create = false;
 
+                                                if ( m_verbose ) {
+                                                    stringstream ss2;
+                                                    ss2 << "Erasing Old "
+                                                        << ipv->first.first
+                                                        << "."
+                                                        << ipv->first
+                                                            .second
+                                                        << " - Device "
+                                                        << ipv->second
+                                                            ->m_device_name
+                                                        << ": "
+                                                        << ipv->second
+                                                            ->m_name
+                                                        << " ("
+                                                        << ipv->second
+                                                            ->m_connection
+                                                        << ")";
+                                                    syslog( LOG_ERR,
+                                                        "[%i] %s(%s): %s",
+                                                        g_pid,
+                                                        "rxPacket",
+                                                        "DeviceDescriptor",
+                                                        ss2.str().c_str()
+                                                    );
+                                                    // give syslog a chance
+                                                    usleep(30000);
+                                                }
+
                                                 // Update key mappings
                                                 m_pvs_by_key[key] =
                                                     ipv->second;
@@ -2640,11 +2682,13 @@ StreamParser::rxPacket
                                                     << " for Former"
                                                     << " Definition"
                                                     << " [Device "
-                                            << ipv->second->m_device_name
+                                                    << ipv->second
+                                                        ->m_device_name
                                                     << ": "
                                                     << ipv->second->m_name
                                                     << " ("
-                                            << ipv->second->m_connection
+                                                    << ipv->second
+                                                        ->m_connection
                                                     << ")],"
                                                     << " Define New "
                                                     << " [Device "
@@ -2661,6 +2705,34 @@ StreamParser::rxPacket
                                                     ss.str().c_str() );
                                                 // give syslog a chance...
                                                 usleep(30000);
+
+                                                if ( m_verbose ) {
+                                                    stringstream ss2;
+                                                    ss2 << "Erasing Old "
+                                                        << ipv->first.first
+                                                        << "."
+                                                        << ipv->first
+                                                            .second
+                                                        << " - Device "
+                                                        << ipv->second
+                                                            ->m_device_name
+                                                        << ": "
+                                                        << ipv->second
+                                                            ->m_name
+                                                        << " ("
+                                                        << ipv->second
+                                                            ->m_connection
+                                                        << ")";
+                                                    syslog( LOG_ERR,
+                                                        "[%i] %s(%s): %s",
+                                                        g_pid,
+                                                        "rxPacket",
+                                                        "DeviceDescriptor",
+                                                        ss2.str().c_str()
+                                                    );
+                                                    // give syslog a chance
+                                                    usleep(30000);
+                                                }
 
                                                 // Existing entry differs,
                                                 // flush and delete
@@ -2752,6 +2824,30 @@ StreamParser::rxPacket
                                                 dev_name + ":" + pv_name
                                                     + ":" + pv_connection ]
                                                 = key;
+
+                                            if ( m_verbose ) {
+                                                stringstream ss2;
+                                                ss2 << "Adding New "
+                                                    << key.first
+                                                    << "."
+                                                    << key.second
+                                                    << " - Device "
+                                                    << info->m_device_name
+                                                    << ": "
+                                                    << info->m_name
+                                                    << " ("
+                                                    << info->m_connection
+                                                    << ")";
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
                                         }
                                         else
                                         {
@@ -2883,6 +2979,30 @@ StreamParser::rxPacket
                                                 dev_name + ":" + pv_name
                                                     + ":" + pv_connection ]
                                                 = key;
+
+                                            if ( m_verbose ) {
+                                                stringstream ss2;
+                                                ss2 << "Adding Revised "
+                                                    << key.first
+                                                    << "."
+                                                    << key.second
+                                                    << " - Device "
+                                                    << info->m_device_name
+                                                    << ": "
+                                                    << info->m_name
+                                                    << " ("
+                                                    << info->m_connection
+                                                    << ")";
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
                                         }
                                         else
                                         {
@@ -2903,6 +3023,32 @@ StreamParser::rxPacket
                                                 ss.str().c_str() );
                                             // give syslog a chance...
                                             usleep(30000);
+
+                                            if ( m_verbose ) {
+                                                stringstream ss2;
+                                                ss2 << "Erasing Old "
+                                                    << ipv->first.first
+                                                    << "."
+                                                    << ipv->first.second
+                                                    << " - Device "
+                                                    << ipv->second
+                                                        ->m_device_name
+                                                    << ": "
+                                                    << ipv->second->m_name
+                                                    << " ("
+                                                    << ipv->second
+                                                        ->m_connection
+                                                    << ")";
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
 
                                             m_pvs_by_key.erase( ipv );
                                         }
@@ -4313,23 +4459,23 @@ StreamParser::toPVType
     const char *a_source    ///< [in] Text-based variable type to convert
 ) const
 {
-    if ( boost::iequals( a_source, "integer" ))
+    if ( boost::iequals( a_source, "integer" ) )
         return PVT_INT;
-    else if ( boost::iequals( a_source, "unsigned" ))
+    else if ( boost::iequals( a_source, "unsigned" ) )
         return PVT_UINT;
-    else if ( boost::iequals( a_source, "unsigned integer" ))
+    else if ( boost::iequals( a_source, "unsigned integer" ) )
         return PVT_UINT;
-    else if ( boost::iequals( a_source, "double" ))
+    else if ( boost::iequals( a_source, "double" ) )
         return PVT_DOUBLE;
-    else if ( boost::iequals( a_source, "float" ))
+    else if ( boost::iequals( a_source, "float" ) )
         return PVT_FLOAT;
-    else if ( boost::iequals( a_source, "string" ))
+    else if ( boost::iequals( a_source, "string" ) )
         return PVT_STRING;
-    else if ( boost::iequals( a_source, "integer array" ))
+    else if ( boost::iequals( a_source, "integer array" ) )
         return PVT_UINT_ARRAY;
-    else if ( boost::iequals( a_source, "double array" ))
+    else if ( boost::iequals( a_source, "double array" ) )
         return PVT_DOUBLE_ARRAY;
-    else if ( boost::istarts_with( a_source, "enum_" ))
+    else if ( boost::istarts_with( a_source, "enum_" ) )
         return PVT_ENUM;
 
     std::string err = "Invalid PV type [";

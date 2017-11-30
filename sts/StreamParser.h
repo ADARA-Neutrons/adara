@@ -33,7 +33,8 @@ public:
     StreamParser( int a_fd, const std::string & a_adara_out_file,
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
-        uint32_t a_ancillary_buf_write_thresh = 4096 ); // number of elems
+        uint32_t a_ancillary_buf_write_thresh = 4096, // number of elems
+        bool a_verbose = false );
 
     virtual ~StreamParser();
 
@@ -179,6 +180,7 @@ private:
     uint16_t                                m_pulse_flag;
 
     struct timespec                         m_default_start_time;       ///< Default Run Start Time (No Neutron Pulses)...
+    bool                                    m_verbose;                  ///< STS Verbosity
 };
 
 
