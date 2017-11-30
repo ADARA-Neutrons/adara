@@ -219,7 +219,7 @@ int main( int argc, char** argv )
                 ("help,h", "show help")
                 ("version", "show version number")
                 ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
-                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output (interactive mode only)")
+                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output mode")
                 ("strict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
                 ("move,m", po::bool_switch( &move )->default_value( false ), "move output nexus file to cataloging location (forces strict parsing)")
                 ("report,r", po::bool_switch( &gather_stats )->default_value( false ), "report stream statistics")
@@ -316,6 +316,8 @@ int main( int argc, char** argv )
             syslog( LOG_ERR, "[%i] No STS Config File Specified", g_pid );
         }
 
+        // Only Dump Verbose STS Settings in Interactive Mode...!
+        // (else screws up the STS-to-SMS return status...! ;-D)
         if ( interact && verbose )
         {
             cout << "sts information" << endl;
@@ -360,7 +362,8 @@ int main( int argc, char** argv )
 
             nxgen = new NxGen( infd, adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
-                evt_buf_size, anc_buf_size, cache_size, compression_level );
+                evt_buf_size, anc_buf_size, cache_size, compression_level,
+                verbose );
 
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
