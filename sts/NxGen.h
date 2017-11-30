@@ -2065,7 +2065,8 @@ public:
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
         unsigned long a_cache_size = 10485760,
-        unsigned short a_compression_level = 0 );
+        unsigned short a_compression_level = 0,
+        bool a_verbose = false );
     ~NxGen();
 
     void dumpProcessingStatistics(void);
