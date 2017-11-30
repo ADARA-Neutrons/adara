@@ -1351,6 +1351,76 @@ private:
             return( ss.str() );
         }
 
+        /// Write Scalar Uint32 PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            uint32_t value,                ///< Uint32 Value
+            std::string units
+        )
+        {
+            m_nxgen.writeScalar( path, name, value, units );
+        }
+
+        /// Write Scalar Double PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            double value,                  ///< Double Value
+            std::string units
+        )
+        {
+            m_nxgen.writeScalar( path, name, value, units );
+        }
+
+        /// Write Scalar String PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::string value,             ///< String Value
+            std::string units
+        )
+        {
+            m_nxgen.writeString( path, name, value );
+            if ( units.size() ) {
+                m_nxgen.writeStringAttribute( path + "/" + name,
+                    "units", units );
+            }
+        }
+
+        /// Write "Scalar" Uint32 PV Array to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::vector<uint32_t> value,   ///< Uint32 Array
+            std::string units
+        )
+        {
+            std::vector<hsize_t> dims;
+            dims.push_back( value.size() );
+
+            m_nxgen.writeMultidimDataset( path, name, value, dims, units );
+        }
+
+        /// Write "Scalar" Double PV Array to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::vector<double> value,     ///< Double Array
+            std::string units
+        )
+        {
+            std::vector<hsize_t> dims;
+            dims.push_back( value.size() );
+
+            m_nxgen.writeMultidimDataset( path, name, value, dims, units );
+        }
+
         /// Search STS Config for Associated Groups & Create...
         void createSTSConfigGroupMatchingElements
         (
@@ -1633,10 +1703,10 @@ private:
                                     // give syslog a chance...
                                     usleep(30000);
 
-                                    m_nxgen.writeString(
+                                    writeScalarValue(
                                         group_path, E->name, 
-                                        valueToString(
-                                            this->m_last_value ) );
+                                        this->m_last_value,
+                                        this->m_units );
 
                                     std::pair<std::string, std::string>
                                         path_link_pair(
