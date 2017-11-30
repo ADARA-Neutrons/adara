@@ -818,7 +818,8 @@ public:
     )
     : PVInfoBase( a_device_name, a_name, a_connection,
         a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-        a_units, a_ignore )
+        a_units, a_ignore ),
+    m_last_value_set(false), m_last_value_more(false)
     {}
 
     /// PVInfo destructor
