@@ -1067,6 +1067,7 @@ void DataSource::startConnect(void)
 			}
 			goto error_fd;
 
+		case EAGAIN:
 		case EINTR:
 		case EINPROGRESS:
 			m_state = CONNECTING;
@@ -1156,7 +1157,7 @@ void DataSource::connectComplete(void)
 	if (rc < 0)
 		e = errno;
 
-	if (e == EINTR || e == EINPROGRESS) {
+	if (e == EAGAIN || e == EINTR || e == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
 		return;
 	}

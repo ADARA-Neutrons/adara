@@ -29,13 +29,14 @@ RateLimitedLogging::History RLLHistory_STSClientMgr;
 // Rate-Limited Logging IDs...
 #define RLL_STS_CLIENT_LOOKUP_FAILED   0
 #define RLL_STS_CONNECTION_REFUSED     1
-#define RLL_STS_CONNECTION_INTR        2
-#define RLL_STS_CONNECTION_INPROGRESS  3
-#define RLL_STS_UNEXPECTED_CONN_ERROR  4
-#define RLL_STS_FAILED_TO_CONNECT      5
-#define RLL_STS_CONNECTION_FAILED      6
-#define RLL_STS_CONNECTION_TIMED_OUT   7
-#define RLL_STS_BOGUS_LOOKUP_SIGNAL    8
+#define RLL_STS_CONNECTION_UNAVAIL     2
+#define RLL_STS_CONNECTION_INTR        3
+#define RLL_STS_CONNECTION_INPROGRESS  4
+#define RLL_STS_UNEXPECTED_CONN_ERROR  5
+#define RLL_STS_FAILED_TO_CONNECT      6
+#define RLL_STS_CONNECTION_FAILED      7
+#define RLL_STS_CONNECTION_TIMED_OUT   8
+#define RLL_STS_BOGUS_LOOKUP_SIGNAL    9
 
 class MaxConnectionsPV : public smsUint32PV {
 public:
@@ -395,6 +396,17 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				<< m_node << ":" << m_service);
 		}
 		goto error;
+	case EAGAIN:
+		/* Rate-limited logging of resource temporarily unavailable */
+		/* [Not that Paranoid...! ;-D] */
+		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
+				RLL_STS_CONNECTION_UNAVAIL, m_node + ":" + m_service,
+				60, 3, 10, log_info ) ) {
+			ERROR(log_info << "Connection "
+				<< "Resource Temporarily Unavailable for STS at "
+				<< m_node << ":" << m_service << " - Ignoring...");
+		}
+		break;
 	case EINTR:
 		/* [PARANOID] Rate-limited logging of interrupted connection */
 		if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
@@ -526,7 +538,7 @@ void STSClientMgr::connectComplete(void)
 	if (rc < 0)
 		err = errno;
 
-	if (err == EINTR || err == EINPROGRESS) {
+	if (err == EAGAIN || err == EINTR || err == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
 		DEBUG("connectComplete() Odd-But-Harmless Connection Failure"
 			<< " to STS at " << m_node << ":" << m_service << " - "
