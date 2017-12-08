@@ -1218,11 +1218,11 @@ void DataSource::dataReady(void)
 			msg += e.what();
 			// *Don't* Throw std::runtime_error(msg), Just Log Instead...
 			/* Rate-limited log of failure */
-			std::string log_info;
+			std::string rll_log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_PARSE_MAX_READ_CHUNK, m_name,
-					60, 3, 100, log_info ) ) {
-				ERROR(log_info
+					60, 3, 100, rll_log_info ) ) {
+				ERROR(rll_log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): " << msg << " - Revert to Original"
 					<< " m_max_read_chunk=" << m_max_read_chunk);
@@ -1255,11 +1255,11 @@ void DataSource::dataReady(void)
 		}
 	} catch (std::runtime_error e) {
 		/* Rate-limited log of failure */
-		std::string log_info;
+		std::string rll_log_info;
 		bool dumpStats = false;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-				RLL_READ_EXCEPTION, m_name, 60, 5, 10, log_info ) ) {
-			ERROR(log_info
+				RLL_READ_EXCEPTION, m_name, 60, 5, 10, rll_log_info ) ) {
+			ERROR(rll_log_info
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Exception reading from " << m_name
 				<< ": " << e.what());
@@ -1281,11 +1281,11 @@ void DataSource::dataReady(void)
 		if ( elapsed > 2.0 )
 		{
 			/* Rate-limited logging of read delay threshold */
-			std::string log_info;
+			std::string rll_log_info;
 			bool dumpStats = false;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_READ_DELAY, m_name, 60, 20, 5, log_info ) ) {
-				ERROR(log_info
+					RLL_READ_DELAY, m_name, 60, 20, 5, rll_log_info ) ) {
+				ERROR(rll_log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"
 					<< " elapsed=" << elapsed << " (" << m_name << ")"
