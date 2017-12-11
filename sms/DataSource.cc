@@ -1183,13 +1183,20 @@ void DataSource::dataReady(void)
 
 	// Update Our Data Timeout/Max Read Chunk Internals Less Frequently,
 	// It Takes Some Time...!
-	// Only allow updates every few seconds (depending on bandwidth... ;-)
+	// Only allow updates every few minutes (depending on bandwidth... ;-)
 	static uint32_t cnt = 0;
-	uint32_t freq = 333;
+	uint32_t freq = 999;
 
 	// Update Data Timeout from PV... (Periodically...)
 	if ( !(++cnt % freq) ) {
-		m_data_timeout = m_pvDataTimeout->value();
+		double new_data_timeout = m_pvDataTimeout->value();
+		if ( !approximatelyEqual( m_data_timeout, new_data_timeout,
+				0.0000001 ) ) {
+			ERROR("dataReady(): Updating Data Timeout for " << m_name
+				<< " from " << m_data_timeout
+				<< " to " << new_data_timeout);
+			m_data_timeout = new_data_timeout;
+		}
 	}
 	m_timer->start(m_data_timeout);
 
