@@ -955,7 +955,10 @@ bool DataSource::timerExpired(void)
 				if ( ++m_data_timeout_retry_count > m_data_timeout_retry )
 				{
 					ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-						<< "Timed out waiting for data from " << m_name );
+						<< "Timed out waiting for data from " << m_name
+						<< " (Retry Count " << m_data_timeout_retry_count
+						<< " > Number of Retries " << m_data_timeout_retry
+						<< "...)");
 					m_pvConnected->failed();
 					connectionFailed(true, true, IDLE);
 				}
