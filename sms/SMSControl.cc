@@ -287,6 +287,7 @@ void SMSControl::addSource(const std::string &name,
 	boost::property_tree::ptree::const_assoc_iterator uri;
 	bool required;
 	double connect_retry, connect_timeout, data_timeout;
+	uint32_t data_timeout_retry;
 	unsigned int chunk_size;
 	bool ignore_eop;
 	bool mixed_data_packets;
@@ -315,7 +316,8 @@ void SMSControl::addSource(const std::string &name,
 	required = info.get<bool>("required", false);
 	connect_retry = info.get<double>("connect_retry", 15.0);
 	connect_timeout = info.get<double>("connect_timeout", 5.0);
-	data_timeout = info.get<double>("data_timeout", 5.0);
+	data_timeout = info.get<double>("data_timeout", 3.0);
+	data_timeout_retry = info.get<uint32_t>("data_timeout_retry", 3);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
@@ -358,6 +360,7 @@ void SMSControl::addSource(const std::string &name,
 							 connect_retry,
 							 connect_timeout,
 							 data_timeout,
+							 data_timeout_retry,
 							 ignore_eop,
 							 mixed_data_packets,
 							 chunk_size,
