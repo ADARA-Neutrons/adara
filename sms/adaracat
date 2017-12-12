@@ -259,7 +259,7 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 			echo -e "Using Live SMS PV" \
 				"- Sending Paused Data!\n" 1>&2
 
-			eval $liveSendPausedCmd
+			eval $liveSendPausedCmd 1>&2
 
 			SendPausedData=$AlwaysSendPausedData
 
@@ -268,7 +268,7 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 			echo -e "Using Live SMS PV" \
 				"- NOT Sending Paused Data!\n" 1>&2
 
-			eval $liveSendPausedCmd
+			eval $liveSendPausedCmd 1>&2
 
 			SendPausedData=$NeverSendPausedData
 

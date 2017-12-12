@@ -38,12 +38,14 @@ NxGen::NxGen
     unsigned short  a_event_buf_chunk_count,    ///< [in] ADARA event buffer size in chunks
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
     unsigned long   a_cache_size,               ///< [in] HDF5 cache size
-    unsigned short  a_compression_level         ///< [in] HDF5 compression level (0 = off to 9 = max)
+    unsigned short  a_compression_level,        ///< [in] HDF5 compression level (0 = off to 9 = max)
+    bool            a_verbose                   ///< [in] STS Verbosity
 )
 :
     StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
         a_chunk_size * a_event_buf_chunk_count, // number of elements
-        a_chunk_size * a_anc_buf_chunk_count ), // number of elements
+        a_chunk_size * a_anc_buf_chunk_count, // number of elements
+        a_verbose ),
     m_gen_nexus(false),
     m_nexus_filename(a_nexus_out_file),
     m_config_file(a_config_file),
@@ -2697,15 +2699,32 @@ NxGen::parseSTSConfigFile
                                         "element" ) == 0
                                 || xmlStrcmp( lev2->name,
                                     (const xmlChar*)
-                                        "element_value" ) == 0 )
+                                        "element_value" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
                         {
                             struct ElementInfo element;
 
-                            element.linkValue =
-                                ( xmlStrcmp( lev2->name,
+                            if ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
+                            {
+                                element.linkLastValue = true;
+                                element.linkValue = false;
+                            }
+                            else if ( xmlStrcmp( lev2->name,
                                     (const xmlChar*)
                                         "element_value" ) == 0 )
-                                            ? true : false;
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = true;
+                            }
+                            else
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = false;
+                            }
 
                             element.lastIndex = 0;
 
@@ -3084,15 +3103,32 @@ NxGen::parseSTSConfigFile
                                                 "element" ) == 0
                                         || xmlStrcmp( lev3->name,
                                             (const xmlChar*)
-                                                "element_value" ) == 0 )
+                                                "element_value" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
                                 {
                                     struct ElementInfo element;
 
-                                    element.linkValue =
-                                        ( xmlStrcmp( lev3->name,
+                                    if ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
+                                    {
+                                        element.linkLastValue = true;
+                                        element.linkValue = false;
+                                    }
+                                    else if ( xmlStrcmp( lev3->name,
                                             (const xmlChar*)
                                                 "element_value" ) == 0 )
-                                                    ? true : false;
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = true;
+                                    }
+                                    else
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = false;
+                                    }
 
                                     element.lastIndex = 0;
 

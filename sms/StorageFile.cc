@@ -170,7 +170,7 @@ void StorageFile::addSync(void)
 	for (len = sizeof(sync); len; len -= rc) {
 		rc = ::write(m_fd, p, len);
 		if (rc <= 0) {
-			if (errno == EINTR)
+			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
 			int err = errno;
@@ -249,7 +249,7 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 
 		rc = writev(m_fd, vec, iovcnt);
 		if (rc <= 0) {
-			if (errno == EINTR)
+			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
 			int err = errno;
@@ -347,7 +347,7 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 
 		rc = writev(m_fd, vec, iovcnt);
 		if (rc <= 0) {
-			if (errno == EINTR)
+			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
 			int err = errno;

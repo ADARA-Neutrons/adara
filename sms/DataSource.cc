@@ -429,15 +429,17 @@ DataSource::DataSource( const std::string &name,
 			bool enabled, bool is_required,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
-			double data_timeout, bool ignore_eop, bool mixed_data_packets,
+			double data_timeout, uint32_t data_timeout_retry,
+			bool ignore_eop, bool mixed_data_packets,
 			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
 			bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
-	m_data_timeout(data_timeout), m_ignore_eop(ignore_eop),
-	m_mixed_data_packets(mixed_data_packets),
+	m_data_timeout(data_timeout), m_data_timeout_retry(data_timeout_retry),
+	m_data_timeout_retry_count(0),
+	m_ignore_eop(ignore_eop), m_mixed_data_packets(mixed_data_packets),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -493,6 +495,9 @@ DataSource::DataSource( const std::string &name,
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":DataTimeout", 0.0));
+
+	m_pvDataTimeoutRetry = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":DataTimeoutRetry"));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
@@ -556,6 +561,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvConnectRetryTimeout);
 	m_ctrl->addPV(m_pvConnectTimeout);
 	m_ctrl->addPV(m_pvDataTimeout);
+	m_ctrl->addPV(m_pvDataTimeoutRetry);
 	m_ctrl->addPV(m_pvIgnoreEoP);
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvMaxReadChunk);
@@ -590,6 +596,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
 	m_pvDataTimeout->update(m_data_timeout, &now);
+	m_pvDataTimeoutRetry->update(m_data_timeout_retry, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
@@ -939,13 +946,33 @@ bool DataSource::timerExpired(void)
 					<< " for " << m_name << ", Resetting Timer.");
 				// Update Data Timeout from PV...
 				m_data_timeout = m_pvDataTimeout->value();
+				m_data_timeout_retry = m_pvDataTimeoutRetry->value();
+				m_data_timeout_retry_count = 0;
 				m_timer->start(m_data_timeout);
 				m_readDelay = false; // reset flag set by SMSControl...
 			} else {
-				ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "Timed out waiting for data from " << m_name );
-				m_pvConnected->failed();
-				connectionFailed(true, true, IDLE);
+				// Retry Count has Expired...?
+				if ( ++m_data_timeout_retry_count > m_data_timeout_retry )
+				{
+					ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "Timed out waiting for data from " << m_name
+						<< " (Retry Count " << m_data_timeout_retry_count
+						<< " > Number of Retries " << m_data_timeout_retry
+						<< "...)");
+					m_pvConnected->failed();
+					connectionFailed(true, true, IDLE);
+				}
+				// Still Have Some Retries Left, Log It!!
+				else
+				{
+					ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "WARNING: "
+						<< "Timed out waiting for data from " << m_name
+						<< " - Retry Count " << m_data_timeout_retry_count
+						<< " <= Number of Retries " << m_data_timeout_retry
+						<< ", Stay Connected, Continuing...");
+					m_timer->start(m_data_timeout);
+				}
 			}
 			break;
 		}
@@ -1067,6 +1094,7 @@ void DataSource::startConnect(void)
 			}
 			goto error_fd;
 
+		case EAGAIN:
 		case EINTR:
 		case EINPROGRESS:
 			m_state = CONNECTING;
@@ -1138,6 +1166,8 @@ void DataSource::connectComplete(void)
 
 		// Update Data Timeout from PV...
 		m_data_timeout = m_pvDataTimeout->value();
+		m_data_timeout_retry = m_pvDataTimeoutRetry->value();
+		m_data_timeout_retry_count = 0;
 		m_timer->start(m_data_timeout);
 
 		m_state = ACTIVE;
@@ -1156,7 +1186,7 @@ void DataSource::connectComplete(void)
 	if (rc < 0)
 		e = errno;
 
-	if (e == EINTR || e == EINPROGRESS) {
+	if (e == EAGAIN || e == EINTR || e == EINPROGRESS) {
 		/* Odd, but harmless; just keep waiting */
 		return;
 	}
@@ -1182,14 +1212,29 @@ void DataSource::dataReady(void)
 
 	// Update Our Data Timeout/Max Read Chunk Internals Less Frequently,
 	// It Takes Some Time...!
-	// Only allow updates every few seconds (depending on bandwidth... ;-)
+	// Only allow updates every few minutes (depending on bandwidth... ;-)
 	static uint32_t cnt = 0;
-	uint32_t freq = 333;
+	uint32_t freq = 999;
 
 	// Update Data Timeout from PV... (Periodically...)
 	if ( !(++cnt % freq) ) {
-		m_data_timeout = m_pvDataTimeout->value();
+		double new_data_timeout = m_pvDataTimeout->value();
+		if ( !approximatelyEqual( m_data_timeout, new_data_timeout,
+				0.0000001 ) ) {
+			ERROR("dataReady(): Updating Data Timeout for " << m_name
+				<< " from " << m_data_timeout
+				<< " to " << new_data_timeout);
+			m_data_timeout = new_data_timeout;
+		}
+		uint32_t new_data_timeout_retry = m_pvDataTimeoutRetry->value();
+		if ( m_data_timeout_retry != new_data_timeout_retry ) {
+			ERROR("dataReady(): Updating Data Timeout Retry for " << m_name
+				<< " from " << m_data_timeout_retry
+				<< " to " << new_data_timeout_retry);
+			m_data_timeout_retry = new_data_timeout_retry;
+		}
 	}
+	m_data_timeout_retry_count = 0;
 	m_timer->start(m_data_timeout);
 
 	struct timespec readStart;
@@ -1217,11 +1262,11 @@ void DataSource::dataReady(void)
 			msg += e.what();
 			// *Don't* Throw std::runtime_error(msg), Just Log Instead...
 			/* Rate-limited log of failure */
-			std::string log_info;
+			std::string rll_log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_PARSE_MAX_READ_CHUNK, m_name,
-					60, 3, 100, log_info ) ) {
-				ERROR(log_info
+					60, 3, 100, rll_log_info ) ) {
+				ERROR(rll_log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): " << msg << " - Revert to Original"
 					<< " m_max_read_chunk=" << m_max_read_chunk);
@@ -1254,11 +1299,11 @@ void DataSource::dataReady(void)
 		}
 	} catch (std::runtime_error e) {
 		/* Rate-limited log of failure */
-		std::string log_info;
+		std::string rll_log_info;
 		bool dumpStats = false;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-				RLL_READ_EXCEPTION, m_name, 60, 5, 10, log_info ) ) {
-			ERROR(log_info
+				RLL_READ_EXCEPTION, m_name, 60, 5, 10, rll_log_info ) ) {
+			ERROR(rll_log_info
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Exception reading from " << m_name
 				<< ": " << e.what());
@@ -1280,11 +1325,11 @@ void DataSource::dataReady(void)
 		if ( elapsed > 2.0 )
 		{
 			/* Rate-limited logging of read delay threshold */
-			std::string log_info;
+			std::string rll_log_info;
 			bool dumpStats = false;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_READ_DELAY, m_name, 60, 20, 5, log_info ) ) {
-				ERROR(log_info
+					RLL_READ_DELAY, m_name, 60, 20, 5, rll_log_info ) ) {
+				ERROR(rll_log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "dataReady(): Read Delay Threshold Exceeded"
 					<< " elapsed=" << elapsed << " (" << m_name << ")"

@@ -438,7 +438,7 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		"container_name", m_sample);
 
 	// Create Container Concatenation "Component" PV...
-	// (value is: container_id + ":" + container_name, lol... ;-D
+	// (value is: ContainerId + ":" + ContainerName, lol... ;-D
 	m_componentPV = addPV(prefix, "Component", "component", m_sample);
 
 	addPV(prefix, "CanIndicator", "can_indicator", m_sample);
@@ -628,8 +628,8 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 	invalidateCache();
 
 	// Update Container "Component" PV, As Needed...
-	if ( pv->label().compare("container_id")
-			|| pv->label().compare("container_name") )
+	if ( !(pv->label().compare("ContainerId"))
+			|| !(pv->label().compare("ContainerName")) )
 	{
 		// Concatenate Container Id and Name to Get "Component"... ;-D
 		struct timespec now;
@@ -637,6 +637,8 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 		std::stringstream ss;
 		ss << m_containerIdPV->value()
 			<< ": " << m_containerNamePV->value();
+		DEBUG("pvChanged(): PV " << pv->label() << " Changed"
+			<< " - Re-Concatenating Sample Component PV: " << ss.str());
 		m_componentPV->update( ss.str(), &now );
 	}
 

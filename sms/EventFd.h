@@ -76,7 +76,7 @@ private:
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = ::read(m_fd, &val, sizeof(val));
 		if (rc != 8) {
-			if (errno != EAGAIN) {
+			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
 				std::string msg("Unable to read eventfd: ");
 				msg += strerror(e);

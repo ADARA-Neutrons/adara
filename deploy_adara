@@ -26,8 +26,9 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-usage=\
-"   usage: deploy_adara [ sms | sts | sts_test | pvsd | dasmon | dasmond ]"
+usage="   usage: deploy_adara \\ \n            "
+usage="$usage [ sms | sts | sts_test | sts_hfir | sts_hfir_test \\ \n"
+usage="$usage                 | pvsd | dasmon | dasmond ]"
 
 if [ $# != 1 ]; then
 	echo -e "\n$usage\n"
@@ -61,6 +62,16 @@ elif [ "$1" == "sts_test" ]; then
 	prog="sts"
 	service=""
 	IS_STS=1
+elif [ "$1" == "sts_hfir" ]; then
+	PROG="STS_HFIR"
+	prog="sts"
+	service=""
+	IS_STS=1
+elif [ "$1" == "sts_hfir_test" ]; then
+	PROG="STS_HFIR_TEST"
+	prog="sts"
+	service=""
+	IS_STS=1
 elif [ "$1" == "pvsd" ]; then
 	PROG="PVSD"
 	prog="pvsd"
@@ -88,7 +99,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.5.1"
+DEPLOY_VERSION="1.5.2"
 
 TMP_DIR="/tmp"
 
@@ -717,7 +728,7 @@ if [ $need_build == 1 ]; then
 
 	if [ $copy_ok != 0 ]; then
 		echo -e -n "\nError Copying SMSD " | tee -a $LOG
-		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -20
 	fi
@@ -735,7 +746,7 @@ if [ $need_build == 1 ]; then
 
 	if [ $copy_ok != 0 ]; then
 		echo -e -n "\nError Copying LiveConf " | tee -a $LOG
-		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -21
 	fi
@@ -747,7 +758,7 @@ if [ $need_build == 1 ]; then
 	if [[ -e sms/adaracat && -x sms/adaracat ]]; then
 
 		echo -e -n "\nCopying SMS ADARACat Script " | tee -a $LOG
-		echo "into Archive Release Tag:\n" | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
 
 		cp -i -p sms/adaracat "$tag_archive" |& tee -a $LOG
 
@@ -755,7 +766,8 @@ if [ $need_build == 1 ]; then
 
 		if [ $copy_ok != 0 ]; then
 			echo -e -n "\nError Copying ADARACat " | tee -a $LOG
-			echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -21
 		fi
@@ -769,7 +781,7 @@ if [ $need_build == 1 ]; then
 	if [[ -e sms/adara_fix_ipts && -x sms/adara_fix_ipts ]]; then
 
 		echo -e -n "\nCopying SMS ADARA Fix IPTS Script " | tee -a $LOG
-		echo "into Archive Release Tag:\n" | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
 
 		cp -i -p sms/adara_fix_ipts "$tag_archive" |& tee -a $LOG
 
@@ -778,7 +790,8 @@ if [ $need_build == 1 ]; then
 		if [ $copy_ok != 0 ]; then
 			echo -e -n "\nError Copying ADARA Fix IPTS Script " \
 				| tee -a $LOG
-			echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -21
 		fi
@@ -798,7 +811,7 @@ if [ $need_build == 1 ]; then
 
 	if [ $copy_ok != 0 ]; then
 		echo -e -n "\nError Copying STS " | tee -a $LOG
-		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -22
 	fi
@@ -817,7 +830,7 @@ if [ $need_build == 1 ]; then
 
 	if [ $copy_ok != 0 ]; then
 		echo -e -n "\nError Copying PVSD " | tee -a $LOG
-		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -23
 	fi
@@ -855,7 +868,7 @@ if [ $need_build == 1 ]; then
 
 	if [ $copy_ok != 0 ]; then
 		echo -e -n "\nError Copying Tools " | tee -a $LOG
-		echo "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
+		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -25
 	fi
@@ -983,7 +996,7 @@ if [ $tag_ok != 0 ]; then
 
 		echo -e -n "\nChecking out New Config $HOST_TYPE Branch: " \
 			| tee -a $LOG
-		echo "$install_branch\n" | tee -a $LOG
+		echo -e "$install_branch\n" | tee -a $LOG
 
 		echo "git checkout $install_branch" | tee -a $LOG
 		git checkout "$install_branch" |& tee -a $LOG
@@ -1101,6 +1114,17 @@ for exe_path in "$tag_archive"/* ; do
 		echo -e "\nModifying STS Executable $exe for Test Deployment." \
 			| tee -a $LOG
 		exe="${exe}_test"
+	# Handle Special STS HFIR Version Deployment...
+	elif [[ $PROG == "STS_HFIR" && $exe == $prog ]]; then
+		echo -e "\nModifying STS Executable $exe for HFIR Deployment." \
+			| tee -a $LOG
+		exe="${exe}_hfir"
+	# Handle Special STS HFIR "Test" Version Deployment...
+	elif [[ $PROG == "STS_HFIR_TEST" && $exe == $prog ]]; then
+		echo -e \
+			"\nModifying STS Executable $exe for HFIR Test Deployment." \
+			| tee -a $LOG
+		exe="${exe}_hfir_test"
 	fi
 
 	echo -e "\nLinking ${exe}:" | tee -a $LOG
@@ -1314,7 +1338,7 @@ if [ $need_sms_subdir == 1 ]; then
 		if [ $add_ok != 0 ]; then
 			echo -e -n "\nError Adding New SMS Config Sub-Directory " \
 				| tee -a $LOG
-			echo "to Git! ($add_ok)\n" | tee -a $LOG
+			echo -e "to Git! ($add_ok)\n" | tee -a $LOG
 			echo "Bailing Out..." | tee -a $LOG
 			exit -38
 		fi

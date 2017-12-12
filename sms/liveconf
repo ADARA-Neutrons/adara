@@ -118,8 +118,16 @@ option_id_type[$num_options]="source"
 option_name[$num_options]="data_timeout"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
-option_default[$num_options]="5"
+option_default[$num_options]="3"
 option_label[$num_options]="[Data Source Data Delivery Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="data_timeout_retry"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataTimeoutRetry"
+option_value_type[$num_options]="UINT32_VALUE(nretries)"
+option_default[$num_options]="3"
+option_label[$num_options]="[Data Source Data Delivery Timeout Retries]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
@@ -1386,6 +1394,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:ConnectTimeout
 					caget $WAIT ${dsprefix}:ConnectRetryTimeout
 					caget $WAIT ${dsprefix}:DataTimeout
+					caget $WAIT ${dsprefix}:DataTimeoutRetry
 					caget $WAIT ${dsprefix}:IgnoreEoP
 					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT -S ${dsprefix}:MaxReadChunk

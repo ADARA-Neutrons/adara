@@ -68,6 +68,13 @@ public:
 		return m_data + header_length();
 	}
 
+	void setPulseId(uint64_t pulseId) // ;-b
+	{
+		uint32_t *field = (uint32_t *) m_data;
+		field[2] = pulseId >> 32;
+		field[3] = pulseId;
+	}
+
 protected:
 	const uint8_t *	m_data;
 	uint32_t	m_len;

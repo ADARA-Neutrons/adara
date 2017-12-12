@@ -20,6 +20,41 @@ ADARA SMS Install Checklist
 		-rw-r--r-- 1 root root 513 Apr 13  2017
 			/etc/rsyslog.d/adaraMailer.conf
 
+-OR-
+
+1. Create Initial SMSD Configuration on New Beamline/Host:
+
+	cd /home/controls/config-daq1/
+
+	cp /SNS/users/y8y/confck.smsd confck
+	git add confck
+	git commit confck
+
+	./confck
+
+	# SMSD Init Script
+
+	mkdir sms
+
+	sudo cp ~/gitsrc/ADARA/sms/smsd.initscript /etc/init.d/smsd
+
+	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.255]
+
+	sudo vi /etc/init.d/smsd
+		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+			-> e.g. with: EPICS_CA_ADDR_LIST="10.111.14.255"
+
+	cp /etc/init.d/smsd sms/smsd.initscript
+
+	# ADARA Mailer Config
+
+	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	cp /etc/rsyslog.d/adaraMailer.conf sms/adaraMailer.conf
+
+	git add sms
+	git commit sms
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
@@ -41,6 +76,8 @@ ADARA SMS Install Checklist
 	sudo /sbin/service rsyslog status
 
 	sudo /sbin/service rsyslog restart
+
+	sudo tail /var/log/messages
 
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 

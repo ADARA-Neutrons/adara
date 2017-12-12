@@ -185,6 +185,7 @@ private:
         std::map<std::string, std::string>
                                     unitsPaths;
         bool                        linkValue;
+        bool                        linkLastValue;
         std::map<std::string, std::string>
                                     createdLinks;
         uint32_t                    lastIndex;
@@ -356,6 +357,10 @@ private:
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
 
+            // Are There More Than One Value to This PV Time-Series?
+            if ( m_cur_size || value_buffer.size() > 1 )
+                this->m_last_value_more = true;
+
             // Capture Value Strings for Enumerated Type PVs...
             // (IFF Everything Works...! ;-D)
             if ( this->m_type == STS::PVT_ENUM
@@ -444,6 +449,10 @@ private:
             // Save Last Value for Conditional STS Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
+
+            // Are There More Than One Value to This PV Time-Series?
+            if ( m_cur_size || value_buffer.size() > 1 )
+                this->m_last_value_more = true;
         }
 
         /// Writes Buffered String PV Values to Nexus File 
@@ -494,6 +503,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -559,6 +572,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -624,6 +641,10 @@ private:
                 // Save Last Value for Conditional STS Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
+
+                // Are There More Than One Value to This PV Time-Series?
+                if ( value_buffer.size() > 1 )
+                    this->m_last_value_more = true;
             }
             else
             {
@@ -1330,6 +1351,76 @@ private:
             return( ss.str() );
         }
 
+        /// Write Scalar Uint32 PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            uint32_t value,                ///< Uint32 Value
+            std::string units
+        )
+        {
+            m_nxgen.writeScalar( path, name, value, units );
+        }
+
+        /// Write Scalar Double PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            double value,                  ///< Double Value
+            std::string units
+        )
+        {
+            m_nxgen.writeScalar( path, name, value, units );
+        }
+
+        /// Write Scalar String PV Value to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::string value,             ///< String Value
+            std::string units
+        )
+        {
+            m_nxgen.writeString( path, name, value );
+            if ( units.size() ) {
+                m_nxgen.writeStringAttribute( path + "/" + name,
+                    "units", units );
+            }
+        }
+
+        /// Write "Scalar" Uint32 PV Array to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::vector<uint32_t> value,   ///< Uint32 Array
+            std::string units
+        )
+        {
+            std::vector<hsize_t> dims;
+            dims.push_back( value.size() );
+
+            m_nxgen.writeMultidimDataset( path, name, value, dims, units );
+        }
+
+        /// Write "Scalar" Double PV Array to NeXus
+        void writeScalarValue
+        (
+            std::string path,
+            std::string name,
+            std::vector<double> value,     ///< Double Array
+            std::string units
+        )
+        {
+            std::vector<hsize_t> dims;
+            dims.push_back( value.size() );
+
+            m_nxgen.writeMultidimDataset( path, name, value, dims, units );
+        }
+
         /// Search STS Config for Associated Groups & Create...
         void createSTSConfigGroupMatchingElements
         (
@@ -1593,8 +1684,81 @@ private:
                         if ( (it = E->createdLinks.find( elem_link_path ))
                                 == E->createdLinks.end() )
                         {
+                            // Create Dataset with *Just Last PV Value*
+                            // in Group...
+                            if ( E->linkLastValue )
+                            {
+                                // Do We Have a "Last PV Value" to Use...?
+                                if ( this->m_last_value_set )
+                                {
+                                    std::string pv_value_path =
+                                        m_log_path + "/" + "value";
+
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s %s in Group as %s",
+                                        g_pid, "Create Data with",
+                                        "Last PV Value from",
+                                        pv_value_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    writeScalarValue(
+                                        group_path, E->name, 
+                                        this->m_last_value,
+                                        this->m_units );
+
+                                    std::pair<std::string, std::string>
+                                        path_link_pair(
+                                           elem_link_path, pv_value_path );
+
+                                    E->createdLinks.insert(
+                                        path_link_pair );
+
+                                    // IF We Have a Chance of Capturing a
+                                    // Units Value from some PV(s), then
+                                    // Save ElementInfo Link Path Now for
+                                    // Setting the Units Attribute Later...
+                                    // (After We've Gone Thru All the PVs)
+                                    if ( E->unitsPatterns.size()
+                                            || E->units.size() )
+                                    {
+                                        E->unitsPaths.insert(
+                                            path_link_pair );
+                                    }
+
+                                    // Log Error if There Were More Than 1
+                                    // Values in This PV Time-Series Log!
+                                    if ( this->m_last_value_more )
+                                    {
+                                        syslog( LOG_ERR,
+                                            "[%i] %s %s %s %s - %s %s",
+                                            g_pid, "STS Error:",
+                                            "More Than 1 PV Value for",
+                                            elem_link_path.c_str(),
+                                            "to Link to Element Path",
+                                            "Check", m_log_path.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                }
+
+                                else
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s %s - %s - %s %s",
+                                        g_pid, "STS Error:",
+                                        "*** NO LAST PV VALUE for",
+                                        elem_link_path.c_str(),
+                                        "Nothing to Link to Element Path",
+                                        "Skipping", m_log_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
+                            }
+
                             // Link PV *Value* Only into Group...
-                            if ( E->linkValue )
+                            else if ( E->linkValue )
                             {
                                 std::string pv_value_path =
                                     m_log_path + "/" + "value";
@@ -1628,7 +1792,7 @@ private:
                                 }
                             }
 
-                            // Link PV Log into Group...
+                            // Link Whole PV Log into Group...
                             else
                             {
                                 syslog( LOG_INFO,
@@ -1971,7 +2135,8 @@ public:
         unsigned short a_event_buf_chunk_count = 20,
         unsigned short a_ancillary_buf_chunk_count = 5,
         unsigned long a_cache_size = 10485760,
-        unsigned short a_compression_level = 0 );
+        unsigned short a_compression_level = 0,
+        bool a_verbose = false );
     ~NxGen();
 
     void dumpProcessingStatistics(void);

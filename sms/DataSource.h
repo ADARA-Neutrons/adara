@@ -31,7 +31,8 @@ class DataSource : public ADARA::POSIXParser {
 public:
 	DataSource(const std::string &name, bool enabled, bool required,
 		const std::string &uri, uint32_t id,
-		double connect_retry, double connect_timeout, double data_timeout,
+		double connect_retry, double connect_timeout,
+		double data_timeout, uint32_t data_timeout_retry,
 		bool ignore_eop, bool mixed_data_packets, unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
@@ -75,6 +76,8 @@ private:
 	double m_connect_retry;
 	double m_connect_timeout;
 	double m_data_timeout;
+	uint32_t m_data_timeout_retry;
+	uint32_t m_data_timeout_retry_count;
 	bool m_ignore_eop;
 	bool m_mixed_data_packets;
 	unsigned int m_max_read_chunk;
@@ -89,6 +92,7 @@ private:
 	boost::shared_ptr<smsFloat64PV> m_pvConnectRetryTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvConnectTimeout;
 	boost::shared_ptr<smsFloat64PV> m_pvDataTimeout;
+	boost::shared_ptr<smsUint32PV> m_pvDataTimeoutRetry;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;

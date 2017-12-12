@@ -8,6 +8,7 @@
 #include <gddApps.h>
 
 #include <stdint.h>
+#include <string.h>
 
 #include "Logging.h"
 
@@ -573,11 +574,25 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, val.dataPointer(), nelem);
 
+	char *old_str = (char *) m_value->dataPointer();
+
 	std::string log_info;
+	bool do_log = false;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
 		DEBUG(log_info << "smsStringPV::write() m_pv_name=" << m_pv_name
-			<< " value=" << new_str);
+			<< " new_value=[" << new_str << "]"
+			<< " old_value=[" << old_str << "]");
+		do_log = true;
+	}
+
+	if ( !strcmp(new_str, old_str)
+			&& m_value->getStat() == epicsAlarmNone ) {
+		if ( do_log ) {
+			DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " String Value Did Not Change - Ignore...");
+		}
+		return S_casApp_success;
 	}
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,

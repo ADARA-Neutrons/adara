@@ -1,5 +1,5 @@
 
-noinst_PROGRAMS += tools/adara-parser tools/adara-dump
+noinst_PROGRAMS += tools/adara-parser tools/adara-dump tools/adara-munge
 
 if BUILD_ADARA_GEN
 noinst_PROGRAMS += tools/adara-gen
@@ -24,3 +24,8 @@ tools_adara_pvgen_LDADD = $(EPICS_LIBS) -lboost_program_options -lpthread
 
 tools_adara_dump_SOURCES = tools/adara-dump.cc $(POSIX_PARSER)
 tools_adara_dump_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
+
+tools_adara_munge_SOURCES = tools/adara-munge.cc $(POSIX_PARSER)
+tools_adara_munge_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
+tools_adara_munge_LDADD = -lboost_program_options
+
