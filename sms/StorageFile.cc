@@ -51,9 +51,10 @@ void StorageFile::config(const boost::property_tree::ptree &conf)
 		try {
 			m_max_file_size = parse_size(val);
 		} catch (std::runtime_error e) {
-			std::string msg("Unable to parse file size: ");
+			std::string msg("config(): Unable to parse max file size: ");
 			msg += e.what();
-			throw std::runtime_error(msg);
+			ERROR(msg);
+			throw std::runtime_error("StorageFile::" + msg);
 		}
 	}
 
@@ -62,9 +63,10 @@ void StorageFile::config(const boost::property_tree::ptree &conf)
 		try {
 			m_max_sync_distance = parse_size(val);
 		} catch (std::runtime_error e) {
-			std::string msg("Unable to parse sync distance: ");
+			std::string msg("config(): Unable to parse sync distance: ");
 			msg += e.what();
-			throw std::runtime_error(msg);
+			ERROR(msg);
+			throw std::runtime_error("StorageFile::" + msg);
 		}
 	}
 }
@@ -106,8 +108,12 @@ void StorageFile::makePath(void)
 	StorageContainer::SharedPtr c = m_owner.lock();
 	char name[32];
 
-	if (!c)
-		throw std::logic_error("StorageFile owner is empty!");
+	if (!c) {
+		std::string msg(
+			"makePath(): StorageFile Owner StorageContainer is Empty!");
+		ERROR(msg);
+		throw std::logic_error("StorageFile::" + msg);
+	}
 
 	m_path = c->name();
 
@@ -138,9 +144,12 @@ void StorageFile::open(int flags)
 	m_fd = openat(StorageManager::base_fd(), m_path.c_str(), flags, 0660);
 	if (m_fd < 0) {
 		int err = errno;
-		std::string msg("StorageFile::open() openat error: ");
+		std::string msg("open(): openat(");
+		msg += m_path;
+		msg += ") error: ";
 		msg += strerror(err);
-		throw std::runtime_error(msg);
+		ERROR(msg);
+		throw std::runtime_error("StorageFile::" + msg);
 	}
 
 	m_fdRefs = 1;
@@ -174,9 +183,10 @@ void StorageFile::addSync(void)
 				continue;
 
 			int err = errno;
-			std::string msg("StorageFile::addSync() write error: ");
+			std::string msg("addSync() write error: ");
 			msg += strerror(err);
-			throw std::runtime_error(msg);
+			ERROR(msg);
+			throw std::runtime_error("StorageFile::" + msg);
 		}
 
 		m_size += rc;
@@ -253,9 +263,10 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 				continue;
 
 			int err = errno;
-			std::string msg("StorageFile::writev() error: ");
+			std::string msg("write(): writev() error: ");
 			msg += strerror(err);
-			throw std::runtime_error(msg);
+			ERROR(msg);
+			throw std::runtime_error("StorageFile::" + msg);
 		}
 
 		m_syncDistance += rc;
@@ -351,9 +362,10 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 				continue;
 
 			int err = errno;
-			std::string msg("StorageFile::writev() save error: ");
+			std::string msg("save(): writev() error: ");
 			msg += strerror(err);
-			throw std::runtime_error(msg);
+			ERROR(msg);
+			throw std::runtime_error("StorageFile::" + msg);
 		}
 
 		m_size += rc;
@@ -439,19 +451,22 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 	 * then copy back in.
 	 */
 	char *path = strdup(f->m_path.c_str());
-	if (!path)
+	if (!path) {
+		ERROR("stateFile(): strdup(): bad alloc for " << f->m_path);
 		throw std::bad_alloc();
+	}
 
 	f->m_fd = mkstemp(path);
 	if (f->m_fd < 0) {
 		int err = errno;
 		free(path);
-		std::string msg("StorageFile::stateFile(");
+		std::string msg("stateFile(");
 		msg += f->m_path;
 		msg += ") mkstemp error: ";
 		msg += strerror(err);
-		throw std::runtime_error(msg);
-        }
+		ERROR(msg);
+		throw std::runtime_error("StorageFile::" + msg);
+	}
 
 	try {
 		/* We did not increase the string length, but there is no
@@ -461,7 +476,7 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 		f->m_path = path;
 		free(path);
 	} catch (...) {
-		ERROR("stateFile() reallocation error");
+		ERROR("stateFile() reallocation error for " << f->m_path);
 		free(path);
 		throw;
 	}
@@ -483,8 +498,12 @@ StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
 	StorageContainer::SharedPtr c = f->m_owner.lock();
 	char name[32];
 
-	if (!c)
-		throw std::logic_error("StorageFile save owner is empty!");
+	if (!c) {
+		std::string msg(
+			"saveFile(): StorageFile Owner StorageContainer is Empty!");
+		ERROR(msg);
+		throw std::logic_error("StorageFile::" + msg);
+	}
 
 	f->m_path = c->name();
 
@@ -609,9 +628,12 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	f->put_fd();
 
 	if (err) {
-		std::string msg("StorageFile::addFile() stat error: ");
+		std::string msg("importFile(");
+		msg += path;
+		msg += ") stat error: ";
 		msg += strerror(err);
-		throw std::runtime_error(msg);
+		ERROR(msg);
+		throw std::runtime_error("StorageFile::" + msg);
 	}
 
 	f->m_size = statbuf.st_size;
@@ -628,9 +650,11 @@ uint64_t StorageFile::fileSize(const std::string &path)
 		err = errno;
 
 	if (err) {
-		std::string msg("fileSize() stat error: ");
+		std::string msg("fileSize(");
+		msg += path;
+		msg += ") stat error: ";
 		msg += strerror(err);
-		DEBUG(msg);
+		ERROR(msg);
 		throw std::runtime_error("StorageFile::" + msg);
 	}
 
