@@ -616,7 +616,27 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	StorageFile::SharedPtr f(
 		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_path = path;
-	f->open(O_RDONLY);
+
+	// Don't Throw An Exception Just Trying to Import Some Old Data File...!
+	// (Whine Loudly Tho... ;-D)
+	try {
+		f->open(O_RDONLY);
+	} catch (std::runtime_error e) {
+		std::string msg("importFile(");
+		msg += path;
+		msg += ") Open Error: ";
+		msg += e.what();
+		msg += " - Ignoring...";
+		ERROR(msg);
+		return StorageFile::SharedPtr();
+	} catch (...) {
+		std::string msg("importFile(");
+		msg += path;
+		msg += ") Unknown Open Error";
+		msg += " - Ignoring...";
+		ERROR(msg);
+		return StorageFile::SharedPtr();
+	}
 
 	f->m_addendum = addendum_file;
 	f->m_addendumFileNumber = addendumFileNumber;
@@ -627,16 +647,19 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		err = errno;
 	f->put_fd();
 
+	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
+	// (Whine Loudly Tho... ;-D)
 	if (err) {
 		std::string msg("importFile(");
 		msg += path;
-		msg += ") stat error: ";
+		msg += ") Stat Error: ";
 		msg += strerror(err);
 		ERROR(msg);
-		throw std::runtime_error("StorageFile::" + msg);
+		return StorageFile::SharedPtr();
 	}
 
 	f->m_size = statbuf.st_size;
+
 	return f;
 }
 
@@ -649,13 +672,15 @@ uint64_t StorageFile::fileSize(const std::string &path)
 	if (err)
 		err = errno;
 
+	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
+	// (Whine Loudly Tho... ;-D)
 	if (err) {
 		std::string msg("fileSize(");
 		msg += path;
-		msg += ") stat error: ";
+		msg += ") Stat Error: ";
 		msg += strerror(err);
 		ERROR(msg);
-		throw std::runtime_error("StorageFile::" + msg);
+		return( (uint64_t) 0 );
 	}
 
 	uint64_t file_size = statbuf.st_size;
