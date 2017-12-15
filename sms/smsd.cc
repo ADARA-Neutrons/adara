@@ -422,7 +422,17 @@ int main(int argc, char **argv)
 
 	INFO("SMS Daemon Started, " << version_str);
 
-	load_config(argv[0], conf, version_str);
+	/* Try to Configure the SMS Daemon... (Catch Exceptions Dagnabbit.) */
+	try {
+		load_config(argv[0], conf, version_str);
+	} catch (std::runtime_error e) {
+		ERROR("Failed to Start (Load Config): " << e.what());
+		exit(1);
+	} catch (...) {
+		ERROR("Failed to Start (Load Config) -- Unknown Exception");
+		exit(1);
+	}
+	
 
 	block_signals();
 
@@ -439,10 +449,10 @@ int main(int argc, char **argv)
 
 		SMSControl::late_config(conf);
 	} catch (std::runtime_error e) {
-		ERROR("failed to start (init): " << e.what());
+		ERROR("Failed to Start (Init): " << e.what());
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start (init) -- unknown exception");
+		ERROR("Failed to Start (Init) -- Unknown Exception");
 		exit(1);
 	}
 
@@ -454,11 +464,11 @@ int main(int argc, char **argv)
 		close_std_files();
 		remove_temp_logger();
 	} catch (std::runtime_error e) {
-		ERROR("failed to start (late init): " << e.what());
+		ERROR("Failed to Start (Late Init): " << e.what());
 		release_parent(CHILD_INIT_FAILED);
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start (late init); unknown exception");
+		ERROR("Failed to Start (Late Init) -- Unknown Exception");
 		release_parent(CHILD_INIT_FAILED);
 		throw;
 	}
@@ -468,8 +478,11 @@ int main(int argc, char **argv)
 		for (;;) {
 			fileDescriptorManager.process(1000.0);
 		}
+	} catch (std::runtime_error e) {
+		ERROR("Dying on an Unexpected/Unhandled Exception: " << e.what());
+		exit(1);
 	} catch (...) {
-		ERROR("dying on an unexpected/unhandled exception");
+		ERROR("Dying on an Unexpected/Unhandled/Unknown Exception");
 		throw;
 	}
 
