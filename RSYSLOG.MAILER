@@ -20,7 +20,7 @@ that might be of interest to developers and maintainers of the system. :-)
 
    $ sudo cp ADARA/rsyslogMailer /usr/local/bin
 
-   -> add cron job to periodically run the script, every 5 minutes:
+   -> add cron job to periodically run the script, every 10 minutes:
 
    $ sudo crontab -e   (*** or edit /etc/crontab ***)
 
@@ -31,10 +31,10 @@ that might be of interest to developers and maintainers of the system. :-)
 
    . . .
 
-   */5 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+   */10 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
    (*** Note: with /etc/crontab, the *User* must also be specified, i.e.:
-      */5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+      */10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
    Duh... ;-)
 
    (Note: the named pipe "/etc/rsyslog.pipes/criticalMessages" is

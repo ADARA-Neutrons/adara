@@ -95,7 +95,7 @@ ADARA SMS Install Checklist
 
 	sudo vi /etc/crontab
 
-		*/5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
 4. Administrator Crontab Setup:
 
