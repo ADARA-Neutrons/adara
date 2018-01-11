@@ -61,6 +61,8 @@ std::string SMSControl::m_pixelMapPath;
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
 
+bool SMSControl::m_noRTDLPulses;
+
 uint64_t SMSControl::m_interPulseTimeChopGlitchMin;
 uint64_t SMSControl::m_interPulseTimeChopGlitchMax;
 
@@ -180,6 +182,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<uint32_t>("sms.max_pulse_buffer_size", 1000);
 	INFO("Setting Max Pulse Buffer Size to "
 		<< m_maxPulseBufferSize << ".");
+
+	m_noRTDLPulses = conf.get<bool>("sms.no_rtdl_pulses", false);
+	INFO("Setting No RTDL Pulses to " << m_noRTDLPulses << ".");
 
 	m_doPulsePchgCorrect =
 			conf.get<bool>("sms.do_pulse_pcharge_correction", true);
@@ -419,6 +424,10 @@ SMSControl::SMSControl() :
 						PopPulseBufferPV(prefix + ":Control:"
 							+ "PopPulseBuffer"));
 
+	m_pvNoRTDLPulses = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "NoRTDLPulses"));
+
 	m_pvDoPulsePchgCorrect = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
 							+ "DoPulsePchgCorrect"));
@@ -447,6 +456,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
+	addPV(m_pvNoRTDLPulses);
 	addPV(m_pvDoPulsePchgCorrect);
 	addPV(m_pvDoPulseVetoCorrect);
 	addPV(m_pvNumDataSources);
@@ -487,6 +497,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
+
+	// Initialize No RTDL Pulses PV from Config Value...
+	m_pvNoRTDLPulses->update(m_noRTDLPulses, &now);
 
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
 	uint64_t baseInterPulseTime = NANO_PER_SECOND_LL / CYCLE_FREQUENCY;
@@ -2530,7 +2543,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						pulse->m_rtdl->packet_length(),
 						false);
-		} else {
+		} else if ( !m_noRTDLPulses ) {
 			/* Rate-limited logging of no RTDL for pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
