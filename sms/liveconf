@@ -223,7 +223,7 @@ option_id_type[$num_options]="ctrl"
 option_name[$num_options]="send_sample_in_run_info"
 option_pv[$num_options]="SMS:RunInfo:SendSampleInRunInfo"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
-option_default[$num_options]="true"
+option_default[$num_options]="false"
 option_label[$num_options]="[Send Sample In Run Info]"
 num_options=$(( num_options + 1 ))
 

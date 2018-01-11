@@ -197,7 +197,7 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		<< m_doPulseVetoCorrect << ".");
 
 	m_sendSampleInRunInfo =
-			conf.get<bool>("sms.send_sample_in_run_info", true);
+			conf.get<bool>("sms.send_sample_in_run_info", false);
 	INFO("Setting Send Sample in Run Info to "
 		<< m_sendSampleInRunInfo << ".");
 
