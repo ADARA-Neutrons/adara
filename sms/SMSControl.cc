@@ -2531,11 +2531,15 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 
 void SMSControl::recordPulse(PulsePtr &pulse)
 {
+	static uint32_t cnt = 0;
+
 	/* Send the RTDL packet, followed by the banked event packet */
 
 	// XXX avoid sending the RTDL for a pulse twice (if duplicated)
 
 	try {
+
+		// Got RTDL... :-D
 		if (pulse->m_rtdl) {
 			/* Don't notify clients; we want to keep the banked
 			 * event packet with the RTDL packet.
@@ -2543,18 +2547,36 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						pulse->m_rtdl->packet_length(),
 						false);
-		} else if ( !m_noRTDLPulses ) {
-			/* Rate-limited logging of no RTDL for pulse */
-			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_NO_RTDL_FOR_PULSE, "none",
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
-					<< ( m_recording ? "[RECORDING] " : "" )
-					<< "recordPulse: NO RTDL for Pulse"
-					<< " id=0x" << std::hex << pulse->m_id.first
-					<< " dup=0x" << pulse->m_id.second << std::dec);
+		}
+
+		// NO RTDL for Pulse!
+		else {
+
+			// Only Check Live Control PV _Very Infrequently_...
+			//    - This Option is Not Likely to Ever Change... ;-D
+			//    - On HFIR, Where this is Needed, We Run at "1 HZ"...
+			//       -> so this should only check the PV once per hour...
+			//    - Otherwise, on SNS, this is like "once per minute"...
+			if ( !(++cnt % 3600) ) {
+				m_noRTDLPulses = m_pvNoRTDLPulses->value();
 			}
+
+			// Skip Error Logging if We Don't Expect Any RTDLs Anyway...
+			if ( !m_noRTDLPulses ) {
+				/* Rate-limited logging of no RTDL for pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_NO_RTDL_FOR_PULSE, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info
+						<< ( m_recording ? "[RECORDING] " : "" )
+						<< "recordPulse: NO RTDL for Pulse"
+						<< " id=0x" << std::hex << pulse->m_id.first
+						<< " dup=0x" << pulse->m_id.second << std::dec);
+				}
+			}
+
+			// Always Mark Pulse as Missing RTDL if it Doesn't Have One!
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 		}
 
