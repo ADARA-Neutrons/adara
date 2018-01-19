@@ -112,6 +112,8 @@ ADARA SMS Install Checklist
 
 5. User Local Bin Soft Link Setup:
 
+	ls -l /usr/local/bin/
+
 	sudo ln -s /home/controls/config-daq1/deploy/adaracat \
 		/usr/local/bin/adaracat
 
@@ -138,20 +140,32 @@ ADARA SMS Install Checklist
 
 6. ADARA Production EPICS Soft Links Setup:
 
-	(rm EpicsBaseLink)
+	ls -l /home/controls/prod/ADARA
+
+	mkdir /home/controls/prod/ADARA
+
+	ls -l /home/controls/prod/ADARA
+
+	(rm /home/controls/prod/ADARA/EpicsBaseLink)
 
 	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
-		EpicsBaseLink
+		/home/controls/prod/ADARA/EpicsBaseLink
 
-	(rm EpicsBaseV4Link)
+	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
 
 	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
-		EpicsBaseV4Link
+		/home/controls/prod/ADARA/EpicsBaseV4Link
 
-	(rm EpicsExtensionsLink)
+	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
 
 	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
-		EpicsExtensionsLink
+		/home/controls/prod/ADARA/EpicsExtensionsLink
+
+	ls -l /home/controls/prod/ADARA
+
+	source $HOME/.bashrc
+
+	printenv | grep EPICS
 
 7. Deploy SMS Daemon:
 
