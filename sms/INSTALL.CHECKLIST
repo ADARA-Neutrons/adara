@@ -106,7 +106,7 @@ ADARA SMS Install Checklist
 		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
 		0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon
 		0 8,17 * * * /home/controls/config-daq1/confck --quiet
-		0 8,17 * * * /usr/local/bin/liveconf-1.6.20-devel --terse --quiet confck
+		0 8,17 * * * /usr/local/bin/liveconf --terse --quiet confck
 
 	crontab -l
 
