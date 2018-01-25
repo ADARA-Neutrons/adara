@@ -18,8 +18,10 @@ namespace STS {
 RateLimitedLogging::History RLLHistory_StreamParserH;
 
 // Rate-Limited Logging IDs...
-#define RLL_PV_VALUE_UPDATE_WEIRD     0
-#define RLL_PV_VALUE_UPDATE_SAWTOOTH  1
+#define RLL_PV_VALUE_UPDATE_WEIRD            0
+#define RLL_PV_VALUE_UPDATE_SAWTOOTH         1
+#define RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP   2
+#define RLL_PV_VALUE_UPDATE_PURGE_EARLY      3
 
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x1000000
@@ -3363,11 +3365,13 @@ StreamParser::pvValueUpdate
 
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
-    // Only process this update if the timestamp is newer than the
+    // Check this update to see if the timestamp is newer than the
     // last time. (m_last_time is initialized to 0, so first real update
-    // will succeed.) This will reject PV updates that are at negative time
+    // will be Ok.) This will *Log* PV updates that are at negative time
     // displacements and filter-out duplicate updates caused by
     // SMS file boundary crossings.
+
+    // *** Otherwise, Pass the Data Thru! *** [Change in Behavior! 1/2018.]
 
     // 1/2018 Note: Because the SMS _Repeats_ the Last Value for
     // Each PV in the Prologue of Each New Local ADARA Stream File,
@@ -3376,73 +3380,38 @@ StreamParser::pvValueUpdate
     // we _Still_ Need to Include a given PV Value Update
     // IFF the PV Value has *Changed* since the Last Update...! ;-D
 
-    if ( ts_nano > pvinfo->m_last_time
-            || ( ts_nano == pvinfo->m_last_time
-                && pvinfo->m_last_value_set
-                && !(pvinfo->valuesEqual(
-                    pvinfo->m_last_value, a_value )) ) )
+    // Here, Both the PV Time and Value are the Same as the Last Update,
+    // So Assume SMS File Boundary Duplicate - Ignore PV Update...
+    // (*Don't* Log, Frequent Occurrence...)
+    if ( ts_nano == pvinfo->m_last_time
+            && pvinfo->m_last_value_set
+            && pvinfo->valuesEqual( pvinfo->m_last_value, a_value ) )
     {
-        // Relative time of update in seconds from first pulse of run
-        double t = 0;
-
-        // Note: if first pulse has not arrived, truncate all PV times to 0
-        if ( m_pulse_info.start_time )
-        {
-            // Truncate negative time offsets to 0
-            if ( ts_nano > m_pulse_info.start_time )
-            {
-                t = ( ts_nano - m_pulse_info.start_time )
-                    / NANO_PER_SECOND_D;
-            }
-            else if ( pvinfo->m_value_buffer.size() )
-            {
-                // Because the time value is 0, erase any values recvd
-                // before now to avoid duplicate time entries.
-                pvinfo->m_value_buffer.clear();
-                pvinfo->m_time_buffer.clear();
-                pvinfo->m_stats.reset();
-            }
-        }
-        else if ( pvinfo->m_value_buffer.size() )
-        {
-            // If we recv multiple value updates before first pulse,
-            // keep only latest
-            pvinfo->m_value_buffer.clear();
-            pvinfo->m_time_buffer.clear();
-            pvinfo->m_stats.reset();
-        }
-
-        pvinfo->m_last_time = ts_nano;
-        pvinfo->m_last_value = a_value;
-        pvinfo->m_last_value_set = true;
-
-        pvinfo->m_value_buffer.push_back(a_value);
-        pvinfo->m_time_buffer.push_back(t);
-
-        pvinfo->addToStats(a_value);
-
-        // Check for buffer write
-        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-            pvinfo->flushBuffers(0);
+        return;
     }
 
     // Log Weird Leftover Case, "Just in Case", Lol... ;-D
-    else if ( ts_nano == pvinfo->m_last_time
+    // (But Still Pass Thru Any PV Value Data...!)
+    if ( ts_nano == pvinfo->m_last_time
             && !(pvinfo->m_last_value_set) )
     {
-        /* Rate-limited logging of duplicate pulses */
+        /* Rate-limited logging of weird update case */
         std::stringstream ss;
         ss << a_device_id << "." << a_pv_id;
         std::string log_info;
         if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
                 RLL_PV_VALUE_UPDATE_WEIRD, ss.str(),
                 60, 10, 100, log_info ) ) {
-            syslog( LOG_ERR,
-                "[%i] %s %s%s %s devId=%u pvId=%u %lu.%09lu [%s] %s",
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu [%s] %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update WEIRD, Same Time But No Value Set!",
-                a_device_id, a_pv_id,
+                ssinfo.str().c_str(),
                 a_timestamp.tv_sec, a_timestamp.tv_nsec,
                 pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
                 "- Ignoring PV Value Update...!"
@@ -3453,23 +3422,26 @@ StreamParser::pvValueUpdate
     }
 
     // Log Value Update if Time Stamp Goes into the Past...! ;-D
-    // (Ignore the "Time Stamp Equals" case, as this happens All the Time
-    // on New SMS File boundaries...! ;-)
+    // (But Still Pass Thru Any PV Value Data...!)
     else if ( ts_nano < pvinfo->m_last_time )
     {
-        /* Rate-limited logging of duplicate pulses */
+        /* Rate-limited logging of tachyon PV update times */
         std::stringstream ss;
         ss << a_device_id << "." << a_pv_id;
         std::string log_info;
         if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
                 RLL_PV_VALUE_UPDATE_SAWTOOTH, ss.str(),
                 60, 10, 100, log_info ) ) {
-            syslog( LOG_ERR,
-              "[%i] %s %s%s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu %s",
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu < %lu.%09lu %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
-                a_device_id, a_pv_id,
+                ssinfo.str().c_str(),
                 a_timestamp.tv_sec, a_timestamp.tv_nsec,
                 (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
@@ -3479,6 +3451,124 @@ StreamParser::pvValueUpdate
             usleep(30000);
         }
     }
+
+    // Now Proceed to Process PV Value Update, Regardless of Errors! ;-D
+
+    // Relative time of update in seconds from first pulse of run.
+    // Note: if first pulse has not arrived, truncate all PV times to 0.
+    double t = 0;
+
+    // First Pulse Has Arrived...
+    if ( m_pulse_info.start_time )
+    {
+        // Positive Time Update, Normalize PV Time to 1st Pulse...
+        if ( ts_nano > m_pulse_info.start_time )
+        {
+            t = ( ts_nano - m_pulse_info.start_time )
+                / NANO_PER_SECOND_D;
+        }
+
+        // Truncate Any Negative Time Offsets to 0...
+        // (Don't Purge Previous PV Values, Could be transient error...!)
+        // - Only Log Negative Time Truncation as Error After 1st PV Value.
+        // (otherwise we get spammed for nearly every PV in the run! ;-D)
+        else
+        {
+            /* Rate-limited logging of truncated negative update times */
+            std::stringstream ss;
+            ss << a_device_id << "." << a_pv_id;
+            std::string log_info;
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
+                    60, 10, 100, log_info ) ) {
+                std::string log_hdr = "";
+                int log_type = LOG_INFO;
+                if ( pvinfo->m_last_value_set ) {
+                    log_type = LOG_ERR;
+                    log_hdr = "STS Error: ";
+                }
+                std::stringstream ssinfo;
+                ssinfo << "devId=" << a_device_id
+                    << " (" << pvinfo->m_device_name << ")";
+                ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                    << " [" << pvinfo->m_connection << "]" << ")";
+                syslog( log_type,
+                    "[%i] %s%s%s %s %s %lu.%09lu < %lu.%09lu",
+                    g_pid, log_hdr.c_str(), log_info.c_str(),
+                    "StreamParser::pvValueUpdate()",
+                    "Truncate Negative Variable Value Update Time to Zero",
+                    ssinfo.str().c_str(),
+                    a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                    (unsigned long)(m_pulse_info.start_time
+                        / NANO_PER_SECOND_LL),
+                    (unsigned long)(m_pulse_info.start_time
+                        % NANO_PER_SECOND_LL)
+                );
+                // give syslog a chance...
+                usleep(30000);
+            }
+        }
+    }
+
+    // No Pulse Has Arrived as Yet, Leave PV Time at 0...
+    // (And Only Save Last of Pre-Pulse PV Value Data...)
+    else if ( pvinfo->m_value_buffer.size() )
+    {
+        // If we recv multiple value updates before first pulse,
+        // keep only latest
+
+        /* Rate-limited logging of duplicate pulses */
+        std::stringstream ss;
+        ss << a_device_id << "." << a_pv_id;
+        std::string log_info;
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_PV_VALUE_UPDATE_PURGE_EARLY, ss.str(),
+                60, 10, 100, log_info ) ) {
+            // If Logging, Include Actual Purged PV Values...
+            // (the times have all been zeroed out... ;-)
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            std::stringstream pvs;
+            pvs << "Purging Previous Values [";
+            for ( uint32_t i=0 ; i < pvinfo->m_value_buffer.size() ; i++ )
+            {
+                if ( i ) pvs << ", ";
+                pvs << pvinfo->valueToString( pvinfo->m_value_buffer[i] );
+            }
+            pvs << "]";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu - %s",
+                g_pid, "STS Error:", log_info.c_str(),
+                "StreamParser::pvValueUpdate()",
+                "Got Pre-Pulse Variable Value Update",
+                ssinfo.str().c_str(),
+                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                pvs.str().c_str()
+            );
+            // give syslog a chance...
+            usleep(30000);
+        }
+
+        // Purge Existing Pre-Pulse PV Data...
+        pvinfo->m_value_buffer.clear();
+        pvinfo->m_time_buffer.clear();
+        pvinfo->m_stats.reset();
+    }
+
+    pvinfo->m_last_time = ts_nano;
+    pvinfo->m_last_value = a_value;
+    pvinfo->m_last_value_set = true;
+
+    pvinfo->m_value_buffer.push_back(a_value);
+    pvinfo->m_time_buffer.push_back(t);
+
+    pvinfo->addToStats(a_value);
+
+    // Check for buffer write
+    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+        pvinfo->flushBuffers(0);
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
