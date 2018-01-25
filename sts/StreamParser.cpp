@@ -18,7 +18,8 @@ namespace STS {
 RateLimitedLogging::History RLLHistory_StreamParserH;
 
 // Rate-Limited Logging IDs...
-#define RLL_PV_VALUE_UPDATE_SAWTOOTH  0
+#define RLL_PV_VALUE_UPDATE_WEIRD     0
+#define RLL_PV_VALUE_UPDATE_SAWTOOTH  1
 
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x1000000
@@ -3367,7 +3368,19 @@ StreamParser::pvValueUpdate
     // will succeed.) This will reject PV updates that are at negative time
     // displacements and filter-out duplicate updates caused by
     // SMS file boundary crossings.
-    if ( ts_nano > pvinfo->m_last_time )
+
+    // 1/2018 Note: Because the SMS _Repeats_ the Last Value for
+    // Each PV in the Prologue of Each New Local ADARA Stream File,
+    // we see Lots of "Duplicate" PV Value Updates for the "Same Time";
+    // However, if the PV Value Update Frequency is Sub-Pulse, then
+    // we _Still_ Need to Include a given PV Value Update
+    // IFF the PV Value has *Changed* since the Last Update...! ;-D
+
+    if ( ts_nano > pvinfo->m_last_time
+            || ( ts_nano == pvinfo->m_last_time
+                && pvinfo->m_last_value_set
+                && !(pvinfo->valuesEqual(
+                    pvinfo->m_last_value, a_value )) ) )
     {
         // Relative time of update in seconds from first pulse of run
         double t = 0;
@@ -3400,13 +3413,43 @@ StreamParser::pvValueUpdate
         }
 
         pvinfo->m_last_time = ts_nano;
+        pvinfo->m_last_value = a_value;
+        pvinfo->m_last_value_set = true;
+
         pvinfo->m_value_buffer.push_back(a_value);
         pvinfo->m_time_buffer.push_back(t);
+
         pvinfo->addToStats(a_value);
 
         // Check for buffer write
         if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
             pvinfo->flushBuffers(0);
+    }
+
+    // Log Weird Leftover Case, "Just in Case", Lol... ;-D
+    else if ( ts_nano == pvinfo->m_last_time
+            && !(pvinfo->m_last_value_set) )
+    {
+        /* Rate-limited logging of duplicate pulses */
+        std::stringstream ss;
+        ss << a_device_id << "." << a_pv_id;
+        std::string log_info;
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_PV_VALUE_UPDATE_WEIRD, ss.str(),
+                60, 10, 100, log_info ) ) {
+            syslog( LOG_ERR,
+                "[%i] %s %s%s %s devId=%u pvId=%u %lu.%09lu [%s] %s",
+                g_pid, "STS Error:", log_info.c_str(),
+                "StreamParser::pvValueUpdate()",
+                "Variable Value Update WEIRD, Same Time But No Value Set!",
+                a_device_id, a_pv_id,
+                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
+                "- Ignoring PV Value Update...!"
+            );
+            // give syslog a chance...
+            usleep(30000);
+        }
     }
 
     // Log Value Update if Time Stamp Goes into the Past...! ;-D
@@ -3422,14 +3465,15 @@ StreamParser::pvValueUpdate
                 RLL_PV_VALUE_UPDATE_SAWTOOTH, ss.str(),
                 60, 10, 100, log_info ) ) {
             syslog( LOG_ERR,
-                "[%i] %s %s%s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu",
+              "[%i] %s %s%s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 a_device_id, a_pv_id,
                 a_timestamp.tv_sec, a_timestamp.tv_nsec,
                 (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
-                (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL)
+                (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
+                "- Ignoring PV Value Update...!"
             );
             // give syslog a chance...
             usleep(30000);
@@ -3668,7 +3712,6 @@ StreamParser::processPulseID
  * (Note that we naturally get *Lots* of Duplicate RunInfoPkt Packets
  * anyway, due to the redundancy at the start of each new SMS Data File.)
  */
-#define EPSILON (0.00000000000001)
 void
 StreamParser::updateRunInfo( const RunInfo &a_run_info )
 {
@@ -3754,7 +3797,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_formula = a_run_info.sample_formula;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass,
-            m_run_info.sample_mass, EPSILON ) ) {
+            m_run_info.sample_mass, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Mass",
@@ -3772,7 +3815,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_mass_units = a_run_info.sample_mass_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass_density,
-            m_run_info.sample_mass_density, EPSILON ) ) {
+            m_run_info.sample_mass_density, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Density",
@@ -3868,7 +3911,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_comments = a_run_info.sample_comments;
     }
     if ( !approximatelyEqual( a_run_info.sample_height_in_container,
-            m_run_info.sample_height_in_container, EPSILON ) ) {
+            m_run_info.sample_height_in_container, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3891,7 +3934,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_height_in_container_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_diameter,
-            m_run_info.sample_interior_diameter, EPSILON ) ) {
+            m_run_info.sample_interior_diameter, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3914,7 +3957,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_height,
-            m_run_info.sample_interior_height, EPSILON ) ) {
+            m_run_info.sample_interior_height, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3937,7 +3980,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_width,
-            m_run_info.sample_interior_width, EPSILON ) ) {
+            m_run_info.sample_interior_width, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3960,7 +4003,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_depth,
-            m_run_info.sample_interior_depth, EPSILON ) ) {
+            m_run_info.sample_interior_depth, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3983,7 +4026,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_diameter,
-            m_run_info.sample_outer_diameter, EPSILON ) ) {
+            m_run_info.sample_outer_diameter, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -4006,7 +4049,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_height,
-            m_run_info.sample_outer_height, EPSILON ) ) {
+            m_run_info.sample_outer_height, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Height",
@@ -4027,7 +4070,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_width,
-            m_run_info.sample_outer_width, EPSILON ) ) {
+            m_run_info.sample_outer_width, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Width",
@@ -4048,7 +4091,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_depth,
-            m_run_info.sample_outer_depth, EPSILON ) ) {
+            m_run_info.sample_outer_depth, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Depth",
@@ -4069,7 +4112,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_volume_cubic,
-            m_run_info.sample_volume_cubic, EPSILON ) ) {
+            m_run_info.sample_volume_cubic, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Volume Cubic",
