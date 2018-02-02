@@ -25,7 +25,6 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
-#include "EventFd.h"
 #include "STSClientMgr.h"
 #include "Logging.h"
 #include "utils.h"
@@ -33,6 +32,8 @@
 namespace fs = boost::filesystem;
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
+
+#include "EventFd.h"
 
 class PoolsizePV : public smsStringPV {
 public:
@@ -669,10 +670,15 @@ void StorageManager::stop(void)
 	endCurrentContainer();
 	close(m_base_fd);
 
-	if (m_ioActive)
-		m_ioCompleteEvent->block();
+	uint64_t value;
 
-	m_ioStartEvent->signal(IOCMD_SHUTDOWN);
+	if (m_ioActive) {
+		m_ioCompleteEvent->block( &value, sizeof(value) );
+	}
+
+	value = IOCMD_SHUTDOWN;
+	m_ioStartEvent->signal( &value, sizeof(value) );
+
 	m_ioThread.join();
 	m_ioActive = true;
 }
@@ -1369,11 +1375,18 @@ void StorageManager::backgroundIo(void)
 	 * m_purgedBlocks	IO thread, indicate how many blocks were purged
 	 */
 	scanStorage();
-	m_ioCompleteEvent->signal(IOCMD_INITIAL);
+
+	uint64_t value = IOCMD_INITIAL;
+	DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = " << value
+		<< "/0x" << std::hex << value << std::dec);
+	m_ioCompleteEvent->signal( &value, sizeof(value) );
 
 	bool alive = true;
 	while (alive) {
-		uint64_t cmd = m_ioStartEvent->block();
+		uint64_t cmd;
+		m_ioStartEvent->block( &cmd, sizeof(cmd) );
+		DEBUG("backgroundIo(): Received cmd = " << cmd
+			<< "/0x" << std::hex << cmd << std::dec);
 
 		/* We only accept two commands -- shutdown, and the
 		 * minimum number of blocks to purge.
@@ -1382,7 +1395,11 @@ void StorageManager::backgroundIo(void)
 			alive = false;
 		else
 			m_purgedBlocks = purgeData(cmd);
-		m_ioCompleteEvent->signal(IOCMD_DONE);
+
+		value = IOCMD_DONE;
+		DEBUG("backgroundIo(): Sending Value IOCMD_DONE = " << value
+			<< "/0x" << std::hex << value << std::dec);
+		m_ioCompleteEvent->signal( &value, sizeof(value) );
 	}
 }
 
@@ -1390,7 +1407,10 @@ void StorageManager::ioCompleted(void)
 {
 	DEBUG("ioCompleted entry");
 
-	uint64_t val = m_ioCompleteEvent->read();
+	uint64_t val;
+	m_ioCompleteEvent->read( &val, sizeof(val) );
+	DEBUG("ioCompleted(): Received val = " << val
+		<< "/0x" << std::hex << val << std::dec);
 
 	if (val == IOCMD_INITIAL) {
 		/* Initial scan is complete, so update the size of the
@@ -1444,7 +1464,9 @@ void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 		<< logStr );
 
 	m_ioActive = true;
-	m_ioStartEvent->signal(goal);
+	DEBUG("requestPurge(): Sending goal = " << goal
+		<< "/0x" << std::hex << goal << std::dec);
+	m_ioStartEvent->signal( &goal, sizeof(goal) );
 }
 
 void StorageManager::populateDailyCache(void)
