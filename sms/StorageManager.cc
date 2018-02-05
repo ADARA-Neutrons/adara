@@ -33,7 +33,7 @@ namespace fs = boost::filesystem;
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
-#include "EventFd.h"
+#include "EventFd.h"   // (Uses logger... :-)
 
 class PoolsizePV : public smsStringPV {
 public:
@@ -546,8 +546,8 @@ void StorageManager::init(void)
 	 * their interest in descriptors.
 	 */
 	m_ioStartEvent = new EventFd();
-	m_ioCompleteEvent = new EventFd(boost::bind(
-					&StorageManager::ioCompleted));
+	m_ioCompleteEvent = new EventFd(
+		boost::bind( &StorageManager::ioCompleted ) );
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
@@ -670,14 +670,21 @@ void StorageManager::stop(void)
 	endCurrentContainer();
 	close(m_base_fd);
 
-	uint64_t value;
+	uint64_t value = 0;
 
-	if (m_ioActive) {
-		m_ioCompleteEvent->block( &value, sizeof(value) );
+	if ( m_ioActive ) {
+		if ( !m_ioCompleteEvent->block( value ) ) {
+			ERROR("stop(): Error Blocking on I/O Complete Event!"
+				<< " value=" << value << "/0x"
+					<< std::hex << value << std::dec);
+		}
 	}
 
-	value = IOCMD_SHUTDOWN;
-	m_ioStartEvent->signal( &value, sizeof(value) );
+	if ( !m_ioStartEvent->signal( IOCMD_SHUTDOWN ) ) {
+		ERROR("stop(): Error Signaling I/O Start Event Shutdown"
+			<< " with IOCMD_SHUTDOWN Notification = " << IOCMD_SHUTDOWN
+				<< "/0x" << std::hex << IOCMD_SHUTDOWN << std::dec);
+	}
 
 	m_ioThread.join();
 	m_ioActive = true;
@@ -1376,43 +1383,66 @@ void StorageManager::backgroundIo(void)
 	 */
 	scanStorage();
 
-	uint64_t value = IOCMD_INITIAL;
-	DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = " << value
-		<< "/0x" << std::hex << value << std::dec);
-	m_ioCompleteEvent->signal( &value, sizeof(value) );
+	DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = " << IOCMD_INITIAL
+		<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	if ( !m_ioCompleteEvent->signal( IOCMD_INITIAL ) ) {
+		ERROR("backgroundIo(): Error Signaling I/O Complete Event"
+			<< " with IOCMD_INITIAL Completion = " << IOCMD_INITIAL
+				<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	}
 
 	bool alive = true;
-	while (alive) {
-		uint64_t cmd;
-		m_ioStartEvent->block( &cmd, sizeof(cmd) );
+	uint64_t cmd;
+
+	while ( alive ) {
+
+		if ( !m_ioStartEvent->block( cmd ) ) {
+			ERROR("backgroundIo(): Error Blocking on I/O Start Event!"
+				<< " cmd=" << cmd << "/0x" << std::hex << cmd << std::dec
+				<< " - Continuing...");
+			continue;
+		}
 		DEBUG("backgroundIo(): Received cmd = " << cmd
 			<< "/0x" << std::hex << cmd << std::dec);
 
 		/* We only accept two commands -- shutdown, and the
 		 * minimum number of blocks to purge.
 		 */
-		if (cmd == IOCMD_SHUTDOWN)
+		if ( cmd == IOCMD_SHUTDOWN )
 			alive = false;
 		else
-			m_purgedBlocks = purgeData(cmd);
+			m_purgedBlocks += purgeData( cmd );
 
-		value = IOCMD_DONE;
-		DEBUG("backgroundIo(): Sending Value IOCMD_DONE = " << value
-			<< "/0x" << std::hex << value << std::dec);
-		m_ioCompleteEvent->signal( &value, sizeof(value) );
+		DEBUG("backgroundIo(): Sending Value IOCMD_DONE = " << IOCMD_DONE
+			<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		if ( !m_ioCompleteEvent->signal( IOCMD_DONE ) ) {
+			ERROR("backgroundIo(): Error Signaling I/O Complete Event"
+				<< " with IOCMD_DONE Completion = " << IOCMD_DONE
+					<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		}
 	}
 }
 
 void StorageManager::ioCompleted(void)
 {
-	DEBUG("ioCompleted entry");
+	DEBUG("ioCompleted() entry");
 
-	uint64_t val;
-	m_ioCompleteEvent->read( &val, sizeof(val) );
+	uint64_t val = 0;
+
+	if ( !m_ioCompleteEvent->read( val ) ) {
+		ERROR("ioCompleted(): Error Reading I/O Complete Event!"
+			<< " val=" << val << "/0x" << std::hex << val << std::dec
+			<< " - Cancelling I/O Operation and Continuing...");
+		m_ioActive = false;
+		ERROR("ioCompleted() failure exit");
+		return;
+	}
 	DEBUG("ioCompleted(): Received val = " << val
 		<< "/0x" << std::hex << val << std::dec);
 
-	if (val == IOCMD_INITIAL) {
+	// Initial Data Directory Scan Results...
+	if ( val == IOCMD_INITIAL ) {
+
 		/* Initial scan is complete, so update the size of the
 		 * data store, and queue any runs needing translation.
 		 *
@@ -1421,6 +1451,7 @@ void StorageManager::ioCompleted(void)
 		 */
 		DEBUG("ioCompleted initially scanned " << m_scannedBlocks);
 		m_blocks_used += m_scannedBlocks;
+		m_scannedBlocks = 0;
 
 		STSClientMgr *sts = STSClientMgr::getInstance();
 		std::list<StorageContainer::SharedPtr>::iterator it;
@@ -1435,14 +1466,18 @@ void StorageManager::ioCompleted(void)
 		 */
 		if (!m_pendingRuns.empty())
 			sts->startConnect();
-	} else {
+	}
+	
+	// Data Directory Purge Request Completed...
+	else {
 		DEBUG("ioCompleted(): Purged " << m_purgedBlocks << " Blocks");
 		m_blocks_used -= m_purgedBlocks;
+		m_purgedBlocks = 0;
 	}
 
 	m_ioActive = false;
 
-	DEBUG("ioCompleted exit");
+	DEBUG("ioCompleted() exit");
 }
 
 void StorageManager::requestPurge( uint64_t goal, std::string logStr )
@@ -1466,7 +1501,11 @@ void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 	m_ioActive = true;
 	DEBUG("requestPurge(): Sending goal = " << goal
 		<< "/0x" << std::hex << goal << std::dec);
-	m_ioStartEvent->signal( &goal, sizeof(goal) );
+	if ( !m_ioStartEvent->signal( goal ) ) {
+		ERROR("requestPurge(): Error Signaling I/O Start Event"
+			<< " with Goal = " << goal
+				<< "/0x" << std::hex << goal << std::dec);
+	}
 }
 
 void StorageManager::populateDailyCache(void)
