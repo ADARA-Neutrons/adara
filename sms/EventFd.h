@@ -37,37 +37,29 @@ public:
 	 * without blocking; at that point we can revisit the guards we
 	 * have in place.
 	 */
-	void read( void *buffer, ssize_t buffer_length )
+	bool read( uint64_t & val )
 	{
-		if ( !m_ready.get() ) {
-			if ( !m_nonBlocking ) {
-				throw std::runtime_error("Calling EventFd::read on a "
-						 "blocking object");
-			}
+		if ( !m_nonBlocking ) {
+			throw std::runtime_error("Calling EventFd::read on a "
+					 "blocking object");
 		}
 
-		do_read( buffer, buffer_length );
+		return do_read( val );
 	}
 
-	void block( void *buffer, ssize_t buffer_length )
+	bool block( uint64_t & val )
 	{
-		if ( m_ready.get() ) {
-			if ( m_nonBlocking ) {
-				throw std::runtime_error("Calling EventFd::block on a "
-						 "non-blocking object");
-			}
+		if ( m_nonBlocking ) {
+			throw std::runtime_error("Calling EventFd::block on a "
+					 "non-blocking object");
 		}
 
-		do_read( buffer, buffer_length );
+		return do_read( val );
 	}
 
-	void signal( void *buffer, ssize_t buffer_length )
+	bool signal( uint64_t val = 1 )
 	{
-		DEBUG("EventFd signal():"
-			<< " buffer=0x" << std::hex << buffer << std::dec
-			<< " buffer_length=" << buffer_length);
-
-		do_write( buffer, buffer_length );
+		return do_write( val );
 	}
 
 	~EventFd() { close( m_fd ); }
@@ -88,17 +80,15 @@ private:
 		}
 	}
 
-	void do_read( void *buffer, ssize_t buffer_length )
+	bool do_read( uint64_t & val )
 	{
-		char *bufptr = (char *) buffer;
-		ssize_t len = buffer_length;
+		char *bufptr = (char *) &val;
+		ssize_t len = sizeof(val);
 		ssize_t rc;
 
-		DEBUG("EventFd do_read():"
-			<< " buffer=0x" << std::hex << buffer << std::dec
-			<< " buffer_length=" << buffer_length);
+		uint32_t cnt = 0;
 
-		while ( len > 0 )
+		while ( len > 0 && cnt++ < 3 )
 		{
 			DEBUG("EventFd do_read(): Reading Value from Fd"
 				<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
@@ -115,8 +105,8 @@ private:
 					msg += strerror(e);
 					throw std::runtime_error(msg);
 				} else {
-					DEBUG("EventFd do_read(): Continuing...");
-					//val = ~0;
+					DEBUG("EventFd do_read(): Continuing..."
+						<< " (cnt=" << cnt << ")");
 				}
 			}
 			else {
@@ -127,21 +117,33 @@ private:
 			}
 		}
 
-		DEBUG("EventFd do_read(): Done. "
-			<< "Read " << buffer_length << " Bytes.");
+		if ( len == 0 ) {
+			DEBUG("EventFd do_read(): Done. "
+				<< "Read " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+			return( true );
+		}
+		else {
+			ERROR("EventFd do_read(): Value Not Read! "
+				<< "Only Read " << ( sizeof(val) - len ) << " Bytes "
+				<< "out of " << sizeof(val) << " Requested. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+			// val = ~0;
+			return( false );
+		}
 	}
 
-	void do_write( void *buffer, ssize_t buffer_length ) {
+	bool do_write( uint64_t val ) {
 
-		char *bufptr = (char *) buffer;
-		ssize_t len = buffer_length;
+		char *bufptr = (char *) &val;
+		ssize_t len = sizeof(val);
 		ssize_t rc;
 
-		DEBUG("EventFd do_write():"
-			<< " buffer=0x" << std::hex << buffer << std::dec
-			<< " buffer_length=" << buffer_length);
+		uint32_t cnt = 0;
 
-		while ( len > 0 )
+		while ( len > 0 && cnt++ < 3 )
 		{
 			DEBUG("EventFd do_write(): Writing Value to Fd"
 				<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
@@ -157,7 +159,8 @@ private:
 					msg += strerror(e);
 					throw std::runtime_error(msg);
 				} else {
-					DEBUG("EventFd do_write(): Continuing...");
+					DEBUG("EventFd do_write(): Continuing..."
+						<< " (cnt=" << cnt << ")");
 				}
 			}
 			else {
@@ -168,9 +171,23 @@ private:
 			}
 		}
 
-		DEBUG("EventFd do_write(): Done. "
-			<< "Wrote " << buffer_length << " Bytes.");
+		if ( len == 0 ) {
+			DEBUG("EventFd do_write(): Done. "
+				<< "Wrote " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+			return( true );
+		}
+		else {
+			ERROR("EventFd do_write(): Value Not Written! "
+				<< "Only Wrote " << ( sizeof(val) - len ) << " Bytes "
+				<< "out of " << sizeof(val) << " Requested. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+			return( false );
+		}
 	}
+
 };
 
 #endif /* __EVENT_FD_H */
