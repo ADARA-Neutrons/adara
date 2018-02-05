@@ -40,9 +40,7 @@ public:
 	void read( void *buffer, ssize_t buffer_length )
 	{
 		if ( !m_ready.get() ) {
-			if ( m_nonBlocking )
-				return( 0 );
-			else {
+			if ( !m_nonBlocking ) {
 				throw std::runtime_error("Calling EventFd::read on a "
 						 "blocking object");
 			}
@@ -54,11 +52,7 @@ public:
 	void block( void *buffer, ssize_t buffer_length )
 	{
 		if ( m_ready.get() ) {
-			if ( !m_nonBlocking ) {
-				ERROR("EventFd block():"
-					<< " Hmmm... Blocking Object is Non-Blocking...?");
-			}
-			else {
+			if ( m_nonBlocking ) {
 				throw std::runtime_error("Calling EventFd::block on a "
 						 "non-blocking object");
 			}
