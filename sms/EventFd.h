@@ -17,9 +17,18 @@ class EventFd {
 public:
 	typedef boost::function<void (fdRegType)> callback;
 
-	EventFd() { init(0); }
+	EventFd( bool nonBlocking = false )
+		: m_nonBlocking(nonBlocking)
+	{
+		if ( nonBlocking )
+			init( EFD_NONBLOCK );
+		else
+			init(0);
+	}
 
-	EventFd( callback cb ) {
+	EventFd( callback cb )
+	{
+		m_nonBlocking = true;
 		init( EFD_NONBLOCK );
 		m_ready.reset(new ReadyAdapter( m_fd, fdrRead, cb ));
 	}
@@ -28,26 +37,38 @@ public:
 	 * without blocking; at that point we can revisit the guards we
 	 * have in place.
 	 */
-	void read( void *buffer, ssize_t buffer_length ) {
+	void read( void *buffer, ssize_t buffer_length )
+	{
 		if ( !m_ready.get() ) {
-			throw std::runtime_error("Calling EventFd::read on a "
+			if ( m_nonBlocking )
+				return( 0 );
+			else {
+				throw std::runtime_error("Calling EventFd::read on a "
 						 "blocking object");
+			}
 		}
 
 		do_read( buffer, buffer_length );
 	}
 
-	void block( void *buffer, ssize_t buffer_length ) {
+	void block( void *buffer, ssize_t buffer_length )
+	{
 		if ( m_ready.get() ) {
-			throw std::runtime_error("Calling EventFd::block on a "
+			if ( !m_nonBlocking ) {
+				ERROR("EventFd block():"
+					<< " Hmmm... Blocking Object is Non-Blocking...?");
+			}
+			else {
+				throw std::runtime_error("Calling EventFd::block on a "
 						 "non-blocking object");
+			}
 		}
 
 		do_read( buffer, buffer_length );
 	}
 
-	void signal( void *buffer, ssize_t buffer_length ) {
-
+	void signal( void *buffer, ssize_t buffer_length )
+	{
 		DEBUG("EventFd signal():"
 			<< " buffer=0x" << std::hex << buffer << std::dec
 			<< " buffer_length=" << buffer_length);
@@ -60,8 +81,10 @@ public:
 private:
 	std::auto_ptr<ReadyAdapter> m_ready;
 	int m_fd;
+	bool m_nonBlocking;
 
-	void init( int flags ) {
+	void init( int flags )
+	{
 		m_fd = eventfd( 0, flags );
 		if ( m_fd < 0 ) {
 			int e = errno;
@@ -71,8 +94,8 @@ private:
 		}
 	}
 
-	void do_read( void *buffer, ssize_t buffer_length ) {
-
+	void do_read( void *buffer, ssize_t buffer_length )
+	{
 		char *bufptr = (char *) buffer;
 		ssize_t len = buffer_length;
 		ssize_t rc;
