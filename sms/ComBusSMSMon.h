@@ -19,22 +19,6 @@ class RestartComBusPV;
 class smsBooleanPV;
 class smsStringPV;
 
-/*
- * Local version of SEVCHK from cadef.h, which "provides efficient test and 
- * display of channel access errors"
- */
-
-/*
-#define     SMSSEVCHK(CA_ERROR_CODE, MESSAGE_STRING) 	\
-{ 							\
-    int ca_unique_status_name  = (CA_ERROR_CODE); 	\
-    if(!(ca_unique_status_name & CA_M_SUCCESS)) 	\
-	ERROR("Channel Access Error: " << 		\
-	ca_message(ca_unique_status_name) << 		\
-	" - " << MESSAGE_STRING);				\
-}
-*/
-
 
 class SMSRunStatus
 {
@@ -106,8 +90,6 @@ private:
 		std::string a_broker_pass );
 
 	void checkRestart();
-
-//	static void restartCallback(struct event_handler_args);
 
 	std::map<uint32_t, SMSRunStatus *> m_run_dict;
 

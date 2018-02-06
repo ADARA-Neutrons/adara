@@ -4,8 +4,6 @@
 #include <string>
 #include <boost/bind.hpp>
 
-//#include <cadef.h>
-
 #include "ComBusSMSMon.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -430,31 +428,6 @@ void ComBusSMSMon::reOpenComm(
 	}
 }
 
-/*
-void ComBusSMSMon::restartCallback(struct event_handler_args args) {
-	if (args.status != ECA_NORMAL) {
-		WARN("Restart Callback status: " << ca_message(args.status));
-		return;
-	}
-	if (args.type == DBR_SHORT && *((uint16_t *)args.dbr)) {
-		*((uint16_t *)args.usr) = 1;
-	}
-}
-
-void ca_exception_handler( struct exception_handler_args args )
-{
-	const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
-
-	ERROR("ComBusSMSMon::ca_exception_handler(): Caught EPICS Exception!"
-		<< " Context=[" << args.ctx << "]"
-		<< " - with Request ChannelId=[" << pName << "]"
-		<< " Operation=" << args.op
-		<< " DataType=[" << dbr_type_to_text( args.type ) << "]"
-		<< " Count=" << args.count
-		<< " [Continuing...!]");
-}
-*/
-
 void ComBusSMSMon::checkRestart()
 {
 	uint64_t val;
@@ -483,59 +456,9 @@ void ComBusSMSMon::commThread()
 	unsigned long hb = 0;
 	SMSRunStatus *inpu = 0, *lookup = 0;
 	int bytesrec = 0;
-//	chid uri_chid, restart_chid, user_chid, domain_chid, pass_chid;
-//	char inbuf[smsStringPV::MAX_LENGTH];
 	unsigned long spam_count = 0;
 
 	INFO("SMS ComBus commThread() started");
-
-	// The CA_ADDR_LIST is set to the local host "broadcast address",
-	// although local host would work. The broadcast address can be more
-	// robust if there are multiple iocs on the same host. ALL the PVs I
-	// am looking at are there, always.  Never changes. (CA used as IPC.)
-	// The AUTO_ADDR_LIST one tells the client not to bother checking
-	// the real Ethernet ports.  It'll find what it wants without that.
-	// Its a minor optimization; I figured if I'm messing around with
-	// the environment variables anyway I might as well do it to some
-	// level of completeness. - Carl A. Lionberger, Tue, 9 Jun 2015
-	// (Note to Jeeem: *Don't Delete These!* Lol, Oops... ;-b)
-//	setenv("EPICS_CA_ADDR_LIST","127.255.255.255", 1);
-//	setenv("EPICS_CA_AUTO_ADDR_LIST","NO", 1);
-
-	// explicitly specify single threaded context. CA being used as ipc.
-//	SMSSEVCHK(ca_context_create(ca_disable_preemptive_callback),
-//		"create ca context");
-
-	// Install Non-Default (And Non-Terminating!) Channel Access
-	// Exception Handler for the SMS...! ;-D
-//	SMSSEVCHK(ca_add_exception_event(ca_exception_handler, 0),
-//		"add EPICS exception handler");
-
-//	SMSSEVCHK(ca_create_channel(m_pvDomain->getName(), 0, 0, 0,
-//			&domain_chid),
-//		"create domain channel");
-//	SMSSEVCHK(ca_create_channel(m_pvBrokerURI->getName(), 0, 0, 0,
-//			&uri_chid),
-//		"create broker uri channel");
-//	SMSSEVCHK(ca_create_channel(m_pvBrokerUser->getName(), 0, 0, 0,
-//			&user_chid),
-//		"create broker user channel");
-//	SMSSEVCHK(ca_create_channel(m_pvBrokerPass->getName(), 0, 0, 0,
-//			&pass_chid),
-//		"create broker passwd channel");
-//	SMSSEVCHK(ca_create_channel(m_pvRestartComBus->getName(), 0, 0, 0, 
-//			&restart_chid),
-//		"create combus restart channel");
-
-//	SMSSEVCHK(ca_create_subscription(DBR_SHORT, 1, restart_chid, DBE_VALUE,
-//			restartCallback, &m_restart_combus, 0), 
-//			"monitor combus restart");
-
-//	INFO("SMS ComBus commThread() Before ca_pend_io(1.0)...");
-
-//	SMSSEVCHK(ca_pend_io(1.0), "ComBus thread monitor");
-
-//	INFO("SMS ComBus commThread() After ca_pend_io(1.0).");
 
 	while ( !m_stop ) {
 
@@ -547,53 +470,11 @@ void ComBusSMSMon::commThread()
 			continue;
 		}
 
-//		ca_poll();	// Where restartCallback() gets called
-
 		checkRestart();
 
 		if ( m_restart_combus ) {
 
 			INFO("ComBus Restart True");
-
-			/*
-			 * These are pended separately so that the same input
-			 * buffer can be reused for each one.
-			 */
-//			SMSSEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
-//				domain_chid, inbuf),
-//				"get combus domain");
-//			SMSSEVCHK(ca_pend_io(1.0), "pend get combus domain");
-//			m_domain = inbuf;
-//			INFO("ComBus Domain = " << m_domain);
-
-//			// If base path is specified ensure it ends with a '.' character
-//			m_domain = ADARA::ComBus::Connection::checkDomain( m_domain );
-//			INFO("ComBus Domain (Checked) = " << m_domain);
-
-//			SMSSEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
-//				uri_chid, inbuf),
-//				"get combus broker uri");
-//			SMSSEVCHK(ca_pend_io(1.0), "pend get broker uri");
-//			m_broker_uri = inbuf;
-//			INFO("ComBus Broker URI = " << m_broker_uri);
-
-//			// Apply default protocol & port if not set
-//			m_broker_uri = ADARA::ComBus::Connection::checkBrokerURI(
-//				m_broker_uri );
-//			INFO("ComBus Broker URI (Checked) = " << m_broker_uri);
-
-//			SMSSEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
-//				user_chid, inbuf),
-//				"get combus broker user");
-//			SMSSEVCHK(ca_pend_io(1.0), "pend get broker user");
-//			m_broker_user = inbuf;
-//			INFO("ComBus Broker User = " << m_broker_user);
-
-//			SMSSEVCHK(ca_array_get(DBR_CHAR, smsStringPV::MAX_LENGTH,
-//				pass_chid, inbuf),
-//				"get combus broker passwd");
-//			SMSSEVCHK(ca_pend_io(1.0), "pend get broker password");
-//			m_broker_pass = inbuf;
 
 			reOpenComm( m_restartCommData.domain,
 				m_restartCommData.broker_uri,
@@ -601,10 +482,6 @@ void ComBusSMSMon::commThread()
 				m_restartCommData.broker_pass );
 
 			m_restart_combus = false;
-
-//			SMSSEVCHK(ca_put(DBR_SHORT, restart_chid,
-//				&m_restart_combus),
-//				"reset of combus restart PV");
 
 			continue;
 		}
