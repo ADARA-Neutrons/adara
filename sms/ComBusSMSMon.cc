@@ -462,8 +462,6 @@ void ComBusSMSMon::commThread()
 
 	while ( !m_stop ) {
 
-		INFO("SMS ComBus commThread() LOOP...");
-
 		if ( !m_combus ) {
 			// Only happens at beginning. Take values from config.
 			openComm();
