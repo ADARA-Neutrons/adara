@@ -321,34 +321,10 @@ void ComBusSMSMon::restartComBus()
 		INFO("ComBus Broker URI (Checked) = " << m_broker_uri);
 
 		// Now Package It All Up for the commThread() to do the Restart.
-		if ( m_domain.size() > MAX_DOMAIN_SIZE - 1 ) {
-			ERROR("restartComBus(): Domain"
-				<< " String Size Too Big for Comm Thread Restart Struct!"
-				<< " Bummer, Can't Restart ComBus...");
-			return;
-		}
-		strcpy( m_restartCommData.domain, m_domain.c_str() );
-		if ( m_broker_uri.size() > MAX_BROKER_URI_SIZE - 1 ) {
-			ERROR("restartComBus(): Broker URI"
-				<< " String Size Too Big for Comm Thread Restart Struct!"
-				<< " Bummer, Can't Restart ComBus...");
-			return;
-		}
-		strcpy( m_restartCommData.broker_uri, m_broker_uri.c_str() );
-		if ( m_broker_user.size() > MAX_BROKER_USER_SIZE - 1 ) {
-			ERROR("restartComBus(): Broker User"
-				<< " String Size Too Big for Comm Thread Restart Struct!"
-				<< " Bummer, Can't Restart ComBus...");
-			return;
-		}
-		strcpy( m_restartCommData.broker_user, m_broker_user.c_str() );
-		if ( m_broker_pass.size() > MAX_BROKER_PASS_SIZE - 1 ) {
-			ERROR("restartComBus(): Broker Pass"
-				<< " String Size Too Big for Comm Thread Restart Struct!"
-				<< " Bummer, Can't Restart ComBus...");
-			return;
-		}
-		strcpy( m_restartCommData.broker_pass, m_broker_pass.c_str() );
+		m_restartCommData.domain = m_domain;
+		m_restartCommData.broker_uri = m_broker_uri;
+		m_restartCommData.broker_user = m_broker_user;
+		m_restartCommData.broker_pass = m_broker_pass;
 
 		// Send the Restart Struct to commThread() to Trigger the Restart!
 		m_commRestart->signal( 1 );

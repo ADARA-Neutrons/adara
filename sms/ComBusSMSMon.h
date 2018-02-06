@@ -82,17 +82,12 @@ public:
 
 	static bool			m_restart_combus;
 
-	#define MAX_DOMAIN_SIZE (32)
-	#define MAX_BROKER_URI_SIZE (1024)
-	#define MAX_BROKER_USER_SIZE (255)
-	#define MAX_BROKER_PASS_SIZE (255)
-
 	struct restart_comm_struct
 	{
-		char domain[MAX_DOMAIN_SIZE];
-		char broker_uri[MAX_BROKER_URI_SIZE];
-		char broker_user[MAX_BROKER_USER_SIZE];
-		char broker_pass[MAX_BROKER_PASS_SIZE];
+		std::string domain;
+		std::string broker_uri;
+		std::string broker_user;
+		std::string broker_pass;
 	};
 
 	static struct restart_comm_struct m_restartCommData;
