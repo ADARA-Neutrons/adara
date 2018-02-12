@@ -749,9 +749,10 @@ Connection::reconnectThread()
         // can interrupt this thread
         sleep( retry_period );
 
-        ss << "reconnectThread(): After Retry Sleep..."
+        std::stringstream ss2;
+        ss2 << "reconnectThread(): After Retry Sleep..."
             << " (retry_period=" << retry_period << ")";
-        exceptionLog( ss.str(), ERR_LOG );
+        exceptionLog( ss2.str(), ERR_LOG );
     }
 
     exceptionLog( "reconnectThread(): After Reconnect Loop...", INFO_LOG);
