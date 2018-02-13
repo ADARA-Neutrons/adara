@@ -741,7 +741,7 @@ Connection::reconnectThread()
         }
 
         std::stringstream ss;
-        ss << "reconnectThread(): Sleeping for "
+        ss << "reconnectThread(): Sleeping for"
             << " retry_period=" << retry_period;
         exceptionLog( ss.str(), ERR_LOG );
 
