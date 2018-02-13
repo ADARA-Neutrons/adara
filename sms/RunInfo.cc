@@ -67,9 +67,16 @@ private:
 
 	void changed(void)
 	{
+		INFO("RunInfoPV::changed()");
+
 		m_runInfo->pvChanged(this);
 		m_lastValid = this->valid();
 		m_runInfo->checkPacket();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
 
 	friend class RunInfoFloat64PV;
@@ -113,6 +120,8 @@ private:
 
 	void changed(void)
 	{
+		INFO("RunInfoFloat64PV::changed()");
+
 		// Just Set the Associated String RunInfoPV to Latest Float Value...
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
@@ -120,6 +129,11 @@ private:
 		ss << std::setprecision(17) << value();
 		m_stringRunInfoPV->update( ss.str(), &now );
 		m_stringRunInfoPV->changed();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 	}
 };
 
@@ -219,8 +233,16 @@ private:
 	}
 
 	void changed(void) {
+
+		INFO("RunUserInfoPV::changed()");
+
 		m_runInfo->invalidateCache();
 		m_runInfo->checkPacket();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
 };
 

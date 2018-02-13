@@ -56,11 +56,18 @@ private:
 
 	void changed(void)
 	{
+		INFO("MarkerCommentPV::changed()");
+
 		// Only Call Callback if String PV Set to Non-Empty Value...
 		// (Otherwise, "unset()" triggers a callback... ;-b)
 		std::string comment = value();
 		if ( !comment.empty() && comment.compare( "(unset)" ) )
 			m_cb();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, comment, &ts );
 	}
 };
 
