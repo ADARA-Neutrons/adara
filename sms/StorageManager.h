@@ -123,6 +123,9 @@ public:
 		return m_scanStart;
 	}
 
+	static void autoSavePV(std::string name, std::string value,
+		struct timespec *ts);
+
 	static void config(const boost::property_tree::ptree &conf);
 
 	static bool set_max_blocks_allowed_value(
@@ -198,6 +201,9 @@ private:
 	static uint32_t m_nextIndexTime;
 	static uint32_t m_indexPeriod;
 
+	static const char *m_autosave_filename;
+	static int m_autoSaveFd;
+
 	static boost::thread m_ioThread;
 	static bool m_ioActive;
 	static EventFd *m_ioStartEvent;
@@ -223,6 +229,8 @@ private:
 	static void scanStorage(void);
 	static void scanDaily(const std::string &dir);
 	static bool isValidDaily(const std::string &dir);
+
+	static bool openAutoSaveFile(void);
 
 	static void backgroundIo(void);
 	static void ioCompleted(void);

@@ -10,6 +10,7 @@
 
 #include <string>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <stdexcept>
 
@@ -311,6 +312,9 @@ uint32_t StorageManager::m_nextIndexTime;
 uint32_t StorageManager::m_indexPeriod;
 std::list<StorageManager::IndexEntry> StorageManager::m_stateIndex;
 
+const char *StorageManager::m_autosave_filename = "SMS.autosav";
+int StorageManager::m_autoSaveFd;
+
 boost::thread StorageManager::m_ioThread;
 
 void StorageManager::config(const boost::property_tree::ptree &conf)
@@ -565,6 +569,9 @@ void StorageManager::init(void)
 			throw std::runtime_error("Unable to retire stale index");
 		}
 	}
+
+	/* Initialize Auto Save File Descriptor */
+	m_autoSaveFd = -1;
 }
 
 void StorageManager::lateInit(void)
@@ -1354,6 +1361,76 @@ void StorageManager::scanStorage(void)
 
 	DEBUG("Scanned " << m_scannedBlocks << " blocks, and had "
 		<< m_pendingRuns.size() << " runs pending translation.");
+}
+
+void StorageManager::autoSavePV( std::string name, std::string value,
+		struct timespec *ts )
+{
+	if ( m_autoSaveFd < 0 && !openAutoSaveFile() )
+	{
+		ERROR("autoSavePV(): No Valid Auto Save File Descriptor!"
+			<< " *** Ignoring PV Write-Thru Value Save for " << name
+			<< " = [" << value << "]"
+			<< " at " << ts->tv_sec << "."
+			<< std::setfill('0') << std::setw(9) << ts->tv_nsec);
+	}
+
+	// Assemble the PV AutoSave Entry...
+	std::stringstream ss;
+	ss << ts->tv_sec << "."
+		<< std::setfill('0') << std::setw(9) << ts->tv_nsec;
+	ss << " " << name << " " << value << std::endl;
+	INFO("autoSavePV(): AutoSaving PV Value - " << ss.str());
+
+	// Write PV AutoSave Entry to File...
+	int rc = write( m_autoSaveFd, ss.str().c_str(), ss.str().length() );
+	if ( rc < 0 ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error Writing PV AutoSave Entry to File - "
+			<< strerror(e));
+		return;
+	}
+
+	if ( rc != (int) ss.str().length() ) {
+		ERROR("autoSavePV(): Short Write for PV AutoSave Entry"
+			<< " - Wrote " << rc << " out of "
+			<< ss.str().length() << " Bytes Expected!");
+	}
+
+	if ( fsync( m_autoSaveFd ) ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error Syncing PV AutoSave File - "
+			<< strerror(e));
+	}
+
+	/* We aren't guaranteed the new file names are safe on disk until
+	 * we sync the directory that contains them.
+	 */
+	if ( fsync( m_base_fd ) ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error with Fsync on SMS Base Dir"
+			<< " for PV AutoSave File - " << strerror(e));
+	}
+}
+
+bool StorageManager::openAutoSaveFile(void)
+{
+	m_autoSaveFd = openat(m_base_fd, m_autosave_filename,
+			O_CREAT|O_APPEND|O_WRONLY, RUN_STORAGE_MODE);
+	if ( m_autoSaveFd < 0 ) {
+		int e = errno;
+		ERROR("openAutoSaveFile(): Unable to Open SMS Auto Save File"
+			<< " for Writing:"
+			<< " [" << m_autosave_filename << "] - "
+			<< strerror(e));
+		return false;
+	}
+	else {
+		ERROR("openAutoSaveFile(): Successfully Opened SMS Auto Save File"
+			<< " for Writing:"
+			<< " [" << m_autosave_filename << "]");
+		return true;
+	}
 }
 
 void StorageManager::backgroundIo(void)
