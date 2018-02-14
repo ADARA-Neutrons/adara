@@ -1,0 +1,298 @@
+#!/bin/bash
+#
+# ADARA Summary
+#
+# Process ADARA "Critical ADARA Syslog Error" Emails
+# to Collect Statistics on the Number and Type of Various Errors.
+# (and Save Jeeem some Time in scouring all these notification emails! ;-D)
+#
+
+S="[[:space:]]"
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] [-h|--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   FILE1, FILE2...   = list of captured email files to summarize"
+	echo "                       (else reads from stdin...)"
+	echo "   -h|--help         = display this usage information"
+	echo
+}
+
+FileList=""
+
+for arg in "$@" ; do
+	# echo "arg=$arg"
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key"
+	# echo "value=$value"
+	if [ "#$key#" == '#--help#' ]; then
+		USAGE
+		exit 0
+	else
+		if [[ -f $key ]]; then
+			echo -e "Adding to File List:\n   [${key}]"
+			FileList="${FileList} ${key}"
+		else
+			echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
+			USAGE
+			exit -1
+		fi
+	fi
+done
+
+#
+# Global Counters
+#
+
+HostList=""
+
+declare -A nHostlogs
+
+declare -A nHostSMSDPulseNoRegEvent
+declare -A nHostSMSDMissingRingPeriod
+declare -A nHostSMSDSystemNOTReady
+declare -A nHostSMSDSystemReady
+declare -A nHostSMSDCorrectPChargeVeto
+
+declare -A nHostPVSDAlive
+declare -A nHostPVSDPartial
+declare -A nHostPVSDHung
+
+nDASMOND=0
+nSMSD=0
+nPVSD=0
+nSTS=0
+
+nblank=0
+nhdr=0
+nlog=0
+
+#
+# Parse One Log Message
+#
+
+PARSE_LOG()
+{
+	log="$1"
+
+	echo "ParseLog=[$log]"
+
+	host=`echo "$log" | awk '{print $1}'`
+	echo "Host=[$host]"
+
+	ckhost=`echo "${HostList}" | grep -c "$host"`
+	if [[ $ckhost == 1 ]]; then
+		nHostlogs[$host]=$(( nHostlogs[$host] + 1 ))
+	else
+		HostList="${HostList} $host"
+		nHostlogs[$host]=1
+		nHostPVSDAlive[$host]=0
+		nHostPVSDPartial[$host]=0
+		nHostPVSDHung[$host]=0
+	fi
+	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
+
+	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
+	echo "App=[$app]"
+
+	if [[ "$app" == "sts" ]]; then
+
+		nSTS=$(( nSTS + 1 ))
+
+		# Strip Off STS PID and Error Prefix...
+		log=`echo "$log" \
+			| awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+
+	elif [[ "$app" == "smsd" ]]; then
+
+		nSMSD=$(( nSMSD + 1 ))
+
+		# Strip Off SMS Error Prefix...
+		log=`echo "$log" \
+			| awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+
+		# "Pulse with No Registered Event Sources" Log
+		if [[ "$log" =~ \
+				Pulse${S}with${S}No${S}Registered${S}Event${S}Sources ]]; \
+		then
+			echo "Pulse with No Registered Event Sources..."
+			nHostSMSDPulseNoRegEvent[$host]=$(( \
+				nHostSMSDPulseNoRegEvent[$host] + 1 ))
+
+		# "Missing ring period" Log
+		elif [[ "$log" =~ Missing${S}ring${S}period ]]; then
+			echo "Missing ring period..."
+			nHostSMSDMissingRingPeriod[$host]=$(( \
+				nHostSMSDMissingRingPeriod[$host] + 1 ))
+
+		# "System NOT Ready" Log
+		elif [[ "$log" =~ System${S}NOT${S}Ready ]]; then
+			echo "System NOT Ready..."
+			nHostSMSDSystemNOTReady[$host]=$(( \
+				nHostSMSDSystemNOTReady[$host] + 1 ))
+
+		# "System Ready" Log
+		elif [[ "$log" =~ System${S}Ready ]]; then
+			echo "System Ready..."
+			nHostSMSDSystemReady[$host]=$(( \
+				nHostSMSDSystemReady[$host] + 1 ))
+
+		# "correctPChargeVeto" Log
+		elif [[ "$log" =~ correctPChargeVeto ]]; then
+			echo "correctPChargeVeto..."
+			nHostSMSDCorrectPChargeVeto[$host]=$(( \
+				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
+
+		fi
+
+	elif [[ "$app" == "pvsd" ]]; then
+
+		nPVSD=$(( nPVSD + 1 ))
+
+		# Strip Off PVSD Error Prefix...
+		log=`echo "$log" \
+			| awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+
+		# "PVSD is Alive" (Partial/Hung Device Log)
+		if [[ "$log" =~ ^PVSD${S}is${S}Alive${S}at${S} ]]; then
+			echo "PVSD is Alive at..."
+			nHostPVSDAlive[$host]=$(( nHostPVSDAlive[$host] + 1 ))
+			np=`echo "$log" | awk -F "[ ()]" '{print $12}'`
+			echo "npartial=$np"
+			nHostPVSDPartial[$host]=$(( nHostPVSDPartial[$host] + np ))
+			nh=`echo "$log" | awk -F "[ ()]" '{print $14}'`
+			echo "nhung=$nh"
+			nHostPVSDHung[$host]=$(( nHostPVSDHung[$host] + nh ))
+		fi
+
+	elif [[ "$app" == "dasmon" ]]; then
+
+		nDASMOND=$(( nDASMOND + 1 ))
+
+		# Strip Off PVSD Error Prefix...
+		log=`echo "$log" \
+			| awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+
+	fi
+
+	echo "StripLog=[$log]"
+}
+
+#
+# Process Each File in Turn...
+#
+
+for f in ${FileList} ; do
+
+	echo "$f"
+
+	while read line ; do
+
+		# Only Process Actual Log Messages...
+
+		# New RHel7-Style Log Message Timestamps...
+		if [[ $line =~ ^20[0-9][0-9]- ]]; then
+
+			echo "Rhel7Log=[$line]"
+			nlog=$(( nlog + 1 ))
+
+			# Strip Off Log Timestamp (to align parsing...)
+			ts=`echo "$line" | awk '{print $1}'`
+			#echo "ts=[$ts]"
+			log=`echo "$line" | sed "s/$ts //"`
+
+			PARSE_LOG "$log"
+
+		elif [[ $line =~ ^Jan[[:space:]] || $line =~ ^Feb[[:space:]] \
+			|| $line =~ ^Mar[[:space:]] || $line =~ ^Apr[[:space:]] \
+			|| $line =~ ^May[[:space:]] || $line =~ ^Jun[[:space:]] \
+			|| $line =~ ^Jul[[:space:]] || $line =~ ^Aug[[:space:]] \
+			|| $line =~ ^Sep[[:space:]] || $line =~ ^Oct[[:space:]] \
+			|| $line =~ ^Nov[[:space:]] || $line =~ ^Dec[[:space:]] \
+		]]; then \
+
+			echo "Rhel6Log=[$line]"
+			nlog=$(( nlog + 1 ))
+
+			# Strip Off Log Timestamp (to align parsing...)
+			ts=`echo "$line" | awk '{printf "%s %2s %s", $1, $2, $3}'`
+			#echo "ts=[$ts]"
+			log=`echo "$line" | sed "s/$ts //"`
+
+			PARSE_LOG "$log"
+
+		elif [[ $line =~ ^$ ]]; then
+			#echo "BlankLine=[$line]"
+			nblank=$(( nblank + 1 ))
+		else
+			#echo "NonLog=[$line]"
+			nhdr=$(( nhdr + 1 ))
+		fi
+
+	done < "$f"
+
+done
+
+#
+# Done, Dump Statistics...
+#
+
+echo -e "\n--- Statistics Summary ---\n"
+
+echo "Per Host Statistics:"
+for h in ${HostList} ; do
+	echo "Host [$h]:"
+	echo "   ${nHostlogs[$h]} Log Messages Total"
+	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
+		echo "SMSD \"Missing ring period\" Log Messages"
+	fi
+	if [[ ${nHostSMSDSystemNOTReady[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDSystemNOTReady[$h]} "
+		echo "SMSD \"System NOT Ready\" Log Messages"
+	fi
+	if [[ ${nHostSMSDSystemReady[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDSystemReady[$h]} "
+		echo "SMSD \"System Ready\" Log Messages"
+	fi
+	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
+		echo "SMSD \"correctPChargeVeto\" Log Messages"
+	fi
+	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
+		echo "SMSD \"Pulse with No Registered Event Sources\" Log Messages"
+	fi
+	if [[ ${nHostPVSDAlive[$h]} -gt 0 ]]; then
+		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Log Messages"
+		avgp=$(( ${nHostPVSDPartial[$h]} / ${nHostPVSDAlive[$h]} ))
+		echo "   $avgp Avg Partial Devices (${nHostPVSDPartial[$h]} Total)"
+		avgh=$(( ${nHostPVSDHung[$h]} / ${nHostPVSDAlive[$h]} ))
+		echo "   $avgh Avg Hung Devices (${nHostPVSDHung[$h]} Total)"
+	fi
+done
+echo
+
+echo "Per App Statistics:"
+echo "$nSTS STS Log Messages"
+echo "$nSMSD SMSD Log Messages"
+echo "$nPVSD PVSD Log Messages"
+echo "$nDASMOND DASMOND Log Messages"
+echo
+
+echo "General Statistics:"
+echo "$nlog Lines of Log Input"
+echo "$nhdr Lines of Non-Log Header Input"
+echo "$nblank Blank Lines of Input"
+echo
+
