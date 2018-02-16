@@ -72,6 +72,7 @@ declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDCorrectPChargeVeto
+declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
@@ -152,6 +153,7 @@ PARSE_LOG()
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
+		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
 		nHostSMSDComBusConnTimeout[$host]=0
@@ -295,6 +297,12 @@ PARSE_LOG()
 			echo "correctPChargeVeto..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
+
+		# Conglomerated "LiveClient" Logs
+		elif [[ "$log" =~ SMS.LiveClient ]]; then
+			echo "LiveClient..."
+			nHostSMSDLiveClientLogs[$host]=$(( \
+				nHostSMSDLiveClientLogs[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -619,6 +627,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
 		echo "SMSD \"correctPChargeVeto\" Logs"
+	fi
+	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
+		echo "SMSD \"Live Client\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
