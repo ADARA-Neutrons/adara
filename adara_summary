@@ -67,11 +67,17 @@ declare -A nHostSTSComBusConnTimeout
 declare -A nHostSTSComBusDisconnectError
 declare -A nHostSTSUpdatingRunInfo
 
-declare -A nHostSMSDPulseNoRegEvent
+declare -A nHostSMSDRunAwayDataSource
 declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDCorrectPChargeVeto
+declare -A nHostSMSDLocalSAWTOOTHRTDL
+declare -A nHostSMSDLocalSAWTOOTHData
+declare -A nHostSMSDGlobalSAWTOOTH
+declare -A nHostSMSDPulseNoRegEvent
+declare -A nHostSMSDFirstNewEventSource
+declare -A nHostSMSDLastEventSource
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
@@ -80,6 +86,7 @@ declare -A nHostSMSDComBusDisconnectError
 
 declare -A nHostPVSDINITHUNG
 declare -A nHostPVSDDeviceRecoveredFromHung
+declare -A nHostPVSDEPICSCAException
 declare -A nHostPVSDActiveMQException
 declare -A nHostPVSDComBusBroadcastError
 declare -A nHostPVSDComBusConnTimeout
@@ -148,11 +155,17 @@ PARSE_LOG()
 		nHostSTSComBusDisconnectError[$host]=0
 		nHostSTSUpdatingRunInfo[$host]=0
 
-		nHostSMSDPulseNoRegEvent[$host]=0
+		nHostSMSDRunAwayDataSource[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
+		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
+		nHostSMSDLocalSAWTOOTHData[$host]=0
+		nHostSMSDGlobalSAWTOOTH[$host]=0
+		nHostSMSDPulseNoRegEvent[$host]=0
+		nHostSMSDFirstNewEventSource[$host]=0
+		nHostSMSDLastEventSource[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
@@ -161,6 +174,7 @@ PARSE_LOG()
 
 		nHostPVSDINITHUNG[$host]=0
 		nHostPVSDDeviceRecoveredFromHung[$host]=0
+		nHostPVSDEPICSCAException[$host]=0
 		nHostPVSDActiveMQException[$host]=0
 		nHostPVSDComBusBroadcastError[$host]=0
 		nHostPVSDComBusConnTimeout[$host]=0
@@ -266,13 +280,11 @@ PARSE_LOG()
 		log=`echo "$log" \
 			| awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 
-		# "Pulse with No Registered Event Sources" Log
-		if [[ "$log" =~ \
-				Pulse${S}with${S}No${S}Registered${S}Event${S}Sources ]]; \
-		then
-			echo "Pulse with No Registered Event Sources..."
-			nHostSMSDPulseNoRegEvent[$host]=$(( \
-				nHostSMSDPulseNoRegEvent[$host] + 1 ))
+		# "Run-Away Data Source" Log
+		if [[ "$log" =~ Run-Away${S}Data${S}Source ]]; then
+			echo "Run-Away Data Source..."
+			nHostSMSDRunAwayDataSource[$host]=$(( \
+				nHostSMSDRunAwayDataSource[$host] + 1 ))
 
 		# "Missing ring period" Log
 		elif [[ "$log" =~ Missing${S}ring${S}period ]]; then
@@ -297,6 +309,48 @@ PARSE_LOG()
 			echo "correctPChargeVeto..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
+
+		# "Local SAWTOOTH RTDL" Log
+		elif [[ "$log" =~ Local${S}SAWTOOTH${S}RTDL ]]; then
+			echo "Local SAWTOOTH RTDL..."
+			nHostSMSDLocalSAWTOOTHRTDL[$host]=$(( \
+				nHostSMSDLocalSAWTOOTHRTDL[$host] + 1 ))
+
+		# "Local SAWTOOTH RawData" Log
+		elif [[ "$log" =~ Local${S}SAWTOOTH${S}RawData ]]; then
+			echo "Local SAWTOOTH RawData..."
+			nHostSMSDLocalSAWTOOTHData[$host]=$(( \
+				nHostSMSDLocalSAWTOOTHData[$host] + 1 ))
+
+		# "Global SAWTOOTH Pulse" Log
+		elif [[ "$log" =~ Global${S}SAWTOOTH${S}Pulse ]]; then
+			echo "Global SAWTOOTH Pulse..."
+			nHostSMSDGlobalSAWTOOTH[$host]=$(( \
+				nHostSMSDGlobalSAWTOOTH[$host] + 1 ))
+
+		# "Pulse with No Registered Event Sources" Log
+		elif [[ "$log" =~ \
+				Pulse${S}with${S}No${S}Registered${S}Event${S}Sources ]]; \
+		then
+			echo "Pulse with No Registered Event Sources..."
+			nHostSMSDPulseNoRegEvent[$host]=$(( \
+				nHostSMSDPulseNoRegEvent[$host] + 1 ))
+
+		# "First New Event Source Registered" Log
+		elif [[ "$log" =~ \
+		  registerEventSource\(\):${S}First${S}New${S}Event${S}Source ]]; \
+		then
+			echo "First New Event Source Registered..."
+			nHostSMSDFirstNewEventSource[$host]=$(( \
+				nHostSMSDFirstNewEventSource[$host] + 1 ))
+
+		# "Last Event Source Unregistered" Log
+		elif [[ "$log" =~ \
+				unregisterEventSource\(\):${S}Last${S}Event${S}Source ]]; \
+		then
+			echo "Last Event Source Unregistered..."
+			nHostSMSDLastEventSource[$host]=$(( \
+				nHostSMSDLastEventSource[$host] + 1 ))
 
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
@@ -368,6 +422,14 @@ PARSE_LOG()
 			echo "Device has recovered from hung state..."
 			nHostPVSDDeviceRecoveredFromHung[$host]=$(( \
 				nHostPVSDDeviceRecoveredFromHung[$host] + 1 ))
+
+		# "Caught EPICS Exception" Log
+		elif [[ "$log" =~ \
+			ca_exception_handler\(\):${S}Caught${S}EPICS${S}Exception ]]; \
+		then
+			echo "Caught EPICS Exception..."
+			nHostPVSDEPICSCAException[$host]=$(( \
+				nHostPVSDEPICSCAException[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -612,6 +674,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSUpdatingRunInfo[$h]} "
 		echo "STS \"Updating RunInfo\" Logs"
 	fi
+	if [[ ${nHostSMSDRunAwayDataSource[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDRunAwayDataSource[$h]} "
+		echo "SMSD \"Run-Away Data Source\" Logs"
+	fi
 	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
 		echo "SMSD \"Missing ring period\" Logs"
@@ -628,13 +694,33 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
 		echo "SMSD \"correctPChargeVeto\" Logs"
 	fi
-	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
-		echo "SMSD \"Live Client\" Logs"
+	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
+		echo "SMSD \"Local SAWTOOTH RTDL\" Logs"
+	fi
+	if [[ ${nHostSMSDLocalSAWTOOTHData[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLocalSAWTOOTHData[$h]} "
+		echo "SMSD \"Local SAWTOOTH RawData\" Logs"
+	fi
+	if [[ ${nHostSMSDGlobalSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDGlobalSAWTOOTH[$h]} "
+		echo "SMSD \"Global SAWTOOTH Pulse\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
 		echo "SMSD \"Pulse with No Registered Event Sources\" Logs"
+	fi
+	if [[ ${nHostSMSDFirstNewEventSource[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDFirstNewEventSource[$h]} "
+		echo "SMSD \"First New Event Source Registered\" Logs"
+	fi
+	if [[ ${nHostSMSDLastEventSource[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDLastEventSource[$h]} "
+		echo "SMSD \"Last Event Source Unregistered\" Logs"
+	fi
+	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
+		echo "SMSD \"Live Client\" Logs"
 	fi
 	if [[ ${nHostSMSDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDActiveMQException[$h]} "
@@ -659,6 +745,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDDeviceRecoveredFromHung[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDDeviceRecoveredFromHung[$h]} "
 		echo "PVSD \"Device has recovered from hung state\" Logs"
+	fi
+	if [[ ${nHostPVSDEPICSCAException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDEPICSCAException[$h]} "
+		echo "PVSD \"Caught EPICS CA Exception\" Logs"
 	fi
 	if [[ ${nHostPVSDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDActiveMQException[$h]} "
@@ -710,10 +800,16 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostPVSDAlive[$h]} -gt 0 ]]; then
 		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Logs"
-		avgp=$(( ${nHostPVSDPartial[$h]} / ${nHostPVSDAlive[$h]} ))
-		echo "   $avgp Avg Partial Devices (${nHostPVSDPartial[$h]} Total)"
-		avgh=$(( ${nHostPVSDHung[$h]} / ${nHostPVSDAlive[$h]} ))
-		echo "   $avgh Avg Hung Devices (${nHostPVSDHung[$h]} Total)"
+		if [[ ${nHostPVSDPartial[$h]} -gt 0 ]]; then
+			avgp=$(( ${nHostPVSDPartial[$h]} / ${nHostPVSDAlive[$h]} ))
+			echo -n "   *** $avgp Avg Partial Devices "
+			echo "(${nHostPVSDPartial[$h]} Total)"
+		fi
+		if [[ ${nHostPVSDHung[$h]} -gt 0 ]]; then
+			avgh=$(( ${nHostPVSDHung[$h]} / ${nHostPVSDAlive[$h]} ))
+			echo -n "   *** $avgh Avg Hung Devices "
+			echo "(${nHostPVSDHung[$h]} Total)"
+		fi
 	fi
 	if [[ ${nHostDASMONDFailedToConnSMS[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostDASMONDFailedToConnSMS[$h]} "
