@@ -132,10 +132,10 @@ PARSE_LOG()
 {
 	log="$1"
 
-	echo "ParseLog=[$log]"
+	#echo "ParseLog=[$log]"
 
 	host=`echo "$log" | awk '{print $1}'`
-	echo "Host=[$host]"
+	#echo "Host=[$host]"
 
 	ckhost=`echo "${HostList}" | grep -c "$host"`
 	if [[ $ckhost == 1 ]]; then
@@ -201,7 +201,7 @@ PARSE_LOG()
 	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
 
 	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
-	echo "App=[$app]"
+	#echo "App=[$app]"
 
 	known=1
 
@@ -215,40 +215,40 @@ PARSE_LOG()
 
 		# "stsLdapLookupUserName()" Log
 		if [[ "$log" =~ stsLdapLookupUserName ]]; then
-			echo "LDAP Lookup User Name..."
+			#echo "LDAP Lookup User Name..."
 			nHostSTSLdapLookupUserName[$host]=$(( \
 				nHostSTSLdapLookupUserName[$host] + 1 ))
 
 		# "More Than 1 PV Value for..." Log
 		elif [[ "$log" =~ More${S}Than${S}1${S}PV${S}Value${S}for ]]; then
-			echo "More Than 1 PV Value for..."
+			#echo "More Than 1 PV Value for..."
 			nHostSTSMoreThanOnePVValue[$host]=$(( \
 				nHostSTSMoreThanOnePVValue[$host] + 1 ))
 
 		# "StreamParser::pvValueUpdate() Variable Value Update SAWTOOTH" Log
 		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
-			echo "Variable Value Update SAWTOOTH..."
+			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueSawtooth[$host]=$(( \
 				nHostSTSVarValueSawtooth[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
 				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
-			echo "ActiveMQ Exception Listener Called..."
+			#echo "ActiveMQ Exception Listener Called..."
 			nHostSTSActiveMQException[$host]=$(( \
 				nHostSTSActiveMQException[$host] + 1 ))
 
 		# "(ComBus) Error Broadcasting Message" Log
 		elif [[ "$log" =~ \
 				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
-			echo "ComBus Error Broadcasting Message..."
+			#echo "ComBus Error Broadcasting Message..."
 			nHostSTSComBusBroadcastError[$host]=$(( \
 				nHostSTSComBusBroadcastError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
 				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
-			echo "ComBus Connection Timeout for Domain..."
+			#echo "ComBus Connection Timeout for Domain..."
 			nHostSTSComBusConnTimeout[$host]=$(( \
 				nHostSTSComBusConnTimeout[$host] + 1 ))
 
@@ -256,13 +256,13 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
 		then
-			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostSTSComBusDisconnectError[$host]=$(( \
 				nHostSTSComBusDisconnectError[$host] + 1 ))
 
 		# "Updating RunInfo" Log
 		elif [[ "$log" =~ Updating${S}RunInfo ]]; then
-			echo "Updating RunInfo..."
+			#echo "Updating RunInfo..."
 			nHostSTSUpdatingRunInfo[$host]=$(( \
 				nHostSTSUpdatingRunInfo[$host] + 1 ))
 
@@ -282,49 +282,49 @@ PARSE_LOG()
 
 		# "Run-Away Data Source" Log
 		if [[ "$log" =~ Run-Away${S}Data${S}Source ]]; then
-			echo "Run-Away Data Source..."
+			#echo "Run-Away Data Source..."
 			nHostSMSDRunAwayDataSource[$host]=$(( \
 				nHostSMSDRunAwayDataSource[$host] + 1 ))
 
 		# "Missing ring period" Log
 		elif [[ "$log" =~ Missing${S}ring${S}period ]]; then
-			echo "Missing ring period..."
+			#echo "Missing ring period..."
 			nHostSMSDMissingRingPeriod[$host]=$(( \
 				nHostSMSDMissingRingPeriod[$host] + 1 ))
 
 		# "System NOT Ready" Log
 		elif [[ "$log" =~ System${S}NOT${S}Ready ]]; then
-			echo "System NOT Ready..."
+			#echo "System NOT Ready..."
 			nHostSMSDSystemNOTReady[$host]=$(( \
 				nHostSMSDSystemNOTReady[$host] + 1 ))
 
 		# "System Ready" Log
 		elif [[ "$log" =~ System${S}Ready ]]; then
-			echo "System Ready..."
+			#echo "System Ready..."
 			nHostSMSDSystemReady[$host]=$(( \
 				nHostSMSDSystemReady[$host] + 1 ))
 
 		# "correctPChargeVeto" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
-			echo "correctPChargeVeto..."
+			#echo "correctPChargeVeto..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
 
 		# "Local SAWTOOTH RTDL" Log
 		elif [[ "$log" =~ Local${S}SAWTOOTH${S}RTDL ]]; then
-			echo "Local SAWTOOTH RTDL..."
+			#echo "Local SAWTOOTH RTDL..."
 			nHostSMSDLocalSAWTOOTHRTDL[$host]=$(( \
 				nHostSMSDLocalSAWTOOTHRTDL[$host] + 1 ))
 
 		# "Local SAWTOOTH RawData" Log
 		elif [[ "$log" =~ Local${S}SAWTOOTH${S}RawData ]]; then
-			echo "Local SAWTOOTH RawData..."
+			#echo "Local SAWTOOTH RawData..."
 			nHostSMSDLocalSAWTOOTHData[$host]=$(( \
 				nHostSMSDLocalSAWTOOTHData[$host] + 1 ))
 
 		# "Global SAWTOOTH Pulse" Log
 		elif [[ "$log" =~ Global${S}SAWTOOTH${S}Pulse ]]; then
-			echo "Global SAWTOOTH Pulse..."
+			#echo "Global SAWTOOTH Pulse..."
 			nHostSMSDGlobalSAWTOOTH[$host]=$(( \
 				nHostSMSDGlobalSAWTOOTH[$host] + 1 ))
 
@@ -332,7 +332,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 				Pulse${S}with${S}No${S}Registered${S}Event${S}Sources ]]; \
 		then
-			echo "Pulse with No Registered Event Sources..."
+			#echo "Pulse with No Registered Event Sources..."
 			nHostSMSDPulseNoRegEvent[$host]=$(( \
 				nHostSMSDPulseNoRegEvent[$host] + 1 ))
 
@@ -340,7 +340,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 		  registerEventSource\(\):${S}First${S}New${S}Event${S}Source ]]; \
 		then
-			echo "First New Event Source Registered..."
+			#echo "First New Event Source Registered..."
 			nHostSMSDFirstNewEventSource[$host]=$(( \
 				nHostSMSDFirstNewEventSource[$host] + 1 ))
 
@@ -348,34 +348,34 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 				unregisterEventSource\(\):${S}Last${S}Event${S}Source ]]; \
 		then
-			echo "Last Event Source Unregistered..."
+			#echo "Last Event Source Unregistered..."
 			nHostSMSDLastEventSource[$host]=$(( \
 				nHostSMSDLastEventSource[$host] + 1 ))
 
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
-			echo "LiveClient..."
+			#echo "LiveClient..."
 			nHostSMSDLiveClientLogs[$host]=$(( \
 				nHostSMSDLiveClientLogs[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
 				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
-			echo "ActiveMQ Exception Listener Called..."
+			#echo "ActiveMQ Exception Listener Called..."
 			nHostSMSDActiveMQException[$host]=$(( \
 				nHostSMSDActiveMQException[$host] + 1 ))
 
 		# "(ComBus) Error Broadcasting Message" Log
 		elif [[ "$log" =~ \
 				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
-			echo "ComBus Error Broadcasting Message..."
+			#echo "ComBus Error Broadcasting Message..."
 			nHostSMSDComBusBroadcastError[$host]=$(( \
 				nHostSMSDComBusBroadcastError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
 				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
-			echo "ComBus Connection Timeout for Domain..."
+			#echo "ComBus Connection Timeout for Domain..."
 			nHostSMSDComBusConnTimeout[$host]=$(( \
 				nHostSMSDComBusConnTimeout[$host] + 1 ))
 
@@ -383,7 +383,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
 		then
-			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostSMSDComBusDisconnectError[$host]=$(( \
 				nHostSMSDComBusDisconnectError[$host] + 1 ))
 
@@ -403,23 +403,23 @@ PARSE_LOG()
 
 		# "PVSD is Alive" (Partial/Hung Device Log)
 		if [[ "$log" =~ ^PVSD${S}is${S}Alive${S}at${S} ]]; then
-			echo "PVSD is Alive at..."
+			#echo "PVSD is Alive at..."
 			nHostPVSDAlive[$host]=$(( nHostPVSDAlive[$host] + 1 ))
 			np=`echo "$log" | awk -F "[ ()]" '{print $12}'`
-			echo "npartial=$np"
+			#echo "npartial=$np"
 			nHostPVSDPartial[$host]=$(( nHostPVSDPartial[$host] + np ))
 			nh=`echo "$log" | awk -F "[ ()]" '{print $14}'`
-			echo "nhung=$nh"
+			#echo "nhung=$nh"
 			nHostPVSDHung[$host]=$(( nHostPVSDHung[$host] + nh ))
 
 		# "INIT HUNG" Log
 		elif [[ "$log" =~ INIT${S}HUNG,${S}Check${S}beamline.xml ]]; then
-			echo "INIT HUNG..."
+			#echo "INIT HUNG..."
 			nHostPVSDINITHUNG[$host]=$(( nHostPVSDINITHUNG[$host] + 1 ))
 
 		# "Device has recovered from hung state" Log
 		elif [[ "$log" =~ has${S}recovered${S}from${S}hung${S}state ]]; then
-			echo "Device has recovered from hung state..."
+			#echo "Device has recovered from hung state..."
 			nHostPVSDDeviceRecoveredFromHung[$host]=$(( \
 				nHostPVSDDeviceRecoveredFromHung[$host] + 1 ))
 
@@ -427,28 +427,28 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			ca_exception_handler\(\):${S}Caught${S}EPICS${S}Exception ]]; \
 		then
-			echo "Caught EPICS Exception..."
+			#echo "Caught EPICS Exception..."
 			nHostPVSDEPICSCAException[$host]=$(( \
 				nHostPVSDEPICSCAException[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
 				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
-			echo "ActiveMQ Exception Listener Called..."
+			#echo "ActiveMQ Exception Listener Called..."
 			nHostPVSDActiveMQException[$host]=$(( \
 				nHostPVSDActiveMQException[$host] + 1 ))
 
 		# "(ComBus) Error Broadcasting Message" Log
 		elif [[ "$log" =~ \
 				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
-			echo "ComBus Error Broadcasting Message..."
+			#echo "ComBus Error Broadcasting Message..."
 			nHostPVSDComBusBroadcastError[$host]=$(( \
 				nHostPVSDComBusBroadcastError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
 				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
-			echo "ComBus Connection Timeout for Domain..."
+			#echo "ComBus Connection Timeout for Domain..."
 			nHostPVSDComBusConnTimeout[$host]=$(( \
 				nHostPVSDComBusConnTimeout[$host] + 1 ))
 
@@ -456,20 +456,20 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
 		then
-			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostPVSDComBusDisconnectError[$host]=$(( \
 				nHostPVSDComBusDisconnectError[$host] + 1 ))
 
 		# "Defining New Device" Log
 		elif [[ "$log" =~ \
 				defineDevice\(\):${S}Defining${S}New${S}Device ]]; then
-			echo "Defining New Device..."
+			#echo "Defining New Device..."
 			nHostPVSDDefiningNewDevice[$host]=$(( \
 				nHostPVSDDefiningNewDevice[$host] + 1 ))
 
 		# "Assign PV ID" Log
 		elif [[ "$log" =~ assign${S}PV${S}ID ]]; then
-			echo "Assign PV ID..."
+			#echo "Assign PV ID..."
 			nHostPVSDAssignPVID[$host]=$(( \
 				nHostPVSDAssignPVID[$host] + 1 ))
 
@@ -477,7 +477,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			configFileMonitorThread\(\):${S}Inactive${S}Device${S}ID ]]; \
 		then
-			echo "Inactive Device ID..."
+			#echo "Inactive Device ID..."
 			nHostPVSDInactiveDeviceID[$host]=$(( \
 				nHostPVSDInactiveDeviceID[$host] + 1 ))
 
@@ -485,34 +485,34 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			epicsEventHandler\(\):${S}Device${S}Not${S}Yet${S}Defined ]]; \
 		then
-			echo "Device Not Yet Defined..."
+			#echo "Device Not Yet Defined..."
 			nHostPVSDDeviceNotYetDefined[$host]=$(( \
 				nHostPVSDDeviceNotYetDefined[$host] + 1 ))
 
 		# "Subscription created" Log
 		elif [[ "$log" =~ \
 			epicsConnectionHandler\(\):${S}Subscription${S}created ]]; then
-			echo "Subscription Created..."
+			#echo "Subscription Created..."
 			nHostPVSDSubscriptionCreated[$host]=$(( \
 				nHostPVSDSubscriptionCreated[$host] + 1 ))
 
 		# "Clearing subscription" Log
 		elif [[ "$log" =~ \
 			epicsConnectionHandler\(\):${S}Clearing${S}subscription ]]; then
-			echo "Clearing Subscription..."
+			#echo "Clearing Subscription..."
 			nHostPVSDClearingSubscription[$host]=$(( \
 				nHostPVSDClearingSubscription[$host] + 1 ))
 
 		# "Connected to ADARA SMS Client" Log
 		elif [[ "$log" =~ Connected${S}to${S}ADARA${S}SMS${S}Client ]]; then
-			echo "Connected to ADARA SMS Client..."
+			#echo "Connected to ADARA SMS Client..."
 			nHostPVSDConnectedToSMSClient[$host]=$(( \
 				nHostPVSDConnectedToSMSClient[$host] + 1 ))
 
 		# "Initial Sends Complete to ADARA SMS Client" Log
 		elif [[ "$log" =~ \
 			Initial${S}Sends${S}Complete${S}to${S}ADARA${S}SMS ]]; then
-			echo "Initial Sends Complete to ADARA SMS..."
+			#echo "Initial Sends Complete to ADARA SMS..."
 			nHostPVSDInitialSendsComplete[$host]=$(( \
 				nHostPVSDInitialSendsComplete[$host] + 1 ))
 
@@ -532,28 +532,28 @@ PARSE_LOG()
 
 		# "Failed to Connect to SMS" Log
 		if [[ "$log" =~ Failed${S}to${S}Connect${S}to${S}SMS${S}at ]]; then
-			echo "Failed to Connect to SMS..."
+			#echo "Failed to Connect to SMS..."
 			nHostDASMONDFailedToConnSMS[$host]=$(( \
 				nHostDASMONDFailedToConnSMS[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
 				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
-			echo "ActiveMQ Exception Listener Called..."
+			#echo "ActiveMQ Exception Listener Called..."
 			nHostDASMONDActiveMQException[$host]=$(( \
 				nHostDASMONDActiveMQException[$host] + 1 ))
 
 		# "(ComBus) Error Broadcasting Message" Log
 		elif [[ "$log" =~ \
 				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
-			echo "ComBus Error Broadcasting Message..."
+			#echo "ComBus Error Broadcasting Message..."
 			nHostDASMONDComBusBroadcastError[$host]=$(( \
 				nHostDASMONDComBusBroadcastError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
 				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
-			echo "ComBus Connection Timeout for Domain..."
+			#echo "ComBus Connection Timeout for Domain..."
 			nHostDASMONDComBusConnTimeout[$host]=$(( \
 				nHostDASMONDComBusConnTimeout[$host] + 1 ))
 
@@ -561,7 +561,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
 		then
-			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostDASMONDComBusDisconnectError[$host]=$(( \
 				nHostDASMONDComBusDisconnectError[$host] + 1 ))
 
@@ -584,7 +584,7 @@ PARSE_LOG()
 
 for f in ${FileList} ; do
 
-	echo "$f"
+	#echo "$f"
 
 	while read line ; do
 
@@ -593,7 +593,7 @@ for f in ${FileList} ; do
 		# New RHel7-Style Log Message Timestamps...
 		if [[ $line =~ ^20[0-9][0-9]- ]]; then
 
-			echo "Rhel7Log=[$line]"
+			#echo "Rhel7Log=[$line]"
 			nlog=$(( nlog + 1 ))
 
 			# Strip Off Log Timestamp (to align parsing...)
@@ -611,7 +611,7 @@ for f in ${FileList} ; do
 			|| $line =~ ^Nov[[:space:]] || $line =~ ^Dec[[:space:]] \
 		]]; then \
 
-			echo "Rhel6Log=[$line]"
+			#echo "Rhel6Log=[$line]"
 			nlog=$(( nlog + 1 ))
 
 			# Strip Off Log Timestamp (to align parsing...)
