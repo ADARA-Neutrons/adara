@@ -58,15 +58,54 @@ HostList=""
 
 declare -A nHostlogs
 
+declare -A nHostSTSLdapLookupUserName
+declare -A nHostSTSMoreThanOnePVValue
+declare -A nHostSTSVarValueSawtooth
+declare -A nHostSTSActiveMQException
+declare -A nHostSTSComBusBroadcastError
+declare -A nHostSTSComBusConnTimeout
+declare -A nHostSTSComBusDisconnectError
+declare -A nHostSTSUpdatingRunInfo
+
 declare -A nHostSMSDPulseNoRegEvent
 declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDCorrectPChargeVeto
+declare -A nHostSMSDActiveMQException
+declare -A nHostSMSDComBusBroadcastError
+declare -A nHostSMSDComBusConnTimeout
+declare -A nHostSMSDComBusDisconnectError
 
+declare -A nHostPVSDINITHUNG
+declare -A nHostPVSDDeviceRecoveredFromHung
+declare -A nHostPVSDActiveMQException
+declare -A nHostPVSDComBusBroadcastError
+declare -A nHostPVSDComBusConnTimeout
+declare -A nHostPVSDComBusDisconnectError
+declare -A nHostPVSDDefiningNewDevice
+declare -A nHostPVSDAssignPVID
+declare -A nHostPVSDInactiveDeviceID
+declare -A nHostPVSDDeviceNotYetDefined
+declare -A nHostPVSDSubscriptionCreated
+declare -A nHostPVSDClearingSubscription
+declare -A nHostPVSDConnectedToSMSClient
+declare -A nHostPVSDInitialSendsComplete
 declare -A nHostPVSDAlive
 declare -A nHostPVSDPartial
 declare -A nHostPVSDHung
+
+declare -A nHostDASMONDFailedToConnSMS
+declare -A nHostDASMONDActiveMQException
+declare -A nHostDASMONDComBusBroadcastError
+declare -A nHostDASMONDComBusConnTimeout
+declare -A nHostDASMONDComBusDisconnectError
+
+nUnknownLogs=0
+nUnknownDASMOND=0
+nUnknownSMSD=0
+nUnknownPVSD=0
+nUnknownSTS=0
 
 nDASMOND=0
 nSMSD=0
@@ -94,16 +133,61 @@ PARSE_LOG()
 	if [[ $ckhost == 1 ]]; then
 		nHostlogs[$host]=$(( nHostlogs[$host] + 1 ))
 	else
+
 		HostList="${HostList} $host"
+
 		nHostlogs[$host]=1
+
+		nHostSTSLdapLookupUserName[$host]=0
+		nHostSTSMoreThanOnePVValue[$host]=0
+		nHostSTSVarValueSawtooth[$host]=0
+		nHostSTSActiveMQException[$host]=0
+		nHostSTSComBusBroadcastError[$host]=0
+		nHostSTSComBusConnTimeout[$host]=0
+		nHostSTSComBusDisconnectError[$host]=0
+		nHostSTSUpdatingRunInfo[$host]=0
+
+		nHostSMSDPulseNoRegEvent[$host]=0
+		nHostSMSDMissingRingPeriod[$host]=0
+		nHostSMSDSystemNOTReady[$host]=0
+		nHostSMSDSystemReady[$host]=0
+		nHostSMSDCorrectPChargeVeto[$host]=0
+		nHostSMSDActiveMQException[$host]=0
+		nHostSMSDComBusBroadcastError[$host]=0
+		nHostSMSDComBusConnTimeout[$host]=0
+		nHostSMSDComBusDisconnectError[$host]=0
+
+		nHostPVSDINITHUNG[$host]=0
+		nHostPVSDDeviceRecoveredFromHung[$host]=0
+		nHostPVSDActiveMQException[$host]=0
+		nHostPVSDComBusBroadcastError[$host]=0
+		nHostPVSDComBusConnTimeout[$host]=0
+		nHostPVSDComBusDisconnectError[$host]=0
+		nHostPVSDDefiningNewDevice[$host]=0
+		nHostPVSDAssignPVID[$host]=0
+		nHostPVSDInactiveDeviceID[$host]=0
+		nHostPVSDDeviceNotYetDefined[$host]=0
+		nHostPVSDSubscriptionCreated[$host]=0
+		nHostPVSDClearingSubscription[$host]=0
+		nHostPVSDConnectedToSMSClient[$host]=0
+		nHostPVSDInitialSendsComplete[$host]=0
 		nHostPVSDAlive[$host]=0
 		nHostPVSDPartial[$host]=0
 		nHostPVSDHung[$host]=0
+
+		nHostDASMONDFailedToConnSMS[$host]=0
+		nHostDASMONDActiveMQException[$host]=0
+		nHostDASMONDComBusBroadcastError[$host]=0
+		nHostDASMONDComBusConnTimeout[$host]=0
+		nHostDASMONDComBusDisconnectError[$host]=0
+
 	fi
 	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
 
 	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	echo "App=[$app]"
+
+	known=1
 
 	if [[ "$app" == "sts" ]]; then
 
@@ -112,6 +196,65 @@ PARSE_LOG()
 		# Strip Off STS PID and Error Prefix...
 		log=`echo "$log" \
 			| awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+
+		# "stsLdapLookupUserName()" Log
+		if [[ "$log" =~ stsLdapLookupUserName ]]; then
+			echo "LDAP Lookup User Name..."
+			nHostSTSLdapLookupUserName[$host]=$(( \
+				nHostSTSLdapLookupUserName[$host] + 1 ))
+
+		# "More Than 1 PV Value for..." Log
+		elif [[ "$log" =~ More${S}Than${S}1${S}PV${S}Value${S}for ]]; then
+			echo "More Than 1 PV Value for..."
+			nHostSTSMoreThanOnePVValue[$host]=$(( \
+				nHostSTSMoreThanOnePVValue[$host] + 1 ))
+
+		# "StreamParser::pvValueUpdate() Variable Value Update SAWTOOTH" Log
+		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
+			echo "Variable Value Update SAWTOOTH..."
+			nHostSTSVarValueSawtooth[$host]=$(( \
+				nHostSTSVarValueSawtooth[$host] + 1 ))
+
+		# "(ComBus) ActiveMQ Exception Listener Called" Log
+		elif [[ "$log" =~ \
+				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
+			echo "ActiveMQ Exception Listener Called..."
+			nHostSTSActiveMQException[$host]=$(( \
+				nHostSTSActiveMQException[$host] + 1 ))
+
+		# "(ComBus) Error Broadcasting Message" Log
+		elif [[ "$log" =~ \
+				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
+			echo "ComBus Error Broadcasting Message..."
+			nHostSTSComBusBroadcastError[$host]=$(( \
+				nHostSTSComBusBroadcastError[$host] + 1 ))
+
+		# "ComBus Connection Timeout for Domain" Log
+		elif [[ "$log" =~ \
+				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
+			echo "ComBus Connection Timeout for Domain..."
+			nHostSTSComBusConnTimeout[$host]=$(( \
+				nHostSTSComBusConnTimeout[$host] + 1 ))
+
+		# "(ComBus) Error Disconnecting Message Producers/Consumers" Log
+		elif [[ "$log" =~ \
+			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
+		then
+			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			nHostSTSComBusDisconnectError[$host]=$(( \
+				nHostSTSComBusDisconnectError[$host] + 1 ))
+
+		# "Updating RunInfo" Log
+		elif [[ "$log" =~ Updating${S}RunInfo ]]; then
+			echo "Updating RunInfo..."
+			nHostSTSUpdatingRunInfo[$host]=$(( \
+				nHostSTSUpdatingRunInfo[$host] + 1 ))
+
+		# Unknown Log Message
+		else
+			nUnknownSTS=$(( nUnknownSTS + 1 ))
+			known=0
+		fi
 
 	elif [[ "$app" == "smsd" ]]; then
 
@@ -153,6 +296,39 @@ PARSE_LOG()
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
 
+		# "(ComBus) ActiveMQ Exception Listener Called" Log
+		elif [[ "$log" =~ \
+				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
+			echo "ActiveMQ Exception Listener Called..."
+			nHostSMSDActiveMQException[$host]=$(( \
+				nHostSMSDActiveMQException[$host] + 1 ))
+
+		# "(ComBus) Error Broadcasting Message" Log
+		elif [[ "$log" =~ \
+				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
+			echo "ComBus Error Broadcasting Message..."
+			nHostSMSDComBusBroadcastError[$host]=$(( \
+				nHostSMSDComBusBroadcastError[$host] + 1 ))
+
+		# "ComBus Connection Timeout for Domain" Log
+		elif [[ "$log" =~ \
+				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
+			echo "ComBus Connection Timeout for Domain..."
+			nHostSMSDComBusConnTimeout[$host]=$(( \
+				nHostSMSDComBusConnTimeout[$host] + 1 ))
+
+		# "(ComBus) Error Disconnecting Message Producers/Consumers" Log
+		elif [[ "$log" =~ \
+			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
+		then
+			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			nHostSMSDComBusDisconnectError[$host]=$(( \
+				nHostSMSDComBusDisconnectError[$host] + 1 ))
+
+		# Unknown Log Message
+		else
+			nUnknownSMSD=$(( nUnknownSMSD + 1 ))
+			known=0
 		fi
 
 	elif [[ "$app" == "pvsd" ]]; then
@@ -173,19 +349,163 @@ PARSE_LOG()
 			nh=`echo "$log" | awk -F "[ ()]" '{print $14}'`
 			echo "nhung=$nh"
 			nHostPVSDHung[$host]=$(( nHostPVSDHung[$host] + nh ))
+
+		# "INIT HUNG" Log
+		elif [[ "$log" =~ INIT${S}HUNG,${S}Check${S}beamline.xml ]]; then
+			echo "INIT HUNG..."
+			nHostPVSDINITHUNG[$host]=$(( nHostPVSDINITHUNG[$host] + 1 ))
+
+		# "Device has recovered from hung state" Log
+		elif [[ "$log" =~ has${S}recovered${S}from${S}hung${S}state ]]; then
+			echo "Device has recovered from hung state..."
+			nHostPVSDDeviceRecoveredFromHung[$host]=$(( \
+				nHostPVSDDeviceRecoveredFromHung[$host] + 1 ))
+
+		# "(ComBus) ActiveMQ Exception Listener Called" Log
+		elif [[ "$log" =~ \
+				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
+			echo "ActiveMQ Exception Listener Called..."
+			nHostPVSDActiveMQException[$host]=$(( \
+				nHostPVSDActiveMQException[$host] + 1 ))
+
+		# "(ComBus) Error Broadcasting Message" Log
+		elif [[ "$log" =~ \
+				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
+			echo "ComBus Error Broadcasting Message..."
+			nHostPVSDComBusBroadcastError[$host]=$(( \
+				nHostPVSDComBusBroadcastError[$host] + 1 ))
+
+		# "ComBus Connection Timeout for Domain" Log
+		elif [[ "$log" =~ \
+				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
+			echo "ComBus Connection Timeout for Domain..."
+			nHostPVSDComBusConnTimeout[$host]=$(( \
+				nHostPVSDComBusConnTimeout[$host] + 1 ))
+
+		# "(ComBus) Error Disconnecting Message Producers/Consumers" Log
+		elif [[ "$log" =~ \
+			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
+		then
+			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			nHostPVSDComBusDisconnectError[$host]=$(( \
+				nHostPVSDComBusDisconnectError[$host] + 1 ))
+
+		# "Defining New Device" Log
+		elif [[ "$log" =~ \
+				defineDevice\(\):${S}Defining${S}New${S}Device ]]; then
+			echo "Defining New Device..."
+			nHostPVSDDefiningNewDevice[$host]=$(( \
+				nHostPVSDDefiningNewDevice[$host] + 1 ))
+
+		# "Assign PV ID" Log
+		elif [[ "$log" =~ assign${S}PV${S}ID ]]; then
+			echo "Assign PV ID..."
+			nHostPVSDAssignPVID[$host]=$(( \
+				nHostPVSDAssignPVID[$host] + 1 ))
+
+		# "Inactive Device ID" Log
+		elif [[ "$log" =~ \
+			configFileMonitorThread\(\):${S}Inactive${S}Device${S}ID ]]; \
+		then
+			echo "Inactive Device ID..."
+			nHostPVSDInactiveDeviceID[$host]=$(( \
+				nHostPVSDInactiveDeviceID[$host] + 1 ))
+
+		# "Device Not Yet Defined" Log
+		elif [[ "$log" =~ \
+			epicsEventHandler\(\):${S}Device${S}Not${S}Yet${S}Defined ]]; \
+		then
+			echo "Device Not Yet Defined..."
+			nHostPVSDDeviceNotYetDefined[$host]=$(( \
+				nHostPVSDDeviceNotYetDefined[$host] + 1 ))
+
+		# "Subscription created" Log
+		elif [[ "$log" =~ \
+			epicsConnectionHandler\(\):${S}Subscription${S}created ]]; then
+			echo "Subscription Created..."
+			nHostPVSDSubscriptionCreated[$host]=$(( \
+				nHostPVSDSubscriptionCreated[$host] + 1 ))
+
+		# "Clearing subscription" Log
+		elif [[ "$log" =~ \
+			epicsConnectionHandler\(\):${S}Clearing${S}subscription ]]; then
+			echo "Clearing Subscription..."
+			nHostPVSDClearingSubscription[$host]=$(( \
+				nHostPVSDClearingSubscription[$host] + 1 ))
+
+		# "Connected to ADARA SMS Client" Log
+		elif [[ "$log" =~ Connected${S}to${S}ADARA${S}SMS${S}Client ]]; then
+			echo "Connected to ADARA SMS Client..."
+			nHostPVSDConnectedToSMSClient[$host]=$(( \
+				nHostPVSDConnectedToSMSClient[$host] + 1 ))
+
+		# "Initial Sends Complete to ADARA SMS Client" Log
+		elif [[ "$log" =~ \
+			Initial${S}Sends${S}Complete${S}to${S}ADARA${S}SMS ]]; then
+			echo "Initial Sends Complete to ADARA SMS..."
+			nHostPVSDInitialSendsComplete[$host]=$(( \
+				nHostPVSDInitialSendsComplete[$host] + 1 ))
+
+		# Unknown Log Message
+		else
+			nUnknownPVSD=$(( nUnknownPVSD + 1 ))
+			known=0
 		fi
 
 	elif [[ "$app" == "dasmon" ]]; then
 
 		nDASMOND=$(( nDASMOND + 1 ))
 
-		# Strip Off PVSD Error Prefix...
+		# Strip Off DASMOND Error Prefix...
 		log=`echo "$log" \
 			| awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 
+		# "Failed to Connect to SMS" Log
+		if [[ "$log" =~ Failed${S}to${S}Connect${S}to${S}SMS${S}at ]]; then
+			echo "Failed to Connect to SMS..."
+			nHostDASMONDFailedToConnSMS[$host]=$(( \
+				nHostDASMONDFailedToConnSMS[$host] + 1 ))
+
+		# "(ComBus) ActiveMQ Exception Listener Called" Log
+		elif [[ "$log" =~ \
+				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
+			echo "ActiveMQ Exception Listener Called..."
+			nHostDASMONDActiveMQException[$host]=$(( \
+				nHostDASMONDActiveMQException[$host] + 1 ))
+
+		# "(ComBus) Error Broadcasting Message" Log
+		elif [[ "$log" =~ \
+				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
+			echo "ComBus Error Broadcasting Message..."
+			nHostDASMONDComBusBroadcastError[$host]=$(( \
+				nHostDASMONDComBusBroadcastError[$host] + 1 ))
+
+		# "ComBus Connection Timeout for Domain" Log
+		elif [[ "$log" =~ \
+				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
+			echo "ComBus Connection Timeout for Domain..."
+			nHostDASMONDComBusConnTimeout[$host]=$(( \
+				nHostDASMONDComBusConnTimeout[$host] + 1 ))
+
+		# "(ComBus) Error Disconnecting Message Producers/Consumers" Log
+		elif [[ "$log" =~ \
+			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
+		then
+			echo "ComBus Error Disconnecting Message Producers/Consumers..."
+			nHostDASMONDComBusDisconnectError[$host]=$(( \
+				nHostDASMONDComBusDisconnectError[$host] + 1 ))
+
+		# Unknown Log Message
+		else
+			nUnknownDASMOND=$(( nUnknownDASMOND + 1 ))
+			known=0
+		fi
 	fi
 
-	echo "StripLog=[$log]"
+	if [[ $known == 0 ]]; then
+		echo "UnknownLog=[$log]"
+		nUnknownLogs=$(( nUnknownLogs + 1 ))
+	fi
 }
 
 #
@@ -251,43 +571,190 @@ echo -e "\n--- Statistics Summary ---\n"
 
 echo "Per Host Statistics:"
 for h in ${HostList} ; do
-	echo "Host [$h]:"
-	echo "   ${nHostlogs[$h]} Log Messages Total"
+	echo -e "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
+	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
+		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
+		echo "STS \"More Than 1 PV Value for\" Logs"
+	fi
+	if [[ ${nHostSTSLdapLookupUserName[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSLdapLookupUserName[$h]} "
+		echo "STS \"LDAP Lookup User Name\" Logs"
+	fi
+	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
+		echo "STS \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostSTSComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSComBusBroadcastError[$h]} "
+		echo "STS \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostSTSComBusConnTimeout[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSComBusConnTimeout[$h]} "
+		echo "STS \"ComBus Connection Timeout for Domain\" Logs"
+	fi
+	if [[ ${nHostSTSComBusDisconnectError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSComBusDisconnectError[$h]} "
+		echo "STS \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostSTSUpdatingRunInfo[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSUpdatingRunInfo[$h]} "
+		echo "STS \"Updating RunInfo\" Logs"
+	fi
 	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
-		echo "SMSD \"Missing ring period\" Log Messages"
+		echo "SMSD \"Missing ring period\" Logs"
 	fi
 	if [[ ${nHostSMSDSystemNOTReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemNOTReady[$h]} "
-		echo "SMSD \"System NOT Ready\" Log Messages"
+		echo "SMSD \"System NOT Ready\" Logs"
 	fi
 	if [[ ${nHostSMSDSystemReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemReady[$h]} "
-		echo "SMSD \"System Ready\" Log Messages"
+		echo "SMSD \"System Ready\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
-		echo "SMSD \"correctPChargeVeto\" Log Messages"
+		echo "SMSD \"correctPChargeVeto\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
-		echo "SMSD \"Pulse with No Registered Event Sources\" Log Messages"
+		echo "SMSD \"Pulse with No Registered Event Sources\" Logs"
+	fi
+	if [[ ${nHostSMSDActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDActiveMQException[$h]} "
+		echo "SMSD \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostSMSDComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusBroadcastError[$h]} "
+		echo "SMSD \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostSMSDComBusConnTimeout[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusConnTimeout[$h]} "
+		echo "SMSD \"ComBus Connection Timeout for Domain\" Logs"
+	fi
+	if [[ ${nHostSMSDComBusDisconnectError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusDisconnectError[$h]} "
+		echo "SMSD \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostPVSDINITHUNG[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDINITHUNG[$h]} "
+		echo "PVSD \"INIT HUNG\" Logs"
+	fi
+	if [[ ${nHostPVSDDeviceRecoveredFromHung[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDDeviceRecoveredFromHung[$h]} "
+		echo "PVSD \"Device has recovered from hung state\" Logs"
+	fi
+	if [[ ${nHostPVSDActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDActiveMQException[$h]} "
+		echo "PVSD \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostPVSDComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDComBusBroadcastError[$h]} "
+		echo "PVSD \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostPVSDComBusConnTimeout[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDComBusConnTimeout[$h]} "
+		echo "PVSD \"ComBus Connection Timeout for Domain\" Logs"
+	fi
+	if [[ ${nHostPVSDComBusDisconnectError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDComBusDisconnectError[$h]} "
+		echo "PVSD \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
+		echo "PVSD \"Defining New Device\" Logs"
+	fi
+	if [[ ${nHostPVSDAssignPVID[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDAssignPVID[$h]} "
+		echo "PVSD \"Assign PV ID\" Logs"
+	fi
+	if [[ ${nHostPVSDInactiveDeviceID[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDInactiveDeviceID[$h]} "
+		echo "PVSD \"Inactive Device ID\" Logs"
+	fi
+	if [[ ${nHostPVSDDeviceNotYetDefined[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDDeviceNotYetDefined[$h]} "
+		echo "PVSD \"Device Not Yet Defined\" Logs"
+	fi
+	if [[ ${nHostPVSDSubscriptionCreated[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDSubscriptionCreated[$h]} "
+		echo "PVSD \"Subscription Created\" Logs"
+	fi
+	if [[ ${nHostPVSDClearingSubscription[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDClearingSubscription[$h]} "
+		echo "PVSD \"Clearing Subscription\" Logs"
+	fi
+	if [[ ${nHostPVSDConnectedToSMSClient[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDConnectedToSMSClient[$h]} "
+		echo "PVSD \"Connected to ADARA SMS Client\" Logs"
+	fi
+	if [[ ${nHostPVSDInitialSendsComplete[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDInitialSendsComplete[$h]} "
+		echo "PVSD \"Initial Sends Complete to ADARA SMS\" Logs"
 	fi
 	if [[ ${nHostPVSDAlive[$h]} -gt 0 ]]; then
-		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Log Messages"
+		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Logs"
 		avgp=$(( ${nHostPVSDPartial[$h]} / ${nHostPVSDAlive[$h]} ))
 		echo "   $avgp Avg Partial Devices (${nHostPVSDPartial[$h]} Total)"
 		avgh=$(( ${nHostPVSDHung[$h]} / ${nHostPVSDAlive[$h]} ))
 		echo "   $avgh Avg Hung Devices (${nHostPVSDHung[$h]} Total)"
 	fi
+	if [[ ${nHostDASMONDFailedToConnSMS[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostDASMONDFailedToConnSMS[$h]} "
+		echo "DASMOND \"Failed to Connect to SMS\" Logs"
+	fi
+	if [[ ${nHostDASMONDActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostDASMONDActiveMQException[$h]} "
+		echo "DASMOND \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostDASMONDComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostDASMONDComBusBroadcastError[$h]} "
+		echo "DASMOND \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostDASMONDComBusConnTimeout[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostDASMONDComBusConnTimeout[$h]} "
+		echo "DASMOND \"ComBus Connection Timeout for Domain\" Logs"
+	fi
+	if [[ ${nHostDASMONDComBusDisconnectError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostDASMONDComBusDisconnectError[$h]} "
+		echo \
+		  "DASMOND \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
 done
 echo
 
 echo "Per App Statistics:"
-echo "$nSTS STS Log Messages"
-echo "$nSMSD SMSD Log Messages"
-echo "$nPVSD PVSD Log Messages"
-echo "$nDASMOND DASMOND Log Messages"
+if [[ $nSTS -gt 0 ]]; then
+	echo "$nSTS STS Logs"
+fi
+if [[ $nSMSD -gt 0 ]]; then
+	echo "$nSMSD SMSD Logs"
+fi
+if [[ $nPVSD -gt 0 ]]; then
+	echo "$nPVSD PVSD Logs"
+fi
+if [[ $nDASMOND -gt 0 ]]; then
+	echo "$nDASMOND DASMOND Logs"
+fi
+echo
+
+echo "Unknown Log/Error Messages: $nUnknownLogs"
+if [[ $nUnknownSTS -gt 0 ]]; then
+	echo "$nUnknownSTS Unknown STS Logs"
+fi
+if [[ $nUnknownSMSD -gt 0 ]]; then
+	echo "$nUnknownSMSD Unknown SMSD Logs"
+fi
+if [[ $nUnknownPVSD -gt 0 ]]; then
+	echo "$nUnknownPVSD Unknown PVSD Logs"
+fi
+if [[ $nUnknownDASMOND -gt 0 ]]; then
+	echo "$nUnknownDASMOND Unknown DASMOND Logs"
+fi
 echo
 
 echo "General Statistics:"
