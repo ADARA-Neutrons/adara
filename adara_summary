@@ -573,14 +573,19 @@ PARSE_LOG()
 	fi
 
 	if [[ $known == 0 ]]; then
-		echo "UnknownLog=[$log]"
+		#echo "*** Unknown Log Message!"
 		nUnknownLogs=$(( nUnknownLogs + 1 ))
+		return 1
+	else
+		return 0
 	fi
 }
 
 #
 # Process Each File in Turn...
 #
+
+last_hdr_from=""
 
 for f in ${FileList} ; do
 
@@ -602,13 +607,22 @@ for f in ${FileList} ; do
 			log=`echo "$line" | sed "s/$ts //"`
 
 			PARSE_LOG "$log"
+			if [[ $? != 0 ]]; then
+				if [[ -n "$last_hdr_from" ]]; then
+					echo -e "\n$last_hdr_from"
+					# Only Dump From Header Once Per Email...
+					last_hdr_from=""
+				fi
+				echo "$line"
+			fi
 
-		elif [[ $line =~ ^Jan[[:space:]] || $line =~ ^Feb[[:space:]] \
-			|| $line =~ ^Mar[[:space:]] || $line =~ ^Apr[[:space:]] \
-			|| $line =~ ^May[[:space:]] || $line =~ ^Jun[[:space:]] \
-			|| $line =~ ^Jul[[:space:]] || $line =~ ^Aug[[:space:]] \
-			|| $line =~ ^Sep[[:space:]] || $line =~ ^Oct[[:space:]] \
-			|| $line =~ ^Nov[[:space:]] || $line =~ ^Dec[[:space:]] \
+		# Old RHel6-Style Log Message Timestamps...
+		elif [[ $line =~ ^Jan${S} || $line =~ ^Feb${S} \
+			|| $line =~ ^Mar${S} || $line =~ ^Apr${S} \
+			|| $line =~ ^May${S} || $line =~ ^Jun${S} \
+			|| $line =~ ^Jul${S} || $line =~ ^Aug${S} \
+			|| $line =~ ^Sep${S} || $line =~ ^Oct${S} \
+			|| $line =~ ^Nov${S} || $line =~ ^Dec${S} \
 		]]; then \
 
 			#echo "Rhel6Log=[$line]"
@@ -620,13 +634,31 @@ for f in ${FileList} ; do
 			log=`echo "$line" | sed "s/$ts //"`
 
 			PARSE_LOG "$log"
+			if [[ $? != 0 ]]; then
+				if [[ -n "$last_hdr_from" ]]; then
+					echo -e "\n$last_hdr_from"
+					# Only Dump From Header Once Per Email...
+					last_hdr_from=""
+				fi
+				echo "$line"
+			fi
 
+		# Blank Lines...
 		elif [[ $line =~ ^$ ]]; then
 			#echo "BlankLine=[$line]"
 			nblank=$(( nblank + 1 ))
+
+		# Other/Email Header Lines...
 		else
+
 			#echo "NonLog=[$line]"
 			nhdr=$(( nhdr + 1 ))
+
+			# Capture Each Email "From" Line as we go, for Errors...
+			if [[ $line =~ ^From${S} ]]; then
+				last_hdr_from="$line"
+			fi
+
 		fi
 
 	done < "$f"
