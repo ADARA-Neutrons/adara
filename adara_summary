@@ -609,7 +609,8 @@ for f in ${FileList} ; do
 			PARSE_LOG "$log"
 			if [[ $? != 0 ]]; then
 				if [[ -n "$last_hdr_from" ]]; then
-					echo -e "\n$last_hdr_from"
+					echo -e "\n[$f]"
+					echo "$last_hdr_from"
 					# Only Dump From Header Once Per Email...
 					last_hdr_from=""
 				fi
@@ -636,7 +637,8 @@ for f in ${FileList} ; do
 			PARSE_LOG "$log"
 			if [[ $? != 0 ]]; then
 				if [[ -n "$last_hdr_from" ]]; then
-					echo -e "\n$last_hdr_from"
+					echo -e "\n[$f]"
+					echo "$last_hdr_from"
 					# Only Dump From Header Once Per Email...
 					last_hdr_from=""
 				fi
