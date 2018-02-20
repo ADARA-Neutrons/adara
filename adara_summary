@@ -40,7 +40,7 @@ for arg in "$@" ; do
 		exit 0
 	else
 		if [[ -f $key ]]; then
-			echo -e "Adding to File List:\n   [${key}]"
+			#echo -e "Adding to File List:\n   [${key}]"
 			FileList="${FileList} ${key}"
 		else
 			echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
@@ -66,6 +66,8 @@ fi
 HostList=""
 
 declare -A nHostlogs
+
+declare -A lastFileFrom
 
 declare -A nHostSTSLdapLookupUserName
 declare -A nHostSTSMoreThanOnePVValue
@@ -140,6 +142,7 @@ nSMSD=0
 nPVSD=0
 nSTS=0
 
+nemail=0
 nblank=0
 nhdr=0
 nlog=0
@@ -709,11 +712,17 @@ PARSE_LOG()
 # Process Each File in Turn...
 #
 
+echo
+echo "Processing File List: ${FileList}"
+echo
+
 last_hdr_from=""
 
 for f in ${FileList} ; do
 
-	#echo "$f"
+	echo "[$f]"
+
+	lastFileFrom[${f}]=""
 
 	while read line ; do
 
@@ -782,7 +791,9 @@ for f in ${FileList} ; do
 
 			# Capture Each Email "From" Line as we go, for Errors...
 			if [[ $line =~ ^From${S} ]]; then
+				lastFileFrom[${f}]="$line"
 				last_hdr_from="$line"
+				nemail=$(( nemail + 1 ))
 			fi
 
 		fi
@@ -1068,8 +1079,17 @@ fi
 echo
 
 echo "General Statistics:"
+echo "$nemail Emails Found"
 echo "$nlog Lines of Log Input"
 echo "$nhdr Lines of Non-Log Header Input"
 echo "$nblank Blank Lines of Input"
+echo
+
+echo "Last Email Per File:"
+for f in ${FileList} ; do
+	if [[ -n "${lastFileFrom[$f]}" ]]; then
+		echo "[$f]: ${lastFileFrom[$f]}"
+	fi
+done
 echo
 
