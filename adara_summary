@@ -51,6 +51,15 @@ for arg in "$@" ; do
 done
 
 #
+# If No Input Files Specified, Read from Stdin...
+#
+
+if [[ -z "${FileList}" ]]; then
+	echo "No Input Files Specified: Reading from /dev/stdin..."
+	FileList="/dev/stdin"
+fi
+
+#
 # Global Counters
 #
 
