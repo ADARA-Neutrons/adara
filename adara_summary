@@ -1088,7 +1088,7 @@ echo
 echo "Last Email Per File:"
 for f in ${FileList} ; do
 	if [[ -n "${lastFileFrom[$f]}" ]]; then
-		echo "[$f]: ${lastFileFrom[$f]}"
+		echo -e "[$f]:\n   ${lastFileFrom[$f]}"
 	fi
 done
 echo
