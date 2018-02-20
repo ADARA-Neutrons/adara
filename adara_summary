@@ -60,17 +60,25 @@ declare -A nHostlogs
 
 declare -A nHostSTSLdapLookupUserName
 declare -A nHostSTSMoreThanOnePVValue
+declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
+declare -A nHostSTSVarValueTruncateNegTime
 declare -A nHostSTSActiveMQException
 declare -A nHostSTSComBusBroadcastError
 declare -A nHostSTSComBusConnTimeout
 declare -A nHostSTSComBusDisconnectError
 declare -A nHostSTSUpdatingRunInfo
+declare -A nHostSTSDetBankSetConfigErr
+declare -A nHostSTSDetBankSetRestrictEv
+declare -A nHostSTSDuplicatePulse
+declare -A nHostSTSOversizePkt
 
 declare -A nHostSMSDRunAwayDataSource
 declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
+declare -A nHostSMSDDataSourceTimedOut
+declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDCorrectPChargeVeto
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
@@ -83,6 +91,7 @@ declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
 declare -A nHostSMSDComBusDisconnectError
+declare -A nHostSMSDOversizePkt
 
 declare -A nHostPVSDINITHUNG
 declare -A nHostPVSDDeviceRecoveredFromHung
@@ -102,12 +111,14 @@ declare -A nHostPVSDInitialSendsComplete
 declare -A nHostPVSDAlive
 declare -A nHostPVSDPartial
 declare -A nHostPVSDHung
+declare -A nHostPVSDOversizePkt
 
 declare -A nHostDASMONDFailedToConnSMS
 declare -A nHostDASMONDActiveMQException
 declare -A nHostDASMONDComBusBroadcastError
 declare -A nHostDASMONDComBusConnTimeout
 declare -A nHostDASMONDComBusDisconnectError
+declare -A nHostDASMONDOversizePkt
 
 nUnknownLogs=0
 nUnknownDASMOND=0
@@ -148,17 +159,25 @@ PARSE_LOG()
 
 		nHostSTSLdapLookupUserName[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
+		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
+		nHostSTSVarValueTruncateNegTime[$host]=0
 		nHostSTSActiveMQException[$host]=0
 		nHostSTSComBusBroadcastError[$host]=0
 		nHostSTSComBusConnTimeout[$host]=0
 		nHostSTSComBusDisconnectError[$host]=0
 		nHostSTSUpdatingRunInfo[$host]=0
+		nHostSTSDetBankSetConfigErr[$host]=0
+		nHostSTSDetBankSetRestrictEv[$host]=0
+		nHostSTSDuplicatePulse[$host]=0
+		nHostSTSOversizePkt[$host]=0
 
 		nHostSMSDRunAwayDataSource[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
+		nHostSMSDDataSourceTimedOut[$host]=0
+		nHostSMSDDataSourceTimedOutRetry[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
@@ -171,6 +190,7 @@ PARSE_LOG()
 		nHostSMSDComBusBroadcastError[$host]=0
 		nHostSMSDComBusConnTimeout[$host]=0
 		nHostSMSDComBusDisconnectError[$host]=0
+		nHostSMSDOversizePkt[$host]=0
 
 		nHostPVSDINITHUNG[$host]=0
 		nHostPVSDDeviceRecoveredFromHung[$host]=0
@@ -190,12 +210,14 @@ PARSE_LOG()
 		nHostPVSDAlive[$host]=0
 		nHostPVSDPartial[$host]=0
 		nHostPVSDHung[$host]=0
+		nHostPVSDOversizePkt[$host]=0
 
 		nHostDASMONDFailedToConnSMS[$host]=0
 		nHostDASMONDActiveMQException[$host]=0
 		nHostDASMONDComBusBroadcastError[$host]=0
 		nHostDASMONDComBusConnTimeout[$host]=0
 		nHostDASMONDComBusDisconnectError[$host]=0
+		nHostDASMONDOversizePkt[$host]=0
 
 	fi
 	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
@@ -210,8 +232,13 @@ PARSE_LOG()
 		nSTS=$(( nSTS + 1 ))
 
 		# Strip Off STS PID and Error Prefix...
-		log=`echo "$log" \
-			| awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		if [[ "$log" =~ sts:${S}STS${S}Error: ]]; then
+			log=`echo "$log" | \
+			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		else
+			log=`echo "$log" | \
+			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		fi
 
 		# "stsLdapLookupUserName()" Log
 		if [[ "$log" =~ stsLdapLookupUserName ]]; then
@@ -225,11 +252,25 @@ PARSE_LOG()
 			nHostSTSMoreThanOnePVValue[$host]=$(( \
 				nHostSTSMoreThanOnePVValue[$host] + 1 ))
 
-		# "StreamParser::pvValueUpdate() Variable Value Update SAWTOOTH" Log
+		# "No Matching Units PV Found..." Log
+		elif [[ "$log" =~ No${S}Matching${S}Units${S}PV${S}Found ]]; then
+			#echo "No Matching Units PV Found..."
+			nHostSTSNoMatchingUnitsPV[$host]=$(( \
+				nHostSTSNoMatchingUnitsPV[$host] + 1 ))
+
+		# "Variable Value Update SAWTOOTH" Log
 		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
 			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueSawtooth[$host]=$(( \
 				nHostSTSVarValueSawtooth[$host] + 1 ))
+
+		# "Truncate Negative Variable Value Update Time" Log
+		elif [[ "$log" =~ \
+			Truncate${S}Negative${S}Variable${S}Value${S}Update${S}Time \
+		]]; then
+			#echo "Variable Value Update SAWTOOTH..."
+			nHostSTSVarValueTruncateNegTime[$host]=$(( \
+				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -266,6 +307,34 @@ PARSE_LOG()
 			nHostSTSUpdatingRunInfo[$host]=$(( \
 				nHostSTSUpdatingRunInfo[$host] + 1 ))
 
+		# "Detector Bank Set Config Error" Log
+		elif [[ "$log" =~ \
+			Detector${S}Bank${S}Set${S}[[:alnum:]]+${S}Config${S}Error \
+		]]; then
+			#echo "Detector Bank Set Config Error..."
+			nHostSTSDetBankSetConfigErr[$host]=$(( \
+				nHostSTSDetBankSetConfigErr[$host] + 1 ))
+
+		# "Restricting Detector Bank Set to Event Mode" Log
+		elif [[ "$log" =~ \
+			Restricting${S}Detector${S}Bank${S}Set${S}to${S}Event${S}Mode \
+		]]; then
+			#echo "Restricting Detector Bank Set to Event Mode..."
+			nHostSTSDetBankSetRestrictEv[$host]=$(( \
+				nHostSTSDetBankSetRestrictEv[$host] + 1 ))
+
+		# "Duplicate Pulse" Log
+		elif [[ "$log" =~ Duplicate${S}Pulse ]]; then
+			#echo "Duplicate Pulse..."
+			nHostSTSDuplicatePulse[$host]=$(( \
+				nHostSTSDuplicatePulse[$host] + 1 ))
+
+		# "OversizePkt" Log
+		elif [[ "$log" =~ OversizePkt ]]; then
+			#echo "OversizePkt..."
+			nHostSTSOversizePkt[$host]=$(( \
+				nHostSTSOversizePkt[$host] + 1 ))
+
 		# Unknown Log Message
 		else
 			nUnknownSTS=$(( nUnknownSTS + 1 ))
@@ -277,8 +346,13 @@ PARSE_LOG()
 		nSMSD=$(( nSMSD + 1 ))
 
 		# Strip Off SMS Error Prefix...
-		log=`echo "$log" \
-			| awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		if [[ "$log" =~ smsd:${S}ERROR ]]; then
+			log=`echo "$log" | \
+			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		else
+			log=`echo "$log" | \
+			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		fi
 
 		# "Run-Away Data Source" Log
 		if [[ "$log" =~ Run-Away${S}Data${S}Source ]]; then
@@ -303,6 +377,21 @@ PARSE_LOG()
 			#echo "System Ready..."
 			nHostSMSDSystemReady[$host]=$(( \
 				nHostSMSDSystemReady[$host] + 1 ))
+
+		# "DataSource - WARNING: Timed out waiting for data from..." Log
+		elif [[ "$log" =~ \
+			WARNING:${S}Timed${S}out${S}waiting${S}for${S}data${S}from \
+		]]; then
+			#echo "WARNING: Timed out waiting for data from... (Retry)"
+			nHostSMSDDataSourceTimedOutRetry[$host]=$(( \
+				nHostSMSDDataSourceTimedOutRetry[$host] + 1 ))
+
+		# "DataSource - Timed out waiting for data from..." Log
+		elif [[ "$log" =~ \
+				Timed${S}out${S}waiting${S}for${S}data${S}from ]]; then
+			#echo "Timed out waiting for data from... (Past Retry)"
+			nHostSMSDDataSourceTimedOut[$host]=$(( \
+				nHostSMSDDataSourceTimedOut[$host] + 1 ))
 
 		# "correctPChargeVeto" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
@@ -387,6 +476,12 @@ PARSE_LOG()
 			nHostSMSDComBusDisconnectError[$host]=$(( \
 				nHostSMSDComBusDisconnectError[$host] + 1 ))
 
+		# "OversizePkt" Log
+		elif [[ "$log" =~ OversizePkt ]]; then
+			#echo "OversizePkt..."
+			nHostSMSDOversizePkt[$host]=$(( \
+				nHostSMSDOversizePkt[$host] + 1 ))
+
 		# Unknown Log Message
 		else
 			nUnknownSMSD=$(( nUnknownSMSD + 1 ))
@@ -397,9 +492,14 @@ PARSE_LOG()
 
 		nPVSD=$(( nPVSD + 1 ))
 
-		# Strip Off PVSD Error Prefix...
-		log=`echo "$log" \
-			| awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		# Strip Off PVSD ERROR Prefix...
+		if [[ "$log" =~ pvsd:${S}PVSD${S}ERROR ]]; then
+			log=`echo "$log" | \
+			awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		else
+			log=`echo "$log" | \
+			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		fi
 
 		# "PVSD is Alive" (Partial/Hung Device Log)
 		if [[ "$log" =~ ^PVSD${S}is${S}Alive${S}at${S} ]]; then
@@ -418,7 +518,8 @@ PARSE_LOG()
 			nHostPVSDINITHUNG[$host]=$(( nHostPVSDINITHUNG[$host] + 1 ))
 
 		# "Device has recovered from hung state" Log
-		elif [[ "$log" =~ has${S}recovered${S}from${S}hung${S}state ]]; then
+		elif [[ "$log" =~ \
+				has${S}recovered${S}from${S}hung${S}state ]]; then
 			#echo "Device has recovered from hung state..."
 			nHostPVSDDeviceRecoveredFromHung[$host]=$(( \
 				nHostPVSDDeviceRecoveredFromHung[$host] + 1 ))
@@ -498,13 +599,15 @@ PARSE_LOG()
 
 		# "Clearing subscription" Log
 		elif [[ "$log" =~ \
-			epicsConnectionHandler\(\):${S}Clearing${S}subscription ]]; then
+			epicsConnectionHandler\(\):${S}Clearing${S}subscription ]]; \
+		then
 			#echo "Clearing Subscription..."
 			nHostPVSDClearingSubscription[$host]=$(( \
 				nHostPVSDClearingSubscription[$host] + 1 ))
 
 		# "Connected to ADARA SMS Client" Log
-		elif [[ "$log" =~ Connected${S}to${S}ADARA${S}SMS${S}Client ]]; then
+		elif [[ "$log" =~ Connected${S}to${S}ADARA${S}SMS${S}Client ]]; \
+		then
 			#echo "Connected to ADARA SMS Client..."
 			nHostPVSDConnectedToSMSClient[$host]=$(( \
 				nHostPVSDConnectedToSMSClient[$host] + 1 ))
@@ -516,6 +619,12 @@ PARSE_LOG()
 			nHostPVSDInitialSendsComplete[$host]=$(( \
 				nHostPVSDInitialSendsComplete[$host] + 1 ))
 
+		# "OversizePkt" Log
+		elif [[ "$log" =~ OversizePkt ]]; then
+			#echo "OversizePkt..."
+			nHostPVSDOversizePkt[$host]=$(( \
+				nHostPVSDOversizePkt[$host] + 1 ))
+
 		# Unknown Log Message
 		else
 			nUnknownPVSD=$(( nUnknownPVSD + 1 ))
@@ -526,9 +635,9 @@ PARSE_LOG()
 
 		nDASMOND=$(( nDASMOND + 1 ))
 
-		# Strip Off DASMOND Error Prefix...
-		log=`echo "$log" \
-			| awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
+		# Strip Off DASMOND Prefix...
+		log=`echo "$log" | \
+			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 
 		# "Failed to Connect to SMS" Log
 		if [[ "$log" =~ Failed${S}to${S}Connect${S}to${S}SMS${S}at ]]; then
@@ -564,6 +673,12 @@ PARSE_LOG()
 			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostDASMONDComBusDisconnectError[$host]=$(( \
 				nHostDASMONDComBusDisconnectError[$host] + 1 ))
+
+		# "OversizePkt" Log
+		elif [[ "$log" =~ OversizePkt ]]; then
+			#echo "OversizePkt..."
+			nHostDASMONDOversizePkt[$host]=$(( \
+				nHostDASMONDOversizePkt[$host] + 1 ))
 
 		# Unknown Log Message
 		else
@@ -680,9 +795,17 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
 		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
 	fi
+	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
+		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
 		echo "STS \"More Than 1 PV Value for\" Logs"
+	fi
+	if [[ ${nHostSTSNoMatchingUnitsPV[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
+		echo "STS \"No Matching Units PV Found\" Logs"
 	fi
 	if [[ ${nHostSTSLdapLookupUserName[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSLdapLookupUserName[$h]} "
@@ -708,6 +831,22 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSUpdatingRunInfo[$h]} "
 		echo "STS \"Updating RunInfo\" Logs"
 	fi
+	if [[ ${nHostSTSDetBankSetConfigErr[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSDetBankSetConfigErr[$h]} "
+		echo "STS \"Detector Bank Set Config Error\" Logs"
+	fi
+	if [[ ${nHostSTSDetBankSetRestrictEv[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSDetBankSetRestrictEv[$h]} "
+		echo "STS \"Restricting Detector Bank Set to Event Mode\" Logs"
+	fi
+	if [[ ${nHostSTSDuplicatePulse[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSDuplicatePulse[$h]} "
+		echo "STS \"Duplicate Pulse\" Logs"
+	fi
+	if [[ ${nHostSTSOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSOversizePkt[$h]} "
+		echo "STS \"OversizePkt\" Logs"
+	fi
 	if [[ ${nHostSMSDRunAwayDataSource[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDRunAwayDataSource[$h]} "
 		echo "SMSD \"Run-Away Data Source\" Logs"
@@ -723,6 +862,14 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDSystemReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemReady[$h]} "
 		echo "SMSD \"System Ready\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
+		echo "SMSD \"Timed out waiting for data (Past Retry!)\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "
+		echo "SMSD \"Timed out waiting for data (Retry)\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
@@ -771,6 +918,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDComBusDisconnectError[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDComBusDisconnectError[$h]} "
 		echo "SMSD \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostSMSDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDOversizePkt[$h]} "
+		echo "SMSD \"OversizePkt\" Logs"
 	fi
 	if [[ ${nHostPVSDINITHUNG[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDINITHUNG[$h]} "
@@ -845,6 +996,10 @@ for h in ${HostList} ; do
 			echo "(${nHostPVSDHung[$h]} Total)"
 		fi
 	fi
+	if [[ ${nHostPVSDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDOversizePkt[$h]} "
+		echo "PVSD \"OversizePkt\" Logs"
+	fi
 	if [[ ${nHostDASMONDFailedToConnSMS[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostDASMONDFailedToConnSMS[$h]} "
 		echo "DASMOND \"Failed to Connect to SMS\" Logs"
@@ -865,6 +1020,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostDASMONDComBusDisconnectError[$h]} "
 		echo \
 		  "DASMOND \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostDASMONDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostDASMONDOversizePkt[$h]} "
+		echo "DASMOND \"OversizePkt\" Logs"
 	fi
 done
 echo
