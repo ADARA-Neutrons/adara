@@ -90,6 +90,7 @@ declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
+declare -A nHostSMSDIPTSITEMSResend
 declare -A nHostSMSDDataSourceTimedOut
 declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDNoRTDLForPulse
@@ -202,6 +203,7 @@ PARSE_LOG()
 		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
+		nHostSMSDIPTSITEMSResend[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
 		nHostSMSDDataSourceTimedOutRetry[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
@@ -425,6 +427,12 @@ PARSE_LOG()
 			#echo "System Ready..."
 			nHostSMSDSystemReady[$host]=$(( \
 				nHostSMSDSystemReady[$host] + 1 ))
+
+		# "IPTS-ITEMS Resend" Log
+		elif [[ "$log" =~ IPTS-ITEMS${S}Resend ]]; then
+			#echo "IPTS-ITEMS Resend..."
+			nHostSMSDIPTSITEMSResend[$host]=$(( \
+				nHostSMSDIPTSITEMSResend[$host] + 1 ))
 
 		# "DataSource - WARNING: Timed out waiting for data from..." Log
 		elif [[ "$log" =~ \
@@ -995,6 +1003,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDSystemReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemReady[$h]} "
 		echo "SMSD \"System Ready\" Logs"
+	fi
+	if [[ ${nHostSMSDIPTSITEMSResend[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDIPTSITEMSResend[$h]} "
+		echo "SMSD \"IPTS-ITEMS Resend\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
