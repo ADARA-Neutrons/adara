@@ -117,6 +117,7 @@ declare -A nHostPVSDComBusConnTimeout
 declare -A nHostPVSDComBusDisconnectError
 declare -A nHostPVSDComBusReconnectThread
 declare -A nHostPVSDDefiningNewDevice
+declare -A nHostPVSDUndefineDevice
 declare -A nHostPVSDMakePvNamesUnique
 declare -A nHostPVSDAssignPVID
 declare -A nHostPVSDInactiveDeviceID
@@ -224,6 +225,7 @@ PARSE_LOG()
 		nHostPVSDComBusDisconnectError[$host]=0
 		nHostPVSDComBusReconnectThread[$host]=0
 		nHostPVSDDefiningNewDevice[$host]=0
+		nHostPVSDUndefineDevice[$host]=0
 		nHostPVSDMakePvNamesUnique[$host]=0
 		nHostPVSDAssignPVID[$host]=0
 		nHostPVSDInactiveDeviceID[$host]=0
@@ -625,6 +627,13 @@ PARSE_LOG()
 			#echo "Defining New Device..."
 			nHostPVSDDefiningNewDevice[$host]=$(( \
 				nHostPVSDDefiningNewDevice[$host] + 1 ))
+
+		# "Undefine Device" Log
+		elif [[ "$log" =~ \
+				undefineDevice\(\):${S}Un-defining${S}device ]]; then
+			#echo "Undefine Device..."
+			nHostPVSDUndefineDevice[$host]=$(( \
+				nHostPVSDUndefineDevice[$host] + 1 ))
 
 		# "Make PV Names Unique" Log
 		elif [[ "$log" =~ ConfigManager::makePvNamesUnique\(\) ]]; then
@@ -1052,6 +1061,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
 		echo "PVSD \"Defining New Device\" Logs"
+	fi
+	if [[ ${nHostPVSDUndefineDevice[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostPVSDUndefineDevice[$h]} "
+		echo "PVSD \"Undefine Device\" Logs"
 	fi
 	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDMakePvNamesUnique[$h]} "
