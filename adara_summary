@@ -87,6 +87,7 @@ declare -A nHostSTSOversizePkt
 
 declare -A nHostSMSDRunAwayDataSource
 declare -A nHostSMSDMissingRingPeriod
+declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDDataSourceTimedOut
@@ -198,6 +199,7 @@ PARSE_LOG()
 
 		nHostSMSDRunAwayDataSource[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
+		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
@@ -405,6 +407,12 @@ PARSE_LOG()
 			#echo "Missing ring period..."
 			nHostSMSDMissingRingPeriod[$host]=$(( \
 				nHostSMSDMissingRingPeriod[$host] + 1 ))
+
+		# "System Uninitialized" Log
+		elif [[ "$log" =~ System${S}Uninitialized ]]; then
+			#echo "System Uninitialized..."
+			nHostSMSDSystemUninitialized[$host]=$(( \
+				nHostSMSDSystemUninitialized[$host] + 1 ))
 
 		# "System NOT Ready" Log
 		elif [[ "$log" =~ System${S}NOT${S}Ready ]]; then
@@ -975,6 +983,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
 		echo "SMSD \"Missing ring period\" Logs"
+	fi
+	if [[ ${nHostSMSDSystemUninitialized[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDSystemUninitialized[$h]} "
+		echo "SMSD \"System Uninitialized\" Logs"
 	fi
 	if [[ ${nHostSMSDSystemNOTReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemNOTReady[$h]} "
