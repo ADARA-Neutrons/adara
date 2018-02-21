@@ -127,6 +127,8 @@ declare -A nHostPVSDSubscriptionCreated
 declare -A nHostPVSDClearingSubscription
 declare -A nHostPVSDConnectedToSMSClient
 declare -A nHostPVSDInitialSendsComplete
+declare -A nHostPVSDSocketWriteFailed
+declare -A nHostPVSDPacketSendFailed
 declare -A nHostPVSDAlive
 declare -A nHostPVSDPartial
 declare -A nHostPVSDHung
@@ -236,6 +238,8 @@ PARSE_LOG()
 		nHostPVSDClearingSubscription[$host]=0
 		nHostPVSDConnectedToSMSClient[$host]=0
 		nHostPVSDInitialSendsComplete[$host]=0
+		nHostPVSDSocketWriteFailed[$host]=0
+		nHostPVSDPacketSendFailed[$host]=0
 		nHostPVSDAlive[$host]=0
 		nHostPVSDPartial[$host]=0
 		nHostPVSDHung[$host]=0
@@ -702,6 +706,22 @@ PARSE_LOG()
 			nHostPVSDInitialSendsComplete[$host]=$(( \
 				nHostPVSDInitialSendsComplete[$host] + 1 ))
 
+		# "OutputAdapter::send(): Socket Write Failed" Log
+		elif [[ "$log" =~ \
+			OutputAdapter::send\(\):${S}Socket${S}Write${S}Failed ]]; \
+		then
+			#echo "OutputAdapter::send(): Socket Write Failed..."
+			nHostPVSDSocketWriteFailed[$host]=$(( \
+				nHostPVSDSocketWriteFailed[$host] + 1 ))
+
+		# "OutputAdapter::sendPacket(): Send Failed" Log
+		elif [[ "$log" =~ \
+			OutputAdapter::sendPacket\(\):${S}Send${S}Failed ]]; \
+		then
+			#echo "OutputAdapter::sendPacket(): Send Failed..."
+			nHostPVSDPacketSendFailed[$host]=$(( \
+				nHostPVSDPacketSendFailed[$host] + 1 ))
+
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
 			#echo "OversizePkt..."
@@ -1111,6 +1131,14 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDInitialSendsComplete[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInitialSendsComplete[$h]} "
 		echo "PVSD \"Initial Sends Complete to ADARA SMS\" Logs"
+	fi
+	if [[ ${nHostPVSDSocketWriteFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDSocketWriteFailed[$h]} "
+		echo "PVSD \"OutputAdapter::send(): Socket Write Failed\" Logs"
+	fi
+	if [[ ${nHostPVSDPacketSendFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDPacketSendFailed[$h]} "
+		echo "PVSD \"OutputAdapter::sendPacket(): Send Failed\" Logs"
 	fi
 	if [[ ${nHostPVSDAlive[$h]} -gt 0 ]]; then
 		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Logs"
