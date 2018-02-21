@@ -91,6 +91,7 @@ declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDIPTSITEMSResend
+declare -A nHostSMSDDataSourceRequired
 declare -A nHostSMSDDataSourceTimedOut
 declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDNoRTDLForPulse
@@ -204,6 +205,7 @@ PARSE_LOG()
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDIPTSITEMSResend[$host]=0
+		nHostSMSDDataSourceRequired[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
 		nHostSMSDDataSourceTimedOutRetry[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
@@ -433,6 +435,13 @@ PARSE_LOG()
 			#echo "IPTS-ITEMS Resend..."
 			nHostSMSDIPTSITEMSResend[$host]=$(( \
 				nHostSMSDIPTSITEMSResend[$host] + 1 ))
+
+		# "Data Source Marked as *Required* for Data Collection" Log
+		elif [[ "$log" =~ \
+				Data${S}Source.*Marked${S}as${S}\*Required\*${S} ]]; then
+			#echo "Data Source Marked as *Required*..."
+			nHostSMSDDataSourceRequired[$host]=$(( \
+				nHostSMSDDataSourceRequired[$host] + 1 ))
 
 		# "DataSource - WARNING: Timed out waiting for data from..." Log
 		elif [[ "$log" =~ \
@@ -1007,6 +1016,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDIPTSITEMSResend[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDIPTSITEMSResend[$h]} "
 		echo "SMSD \"IPTS-ITEMS Resend\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceRequired[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDDataSourceRequired[$h]} "
+		echo "SMSD \"Data Source Marked as *Required*\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
