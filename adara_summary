@@ -91,6 +91,7 @@ declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDDataSourceTimedOut
 declare -A nHostSMSDDataSourceTimedOutRetry
+declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDCorrectPChargeVeto
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
@@ -196,6 +197,7 @@ PARSE_LOG()
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
 		nHostSMSDDataSourceTimedOutRetry[$host]=0
+		nHostSMSDNoRTDLForPulse[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
@@ -420,6 +422,12 @@ PARSE_LOG()
 			#echo "Timed out waiting for data from... (Past Retry)"
 			nHostSMSDDataSourceTimedOut[$host]=$(( \
 				nHostSMSDDataSourceTimedOut[$host] + 1 ))
+
+		# "NO RTDL for Pulse" Log
+		elif [[ "$log" =~ NO${S}RTDL${S}for${S}Pulse ]]; then
+			#echo "NO RTDL for Pulse..."
+			nHostSMSDNoRTDLForPulse[$host]=$(( \
+				nHostSMSDNoRTDLForPulse[$host] + 1 ))
 
 		# "correctPChargeVeto" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
@@ -934,6 +942,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "
 		echo "SMSD \"Timed out waiting for data (Retry)\" Logs"
+	fi
+	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
+		echo "SMSD \"NO RTDL for Pulse\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
