@@ -118,6 +118,7 @@ declare -A nHostPVSDComBusDisconnectError
 declare -A nHostPVSDComBusReconnectThread
 declare -A nHostPVSDDefiningNewDevice
 declare -A nHostPVSDUndefineDevice
+declare -A nHostPVSDUndefineDevicePkt
 declare -A nHostPVSDMakePvNamesUnique
 declare -A nHostPVSDAssignPVID
 declare -A nHostPVSDInactiveDeviceID
@@ -226,6 +227,7 @@ PARSE_LOG()
 		nHostPVSDComBusReconnectThread[$host]=0
 		nHostPVSDDefiningNewDevice[$host]=0
 		nHostPVSDUndefineDevice[$host]=0
+		nHostPVSDUndefineDevicePkt[$host]=0
 		nHostPVSDMakePvNamesUnique[$host]=0
 		nHostPVSDAssignPVID[$host]=0
 		nHostPVSDInactiveDeviceID[$host]=0
@@ -634,6 +636,14 @@ PARSE_LOG()
 			#echo "Undefine Device..."
 			nHostPVSDUndefineDevice[$host]=$(( \
 				nHostPVSDUndefineDevice[$host] + 1 ))
+
+		# "Sending Empty Descriptor to *Undefine* Device" Log
+		elif [[ "$log" =~ \
+		  Sending${S}Empty${S}Descriptor${S}to${S}\*Undefine\*${S}Device \
+		]]; then
+			#echo "Undefine Device..."
+			nHostPVSDUndefineDevicePkt[$host]=$(( \
+				nHostPVSDUndefineDevicePkt[$host] + 1 ))
 
 		# "Make PV Names Unique" Log
 		elif [[ "$log" =~ ConfigManager::makePvNamesUnique\(\) ]]; then
@@ -1065,6 +1075,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDUndefineDevice[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostPVSDUndefineDevice[$h]} "
 		echo "PVSD \"Undefine Device\" Logs"
+	fi
+	if [[ ${nHostPVSDUndefineDevicePkt[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostPVSDUndefineDevicePkt[$h]} "
+		echo "PVSD \"Sending Empty Descriptor to *Undefine* Device\" Logs"
 	fi
 	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDMakePvNamesUnique[$h]} "
