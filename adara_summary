@@ -92,6 +92,7 @@ declare -A nHostSMSDSystemReady
 declare -A nHostSMSDDataSourceTimedOut
 declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDNoRTDLForPulse
+declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDCorrectPChargeVeto
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
@@ -198,6 +199,7 @@ PARSE_LOG()
 		nHostSMSDDataSourceTimedOut[$host]=0
 		nHostSMSDDataSourceTimedOutRetry[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
+		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
@@ -428,6 +430,14 @@ PARSE_LOG()
 			#echo "NO RTDL for Pulse..."
 			nHostSMSDNoRTDLForPulse[$host]=$(( \
 				nHostSMSDNoRTDLForPulse[$host] + 1 ))
+
+		# "No More Pulses for Proton Charge/Veto Flags Correction" Log
+		elif [[ "$log" =~ \
+			No${S}More${S}Pulses${S}for${S}Proton${S}Charge/Veto${S}Flags \
+		]]; then
+			#echo "No More Pulses for Proton Charge/Veto Flags Correction"
+			nHostSMSDNoMorePulsesForCorrect[$host]=$(( \
+				nHostSMSDNoMorePulsesForCorrect[$host] + 1 ))
 
 		# "correctPChargeVeto" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
@@ -946,6 +956,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
 		echo "SMSD \"NO RTDL for Pulse\" Logs"
+	fi
+	if [[ ${nHostSMSDNoMorePulsesForCorrect[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDNoMorePulsesForCorrect[$h]} "
+		echo "SMSD \"No More Pulses for PCharge/Veto Correction\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
