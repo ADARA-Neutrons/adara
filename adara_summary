@@ -78,6 +78,7 @@ declare -A nHostSTSActiveMQException
 declare -A nHostSTSComBusBroadcastError
 declare -A nHostSTSComBusConnTimeout
 declare -A nHostSTSComBusDisconnectError
+declare -A nHostSTSComBusReconnectThread
 declare -A nHostSTSUpdatingRunInfo
 declare -A nHostSTSDetBankSetConfigErr
 declare -A nHostSTSDetBankSetRestrictEv
@@ -102,6 +103,7 @@ declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
 declare -A nHostSMSDComBusDisconnectError
+declare -A nHostSMSDComBusReconnectThread
 declare -A nHostSMSDOversizePkt
 
 declare -A nHostPVSDINITHUNG
@@ -111,6 +113,7 @@ declare -A nHostPVSDActiveMQException
 declare -A nHostPVSDComBusBroadcastError
 declare -A nHostPVSDComBusConnTimeout
 declare -A nHostPVSDComBusDisconnectError
+declare -A nHostPVSDComBusReconnectThread
 declare -A nHostPVSDDefiningNewDevice
 declare -A nHostPVSDAssignPVID
 declare -A nHostPVSDInactiveDeviceID
@@ -129,6 +132,7 @@ declare -A nHostDASMONDActiveMQException
 declare -A nHostDASMONDComBusBroadcastError
 declare -A nHostDASMONDComBusConnTimeout
 declare -A nHostDASMONDComBusDisconnectError
+declare -A nHostDASMONDComBusReconnectThread
 declare -A nHostDASMONDOversizePkt
 
 nUnknownLogs=0
@@ -178,6 +182,7 @@ PARSE_LOG()
 		nHostSTSComBusBroadcastError[$host]=0
 		nHostSTSComBusConnTimeout[$host]=0
 		nHostSTSComBusDisconnectError[$host]=0
+		nHostSTSComBusReconnectThread[$host]=0
 		nHostSTSUpdatingRunInfo[$host]=0
 		nHostSTSDetBankSetConfigErr[$host]=0
 		nHostSTSDetBankSetRestrictEv[$host]=0
@@ -202,6 +207,7 @@ PARSE_LOG()
 		nHostSMSDComBusBroadcastError[$host]=0
 		nHostSMSDComBusConnTimeout[$host]=0
 		nHostSMSDComBusDisconnectError[$host]=0
+		nHostSMSDComBusReconnectThread[$host]=0
 		nHostSMSDOversizePkt[$host]=0
 
 		nHostPVSDINITHUNG[$host]=0
@@ -211,6 +217,7 @@ PARSE_LOG()
 		nHostPVSDComBusBroadcastError[$host]=0
 		nHostPVSDComBusConnTimeout[$host]=0
 		nHostPVSDComBusDisconnectError[$host]=0
+		nHostPVSDComBusReconnectThread[$host]=0
 		nHostPVSDDefiningNewDevice[$host]=0
 		nHostPVSDAssignPVID[$host]=0
 		nHostPVSDInactiveDeviceID[$host]=0
@@ -229,6 +236,7 @@ PARSE_LOG()
 		nHostDASMONDComBusBroadcastError[$host]=0
 		nHostDASMONDComBusConnTimeout[$host]=0
 		nHostDASMONDComBusDisconnectError[$host]=0
+		nHostDASMONDComBusReconnectThread[$host]=0
 		nHostDASMONDOversizePkt[$host]=0
 
 	fi
@@ -312,6 +320,12 @@ PARSE_LOG()
 			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostSTSComBusDisconnectError[$host]=$(( \
 				nHostSTSComBusDisconnectError[$host] + 1 ))
+
+		# "(ComBus) Reconnect Thread" Logs
+		elif [[ "$log" =~ ComBus:${S}reconnectThread\(\) ]]; then
+			#echo "ComBus Reconnect Thread..."
+			nHostSTSComBusReconnectThread[$host]=$(( \
+				nHostSTSComBusReconnectThread[$host] + 1 ))
 
 		# "Updating RunInfo" Log
 		elif [[ "$log" =~ Updating${S}RunInfo ]]; then
@@ -488,6 +502,12 @@ PARSE_LOG()
 			nHostSMSDComBusDisconnectError[$host]=$(( \
 				nHostSMSDComBusDisconnectError[$host] + 1 ))
 
+		# "(ComBus) Reconnect Thread" Logs
+		elif [[ "$log" =~ ComBus:${S}reconnectThread\(\) ]]; then
+			#echo "ComBus Reconnect Thread..."
+			nHostSMSDComBusReconnectThread[$host]=$(( \
+				nHostSMSDComBusReconnectThread[$host] + 1 ))
+
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
 			#echo "OversizePkt..."
@@ -572,6 +592,12 @@ PARSE_LOG()
 			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostPVSDComBusDisconnectError[$host]=$(( \
 				nHostPVSDComBusDisconnectError[$host] + 1 ))
+
+		# "(ComBus) Reconnect Thread" Logs
+		elif [[ "$log" =~ ComBus:${S}reconnectThread\(\) ]]; then
+			#echo "ComBus Reconnect Thread..."
+			nHostPVSDComBusReconnectThread[$host]=$(( \
+				nHostPVSDComBusReconnectThread[$host] + 1 ))
 
 		# "Defining New Device" Log
 		elif [[ "$log" =~ \
@@ -685,6 +711,12 @@ PARSE_LOG()
 			#echo "ComBus Error Disconnecting Message Producers/Consumers"
 			nHostDASMONDComBusDisconnectError[$host]=$(( \
 				nHostDASMONDComBusDisconnectError[$host] + 1 ))
+
+		# "(ComBus) Reconnect Thread" Logs
+		elif [[ "$log" =~ ComBus:${S}reconnectThread\(\) ]]; then
+			#echo "ComBus Reconnect Thread..."
+			nHostDASMONDComBusReconnectThread[$host]=$(( \
+				nHostDASMONDComBusReconnectThread[$host] + 1 ))
 
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
@@ -847,6 +879,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSComBusDisconnectError[$h]} "
 		echo "STS \"ComBus Error Disconnecting Producers/Consumers\" Logs"
 	fi
+	if [[ ${nHostSTSComBusReconnectThread[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSComBusReconnectThread[$h]} "
+		echo "STS \"ComBus Reconnect Thread\" Logs"
+	fi
 	if [[ ${nHostSTSUpdatingRunInfo[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSUpdatingRunInfo[$h]} "
 		echo "STS \"Updating RunInfo\" Logs"
@@ -939,6 +975,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDComBusDisconnectError[$h]} "
 		echo "SMSD \"ComBus Error Disconnecting Producers/Consumers\" Logs"
 	fi
+	if [[ ${nHostSMSDComBusReconnectThread[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusReconnectThread[$h]} "
+		echo "SMSD \"ComBus Reconnect Thread\" Logs"
+	fi
 	if [[ ${nHostSMSDOversizePkt[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDOversizePkt[$h]} "
 		echo "SMSD \"OversizePkt\" Logs"
@@ -970,6 +1010,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDComBusDisconnectError[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDComBusDisconnectError[$h]} "
 		echo "PVSD \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostPVSDComBusReconnectThread[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDComBusReconnectThread[$h]} "
+		echo "PVSD \"ComBus Reconnect Thread\" Logs"
 	fi
 	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
@@ -1040,6 +1084,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostDASMONDComBusDisconnectError[$h]} "
 		echo \
 		  "DASMOND \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	fi
+	if [[ ${nHostDASMONDComBusReconnectThread[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostDASMONDComBusReconnectThread[$h]} "
+		echo "DASMOND \"ComBus Reconnect Thread\" Logs"
 	fi
 	if [[ ${nHostDASMONDOversizePkt[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostDASMONDOversizePkt[$h]} "
