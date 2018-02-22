@@ -1480,8 +1480,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
+					2, 10, 200, log_info ) ) {
+				WARN(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Interleaved Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
