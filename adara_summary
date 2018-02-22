@@ -133,6 +133,7 @@ declare -A nHostPVSDDeviceNotYetDefined
 declare -A nHostPVSDSubscriptionCreated
 declare -A nHostPVSDClearingSubscription
 declare -A nHostPVSDConnectedToSMSClient
+declare -A nHostPVSDDisconnectFromSMSClient
 declare -A nHostPVSDInitialSendsComplete
 declare -A nHostPVSDSocketWriteFailed
 declare -A nHostPVSDPacketSendFailed
@@ -251,6 +252,7 @@ PARSE_LOG()
 		nHostPVSDSubscriptionCreated[$host]=0
 		nHostPVSDClearingSubscription[$host]=0
 		nHostPVSDConnectedToSMSClient[$host]=0
+		nHostPVSDDisconnectFromSMSClient[$host]=0
 		nHostPVSDInitialSendsComplete[$host]=0
 		nHostPVSDSocketWriteFailed[$host]=0
 		nHostPVSDPacketSendFailed[$host]=0
@@ -760,6 +762,14 @@ PARSE_LOG()
 			nHostPVSDConnectedToSMSClient[$host]=$(( \
 				nHostPVSDConnectedToSMSClient[$host] + 1 ))
 
+		# "Disconnecting from ADARA SMS Client" Log
+		elif [[ "$log" =~ \
+			Disconnecting${S}from${S}ADARA${S}SMS${S}Client${S}at ]]; \
+		then
+			#echo "Disconnecting from ADARA SMS Client..."
+			nHostPVSDDisconnectFromSMSClient[$host]=$(( \
+				nHostPVSDDisconnectFromSMSClient[$host] + 1 ))
+
 		# "Initial Sends Complete to ADARA SMS Client" Log
 		elif [[ "$log" =~ \
 			Initial${S}Sends${S}Complete${S}to${S}ADARA${S}SMS ]]; then
@@ -1216,6 +1226,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDConnectedToSMSClient[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDConnectedToSMSClient[$h]} "
 		echo "PVSD \"Connected to ADARA SMS Client\" Logs"
+	fi
+	if [[ ${nHostPVSDDisconnectFromSMSClient[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDDisconnectFromSMSClient[$h]} "
+		echo "PVSD \"Disconnecting from ADARA SMS Client\" Logs"
 	fi
 	if [[ ${nHostPVSDInitialSendsComplete[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInitialSendsComplete[$h]} "
