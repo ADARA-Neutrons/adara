@@ -77,6 +77,8 @@ declare -A nHostSTSVarValueTruncateNegTime
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
+declare -A nHostSTSNoNeutronPulsesInStream
+declare -A nHostSTSEmptyFinalPulseInfo
 declare -A nHostSTSActiveMQException
 declare -A nHostSTSComBusBroadcastError
 declare -A nHostSTSComBusConnTimeout
@@ -200,6 +202,8 @@ PARSE_LOG()
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
+		nHostSTSNoNeutronPulsesInStream[$host]=0
+		nHostSTSEmptyFinalPulseInfo[$host]=0
 		nHostSTSActiveMQException[$host]=0
 		nHostSTSComBusBroadcastError[$host]=0
 		nHostSTSComBusConnTimeout[$host]=0
@@ -349,6 +353,21 @@ PARSE_LOG()
 			#echo "Translation... failed..."
 			nHostSTSTranslationFailed[$host]=$(( \
 				nHostSTSTranslationFailed[$host] + 1 ))
+
+		# "No Neutron Pulses Received in Stream" Logs
+		elif [[ "$log" =~ \
+			No${S}Neutron${S}Pulses${S}Received${S}in${S}Stream ]]; \
+		then
+			#echo "No Neutron Pulses Received in Stream..."
+			nHostSTSNoNeutronPulsesInStream[$host]=$(( \
+				nHostSTSNoNeutronPulsesInStream[$host] + 1 ))
+
+		# "Empty Final Pulse Info Buffer(s)" Logs
+		elif [[ "$log" =~ \
+				Empty${S}Final${S}Pulse${S}Info${S}Buffer\(s\) ]]; then
+			#echo "Empty Final Pulse Info Buffer(s)..."
+			nHostSTSEmptyFinalPulseInfo[$host]=$(( \
+				nHostSTSEmptyFinalPulseInfo[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -1033,6 +1052,14 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSTranslationFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSTranslationFailed[$h]} "
 		echo "STS \"Translation... failed...\" Logs"
+	fi
+	if [[ ${nHostSTSNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTSNoNeutronPulsesInStream[$h]} "
+		echo "STS \"No Neutron Pulses Received in Stream\" Logs"
+	fi
+	if [[ ${nHostSTSEmptyFinalPulseInfo[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
+		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
 	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
