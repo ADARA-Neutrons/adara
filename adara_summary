@@ -90,6 +90,7 @@ declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
+declare -A nHostSMSDFailedToStartRun
 declare -A nHostSMSDIPTSITEMSResend
 declare -A nHostSMSDDataSourceRequired
 declare -A nHostSMSDDataSourceTimedOut
@@ -209,6 +210,7 @@ PARSE_LOG()
 		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
+		nHostSMSDFailedToStartRun[$host]=0
 		nHostSMSDIPTSITEMSResend[$host]=0
 		nHostSMSDDataSourceRequired[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
@@ -439,6 +441,13 @@ PARSE_LOG()
 			#echo "System Ready..."
 			nHostSMSDSystemReady[$host]=$(( \
 				nHostSMSDSystemReady[$host] + 1 ))
+
+		# "Failed to Start Run/Not Starting Run" Logs
+		elif [[ "$log" =~ Failed${S}to${S}Start${S}Run \
+				|| "$log" =~ Not${S}Starting${S}Run ]]; then
+			#echo "Failed to Start Run/Not Starting Run..."
+			nHostSMSDFailedToStartRun[$host]=$(( \
+				nHostSMSDFailedToStartRun[$host] + 1 ))
 
 		# "IPTS-ITEMS Resend" Log
 		elif [[ "$log" =~ IPTS-ITEMS${S}Resend ]]; then
@@ -1058,6 +1067,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDSystemReady[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemReady[$h]} "
 		echo "SMSD \"System Ready\" Logs"
+	fi
+	if [[ ${nHostSMSDFailedToStartRun[$h]} -gt 0 ]]; then
+		echo -n "   **** ${nHostSMSDFailedToStartRun[$h]} "
+		echo "SMSD \"Failed to Start Run/Not Starting Run\" Logs"
 	fi
 	if [[ ${nHostSMSDIPTSITEMSResend[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDIPTSITEMSResend[$h]} "
