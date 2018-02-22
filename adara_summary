@@ -99,6 +99,7 @@ declare -A nHostSMSDBogusRTDLDistantFuture
 declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDCorrectPChargeVeto
+declare -A nHostSMSDDumpPulseInvariants
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
 declare -A nHostSMSDGlobalSAWTOOTH
@@ -215,6 +216,7 @@ PARSE_LOG()
 		nHostSMSDNoRTDLForPulse[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
+		nHostSMSDDumpPulseInvariants[$host]=0
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
 		nHostSMSDGlobalSAWTOOTH[$host]=0
@@ -492,11 +494,17 @@ PARSE_LOG()
 			nHostSMSDNoMorePulsesForCorrect[$host]=$(( \
 				nHostSMSDNoMorePulsesForCorrect[$host] + 1 ))
 
-		# "correctPChargeVeto" Log
-		elif [[ "$log" =~ correctPChargeVeto ]]; then
-			#echo "correctPChargeVeto..."
+		# "correctPChargeVeto()" Log
+		elif [[ "$log" =~ correctPChargeVeto\(\) ]]; then
+			#echo "correctPChargeVeto()..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
+
+		# "dumpPulseInvariants()" Log
+		elif [[ "$log" =~ dumpPulseInvariants\(\) ]]; then
+			#echo "dumpPulseInvariants()..."
+			nHostSMSDDumpPulseInvariants[$host]=$(( \
+				nHostSMSDDumpPulseInvariants[$host] + 1 ))
 
 		# "Local SAWTOOTH RTDL" Log
 		elif [[ "$log" =~ Local${S}SAWTOOTH${S}RTDL ]]; then
@@ -1067,7 +1075,11 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
-		echo "SMSD \"correctPChargeVeto\" Logs"
+		echo "SMSD \"correctPChargeVeto()\" Logs"
+	fi
+	if [[ ${nHostSMSDDumpPulseInvariants[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDDumpPulseInvariants[$h]} "
+		echo "SMSD \"dumpPulseInvariants()\" Logs"
 	fi
 	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
