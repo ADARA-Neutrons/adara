@@ -99,6 +99,7 @@ declare -A nHostSMSDBogusRTDLDistantFuture
 declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDCorrectPChargeVeto
+declare -A nHostSMSDLocalDuplicatePulse
 declare -A nHostSMSDDumpPulseInvariants
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
@@ -216,6 +217,7 @@ PARSE_LOG()
 		nHostSMSDNoRTDLForPulse[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
+		nHostSMSDLocalDuplicatePulse[$host]=0
 		nHostSMSDDumpPulseInvariants[$host]=0
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
@@ -499,6 +501,12 @@ PARSE_LOG()
 			#echo "correctPChargeVeto()..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
+
+		# "Local Duplicate pulse" Log
+		elif [[ "$log" =~ Local${S}Duplicate${S}pulse${S}from ]]; then
+			#echo "Local Duplicate pulse from..."
+			nHostSMSDLocalDuplicatePulse[$host]=$(( \
+				nHostSMSDLocalDuplicatePulse[$host] + 1 ))
 
 		# "dumpPulseInvariants()" Log
 		elif [[ "$log" =~ dumpPulseInvariants\(\) ]]; then
@@ -1076,6 +1084,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
 		echo "SMSD \"correctPChargeVeto()\" Logs"
+	fi
+	if [[ ${nHostSMSDLocalDuplicatePulse[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSMSDLocalDuplicatePulse[$h]} "
+		echo "SMSD \"Local Duplicate pulse\" Logs"
 	fi
 	if [[ ${nHostSMSDDumpPulseInvariants[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDDumpPulseInvariants[$h]} "
