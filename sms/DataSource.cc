@@ -229,8 +229,8 @@ public:
 					<< std::hex << " src=0x" << m_hwId
 					<< " pulseId=0x" << m_activePulse << std::dec
 					<< " trueNew=" << m_trueNew);
+				dumpPulseInvariants(pkt);
 			}
-			dumpPulseInvariants(pkt);
 			m_dupCount++;
 		} else
 			m_dupCount = 0;
