@@ -74,6 +74,9 @@ declare -A nHostSTSMoreThanOnePVValue
 declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
+declare -A nHostSTSConnectionFailed
+declare -A nHostSTSParserStoppedUnexpect
+declare -A nHostSTSTranslationFailed
 declare -A nHostSTSActiveMQException
 declare -A nHostSTSComBusBroadcastError
 declare -A nHostSTSComBusConnTimeout
@@ -194,6 +197,9 @@ PARSE_LOG()
 		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
+		nHostSTSConnectionFailed[$host]=0
+		nHostSTSParserStoppedUnexpect[$host]=0
+		nHostSTSTranslationFailed[$host]=0
 		nHostSTSActiveMQException[$host]=0
 		nHostSTSComBusBroadcastError[$host]=0
 		nHostSTSComBusConnTimeout[$host]=0
@@ -323,6 +329,26 @@ PARSE_LOG()
 			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueTruncateNegTime[$host]=$(( \
 				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
+
+		# "Connection Failed, Not Done Processing" Log
+		elif [[ "$log" =~ \
+				Connection${S}Failed,${S}Not${S}Done${S}Processing ]]; then
+			#echo "Connection Failed, Not Done Processing..."
+			nHostSTSConnectionFailed[$host]=$(( \
+				nHostSTSConnectionFailed[$host] + 1 ))
+
+		# "ADARA parser stopped unexpectedly" Log
+		elif [[ "$log" =~ \
+				ADARA${S}parser${S}stopped${S}unexpectedly ]]; then
+			#echo "ADARA parser stopped unexpectedly..."
+			nHostSTSParserStoppedUnexpect[$host]=$(( \
+				nHostSTSParserStoppedUnexpect[$host] + 1 ))
+
+		# "Translation... failed..." Logs
+		elif [[ "$log" =~ Translation${S}.*${S}failed ]]; then
+			#echo "Translation... failed..."
+			nHostSTSTranslationFailed[$host]=$(( \
+				nHostSTSTranslationFailed[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -995,6 +1021,18 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
 		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	fi
+	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
+		echo "STS \"Connection Failed, Not Done Processing\" Logs"
+	fi
+	if [[ ${nHostSTSParserStoppedUnexpect[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSParserStoppedUnexpect[$h]} "
+		echo "STS \"ADARA parser stopped unexpectedly\" Logs"
+	fi
+	if [[ ${nHostSTSTranslationFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSTranslationFailed[$h]} "
+		echo "STS \"Translation... failed...\" Logs"
 	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
