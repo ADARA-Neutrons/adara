@@ -850,7 +850,7 @@ PARSE_LOG()
 				nHostPVSDPacketSendFailed[$host] + 1 ))
 
 		# "Queue Deactivated" Log
-		elif [[ "$log" =~ Queue${S}Deactivated ]]; then
+		elif [[ "$log" =~ Queue(s)*${S}Deactivated ]]; then
 			#echo "Queue Deactivated..."
 			nHostPVSDQueueDeactivated[$host]=$(( \
 				nHostPVSDQueueDeactivated[$host] + 1 ))
