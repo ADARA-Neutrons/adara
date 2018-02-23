@@ -143,6 +143,7 @@ declare -A nHostPVSDDisconnectFromSMSClient
 declare -A nHostPVSDInitialSendsComplete
 declare -A nHostPVSDSocketWriteFailed
 declare -A nHostPVSDPacketSendFailed
+declare -A nHostPVSDQueueDeactivated
 declare -A nHostPVSDAlive
 declare -A nHostPVSDPartial
 declare -A nHostPVSDHung
@@ -268,6 +269,7 @@ PARSE_LOG()
 		nHostPVSDInitialSendsComplete[$host]=0
 		nHostPVSDSocketWriteFailed[$host]=0
 		nHostPVSDPacketSendFailed[$host]=0
+		nHostPVSDQueueDeactivated[$host]=0
 		nHostPVSDAlive[$host]=0
 		nHostPVSDPartial[$host]=0
 		nHostPVSDHung[$host]=0
@@ -847,6 +849,12 @@ PARSE_LOG()
 			nHostPVSDPacketSendFailed[$host]=$(( \
 				nHostPVSDPacketSendFailed[$host] + 1 ))
 
+		# "Queue Deactivated" Log
+		elif [[ "$log" =~ Queue${S}Deactivated ]]; then
+			#echo "Queue Deactivated..."
+			nHostPVSDQueueDeactivated[$host]=$(( \
+				nHostPVSDQueueDeactivated[$host] + 1 ))
+
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
 			#echo "OversizePkt..."
@@ -1320,6 +1328,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDPacketSendFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDPacketSendFailed[$h]} "
 		echo "PVSD \"OutputAdapter::sendPacket(): Send Failed\" Logs"
+	fi
+	if [[ ${nHostPVSDQueueDeactivated[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDQueueDeactivated[$h]} "
+		echo "PVSD \"Queue Deactivated\" Logs"
 	fi
 	if [[ ${nHostPVSDAlive[$h]} -gt 0 ]]; then
 		echo "   ${nHostPVSDAlive[$h]} \"PVSD is Alive\" Logs"
