@@ -78,6 +78,8 @@ bool SMSControl::m_sendSampleInRunInfo;
 
 bool SMSControl::m_allowNonOneToOnePixelMapping;
 
+bool SMSControl::m_useOrigPixelMappingPkt;
+
 bool SMSControl::m_notesCommentAutoReset;
 
 class PopPulseBufferPV : public smsInt32PV {
@@ -206,6 +208,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 				false);
 	INFO("Setting Allow Non-One-to-One Pixel Mapping to "
 		<< m_allowNonOneToOnePixelMapping << ".");
+
+	m_useOrigPixelMappingPkt =
+			conf.get<bool>("sms.use_orig_pixel_mapping_pkt", false);
+	INFO("Setting Use Original Pixel Mapping Packet to "
+		<< m_useOrigPixelMappingPkt << ".");
 
 	m_notesCommentAutoReset =
 			conf.get<bool>("sms.run_notes_auto_reset", true);
@@ -528,7 +535,7 @@ SMSControl::SMSControl() :
 		m_sendSampleInRunInfo));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath,
-		m_allowNonOneToOnePixelMapping));
+		m_allowNonOneToOnePixelMapping, m_useOrigPixelMappingPkt));
 
 	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 
