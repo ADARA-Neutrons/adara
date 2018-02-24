@@ -92,6 +92,7 @@ private:
     bool        rxPacket( const ADARA::RunStatusPkt &a_pkt );
     bool        rxPacket( const ADARA::BankedEventPkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingPkt &a_pkt );
+    bool        rxPacket( const ADARA::PixelMappingAltPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorPkt &a_pkt );
     bool        rxPacket( const ADARA::RunInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::GeometryPkt &a_pkt );

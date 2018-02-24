@@ -314,6 +314,7 @@ StreamParser::rxPacket
         // Note: these should arrive before event processing,
         // but it is no guaranteed.
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+        case ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE:
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
                 PKT_BIT_PIXELMAP)
 
@@ -448,6 +449,130 @@ StreamParser::rxPacket
 // ADARA Pixel Mapping packet processing
 //---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Pixel Mapping Alt ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA PixelMappingAlt packets. Detector source and
+ * bank information is extracted from the received packet and BankInfo
+ * instances are created (using the makeBankInfo() virtual factory method)
+ * to capture essential bank parameters need for subsequent banked event
+ * processing. The receipt of a Pixel Mapping packets also triggers
+ * progression to the internal event processing state.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::PixelMappingAltPkt &a_pkt     ///< [in] ADARA PixelMappingAltPkt object to process
+)
+{
+    const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+    const uint32_t *epos = (const uint32_t *)
+        ( a_pkt.mappingData() + a_pkt.payload_length()
+            - sizeof(uint32_t) );
+
+    uint32_t      base_physical;
+    uint16_t        bank_id;
+    uint16_t        pix_count;
+
+    // Note: a vector is used for BankInfo instances where the bank_id
+    // is the offset into the vector. This is safe as bank IDs are
+    // monotonically increasing integers starting at 0. IF this ever
+    // changes, then the bank container will need to be changed to a map
+    // (which would result in a slight performance drop). Also note that
+    // the current code accommodates gaps in the banks by zeroing and
+    // subsequently checking entries when iterating over the container.
+
+    // Get number of banks (largest bank id) explicitly from packet and
+    // reserve bank container storage
+
+    uint16_t bank_count = (uint16_t) a_pkt.numBanks();
+
+    m_banks.resize( bank_count + 1, 0 );
+
+    syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
+        "PixelMappingAltPkt", bank_count );
+    usleep(30000); // give syslog a chance...
+
+    // Now build banks and populate bank container
+    while ( rpos < epos )
+    {
+        base_physical = *rpos++;
+        //rpos++;   // Skip Base Physical PixelId...
+        bank_id = (uint16_t)(*rpos >> 16);
+        pix_count = (uint16_t)(*rpos & 0xFFFF);
+        rpos++;
+
+        syslog( LOG_INFO,
+            "[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
+            g_pid, "PixelMappingAltPkt",
+            base_physical, bank_id, pix_count );
+        usleep(30000); // give syslog a chance...
+
+        // Skip Unmapped Sections of Pixel Map...!
+        if ( bank_id == (uint16_t) UNMAPPED_BANK )
+        {
+            syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
+                g_pid, "PixelMappingAltPkt" );
+            usleep(30000); // give syslog a chance...
+
+            // Next Section
+            rpos += pix_count;
+            continue;
+        }
+
+        // Create New BankInfo...
+        if ( !m_banks[bank_id] )
+        {
+            syslog( LOG_INFO, "[%i] %s: New BankInfo for %u",
+                g_pid, "PixelMappingAltPkt", bank_id );
+            usleep(30000); // give syslog a chance...
+
+            // Create BankInfo Instance
+            m_banks[bank_id] = makeBankInfo( bank_id,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            m_banks[bank_id]->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+        }
+
+        // Append This Section's Logical PixelIds...
+        const uint32_t *epos2 = rpos + pix_count;
+        while ( rpos < epos2 )
+        {
+            //syslog( LOG_INFO, "[%i] %s: Next Logical PixelId = %u",
+                //g_pid, "PixelMappingAltPkt", *rpos );
+            //usleep(30000); // give syslog a chance...
+
+            m_banks[bank_id]->m_logical_pixelids.push_back(*rpos++);
+        }
+
+        syslog( LOG_INFO,
+            "[%i] %s: Done with Section, Last Logical PixelId = %u",
+            g_pid, "PixelMappingAltPkt",
+            m_banks[bank_id]->m_logical_pixelids.back() );
+        usleep(30000); // give syslog a chance...
+
+        // syslog( LOG_INFO,
+            // "[%i] %s: bank_id=%u base_physical=%u count=%u tot=%lu",
+            // g_pid, "PixelMappingAltPkt", bank_id, base_physical,
+            // pix_count, m_banks[bank_id]->m_logical_pixelids.size() );
+        // usleep(30000); // give syslog a chance...
+    }
+
+    syslog( LOG_INFO, "[%i] %s: Done with PixelMappingAltPkt Packet",
+        g_pid, "PixelMappingAltPkt" );
+    usleep(30000); // give syslog a chance...
+
+    // The receipt of a pixel mapping packet allows state to progress
+    // to event processing
+    m_processing_state = PROCESSING_EVENTS;
+
+    return false;
+}
+
+
 /*! \brief This method processes Pixel Mapping ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
@@ -464,9 +589,9 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
-    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
-        + a_pkt.payload_length());
+    const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+    const uint32_t *epos = (const uint32_t *)
+        ( a_pkt.mappingData() + a_pkt.payload_length() );
 
     uint32_t        base_logical;
     uint16_t        bank_id;
@@ -493,8 +618,18 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos2 >> 16);
         pix_count = (uint16_t)(*rpos2 & 0xFFFF);
         rpos2++;
+        syslog( LOG_INFO,
+            "[%i] %s: bank_id=%u pix_count=%u", g_pid, "PixelMappingPkt",
+            bank_id, pix_count );
+        usleep(30000); // give syslog a chance...
         if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
+        {
             bank_count = bank_id;
+            syslog( LOG_INFO,
+                "[%i] %s: bank_count -> %u", g_pid, "PixelMappingPkt",
+                bank_count );
+            usleep(30000); // give syslog a chance...
+        }
         rpos2 += pix_count;
     }
 
@@ -502,6 +637,7 @@ StreamParser::rxPacket
 
     syslog( LOG_INFO,
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
+    usleep(30000); // give syslog a chance...
 
     // Now build banks and populate bank container
     while ( rpos < epos )
@@ -543,6 +679,7 @@ StreamParser::rxPacket
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
             // m_banks[bank_id]->m_logical_pixelids.size() );
+        // usleep(30000); // give syslog a chance...
 
         // Next Section
         rpos += pix_count;
@@ -4532,6 +4669,8 @@ StreamParser::getPktName(
             ss << "Beam Monitor Event"; break;
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
             ss << "Pixel Map"; break;
+        case ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE:
+            ss << "Pixel Map Alt"; break;
         case ADARA::PacketType::RUN_STATUS_TYPE:
             ss << "Run Stat"; break;
         case ADARA::PacketType::RUN_INFO_TYPE:
