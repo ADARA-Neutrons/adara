@@ -140,6 +140,7 @@ protected:
 	virtual bool rxPacket(const BankedEventPkt &pkt);
 	virtual bool rxPacket(const BeamMonitorPkt &pkt);
 	virtual bool rxPacket(const PixelMappingPkt &pkt);
+	virtual bool rxPacket(const PixelMappingAltPkt &pkt);
 	virtual bool rxPacket(const RunStatusPkt &pkt);
 	virtual bool rxPacket(const RunInfoPkt &pkt);
 	virtual bool rxPacket(const TransCompletePkt &pkt);
