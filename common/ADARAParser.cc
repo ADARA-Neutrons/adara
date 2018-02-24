@@ -270,6 +270,7 @@ bool Parser::rxPacket(const Packet &pkt)
 		MAP_TYPE(PacketType::BANKED_EVENT_TYPE, BankedEventPkt);
 		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_TYPE, BeamMonitorPkt);
 		MAP_TYPE(PacketType::PIXEL_MAPPING_TYPE, PixelMappingPkt);
+		MAP_TYPE(PacketType::PIXEL_MAPPING_ALT_TYPE, PixelMappingAltPkt);
 		MAP_TYPE(PacketType::RUN_STATUS_TYPE, RunStatusPkt);
 		MAP_TYPE(PacketType::RUN_INFO_TYPE, RunInfoPkt);
 		MAP_TYPE(PacketType::TRANS_COMPLETE_TYPE, TransCompletePkt);
@@ -328,6 +329,7 @@ EXPAND_HANDLER(SourceListPkt)
 EXPAND_HANDLER(BankedEventPkt)
 EXPAND_HANDLER(BeamMonitorPkt)
 EXPAND_HANDLER(PixelMappingPkt)
+EXPAND_HANDLER(PixelMappingAltPkt)
 EXPAND_HANDLER(RunStatusPkt)
 EXPAND_HANDLER(RunInfoPkt)
 EXPAND_HANDLER(TransCompletePkt)
