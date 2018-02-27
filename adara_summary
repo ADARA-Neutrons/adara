@@ -107,6 +107,7 @@ declare -A nHostSMSDBogusRTDLDistantPast
 declare -A nHostSMSDBogusRTDLDistantFuture
 declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDNoMorePulsesForCorrect
+declare -A nHostSMSDNewChopperId
 declare -A nHostSMSDCorrectPChargeVeto
 declare -A nHostSMSDLocalDuplicatePulse
 declare -A nHostSMSDDumpPulseInvariants
@@ -237,6 +238,7 @@ PARSE_LOG()
 		nHostSMSDBogusRTDLDistantFuture[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
+		nHostSMSDNewChopperId[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
 		nHostSMSDLocalDuplicatePulse[$host]=0
 		nHostSMSDDumpPulseInvariants[$host]=0
@@ -568,6 +570,12 @@ PARSE_LOG()
 			#echo "No More Pulses for Proton Charge/Veto Flags Correction"
 			nHostSMSDNoMorePulsesForCorrect[$host]=$(( \
 				nHostSMSDNoMorePulsesForCorrect[$host] + 1 ))
+
+		# "New Chopper id=" Log
+		elif [[ "$log" =~ New${S}Chopper${S}id= ]]; then
+			#echo "New Chopper id=..."
+			nHostSMSDNewChopperId[$host]=$(( \
+				nHostSMSDNewChopperId[$host] + 1 ))
 
 		# "correctPChargeVeto()" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
@@ -1206,6 +1214,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDNoMorePulsesForCorrect[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDNoMorePulsesForCorrect[$h]} "
 		echo "SMSD \"No More Pulses for PCharge/Veto Correction\" Logs"
+	fi
+	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
+		echo "SMSD \"New Chopper id=\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
