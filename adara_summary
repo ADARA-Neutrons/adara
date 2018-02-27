@@ -74,6 +74,7 @@ declare -A nHostSTSMoreThanOnePVValue
 declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
+declare -A nHostSTSAsynchLookupFailure
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
@@ -110,6 +111,7 @@ declare -A nHostSMSDDumpPulseInvariants
 declare -A nHostSMSDLocalSAWTOOTHRTDL
 declare -A nHostSMSDLocalSAWTOOTHData
 declare -A nHostSMSDGlobalSAWTOOTH
+declare -A nHostSMSDPulseBufferOverflow
 declare -A nHostSMSDPulseNoRegEvent
 declare -A nHostSMSDFirstNewEventSource
 declare -A nHostSMSDLastEventSource
@@ -200,6 +202,7 @@ PARSE_LOG()
 		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
+		nHostSTSAsynchLookupFailure[$host]=0
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
@@ -236,6 +239,7 @@ PARSE_LOG()
 		nHostSMSDLocalSAWTOOTHRTDL[$host]=0
 		nHostSMSDLocalSAWTOOTHData[$host]=0
 		nHostSMSDGlobalSAWTOOTH[$host]=0
+		nHostSMSDPulseBufferOverflow[$host]=0
 		nHostSMSDPulseNoRegEvent[$host]=0
 		nHostSMSDFirstNewEventSource[$host]=0
 		nHostSMSDLastEventSource[$host]=0
@@ -335,6 +339,13 @@ PARSE_LOG()
 			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueTruncateNegTime[$host]=$(( \
 				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
+
+		# "Asynchronous Lookup Failed for STS" Log
+		elif [[ "$log" =~ \
+				Asynchronous${S}Lookup${S}Failed${S}for${S}STS ]]; then
+			#echo "Asynchronous Lookup Failed for STS..."
+			nHostSTSAsynchLookupFailure[$host]=$(( \
+				nHostSTSAsynchLookupFailure[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
@@ -589,6 +600,12 @@ PARSE_LOG()
 			#echo "Global SAWTOOTH Pulse..."
 			nHostSMSDGlobalSAWTOOTH[$host]=$(( \
 				nHostSMSDGlobalSAWTOOTH[$host] + 1 ))
+
+		# "Internal Pulse Buffer Overflow" Log
+		elif [[ "$log" =~ Internal${S}Pulse${S}Buffer${S}Overflow ]]; then
+			#echo "Internal Pulse Buffer Overflow..."
+			nHostSMSDPulseBufferOverflow[$host]=$(( \
+				nHostSMSDPulseBufferOverflow[$host] + 1 ))
 
 		# "Pulse with No Registered Event Sources" Log
 		elif [[ "$log" =~ \
@@ -1049,6 +1066,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
 		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
 	fi
+	if [[ ${nHostSTSAsynchLookupFailure[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSAsynchLookupFailure[$h]} "
+		echo "STS \"Asynchronous Lookup Failed for STS\" Logs"
+	fi
 	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
 		echo "STS \"Connection Failed, Not Done Processing\" Logs"
@@ -1200,6 +1221,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDGlobalSAWTOOTH[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDGlobalSAWTOOTH[$h]} "
 		echo "SMSD \"Global SAWTOOTH Pulse\" Logs"
+	fi
+	if [[ ${nHostSMSDPulseBufferOverflow[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDPulseBufferOverflow[$h]} "
+		echo "SMSD \"Internal Pulse Buffer Overflow\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
