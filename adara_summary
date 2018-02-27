@@ -65,16 +65,17 @@ fi
 
 HostList=""
 
+declare -A lastFileFrom
+
 declare -A nHostlogs
 
-declare -A lastFileFrom
+declare -A nHostUnknownLogs
 
 declare -A nHostSTSLdapLookupUserName
 declare -A nHostSTSMoreThanOnePVValue
 declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
-declare -A nHostSTSAsynchLookupFailure
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
@@ -97,6 +98,7 @@ declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
 declare -A nHostSMSDFailedToStartRun
+declare -A nHostSMSDAsynchLookupFailure
 declare -A nHostSMSDIPTSITEMSResend
 declare -A nHostSMSDDataSourceRequired
 declare -A nHostSMSDDataSourceTimedOut
@@ -159,11 +161,11 @@ declare -A nHostDASMONDComBusDisconnectError
 declare -A nHostDASMONDComBusReconnectThread
 declare -A nHostDASMONDOversizePkt
 
-nUnknownLogs=0
 nUnknownDASMOND=0
 nUnknownSMSD=0
 nUnknownPVSD=0
 nUnknownSTS=0
+nUnknownLogs=0
 
 nDASMOND=0
 nSMSD=0
@@ -197,12 +199,13 @@ PARSE_LOG()
 
 		nHostlogs[$host]=1
 
+		nHostUnknownLogs[$host]=0
+
 		nHostSTSLdapLookupUserName[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
 		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
-		nHostSTSAsynchLookupFailure[$host]=0
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
@@ -225,6 +228,7 @@ PARSE_LOG()
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
 		nHostSMSDFailedToStartRun[$host]=0
+		nHostSMSDAsynchLookupFailure[$host]=0
 		nHostSMSDIPTSITEMSResend[$host]=0
 		nHostSMSDDataSourceRequired[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
@@ -339,13 +343,6 @@ PARSE_LOG()
 			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueTruncateNegTime[$host]=$(( \
 				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
-
-		# "Asynchronous Lookup Failed for STS" Log
-		elif [[ "$log" =~ \
-				Asynchronous${S}Lookup${S}Failed${S}for${S}STS ]]; then
-			#echo "Asynchronous Lookup Failed for STS..."
-			nHostSTSAsynchLookupFailure[$host]=$(( \
-				nHostSTSAsynchLookupFailure[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
@@ -506,6 +503,13 @@ PARSE_LOG()
 			#echo "Failed to Start Run/Not Starting Run..."
 			nHostSMSDFailedToStartRun[$host]=$(( \
 				nHostSMSDFailedToStartRun[$host] + 1 ))
+
+		# "Asynchronous Lookup Failed for STS" Log
+		elif [[ "$log" =~ \
+				Asynchronous${S}Lookup${S}Failed${S}for${S}STS ]]; then
+			#echo "Asynchronous Lookup Failed for STS..."
+			nHostSMSDAsynchLookupFailure[$host]=$(( \
+				nHostSMSDAsynchLookupFailure[$host] + 1 ))
 
 		# "IPTS-ITEMS Resend" Log
 		elif [[ "$log" =~ IPTS-ITEMS${S}Resend ]]; then
@@ -948,6 +952,7 @@ PARSE_LOG()
 
 	if [[ $known == 0 ]]; then
 		#echo "*** Unknown Log Message!"
+		nHostUnknownLogs[$host]=$(( nHostUnknownLogs[$host] + 1 ))
 		nUnknownLogs=$(( nUnknownLogs + 1 ))
 		return 1
 	else
@@ -1057,7 +1062,11 @@ echo -e "\n--- Statistics Summary ---\n"
 
 echo "Per Host Statistics:"
 for h in ${HostList} ; do
-	echo -e "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
+	echo -e -n "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
+	if [[ ${nHostUnknownLogs[$h]} -gt 0 ]]; then
+		echo -n ", *** ${nHostUnknownLogs[$h]} Unknown Logs! ***"
+	fi
+	echo
 	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
 		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
@@ -1065,10 +1074,6 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
 		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
-	fi
-	if [[ ${nHostSTSAsynchLookupFailure[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSAsynchLookupFailure[$h]} "
-		echo "STS \"Asynchronous Lookup Failed for STS\" Logs"
 	fi
 	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
@@ -1165,6 +1170,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDFailedToStartRun[$h]} -gt 0 ]]; then
 		echo -n "   **** ${nHostSMSDFailedToStartRun[$h]} "
 		echo "SMSD \"Failed to Start Run/Not Starting Run\" Logs"
+	fi
+	if [[ ${nHostSMSDAsynchLookupFailure[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDAsynchLookupFailure[$h]} "
+		echo "STS \"Asynchronous Lookup Failed for STS\" Logs"
 	fi
 	if [[ ${nHostSMSDIPTSITEMSResend[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDIPTSITEMSResend[$h]} "
