@@ -101,6 +101,7 @@ declare -A nHostSMSDFailedToStartRun
 declare -A nHostSMSDAsynchLookupFailure
 declare -A nHostSMSDIPTSITEMSResend
 declare -A nHostSMSDDataSourceRequired
+declare -A nHostSMSDDataSourceReadDelay
 declare -A nHostSMSDDataSourceTimedOut
 declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDBogusRTDLDistantPast
@@ -232,6 +233,7 @@ PARSE_LOG()
 		nHostSMSDAsynchLookupFailure[$host]=0
 		nHostSMSDIPTSITEMSResend[$host]=0
 		nHostSMSDDataSourceRequired[$host]=0
+		nHostSMSDDataSourceReadDelay[$host]=0
 		nHostSMSDDataSourceTimedOut[$host]=0
 		nHostSMSDDataSourceTimedOutRetry[$host]=0
 		nHostSMSDBogusRTDLDistantPast[$host]=0
@@ -525,6 +527,12 @@ PARSE_LOG()
 			#echo "Data Source Marked as *Required*..."
 			nHostSMSDDataSourceRequired[$host]=$(( \
 				nHostSMSDDataSourceRequired[$host] + 1 ))
+
+		# "Read Delay Threshold Exceeded" Log
+		elif [[ "$log" =~ Read${S}Delay${S}Threshold${S}Exceeded ]]; then
+			#echo "Read Delay Threshold Exceeded..."
+			nHostSMSDDataSourceReadDelay[$host]=$(( \
+				nHostSMSDDataSourceReadDelay[$host] + 1 ))
 
 		# "DataSource - WARNING: Timed out waiting for data from..." Log
 		elif [[ "$log" =~ \
@@ -1190,6 +1198,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDDataSourceRequired[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDDataSourceRequired[$h]} "
 		echo "SMSD \"Data Source Marked as *Required*\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceReadDelay[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSMSDDataSourceReadDelay[$h]} "
+		echo "SMSD \"Read Delay Threshold Exceeded\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
