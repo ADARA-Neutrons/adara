@@ -570,7 +570,7 @@ PARSE_LOG()
 				nHostSMSDNoMorePulsesForCorrect[$host] + 1 ))
 
 		# "correctPChargeVeto()" Log
-		elif [[ "$log" =~ correctPChargeVeto\(\) ]]; then
+		elif [[ "$log" =~ correctPChargeVeto ]]; then
 			#echo "correctPChargeVeto()..."
 			nHostSMSDCorrectPChargeVeto[$host]=$(( \
 				nHostSMSDCorrectPChargeVeto[$host] + 1 ))
