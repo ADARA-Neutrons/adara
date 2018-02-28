@@ -108,6 +108,11 @@ ADARA SMS Install Checklist
 
 	sudo vi /etc/crontab
 
+		# MAILTO=root
+		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		MAILTO="root@localhost"
+		HOME=/
+
 		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
 	cp /etc/crontab ./sms/etc.crontab
