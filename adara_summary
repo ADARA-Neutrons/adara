@@ -141,6 +141,7 @@ declare -A nHostPVSDUndefineDevicePkt
 declare -A nHostPVSDMakePvNamesUnique
 declare -A nHostPVSDAssignPVID
 declare -A nHostPVSDInactiveDeviceID
+declare -A nHostPVSDFailedChannelInfoPV
 declare -A nHostPVSDDeviceNotYetDefined
 declare -A nHostPVSDSubscriptionCreated
 declare -A nHostPVSDClearingSubscription
@@ -273,6 +274,7 @@ PARSE_LOG()
 		nHostPVSDMakePvNamesUnique[$host]=0
 		nHostPVSDAssignPVID[$host]=0
 		nHostPVSDInactiveDeviceID[$host]=0
+		nHostPVSDFailedChannelInfoPV[$host]=0
 		nHostPVSDDeviceNotYetDefined[$host]=0
 		nHostPVSDSubscriptionCreated[$host]=0
 		nHostPVSDClearingSubscription[$host]=0
@@ -825,6 +827,14 @@ PARSE_LOG()
 			nHostPVSDInactiveDeviceID[$host]=$(( \
 				nHostPVSDInactiveDeviceID[$host] + 1 ))
 
+		# "Failed to get channel info for PV" Log
+		elif [[ "$log" =~ \
+			Failed${S}to${S}get${S}channel${S}info${S}for${S}PV ]]; \
+		then
+			#echo "Failed to get channel info for PV..."
+			nHostPVSDFailedChannelInfoPV[$host]=$(( \
+				nHostPVSDFailedChannelInfoPV[$host] + 1 ))
+
 		# "Device Not Yet Defined" Log
 		elif [[ "$log" =~ \
 			epicsEventHandler\(\):${S}Device${S}Not${S}Yet${S}Defined ]]; \
@@ -1354,6 +1364,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDInactiveDeviceID[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInactiveDeviceID[$h]} "
 		echo "PVSD \"Inactive Device ID\" Logs"
+	fi
+	if [[ ${nHostPVSDFailedChannelInfoPV[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDFailedChannelInfoPV[$h]} "
+		echo "PVSD \"Failed to get channel info for PV\" Logs"
 	fi
 	if [[ ${nHostPVSDDeviceNotYetDefined[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDeviceNotYetDefined[$h]} "
