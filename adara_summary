@@ -551,19 +551,19 @@ PARSE_LOG()
 			nHostSMSDDataSourceTimedOut[$host]=$(( \
 				nHostSMSDDataSourceTimedOut[$host] + 1 ))
 
-		# "Bogus RawData Pulse Time from Distant Past" Log
+		# "Bogus RTDL/RawData Pulse Time from Distant Past" Log
 		elif [[ "$log" =~ \
-			Bogus${S}RawData${S}Pulse${S}Time${S}from${S}Distant${S}Past \
+			Bogus${S}.+${S}Pulse${S}Time${S}from${S}Distant${S}Past \
 		]]; then
-			#echo "Bogus RawData Pulse Time from Distant Past..."
+			#echo "Bogus RTDL/RawData Pulse Time from Distant Past..."
 			nHostSMSDBogusRTDLDistantPast[$host]=$(( \
 				nHostSMSDBogusRTDLDistantPast[$host] + 1 ))
 
-		# "Bogus RawData Pulse Time from Distant Future" Log
+		# "Bogus RTDL/RawData Pulse Time from Distant Future" Log
 		elif [[ "$log" =~ \
-		  Bogus${S}RawData${S}Pulse${S}Time${S}from${S}Distant${S}Future \
+			Bogus${S}.+${S}Pulse${S}Time${S}from${S}Distant${S}Future \
 		]]; then
-			#echo "Bogus RawData Pulse Time from Distant Future..."
+			#echo "Bogus RTDL/RawData Pulse Time from Distant Future..."
 			nHostSMSDBogusRTDLDistantFuture[$host]=$(( \
 				nHostSMSDBogusRTDLDistantFuture[$host] + 1 ))
 
@@ -1223,11 +1223,11 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
-		echo "SMSD \"Bogus RawData Pulse Time from Distant Past\" Logs"
+		echo "SMSD \"Bogus Pulse Time from Distant Past\" Logs"
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantFuture[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantFuture[$h]} "
-		echo "SMSD \"Bogus RawData Pulse Time from Distant Future\" Logs"
+		echo "SMSD \"Bogus Pulse Time from Distant Future\" Logs"
 	fi
 	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
