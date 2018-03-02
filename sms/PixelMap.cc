@@ -173,7 +173,6 @@ DEBUG("genAltPacket() Entry");
 		 */
 		if (it->first != expected || it->second.second != bank
 				|| entries >= max_section_pixelid_count) {
-DEBUG("Section bank=" << bank << " entries=" << entries);
 			sections.push(entries);
 			entries = 0;
 			bank = it->second.second;
@@ -183,7 +182,6 @@ DEBUG("Section bank=" << bank << " entries=" << entries);
 	}
 
 	/* Push the last section we were working on. */
-DEBUG("Section bank=" << bank << " entries=" << entries << " FINAL");
 	sections.push(entries);
 
 DEBUG("sections.size()=" << sections.size());
@@ -220,8 +218,6 @@ DEBUG("packetSize=" << packetSize);
 		/* First the header (base physical ID, bankid, count) */
 		bank_count = (uint32_t) it->second.second << 16;
 		bank_count |= entries;
-
-DEBUG("Pkt: base_physical=" << it->first << " bank=" << it->second.second << " entries=" << entries);
 
 		*u32++ = it->first;
 		*u32++ = bank_count;
@@ -283,7 +279,6 @@ DEBUG("genPacket() Entry");
 		 */
 		if (it->first != expected || it->second.second != bank
 				|| entries >= max_section_pixelid_count) {
-DEBUG("Section bank=" << bank << " entries=" << entries);
 			sections.push(entries);
 			entries = 0;
 			bank = it->second.second;
@@ -293,7 +288,6 @@ DEBUG("Section bank=" << bank << " entries=" << entries);
 	}
 
 	/* Push the last section we were working on. */
-DEBUG("Section bank=" << bank << " entries=" << entries << " FINAL");
 	sections.push(entries);
 
 DEBUG("sections.size()=" << sections.size());
@@ -327,8 +321,6 @@ DEBUG("packetSize=" << packetSize);
 		/* First the header (base logical ID, bankid, count) */
 		bank_count = (uint32_t) it->second.second << 16;
 		bank_count |= entries;
-
-DEBUG("Pkt: base_logical=" << it->first << " bank=" << it->second.second << " entries=" << entries);
 
 		*u32++ = it->first;
 		*u32++ = bank_count;
