@@ -43,9 +43,6 @@ public:
 	MaxConnectionsPV(const std::string &name, STSClientMgr *stsClientMgr) :
 		smsUint32PV(name), m_stsClientMgr(stsClientMgr) {}
 
-private:
-	STSClientMgr *m_stsClientMgr;
-
 	void changed(void)
 	{
 		// Give Peace a Chance...
@@ -55,6 +52,9 @@ private:
 			<< " PV value changed, Start Any STS Client Connections...");
 		m_stsClientMgr->startConnect();
 	}
+
+private:
+	STSClientMgr *m_stsClientMgr;
 };
 
 std::string STSClientMgr::m_node;

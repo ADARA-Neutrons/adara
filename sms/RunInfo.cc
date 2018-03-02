@@ -31,13 +31,13 @@ public:
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
 
-private:
-	RunInfo *m_master;
-	bool m_unlocked;
-
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
 	void triggered(void) { m_master->reset(); }
+
+private:
+	RunInfo *m_master;
+	bool m_unlocked;
 };
 
 class RunInfoPV : public smsStringPV {
@@ -56,13 +56,6 @@ public:
 
 	bool lastValid(void) { return m_lastValid; }
 
-private:
-	std::string m_label;
-	bool m_isRequired;
-	RunInfo *m_runInfo;
-	bool m_unlocked;
-	bool m_lastValid;
-
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
 	void changed(void)
@@ -79,6 +72,13 @@ private:
 		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
 
+private:
+	std::string m_label;
+	bool m_isRequired;
+	RunInfo *m_runInfo;
+	bool m_unlocked;
+	bool m_lastValid;
+
 	friend class RunInfoFloat64PV;
 };
 
@@ -89,9 +89,6 @@ public:
 			double min = -1.7976931348623157E308,
 			double max = 1.7976931348623157E308) :
 		smsFloat64PV(name, min, max), m_stringRunInfoPV(stringRunInfoPV) {}
-
-private:
-	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
 
 	// Defer to Regular *String* Version of This PV for Locking/Unlocking...
 	bool allowUpdate(const gdd &val)
@@ -135,6 +132,9 @@ private:
 		m_value->getTimeStamp(&ts);
 		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 	}
+
+private:
+	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
 };
 
 class RunUserInfoPV : public smsStringPV {
@@ -145,10 +145,6 @@ public:
 
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
-
-private:
-	RunInfo *m_runInfo;
-	bool m_unlocked;
 
 	bool validateUser(const std::string &val) {
 		size_t sep, next;
@@ -244,6 +240,10 @@ private:
 		m_value->getTimeStamp(&ts);
 		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
+
+private:
+	RunInfo *m_runInfo;
+	bool m_unlocked;
 };
 
 static void xmlEncodeTo(std::string &out, const std::string &in,

@@ -46,15 +46,15 @@ public:
 	RestartComBusPV( const std::string &name, ComBusSMSMon *cbsm ) :
 		smsBooleanPV(name), m_comBusSMSMon(cbsm) {}
 
-private:
-	ComBusSMSMon *m_comBusSMSMon;
-
 	void changed(void)
 	{
 		if ( value() ) {
 			m_comBusSMSMon->restartComBus();
 		}
 	}
+
+private:
+	ComBusSMSMon *m_comBusSMSMon;
 };
 
 ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,

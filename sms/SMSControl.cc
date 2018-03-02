@@ -87,7 +87,6 @@ public:
 	PopPulseBufferPV(const std::string &name) :
 		smsInt32PV(name) {}
 
-private:
 	void changed(void)
 	{
 		int32_t pop_state = value();
@@ -115,7 +114,6 @@ public:
 	CleanShutdownPV(const std::string &name) :
 		smsTriggerPV(name) {}
 
-private:
 	void triggered(void)
 	{
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."

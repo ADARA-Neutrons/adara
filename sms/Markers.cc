@@ -19,9 +19,6 @@ public:
 	MarkerPausedPV( const std::string &name, Markers *m ) :
 		smsBooleanPV(name), m_markers(m) {}
 
-private:
-	Markers *m_markers;
-
 	void changed(void)
 	{
 		if ( value() )
@@ -29,6 +26,9 @@ private:
 		else
 			m_markers->resume();
 	}
+
+private:
+	Markers *m_markers;
 };
 
 class MarkerTriggerPV : public smsTriggerPV {
@@ -38,10 +38,10 @@ public:
 	MarkerTriggerPV( const std::string &name, callback cb ) :
 		smsTriggerPV(name), m_cb(cb) {}
 
+	void triggered(void) { m_cb(); }
+
 private:
 	callback m_cb;
-
-	void triggered(void) { m_cb(); }
 };
 
 class MarkerCommentPV : public smsStringPV {
@@ -50,9 +50,6 @@ public:
 
 	MarkerCommentPV( const std::string &name, callback cb ) :
 		smsStringPV(name), m_cb(cb) {}
-
-private:
-	callback m_cb;
 
 	void changed(void)
 	{
@@ -69,6 +66,9 @@ private:
 		m_value->getTimeStamp(&ts);
 		StorageManager::autoSavePV( m_pv_name, comment, &ts );
 	}
+
+private:
+	callback m_cb;
 };
 
 Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :

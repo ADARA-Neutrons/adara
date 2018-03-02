@@ -20,9 +20,6 @@ public:
 	ListenStringPV(const std::string &name, LiveServer *liveServer) :
 		smsStringPV(name), m_liveServer(liveServer) {}
 
-private:
-	LiveServer *m_liveServer;
-
 	void changed(void)
 	{
 		// On Any Change to the LiveServer Listener URI/Service PVs,
@@ -31,6 +28,9 @@ private:
 			<< " PV value changed, Reset Listener Setup...");
 		m_liveServer->setupListener();
 	}
+
+private:
+	LiveServer *m_liveServer;
 };
 
 LiveServer *LiveServer::m_singleton;

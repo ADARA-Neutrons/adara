@@ -41,9 +41,6 @@ class PoolsizePV : public smsStringPV {
 public:
 	PoolsizePV(const std::string &name, uint32_t block_size) :
 		smsStringPV(name), m_block_size(block_size) {}
-private:
-
-	uint64_t m_block_size;
 
 	void changed(void)
 	{
@@ -79,6 +76,9 @@ private:
 		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
+
+private:
+	uint64_t m_block_size;
 };
 
 class PercentPV : public smsUint32PV {
@@ -86,11 +86,6 @@ public:
 	PercentPV(const std::string &name,
 			std::string baseDir, uint32_t block_size) :
 		smsUint32PV(name), m_baseDir(baseDir), m_block_size(block_size) {}
-
-private:
-
-	std::string m_baseDir;
-	uint64_t m_block_size;
 
 	void changed(void)
 	{
@@ -129,16 +124,16 @@ private:
 		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
+
+private:
+	std::string m_baseDir;
+	uint64_t m_block_size;
 };
 
 class MaxBlocksPV : public smsUint32PV {
 public:
 	MaxBlocksPV(const std::string &name, bool isMultiplier) :
 		smsUint32PV(name), m_isMultiplier(isMultiplier) {}
-
-private:
-
-	bool m_isMultiplier;
 
 	void changed(void)
 	{
@@ -159,14 +154,15 @@ private:
 			StorageManager::update_max_blocks_allowed_pv();
 		}
 	}
+
+private:
+	bool m_isMultiplier;
 };
 
 class BlockSizePV : public smsUint32PV {
 public:
 	BlockSizePV(const std::string &name) :
 		smsUint32PV(name) {}
-
-private:
 
 	// Make "Read-Only" By Design... ;-D
 	bool allowUpdate(const gdd &)
@@ -179,7 +175,6 @@ class RescanRunDirPV : public smsStringPV {
 public:
 	RescanRunDirPV(const std::string &name) :
 		smsStringPV(name) {}
-private:
 
 	void changed(void)
 	{
