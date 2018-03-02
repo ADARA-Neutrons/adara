@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -312,6 +313,9 @@ uint32_t StorageManager::m_nextIndexTime;
 uint32_t StorageManager::m_indexPeriod;
 std::list<StorageManager::IndexEntry> StorageManager::m_stateIndex;
 
+std::map<std::string, std::pair<std::string, std::string> >
+	StorageManager::m_autoSaveConfig;
+
 const char *StorageManager::m_autosave_filename = "SMS.autosav";
 int StorageManager::m_autoSaveFd;
 
@@ -570,7 +574,12 @@ void StorageManager::init(void)
 		}
 	}
 
-	/* Initialize Auto Save File Descriptor */
+	/* Parse Any AutoSave File & Capture PV Config... */
+	if ( !parseAutoSaveFile() ) {
+		ERROR("init(): Failed to Parse SMS AutoSave File...!");
+	}
+
+	/* Initialize AutoSave File Descriptor */
 	m_autoSaveFd = -1;
 }
 
@@ -1363,43 +1372,46 @@ void StorageManager::scanStorage(void)
 		<< m_pendingRuns.size() << " runs pending translation.");
 }
 
-void StorageManager::autoSavePV( std::string name, std::string value,
-		struct timespec *ts )
+void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
+		struct timespec *pv_time )
 {
 	if ( m_autoSaveFd < 0 && !openAutoSaveFile() )
 	{
-		ERROR("autoSavePV(): No Valid Auto Save File Descriptor!"
-			<< " *** Ignoring PV Write-Thru Value Save for " << name
-			<< " = [" << value << "]"
-			<< " at " << ts->tv_sec << "."
-			<< std::setfill('0') << std::setw(9) << ts->tv_nsec);
+		ERROR("autoSavePV(): No Valid AutoSave File Descriptor!"
+			<< " *** Ignoring PV Write-Thru Value Save for " << pv_name
+			<< " = [" << pv_value << "]"
+			<< " at " << pv_time->tv_sec << "."
+			<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec);
 	}
 
 	// Assemble the PV AutoSave Entry...
 	std::stringstream ss;
-	ss << ts->tv_sec << "."
-		<< std::setfill('0') << std::setw(9) << ts->tv_nsec;
-	ss << " " << name << " " << value << std::endl;
+	ss << pv_time->tv_sec << "."
+		<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec;
+	ss << " " << pv_name << " " << pv_value << std::endl;
 	INFO("autoSavePV(): AutoSaving PV Value - " << ss.str());
 
 	// Write PV AutoSave Entry to File...
 	int rc = write( m_autoSaveFd, ss.str().c_str(), ss.str().length() );
 	if ( rc < 0 ) {
 		int e = errno;
-		ERROR("autoSavePV(): Error Writing PV AutoSave Entry to File - "
+		ERROR("autoSavePV(): Error Writing PV AutoSave Entry to File"
+			<< " [" << ss.str() << "] - "
 			<< strerror(e));
 		return;
 	}
 
 	if ( rc != (int) ss.str().length() ) {
 		ERROR("autoSavePV(): Short Write for PV AutoSave Entry"
+			<< " [" << ss.str() << "]"
 			<< " - Wrote " << rc << " out of "
 			<< ss.str().length() << " Bytes Expected!");
 	}
 
 	if ( fsync( m_autoSaveFd ) ) {
 		int e = errno;
-		ERROR("autoSavePV(): Error Syncing PV AutoSave File - "
+		ERROR("autoSavePV(): Error Syncing PV AutoSave File"
+			<< " [" << ss.str() << "] - "
 			<< strerror(e));
 	}
 
@@ -1409,7 +1421,9 @@ void StorageManager::autoSavePV( std::string name, std::string value,
 	if ( fsync( m_base_fd ) ) {
 		int e = errno;
 		ERROR("autoSavePV(): Error with Fsync on SMS Base Dir"
-			<< " for PV AutoSave File - " << strerror(e));
+			<< " for PV AutoSave File"
+			<< " [" << ss.str() << "] - "
+			<< strerror(e));
 	}
 }
 
@@ -1419,18 +1433,190 @@ bool StorageManager::openAutoSaveFile(void)
 			O_CREAT|O_APPEND|O_WRONLY, RUN_STORAGE_MODE);
 	if ( m_autoSaveFd < 0 ) {
 		int e = errno;
-		ERROR("openAutoSaveFile(): Unable to Open SMS Auto Save File"
+		ERROR("openAutoSaveFile(): Unable to Open SMS AutoSave File"
 			<< " for Writing:"
 			<< " [" << m_autosave_filename << "] - "
 			<< strerror(e));
 		return false;
 	}
 	else {
-		ERROR("openAutoSaveFile(): Successfully Opened SMS Auto Save File"
+		ERROR("openAutoSaveFile(): Successfully Opened SMS AutoSave File"
 			<< " for Writing:"
 			<< " [" << m_autosave_filename << "]");
 		return true;
 	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		std::string & pv_value, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		pv_value = it->second.second;
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		double & pv_dvalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		try {
+			pv_dvalue = boost::lexical_cast<double>( it->second.second );
+		}
+		catch (...) {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Float64 Value for PV"
+				<< pv_name << " - (" << it->second.second << ")");
+			return( false );
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::parseAutoSaveFile(void)
+{
+	std::ifstream f(m_autosave_filename);
+
+	if ( f.fail() ) {
+		int e = errno;
+		ERROR("parseAutoSaveFile(): Unable to Open SMS AutoSave File"
+			<< " for Reading:"
+			<< " [" << m_autosave_filename << "] - "
+			<< strerror(e));
+		return false;
+	}
+
+	ERROR("parseAutoSaveFile(): Successfully Opened SMS AutoSave File"
+		<< " for Reading:"
+		<< " [" << m_autosave_filename << "]");
+
+	std::string line;
+	int lineno = 0;
+
+	for (;;) {
+
+		// Get Next Line from AutoSave File...
+		lineno++;
+		getline(f, line);
+		if ( f.fail() )
+			break;
+
+		// Parse the PV AutoSave Line...
+
+		std::istringstream iss(line);
+
+		std::string pv_time;
+		std::string pv_name;
+		std::string pv_value;
+
+		iss >> pv_time;
+
+		iss >> pv_name;
+
+		std::getline( iss, pv_value );
+
+		// Strip Off Preceding White Space...
+		if ( pv_value.at(0) == ' ' )
+			pv_value = pv_value.substr(1);
+
+		DEBUG("parseAutoSaveFile(): Read PV [" << pv_name << "]"
+			<< " at time [" << pv_time << "]"
+			<< " as value [" << pv_value << "]");
+
+		m_autoSaveConfig[ pv_name ] = std::pair<std::string, std::string>(
+			pv_time, pv_value );
+	}
+
+	// Dump AutoSave Config
+	DEBUG("parseAutoSaveFile(): Retrieved AutoSave Config:");
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it;
+	for ( it = m_autoSaveConfig.begin() ;
+			it != m_autoSaveConfig.end(); ++it ) {
+		DEBUG(it->first << "(" << it->second.first << ") = ["
+			<< it->second.second << "]");
+	}
+
+	// XXX TODO: Rotate the AutoSave Files, Now That We've Retrieved
+	// All the PV Values into the Configuration...
+
+	return true;
 }
 
 void StorageManager::backgroundIo(void)

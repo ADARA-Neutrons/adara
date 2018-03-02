@@ -123,8 +123,13 @@ public:
 		return m_scanStart;
 	}
 
-	static void autoSavePV(std::string name, std::string value,
-		struct timespec *ts);
+	static void autoSavePV(std::string pv_name, std::string pv_value,
+		struct timespec *pv_time);
+
+	static bool getAutoSavePV(std::string pv_name, std::string & pv_value,
+		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, double & pv_dvalue,
+		struct timespec & pv_time);
 
 	static void config(const boost::property_tree::ptree &conf);
 
@@ -201,6 +206,9 @@ private:
 	static uint32_t m_nextIndexTime;
 	static uint32_t m_indexPeriod;
 
+	static std::map<std::string, std::pair<std::string, std::string> >
+		m_autoSaveConfig;
+
 	static const char *m_autosave_filename;
 	static int m_autoSaveFd;
 
@@ -231,6 +239,8 @@ private:
 	static bool isValidDaily(const std::string &dir);
 
 	static bool openAutoSaveFile(void);
+
+	static bool parseAutoSaveFile(void);
 
 	static void backgroundIo(void);
 	static void ioCompleted(void);
