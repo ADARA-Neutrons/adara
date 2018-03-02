@@ -132,6 +132,26 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME, &now );
 	m_notesCommentAutoResetPV->update(m_notesCommentAutoReset, &now);
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+
+	if ( StorageManager::getAutoSavePV( m_scanCommentPV->getName(),
+			value, ts ) ) {
+		m_scanCommentPV->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_notesCommentPV->getName(),
+			value, ts ) ) {
+		m_notesCommentPV->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_annotationCommentPV->getName(),
+			value, ts ) ) {
+		m_annotationCommentPV->update(value, &ts);
+	}
 }
 
 Markers::~Markers()

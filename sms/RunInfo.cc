@@ -558,6 +558,79 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 
 	m_connection = StorageManager::onPrologue(
 		boost::bind(&RunInfo::onPrologue, this));
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+	double dvalue;
+
+	// RunInfoFloat64PVs...
+
+	if ( StorageManager::getAutoSavePV(
+			m_massFloat64PV->getName(), dvalue, ts ) ) {
+		m_massFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_densityFloat64PV->getName(), dvalue, ts ) ) {
+		m_densityFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_heightInContainerFloat64PV->getName(), dvalue, ts ) ) {
+		m_heightInContainerFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorDiameterFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorDiameterFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorHeightFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorHeightFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorWidthFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorWidthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorDepthFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorDepthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerDiameterFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerDiameterFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerHeightFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerHeightFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerWidthFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerWidthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerDepthFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerDepthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_volumeCubicFloat64PV->getName(), dvalue, ts ) ) {
+		m_volumeCubicFloat64PV->update(dvalue, &ts);
+	}
+
+	// UserInfo PV
+	if ( StorageManager::getAutoSavePV( m_userPV->getName(), value, ts ) ) {
+		m_userPV->update(value, &ts);
+	}
 }
 
 RunInfo::~RunInfo()
@@ -573,8 +646,17 @@ RunInfo::RunInfoPVSharedPtr RunInfo::addPV(
 	std::string pvName = prefix + pv_name;
 	map[xml_name].reset(
 		new RunInfoPV(pvName, pv_name, (map == m_required), this));
-	m_ctrl->addPV(map[xml_name]);
-	return(map[xml_name]);
+	RunInfoPVSharedPtr pv = map[xml_name];
+	m_ctrl->addPV(pv);
+
+	// Restore Any PVs to AutoSaved Config Values...
+	struct timespec ts;
+	std::string value;
+	if ( StorageManager::getAutoSavePV( pv->getName(), value, ts ) ) {
+		pv->update(value, &ts);
+	}
+
+	return(pv);
 }
 
 std::string RunInfo::getPropId(void)
