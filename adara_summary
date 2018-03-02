@@ -136,6 +136,7 @@ declare -A nHostPVSDComBusConnTimeout
 declare -A nHostPVSDComBusDisconnectError
 declare -A nHostPVSDComBusReconnectThread
 declare -A nHostPVSDDefiningNewDevice
+declare -A nHostPVSDReDefiningDevice
 declare -A nHostPVSDUndefineDevice
 declare -A nHostPVSDUndefineDevicePkt
 declare -A nHostPVSDMakePvNamesUnique
@@ -269,6 +270,7 @@ PARSE_LOG()
 		nHostPVSDComBusDisconnectError[$host]=0
 		nHostPVSDComBusReconnectThread[$host]=0
 		nHostPVSDDefiningNewDevice[$host]=0
+		nHostPVSDReDefiningDevice[$host]=0
 		nHostPVSDUndefineDevice[$host]=0
 		nHostPVSDUndefineDevicePkt[$host]=0
 		nHostPVSDMakePvNamesUnique[$host]=0
@@ -792,6 +794,13 @@ PARSE_LOG()
 			nHostPVSDDefiningNewDevice[$host]=$(( \
 				nHostPVSDDefiningNewDevice[$host] + 1 ))
 
+		# "Re-defining Device" Log
+		elif [[ "$log" =~ \
+				defineDevice\(\):${S}Re-defining${S}Device ]]; then
+			#echo "Re-defining Device..."
+			nHostPVSDReDefiningDevice[$host]=$(( \
+				nHostPVSDReDefiningDevice[$host] + 1 ))
+
 		# "Undefine Device" Log
 		elif [[ "$log" =~ \
 				undefineDevice\(\):${S}Un-defining${S}device ]]; then
@@ -814,7 +823,7 @@ PARSE_LOG()
 				nHostPVSDMakePvNamesUnique[$host] + 1 ))
 
 		# "Assign PV ID" Log
-		elif [[ "$log" =~ assign${S}PV${S}ID ]]; then
+		elif [[ "$log" =~ [Aa]ssign${S}PV${S}ID ]]; then
 			#echo "Assign PV ID..."
 			nHostPVSDAssignPVID[$host]=$(( \
 				nHostPVSDAssignPVID[$host] + 1 ))
@@ -1344,6 +1353,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
 		echo "PVSD \"Defining New Device\" Logs"
+	fi
+	if [[ ${nHostPVSDReDefiningDevice[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDReDefiningDevice[$h]} "
+		echo "PVSD \"Re-defining Device\" Logs"
 	fi
 	if [[ ${nHostPVSDUndefineDevice[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostPVSDUndefineDevice[$h]} "
