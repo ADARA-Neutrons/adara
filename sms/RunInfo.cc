@@ -744,6 +744,7 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 		DEBUG("pvChanged(): PV " << pv->label() << " Changed"
 			<< " - Re-Concatenating Sample Component PV: " << ss.str());
 		m_componentPV->update( ss.str(), &now );
+		m_componentPV->changed();  // Trigger AutoSave...! ;-D
 	}
 
 	// Check for Change in "Required" PV Status...
