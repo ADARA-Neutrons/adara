@@ -1595,23 +1595,21 @@ bool StorageManager::parseAutoSaveFile(void)
 		if ( pv_value.at(0) == ' ' )
 			pv_value = pv_value.substr(1);
 
-		DEBUG("parseAutoSaveFile(): Read PV [" << pv_name << "]"
-			<< " at time [" << pv_time << "]"
-			<< " as value [" << pv_value << "]");
-
 		m_autoSaveConfig[ pv_name ] = std::pair<std::string, std::string>(
 			pv_time, pv_value );
 	}
 
+	DEBUG("parseAutoSaveFile(): Retrieved AutoSave Config, "
+		<< m_autoSaveConfig.size() << " Entries Captured");
+
 	// Dump AutoSave Config
-	DEBUG("parseAutoSaveFile(): Retrieved AutoSave Config:");
-	std::map<std::string,
-		std::pair<std::string, std::string> >::iterator it;
-	for ( it = m_autoSaveConfig.begin() ;
-			it != m_autoSaveConfig.end(); ++it ) {
-		DEBUG(it->first << "(" << it->second.first << ") = ["
-			<< it->second.second << "]");
-	}
+	//std::map<std::string,
+		//std::pair<std::string, std::string> >::iterator it;
+	//for ( it = m_autoSaveConfig.begin() ;
+			//it != m_autoSaveConfig.end(); ++it ) {
+		//DEBUG(it->first << "(" << it->second.first << ") = ["
+			//<< it->second.second << "]");
+	//}
 
 	// XXX TODO: Rotate the AutoSave Files, Now That We've Retrieved
 	// All the PV Values into the Configuration...
