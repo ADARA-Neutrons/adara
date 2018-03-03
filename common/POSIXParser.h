@@ -8,7 +8,7 @@ namespace ADARA {
 class POSIXParser : public Parser {
 public:
 	POSIXParser(unsigned int inital_buffer_size = 1024 * 1024,
-		    unsigned int max_pkt_size = 8 * 1024 * 1024) :
+		    unsigned int max_pkt_size = 48 * 1024 * 1024) : // For PixelMap!
 		Parser(inital_buffer_size, max_pkt_size) { }
 
 	/* Returns false if we hit EOF or a callback asked to stop. We return

@@ -24,7 +24,7 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 #define RLL_PV_VALUE_UPDATE_PURGE_EARLY      3
 
 /// This sets the size of the ADARA parser stream buffer in bytes
-#define ADARA_IN_BUF_SIZE   0x1000000
+#define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
 
 
 //---------------------------------------------------------------------------------------------------------------------
