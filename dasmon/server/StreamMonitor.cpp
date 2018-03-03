@@ -743,6 +743,8 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
             {
                 // Logical PixelId...
                 pid = *rpos++;
+                if ( pid == (uint32_t) -1 )
+                    continue;
                 if ( first_pid )
                 {
                     max_pid = pid;
@@ -756,6 +758,9 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
         m_pixbankmap.clear();
         m_pixbankmap.resize( max_pid + 1, -1 );
 
+        syslog( LOG_ERR, "%s: Max Logical PixelId = %u",
+            "ADARA::PixelMappingAltPkt", max_pid );
+
         // Build Logical-Pid-to-Bank Index
         rpos = (const uint32_t *) a_pkt.mappingData();
         while ( rpos < epos )
@@ -768,8 +773,12 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
             epos2 = rpos + pix_count;
             while ( rpos < epos2 )
             {
+                pid = *rpos++;
+                if ( pid == (uint32_t) -1 )
+                    continue;
+
                 // Store Bank ID to Logical PixelIds Map
-                m_pixbankmap[*rpos++] = bank_id;
+                m_pixbankmap[pid] = bank_id;
             }
         }
         m_pixbankmap_processed = true;
