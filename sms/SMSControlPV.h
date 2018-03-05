@@ -53,6 +53,8 @@ public:
 					  const char * const user,
 					  const char * const host);
 
+	void timestamp(struct timespec &ts);
+
 	void destroy(void);
 
 protected:

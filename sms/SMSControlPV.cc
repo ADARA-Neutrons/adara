@@ -232,6 +232,11 @@ void smsPV::notify(void)
 	}
 }
 
+void smsPV::timestamp(struct timespec &ts)
+{
+    m_value->getTimeStamp(&ts);
+}
+
 void smsPV::destroy(void)
 {
 	/* PVs are pre-allocated; SMControl will clean us up */
