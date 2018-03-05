@@ -1648,16 +1648,10 @@ bool StorageManager::parseAutoSaveFile(void)
 
 		try {
 
+			// If It Exists (Not Already Rotated), Remove Old AutoSave File
 			if ( !stat( dst_asf.str().c_str(), &stats ) ) {
-				// Remove Older AutoSave File...
 				boost::filesystem::remove( boost::filesystem::path(
 					m_baseDir + "/" + dst_asf.str() ) );
-			}
-			else {
-				DEBUG("parseAutoSaveFile(): SMS AutoSave File "
-					<< ( m_baseDir + "/" + dst_asf.str() )
-					<< " Not Found - Nothing to Remove"
-					<< " for AutoSave Rotate...");
 			}
 
 			// Rotate Newer AutoSave File into the Next Slot...
