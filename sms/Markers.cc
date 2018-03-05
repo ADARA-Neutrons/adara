@@ -141,16 +141,19 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	if ( StorageManager::getAutoSavePV( m_scanCommentPV->getName(),
 			value, ts ) ) {
 		m_scanCommentPV->update(value, &ts);
+		m_scanCommentPV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV( m_notesCommentPV->getName(),
 			value, ts ) ) {
 		m_notesCommentPV->update(value, &ts);
+		m_notesCommentPV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV( m_annotationCommentPV->getName(),
 			value, ts ) ) {
 		m_annotationCommentPV->update(value, &ts);
+		m_annotationCommentPV->changed();
 	}
 }
 
