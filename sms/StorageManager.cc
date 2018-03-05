@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <string>
 #include <fstream>
@@ -311,8 +312,12 @@ std::list<StorageManager::IndexEntry> StorageManager::m_stateIndex;
 std::map<std::string, std::pair<std::string, std::string> >
 	StorageManager::m_autoSaveConfig;
 
-const char *StorageManager::m_autosave_filename = "SMS.autosav";
+std::string StorageManager::m_autosave_basename = "SMS";
+std::string StorageManager::m_autosave_filesuffix = ".autosav";
+const char *StorageManager::m_autosave_filename;
 int StorageManager::m_autoSaveFd;
+
+#define SMS_AUTOSAVE_ROTATE_SIZE	(3)
 
 boost::thread StorageManager::m_ioThread;
 
@@ -569,12 +574,17 @@ void StorageManager::init(void)
 		}
 	}
 
+	/* Construct the Default SMS AutoSave File Name... */
+	/* Make Copy, Don't Count on Compiler to return Permanent Reference! */
+	m_autosave_filename =
+		strdup( (m_autosave_basename + m_autosave_filesuffix).c_str() );
+
 	/* Parse Any AutoSave File & Capture PV Config... */
 	if ( !parseAutoSaveFile() ) {
 		ERROR("init(): Failed to Parse SMS AutoSave File...!");
 	}
 
-	/* Initialize AutoSave File Descriptor */
+	/* Initialize AutoSave File Name & Descriptor */
 	m_autoSaveFd = -1;
 }
 
@@ -1606,8 +1616,67 @@ bool StorageManager::parseAutoSaveFile(void)
 			//<< it->second.second << "]");
 	//}
 
-	// XXX TODO: Rotate the AutoSave Files, Now That We've Retrieved
+	// Rotate the AutoSave Files, Now That We've Retrieved
 	// All the PV Values into the Configuration...
+
+	struct stat stats;
+
+	for ( uint32_t i=SMS_AUTOSAVE_ROTATE_SIZE ; i > 0 ; i-- ) {
+
+		std::stringstream src_asf;
+		std::stringstream dst_asf;
+
+		// Move the Current SMS AutoSave File to "Slot 1"...
+		if ( i == 1 ) {
+			src_asf << m_autosave_filename;
+			dst_asf << m_autosave_basename << i << m_autosave_filesuffix;
+		}
+
+		// Move "Slot 'I-1'" AutoSave File into "Slot 'I'"...
+		else {
+			src_asf << m_autosave_basename << (i - 1)
+				<< m_autosave_filesuffix;
+			dst_asf << m_autosave_basename << i << m_autosave_filesuffix;
+		}
+
+		if ( stat( src_asf.str().c_str(), &stats ) ) {
+			DEBUG("parseAutoSaveFile(): SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() )
+				<< " Not Found - Skipping AutoSave Rotate...");
+			continue;
+		}
+
+		try {
+
+			if ( !stat( dst_asf.str().c_str(), &stats ) ) {
+				// Remove Older AutoSave File...
+				boost::filesystem::remove( boost::filesystem::path(
+					m_baseDir + "/" + dst_asf.str() ) );
+			}
+			else {
+				DEBUG("parseAutoSaveFile(): SMS AutoSave File "
+					<< ( m_baseDir + "/" + dst_asf.str() )
+					<< " Not Found - Nothing to Remove"
+					<< " for AutoSave Rotate...");
+			}
+
+			// Rotate Newer AutoSave File into the Next Slot...
+	        boost::filesystem::rename(
+				boost::filesystem::path( m_baseDir + "/" + src_asf.str() ),
+				boost::filesystem::path( m_baseDir + "/" + dst_asf.str() )
+			);
+
+		}
+		catch( boost::filesystem::filesystem_error &e ) {
+			ERROR("parseAutoSaveFile(): Error Rotating SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
+		}
+
+		DEBUG("parseAutoSaveFile(): Rotated SMS AutoSave File "
+			<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+			<< ( m_baseDir + "/" + dst_asf.str() ) );
+	}
 
 	return true;
 }

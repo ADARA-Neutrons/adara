@@ -209,6 +209,8 @@ private:
 	static std::map<std::string, std::pair<std::string, std::string> >
 		m_autoSaveConfig;
 
+	static std::string m_autosave_basename;
+	static std::string m_autosave_filesuffix;
 	static const char *m_autosave_filename;
 	static int m_autoSaveFd;
 
