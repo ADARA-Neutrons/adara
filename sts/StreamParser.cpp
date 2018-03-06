@@ -470,7 +470,7 @@ StreamParser::rxPacket
         ( a_pkt.mappingData() + a_pkt.payload_length()
             - sizeof(uint32_t) );
 
-    uint32_t      base_physical;
+    uint32_t        base_physical;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
@@ -494,6 +494,10 @@ StreamParser::rxPacket
     usleep(30000); // give syslog a chance...
 
     // Now build banks and populate bank container
+
+    uint32_t skip_pix_count = 0;
+    uint32_t tot_pix_count = 0;
+
     while ( rpos < epos )
     {
         base_physical = *rpos++;
@@ -516,6 +520,7 @@ StreamParser::rxPacket
             usleep(30000); // give syslog a chance...
 
             // Next Section
+            skip_pix_count += pix_count;
             rpos += pix_count;
             continue;
         }
@@ -539,6 +544,7 @@ StreamParser::rxPacket
 
         // Append This Section's Logical PixelIds...
         const uint32_t *epos2 = rpos + pix_count;
+        tot_pix_count += pix_count;
         while ( rpos < epos2 )
         {
             //syslog( LOG_INFO, "[%i] %s: Next Logical PixelId = %u",
@@ -561,8 +567,8 @@ StreamParser::rxPacket
         // usleep(30000); // give syslog a chance...
     }
 
-    syslog( LOG_INFO, "[%i] %s: Done with PixelMappingAltPkt Packet",
-        g_pid, "PixelMappingAltPkt" );
+    syslog( LOG_INFO, "[%i] %s: Done with Packet, PixelIds Tot=%u Skip=%u",
+        g_pid, "PixelMappingAltPkt", tot_pix_count, skip_pix_count );
     usleep(30000); // give syslog a chance...
 
     // The receipt of a pixel mapping packet allows state to progress
