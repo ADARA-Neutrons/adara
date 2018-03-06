@@ -470,7 +470,7 @@ StreamParser::rxPacket
         ( a_pkt.mappingData() + a_pkt.payload_length()
             - sizeof(uint32_t) );
 
-    uint32_t        base_physical;
+    //uint32_t        base_physical;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
@@ -497,41 +497,40 @@ StreamParser::rxPacket
 
     uint32_t skip_pix_count = 0;
     uint32_t tot_pix_count = 0;
+    uint32_t skip_sections = 0;
+    uint32_t section_count = 0;
 
     while ( rpos < epos )
     {
-        base_physical = *rpos++;
-        //rpos++;   // Skip Base Physical PixelId...
+        //base_physical = *rpos++;
+        rpos++;   // Skip Base Physical PixelId...
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
-        syslog( LOG_INFO,
-            "[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
-            g_pid, "PixelMappingAltPkt",
-            base_physical, bank_id, pix_count );
-        usleep(30000); // give syslog a chance...
+        //syslog( LOG_INFO,
+            //"[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
+            //g_pid, "PixelMappingAltPkt",
+            //base_physical, bank_id, pix_count );
+        //usleep(30000); // give syslog a chance...
 
         // Skip Unmapped Sections of Pixel Map...!
         if ( bank_id == (uint16_t) UNMAPPED_BANK )
         {
-            syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
-                g_pid, "PixelMappingAltPkt" );
-            usleep(30000); // give syslog a chance...
+            //syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
+                //g_pid, "PixelMappingAltPkt" );
+            //usleep(30000); // give syslog a chance...
 
             // Next Section
             skip_pix_count += pix_count;
             rpos += pix_count;
+            skip_sections++;
             continue;
         }
 
         // Create New BankInfo...
         if ( !m_banks[bank_id] )
         {
-            syslog( LOG_INFO, "[%i] %s: New BankInfo for %u",
-                g_pid, "PixelMappingAltPkt", bank_id );
-            usleep(30000); // give syslog a chance...
-
             // Create BankInfo Instance
             m_banks[bank_id] = makeBankInfo( bank_id,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
@@ -545,30 +544,26 @@ StreamParser::rxPacket
         // Append This Section's Logical PixelIds...
         const uint32_t *epos2 = rpos + pix_count;
         tot_pix_count += pix_count;
-        while ( rpos < epos2 )
-        {
-            //syslog( LOG_INFO, "[%i] %s: Next Logical PixelId = %u",
-                //g_pid, "PixelMappingAltPkt", *rpos );
-            //usleep(30000); // give syslog a chance...
-
+        while ( rpos < epos2 ) {
             m_banks[bank_id]->m_logical_pixelids.push_back(*rpos++);
         }
 
-        syslog( LOG_INFO,
-            "[%i] %s: Done with Section, Last Logical PixelId = %u",
-            g_pid, "PixelMappingAltPkt",
-            m_banks[bank_id]->m_logical_pixelids.back() );
-        usleep(30000); // give syslog a chance...
+        section_count++;
 
         // syslog( LOG_INFO,
-            // "[%i] %s: bank_id=%u base_physical=%u count=%u tot=%lu",
-            // g_pid, "PixelMappingAltPkt", bank_id, base_physical,
+            // "[%i] %s: %s, %s=%u %s=%u %s = %u count=%u tot=%lu",
+            // g_pid, "PixelMappingAltPkt", "Done with Section",
+            // "bank_id", bank_id, "base_physical", base_physical,
+            // "Last Logical PixelId",
+            // m_banks[bank_id]->m_logical_pixelids.back(),
             // pix_count, m_banks[bank_id]->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
     }
 
-    syslog( LOG_INFO, "[%i] %s: Done with Packet, PixelIds Tot=%u Skip=%u",
-        g_pid, "PixelMappingAltPkt", tot_pix_count, skip_pix_count );
+    syslog( LOG_INFO,
+        "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
+        g_pid, "PixelMappingAltPkt", "Done with Packet",
+        tot_pix_count, skip_pix_count, section_count, skip_sections );
     usleep(30000); // give syslog a chance...
 
     // The receipt of a pixel mapping packet allows state to progress
