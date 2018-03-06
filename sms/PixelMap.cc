@@ -4,6 +4,7 @@
 #include <utility>
 #include <stdexcept>
 #include <string>
+#include <iterator>
 #include <queue>
 #include <map>
 #include <set>
@@ -111,7 +112,8 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		map->insert(make_pair(phys, std::make_pair(logical, bank)));
 	}
 
-	INFO("readMap(): Done Reading Pixel Map File.");
+	INFO("readMap(): Done Reading Pixel Map File."
+		<< " [" << ( lineno - 1 ) << " Lines Read.]");
 
 	if (!f.eof()) {
 		std::string msg("Read Error in Pixel Map File ");
@@ -134,12 +136,14 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 	std::queue<uint16_t> sections;
 	TempMap::iterator it, end;
 	uint32_t payload, expected, bank_count;
+	uint32_t tot_pixelid_count;
+	uint32_t section_count;
 	struct timespec now;
 	uint32_t *u32;
 	uint16_t i, entries, bank;
 	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
 
-DEBUG("genAltPacket() Entry");
+	DEBUG("genAltPacket() Entry");
 
 	/* We now support Non-One-to-One Pixel Mappings, therefore
 	 * we must also avoid using any "Inverse" Mappings, as these
@@ -165,6 +169,9 @@ DEBUG("genAltPacket() Entry");
 	entries = 1;
 	bank = it->second.second;
 
+	tot_pixelid_count = 0;
+	section_count = 0;
+
 	for (++it, end = map->end(); it != end; ++it) {
 		/* If we've found a discontinuity in the physical pixels,
 		 * or we changed banks, OR we have _Filled Up_ this section
@@ -174,6 +181,12 @@ DEBUG("genAltPacket() Entry");
 		if (it->first != expected || it->second.second != bank
 				|| entries >= max_section_pixelid_count) {
 			sections.push(entries);
+			// Skip Unmapped Banks...! Don't Count/Send Unmapped PixelIds...
+			// No Need to Send These Over the Wire!
+			if ( bank != (uint16_t) -1 ) {
+				tot_pixelid_count += entries;
+				section_count++;
+			}
 			entries = 0;
 			bank = it->second.second;
 		}
@@ -183,18 +196,28 @@ DEBUG("genAltPacket() Entry");
 
 	/* Push the last section we were working on. */
 	sections.push(entries);
+	// Skip Unmapped Banks...! No Need to Send These Over the Wire!
+	if ( bank != (uint16_t) -1 ) {
+		tot_pixelid_count += entries;
+		section_count++;
+	}
 
-DEBUG("sections.size()=" << sections.size());
+	DEBUG("section_count=" << section_count);
+	DEBUG("sections.size()=" << sections.size());
+	DEBUG("tot_pixelid_count=" << tot_pixelid_count);
+	DEBUG("map->size()=" << map->size());
 
 	/* Now, build the packet; we have enough information to calculate
 	 * its size.
 	 */
-	payload = sections.size() * (sizeof(uint32_t) + 2 * sizeof(uint16_t));
-	payload += map->size() * sizeof(uint32_t);
+	payload = section_count * ( sizeof(uint32_t) + (2 * sizeof(uint16_t)) );
+	DEBUG("payload(sections)=" << payload);
+	payload += tot_pixelid_count * sizeof(uint32_t);
+	DEBUG("payload(tot_pixelid_count)=" << payload);
 	payload += sizeof(uint32_t); // for Explicit "Number of Banks"! ;-D
-DEBUG("payload=" << payload);
+	DEBUG("payload(numbanks)=" << payload);
 	packetSize = payload + sizeof(ADARA::Header);
-DEBUG("packetSize=" << packetSize);
+	DEBUG("packetSize=" << packetSize);
 
 	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
 
@@ -215,6 +238,12 @@ DEBUG("packetSize=" << packetSize);
 		entries = sections.front();
 		sections.pop();
 
+		// Skip Unmapped Banks...! No Need to Send These Over the Wire!
+		if ( it->second.second == (uint16_t) -1 ) {
+			std::advance( it, entries );
+			continue;
+		}
+
 		/* First the header (base physical ID, bankid, count) */
 		bank_count = (uint32_t) it->second.second << 16;
 		bank_count |= entries;
@@ -223,11 +252,17 @@ DEBUG("packetSize=" << packetSize);
 		*u32++ = bank_count;
 
 		/* Then the entries (logical id) */
-		for (i = 0; i < entries; ++it, ++i)
+		for (i = 0; i < entries; ++it, ++i) {
 			*u32++ = it->second.first;
+		}
 	}
 
-DEBUG("Done");
+	//DEBUG("Resulting Size: u32=" << std::hex << u32
+		//<< " Starting Payload: pkt.get()=" << ((uint32_t *) pkt.get())
+		//<< " Effective Size: (4 * (u32 - pkt.get()))="
+		//<< std::dec << ( 4 * ( u32 - ((uint32_t *) pkt.get()) ) ) );
+
+	DEBUG("Done");
 
 	return pkt;
 }
