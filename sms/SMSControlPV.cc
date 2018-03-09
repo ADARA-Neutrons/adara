@@ -1,6 +1,9 @@
 
+#include <sstream>
+
 #include "EPICS.h"
 #include "DataSource.h"
+#include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
@@ -31,7 +34,7 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
  */
 #define uninitialized_var(x) x = 0
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 {
@@ -58,7 +61,7 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getEnabledEnums(gdd &in)
 {
@@ -84,7 +87,7 @@ static gddAppFuncTableStatus getEnabledEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getErrorEnums(gdd &in)
 {
@@ -110,7 +113,7 @@ static gddAppFuncTableStatus getErrorEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 {
@@ -142,7 +145,7 @@ static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsPV::smsPV() : m_interested(false)
 {
@@ -242,6 +245,10 @@ void smsPV::destroy(void)
 	/* PVs are pre-allocated; SMControl will clean us up */
 }
 
+void smsPV::changed(void)
+{
+}
+
 gddAppFuncTableStatus smsPV::getEnums(gdd &)
 {
 	return S_gddAppFuncTable_badType;
@@ -276,7 +283,7 @@ gddAppFuncTableStatus smsPV::maximumNumber(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsReadOnlyChannel::smsReadOnlyChannel(const casCtx &cas) : casChannel(cas)
 {
@@ -287,7 +294,7 @@ bool smsReadOnlyChannel::writeAccess(void) const
 	return false;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 {
@@ -357,9 +364,14 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 	m_value = val;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+void smsRunNumberPV::changed(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
 
 smsRecordingPV::smsRecordingPV(const std::string &prefix,
 	SMSControl *ctrl) :
@@ -432,12 +444,17 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
-	if (m_ctrl->setRecording(v))
+	if (m_ctrl->setRecording(v)) {
+		notify();
+		changed();
 		return S_casApp_success;
+	}
 
 	/* don't cause disruption at the CA level just because the run 
 	 * couldn't start
 	 */
+	notify();
+	changed();
 	return S_casApp_success;
 }
 
@@ -460,11 +477,17 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 	m_value = val;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+void smsRecordingPV::changed(void)
+{
+}
 
-smsStringPV::smsStringPV(const std::string &name) : smsPV(name)
+/* -------------------------------------------------------------------- */
+
+smsStringPV::smsStringPV(const std::string &name, bool auto_save)
+		: smsPV(name), m_auto_save(auto_save)
 {
 	m_pv_name = name;
 	unset();
@@ -611,6 +634,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	nv->setSevr(epicsSevNone);
 
 	m_value = nv;
+
 	notify();
 	changed();
 
@@ -644,6 +668,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 	m_value = nv;
 
 	notify();
+	changed();
 }
 
 void smsStringPV::unset(void)
@@ -683,11 +708,21 @@ std::string smsStringPV::value(void)
 
 void smsStringPV::changed(void)
 {
+	if ( m_auto_save )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
-smsBooleanPV::smsBooleanPV(const std::string &name) : smsPV(name)
+smsBooleanPV::smsBooleanPV(const std::string &name,
+		bool auto_save, bool no_changed_on_update)
+	: smsPV(name), m_auto_save(auto_save),
+	m_no_changed_on_update(no_changed_on_update)
 {
 	struct timespec ts;
 
@@ -764,7 +799,6 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -793,6 +827,11 @@ void smsBooleanPV::update(bool val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+
+	// _Conditionally_ Call "changed()" in "update()" for smsBooleanPV...
+	//    - needed for "MarkerPausedPV" in SMS Markers Class
+	if ( !m_no_changed_on_update )
+		changed();
 }
 
 bool smsBooleanPV::valid(void)
@@ -810,13 +849,24 @@ bool smsBooleanPV::value(void)
 
 void smsBooleanPV::changed(void)
 {
+	if ( m_auto_save )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsEnabledPV::smsEnabledPV(const std::string &name,
-		DataSource *dataSource) :
-	smsBooleanPV(name), m_dataSource(dataSource) { }
+		DataSource *dataSource, bool auto_save) :
+	smsBooleanPV(name, auto_save), m_dataSource(dataSource)
+{
+}
 
 gddAppFuncTableStatus smsEnabledPV::getEnums(gdd &in)
 {
@@ -854,12 +904,13 @@ void smsEnabledPV::update(bool val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
-smsErrorPV::smsErrorPV(const std::string &name) :
-						smsBooleanPV(name) { }
+smsErrorPV::smsErrorPV(const std::string &name)
+	: smsBooleanPV(name, false) { }
 
 gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
 {
@@ -919,9 +970,10 @@ void smsErrorPV::update(bool val, struct timespec *ts, bool major)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsConnectedPV::smsConnectedPV(const std::string &name) : smsPV(name)
 {
@@ -1000,7 +1052,6 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1035,6 +1086,7 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 void smsConnectedPV::connected() {
@@ -1135,10 +1187,11 @@ void smsConnectedPV::changed(void)
 {
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsUint32PV::smsUint32PV(const std::string &name,
-		uint32_t min, uint32_t max) : smsPV(name)
+		uint32_t min, uint32_t max, bool auto_save) :
+	smsPV(name), m_auto_save(auto_save)
 {
 	// Apply Min and Max Limits
 	m_min = min;
@@ -1278,7 +1331,6 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1307,6 +1359,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 bool smsUint32PV::valid(void)
@@ -1324,9 +1377,18 @@ uint32_t smsUint32PV::value(void)
 
 void smsUint32PV::changed(void)
 {
+	if ( m_auto_save )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsInt32PV::smsInt32PV(const std::string &name) : smsPV(name)
 {
@@ -1396,7 +1458,6 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1425,6 +1486,7 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 bool smsInt32PV::valid(void)
@@ -1444,7 +1506,7 @@ void smsInt32PV::changed(void)
 {
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsTriggerPV::smsTriggerPV(const std::string &name)
 {
@@ -1539,15 +1601,22 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			m_value->setTimeStamp(&ts);
 			postEvent(mask, *m_value);
 		}
+
+		changed();
 	}
 
 	return S_casApp_success;
 }
 
-/* ----------------------------------------------------------------------- */
+void smsTriggerPV::changed(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
 
 smsFloat64PV::smsFloat64PV(const std::string &name,
-		double min, double max) : smsPV(name)
+		double min, double max, bool auto_save)
+	: smsPV(name), m_auto_save(auto_save)
 {
 	// Apply Min and Max Limits
 	m_min = min;
@@ -1690,12 +1759,12 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	m_value->get(cur);
+	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
 	if (v == cur)
 		return S_casApp_success;
 
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1711,6 +1780,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	gdd *nval;
 
 	m_value->get(v);
+	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
 	if (v == val)
 		return;
 
@@ -1724,6 +1794,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 bool smsFloat64PV::valid(void)
@@ -1741,5 +1812,14 @@ double smsFloat64PV::value(void)
 
 void smsFloat64PV::changed(void)
 {
+	if ( m_auto_save )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << std::setprecision(17) << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 

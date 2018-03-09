@@ -57,6 +57,8 @@ public:
 
 	void destroy(void);
 
+	virtual void changed(void);
+
 protected:
 	smartGDDPointer m_value;
 	std::string m_pv_name;
@@ -93,6 +95,8 @@ public:
 	casChannel *createChannel(const casCtx &ctx, const char * const user,
 				  const char * const host);
 
+	virtual void changed(void);
+
 private:
 	gddAppFuncTableStatus getValue(gdd &value);
 
@@ -112,6 +116,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
+	virtual void changed(void);
+
 private:
 	SMSControl *m_ctrl;
 
@@ -123,7 +129,7 @@ class smsStringPV : public smsPV {
 public:
 	enum { MAX_LENGTH = 2048 };
 
-	smsStringPV(const std::string &name);
+	smsStringPV(const std::string &name, bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -143,11 +149,16 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+private:
+	bool m_auto_save;
 };
 
 class smsBooleanPV : public smsPV {
 public:
-	smsBooleanPV(const std::string &name);
+	smsBooleanPV(const std::string &name,
+		bool auto_save = false,
+		bool no_changed_on_update = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -165,11 +176,16 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+private:
+	bool m_auto_save;
+	bool m_no_changed_on_update;
 };
 
 class smsEnabledPV : public smsBooleanPV {
 public:
-	smsEnabledPV(const std::string &name, DataSource *dataSource);
+	smsEnabledPV(const std::string &name, DataSource *dataSource,
+		bool auto_save = false);
 
 	virtual aitEnum bestExternalType(void) const;
 
@@ -198,8 +214,9 @@ public:
 class smsUint32PV : public smsPV {
 public:
 	smsUint32PV(const std::string &name,
-		uint32_t min = 0, uint32_t max = INT32_MAX);
-		// Uint32's in EPICS are Really Int32's...
+		// Note: Uint32's in EPICS are Really Int32's...
+		uint32_t min = 0, uint32_t max = INT32_MAX,
+		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -228,6 +245,9 @@ protected:
 	gddAppFuncTableStatus minimumNumber(gdd &in);
 
 	void initReadTable(void);
+
+private:
+	bool m_auto_save;
 };
 
 class smsInt32PV : public smsPV {
@@ -287,6 +307,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
+	virtual void changed(void);
+
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
@@ -298,7 +320,8 @@ class smsFloat64PV : public smsPV {
 public:
 	smsFloat64PV(const std::string &name,
 		double min = -1.7976931348623157E308,
-		double max = 1.7976931348623157E308);
+		double max = 1.7976931348623157E308,
+		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -328,6 +351,9 @@ protected:
 	gddAppFuncTableStatus minimumNumber(gdd &in);
 
 	void initReadTable(void);
+
+private:
+	bool m_auto_save;
 };
 
 #endif /* __SMS_CONTROL_PV_H */
