@@ -1391,6 +1391,7 @@ if [[ "$command" == "status" \
 				dsprefix="${PRE}:SMS:DataSource:${ds}"
 
 				caget $WAIT -S ${dsprefix}:Name
+				caget $WAIT -S ${dsprefix}:BaseName
 				caget $WAIT -S ${dsprefix}:DataURI
 				caget $WAIT ${dsprefix}:Enabled
 				caget $WAIT ${dsprefix}:Required

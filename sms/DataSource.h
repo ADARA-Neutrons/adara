@@ -48,7 +48,7 @@ public:
 	void enabled(void);
 	void disabled(void);
 
-	void setRequired( bool is_required );
+	void setRequired( bool is_required, bool force = false );
 
 	bool isRequired(void) { return m_required; }
 
@@ -85,6 +85,7 @@ private:
 	bool m_save_input_stream;
 
 	boost::shared_ptr<smsStringPV> m_pvName;
+	boost::shared_ptr<smsStringPV> m_pvBaseName;
 	boost::shared_ptr<smsStringPV> m_pvDataURI;
 	boost::shared_ptr<smsEnabledPV> m_pvEnabled;
 	boost::shared_ptr<DataSourceRequiredPV> m_pvRequired;

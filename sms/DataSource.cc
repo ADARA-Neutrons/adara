@@ -454,9 +454,11 @@ DataSource::DataSource( const std::string &name,
 
 	m_enabled = enabled;
 
-	setRequired( is_required );
+	m_required = is_required;
 
-	parseURI(uri);
+	setRequired( m_required, true );
+
+	parseURI(m_uri);
 
 	// Initialize Pulse/Event Bandwidth Statistics
 
@@ -475,8 +477,11 @@ DataSource::DataSource( const std::string &name,
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
 
+	m_pvBaseName = boost::shared_ptr<smsStringPV>(new
+		smsStringPV(prefix + ":BaseName", /* AutoSave */ true));
+
 	m_pvDataURI = boost::shared_ptr<smsStringPV>(new
-		smsStringPV(prefix + ":DataURI"));
+		smsStringPV(prefix + ":DataURI", /* AutoSave */ true));
 
 	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
 		smsEnabledPV(prefix + ":Enabled", this));
@@ -554,6 +559,7 @@ DataSource::DataSource( const std::string &name,
 		smsUint32PV(prefix + ":NumHWSources"));
 
 	m_ctrl->addPV(m_pvName);
+	m_ctrl->addPV(m_pvBaseName);
 	m_ctrl->addPV(m_pvDataURI);
 	m_ctrl->addPV(m_pvEnabled);
 	m_ctrl->addPV(m_pvRequired);
@@ -590,7 +596,8 @@ DataSource::DataSource( const std::string &name,
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	m_pvName->update(m_name, &now);
-	m_pvDataURI->update(uri, &now);
+	m_pvBaseName->update(m_basename, &now);
+	m_pvDataURI->update(m_uri, &now);
 	m_pvRequired->update(m_required, &now);
 	m_pvConnected->disconnected();
 	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
@@ -621,6 +628,41 @@ DataSource::DataSource( const std::string &name,
 	std::stringstream ssMRC;
 	ssMRC << m_max_read_chunk;
 	m_pvMaxReadChunk->update(ssMRC.str(), &now);
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+
+	// DataSource BaseName and URI...
+
+	bool do_name = false;
+
+	if ( StorageManager::getAutoSavePV( m_pvBaseName->getName(),
+			value, ts ) ) {
+		m_basename = value;
+		m_pvBaseName->update(value, &ts);
+		do_name = true;
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvDataURI->getName(),
+			value, ts ) ) {
+		m_uri = value;
+		m_pvDataURI->update(value, &ts);
+		do_name = true;
+	}
+
+	// Regenerate DataSource Name...
+	if ( do_name ) {
+		m_name = m_uri;
+		m_name += " (";
+		m_name += m_basename;
+		m_name += ")";
+		// Parse New URI...
+		parseURI(m_uri);
+		// Update DataSource Name PV...
+		m_pvName->update(m_name, &ts);
+	}
 
 	// Set Up Data Source Connection Timer...
 	try {
@@ -734,22 +776,34 @@ void DataSource::parseURI(std::string uri)
 	}
 }
 
-void DataSource::setRequired(bool is_required)
+void DataSource::setRequired(bool is_required, bool force)
 {
-	m_required = is_required;
-
-	if ( m_required && !m_enabled )
+	// Only Do Stuff if the Value Changed (or on First Setting ("force"))
+	if ( is_required != m_required || force )
 	{
-		std::string isRequired = ( m_required )
-			? "*Required*" : "*Not Required*";
+		INFO("setRequired(): Setting Required Flag to"
+			<< " [" << is_required << "]" << " force=" << force);
 
-		ERROR("*** Note: DISABLED Data Source " << m_name
-			<< " Marked as " << isRequired
-			<< " for Data Collection!");
+		m_required = is_required;
+
+		if ( m_required && !m_enabled )
+		{
+			std::string isRequired = ( m_required )
+				? "*Required*" : "*Not Required*";
+
+			ERROR("*** Note: DISABLED Data Source " << m_name
+				<< " Marked as " << isRequired
+				<< " for Data Collection!");
+		}
+
+		// Tell Control We've Changed Our Required Status...
+		m_ctrl->updateDataSourceConnectivity();
 	}
-
-	// Tell Control We've Changed Our Required Status...
-	m_ctrl->updateDataSourceConnectivity();
+	else {
+		INFO("setRequired(): No Change to Required Flag"
+			<< " [" << m_required << "]" << " force=" << force
+			<< " - Ignoring...");
+	}
 }
 
 void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
@@ -1015,18 +1069,22 @@ void DataSource::startConnect(void)
 	reset();
 
 	// Update Data URI from PV...
+	std::string basename = m_pvBaseName->value();
 	std::string uri = m_pvDataURI->value();
-	if ( uri != m_uri ) {
+	if ( m_basename.compare( basename ) || m_uri.compare( uri ) ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Setting New Data URI from PV: " << uri );
+			<< "Setting New Data Source Info from PVs:"
+			<< " BaseName=" << basename
+			<< " URI=" << uri );
+		m_basename = basename;
 		m_uri = uri;
 		// Regenerate DataSource Name...
-		m_name = uri;
+		m_name = m_uri;
 		m_name += " (";
 		m_name += m_basename;
 		m_name += ")";
 		// Parse New URI...
-		parseURI(uri);
+		parseURI(m_uri);
 		// Update DataSource Name PV...
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME_COARSE, &now);
