@@ -316,7 +316,7 @@ public:
 			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
 			if ( throttle != m_info->getThrottle() )
 			{
-				INFO("DetBankSetBinPV: Changing Detector Bank Set "
+				INFO("DetBankSetThrottlePV: Changing Detector Bank Set "
 					<< m_info->getName() << " Throttle Frequency for "
 					<< m_pv_name << " from " << m_info->getThrottle()
 					<< " to " << throttle);
