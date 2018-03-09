@@ -17,8 +17,16 @@ static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
 class MarkerPausedPV : public smsBooleanPV {
 public:
 	MarkerPausedPV( const std::string &name, Markers *m ) :
-		smsBooleanPV(name), m_markers(m) {}
+		smsBooleanPV(name, /* auto_save */ false,
+			/* no_changed_on_update */ true),
+		m_markers(m)
+	{}
 
+	// Note: We *Don't* Want to Call "changed()" at the end of "update()"
+	// for this smsBooleanPV derivation...
+	//    -> we need to change ("update()") the value of the Paused PV
+	//    _Without_ triggering all the tricking-down consequences! ;-D
+	// This "changed()" method only gets called for External "write()"...
 	void changed(void)
 	{
 		if ( value() )
@@ -141,19 +149,16 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	if ( StorageManager::getAutoSavePV( m_scanCommentPV->getName(),
 			value, ts ) ) {
 		m_scanCommentPV->update(value, &ts);
-		m_scanCommentPV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV( m_notesCommentPV->getName(),
 			value, ts ) ) {
 		m_notesCommentPV->update(value, &ts);
-		m_notesCommentPV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV( m_annotationCommentPV->getName(),
 			value, ts ) ) {
 		m_annotationCommentPV->update(value, &ts);
-		m_annotationCommentPV->changed();
 	}
 }
 
@@ -188,7 +193,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		// Spew "We've Resumed" Packet
 		std::string comment = "Warning: Run Resumed at New Run Start!";
 		emitPacket( now, ADARA::MarkerType::RESUME, comment );
-		// update() doesn't trigger changed()!
+		// _This_ update() _Doesn't_ trigger changed()...!
 		m_pausedPV->update(false, &now);
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
 		// (just use generic Annotation Comment... ;-)
@@ -206,7 +211,6 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		scanStopQueue.push_back(
 			std::pair<struct timespec, std::string>( now,
 				ss_scan.str() + "[PRE-RUN] " + comment ) );
-		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
@@ -266,7 +270,7 @@ void Markers::runStop(void)
 		// Spew "We've Resumed" Packet
 		emitPacket( now, ADARA::MarkerType::RESUME,
 			"Warning: Run Resumed at Run Stop!" );
-		// update() doesn't trigger changed()!
+		// _This_ update() _Doesn't_ trigger changed()...!
 		m_pausedPV->update(false, &now);
 	}
 
@@ -279,7 +283,6 @@ void Markers::runStop(void)
 	if ( m_scanIndex ) {
 		emitPacket( now, ADARA::MarkerType::SCAN_STOP,
 			"Warning: Scan Stopped at Run Stop!" );
-		// update() doesn't trigger changed()!
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
