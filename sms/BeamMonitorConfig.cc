@@ -30,14 +30,18 @@ public:
 		{
 			uint32_t id = value();
 
-			WARN("BeamMonIdPV: CHANGING BEAM MONITOR ID in Config! "
-				<< m_pv_name << " Re-Numbered from " << m_info->getId()
-				<< " to " << id << "! (Never Use This. :-)");
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( id != m_info->getId() )
+			{
+				WARN("BeamMonIdPV: CHANGING BEAM MONITOR ID in Config! "
+					<< m_pv_name << " Re-Numbered from " << m_info->getId()
+					<< " to " << id << "! (Never Use This. :-)");
 
-			m_info->setId(id);
+				m_info->setId(id);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -91,18 +95,22 @@ public:
 
 			std::string newFormat = ( do_histo ) ? "histo" : "event";
 
-			INFO("BeamMonFormatPV: Changing Beam Monitor "
-				<< m_info->getId() << " Output Format for "
-				<< m_pv_name << " from " << m_info->getFormat()
-				<< " to " << newFormat);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( newFormat.compare( m_info->getFormat() ) )
+			{
+				INFO("BeamMonFormatPV: Changing Beam Monitor "
+					<< m_info->getId() << " Output Format for "
+					<< m_pv_name << " from " << m_info->getFormat()
+					<< " to " << newFormat);
 
-			m_info->setFormat(newFormat);
+				m_info->setFormat(newFormat);
 
-			// Update Event/Histo Counts in Config...
-			m_config->updateFormatCounts(do_histo);
+				// Update Event/Histo Counts in Config...
+				m_config->updateFormatCounts(do_histo);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -120,15 +128,19 @@ public:
 		{
 			uint32_t tofOffset = value();
 
-			INFO("BeamMonOffsetPV: Changing Beam Monitor "
-				<< m_info->getId() << " TOF Offset for "
-				<< m_pv_name << " from " << m_info->getTofOffset()
-				<< " to " << tofOffset);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofOffset != m_info->getTofOffset() )
+			{
+				INFO("BeamMonOffsetPV: Changing Beam Monitor "
+					<< m_info->getId() << " TOF Offset for "
+					<< m_pv_name << " from " << m_info->getTofOffset()
+					<< " to " << tofOffset);
 
-			m_info->setTofOffset(tofOffset);
+				m_info->setTofOffset(tofOffset);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -146,15 +158,19 @@ public:
 		{
 			uint32_t tofMax = value();
 
-			INFO("BeamMonMaxPV: Changing Beam Monitor "
-				<< m_info->getId() << " Maximum TOF for "
-				<< m_pv_name << " from " << m_info->getTofMax()
-				<< " to " << tofMax);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofMax != m_info->getTofMax() )
+			{
+				INFO("BeamMonMaxPV: Changing Beam Monitor "
+					<< m_info->getId() << " Maximum TOF for "
+					<< m_pv_name << " from " << m_info->getTofMax()
+					<< " to " << tofMax);
 
-			m_info->setTofMax(tofMax);
+				m_info->setTofMax(tofMax);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -172,11 +188,6 @@ public:
 		{
 			uint32_t tofBin = value();
 
-			INFO("BeamMonBinPV: Changing Beam Monitor "
-				<< m_info->getId() << " TOF Histogram Bin Size for "
-				<< m_pv_name << " from " << m_info->getTofBin()
-				<< " to " << tofBin);
-
 			if ( tofBin < 1 )
 			{
 				ERROR("BeamMonBinPV: TOF Histogram Bin Size < 1!"
@@ -184,10 +195,19 @@ public:
 				tofBin = 1;
 			}
 
-			m_info->setTofBin(tofBin);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofBin != m_info->getTofBin() )
+			{
+				INFO("BeamMonBinPV: Changing Beam Monitor "
+					<< m_info->getId() << " TOF Histogram Bin Size for "
+					<< m_pv_name << " from " << m_info->getTofBin()
+					<< " to " << tofBin);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				m_info->setTofBin(tofBin);
+
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -205,15 +225,20 @@ public:
 		{
 			double distance = value();
 
-			INFO("BeamMonDistancePV: Changing Beam Monitor "
-				<< m_info->getId() << " Distance for "
-				<< m_pv_name << " from " << m_info->getDistance()
-				<< " to " << distance);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
+			if ( distance != m_info->getDistance() )
+			{
+				INFO("BeamMonDistancePV: Changing Beam Monitor "
+					<< m_info->getId() << " Distance for "
+					<< m_pv_name << " from " << m_info->getDistance()
+					<< " to " << distance);
 
-			m_info->setDistance(distance);
+				m_info->setDistance(distance);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
