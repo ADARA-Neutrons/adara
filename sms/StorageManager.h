@@ -130,6 +130,10 @@ public:
 		struct timespec & pv_time);
 	static bool getAutoSavePV(std::string pv_name, double & pv_dvalue,
 		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, uint32_t & pv_ivalue,
+		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, bool & pv_bvalue,
+		struct timespec & pv_time);
 
 	static void config(const boost::property_tree::ptree &conf);
 

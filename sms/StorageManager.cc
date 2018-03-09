@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <stdexcept>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
@@ -181,7 +182,8 @@ public:
 	{
 		std::string rescanRunDir = value();
 
-		if ( !rescanRunDir.length() ) {
+		if ( !rescanRunDir.length()
+				|| !rescanRunDir.compare( "(unset)" ) ) {
 			DEBUG("RescanRunDirPV changed():"
 				<< " Ignoring Empty Run Directory Path Value");
 			return;
@@ -1520,6 +1522,122 @@ bool StorageManager::getAutoSavePV( std::string pv_name,
 				<< " Error Parsing AutoSaved Config Float64 Value for PV"
 				<< pv_name << " - (" << it->second.second << ")");
 			return( false );
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		uint32_t & pv_ivalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		try {
+			pv_ivalue = boost::lexical_cast<uint32_t>( it->second.second );
+		}
+		catch (...) {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Uint32 Value for PV"
+				<< pv_name << " - (" << it->second.second << ")");
+			return( false );
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		bool & pv_bvalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		if ( boost::iequals( it->second.second, "true" )
+				|| !it->second.second.compare( "1" ) ) {
+			pv_bvalue = true;
+		}
+		else if ( boost::iequals( it->second.second, "false" )
+				|| !it->second.second.compare( "0" ) ) {
+			pv_bvalue = false;
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Bool Value for PV"
+				<< pv_name << " - (" << it->second.second << ")"
+				<< ", Assuming *False*...");
+			pv_bvalue = false;
 		}
 
 		size_t dot = it->second.first.find(".");
