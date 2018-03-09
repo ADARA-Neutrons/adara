@@ -910,7 +910,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts)
 /* -------------------------------------------------------------------- */
 
 smsErrorPV::smsErrorPV(const std::string &name)
-	: smsBooleanPV(name, false) { }
+	: smsBooleanPV(name, /* AutoSave */ false) { }
 
 gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
 {

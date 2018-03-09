@@ -17,8 +17,8 @@ static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
 class MarkerPausedPV : public smsBooleanPV {
 public:
 	MarkerPausedPV( const std::string &name, Markers *m ) :
-		smsBooleanPV(name, /* auto_save */ false,
-			/* no_changed_on_update */ true),
+		smsBooleanPV(name, /* AutoSave */ false,
+			/* No Changed on Update */ true),
 		m_markers(m)
 	{}
 
