@@ -125,7 +125,6 @@ public:
 		std::stringstream ss;
 		ss << std::setprecision(17) << value();
 		m_stringRunInfoPV->update( ss.str(), &ts );
-		m_stringRunInfoPV->changed();
 
 		// AutoSave PV Value Change...
 		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
@@ -568,79 +567,66 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	if ( StorageManager::getAutoSavePV(
 			m_massFloat64PV->getName(), dvalue, ts ) ) {
 		m_massFloat64PV->update(dvalue, &ts);
-		m_massFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_densityFloat64PV->getName(), dvalue, ts ) ) {
 		m_densityFloat64PV->update(dvalue, &ts);
-		m_densityFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_heightInContainerFloat64PV->getName(), dvalue, ts ) ) {
 		m_heightInContainerFloat64PV->update(dvalue, &ts);
-		m_heightInContainerFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_interiorDiameterFloat64PV->getName(), dvalue, ts ) ) {
 		m_interiorDiameterFloat64PV->update(dvalue, &ts);
-		m_interiorDiameterFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_interiorHeightFloat64PV->getName(), dvalue, ts ) ) {
 		m_interiorHeightFloat64PV->update(dvalue, &ts);
-		m_interiorHeightFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_interiorWidthFloat64PV->getName(), dvalue, ts ) ) {
 		m_interiorWidthFloat64PV->update(dvalue, &ts);
-		m_interiorWidthFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_interiorDepthFloat64PV->getName(), dvalue, ts ) ) {
 		m_interiorDepthFloat64PV->update(dvalue, &ts);
-		m_interiorDepthFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_outerDiameterFloat64PV->getName(), dvalue, ts ) ) {
 		m_outerDiameterFloat64PV->update(dvalue, &ts);
-		m_outerDiameterFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_outerHeightFloat64PV->getName(), dvalue, ts ) ) {
 		m_outerHeightFloat64PV->update(dvalue, &ts);
-		m_outerHeightFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_outerWidthFloat64PV->getName(), dvalue, ts ) ) {
 		m_outerWidthFloat64PV->update(dvalue, &ts);
-		m_outerWidthFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_outerDepthFloat64PV->getName(), dvalue, ts ) ) {
 		m_outerDepthFloat64PV->update(dvalue, &ts);
-		m_outerDepthFloat64PV->changed();
 	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_volumeCubicFloat64PV->getName(), dvalue, ts ) ) {
 		m_volumeCubicFloat64PV->update(dvalue, &ts);
-		m_volumeCubicFloat64PV->changed();
 	}
 
 	// UserInfo PV
 	if ( StorageManager::getAutoSavePV( m_userPV->getName(), value, ts ) ) {
 		m_userPV->update(value, &ts);
-		m_userPV->changed();
 	}
 
 	// RunInfoPVs by Map...
@@ -652,7 +638,6 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		if ( StorageManager::getAutoSavePV( it->second->getName(),
 				value, ts ) ) {
 			it->second->update(value, &ts);
-			it->second->changed();
 		}
 	}
 
@@ -661,7 +646,6 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		if ( StorageManager::getAutoSavePV( it->second->getName(),
 				value, ts ) ) {
 			it->second->update(value, &ts);
-			it->second->changed();
 		}
 	}
 
@@ -670,7 +654,6 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		if ( StorageManager::getAutoSavePV( it->second->getName(),
 				value, ts ) ) {
 			it->second->update(value, &ts);
-			it->second->changed();
 		}
 	}
 }
@@ -778,7 +761,6 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 		DEBUG("pvChanged(): PV " << pv->label() << " Changed"
 			<< " - Re-Concatenating Sample Component PV: " << ss.str());
 		m_componentPV->update( ss.str(), &ts );
-		m_componentPV->changed();  // Trigger AutoSave...! ;-D
 	}
 
 	// Check for Change in "Required" PV Status...
