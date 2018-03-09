@@ -140,7 +140,8 @@ public:
 	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
 
-	void unset(void);
+	void unset(bool init = false);
+
 	bool valid(void);
 	std::string value(void);
 

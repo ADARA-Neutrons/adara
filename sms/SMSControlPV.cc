@@ -490,7 +490,7 @@ smsStringPV::smsStringPV(const std::string &name, bool auto_save)
 		: smsPV(name), m_auto_save(auto_save)
 {
 	m_pv_name = name;
-	unset();
+	unset( true );
 }
 
 unsigned int smsStringPV::maxDimension(void) const
@@ -648,12 +648,28 @@ bool smsStringPV::allowUpdate(const gdd &)
 
 void smsStringPV::update(const std::string str, struct timespec *ts)
 {
+	if ( str.size() == 0 ) {
+		DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+			<< " Setting to Empty String, Unset Value.");
+		unset();
+		return;
+	}
+
 	/* We ensure we have room for MAX_LENGTH characters, plus a
 	 * trailing nul to make live easier when converting to a std::string.
 	 */
 	char *new_str = new char[MAX_LENGTH+1];
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, (void *)str.c_str(), str.length());
+
+	char *old_str = (char *) m_value->dataPointer();
+
+	if ( !strcmp(new_str, old_str)
+			&& m_value->getStat() == epicsAlarmNone ) {
+		DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+			<< " String Value Did Not Change - Ignore...");
+		return;
+	}
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
@@ -671,7 +687,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 	changed();
 }
 
-void smsStringPV::unset(void)
+void smsStringPV::unset(bool init)
 {
 	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
 		return;
@@ -683,6 +699,22 @@ void smsStringPV::unset(void)
 	memset(new_str, 0, MAX_LENGTH+1);
 	strcpy(new_str, "(unset)");
 
+	if ( !init )
+	{
+		char *old_str = (char *) m_value->dataPointer();
+
+		if ( !strcmp(new_str, old_str)
+				&& m_value->getStat() == epicsAlarmNone ) {
+			DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
+				<< " String Value Did Not Change - Ignore...");
+			return;
+		}
+	}
+	else {
+		DEBUG("smsStringPV::unset() Init m_pv_name=" << m_pv_name
+			<< " to value=[" << new_str << "]");
+	}
+
 	m_value = new gddAtomic(gddAppType_value, aitEnumUint8, 1, MAX_LENGTH);
 	m_value->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 	m_value->setStat(epicsAlarmUDF);
@@ -693,7 +725,10 @@ void smsStringPV::unset(void)
 	m_value->getBound(0, start, nelem);
 
 	notify();
-	changed();
+	
+	// Don't call "changed()" (or AutoSave) on String PV Initialization...
+	if ( !init )
+		changed();
 }
 
 bool smsStringPV::valid(void)
@@ -829,7 +864,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts)
 	notify();
 
 	// _Conditionally_ Call "changed()" in "update()" for smsBooleanPV...
-	//    - needed for "MarkerPausedPV" in SMS Markers Class
+	//    - needed _Not_ to call for "MarkerPausedPV" in SMS Markers Class
 	if ( !m_no_changed_on_update )
 		changed();
 }
@@ -854,9 +889,10 @@ void smsBooleanPV::changed(void)
 		// AutoSave PV Value Change...
 		struct timespec ts;
 		m_value->getTimeStamp(&ts);
-		std::stringstream ss;
-		ss << value();
-		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		bool bval = value();
+		// Use String Representation of Boolean for AutoSave File... :-D
+		std::string bvalstr = ( bval ) ? "true" : "false";
+		StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
 	}
 }
 
