@@ -27,6 +27,8 @@ public:
 
 	bool getSendPausedData(void);
 
+	bool isInit(void) { return m_init; }
+
 private:
 	static LiveServer *m_singleton;
 
@@ -38,6 +40,8 @@ private:
 	static double m_listen_retry;
 
 	static bool m_send_paused_data;
+
+	bool m_init;
 
 	ReadyAdapter *m_fdreg;
 	struct addrinfo *m_addrinfo;

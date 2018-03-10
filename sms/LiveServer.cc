@@ -22,10 +22,17 @@ public:
 
 	void changed(void)
 	{
+		if ( ! m_liveServer->isInit() ) {
+			ERROR("ListenStringPV: " << m_pv_name << " PV value changed"
+				<< " [" << value() << "]"
+				<< " But Live Server Not Yet Initialized - Ignore...");
+			return;
+		}
+
 		// On Any Change to the LiveServer Listener URI/Service PVs,
 		// Reset the Listener Setup... :-D
-		ERROR("ListenStringPV: " << m_pv_name
-			<< " PV value changed, Reset Listener Setup...");
+		ERROR("ListenStringPV: " << m_pv_name << " PV value changed"
+			<< " [" << value() << "]" << " - Reset Listener Setup...");
 		m_liveServer->setupListener();
 	}
 
@@ -64,7 +71,7 @@ void LiveServer::init()
 LiveServer::LiveServer() :
 		m_listen_timer(new TimerAdapter<LiveServer>(this,
 			&LiveServer::listenRetry)),
-		m_fdreg(NULL), m_addrinfo(NULL), m_fd(-1)
+		m_init(false), m_fdreg(NULL), m_addrinfo(NULL), m_fd(-1)
 {
 	// Create Run-Time Configuration PVs for Listener Params/Status
 
@@ -110,8 +117,10 @@ LiveServer::LiveServer() :
 
 	m_pvSendPausedData->update(m_send_paused_data, &now);
 
-	// Initialize Listener...
+	// We're Done Initializing Now...
+	m_init = true;
 
+	// Initialize Listener...
 	setupListener();
 }
 
@@ -162,6 +171,8 @@ void LiveServer::setupListener(void)
 
 	struct timespec now;
 
+	std::string service;
+	std::string host;
 	std::string msg;
 
 	memset(&hints, 0, sizeof(hints));
@@ -171,14 +182,26 @@ void LiveServer::setupListener(void)
 	hints.ai_flags = AI_PASSIVE;
 
 	// Update Listener URI from PV...
-	m_host = m_pvListenerURI->value();
+	host = m_pvListenerURI->value();
+	// Not Soup Yet...
+	if ( !host.compare("(unset)") ) {
+		msg = "Listener URI Not Set Yet - Defer...";
+		goto error;
+	}
+	m_host = host;
 	if ( !m_host.compare("ANY") )
 		node = (char *) NULL;
 	else
 		node = (char *) m_host.c_str();
 
 	// Update Listener Service from PV...
-	m_service = m_pvListenerService->value();
+	service = m_pvListenerService->value();
+	// Not Soup Yet...
+	if ( !service.compare("(unset)") ) {
+		msg = "Listener Service Not Set Yet - Defer...";
+		goto error;
+	}
+	m_service = service;
 
 	rc = getaddrinfo(node, m_service.c_str(), &hints, &m_addrinfo);
 	if (rc) {
