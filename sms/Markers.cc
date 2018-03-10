@@ -125,7 +125,7 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	ctrl->addPV(m_notesCommentPV);
 
 	m_notesCommentAutoResetPV.reset( new smsBooleanPV(
-			prefix + "NotesCommentAutoReset" ) );
+			prefix + "NotesCommentAutoReset", /* AutoSave */ true ) );
 	ctrl->addPV(m_notesCommentAutoResetPV);
 
 	m_annotationCommentPV.reset(
@@ -145,6 +145,7 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 
 	struct timespec ts;
 	std::string value;
+	bool bvalue;
 
 	if ( StorageManager::getAutoSavePV( m_scanCommentPV->getName(),
 			value, ts ) ) {
@@ -154,6 +155,12 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	if ( StorageManager::getAutoSavePV( m_notesCommentPV->getName(),
 			value, ts ) ) {
 		m_notesCommentPV->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_notesCommentAutoResetPV->getName(), bvalue, ts ) ) {
+		m_notesCommentAutoReset = bvalue;
+		m_notesCommentAutoResetPV->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_annotationCommentPV->getName(),
