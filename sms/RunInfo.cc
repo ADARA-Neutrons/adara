@@ -420,7 +420,7 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 
 	// Send Sample Info in RunInfo...?
 	m_sendSampleInRunInfoPV.reset(new smsBooleanPV(prefix
-		+ "SendSampleInRunInfo"));
+		+ "SendSampleInRunInfo", /* AutoSave */ true));
 	m_ctrl->addPV(m_sendSampleInRunInfoPV);
 
 	struct timespec now;
@@ -561,6 +561,15 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	struct timespec ts;
 	std::string value;
 	double dvalue;
+	bool bvalue;
+
+	// SendSampleInRunInfo
+
+	if ( StorageManager::getAutoSavePV(
+			m_sendSampleInRunInfoPV->getName(), bvalue, ts ) ) {
+		m_sendSampleInRunInfo = bvalue;
+		m_sendSampleInRunInfoPV->update(bvalue, &ts);
+	}
 
 	// RunInfoFloat64PVs...
 
