@@ -140,7 +140,8 @@ public:
 	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
 
-	void unset(bool init = false);
+	void unset(bool init = false,
+		struct timespec *ts = (struct timespec *) NULL);
 
 	bool valid(void);
 	std::string value(void);
@@ -150,6 +151,8 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	bool m_first_set;
 
 private:
 	bool m_auto_save;
@@ -177,6 +180,8 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	bool m_first_set;
 
 private:
 	bool m_auto_save;
@@ -236,6 +241,8 @@ public:
 	virtual void changed(void);
 
 	uint32_t m_min, m_max;
+
+	bool m_first_set;
 
 protected:
 	gddAppFuncTable<smsUint32PV>	m_read_table;
@@ -341,6 +348,8 @@ public:
 	virtual void changed(void);
 
 	double m_min, m_max;
+
+	bool m_first_set;
 
 protected:
 	gddAppFuncTable<smsFloat64PV>    m_read_table;
