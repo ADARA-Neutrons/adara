@@ -12,6 +12,7 @@
 #define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
 
 #include <boost/program_options.hpp>
+#include <boost/lexical_cast.hpp>
 
 namespace po = boost::program_options;
 
@@ -89,10 +90,56 @@ static const char *severityString(ADARA::VariableSeverity::Enum severity)
 	return "UndefinedSeverity";
 }
 
+static const char *pulseFlavor(ADARA::PulseFlavor::Enum flavor)
+{
+	switch (flavor) {
+	case ADARA::PulseFlavor::NO_BEAM:
+		return "No Beam";
+	case ADARA::PulseFlavor::NORMAL_TGT_1:
+		return "Target Station 1 Normal";
+	case ADARA::PulseFlavor::NORMAL_TGT_2:
+		return "Target Station 2 Normal";
+	case ADARA::PulseFlavor::DIAG_10us:
+		return "10us Diagnostic";
+	case ADARA::PulseFlavor::DIAG_50us:
+		return "50us Diagnostic";
+	case ADARA::PulseFlavor::DIAG_100us:
+		return "100us Diagnostic";
+	case ADARA::PulseFlavor::SPECIAL_PHYSICS_1:
+		return "Special Physics 1";
+	case ADARA::PulseFlavor::SPECIAL_PHYSICS_2:
+		return "Special Physics 2";
+	}
+
+	return "UndefinedFlavor";
+}
+
+static const char *dataFlags(uint32_t flags)
+{
+	static std::string dataFlagsStr;
+	bool first = true;
+	dataFlagsStr = "";
+	if (flags & ADARA::DataFlags::GOT_NEUTRONS) {
+		if (!first) dataFlagsStr += " ";
+		else first = false;
+		dataFlagsStr += "GOT_NEUTRONS";
+	}
+	if (flags & ADARA::DataFlags::GOT_METADATA) {
+		if (!first) dataFlagsStr += " ";
+		else first = false;
+		dataFlagsStr += "GOT_METADATA";
+	}
+	if (first)
+		dataFlagsStr += "[DataFlags Not Set]";
+	return dataFlagsStr.c_str();
+}
+
 class MungeParser : public ADARA::POSIXParser {
 public:
 	MungeParser() :
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
+		m_starttime_sec(0), m_starttime_nsec(0),
+		m_endtime_sec(0), m_endtime_nsec(0),
 		m_posixRead(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
 		m_out(std::cout)
@@ -114,6 +161,16 @@ public:
 				unsigned int chunk_len);
 
 	// Packet Types to Munge...! ;-D
+
+	bool rxPacket(const ADARA::RawDataPkt &pkt);
+    bool rxPacket(const ADARA::MappedDataPkt &pkt);
+
+	bool handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped);
+
+	bool rxPacket(const ADARA::RTDLPkt &pkt);
+	bool rxPacket(const ADARA::BankedEventPkt &pkt);
+    bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
+	bool rxPacket(const ADARA::RunStatusPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
@@ -123,6 +180,10 @@ public:
 	using ADARA::POSIXParser::rxPacket;
 
 private:
+	uint32_t m_starttime_sec;
+	uint32_t m_starttime_nsec;
+	uint32_t m_endtime_sec;
+	uint32_t m_endtime_nsec;
 	bool m_posixRead;
 	bool m_lowRate;
 	bool m_terse;
@@ -206,6 +267,244 @@ bool MungeParser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	return false;
 }
 
+bool MungeParser::rxPacket(const ADARA::RawDataPkt &pkt)
+{
+	return( handleDataPkt(&pkt, false) );
+}
+
+bool MungeParser::rxPacket(const ADARA::MappedDataPkt &pkt)
+{
+	return( handleDataPkt(dynamic_cast<const ADARA::RawDataPkt *>(&pkt),
+		true) );
+}
+
+bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
+		bool is_mapped)
+{
+	if ( !m_terse ) {
+		printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
+			"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
+			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
+			"    dataFlags=%s 0x%x (%s)\n"
+			"    flavor %d (%s)\n"
+			"    intrapulse %luns tofOffset %luns%s\n"
+			"    charge %lupC, %u events\n",
+			(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
+			is_mapped ? "MAPPED" : "RAW",
+			pkt->base_type(), pkt->version(),
+			pkt->sourceID(), pkt->pktSeq(), pkt->dspSeq(),
+			pkt->endOfPulse() ? " EOP" : "",
+			pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
+			pkt->vetoFlags(), pkt->badVeto() ? " (BAD)" : "",
+			pkt->timingStatus(),
+			pkt->gotDataFlags() ? "true" : "false",
+			(int) pkt->dataFlags(), dataFlags(pkt->dataFlags()),
+			(int) pkt->flavor(), pulseFlavor(pkt->flavor()),
+			(uint64_t) pkt->intraPulseTime() * 100,
+			(uint64_t) pkt->tofOffset() * 100,
+			pkt->tofCorrected() ? "" : " (raw)",
+			(uint64_t) pkt->pulseCharge() * 10, pkt->num_events());
+	}
+
+	// Save Last Packet Time as Potential "End of Run" Timestamp...
+	m_endtime_sec = (uint32_t) (pkt->pulseId() >> 32);
+	m_endtime_nsec = (uint32_t) pkt->pulseId();
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::RTDLPkt &pkt)
+{
+	if ( !m_terse ) {
+		printf("%u.%09u RTDL (0x%x,v%u) [%u bytes]\n"
+			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
+			"    dataFlags=%s 0x%x (%s)\n"
+			"    flavor %d (%s)\n"
+			"    intrapulse %luns tofOffset %luns%s\n"
+			"    charge %lupC period %ups\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
+			pkt.vetoFlags(), pkt.badVeto() ? " (BAD)" : "",
+			pkt.timingStatus(),
+			pkt.gotDataFlags() ? "true" : "false",
+			(int) pkt.dataFlags(), dataFlags(pkt.dataFlags()),
+			(int) pkt.flavor(), pulseFlavor(pkt.flavor()),
+			(uint64_t) pkt.intraPulseTime() * 100,
+			(uint64_t) pkt.tofOffset() * 100,
+			pkt.tofCorrected() ? "" : " (raw)",
+			(uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod());
+	}
+
+	// Save Last Packet Time as Potential "End of Run" Timestamp...
+	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime_nsec = (uint32_t) pkt.pulseId();
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::BankedEventPkt &pkt)
+{
+	if ( !m_terse ) {
+		printf("%u.%09u BANKED EVENT DATA (0x%x,v%u) [%u bytes]\n"
+			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+			pkt.pulseEnergy(), pkt.vetoFlags());
+		if (pkt.flags()) {
+			printf("    flags");
+			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+				printf(" ERROR");
+			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+				printf(" PARTIAL");
+			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+				printf(" VETO");
+			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+				printf(" NO_RTDL");
+			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+				printf(" MAPPING");
+			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+				printf(" DUP_PULSE");
+			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+				printf(" PCHG_UNCOR");
+			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+				printf(" VETO_UNCOR");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
+			printf("\n");
+		}
+	}
+
+	// Save Last Packet Time as Potential "End of Run" Timestamp...
+	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime_nsec = (uint32_t) pkt.pulseId();
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
+{
+	if ( !m_terse ) {
+		printf("%u.%09u BEAM MONITOR DATA (0x%x,v%u) [%u bytes]\n"
+			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+			pkt.pulseEnergy(), pkt.vetoFlags());
+		if (pkt.flags()) {
+			printf("    flags");
+			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+				printf(" ERROR");
+			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+				printf(" PARTIAL");
+			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+				printf(" VETO");
+			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+				printf(" NO_RTDL");
+			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+				printf(" MAPPING");
+			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+				printf(" DUP_PULSE");
+			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+				printf(" PCHG_UNCOR");
+			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+				printf(" VETO_UNCOR");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
+			printf("\n");
+		}
+	}
+
+	// Save Last Packet Time as Potential "End of Run" Timestamp...
+	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime_nsec = (uint32_t) pkt.pulseId();
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
+{
+	if ( !m_terse ) {
+		fprintf(stderr,"%u.%09u RUN STATUS (0x%x,v%u) [%u bytes]\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length());
+
+		switch (pkt.status()) {
+		case ADARA::RunStatus::NO_RUN:
+			fprintf(stderr,"    No current run\n");
+			break;
+		case ADARA::RunStatus::STATE:
+			fprintf(stderr,"    State snapshot\n");
+			break;
+		case ADARA::RunStatus::NEW_RUN:
+			fprintf(stderr,"    New run\n");
+			break;
+		case ADARA::RunStatus::RUN_EOF:
+			fprintf(stderr,"    End of file (run continues)\n");
+			break;
+		case ADARA::RunStatus::RUN_BOF:
+			fprintf(stderr,"    Beginning of file (continuing run)\n");
+			break;
+		case ADARA::RunStatus::END_RUN:
+			fprintf(stderr,"    End of run\n");
+			break;
+		}
+
+		if (pkt.runNumber()) {
+			fprintf(stderr,"    Run %u started at epoch %u\n",
+				pkt.runNumber(), pkt.runStart());
+			if (pkt.status() != ADARA::RunStatus::STATE)
+				fprintf(stderr,"    File index %u\n", pkt.fileNumber());
+#if 0
+			if (pkt.version() == 0x01) {
+				printf("    Paused 0x%x Pause File index %u\n",
+					pkt.paused(), pkt.pauseFileNumber());
+				printf("    Addendum 0x%x Addendum File index %u\n",
+					pkt.addendum(), pkt.addendumFileNumber());
+			}
+#endif
+		}
+	}
+
+	// REF_M "Hysterical" Replay Tweaks to Run Status
+	// - Run Start Time and Run End Time Must Match Historical Data...!
+	if ( m_starttime_sec > 0 && m_starttime_nsec > 0 )
+	{
+		if ( pkt.status() == ADARA::RunStatus::NEW_RUN )
+		{
+			std::cerr << "*** Found Run Status - New Run...!"
+				<< std::endl;
+			uint64_t newPulseId;
+			newPulseId = ((uint64_t) m_starttime_sec) << 32;
+			newPulseId |= m_starttime_nsec;
+			ADARA::RunStatusPkt *PKT =
+				const_cast<ADARA::RunStatusPkt*>(&pkt);
+			PKT->setPulseId( newPulseId );
+			PKT->setRunStart( m_starttime_sec );
+		}
+		else if ( pkt.status() == ADARA::RunStatus::END_RUN )
+		{
+			std::cerr << "*** Found Run Status - End of Run...!"
+				<< std::endl;
+			uint64_t newPulseId;
+			newPulseId = ((uint64_t) m_endtime_sec) << 32;
+			newPulseId |= m_endtime_nsec;
+			ADARA::RunStatusPkt *PKT =
+				const_cast<ADARA::RunStatusPkt*>(&pkt);
+			PKT->setPulseId( newPulseId );
+			// *Always* Set to Run Start Time! ;-D
+			PKT->setRunStart( m_starttime_sec );
+		}
+	}
+
+	return false;
+}
+
 bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
 	if ( !m_terse ) {
@@ -237,6 +536,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 
 	// CNCS FitSam "Off-By-11-Minutes" Bug, November 2017...
 	// - correct timing by 667.908933229 seconds...
+	/*
 	if ( pkt.devId() == 2 )
 	{
 		std::cerr << "*** Found FitSam Device (2) Double Variable Update!"
@@ -257,6 +557,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 			const_cast<ADARA::VariableDoublePkt*>(&pkt);
 		PKT->setPulseId( newPulseId );
 	}
+	*/
 
 	return false;
 }
@@ -391,12 +692,16 @@ void MungeParser::read_file(int fd)
 
 void MungeParser::parse(int argc, char **argv)
 {
+	std::string m_starttime;
+
 		po::options_description opts("Allowed options");
 		opts.add_options()
 		("help,h", "Show usage information")
 		("posixread,P", "Use POSIX read() to parse incoming stream")
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
-		("catch,C", "Catch Exceptions, Try to parse past bad packets");
+		("catch,C", "Catch Exceptions, Try to parse past bad packets")
+		("starttime", po::value<std::string>(&m_starttime),
+			"Hysterical Start Time for Experiment Data");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -423,6 +728,21 @@ void MungeParser::parse(int argc, char **argv)
 			std::cerr << opts << std::endl;
 			exit(2);
 		}
+
+	if ( m_starttime.size() ) {
+		std::cerr << "Run Start Time Requested as: "
+			<< m_starttime << std::endl;
+		size_t dot = m_starttime.find(".");
+		if ( dot != std::string::npos ) {
+			m_starttime_sec = boost::lexical_cast<uint32_t>(
+				m_starttime.substr(0, dot) );
+			m_starttime_nsec = boost::lexical_cast<uint32_t>(
+				m_starttime.substr(dot + 1) );
+			std::cerr << "Run Start Time"
+				<< " -> sec=" << m_starttime_sec
+				<< " nsec=" << m_starttime_nsec << std::endl;
+		}
+	}
 
 	m_posixRead = vm.count("posixread");
 	m_lowRate = vm.count("low");
