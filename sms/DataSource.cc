@@ -62,8 +62,10 @@ RateLimitedLogging::History RLLHistory_DataSource;
 class DataSourceRequiredPV : public smsBooleanPV {
 public:
 	DataSourceRequiredPV( const std::string &name,
-			DataSource *dataSource ) :
-		smsBooleanPV(name), m_dataSource(dataSource) { }
+			DataSource *dataSource, bool auto_save = false ) :
+		smsBooleanPV(name, auto_save), m_dataSource(dataSource),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
@@ -77,10 +79,22 @@ public:
 			<< " for Data Collection!");
 
 		m_dataSource->setRequired( is_required );
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			// Use String Representation of Boolean for AutoSave File...
+			std::string bvalstr = ( is_required ) ? "true" : "false";
+			StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
+		}
 	}
 
 private:
 	DataSource *m_dataSource;
+
+	bool m_auto_save;
 };
 
 
@@ -495,7 +509,26 @@ DataSource::DataSource( const std::string &name,
 		ts_enabled = now;
 	}
 
+	// Check for "Required" AutoSave _Now_ Before Proceeding...
+	//    - "m_required" gets used immediately in setRequired()...!
+
+	struct timespec ts_required;
+
+	m_pvRequired = boost::shared_ptr<DataSourceRequiredPV>(new
+		DataSourceRequiredPV(prefix + ":Required", this,
+			/* AutoSave */ true));
+
 	m_required = is_required;
+
+	if ( StorageManager::getAutoSavePV( m_pvRequired->getName(),
+			bvalue, ts_required ) ) {
+		DEBUG("DataSource(): Updating Required State from AutoSave"
+			<< " - m_required=" << m_required << " -> " << bvalue);
+		m_required = bvalue;
+	}
+	else {
+		ts_required = now;
+	}
 
 	setRequired( m_required, true );
 
@@ -509,9 +542,6 @@ DataSource::DataSource( const std::string &name,
 
 	m_pvDataURI = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":DataURI", /* AutoSave */ true));
-
-	m_pvRequired = boost::shared_ptr<DataSourceRequiredPV>(new
-		DataSourceRequiredPV(prefix + ":Required", this));
 
 	m_pvConnected = boost::shared_ptr<smsConnectedPV>(new
 		smsConnectedPV(prefix + ":Connected"));
@@ -619,7 +649,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvName->update(m_name, &now);
 	m_pvBaseName->update(m_basename, &now);
 	m_pvDataURI->update(m_uri, &now);
-	m_pvRequired->update(m_required, &now);
+	m_pvRequired->update(m_required, &ts_required); // AutoSave TimeStamp
 	m_pvConnected->disconnected();
 	m_pvConnectRetryTimeout->update(m_connect_retry, &now);
 	m_pvConnectTimeout->update(m_connect_timeout, &now);
