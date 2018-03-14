@@ -446,25 +446,12 @@ DataSource::DataSource( const std::string &name,
 	// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
 	m_ctrl = SMSControl::getInstance();
 
-	// Parse Basic Data Source Info...
-
-	m_name += " (";
-	m_name += m_basename;
-	m_name += ")";
-
-	m_enabled = enabled;
-
-	m_required = is_required;
-
-	setRequired( m_required, true );
-
-	parseURI(m_uri);
-
 	// Initialize Pulse/Event Bandwidth Statistics
 
 	resetBandwidthStatistics();
 
-	// Create Run-Time Status and Configuration PVs Per Data Source...
+	// Create Run-Time Status and Configuration PV Prefix
+	//    - Full Set of PVs Per Data Source Index...
 
 	std::string prefix(m_ctrl->getBeamlineId());
 	prefix += ":SMS";
@@ -474,6 +461,46 @@ DataSource::DataSource( const std::string &name,
 	ss << m_smsSourceId;
 	prefix += ss.str();
 
+	// Parse Basic Data Source Info...
+
+	m_name += " (";
+	m_name += m_basename;
+	m_name += ")";
+
+	// Get "Now" Timestamp for Subsequent PV Updates...
+	// (Need it early for "Enabled" PV... ;-D)
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
+
+	// Check for "Enabled" AutoSave _Now_ Before Proceeding...
+	//    - "m_enabled" gets used immediately in setRequired(), but we
+	//    wait until the very end of the Constructor to Update the PV...!
+
+	struct timespec ts_enabled;
+	bool bvalue;
+
+	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
+		smsEnabledPV(prefix + ":Enabled", this, /* AutoSave */ true));
+
+	m_enabled = enabled;
+
+	if ( StorageManager::getAutoSavePV( m_pvEnabled->getName(),
+			bvalue, ts_enabled ) ) {
+		DEBUG("DataSource(): Updating Enabled State from AutoSave"
+			<< " - m_enabled=" << m_enabled << " -> " << bvalue);
+		m_enabled = bvalue;
+	}
+	else {
+		ts_enabled = now;
+	}
+
+	m_required = is_required;
+
+	setRequired( m_required, true );
+
+	parseURI(m_uri);
+
 	m_pvName = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":Name"));
 
@@ -482,9 +509,6 @@ DataSource::DataSource( const std::string &name,
 
 	m_pvDataURI = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":DataURI", /* AutoSave */ true));
-
-	m_pvEnabled = boost::shared_ptr<smsEnabledPV>(new
-		smsEnabledPV(prefix + ":Enabled", this));
 
 	m_pvRequired = boost::shared_ptr<DataSourceRequiredPV>(new
 		DataSourceRequiredPV(prefix + ":Required", this));
@@ -591,9 +615,6 @@ DataSource::DataSource( const std::string &name,
 
 	// Initialize Data Source PVs...
 	// (All except "Enabled"!  Save that for later... :-)
-
-	struct timespec now;
-	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	m_pvName->update(m_name, &now);
 	m_pvBaseName->update(m_basename, &now);
@@ -715,7 +736,8 @@ DataSource::DataSource( const std::string &name,
 		boost::bind(&DataSource::onSavePrologue, this), m_smsSourceId );
 
 	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
-	m_pvEnabled->update(m_enabled, &now);
+	// (Possibly Using TimeStamp from AutoSaved Value... ;-D)
+	m_pvEnabled->update(m_enabled, &ts_enabled);
 }
 
 DataSource::~DataSource()
