@@ -163,13 +163,13 @@ public:
 	// Packet Types to Munge...! ;-D
 
 	bool rxPacket(const ADARA::RawDataPkt &pkt);
-    bool rxPacket(const ADARA::MappedDataPkt &pkt);
+	bool rxPacket(const ADARA::MappedDataPkt &pkt);
 
 	bool handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped);
 
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
-    bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
+	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
 	bool rxPacket(const ADARA::RunStatusPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
