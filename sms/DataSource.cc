@@ -547,16 +547,20 @@ DataSource::DataSource( const std::string &name,
 		smsConnectedPV(prefix + ":Connected"));
 
 	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0));
+		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":DataTimeout", 0.0));
+		smsFloat64PV(prefix + ":DataTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvDataTimeoutRetry = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":DataTimeoutRetry"));
+		smsUint32PV(prefix + ":DataTimeoutRetry", 0, INT32_MAX,
+			/* AutoSave */ true));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP"));
@@ -684,6 +688,8 @@ DataSource::DataSource( const std::string &name,
 
 	struct timespec ts;
 	std::string value;
+	uint32_t uvalue;
+	double dvalue;
 
 	// DataSource BaseName and URI...
 
@@ -713,6 +719,32 @@ DataSource::DataSource( const std::string &name,
 		parseURI(m_uri);
 		// Update DataSource Name PV...
 		m_pvName->update(m_name, &ts);
+	}
+
+	// DataSource Timeouts...
+
+	if ( StorageManager::getAutoSavePV( m_pvConnectRetryTimeout->getName(),
+			dvalue, ts ) ) {
+		m_connect_retry = dvalue;
+		m_pvConnectRetryTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvConnectTimeout->getName(),
+			dvalue, ts ) ) {
+		m_connect_timeout = dvalue;
+		m_pvConnectTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvDataTimeout->getName(),
+			dvalue, ts ) ) {
+		m_data_timeout = dvalue;
+		m_pvDataTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvDataTimeoutRetry->getName(),
+			uvalue, ts ) ) {
+		m_data_timeout_retry = uvalue;
+		m_pvDataTimeoutRetry->update(uvalue, &ts);
 	}
 
 	// Set Up Data Source Connection Timer...
