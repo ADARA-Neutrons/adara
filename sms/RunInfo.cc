@@ -86,8 +86,8 @@ class RunInfoFloat64PV : public smsFloat64PV {
 public:
 	RunInfoFloat64PV(const std::string &name,
 			RunInfo::RunInfoPVSharedPtr stringRunInfoPV,
-			double min = -1.7976931348623157E308,
-			double max = 1.7976931348623157E308) :
+			double min = FLOAT64_MIN,
+			double max = FLOAT64_MAX) :
 		smsFloat64PV(name, min, max), m_stringRunInfoPV(stringRunInfoPV) {}
 
 	// Defer to Regular *String* Version of This PV for Locking/Unlocking...
