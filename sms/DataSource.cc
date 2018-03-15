@@ -563,19 +563,20 @@ DataSource::DataSource( const std::string &name,
 			/* AutoSave */ true));
 
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":IgnoreEoP"));
+		smsBooleanPV(prefix + ":IgnoreEoP", /* AutoSave */ true));
 
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":MixedDataPackets"));
+		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
 
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
-		smsStringPV(prefix + ":MaxReadChunk"));
+		smsStringPV(prefix + ":MaxReadChunk", /* AutoSave */ true));
 
 	m_pvRTDLNoDataThresh = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":RTDLNoDataThresh"));
+		smsUint32PV(prefix + ":RTDLNoDataThresh", 0, INT32_MAX,
+			/* AutoSave */ true));
 
 	m_pvSaveInputStream = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":SaveInputStream"));
+		smsBooleanPV(prefix + ":SaveInputStream", /* AutoSave */ true));
 
 	m_pvPulseBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
 		smsUint32PV(prefix + ":PulseBandwidthSecond"));
@@ -745,6 +746,63 @@ DataSource::DataSource( const std::string &name,
 			uvalue, ts ) ) {
 		m_data_timeout_retry = uvalue;
 		m_pvDataTimeoutRetry->update(uvalue, &ts);
+	}
+
+	// Misc DataSource Control Settings...
+
+	if ( StorageManager::getAutoSavePV( m_pvIgnoreEoP->getName(),
+			bvalue, ts ) ) {
+		m_ignore_eop = bvalue;
+		m_pvIgnoreEoP->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvMixedDataPackets->getName(),
+			bvalue, ts ) ) {
+		m_mixed_data_packets = bvalue;
+		m_pvMixedDataPackets->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvRTDLNoDataThresh->getName(),
+			uvalue, ts ) ) {
+		m_rtdlNoDataThresh = uvalue;
+		m_pvRTDLNoDataThresh->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvSaveInputStream->getName(),
+			bvalue, ts ) ) {
+		m_save_input_stream = bvalue;
+		m_pvSaveInputStream->update(bvalue, &ts);
+	}
+
+	// Restore/Parse/Check Max Read Chunk from AutoSave... ;-D
+
+	if ( StorageManager::getAutoSavePV( m_pvMaxReadChunk->getName(),
+			value, ts ) ) {
+		unsigned int tmp_max_read_chunk;
+		bool parse_ok = true;
+		try {
+			tmp_max_read_chunk = parse_size(value);
+		} catch (std::runtime_error e) {
+			std::string msg("Unable to parse read size for source '");
+			msg += m_name;
+			msg += "': ";
+			msg += e.what();
+			ERROR("Invalid AutoSave Value for Max Read Size: "
+				<< msg << " - Leave As Is"
+				<< " m_max_read_chunk=" << m_max_read_chunk);
+			parse_ok = false;
+		}
+		if ( parse_ok ) {
+			m_max_read_chunk = tmp_max_read_chunk;
+			// Log the change...
+			std::stringstream ssMRC;
+			ssMRC << "AutoSave:";
+			ssMRC << " Setting Max Read Chunk Size for " << m_name;
+			ssMRC << " to " << m_max_read_chunk;
+			ssMRC << " (" << value << ")";
+			DEBUG(ssMRC.str());
+			m_pvMaxReadChunk->update(value, &ts);
+		}
 	}
 
 	// Set Up Data Source Connection Timer...
@@ -1422,8 +1480,7 @@ void DataSource::dataReady(void)
 			std::stringstream ssMRC;
 			ssMRC << ( m_ctrl->getRecording() ? "[RECORDING] " : "" );
 			ssMRC << "Setting Max Read Chunk Size for " << m_name;
-			ssMRC << " to ";
-			ssMRC << m_max_read_chunk;
+			ssMRC << " to " << m_max_read_chunk;
 			ssMRC << " (" << val << ")";
 			INFO(ssMRC.str());
 		}
