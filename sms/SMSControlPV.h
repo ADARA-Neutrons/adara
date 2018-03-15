@@ -5,6 +5,14 @@
 #include <string>
 #include <stdint.h>
 
+#ifndef FLOAT64_MAX
+#define FLOAT64_MAX (1.7976931348623157E308)
+#endif
+
+#ifndef FLOAT64_MIN
+#define FLOAT64_MIN (-1.7976931348623157E308)
+#endif
+
 #ifndef INT32_MAX
 #define INT32_MAX (2147483647)
 #endif
@@ -327,8 +335,8 @@ public:
 class smsFloat64PV : public smsPV {
 public:
 	smsFloat64PV(const std::string &name,
-		double min = -1.7976931348623157E308,
-		double max = 1.7976931348623157E308,
+		double min = FLOAT64_MIN,
+		double max = FLOAT64_MAX,
 		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
