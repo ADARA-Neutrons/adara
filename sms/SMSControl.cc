@@ -419,11 +419,13 @@ SMSControl::SMSControl() :
 
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
-							+ "NoEoPPulseBufferSize"));
+							+ "NoEoPPulseBufferSize", 0, INT32_MAX,
+						/* AutoSave */ true));
 
 	m_pvMaxPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
-							+ "MaxPulseBufferSize"));
+							+ "MaxPulseBufferSize", 0, INT32_MAX,
+						/* AutoSave */ true));
 
 	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
 						PopPulseBufferPV(prefix + ":Control:"
@@ -431,15 +433,18 @@ SMSControl::SMSControl() :
 
 	m_pvNoRTDLPulses = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
-							+ "NoRTDLPulses"));
+							+ "NoRTDLPulses",
+						/* AutoSave */ true));
 
 	m_pvDoPulsePchgCorrect = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
-							+ "DoPulsePchgCorrect"));
+							+ "DoPulsePchgCorrect",
+						/* AutoSave */ true));
 
 	m_pvDoPulseVetoCorrect = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
-							+ "DoPulseVetoCorrect"));
+							+ "DoPulseVetoCorrect",
+						/* AutoSave */ true));
 
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
@@ -523,6 +528,43 @@ SMSControl::SMSControl() :
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
 
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	uint32_t uvalue;
+	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNoEoPPulseBufferSize->getName(), uvalue, ts ) ) {
+		m_noEoPPulseBufferSize = uvalue;
+		m_pvNoEoPPulseBufferSize->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxPulseBufferSize->getName(), uvalue, ts ) ) {
+		m_maxPulseBufferSize = uvalue;
+		m_pvMaxPulseBufferSize->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNoRTDLPulses->getName(), bvalue, ts ) ) {
+		m_noRTDLPulses = bvalue;
+		m_pvNoRTDLPulses->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvDoPulsePchgCorrect->getName(), bvalue, ts ) ) {
+		m_doPulsePchgCorrect = bvalue;
+		m_pvDoPulsePchgCorrect->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvDoPulseVetoCorrect->getName(), bvalue, ts ) ) {
+		m_doPulseVetoCorrect = bvalue;
+		m_pvDoPulseVetoCorrect->update(bvalue, &ts);
+	}
+
+	// Initialize Next Run Number...
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to Get Next Run Number");
