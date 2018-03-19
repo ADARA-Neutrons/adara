@@ -73,6 +73,7 @@ declare -A nHostUnknownLogs
 
 declare -A nHostSTSLdapLookupUserName
 declare -A nHostSTSMoreThanOnePVValue
+declare -A nHostSTSPVIDReNumbered
 declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
@@ -207,6 +208,7 @@ PARSE_LOG()
 
 		nHostSTSLdapLookupUserName[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
+		nHostSTSPVIDReNumbered[$host]=0
 		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
@@ -331,6 +333,12 @@ PARSE_LOG()
 			#echo "More Than 1 PV Value for..."
 			nHostSTSMoreThanOnePVValue[$host]=$(( \
 				nHostSTSMoreThanOnePVValue[$host] + 1 ))
+
+		# "PV ID Re-Numbered" Log
+		elif [[ "$log" =~ PV${S}ID${S}Re-Numbered ]]; then
+			#echo "PV ID Re-Numbered..."
+			nHostSTSPVIDReNumbered[$host]=$(( \
+				nHostSTSPVIDReNumbered[$host] + 1 ))
 
 		# "No Matching Units PV Found..." Log
 		elif [[ "$log" =~ No${S}Matching${S}Units${S}PV${S}Found ]]; then
@@ -1133,6 +1141,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
 		echo "STS \"More Than 1 PV Value for\" Logs"
+	fi
+	if [[ ${nHostSTSPVIDReNumbered[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSPVIDReNumbered[$h]} "
+		echo "STS \"PV ID Re-Numbered\" Logs"
 	fi
 	if [[ ${nHostSTSNoMatchingUnitsPV[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
