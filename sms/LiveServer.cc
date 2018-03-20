@@ -7,6 +7,7 @@
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "LiveServer.h"
@@ -17,11 +18,22 @@ static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
 class ListenStringPV : public smsStringPV {
 public:
-	ListenStringPV(const std::string &name, LiveServer *liveServer) :
-		smsStringPV(name), m_liveServer(liveServer) {}
+	ListenStringPV(const std::string &name, LiveServer *liveServer,
+			bool auto_save = false) :
+		smsStringPV(name, auto_save), m_liveServer(liveServer),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			StorageManager::autoSavePV( m_pv_name, value(), &ts );
+		}
+
 		if ( ! m_liveServer->isInit() ) {
 			ERROR("ListenStringPV: " << m_pv_name << " PV value changed"
 				<< " [" << value() << "]"
@@ -38,6 +50,8 @@ public:
 
 private:
 	LiveServer *m_liveServer;
+
+	bool m_auto_save;
 };
 
 LiveServer *LiveServer::m_singleton;
@@ -89,15 +103,18 @@ LiveServer::LiveServer() :
 		smsErrorPV(prefix + ":ListenStatus"));
 
 	m_pvListenRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ListenRetryTimeout", 0.0));
+		smsFloat64PV(prefix + ":ListenRetryTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvListenerURI = boost::shared_ptr<ListenStringPV>(new
-		ListenStringPV(prefix + ":ListenerURI", this));
+		ListenStringPV(prefix + ":ListenerURI", this,
+			/* AutoSave */ true));
 	m_pvListenerService = boost::shared_ptr<ListenStringPV>(new
-		ListenStringPV(prefix + ":ListenerService", this));
+		ListenStringPV(prefix + ":ListenerService", this,
+			/* AutoSave */ true));
 
 	m_pvSendPausedData = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":SendPausedData"));
+		smsBooleanPV(prefix + ":SendPausedData", /* AutoSave */ true));
 
 	ctrl->addPV(m_pvListenStatus);
 	ctrl->addPV(m_pvListenRetryTimeout);
@@ -116,6 +133,37 @@ LiveServer::LiveServer() :
 	m_pvListenerService->update(m_service, &now);
 
 	m_pvSendPausedData->update(m_send_paused_data, &now);
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+	double dvalue;
+	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV( m_pvListenRetryTimeout->getName(),
+			dvalue, ts ) ) {
+		m_listen_retry = dvalue;
+		m_pvListenRetryTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvListenerURI->getName(),
+			value, ts ) ) {
+		m_host = value;
+		m_pvListenerURI->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvListenerService->getName(),
+			value, ts ) ) {
+		m_service = value;
+		m_pvListenerService->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvSendPausedData->getName(),
+			bvalue, ts ) ) {
+		m_send_paused_data = bvalue;
+		m_pvSendPausedData->update(bvalue, &ts);
+	}
 
 	// We're Done Initializing Now...
 	m_init = true;
