@@ -41,18 +41,32 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 class PoolsizePV : public smsStringPV {
 public:
-	PoolsizePV(const std::string &name, uint32_t block_size) :
-		smsStringPV(name), m_block_size(block_size) {}
+	PoolsizePV(const std::string &name, uint32_t block_size,
+			bool auto_save = false) :
+		smsStringPV(name, auto_save), m_block_size(block_size),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
-		DEBUG("PoolsizePV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed...");
-
 		std::string poolsize = value();
+
+		DEBUG("PoolsizePV: " << m_pv_name
+			<< " PV Value Changed to [" << poolsize << "]"
+			<< ", Set Max Blocks Allowed...");
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			StorageManager::autoSavePV( m_pv_name, poolsize, &ts );
+		}
+
 		uint64_t maxSize;
 
-		if (poolsize.length()) {
+		// Make Sure Poolsize is Actually Set...! ;-D
+		if ( poolsize.length() && poolsize.compare("(unset)") ) {
 			try {
 				maxSize = parse_size(poolsize);
 			} catch (std::runtime_error e) {
@@ -62,7 +76,8 @@ public:
 				return;
 			}
 		} else {
-			DEBUG("PoolsizePV changed(): Ignoring Empty PV String Value");
+			DEBUG("PoolsizePV changed():"
+				<< " Ignoring Empty/Unset PV String Value");
 			return;
 		}
 
@@ -81,21 +96,47 @@ public:
 
 private:
 	uint64_t m_block_size;
+
+	bool m_auto_save;
 };
 
 class PercentPV : public smsUint32PV {
 public:
 	PercentPV(const std::string &name,
-			std::string baseDir, uint32_t block_size) :
-		smsUint32PV(name), m_baseDir(baseDir), m_block_size(block_size) {}
+			std::string baseDir, uint32_t block_size,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save),
+		m_baseDir(baseDir), m_block_size(block_size),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
-		DEBUG("PercentPV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed...");
-
 		uint32_t percent = value();
+
+		DEBUG("PercentPV: " << m_pv_name
+			<< " PV Value Changed to " << percent
+			<< ", Set Max Blocks Allowed...");
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			std::stringstream ss;
+			ss << percent;
+			StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		}
+
 		uint64_t maxSize;
+
+		// Make Sure Percent is Actually Set...! ;-D
+		//    -> *Don't* Set Max Blocks to Zero...! ;-o
+		if ( !percent ) {
+			DEBUG("PercentPV changed(): Ignoring Zero PV Value");
+			return;
+		}
 
 		/* If the user doesn't specify a size, we'll use a percentage
 		 * of the total space, 80% by default.
@@ -129,13 +170,21 @@ public:
 
 private:
 	std::string m_baseDir;
+
 	uint64_t m_block_size;
+
+	bool m_auto_save;
 };
 
 class MaxBlocksPV : public smsUint32PV {
 public:
-	MaxBlocksPV(const std::string &name, bool isMultiplier) :
-		smsUint32PV(name), m_isMultiplier(isMultiplier) {}
+	MaxBlocksPV(const std::string &name, bool isMultiplier,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save),
+		m_isMultiplier(isMultiplier),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
@@ -146,6 +195,16 @@ public:
 			<< ( m_isMultiplier ? " Multiplier" : " Base" )
 			<< " to "
 			<< max_blocks_allowed_value );
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			std::stringstream ss;
+			ss << max_blocks_allowed_value;
+			StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		}
 
 		// Set Max Blocks Allowed Value (Multiplier/Base)
 		// for StorageManager...
@@ -159,6 +218,8 @@ public:
 
 private:
 	bool m_isMultiplier;
+
+	bool m_auto_save;
 };
 
 class BlockSizePV : public smsUint32PV {
@@ -609,16 +670,20 @@ void StorageManager::lateInit(void)
 	prefix += ":StorageManager";
 
 	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new
-		PoolsizePV(prefix + ":Poolsize", m_block_size));
+		PoolsizePV(prefix + ":Poolsize", m_block_size,
+			/* AutoSave */ true));
 
 	m_pvPercent = boost::shared_ptr<PercentPV>(new
-		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
+		PercentPV(prefix + ":Percent", m_baseDir, m_block_size,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvMaxBlocksAllowedMultiplier = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvBlockSize = boost::shared_ptr<BlockSizePV>(new
 		BlockSizePV(prefix + ":BlockSize"));
@@ -656,6 +721,36 @@ void StorageManager::lateInit(void)
 
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
+
+	/* Restore Any PVs to AutoSaved Config Values... */
+
+	struct timespec ts;
+	std::string value;
+	uint32_t uvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvPoolsize->getName(), value, ts ) ) {
+		m_poolsize = value;
+		m_pvPoolsize->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvPercent->getName(), uvalue, ts ) ) {
+		m_percent = uvalue;
+		m_pvPercent->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxBlocksAllowed->getName(), uvalue, ts ) ) {
+		m_max_blocks_allowed_base = uvalue;
+		m_pvMaxBlocksAllowed->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxBlocksAllowedMultiplier->getName(), uvalue, ts ) ) {
+		m_max_blocks_allowed_multiplier = uvalue;
+		m_pvMaxBlocksAllowedMultiplier->update(uvalue, &ts);
+	}
 
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
