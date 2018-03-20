@@ -4,9 +4,10 @@
 #include <string>
 #include <boost/bind.hpp>
 
-#include "ComBusSMSMon.h"
+#include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
+#include "ComBusSMSMon.h"
 #include "Logging.h"
 
 static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
@@ -258,13 +259,13 @@ ComBusSMSMon::start(void)
 			RestartComBusPV( prefix + ":Restart", this ));
 
 		m_pvDomain = boost::shared_ptr<smsStringPV>(new
-			smsStringPV(prefix + ":Domain"));
+			smsStringPV(prefix + ":Domain", /* AutoSave */ true));
 		m_pvBrokerURI = boost::shared_ptr<smsStringPV>(new
-			smsStringPV(prefix + ":BrokerURI"));
+			smsStringPV(prefix + ":BrokerURI", /* AutoSave */ true));
 		m_pvBrokerUser = boost::shared_ptr<smsStringPV>(new
-			smsStringPV(prefix + ":BrokerUser"));
+			smsStringPV(prefix + ":BrokerUser", /* AutoSave */ true));
 		m_pvBrokerPass = boost::shared_ptr<smsStringPV>(new
-			smsStringPV(prefix + ":BrokerPass"));
+			smsStringPV(prefix + ":BrokerPass", /* AutoSave */ true));
 
 		ctrl->addPV(m_pvRestartComBus);
 
@@ -283,6 +284,36 @@ ComBusSMSMon::start(void)
 		m_pvBrokerUser->update(m_broker_user, &now);
 		m_pvBrokerPass->update(m_broker_pass, &now);
 
+		// Restore Any PVs to AutoSaved Config Values...
+
+		struct timespec ts;
+		std::string value;
+
+		if ( StorageManager::getAutoSavePV( m_pvDomain->getName(),
+				value, ts ) ) {
+			m_domain = value;
+			m_pvDomain->update(value, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV( m_pvBrokerURI->getName(),
+				value, ts ) ) {
+			m_broker_uri = value;
+			m_pvBrokerURI->update(value, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV( m_pvBrokerUser->getName(),
+				value, ts ) ) {
+			m_broker_user = value;
+			m_pvBrokerUser->update(value, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV( m_pvBrokerPass->getName(),
+				value, ts ) ) {
+			m_broker_pass = value;
+			m_pvBrokerPass->update(value, &ts);
+		}
+
+		// Start ComBus Comm Thread...
 		m_comm_thread = new boost::thread(
 			boost::bind( &ComBusSMSMon::commThread, this ) );
 	}
