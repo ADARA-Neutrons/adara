@@ -1323,7 +1323,7 @@ private:
         )
         {
             m_nxgen.writeString( path, name, value );
-            if ( units.size() ) {
+            if ( units.size() && units.compare("(unset)") ) {
                 m_nxgen.writeStringAttribute( path + "/" + name,
                     "units", units );
             }
