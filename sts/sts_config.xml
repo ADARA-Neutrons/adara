@@ -21,6 +21,8 @@
 		<type>NXsample</type>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Id$</pattern>
+			<pattern>SampleId$</pattern>
+			<pattern>CS:ITEMS$</pattern>
 			<name>identifier</name>
 		</element_last_value>
 		<element_last_value>
@@ -56,6 +58,7 @@
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:ContainerName$</pattern>
+			<pattern>CS:ITEMS:Container$</pattern>
 			<name>container_name</name>
 		</element_last_value>
 		<element_last_value>
