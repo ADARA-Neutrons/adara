@@ -27,7 +27,8 @@
 #
 
 usage="   usage: deploy_adara \\ \n            "
-usage="$usage [ sms | sts | sts_test | sts_hfir | sts_hfir_test \\ \n"
+usage="$usage [ sms | sts | sts_test | sts_dummy  \\ \n"
+usage="$usage                 | sts_hfir | sts_hfir_test \\ \n"
 usage="$usage                 | pvsd | dasmon | dasmond ]"
 
 if [ $# != 1 ]; then
@@ -59,6 +60,11 @@ elif [ "$1" == "sts" ]; then
 	IS_STS=1
 elif [ "$1" == "sts_test" ]; then
 	PROG="STS_TEST"
+	prog="sts"
+	service=""
+	IS_STS=1
+elif [ "$1" == "sts_dummy" ]; then
+	PROG="STS_DUMMY"
 	prog="sts"
 	service=""
 	IS_STS=1
@@ -99,7 +105,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.5.2"
+DEPLOY_VERSION="1.5.3"
 
 TMP_DIR="/tmp"
 
@@ -1114,6 +1120,11 @@ for exe_path in "$tag_archive"/* ; do
 		echo -e "\nModifying STS Executable $exe for Test Deployment." \
 			| tee -a $LOG
 		exe="${exe}_test"
+	# Handle Special STS "Dummy" Version Deployment...
+	elif [[ $PROG == "STS_DUMMY" && $exe == $prog ]]; then
+		echo -e "\nModifying STS Executable $exe for Dummy Deployment." \
+			| tee -a $LOG
+		exe="${exe}_dummy"
 	# Handle Special STS HFIR Version Deployment...
 	elif [[ $PROG == "STS_HFIR" && $exe == $prog ]]; then
 		echo -e "\nModifying STS Executable $exe for HFIR Deployment." \
