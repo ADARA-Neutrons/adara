@@ -121,6 +121,7 @@ declare -A nHostSMSDPulseNoRegEvent
 declare -A nHostSMSDFirstNewEventSource
 declare -A nHostSMSDLastEventSource
 declare -A nHostSMSDSTSConnectionFailed
+declare -A nHostSMSDLostConnectionToSTS
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
@@ -257,6 +258,7 @@ PARSE_LOG()
 		nHostSMSDFirstNewEventSource[$host]=0
 		nHostSMSDLastEventSource[$host]=0
 		nHostSMSDSTSConnectionFailed[$host]=0
+		nHostSMSDLostConnectionToSTS[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
@@ -671,6 +673,13 @@ PARSE_LOG()
 			#echo "Connection Failed to STS at..."
 			nHostSMSDSTSConnectionFailed[$host]=$(( \
 				nHostSMSDSTSConnectionFailed[$host] + 1 ))
+
+		# "Lost connection to STS for run..." Log
+		elif [[ "$log" =~ \
+				Lost${S}connection${S}to${S}STS${S}for${S}run ]]; then
+			#echo "Lost connection to STS for run..."
+			nHostSMSDLostConnectionToSTS[$host]=$(( \
+				nHostSMSDLostConnectionToSTS[$host] + 1 ))
 
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
@@ -1314,6 +1323,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDSTSConnectionFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDSTSConnectionFailed[$h]} "
 		echo "STS \"Connection Failed to STS at...\" Logs"
+	fi
+	if [[ ${nHostSMSDLostConnectionToSTS[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLostConnectionToSTS[$h]} "
+		echo "STS \"Lost connection to STS for run...\" Logs"
 	fi
 	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
