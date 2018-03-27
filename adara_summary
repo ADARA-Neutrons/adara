@@ -78,7 +78,6 @@ declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
 declare -A nHostSTSConnectionFailed
-declare -A nHostSTSConnectionFailedNotDone
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
 declare -A nHostSTSNoNeutronPulsesInStream
@@ -121,6 +120,7 @@ declare -A nHostSMSDPulseBufferOverflow
 declare -A nHostSMSDPulseNoRegEvent
 declare -A nHostSMSDFirstNewEventSource
 declare -A nHostSMSDLastEventSource
+declare -A nHostSMSDSTSConnectionFailed
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
@@ -214,7 +214,6 @@ PARSE_LOG()
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
 		nHostSTSConnectionFailed[$host]=0
-		nHostSTSConnectionFailedNotDone[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
 		nHostSTSNoNeutronPulsesInStream[$host]=0
@@ -257,6 +256,7 @@ PARSE_LOG()
 		nHostSMSDPulseNoRegEvent[$host]=0
 		nHostSMSDFirstNewEventSource[$host]=0
 		nHostSMSDLastEventSource[$host]=0
+		nHostSMSDSTSConnectionFailed[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
@@ -362,19 +362,12 @@ PARSE_LOG()
 			nHostSTSVarValueTruncateNegTime[$host]=$(( \
 				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
 
-		# "Connection Failed to STS at..." Log
-		elif [[ "$log" =~ \
-				Connection${S}Failed${S}to${S}STS${S}at ]]; then
-			#echo "Connection Failed to STS at..."
-			nHostSTSConnectionFailed[$host]=$(( \
-				nHostSTSConnectionFailed[$host] + 1 ))
-
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
 				Connection${S}Failed,${S}Not${S}Done${S}Processing ]]; then
 			#echo "Connection Failed, Not Done Processing..."
-			nHostSTSConnectionFailedNotDone[$host]=$(( \
-				nHostSTSConnectionFailedNotDone[$host] + 1 ))
+			nHostSTSConnectionFailed[$host]=$(( \
+				nHostSTSConnectionFailed[$host] + 1 ))
 
 		# "ADARA parser stopped unexpectedly" Log
 		elif [[ "$log" =~ \
@@ -671,6 +664,13 @@ PARSE_LOG()
 			#echo "Last Event Source Unregistered..."
 			nHostSMSDLastEventSource[$host]=$(( \
 				nHostSMSDLastEventSource[$host] + 1 ))
+
+		# "Connection Failed to STS at..." Log
+		elif [[ "$log" =~ \
+				Connection${S}Failed${S}to${S}STS${S}at ]]; then
+			#echo "Connection Failed to STS at..."
+			nHostSMSDSTSConnectionFailed[$host]=$(( \
+				nHostSMSDSTSConnectionFailed[$host] + 1 ))
 
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
@@ -1129,10 +1129,6 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
-		echo "STS \"Connection Failed to STS at...\" Logs"
-	fi
-	if [[ ${nHostSTSConnectionFailedNotDone[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSConnectionFailedNotDone[$h]} "
 		echo "STS \"Connection Failed, Not Done Processing\" Logs"
 	fi
 	if [[ ${nHostSTSParserStoppedUnexpect[$h]} -gt 0 ]]; then
@@ -1314,6 +1310,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDLastEventSource[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDLastEventSource[$h]} "
 		echo "SMSD \"Last Event Source Unregistered\" Logs"
+	fi
+	if [[ ${nHostSMSDSTSConnectionFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDSTSConnectionFailed[$h]} "
+		echo "STS \"Connection Failed to STS at...\" Logs"
 	fi
 	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
