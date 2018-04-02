@@ -123,6 +123,7 @@ declare -A nHostSMSDLastEventSource
 declare -A nHostSMSDSTSConnectionFailed
 declare -A nHostSMSDLostConnectionToSTS
 declare -A nHostSMSDLiveClientLogs
+declare -A nHostSMSDEPICSCAException
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
@@ -260,6 +261,7 @@ PARSE_LOG()
 		nHostSMSDSTSConnectionFailed[$host]=0
 		nHostSMSDLostConnectionToSTS[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
+		nHostSMSDEPICSCAException[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
 		nHostSMSDComBusConnTimeout[$host]=0
@@ -686,6 +688,14 @@ PARSE_LOG()
 			#echo "LiveClient..."
 			nHostSMSDLiveClientLogs[$host]=$(( \
 				nHostSMSDLiveClientLogs[$host] + 1 ))
+
+		# "Caught EPICS Exception" Log
+		elif [[ "$log" =~ \
+			ca_exception_handler\(\):${S}Caught${S}EPICS${S}Exception ]]; \
+		then
+			#echo "Caught EPICS Exception..."
+			nHostSMSDEPICSCAException[$host]=$(( \
+				nHostSMSDEPICSCAException[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
@@ -1331,6 +1341,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
 		echo "SMSD \"Live Client\" Logs"
+	fi
+	if [[ ${nHostSMSDEPICSCAException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDEPICSCAException[$h]} "
+		echo "SMSD \"Caught EPICS CA Exception\" Logs"
 	fi
 	if [[ ${nHostSMSDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDActiveMQException[$h]} "
