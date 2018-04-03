@@ -1158,7 +1158,7 @@ void SMSControl::setSummaryReason( bool setBase, bool changedValid,
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	m_pvSummary->update( m_summaryIsError, &now, major );
+	m_pvSummary->update( m_summaryIsError, major, &now );
 	m_pvSummaryReason->update( m_reason, &now );
 }
 

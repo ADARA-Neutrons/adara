@@ -320,7 +320,7 @@ void LiveServer::setupListener(void)
 
 	// Update LiveServer Listen Status PV, All OK.
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_pvListenStatus->update(0, &now);
+	m_pvListenStatus->update(0, false /* major */, &now);
 
 	return;
 
@@ -353,7 +353,7 @@ error:
 
 	// Update LiveServer Listen Status PV, Setup Failed!
 	clock_gettime(CLOCK_REALTIME, &now);
-	m_pvListenStatus->update(1, &now);
+	m_pvListenStatus->update(1, true /* major */, &now);
 
 	// Update Listen Retry Timeout from PV...
 	m_listen_retry = m_pvListenRetryTimeout->value();
