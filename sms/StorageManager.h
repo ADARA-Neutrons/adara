@@ -260,7 +260,7 @@ private:
 				const std::string &dir, uint64_t &total_size);
 
 	static void addBaseStorage(uint64_t size);
-	static void startContainer(uint32_t run = 0,
+	static void startContainer(bool paused = false, uint32_t run = 0,
 				std::string propId = std::string("UNKNOWN"));
 	static void endCurrentContainer(void);
 	static void fileCreated(StorageFile::SharedPtr &f);

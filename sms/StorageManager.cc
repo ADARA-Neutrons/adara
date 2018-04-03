@@ -1012,7 +1012,8 @@ void StorageManager::addBaseStorage(uint64_t size)
 	m_blocks_used += blocks;
 }
 
-void StorageManager::startContainer(uint32_t run, std::string propId)
+void StorageManager::startContainer(
+		bool paused, uint32_t run, std::string propId)
 {
 	struct timespec now;
 
@@ -1028,6 +1029,10 @@ void StorageManager::startContainer(uint32_t run, std::string propId)
 
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run, propId);
+
+	if ( paused ) {
+		m_cur_container->setPaused( paused );
+	}
 
 	if (run) {
 		m_combus->sendOriginal(run, propId,
@@ -1117,7 +1122,7 @@ void StorageManager::startRecording(uint32_t run, std::string propId)
 	}
 
 	endCurrentContainer();
-	startContainer(run, propId);
+	startContainer(false /* paused */, run, propId);
 }
 
 void StorageManager::stopRecording(void)
@@ -1252,6 +1257,24 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 			break;
 	}
 
+	/* Check for Long-Non-Running Containers that Could Make the SMS
+	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
+	 * - If We're About to Create the 101st File Here (Current File
+	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 */
+	if ( !m_cur_container->runNumber()
+			&& m_cur_container->file()
+			&& m_cur_container->file()->oversize()
+			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+		WARN("addPacket(): Long-Non-Running Container "
+			<< m_baseDir << "/" << m_cur_container->name()
+			<< " Reached 100 Files"
+			<< " - Split Container for Purging...");
+		bool paused = m_cur_container->paused();
+		endCurrentContainer();
+		startContainer( paused );
+	}
+
 	/* Save off where we are in the stream, as we may need to point
 	 * to this location for replay after a snapshot.
 	 */
@@ -1303,6 +1326,24 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
+
+	/* Check for Long-Non-Running Containers that Could Make the SMS
+	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
+	 * - If We're About to Create the 101st File Here (Current File
+	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 */
+	if ( !m_cur_container->runNumber()
+			&& m_cur_container->savefile( dataSourceId )
+			&& m_cur_container->savefile( dataSourceId )->oversize()
+			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+		WARN("savePacket(): Long-Non-Running Container "
+			<< m_baseDir << "/" << m_cur_container->name()
+			<< " Reached 100 Files"
+			<< " - Split Container for Purging...");
+		bool paused = m_cur_container->paused();
+		endCurrentContainer();
+		startContainer( paused );
+	}
 
 	m_cur_container->save(iovec, len, dataSourceId, true);
 
