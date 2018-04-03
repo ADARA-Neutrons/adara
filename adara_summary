@@ -71,7 +71,8 @@ declare -A nHostlogs
 
 declare -A nHostUnknownLogs
 
-declare -A nHostSTSLdapLookupUserName
+declare -A nHostSTSLDAPLookupUserName
+declare -A nHostSTSLDAPSearchFailed
 declare -A nHostSTSMoreThanOnePVValue
 declare -A nHostSTSPVIDReNumbered
 declare -A nHostSTSNoMatchingUnitsPV
@@ -209,7 +210,8 @@ PARSE_LOG()
 
 		nHostUnknownLogs[$host]=0
 
-		nHostSTSLdapLookupUserName[$host]=0
+		nHostSTSLDAPLookupUserName[$host]=0
+		nHostSTSLDAPSearchFailed[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
 		nHostSTSPVIDReNumbered[$host]=0
 		nHostSTSNoMatchingUnitsPV[$host]=0
@@ -328,11 +330,18 @@ PARSE_LOG()
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
 
-		# "stsLdapLookupUserName()" Log
-		if [[ "$log" =~ stsLdapLookupUserName ]]; then
+		# "stsLDAPLookupUserName()" Log
+		if [[ "$log" =~ stsLDAPLookupUserName ]]; then
 			#echo "LDAP Lookup User Name..."
-			nHostSTSLdapLookupUserName[$host]=$(( \
-				nHostSTSLdapLookupUserName[$host] + 1 ))
+			nHostSTSLDAPLookupUserName[$host]=$(( \
+				nHostSTSLDAPLookupUserName[$host] + 1 ))
+
+		# "stsLdapConnect(): LDAP Search Failed" Log
+		elif [[ "$log" =~ \
+				stsLdapConnect\(\)\:${S}LDAP${S}Search${S}Failed ]]; then
+			#echo "stsLdapConnect(): LDAP Search Failed..."
+			nHostSTSLDAPSearchFailed[$host]=$(( \
+				nHostSTSLDAPSearchFailed[$host] + 1 ))
 
 		# "More Than 1 PV Value for..." Log
 		elif [[ "$log" =~ More${S}Than${S}1${S}PV${S}Value${S}for ]]; then
@@ -1178,9 +1187,13 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
 		echo "STS \"No Matching Units PV Found\" Logs"
 	fi
-	if [[ ${nHostSTSLdapLookupUserName[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSLdapLookupUserName[$h]} "
+	if [[ ${nHostSTSLDAPLookupUserName[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSLDAPLookupUserName[$h]} "
 		echo "STS \"LDAP Lookup User Name\" Logs"
+	fi
+	if [[ ${nHostSTSLDAPSearchFailed[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTSLDAPSearchFailed[$h]} "
+		echo "STS \"stsLdapConnect(): LDAP Search Failed\" Logs"
 	fi
 	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
