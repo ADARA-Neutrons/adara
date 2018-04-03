@@ -177,12 +177,12 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	virtual void update(bool val, struct timespec *ts);
+	virtual void update(bool val, struct timespec *ts,
+		bool force_changed = false);
 
 	bool valid(void);
 	bool value(void);
 
-public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
 
@@ -203,7 +203,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
+	void update(bool val, struct timespec *ts, bool force_changed = false);
 
 	gddAppFuncTableStatus getEnums(gdd &value);
 
@@ -211,18 +211,28 @@ private:
 	DataSource *m_dataSource;
 };
 
-class smsErrorPV : public smsBooleanPV {
+class smsErrorPV : public smsPV {
 public:
 	smsErrorPV(const std::string &name);
 
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
-	void update(bool val, struct timespec *ts, bool major);
+	void update(bool val, bool major, struct timespec *ts);
+
 	void set(void);
 	void reset(void);
 
+	bool valid(void);
+	bool value(void);
+
+	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
 };
 
 class smsUint32PV : public smsPV {
