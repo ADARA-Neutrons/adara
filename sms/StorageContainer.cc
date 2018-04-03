@@ -64,6 +64,10 @@ void StorageContainer::newFile(void)
 	}
 	m_files.push_back(m_cur_file);
 
+	// Keep Track of the Number of Stream Files,
+	// for Long-Non-Running Container Splitting...
+	m_totFileCount++;
+
 	/* Tell the storage manager about the new file so we can
 	 * add the prologue before anyone else sees it.
 	 */
@@ -165,6 +169,10 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 		m_ds_input_files[dataSourceId] =
 			StorageFile::saveFile( m_weakThis, dataSourceId,
 					++(m_ds_input_num_files[dataSourceId]) );
+
+		// Keep Track of the Number of Saved Input Stream Files,
+		// for Long-Non-Running Container Splitting...
+		m_totFileCount++;
 
 		/* Tell the storage manager about the new Saved Input Stream file
 		 * so we can add the prologue before anyone else sees it.
@@ -275,14 +283,16 @@ void StorageContainer::markManual(void)
 StorageContainer::StorageContainer(const struct timespec &start,
 		uint32_t run, std::string &propId) :
 	m_startTime(start), m_runNumber(run), m_propId(propId),
-	m_numFiles(0), m_numPauseFiles(0), m_active(true), m_paused(false),
+	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
+	m_active(true), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
 {
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
-	m_runNumber(0), m_propId("UNKNOWN"), m_numFiles(0), m_numPauseFiles(0),
+	m_runNumber(0), m_propId("UNKNOWN"),
+	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
 	m_name(name), m_active(false), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
