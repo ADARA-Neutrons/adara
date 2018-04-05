@@ -140,7 +140,7 @@ public:
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
 		m_starttime_sec(0), m_starttime_nsec(0),
 		m_endtime_sec(0), m_endtime_nsec(0),
-		m_posixRead(false), m_lowRate(false),
+		m_case(0), m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
 		m_out(std::cout)
 	{ }
@@ -171,6 +171,7 @@ public:
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
 	bool rxPacket(const ADARA::RunStatusPkt &pkt);
+	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32Pkt &pkt);
 	bool rxPacket(const ADARA::VariableDoublePkt &pkt);
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
@@ -180,11 +181,14 @@ public:
 	using ADARA::POSIXParser::rxPacket;
 
 private:
+	uint32_t m_descriptor_count[100];
 	uint32_t m_starttime_sec;
 	uint32_t m_starttime_nsec;
 	uint32_t m_endtime_sec;
 	uint32_t m_endtime_nsec;
+	uint32_t m_case;
 	bool m_posixRead;
+	bool m_showDDP;
 	bool m_lowRate;
 	bool m_terse;
 	bool m_catch;
@@ -471,6 +475,7 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 		}
 	}
 
+#ifdef REF_M_HYSTERICAL
 	// REF_M "Hysterical" Replay Tweaks to Run Status
 	// - Run Start Time and Run End Time Must Match Historical Data...!
 	if ( m_starttime_sec > 0 && m_starttime_nsec > 0 )
@@ -501,6 +506,98 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 			PKT->setRunStart( m_starttime_sec );
 		}
 	}
+#endif
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
+{
+	if ( !m_terse || m_showDDP ) {
+		// TODO display more fields (check that the contents don't change)
+		printf("%u.%09u DEVICE DESCRIPTOR (0x%x,v%u) [%u bytes]\n"
+			"    Device %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId());
+	}
+
+	if ( m_showDDP )
+	{
+		printf( "%s\n", pkt.description().c_str() );
+	}
+
+	//
+	// Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run!)
+	//
+
+	// Another Descriptor for the Given Device Id...
+	(m_descriptor_count[ pkt.devId() ])++;
+
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::DeviceDescriptorPkt *PKT =
+				const_cast<ADARA::DeviceDescriptorPkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::DeviceDescriptorPkt *PKT =
+			const_cast<ADARA::DeviceDescriptorPkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
+	}
 
 	return false;
 }
@@ -516,6 +613,71 @@ bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value());
+	}
+
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::VariableU32Pkt *PKT =
+				const_cast<ADARA::VariableU32Pkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::VariableU32Pkt *PKT =
+			const_cast<ADARA::VariableU32Pkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
 	}
 
 	return false;
@@ -559,6 +721,71 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 	}
 	*/
 
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::VariableDoublePkt *PKT =
+				const_cast<ADARA::VariableDoublePkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::VariableDoublePkt *PKT =
+			const_cast<ADARA::VariableDoublePkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
+	}
+
 	return false;
 }
 
@@ -573,6 +800,71 @@ bool MungeParser::rxPacket(const ADARA::VariableStringPkt &pkt)
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value().c_str());
+	}
+
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::VariableStringPkt *PKT =
+				const_cast<ADARA::VariableStringPkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::VariableStringPkt *PKT =
+			const_cast<ADARA::VariableStringPkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
 	}
 
 	return false;
@@ -597,6 +889,71 @@ bool MungeParser::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 		fprintf(stderr,"\n");
 	}
 
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::VariableU32ArrayPkt *PKT =
+				const_cast<ADARA::VariableU32ArrayPkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::VariableU32ArrayPkt *PKT =
+			const_cast<ADARA::VariableU32ArrayPkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
+	}
+
 	return false;
 }
 
@@ -618,6 +975,71 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 			fprintf(stderr," %lf", pkt.value()[i]);
 		}
 		fprintf(stderr,"\n");
+	}
+
+	// CASE #1: Stream Files _Before_ and Up To Change
+	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
+	// -> *Only* Replace Device Ids Until *2nd* Device Descriptor is Found!
+	if ( m_case == 1 )
+	{
+		if ( m_descriptor_count[ pkt.devId() ] < 2 )
+		{
+			ADARA::VariableDoubleArrayPkt *PKT =
+				const_cast<ADARA::VariableDoubleArrayPkt*>(&pkt);
+			switch ( PKT->devId() )
+			{
+				case 1: break;
+				case 2: PKT->remapDeviceId( 34 ); break;
+				case 3: PKT->remapDeviceId( 33 ); break;
+				case 4: PKT->remapDeviceId( 21 ); break;
+				case 5: PKT->remapDeviceId( 31 ); break;
+				case 6: PKT->remapDeviceId( 30 ); break;
+				case 7: PKT->remapDeviceId( 8 ); break;
+				case 8: PKT->remapDeviceId( 9 ); break;
+				case 9: PKT->remapDeviceId( 10 ); break;
+				case 10: PKT->remapDeviceId( 11 ); break;
+				case 11: PKT->remapDeviceId( 19 ); break;
+				case 12: PKT->remapDeviceId( 29 ); break;
+				case 13: PKT->remapDeviceId( 28 ); break;
+				case 14: PKT->remapDeviceId( 18 ); break;
+				case 15: PKT->remapDeviceId( 26 ); break;
+				case 16: PKT->remapDeviceId( 24 ); break;
+				case 18: PKT->remapDeviceId( 15 ); break;
+				case 19: PKT->remapDeviceId( 12 ); break;
+				case 20: PKT->remapDeviceId( 27 ); break;
+				case 21: PKT->remapDeviceId( 32 ); break;
+				case 22: PKT->remapDeviceId( 17 ); break;
+				case 24: PKT->remapDeviceId( 25 ); break;
+				default:
+					std::cerr << "*** Error in DeviceDescriptorPkt:"
+						<< " Unknown Device Id = " << PKT->devId()
+						<< " - Ignoring...!" << std::endl;
+					break;
+			}
+		}
+	}
+
+	// CASE #2: Stream Files _After_ Change
+	// -> *Only* Edit Device Ids for Devices with Multiple Descriptors...
+	
+	else if ( m_case == 2 )
+	{
+		ADARA::VariableDoubleArrayPkt *PKT =
+			const_cast<ADARA::VariableDoubleArrayPkt*>(&pkt);
+		switch ( PKT->devId() )
+		{
+			case 2: PKT->remapDeviceId( 34 ); break;
+			case 3: PKT->remapDeviceId( 33 ); break;
+			case 4: PKT->remapDeviceId( 21 ); break;
+			case 5: PKT->remapDeviceId( 31 ); break;
+			case 6: PKT->remapDeviceId( 30 ); break;
+			case 7: PKT->remapDeviceId( 8 ); break;
+			case 13: PKT->remapDeviceId( 28 ); break;
+			case 14: PKT->remapDeviceId( 18 ); break;
+			case 20: PKT->remapDeviceId( 27 ); break;
+			case 22: PKT->remapDeviceId( 17 ); break;
+			default: break;
+		}
 	}
 
 	return false;
@@ -701,7 +1123,9 @@ void MungeParser::parse(int argc, char **argv)
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
 		("starttime", po::value<std::string>(&m_starttime),
-			"Hysterical Start Time for Experiment Data");
+			"Hysterical Start Time for Experiment Data")
+		("case", po::value<uint32_t>(&m_case),
+			"Which Munge Case We Are Executing... (1,2,3...)");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
@@ -745,6 +1169,7 @@ void MungeParser::parse(int argc, char **argv)
 	}
 
 	m_posixRead = vm.count("posixread");
+	m_showDDP = vm.count("showddp");
 	m_lowRate = vm.count("low");
 	m_terse = vm.count("terse");
 	m_catch = vm.count("catch");
@@ -772,6 +1197,12 @@ void MungeParser::parse(int argc, char **argv)
 			std::cerr << argv[0] << ": " << m << std::endl;
 			exit(1);
 		}
+	}
+
+	// For Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run)
+	for ( uint32_t i=0 ; i < sizeof(m_descriptor_count) ; i++ ) {
+		std::cerr << "Initializing Descriptor Count #" << i << std::endl;
+		m_descriptor_count[i] = 0;
 	}
 }
 
