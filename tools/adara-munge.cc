@@ -567,11 +567,7 @@ bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -648,11 +644,7 @@ bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -754,11 +746,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -835,11 +823,7 @@ bool MungeParser::rxPacket(const ADARA::VariableStringPkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -922,11 +906,7 @@ bool MungeParser::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -1010,11 +990,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 				case 21: PKT->remapDeviceId( 32 ); break;
 				case 22: PKT->remapDeviceId( 17 ); break;
 				case 24: PKT->remapDeviceId( 25 ); break;
-				default:
-					std::cerr << "*** Error in DeviceDescriptorPkt:"
-						<< " Unknown Device Id = " << PKT->devId()
-						<< " - Ignoring...!" << std::endl;
-					break;
+				default: break;
 			}
 		}
 	}
@@ -1174,6 +1150,12 @@ void MungeParser::parse(int argc, char **argv)
 	m_terse = vm.count("terse");
 	m_catch = vm.count("catch");
 
+	// For Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run)
+	for ( uint32_t i=0 ;
+			i < ( sizeof(m_descriptor_count) / sizeof(uint32_t) ) ; i++ ) {
+		m_descriptor_count[i] = 0;
+	}
+
 	if (!vm.count("file")) {
 		try {
 			if ( m_posixRead ) {
@@ -1197,12 +1179,6 @@ void MungeParser::parse(int argc, char **argv)
 			std::cerr << argv[0] << ": " << m << std::endl;
 			exit(1);
 		}
-	}
-
-	// For Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run)
-	for ( uint32_t i=0 ; i < sizeof(m_descriptor_count) ; i++ ) {
-		std::cerr << "Initializing Descriptor Count #" << i << std::endl;
-		m_descriptor_count[i] = 0;
 	}
 }
 
