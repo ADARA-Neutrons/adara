@@ -1828,7 +1828,8 @@ private:
                         if ( ! E->unitsValue.size() )
                         {
                             std::stringstream ss;
-                            ss << valueToString( this->m_last_value );
+                            ss << this->valueToString(
+                                this->m_last_value );
 
                             // REMOVE ME...
                             syslog( LOG_INFO,
