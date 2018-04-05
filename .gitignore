@@ -7,6 +7,7 @@
 common/test/parser-test
 
 tools/adara-gen
+tools/adara-munge
 tools/adara-pvgen
 tools/adara-parser
 tools/adara-dump
