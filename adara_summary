@@ -1157,13 +1157,10 @@ for h in ${HostList} ; do
 		echo -n ", *** ${nHostUnknownLogs[$h]} Unknown Logs! ***"
 	fi
 	echo
-	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
-		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
-	fi
-	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
-		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	# STS Error Stats...
+	if [[ ${nHostSTSTranslationFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSTranslationFailed[$h]} "
+		echo "STS \"Translation... failed...\" Logs"
 	fi
 	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
@@ -1173,9 +1170,29 @@ for h in ${HostList} ; do
 		echo -n "   *** ${nHostSTSParserStoppedUnexpect[$h]} "
 		echo "STS \"ADARA parser stopped unexpectedly\" Logs"
 	fi
-	if [[ ${nHostSTSTranslationFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSTranslationFailed[$h]} "
-		echo "STS \"Translation... failed...\" Logs"
+	if [[ ${nHostSTSPVIDReNumbered[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSPVIDReNumbered[$h]} "
+		echo "STS \"PV ID Re-Numbered\" Logs"
+	fi
+	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
+		echo "STS \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostSTSComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSComBusBroadcastError[$h]} "
+		echo "STS \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostSTSDuplicatePulse[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSDuplicatePulse[$h]} "
+		echo "STS \"Duplicate Pulse\" Logs"
+	fi
+	if [[ ${nHostSTSOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSOversizePkt[$h]} "
+		echo "STS \"OversizePkt\" Logs"
+	fi
+	if [[ ${nHostSTSLDAPSearchFailed[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTSLDAPSearchFailed[$h]} "
+		echo "STS \"stsLdapConnect(): LDAP Search Failed\" Logs"
 	fi
 	if [[ ${nHostSTSNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSNoNeutronPulsesInStream[$h]} "
@@ -1185,13 +1202,17 @@ for h in ${HostList} ; do
 		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
 		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
 	fi
+	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
+		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
+		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
 		echo "STS \"More Than 1 PV Value for\" Logs"
-	fi
-	if [[ ${nHostSTSPVIDReNumbered[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSPVIDReNumbered[$h]} "
-		echo "STS \"PV ID Re-Numbered\" Logs"
 	fi
 	if [[ ${nHostSTSNoMatchingUnitsPV[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
@@ -1200,18 +1221,6 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSLDAPLookupUserName[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSLDAPLookupUserName[$h]} "
 		echo "STS \"LDAP Lookup User Name\" Logs"
-	fi
-	if [[ ${nHostSTSLDAPSearchFailed[$h]} -gt 0 ]]; then
-		echo -n "   ** ${nHostSTSLDAPSearchFailed[$h]} "
-		echo "STS \"stsLdapConnect(): LDAP Search Failed\" Logs"
-	fi
-	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
-		echo "STS \"ActiveMQ Exception Listener Called\" Logs"
-	fi
-	if [[ ${nHostSTSComBusBroadcastError[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSComBusBroadcastError[$h]} "
-		echo "STS \"ComBus Error Broadcasting Message\" Logs"
 	fi
 	if [[ ${nHostSTSComBusConnTimeout[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSComBusConnTimeout[$h]} "
@@ -1237,21 +1246,82 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTSDetBankSetRestrictEv[$h]} "
 		echo "STS \"Restricting Detector Bank Set to Event Mode\" Logs"
 	fi
-	if [[ ${nHostSTSDuplicatePulse[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSDuplicatePulse[$h]} "
-		echo "STS \"Duplicate Pulse\" Logs"
+	# SMS Error Stats...
+	if [[ ${nHostSMSDFailedToStartRun[$h]} -gt 0 ]]; then
+		echo -n "   **** ${nHostSMSDFailedToStartRun[$h]} "
+		echo "SMSD \"Failed to Start Run/Not Starting Run\" Logs"
 	fi
-	if [[ ${nHostSTSOversizePkt[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSOversizePkt[$h]} "
-		echo "STS \"OversizePkt\" Logs"
+	if [[ ${nHostSMSDAsynchLookupFailure[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDAsynchLookupFailure[$h]} "
+		echo "SMSD \"Asynchronous Lookup Failed for STS\" Logs"
+	fi
+	if [[ ${nHostSMSDSTSConnectionFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDSTSConnectionFailed[$h]} "
+		echo "SMSD \"Connection Failed to STS at...\" Logs"
+	fi
+	if [[ ${nHostSMSDLostConnectionToSTS[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLostConnectionToSTS[$h]} "
+		echo "SMSD \"Lost connection to STS for run...\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
+		echo "SMSD \"Timed out waiting for data (Past Retry!)\" Logs"
+	fi
+	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
+		echo "SMSD \"Missing ring period\" Logs"
 	fi
 	if [[ ${nHostSMSDRunAwayDataSource[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDRunAwayDataSource[$h]} "
 		echo "SMSD \"Run-Away Data Source\" Logs"
 	fi
-	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
-		echo "SMSD \"Missing ring period\" Logs"
+	if [[ ${nHostSMSDPulseBufferOverflow[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDPulseBufferOverflow[$h]} "
+		echo "SMSD \"Internal Pulse Buffer Overflow\" Logs"
+	fi
+	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
+		echo "SMSD \"Bogus Pulse Time from Distant Past\" Logs"
+	fi
+	if [[ ${nHostSMSDBogusRTDLDistantFuture[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDBogusRTDLDistantFuture[$h]} "
+		echo "SMSD \"Bogus Pulse Time from Distant Future\" Logs"
+	fi
+	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
+		echo "SMSD \"Local SAWTOOTH RTDL\" Logs"
+	fi
+	if [[ ${nHostSMSDLocalSAWTOOTHData[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLocalSAWTOOTHData[$h]} "
+		echo "SMSD \"Local SAWTOOTH RawData\" Logs"
+	fi
+	if [[ ${nHostSMSDEPICSCAException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDEPICSCAException[$h]} "
+		echo "SMSD \"Caught EPICS CA Exception\" Logs"
+	fi
+	if [[ ${nHostSMSDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDOversizePkt[$h]} "
+		echo "SMSD \"OversizePkt\" Logs"
+	fi
+	if [[ ${nHostSMSDLocalDuplicatePulse[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSMSDLocalDuplicatePulse[$h]} "
+		echo "SMSD \"Local Duplicate pulse\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceReadDelay[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSMSDDataSourceReadDelay[$h]} "
+		echo "SMSD \"Read Delay Threshold Exceeded\" Logs"
+	fi
+	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "
+		echo "SMSD \"Timed out waiting for data (Retry)\" Logs"
+	fi
+	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
+		echo "SMSD \"NO RTDL for Pulse\" Logs"
+	fi
+	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
+		echo "SMSD \"New Chopper id=\" Logs"
 	fi
 	if [[ ${nHostSMSDSystemUninitialized[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemUninitialized[$h]} "
@@ -1265,14 +1335,6 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDSystemReady[$h]} "
 		echo "SMSD \"System Ready\" Logs"
 	fi
-	if [[ ${nHostSMSDFailedToStartRun[$h]} -gt 0 ]]; then
-		echo -n "   **** ${nHostSMSDFailedToStartRun[$h]} "
-		echo "SMSD \"Failed to Start Run/Not Starting Run\" Logs"
-	fi
-	if [[ ${nHostSMSDAsynchLookupFailure[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDAsynchLookupFailure[$h]} "
-		echo "STS \"Asynchronous Lookup Failed for STS\" Logs"
-	fi
 	if [[ ${nHostSMSDIPTSITEMSResend[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDIPTSITEMSResend[$h]} "
 		echo "SMSD \"IPTS-ITEMS Resend\" Logs"
@@ -1281,37 +1343,9 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDDataSourceRequired[$h]} "
 		echo "SMSD \"Data Source Marked as *Required*\" Logs"
 	fi
-	if [[ ${nHostSMSDDataSourceReadDelay[$h]} -gt 0 ]]; then
-		echo -n "   ** ${nHostSMSDDataSourceReadDelay[$h]} "
-		echo "SMSD \"Read Delay Threshold Exceeded\" Logs"
-	fi
-	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
-		echo "SMSD \"Timed out waiting for data (Past Retry!)\" Logs"
-	fi
-	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "
-		echo "SMSD \"Timed out waiting for data (Retry)\" Logs"
-	fi
-	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
-		echo "SMSD \"Bogus Pulse Time from Distant Past\" Logs"
-	fi
-	if [[ ${nHostSMSDBogusRTDLDistantFuture[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDBogusRTDLDistantFuture[$h]} "
-		echo "SMSD \"Bogus Pulse Time from Distant Future\" Logs"
-	fi
-	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
-		echo "SMSD \"NO RTDL for Pulse\" Logs"
-	fi
 	if [[ ${nHostSMSDNoMorePulsesForCorrect[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDNoMorePulsesForCorrect[$h]} "
 		echo "SMSD \"No More Pulses for PCharge/Veto Correction\" Logs"
-	fi
-	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
-		echo "SMSD \"New Chopper id=\" Logs"
 	fi
 	if [[ ${nHostSMSDChopperEventSync[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDChopperEventSync[$h]} "
@@ -1321,29 +1355,13 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
 		echo "SMSD \"correctPChargeVeto()\" Logs"
 	fi
-	if [[ ${nHostSMSDLocalDuplicatePulse[$h]} -gt 0 ]]; then
-		echo -n "   ** ${nHostSMSDLocalDuplicatePulse[$h]} "
-		echo "SMSD \"Local Duplicate pulse\" Logs"
-	fi
 	if [[ ${nHostSMSDDumpPulseInvariants[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDDumpPulseInvariants[$h]} "
 		echo "SMSD \"dumpPulseInvariants()\" Logs"
 	fi
-	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
-		echo "SMSD \"Local SAWTOOTH RTDL\" Logs"
-	fi
-	if [[ ${nHostSMSDLocalSAWTOOTHData[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDLocalSAWTOOTHData[$h]} "
-		echo "SMSD \"Local SAWTOOTH RawData\" Logs"
-	fi
 	if [[ ${nHostSMSDGlobalSAWTOOTH[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDGlobalSAWTOOTH[$h]} "
 		echo "SMSD \"Global SAWTOOTH Pulse\" Logs"
-	fi
-	if [[ ${nHostSMSDPulseBufferOverflow[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDPulseBufferOverflow[$h]} "
-		echo "SMSD \"Internal Pulse Buffer Overflow\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
@@ -1357,21 +1375,9 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDLastEventSource[$h]} "
 		echo "SMSD \"Last Event Source Unregistered\" Logs"
 	fi
-	if [[ ${nHostSMSDSTSConnectionFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDSTSConnectionFailed[$h]} "
-		echo "STS \"Connection Failed to STS at...\" Logs"
-	fi
-	if [[ ${nHostSMSDLostConnectionToSTS[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDLostConnectionToSTS[$h]} "
-		echo "STS \"Lost connection to STS for run...\" Logs"
-	fi
 	if [[ ${nHostSMSDLiveClientLogs[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDLiveClientLogs[$h]} "
 		echo "SMSD \"Live Client\" Logs"
-	fi
-	if [[ ${nHostSMSDEPICSCAException[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDEPICSCAException[$h]} "
-		echo "SMSD \"Caught EPICS CA Exception\" Logs"
 	fi
 	if [[ ${nHostSMSDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDActiveMQException[$h]} "
@@ -1393,9 +1399,14 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDComBusReconnectThread[$h]} "
 		echo "SMSD \"ComBus Reconnect Thread\" Logs"
 	fi
-	if [[ ${nHostSMSDOversizePkt[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDOversizePkt[$h]} "
-		echo "SMSD \"OversizePkt\" Logs"
+	# PVSD Error Stats...
+	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDMakePvNamesUnique[$h]} "
+		echo "PVSD \"Make PV Names Unique (Name Clash!)\" Logs"
+	fi
+	if [[ ${nHostPVSDFailedChannelInfoPV[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDFailedChannelInfoPV[$h]} "
+		echo "PVSD \"Failed to get channel info for PV\" Logs"
 	fi
 	if [[ ${nHostPVSDINITHUNG[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDINITHUNG[$h]} "
@@ -1408,6 +1419,38 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDEPICSCAException[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostPVSDEPICSCAException[$h]} "
 		echo "PVSD \"Caught EPICS CA Exception\" Logs"
+	fi
+	if [[ ${nHostPVSDDisconnectFromSMSClient[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDDisconnectFromSMSClient[$h]} "
+		echo "PVSD \"Disconnecting from ADARA SMS Client\" Logs"
+	fi
+	if [[ ${nHostPVSDSocketWriteFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDSocketWriteFailed[$h]} "
+		echo "PVSD \"OutputAdapter::send(): Socket Write Failed\" Logs"
+	fi
+	if [[ ${nHostPVSDPacketSendFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDPacketSendFailed[$h]} "
+		echo "PVSD \"OutputAdapter::sendPacket(): Send Failed\" Logs"
+	fi
+	if [[ ${nHostPVSDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostPVSDOversizePkt[$h]} "
+		echo "PVSD \"OversizePkt\" Logs"
+	fi
+	if [[ ${nHostPVSDUndefineDevice[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostPVSDUndefineDevice[$h]} "
+		echo "PVSD \"Undefine Device\" Logs"
+	fi
+	if [[ ${nHostPVSDUndefineDevicePkt[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostPVSDUndefineDevicePkt[$h]} "
+		echo "PVSD \"Sending Empty Descriptor to *Undefine* Device\" Logs"
+	fi
+	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
+		echo "PVSD \"Defining New Device\" Logs"
+	fi
+	if [[ ${nHostPVSDReDefiningDevice[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDReDefiningDevice[$h]} "
+		echo "PVSD \"Re-defining Device\" Logs"
 	fi
 	if [[ ${nHostPVSDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDActiveMQException[$h]} "
@@ -1429,26 +1472,6 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostPVSDComBusReconnectThread[$h]} "
 		echo "PVSD \"ComBus Reconnect Thread\" Logs"
 	fi
-	if [[ ${nHostPVSDDefiningNewDevice[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostPVSDDefiningNewDevice[$h]} "
-		echo "PVSD \"Defining New Device\" Logs"
-	fi
-	if [[ ${nHostPVSDReDefiningDevice[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostPVSDReDefiningDevice[$h]} "
-		echo "PVSD \"Re-defining Device\" Logs"
-	fi
-	if [[ ${nHostPVSDUndefineDevice[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostPVSDUndefineDevice[$h]} "
-		echo "PVSD \"Undefine Device\" Logs"
-	fi
-	if [[ ${nHostPVSDUndefineDevicePkt[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostPVSDUndefineDevicePkt[$h]} "
-		echo "PVSD \"Sending Empty Descriptor to *Undefine* Device\" Logs"
-	fi
-	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDMakePvNamesUnique[$h]} "
-		echo "PVSD \"Make PV Names Unique (Name Clash!)\" Logs"
-	fi
 	if [[ ${nHostPVSDAssignPVID[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDAssignPVID[$h]} "
 		echo "PVSD \"Assign PV ID\" Logs"
@@ -1456,10 +1479,6 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDInactiveDeviceID[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInactiveDeviceID[$h]} "
 		echo "PVSD \"Inactive Device ID\" Logs"
-	fi
-	if [[ ${nHostPVSDFailedChannelInfoPV[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDFailedChannelInfoPV[$h]} "
-		echo "PVSD \"Failed to get channel info for PV\" Logs"
 	fi
 	if [[ ${nHostPVSDDeviceNotYetDefined[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDeviceNotYetDefined[$h]} "
@@ -1477,21 +1496,9 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostPVSDConnectedToSMSClient[$h]} "
 		echo "PVSD \"Connected to ADARA SMS Client\" Logs"
 	fi
-	if [[ ${nHostPVSDDisconnectFromSMSClient[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDDisconnectFromSMSClient[$h]} "
-		echo "PVSD \"Disconnecting from ADARA SMS Client\" Logs"
-	fi
 	if [[ ${nHostPVSDInitialSendsComplete[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInitialSendsComplete[$h]} "
 		echo "PVSD \"Initial Sends Complete to ADARA SMS\" Logs"
-	fi
-	if [[ ${nHostPVSDSocketWriteFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDSocketWriteFailed[$h]} "
-		echo "PVSD \"OutputAdapter::send(): Socket Write Failed\" Logs"
-	fi
-	if [[ ${nHostPVSDPacketSendFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDPacketSendFailed[$h]} "
-		echo "PVSD \"OutputAdapter::sendPacket(): Send Failed\" Logs"
 	fi
 	if [[ ${nHostPVSDQueueDeactivated[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDQueueDeactivated[$h]} "
@@ -1510,13 +1517,14 @@ for h in ${HostList} ; do
 			echo "(${nHostPVSDHung[$h]} Total)"
 		fi
 	fi
-	if [[ ${nHostPVSDOversizePkt[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostPVSDOversizePkt[$h]} "
-		echo "PVSD \"OversizePkt\" Logs"
-	fi
+	# DASMOND Error Stats...
 	if [[ ${nHostDASMONDFailedToConnSMS[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostDASMONDFailedToConnSMS[$h]} "
 		echo "DASMOND \"Failed to Connect to SMS\" Logs"
+	fi
+	if [[ ${nHostDASMONDOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostDASMONDOversizePkt[$h]} "
+		echo "DASMOND \"OversizePkt\" Logs"
 	fi
 	if [[ ${nHostDASMONDActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostDASMONDActiveMQException[$h]} "
@@ -1538,10 +1546,6 @@ for h in ${HostList} ; do
 	if [[ ${nHostDASMONDComBusReconnectThread[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostDASMONDComBusReconnectThread[$h]} "
 		echo "DASMOND \"ComBus Reconnect Thread\" Logs"
-	fi
-	if [[ ${nHostDASMONDOversizePkt[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostDASMONDOversizePkt[$h]} "
-		echo "DASMOND \"OversizePkt\" Logs"
 	fi
 done
 echo
