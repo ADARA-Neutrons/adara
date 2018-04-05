@@ -112,6 +112,7 @@ declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDNewChopperId
 declare -A nHostSMSDChopperEventSync
+declare -A nHostSMSDChopperGlitchEvent
 declare -A nHostSMSDCorrectPChargeVeto
 declare -A nHostSMSDLocalDuplicatePulse
 declare -A nHostSMSDDumpPulseInvariants
@@ -252,6 +253,7 @@ PARSE_LOG()
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDNewChopperId[$host]=0
 		nHostSMSDChopperEventSync[$host]=0
+		nHostSMSDChopperGlitchEvent[$host]=0
 		nHostSMSDCorrectPChargeVeto[$host]=0
 		nHostSMSDLocalDuplicatePulse[$host]=0
 		nHostSMSDDumpPulseInvariants[$host]=0
@@ -621,6 +623,14 @@ PARSE_LOG()
 			#echo "Chopper <N> Event Synchronization Error..."
 			nHostSMSDChopperEventSync[$host]=$(( \
 				nHostSMSDChopperEventSync[$host] + 1 ))
+
+		# "Chopper <N> Glitch Event Error" Log
+		elif [[ "$log" =~ \
+				Chopper${S}[[:digit:]]+${S}Glitch${S}Event${S}Error \
+		]]; then
+			#echo "Chopper <N> Glitch Event Error"
+			nHostSMSDChopperGlitchEvent[$host]=$(( \
+				nHostSMSDChopperGlitchEvent[$host] + 1 ))
 
 		# "correctPChargeVeto()" Log
 		elif [[ "$log" =~ correctPChargeVeto ]]; then
@@ -1350,6 +1360,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDChopperEventSync[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDChopperEventSync[$h]} "
 		echo "SMSD \"Chopper Event Synchronization Error\" Logs"
+	fi
+	if [[ ${nHostSMSDChopperGlitchEvent[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDChopperGlitchEvent[$h]} "
+		echo "SMSD \"Chopper Glitch Event Error\" Logs"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
