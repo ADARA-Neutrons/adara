@@ -81,6 +81,7 @@ declare -A nHostSTSVarValueTruncateNegTime
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
+declare -A nHostSTSPulseTimeBackwards
 declare -A nHostSTSNoNeutronPulsesInStream
 declare -A nHostSTSEmptyFinalPulseInfo
 declare -A nHostSTSActiveMQException
@@ -226,6 +227,7 @@ PARSE_LOG()
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
+		nHostSTSPulseTimeBackwards[$host]=0
 		nHostSTSNoNeutronPulsesInStream[$host]=0
 		nHostSTSEmptyFinalPulseInfo[$host]=0
 		nHostSTSActiveMQException[$host]=0
@@ -406,6 +408,14 @@ PARSE_LOG()
 			#echo "Translation... failed..."
 			nHostSTSTranslationFailed[$host]=$(( \
 				nHostSTSTranslationFailed[$host] + 1 ))
+
+		# "Unexpected input: Pulse time went backwards" Logs
+		elif [[ "$log" =~ \
+			Unexpected${S}input:${S}Pulse${S}time${S}went${S}backwards \
+		]]; then
+			#echo "Unexpected input: Pulse time went backwards..."
+			nHostSTSPulseTimeBackwards[$host]=$(( \
+				nHostSTSPulseTimeBackwards[$host] + 1 ))
 
 		# "No Neutron Pulses Received in Stream" Logs
 		elif [[ "$log" =~ \
@@ -1219,6 +1229,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSPVIDReNumbered[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSPVIDReNumbered[$h]} "
 		echo "STS \"PV ID Re-Numbered\" Logs"
+	fi
+	if [[ ${nHostSTSPulseTimeBackwards[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTSPulseTimeBackwards[$h]} "
+		echo "STS \"Unexpected input: Pulse time went backwards\" Logs"
 	fi
 	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
