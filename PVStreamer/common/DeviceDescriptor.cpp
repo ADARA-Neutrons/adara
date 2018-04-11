@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
 #include "DeviceDescriptor.h"
 
 using namespace std;
@@ -86,8 +87,13 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
 {
     if ( m_type == PV_ENUM && !m_enum )
     {
-        throw runtime_error(
-            "EnumDescriptor can not be null for PV of type PV_ENUM");
+        std::stringstream ss;
+        ss << "EnumDescriptor Cannot Be NULL for PV of Type PV_ENUM:"
+            << " name=" << a_name
+            << " connection=" << a_connection
+            << " elem_count=" << a_elem_count
+            << " units=" << a_units;
+        throw runtime_error( ss.str() );
     }
 }
 
@@ -262,8 +268,16 @@ DeviceDescriptor::definePV(
         PVType a_type, uint32_t a_elem_count,
         EnumDescriptor *a_enum, const string &a_units )
 {
-    if ( getPvByName( a_name ))
-        throw runtime_error("Cannot define PV with duplicate name (alias)");
+    if ( getPvByName( a_name )) {
+        std::stringstream ss;
+        ss << "Cannot Define PV with Duplicate Name (or Alias): "
+            << " name=" << a_name
+            << " connection=" << a_connection
+            << " type=" << a_type
+            << " elem_count=" << a_elem_count
+            << " units=" << a_units;
+        throw runtime_error( ss.str() );
+    }
 
     m_pvs.push_back( new PVDescriptor( this, a_name, a_connection,
         a_type, a_elem_count, a_enum, a_units ) );
