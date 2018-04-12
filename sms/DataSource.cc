@@ -1711,7 +1711,7 @@ void DataSource::resetPacketStats(void)
 	Parser::resetDiscardedPacketsStats();
 }
 
-HWSource &DataSource::getHWSource(uint32_t hwId)
+boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 {
 	HWSrcMap::iterator it;
 
@@ -1866,7 +1866,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		}
 
 		// Create New HWSource... (Pass In Id and Bandwidth PVs...)
-		HWSrcPtr src( new HWSource(
+		boost::shared_ptr<HWSource> src( new HWSource(
 			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
 			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
 			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
@@ -1881,7 +1881,7 @@ HWSource &DataSource::getHWSource(uint32_t hwId)
 		m_pvNumHWSources->update(m_hwSources.size(), &now);
 	}
 
-	return *(it->second);
+	return( it->second );
 }
 
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
@@ -1902,10 +1902,10 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	static uint32_t cnt = 0;
 	++cnt;
 
-	HWSource &hw_src = getHWSource(pkt->sourceID());
+	boost::shared_ptr<HWSource> hw_src = getHWSource(pkt->sourceID());
 
 	// Reset "RTDL Packets with No Data Packets" Count...
-	hw_src.m_rtdlNoDataCount = 0;
+	hw_src->m_rtdlNoDataCount = 0;
 
 	/* Check that the fields are consistent with the pulse we are
 	 * currently processing. If not, then we've started a new pulse.
@@ -1913,10 +1913,10 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	 * markers and duplicate pulse ids.
 	 */
 	bool good_pulse = true;
-	if (hw_src.checkPulseInvariants(*pkt))
-		good_pulse = hw_src.newPulse(*pkt);
+	if (hw_src->checkPulseInvariants(*pkt))
+		good_pulse = hw_src->newPulse(*pkt);
 	else
-		good_pulse = hw_src.pulseGood();
+		good_pulse = hw_src->pulseGood();
 
 	// Event Type Counts for Live Bandwidth Statistics...
 	uint32_t event_count = 0, meta_count = 0, err_count = 0;
@@ -1933,12 +1933,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 			m_mixed_data_packets = m_pvMixedDataPackets->value();
 		}
 
-		m_ctrl->pulseEvents(*pkt, hw_src.hwId(), hw_src.dupCount(),
+		m_ctrl->pulseEvents(*pkt, hw_src->hwId(), hw_src->dupCount(),
 			is_mapped, m_mixed_data_packets,
 			event_count, meta_count, err_count);
 
-		if (hw_src.checkSeq(*pkt))
-			m_ctrl->markPartial(pkt->pulseId(), hw_src.dupCount());
+		if (hw_src->checkSeq(*pkt))
+			m_ctrl->markPartial(pkt->pulseId(), hw_src->dupCount());
 	}
 
 	// Pulse is "Bad", Count All Events as Errors...
@@ -1953,7 +1953,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		m_ignore_eop = m_pvIgnoreEoP->value();
 	}
 	if (!m_ignore_eop && pkt->endOfPulse())
-		hw_src.endPulse();
+		hw_src->endPulse();
 
 	// Count Events in Various Statistics...
 
@@ -1975,9 +1975,9 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	m_event_count_second += event_count;
 	m_meta_count_second += meta_count;
 	m_err_count_second += err_count;
-	hw_src.m_event_count_second += event_count;
-	hw_src.m_meta_count_second += meta_count;
-	hw_src.m_err_count_second += err_count;
+	hw_src->m_event_count_second += event_count;
+	hw_src->m_meta_count_second += meta_count;
+	hw_src->m_err_count_second += err_count;
 
 	// Event Count Per Minute
 	uint32_t min = now.tv_sec / 60;
@@ -1990,9 +1990,9 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	m_event_count_minute += event_count;
 	m_meta_count_minute += meta_count;
 	m_err_count_minute += err_count;
-	hw_src.m_event_count_minute += event_count;
-	hw_src.m_meta_count_minute += meta_count;
-	hw_src.m_err_count_minute += err_count;
+	hw_src->m_event_count_minute += event_count;
+	hw_src->m_meta_count_minute += meta_count;
+	hw_src->m_err_count_minute += err_count;
 
 	// Event Count Per Ten Minutes
 	uint32_t tenmin = now.tv_sec / 600;
@@ -2005,9 +2005,9 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	m_event_count_tenmin += event_count;
 	m_meta_count_tenmin += meta_count;
 	m_err_count_tenmin += err_count;
-	hw_src.m_event_count_tenmin += event_count;
-	hw_src.m_meta_count_tenmin += meta_count;
-	hw_src.m_err_count_tenmin += err_count;
+	hw_src->m_event_count_tenmin += event_count;
+	hw_src->m_meta_count_tenmin += meta_count;
+	hw_src->m_err_count_tenmin += err_count;
 
 	return false;
 }

@@ -55,9 +55,7 @@ public:
 	bool isConnected(void) { return ( m_state == ACTIVE ); }
 
 private:
-	typedef boost::shared_ptr<HWSource> HWSrcPtr;
-	typedef std::map<uint32_t, HWSrcPtr> HWSrcMap;
-	typedef std::bitset<256> SourceSet;
+	typedef std::map<uint32_t, boost::shared_ptr<HWSource> > HWSrcMap;
 
 	enum State { DISABLED, IDLE, CONNECTING, ACTIVE };
 
@@ -118,7 +116,7 @@ private:
 
 	boost::shared_ptr<smsUint32PV> m_pvNumHWSources;
 
-	SourceSet m_hwIndices;
+	SMSControl::SourceSet m_hwIndices;
 
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvHWSourceHwIds;
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvHWSourceSmsIds;
@@ -241,7 +239,7 @@ private:
 	uint32_t	m_last_minute;
 	uint32_t	m_last_tenmin;
 
-	HWSource &getHWSource(uint32_t hwId);
+	boost::shared_ptr<HWSource> getHWSource(uint32_t hwId);
 
 	friend class TimerAdapter<DataSource>;
 
