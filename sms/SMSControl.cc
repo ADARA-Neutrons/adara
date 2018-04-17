@@ -1162,10 +1162,10 @@ void SMSControl::setSummaryReason( bool setBase, bool changedValid,
 	m_pvSummaryReason->update( m_reason, &now );
 }
 
-uint32_t SMSControl::registerEventSource(uint32_t hwId)
+uint32_t SMSControl::registerEventSource(uint32_t srcId, uint32_t hwId)
 {
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "registerEventSource(): hwId=" << hwId);
+		<< "registerEventSource(): srcId=" << srcId << " hwId=" << hwId);
 
 	/* We're called when a data source discovers a new hardware
 	 * source id and needs to allocate a bit position for completing
@@ -1194,8 +1194,10 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 				}
 				m_noRegisteredEventSources = false;
 			}
-			// Set New Event Source Bit & Return Index...
+			// Set New Event Source Bit & DataSource Reverse Lookup Index
 			m_eventSources.set(i);
+			m_eventSourcesIndex[i] = srcId - 1; // m_nextSrcId Starts at 1
+			// Return Event Source Index as "smsId"...
 			DEBUG("registerEventSource(): returning smsId=" << i);
 			return i;
 		}
@@ -1206,10 +1208,11 @@ uint32_t SMSControl::registerEventSource(uint32_t hwId)
 	throw std::runtime_error("No more event sources available");
 }
 
-void SMSControl::unregisterEventSource(uint32_t smsId)
+void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 {
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "unregisterEventSource(): smsId=" << smsId );
+		<< "unregisterEventSource(): srcId=" << srcId
+		<< " smsId=" << smsId );
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
@@ -1381,6 +1384,25 @@ done:
 
 	// Mark This Id for Re-Use...
 	m_eventSources.reset(smsId);
+
+	// (Check &) Reset DataSource Reverse Lookup Index...
+	if ( m_eventSourcesIndex[smsId] != srcId - 1 ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource:"
+			<< " Mismatch in DataSource Reverse Lookup Index!"
+			<< " m_eventSourcesIndex[" << smsId << "]="
+			<< m_eventSourcesIndex[smsId]
+			<< " != (srcId-1)=" << (srcId - 1) );
+	}
+	else if ( srcId == (uint32_t) -1 ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource:"
+			<< " Bad DataSource srcId=" << srcId
+			<< " (DataSource Reverse Lookup Index"
+			<< " m_eventSourcesIndex[" << smsId << "]="
+			<< m_eventSourcesIndex[smsId] << ")" );
+	}
+	m_eventSourcesIndex[smsId] = (uint32_t) -1;
 
 	// Check for "No Registered Event Sources" State Change...
 	if ( m_eventSources.none() ) {
@@ -2258,12 +2280,82 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 	pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 }
 
+#define INTERMITTENT_DATA_THRESHOLD (9)
+
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
+	static uint32_t data_source_pending_counts[ SOURCE_SET_SIZE ];
 	static uint32_t queue_log_count = 0;
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
+
+	// *Before* We Mark This Pulse Complete,
+	// Check for Any "Intermittent/Bursty" Data Sources
+	// and "Unregister" Them as Event Sources...! ;-D
+	// (Only Check for this If there are "Enough" Pulses,
+	// and More than One Active Event Source...! ;-)
+	if ( m_pulses.size() > INTERMITTENT_DATA_THRESHOLD
+			&& m_eventSources.count() > 1 ) {
+		// Count Number of Consecutive "Missing Pulses" Per DataSource...
+		memset( (void *)&data_source_pending_counts, 0,
+			sizeof(data_source_pending_counts) );
+		size_t unset_count = -1;
+		bool found = false;
+		uint32_t i;
+		// Check Thru Pulses in Buffer, Looking for Pending DataSources...
+		for ( it = m_pulses.begin(); it != m_pulses.end(); it++ ) {
+			// Check All the Pending DataSources for This Pulse...
+			unset_count = it->second->m_pending.count();
+			for ( i=0 ; unset_count && i < m_eventSources.size() ; i++ ) {
+				// This is a Pending DataSource for This Pulse...
+				if ( it->second->m_pending[i] ) {
+					// Count How Many Pulses This DataSource is Pending For
+					if ( ++(data_source_pending_counts[i])
+							>= INTERMITTENT_DATA_THRESHOLD ) {
+						ERROR( ( m_recording ? "[RECORDING] " : "" )
+							<< "markComplete():"
+							<< " Identified Intermittent Data Source"
+							<< " srcId=" << ( m_eventSourcesIndex[i] + 1 )
+							<< " smsId=" << i
+							<< " (pending count = "
+							<< data_source_pending_counts[i] << ")"
+							<< " - Marking Event Source as Intermittent"
+							<< " and Unregistering as Event Source...!" );
+						if ( m_eventSourcesIndex[i] != (uint32_t) -1
+								&& m_eventSourcesIndex[i]
+									< m_dataSources.size() ) {
+							// Need to Set DataSource *First*,
+							// as unregisterEventSource() Clears
+							// DataSource Reverse Lookup Index! ;-D
+							m_dataSources[ m_eventSourcesIndex[i] ]->
+								setIntermittent( i, true );
+							unregisterEventSource(
+								m_eventSourcesIndex[i] + 1, i);
+						} else {
+							ERROR( ( m_recording ? "[RECORDING] " : "" )
+								<< "markComplete():"
+								<< " Bad DataSource Reverse Lookup Index "
+								<< m_eventSourcesIndex[i]
+								<< " For smsId=" << i
+								<< " - Can't Set DataSource"
+								<< " as Intermittent!" );
+						}
+						// Only Capture _One_ Intermittent Data Source
+						// At A Time...! ;-D (Screws Up the Pulse List...!)
+						found = true;
+						break;
+					}
+					// One Less Pending DataSource to Check for This Pulse
+					unset_count--;
+				}
+			}
+			// If Found, Iterator will be Corrupted - Break Out...! ;-D
+			if ( found ) break;
+		}
+	}
+
+	// _Now_ Proceed with Normal Pulse Completion Marking...
 	PulseMap::iterator current = getPulse(pulseId, dup);
 	PulsePtr &pulse = current->second;
 
