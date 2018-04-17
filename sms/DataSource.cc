@@ -125,7 +125,7 @@ public:
 		m_pvHWSourceErrBandwidthSecond(pvHWSourceErrBandwidthSecond),
 		m_pvHWSourceErrBandwidthMinute(pvHWSourceErrBandwidthMinute),
 		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
-		m_name(name), m_hwId(hwId), m_smsId(smsId),
+		m_name(name), m_hwId(hwId), m_smsId(smsId), m_intermittent(false),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
 	{
@@ -173,11 +173,35 @@ public:
 		}
 	}
 
+	uint32_t hwId(void) const { return m_hwId; }
+	uint32_t smsId(void) const { return m_smsId; }
+
+	void setSmsId( uint32_t smsId )
+	{
+		m_smsId = smsId;
+
+		// Update HWSource "smsId" PV...
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME_COARSE, &now);
+		m_pvHWSourceSmsId->update(m_smsId, &now);
+	}
+
+	uint32_t intermittent(void) const { return m_intermittent; }
+
+	void setIntermittent( bool intermittent )
+	{
+		m_intermittent = intermittent;
+	}
+
 	uint64_t pulse(void) const { return m_activePulse; }
 	uint64_t lastPulse(void) const { return m_lastPulse; }
 	uint32_t dupCount(void) const { return m_dupCount; }
-	uint32_t hwId(void) const { return m_hwId; }
-	uint32_t smsId(void) const { return m_smsId; }
+	uint32_t pulseGood(void) const { return m_pulseGood; }
+
+	void setPulseGood( bool good )
+	{
+		m_pulseGood = good;
+	}
 
 	void endPulse(bool eop = true) {
 
@@ -418,6 +442,8 @@ private:
 
 	uint32_t	m_hwId;
 	uint32_t	m_smsId;
+
+	bool		m_intermittent;
 
 	uint64_t	m_activePulse;
 	uint64_t	m_lastPulse;
@@ -960,16 +986,26 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
 	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
-		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Unregistering Event Source " << it->second->smsId()
-			<< " for " << why << " Data Source " << m_name );
-		it->second->endPulse(false);
 		// Reset HWSource PV Index Bit, Clear Out SMS Id PV Value...
 		if ( it->second->m_hwIndex >= 0 ) {
 			it->second->m_pvHWSourceSmsId->update(-1, &now);
 			m_hwIndices.reset( it->second->m_hwIndex );
 		}
-		m_ctrl->unregisterEventSource(it->second->smsId());
+		// Only End Pulse & Unregister Event Source if Still Active...!
+		if ( it->second->smsId() != (uint32_t) -1 ) {
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Unregistering Event Source " << it->second->smsId()
+				<< " for " << why << " Data Source " << m_name );
+			it->second->endPulse(false);
+			m_ctrl->unregisterEventSource(m_smsSourceId,
+				it->second->smsId());
+		}
+		else {
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Skipping Unregistering of Inactive Event Source"
+				<< " (hwId=" << it->second->hwId() << ")"
+				<< " for " << why << " Data Source " << m_name );
+		}
 	}
 
 	m_hwSources.clear();
@@ -1719,7 +1755,7 @@ boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 
 	if (it == m_hwSources.end()) {
 
-		uint32_t smsId = m_ctrl->registerEventSource(hwId);
+		uint32_t smsId = m_ctrl->registerEventSource(m_smsSourceId, hwId);
 
 		// Get Next Available HW Index for PVs...
 		size_t i, max = m_hwIndices.size();
@@ -1884,6 +1920,51 @@ boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 	return( it->second );
 }
 
+void DataSource::setIntermittent( uint32_t smsId, bool intermittent )
+{
+	ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+		<< "setIntermittent(): Setting HwSource Intermittent State"
+		<< " smsId=" << smsId
+		<< " intermittent=" << intermittent );
+
+	HWSrcMap::iterator it;
+
+	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
+		if ( it->second->smsId() == smsId )
+			break;
+	}
+
+	if (it == m_hwSources.end()) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "setIntermittent(): HwSource Not Found for"
+			<< " smsId=" << smsId
+			<< " (intermittent=" << intermittent << ")!" );
+	}
+	else {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "setIntermittent(): Found HwSource for"
+			<< " smsId=" << smsId
+			<< " -> Setting intermittent=" << intermittent
+			<< " for hwId=" << it->second->hwId() );
+		if ( intermittent ) {
+			it->second->setPulseGood( false ); // Don't Re-markComplete()!
+			it->second->endPulse( false );
+			it->second->setSmsId( (uint32_t) -1 );
+		}
+		else {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "setIntermittent():"
+				<< " Re-Registering srcId=" << m_smsSourceId
+				<< " hwId=" << it->second->hwId()
+				<< " as an Event Source Again...");
+			uint32_t smsId = m_ctrl->registerEventSource( m_smsSourceId,
+				it->second->hwId() );
+			it->second->setSmsId( smsId );
+		}
+		it->second->setIntermittent( intermittent );
+	}
+}
+
 bool DataSource::rxPacket(const ADARA::RawDataPkt &pkt)
 {
 	return( handleDataPkt(&pkt, false) );
@@ -1903,6 +1984,32 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	++cnt;
 
 	boost::shared_ptr<HWSource> hw_src = getHWSource(pkt->sourceID());
+
+	// Check for Intermittent HWSource...
+	if ( hw_src->intermittent() ) {
+		// See If Any Data Here, Or Just End of Last Long-Lost Pulse...?
+		if ( hw_src->lastPulse() == pkt->pulseId()
+				&& pkt->num_events() == 0 ) {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "handleDataPkt(): Intermittent Data Source Recovered!"
+				<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
+				<< " Long-Lost Pulse Returns for srcId=" << m_smsSourceId
+				<< " hwId=" << hw_src->hwId()
+				<< " - Ignore This Pulse and Wait for Data..." );
+			return false;
+		}
+		// Got Some Data, Need to Re-Register This HwId as an Event Source!
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "handleDataPkt(): Intermittent Data Source Recovered!"
+			<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
+			<< " Re-Registering srcId=" << m_smsSourceId
+			<< " hwId=" << hw_src->hwId()
+			<< " as an Event Source Again..." );
+		uint32_t smsId = m_ctrl->registerEventSource( m_smsSourceId,
+			hw_src->hwId() );
+		hw_src->setSmsId( smsId );
+		hw_src->setIntermittent( false );
+	}
 
 	// Reset "RTDL Packets with No Data Packets" Count...
 	hw_src->m_rtdlNoDataCount = 0;
@@ -2170,7 +2277,11 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 					m_hwIndices.reset( it->second->m_hwIndex );
 				}
 
-				m_ctrl->unregisterEventSource(it->second->smsId());
+				// Only Unregister Event Source if Still Active...!
+				if ( it->second->smsId() != (uint32_t) -1 ) {
+					m_ctrl->unregisterEventSource(m_smsSourceId,
+						it->second->smsId());
+				}
 
 				// Remove Hardware Source from Map...
 				// (Note: iterator increments to next element,
