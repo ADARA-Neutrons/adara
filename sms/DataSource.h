@@ -54,6 +54,8 @@ public:
 
 	bool isConnected(void) { return ( m_state == ACTIVE ); }
 
+	void setIntermittent( uint32_t smsId, bool intermittent );
+
 private:
 	typedef std::map<uint32_t, boost::shared_ptr<HWSource> > HWSrcMap;
 
