@@ -39,6 +39,11 @@ class Markers;
 
 class SMSControl : public caServer {
 public:
+
+#define SOURCE_SET_SIZE (256)
+
+	typedef std::bitset<SOURCE_SET_SIZE> SourceSet;
+
 	typedef boost::shared_ptr<casPV> PVSharedPtr;
 
 	void show(unsigned level) const;
@@ -57,8 +62,8 @@ public:
 	void sourceUp(uint32_t srcId);
 	void sourceDown(uint32_t srcId, bool stateChanged);
 
-	uint32_t registerEventSource(uint32_t hwId);
-	void unregisterEventSource(uint32_t smsId);
+	uint32_t registerEventSource(uint32_t srcId, uint32_t hwId);
+	void unregisterEventSource(uint32_t srcId, uint32_t smsId);
 
 	void pulseEvents(const ADARA::RawDataPkt &pkt,
 			uint32_t hwId, uint32_t dup,
@@ -117,7 +122,6 @@ private:
 	SMSControl();
 	~SMSControl();
 
-	typedef std::bitset<256> SourceSet;
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
 
 	typedef std::vector<ADARA::Event> EventVector;
@@ -217,6 +221,7 @@ private:
 
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 
+	uint32_t m_eventSourcesIndex[ SOURCE_SET_SIZE ];
 	SourceSet m_eventSources;
 	bool m_noRegisteredEventSources;
 	uint32_t m_noRegisteredEventSourcesCount;
