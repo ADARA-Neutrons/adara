@@ -82,6 +82,8 @@ bool SMSControl::m_useOrigPixelMappingPkt;
 
 bool SMSControl::m_notesCommentAutoReset;
 
+uint32_t SMSControl::m_intermittentDataThreshold;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -216,6 +218,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.run_notes_auto_reset", true);
 	INFO("Setting Run Notes Auto Reset to "
 		<< m_notesCommentAutoReset << ".");
+
+	m_intermittentDataThreshold =
+			conf.get<uint32_t>("sms.intermittent_data_threshold", 9);
+	INFO("Setting Intermittent Data Threshold to "
+		<< m_intermittentDataThreshold << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -446,6 +453,11 @@ SMSControl::SMSControl() :
 							+ "DoPulseVetoCorrect",
 						/* AutoSave */ true));
 
+	m_pvIntermittentDataThreshold = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "IntermittentDataThreshold", 0, INT32_MAX,
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -469,6 +481,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoRTDLPulses);
 	addPV(m_pvDoPulsePchgCorrect);
 	addPV(m_pvDoPulseVetoCorrect);
+	addPV(m_pvIntermittentDataThreshold);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -522,6 +535,10 @@ SMSControl::SMSControl() :
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
 	m_pvDoPulseVetoCorrect->update(m_doPulseVetoCorrect, &now);
 
+	// Initialize Intermittent Data	Threshold...
+	m_pvIntermittentDataThreshold->update(
+		m_intermittentDataThreshold, &now);
+
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
 
@@ -562,6 +579,12 @@ SMSControl::SMSControl() :
 			m_pvDoPulseVetoCorrect->getName(), bvalue, ts ) ) {
 		m_doPulseVetoCorrect = bvalue;
 		m_pvDoPulseVetoCorrect->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvIntermittentDataThreshold->getName(), uvalue, ts ) ) {
+		m_intermittentDataThreshold = uvalue;
+		m_pvIntermittentDataThreshold->update(uvalue, &ts);
 	}
 
 	// Initialize Next Run Number...
@@ -2280,22 +2303,28 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 	pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
 }
 
-#define INTERMITTENT_DATA_THRESHOLD (9)
-
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 			uint32_t smsId)
 {
 	static uint32_t data_source_pending_counts[ SOURCE_SET_SIZE ];
 	static uint32_t queue_log_count = 0;
+	static uint32_t cnt = 0;
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
+
+	// Infrequently Check Live Control PV for Intermittent Data Threshold
+	// (Once Per Minute...)
+	if ( !(++cnt % 3600) ) {
+		m_intermittentDataThreshold =
+			m_pvIntermittentDataThreshold->value();
+	}
 
 	// *Before* We Mark This Pulse Complete,
 	// Check for Any "Intermittent/Bursty" Data Sources
 	// and "Unregister" Them as Event Sources...! ;-D
 	// (Only Check for this If there are "Enough" Pulses,
 	// and More than One Active Event Source...! ;-)
-	if ( m_pulses.size() > INTERMITTENT_DATA_THRESHOLD
+	if ( m_pulses.size() > m_intermittentDataThreshold
 			&& m_eventSources.count() > 1 ) {
 		// Count Number of Consecutive "Missing Pulses" Per DataSource...
 		memset( (void *)&data_source_pending_counts, 0,
@@ -2312,7 +2341,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				if ( it->second->m_pending[i] ) {
 					// Count How Many Pulses This DataSource is Pending For
 					if ( ++(data_source_pending_counts[i])
-							>= INTERMITTENT_DATA_THRESHOLD ) {
+							>= m_intermittentDataThreshold ) {
 						ERROR( ( m_recording ? "[RECORDING] " : "" )
 							<< "markComplete():"
 							<< " Identified Intermittent Data Source"
@@ -2440,14 +2469,12 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	 * fixed-number-of-pulse buffering, to ensure complete pulses.
 	 */
 
-	// [LESS FREQUENTLY] Get Latest "No End-of-Pulse Buffer Size" Value
-	// from PV...
-	static uint32_t cnt = 0;
-
+	// [LESS FREQUENTLY] Get Latest "No End-of-Pulse Buffer Size" PV Value
+	// (Re-Use "count" from above Intermittent Data Threshold PV check...)
 	// Once Every 10 Seconds...
 	uint32_t freq = 600;
 
-	if ( !(++cnt % freq) ) {
+	if ( !(cnt % freq) ) {
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 	}
 
