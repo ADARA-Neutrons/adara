@@ -296,6 +296,9 @@ private:
 
 	static bool m_notesCommentAutoReset;
 
+	boost::shared_ptr<smsUint32PV> m_pvIntermittentDataThreshold;
+	static uint32_t m_intermittentDataThreshold;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
