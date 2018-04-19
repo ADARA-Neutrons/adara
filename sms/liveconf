@@ -235,6 +235,14 @@ option_default[$num_options]="true"
 option_label[$num_options]="[Auto-Reset the Run Notes Between Runs]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="intermittent_data_threshold"
+option_pv[$num_options]="SMS:Control:IntermittentDataThreshold"
+option_value_type[$num_options]="UINT32_VALUE(number_of_missing_pulses)"
+option_default[$num_options]="9"
+option_label[$num_options]="[Intermittent Data Source Threshold]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -1495,6 +1503,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:NoRTDLPulses
 		caget $WAIT ${PRE}:SMS:Control:DoPulsePchgCorrect
 		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
+		caget $WAIT ${PRE}:SMS:Control:IntermittentDataThreshold
 
 		echo
 
