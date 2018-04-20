@@ -1,0 +1,27 @@
+
+1. Capture First Packet Time (Hex Seconds) from Top of 1st File
+
+2. Replace Packet Time Below with Hex Seconds/Nanoseconds of Preceding Pkt
+	-> 4dde 3835, e67a da31
+
+3. Replace Starting Epoch Below with Hex Seconds from (1)
+	-> dfd4 0200
+
+4. Replace File Index with Hex Index of This Last File
+	-> 0100
+
+5. When Done, Convert Back to "Analog", Save File, and then:
+	-> truncate --size=-1 foo.adara
+
+6. Call LiveConf to get RescanRunDir PV for this beamline:
+	-> liveconf sys_status
+
+7. Set RescanRunDir to `pwd`
+	-> caput -S RescanRunDir `pwd`
+
+3d55c90: XXXX XXXX 0c00 0000 0003 4000 4dde 3835  ed........@.M.85
+3d55ca0: e67a da31 dfd4 0200 bbcc 3835 0100 0004  .z.1......85....
+3d55cb0: 0a                                       .
+
+Note: File Must End in "0a" Byte...! ;-D
+
