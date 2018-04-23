@@ -779,9 +779,9 @@ PARSE_LOG()
 			|| "$log" =~ \
 				ComBusSMSMon::SendUpdate\(\)${S}failed${S}for${S}Domain \
 		]]; then
-			#echo "ComBus SendOriginal()/Update() failed for Domain..."
-			nHostSTSComBusSendError[$host]=$(( \
-				nHostSTSComBusSendError[$host] + 1 ))
+			#echo "ComBus SendOriginal/Update failed for Domain..."
+			nHostSMSDComBusSendError[$host]=$(( \
+				nHostSMSDComBusSendError[$host] + 1 ))
 
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
@@ -1439,9 +1439,9 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDComBusReconnectThread[$h]} "
 		echo "SMSD \"ComBus Reconnect Thread\" Logs"
 	fi
-	if [[ ${nHostSTSComBusSendError[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSComBusSendError[$h]} "
-		echo "SMSD \"SendOriginal()/Update() failed for Domain\" Logs"
+	if [[ ${nHostSMSDComBusSendError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusSendError[$h]} "
+		echo "SMSD \"ComBus SendOriginal/Update failed for Domain\" Logs"
 	fi
 	# PVSD Error Stats...
 	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
