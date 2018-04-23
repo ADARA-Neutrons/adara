@@ -137,6 +137,7 @@ declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
 declare -A nHostSMSDComBusDisconnectError
 declare -A nHostSMSDComBusReconnectThread
+declare -A nHostSMSDComBusSendError
 declare -A nHostSMSDOversizePkt
 
 declare -A nHostPVSDINITHUNG
@@ -283,6 +284,7 @@ PARSE_LOG()
 		nHostSMSDComBusConnTimeout[$host]=0
 		nHostSMSDComBusDisconnectError[$host]=0
 		nHostSMSDComBusReconnectThread[$host]=0
+		nHostSMSDComBusSendError[$host]=0
 		nHostSMSDOversizePkt[$host]=0
 
 		nHostPVSDINITHUNG[$host]=0
@@ -806,6 +808,16 @@ PARSE_LOG()
 			#echo "ComBus Reconnect Thread..."
 			nHostSMSDComBusReconnectThread[$host]=$(( \
 				nHostSMSDComBusReconnectThread[$host] + 1 ))
+
+		# "(ComBus) SendOriginal() or SendUpdate() failed for Domain" Logs
+		elif [[ "$log" =~ \
+				ComBusSMSMon::SendOriginal\(\)${S}failed${S}for${S}Domain \
+			|| "$log" =~ \
+				ComBusSMSMon::SendUpdate\(\)${S}failed${S}for${S}Domain \
+		]]; then
+			#echo "ComBus SendOriginal()/Update() failed for Domain..."
+			nHostSTSComBusSendError[$host]=$(( \
+				nHostSTSComBusSendError[$host] + 1 ))
 
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
@@ -1478,6 +1490,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDComBusReconnectThread[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDComBusReconnectThread[$h]} "
 		echo "SMSD \"ComBus Reconnect Thread\" Logs"
+	fi
+	if [[ ${nHostSTSComBusSendError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSComBusSendError[$h]} "
+		echo "SMSD \"SendOriginal()/Update() failed for Domain\" Logs"
 	fi
 	# PVSD Error Stats...
 	if [[ ${nHostPVSDMakePvNamesUnique[$h]} -gt 0 ]]; then
