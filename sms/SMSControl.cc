@@ -2067,7 +2067,21 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	 * which is Very Convenient for Sub-60Hz Operation, where we don't
 	 * _Want_ any Proton Charge for those Pulses... ;-D  "Lucky."
 	 */
-	pulse->m_charge = pkt.pulseCharge();
+	if (pulse->m_rtdl) {
+		// Always Pull Proton Charge from RTDL Packet,
+		// as Data Packet does _Not_ Always Provide This Any More! ;-D
+		pulse->m_charge = pulse->m_rtdl->pulseCharge();
+	}
+	else {
+		if ( !m_noRTDLPulses ) {
+			ERROR("pulseEvents(): Missing RTDL for Setting Proton Charge!"
+				<< " Use Data Packet Proton Charge, If Available..."
+				<< " Data=" << pkt.pulseCharge()
+				<< " id=0x" << std::hex << pulse->m_id.first
+				<< " dup=0x" << pulse->m_id.second << std::dec);
+		}
+		pulse->m_charge = pkt.pulseCharge();
+	}
 
 	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
@@ -2324,7 +2338,8 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// and "Unregister" Them as Event Sources...! ;-D
 	// (Only Check for this If there are "Enough" Pulses,
 	// and More than One Active Event Source...! ;-)
-	if ( m_pulses.size() > m_intermittentDataThreshold
+	if ( m_intermittentDataThreshold > 0
+			&& m_pulses.size() > m_intermittentDataThreshold
 			&& m_eventSources.count() > 1 ) {
 		// Count Number of Consecutive "Missing Pulses" Per DataSource...
 		memset( (void *)&data_source_pending_counts, 0,
