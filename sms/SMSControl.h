@@ -81,6 +81,9 @@ public:
 	void resetSourcesReadDelay(void);
 	void setSourcesReadDelay(void);
 
+	uint32_t getIntermittentDataThreshold(void)
+		{ return m_intermittentDataThreshold; }
+
 	void resetPacketStats(void);
 
 	int32_t registerLiveClient(std::string clientName,
