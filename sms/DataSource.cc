@@ -125,7 +125,8 @@ public:
 		m_pvHWSourceErrBandwidthSecond(pvHWSourceErrBandwidthSecond),
 		m_pvHWSourceErrBandwidthMinute(pvHWSourceErrBandwidthMinute),
 		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
-		m_name(name), m_hwId(hwId), m_smsId(smsId), m_intermittent(false),
+		m_name(name), m_hwId(hwId), m_smsId(smsId),
+		m_intermittent(false), m_recoverPktCount(0),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
 		m_trueNew(true)
 	{
@@ -192,6 +193,10 @@ public:
 	{
 		m_intermittent = intermittent;
 	}
+
+	uint32_t incrRecoverPktCount(void) { return (++m_recoverPktCount); }
+
+	void resetRecoverPktCount(void) { m_recoverPktCount = 0; }
 
 	uint64_t pulse(void) const { return m_activePulse; }
 	uint64_t lastPulse(void) const { return m_lastPulse; }
@@ -444,6 +449,8 @@ private:
 	uint32_t	m_smsId;
 
 	bool		m_intermittent;
+
+	uint32_t	m_recoverPktCount;
 
 	uint64_t	m_activePulse;
 	uint64_t	m_lastPulse;
@@ -1948,7 +1955,7 @@ void DataSource::setIntermittent( uint32_t smsId, bool intermittent )
 			<< " for hwId=" << it->second->hwId() );
 		if ( intermittent ) {
 			it->second->setPulseGood( false ); // Don't Re-markComplete()!
-			it->second->endPulse( false );
+			//it->second->endPulse( false );
 			it->second->setSmsId( (uint32_t) -1 );
 		}
 		else {
@@ -1987,28 +1994,52 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	// Check for Intermittent HWSource...
 	if ( hw_src->intermittent() ) {
+		uint32_t recoverCount = 0;
 		// See If Any Data Here, Or Just End of Last Long-Lost Pulse...?
-		if ( hw_src->lastPulse() == pkt->pulseId()
+		if ( hw_src->pulse() == pkt->pulseId()
 				&& pkt->num_events() == 0 ) {
-			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "handleDataPkt(): Intermittent Data Source Recovered!"
+			DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "handleDataPkt(): Intermittent Data Source Activity"
 				<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
 				<< " Long-Lost Pulse Returns for srcId=" << m_smsSourceId
 				<< " hwId=" << hw_src->hwId()
-				<< " - Ignore This Pulse and Wait for Data..." );
+				<< " - No Events: Ignore This Pulse, Wait for Data..." );
+			hw_src->setPulseGood( false ); // Don't Re-markComplete()!
 			return false;
 		}
-		// Got Some Data, Need to Re-Register This HwId as an Event Source!
-		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "handleDataPkt(): Intermittent Data Source Recovered!"
-			<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
-			<< " Re-Registering srcId=" << m_smsSourceId
-			<< " hwId=" << hw_src->hwId()
-			<< " as an Event Source Again..." );
-		uint32_t smsId = m_ctrl->registerEventSource( m_smsSourceId,
-			hw_src->hwId() );
-		hw_src->setSmsId( smsId );
-		hw_src->setIntermittent( false );
+		// "Open Loop Hysteresis" Recovery from Intermittent Data Source
+		// (Just counts "Threshold" Data Packets, _Not_ A Good Indicator!)
+		// -> TODO: Implement Better Intermittent Source Bookkeeping
+		// in SMSControl (at some expense to performance...?)
+		else if ( (recoverCount = hw_src->incrRecoverPktCount())
+				< m_ctrl->getIntermittentDataThreshold() ) {
+			DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "handleDataPkt(): Data Packet Received for"
+				<< " Intermittent Data Source"
+				<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
+				<< " srcId=" << m_smsSourceId
+				<< " hwId=" << hw_src->hwId()
+				<< " recoverCount=" << recoverCount
+				<< " < intermittentDataThresh="
+				<< m_ctrl->getIntermittentDataThreshold()
+				<< " - Process This Pulse"
+				<< " But Leave Data Source as Intermittent..." );
+		}
+		else {
+			// We've Reached the Intermittent Data Threshold Again,
+			// Need to Re-Register This HwId as an Event Source!
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "handleDataPkt(): Intermittent Data Source Recovered!"
+				<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
+				<< " Re-Registering srcId=" << m_smsSourceId
+				<< " hwId=" << hw_src->hwId()
+				<< " as an Event Source Again..." );
+			uint32_t smsId = m_ctrl->registerEventSource( m_smsSourceId,
+				hw_src->hwId() );
+			hw_src->setSmsId( smsId );
+			hw_src->setIntermittent( false );
+			hw_src->resetRecoverPktCount();
+		}
 	}
 
 	// Reset "RTDL Packets with No Data Packets" Count...
