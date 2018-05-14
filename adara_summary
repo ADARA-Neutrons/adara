@@ -96,6 +96,10 @@ declare -A nHostSTSDuplicatePulse
 declare -A nHostSTSOversizePkt
 
 declare -A nHostSMSDRunAwayDataSource
+declare -A nHostSMSDIdentifiedIntermittent
+declare -A nHostSMSDIntermittentRecovered
+declare -A nHostSMSDSetHWSourceIntermittent
+declare -A nHostSMSDFoundHWSourceIntermittent
 declare -A nHostSMSDMissingRingPeriod
 declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
@@ -239,6 +243,10 @@ PARSE_LOG()
 		nHostSTSOversizePkt[$host]=0
 
 		nHostSMSDRunAwayDataSource[$host]=0
+		nHostSMSDIdentifiedIntermittent[$host]=0
+		nHostSMSDIntermittentRecovered[$host]=0
+		nHostSMSDSetHWSourceIntermittent[$host]=0
+		nHostSMSDFoundHWSourceIntermittent[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
 		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
@@ -519,6 +527,34 @@ PARSE_LOG()
 			#echo "Run-Away Data Source..."
 			nHostSMSDRunAwayDataSource[$host]=$(( \
 				nHostSMSDRunAwayDataSource[$host] + 1 ))
+
+		# "Identified Intermittent Data Source" Log
+		elif [[ "$log" =~ Identified${S}Intermittent${S}Data${S}Source \
+		]]; then
+			#echo "Identified Intermittent Data Source..."
+			nHostSMSDIdentifiedIntermittent[$host]=$(( \
+				nHostSMSDIdentifiedIntermittent[$host] + 1 ))
+
+		# "Intermittent Data Source Recovered" Log
+		elif [[ "$log" =~ Intermittent${S}Data${S}Source${S}Recovered \
+		]]; then
+			#echo "Intermittent Data Source Recovered..."
+			nHostSMSDIntermittentRecovered[$host]=$(( \
+				nHostSMSDIntermittentRecovered[$host] + 1 ))
+
+		# "Setting HwSource Intermittent State" Log
+		elif [[ "$log" =~ Setting${S}HwSource${S}Intermittent${S}State \
+		]]; then
+			#echo "Setting HwSource Intermittent State..."
+			nHostSMSDSetHWSourceIntermittent[$host]=$(( \
+				nHostSMSDSetHWSourceIntermittent[$host] + 1 ))
+
+		# "setIntermittent(): Found HwSource" Log
+		elif [[ "$log" =~ setIntermittent\(\):${S}Found${S}HwSource \
+		]]; then
+			#echo "setIntermittent(): Found HwSource..."
+			nHostSMSDSetHWSourceIntermittent[$host]=$(( \
+				nHostSMSDSetHWSourceIntermittent[$host] + 1 ))
 
 		# "Missing ring period" Log
 		elif [[ "$log" =~ Missing${S}ring${S}period ]]; then
@@ -1358,6 +1394,22 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
 		echo "SMSD \"New Chopper id=\" Logs"
+	fi
+	if [[ ${nHostSMSDIdentifiedIntermittent[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDIdentifiedIntermittent[$h]} "
+		echo "SMSD \"Identified Intermittent Data Source\" Logs"
+	fi
+	if [[ ${nHostSMSDIntermittentRecovered[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDIntermittentRecovered[$h]} "
+		echo "SMSD \"Intermittent Data Source Recovered\" Logs"
+	fi
+	if [[ ${nHostSMSDSetHWSourceIntermittent[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDSetHWSourceIntermittent[$h]} "
+		echo "SMSD \"Setting HwSource Intermittent State\" Logs"
+	fi
+	if [[ ${nHostSMSDFoundHWSourceIntermittent[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDFoundHWSourceIntermittent[$h]} "
+		echo "SMSD \"setIntermittent(): Found HwSource\" Logs"
 	fi
 	if [[ ${nHostSMSDSystemUninitialized[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDSystemUninitialized[$h]} "
