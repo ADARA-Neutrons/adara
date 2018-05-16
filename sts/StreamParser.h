@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
@@ -66,6 +67,29 @@ private:
         PROCESSING_EVENTS       = 0x0004,
         DONE_PROCESSING         = 0x0008
     };
+
+    /// Convert Processing State Enum to String Value (for Logging)
+    std::string getProcessingStateString()
+    {
+        std::stringstream ss;
+        switch ( m_processing_state )
+        {
+            case PROCESSING_NOT_STARTED:
+                ss << "PROCESSING_NOT_STARTED"; break;
+            case WAITING_FOR_RUN_START:
+                ss << "WAITING_FOR_RUN_START"; break;
+            case PROCESSING_RUN_HEADER:
+                ss << "PROCESSING_RUN_HEADER"; break;
+            case PROCESSING_EVENTS:
+                ss << "PROCESSING_EVENTS"; break;
+            case DONE_PROCESSING:
+                ss << "DONE_PROCESSING"; break;
+            default:
+                ss << "<UnknownProcessingState>"; break;
+        }
+        ss << " (0x" << std::hex << m_processing_state << std::dec << ")";
+        return( ss.str() );
+    }
 
     /// Defines packet statistics that can be gathers and displayed
     struct PktStats
