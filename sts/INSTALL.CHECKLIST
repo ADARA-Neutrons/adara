@@ -1,0 +1,213 @@
+
+ADARA STS Install Checklist
+
+	- for a New or Upgraded STS1/STS2 (or Labanalysis) Host...
+
+1. Verify State of Existing Git Config Repository:
+
+	pushd /home/controls/config/ ; git pull ; git diff ; git status
+
+	./confck
+
+	sudo cp etc/rsyslog.d/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	sudo cp etc/rsyslog.d/stslog.conf /etc/rsyslog.d/stslog.conf
+
+	sudo cp etc/xinetd.d/sts /etc/xinetd.d/sts
+
+	sudo cp etc/xinetd.d/sts_dummy /etc/xinetd.d/sts_dummy
+
+	sudo cp etc/xinetd.d/sts_hfir /etc/xinetd.d/sts_hfir
+
+	sudo cp etc/xinetd.d/sts_hfir_test /etc/xinetd.d/sts_hfir_test
+
+	sudo cp etc/xinetd.d/sts_test /etc/xinetd.d/sts_test
+
+	sudo cp usr/local/bin/sts /usr/local/bin/sts
+
+	sudo cp usr/local/bin/sts_dummy /usr/local/bin/sts_dummy
+
+	sudo cp usr/local/bin/sts_hfir /usr/local/bin/sts_hfir
+
+	sudo cp usr/local/bin/sts_hfir_test /usr/local/bin/sts_hfir_test
+
+	sudo cp usr/local/bin/sts_test /usr/local/bin/sts_test
+
+	ls -l /etc/rsyslog.d/adaraMailer.conf /etc/rsyslog.d/stslog.conf \
+		/etc/xinetd.d/sts /etc/xinetd.d/sts_dummy \
+		/etc/xinetd.d/sts_hfir /etc/xinetd.d/sts_hfir_test \
+		/etc/xinetd.d/sts_test \
+		/usr/local/bin/sts /usr/local/bin/sts_dummy \
+		/usr/local/bin/sts_hfir /usr/local/bin/sts_hfir_test \
+		/usr/local/bin/sts_test
+
+	-rw-r--r-- 1 root     root           513 Apr  2 15:12
+		/etc/rsyslog.d/adaraMailer.conf
+
+	-rw-r--r-- 1 root     root           145 Mar 22 16:52
+		/etc/rsyslog.d/stslog.conf
+
+	-rw-rw-r-- 1 root     sts_developers 321 Mar 22 16:47
+		/etc/xinetd.d/sts
+	-rw-rw-r-- 1 root     sts_developers 320 Mar 23 15:36
+		/etc/xinetd.d/sts_dummy
+	-rw-rw-r-- 1 root     sts_developers 337 Mar 22 16:47
+		/etc/xinetd.d/sts_hfir
+	-rw-rw-r-- 1 root     sts_developers 352 Mar 22 16:46
+		/etc/xinetd.d/sts_hfir_test
+	-rw-rw-r-- 1 root     sts_developers 336 Mar 22 16:46
+		/etc/xinetd.d/sts_test
+
+	-rwxrwxr-x 1 snsdata  adara          246 Mar 22 16:44
+		/usr/local/bin/sts*
+	-rwxrwxr-x 1 snsdata  adara          308 Mar 22 16:44
+		/usr/local/bin/sts_dummy*
+	-rwxrwxr-x 1 hfirdata adara          417 Mar 22 16:43
+		/usr/local/bin/sts_hfir*
+	-rwxrwxr-x 1 hfirdata adara          442 Mar 22 16:43
+		/usr/local/bin/sts_hfir_test*
+	-rwxrwxr-x 1 snsdata  adara          261 Mar 22 16:42
+		/usr/local/bin/sts_test*
+
+	./confck
+
+2. RSyslog Setup:
+
+	# NOTE: We no longer edit this file for the STS Log file...
+	# -> this is handled by the "/etc/rsyslog.d/stslog.conf" file
+
+	ls -l /var/log/sts.log
+
+	sudo touch /var/log/sts.log
+
+	sudo chgrp users /var/log/sts.log
+
+	sudo chmod g+w /var/log/sts.log
+
+	ls -l /var/log/sts.log
+
+	sudo /sbin/service rsyslog status
+
+	sudo /sbin/service rsyslog restart
+
+	sudo tail /var/log/messages
+
+	./confck 
+
+	cp /etc/rsyslog.conf etc/rsyslog.conf
+
+	git add etc/rsyslog.conf
+	git commit etc/rsyslog.conf
+
+	./confck
+
+3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
+
+	ls -l /etc/rsyslog.pipes
+
+	sudo mkdir /etc/rsyslog.pipes
+
+	sudo mknod /etc/rsyslog.pipes/criticalMessages p
+
+	sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+
+	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+
+	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
+
+	sudo vi /etc/crontab
+
+		# MAILTO=root
+		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		MAILTO="root@localhost"
+		HOME=/
+
+		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+	./confck
+
+	cp /etc/crontab etc/etc.crontab
+
+	git add etc/etc.crontab
+	git commit etc/etc.crontab
+
+	./confck
+
+4. Administrator Crontab Setup:
+
+	crontab -l
+
+	crontab -e
+
+	MAILTO='kohlja@ornl.gov'
+	0 8,17 * * * /home/controls/config/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-test/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-hfir/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-hfir-test/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-dummy/confck --quiet
+
+	crontab -l
+
+5. User Local Bin Soft Link Setup:
+
+	ls -l /usr/sbin/sts*
+
+	sudo ln -s /home/controls/config/deploy/sts /usr/sbin/sts
+
+	sudo ln -s /home/controls/config/deploy/sts_dummy /usr/sbin/sts_dummy
+
+	sudo ln -s /home/controls/config/deploy/sts_hfir /usr/sbin/sts_hfir
+
+	sudo ln -s /home/controls/config/deploy/sts_hfir_test \
+		/usr/sbin/sts_hfir_test
+
+	sudo ln -s /home/controls/config/deploy/sts_test /usr/sbin/sts_test
+
+	ls -l /usr/sbin/sts*
+
+6. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+
+	ls -l /home/controls/prod/ADARA
+
+	mkdir /home/controls/prod/ADARA
+
+	ls -l /home/controls/prod/ADARA
+
+	(rm /home/controls/prod/ADARA/EpicsBaseLink)
+
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
+		/home/controls/prod/ADARA/EpicsBaseLink
+
+	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
+
+	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
+		/home/controls/prod/ADARA/EpicsBaseV4Link
+
+	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
+
+	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
+		/home/controls/prod/ADARA/EpicsExtensionsLink
+
+	ls -l /home/controls/prod/ADARA
+
+	source $HOME/.bashrc
+
+	printenv | grep EPICS
+
+8. Deploy STS Daemon:
+
+	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+	(ls -l /home/controls/config/deploy/sts)
+
+		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
+			/home/controls/config/deploy/sts ->
+				/home/controls/prod/ADARA/20170717/v1.6.19/sts*
+
+	./deploy_adara sts
+
+DONE!!! :-D
+
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+
