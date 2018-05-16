@@ -141,7 +141,9 @@ StreamParser::processStream()
     if ( m_processing_state != PROCESSING_NOT_STARTED )
     {
         THROW_TRACE( ERR_INVALID_OPERATION,
-        "StreamParser::processStream() can not be called more than once." )
+            "StreamParser::processStream() cannot be called more than once"
+                << " (Processing State = " << getProcessingStateString()
+                << ")." )
     }
 
     try
@@ -157,16 +159,20 @@ StreamParser::processStream()
                 if ( m_processing_state != DONE_PROCESSING )
                 {
                     syslog( LOG_ERR,
-                    "[%i] STS failed %s: %s, Not Done Processing! (%s)",
+                    "[%i] STS failed %s: %s, %s (%s = %s)! [%s]",
                         g_pid, "processStream()", "Connection Failed",
+                        "Not Done Processing", "Processing State",
+                        getProcessingStateString().c_str(),
                         log_info.c_str() );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
                         syslog( LOG_ERR,
-                            "[%i] %s %s: %s, Still Processing Events!",
+                            "[%i] %s %s: %s, %s (%s = %s)!",
                             g_pid, "STS Error:", "processStream()",
-                            "Connection Failed" );
+                            "Connection Failed", "Still Processing Events",
+                            "Processing State",
+                            getProcessingStateString().c_str() );
 
                         // On fatal error, flush buffers to Nexus
                         // before terminating
@@ -191,17 +197,23 @@ StreamParser::processStream()
     }
     catch ( TraceException &e )
     {
-        RETHROW_TRACE( e, "processStream() failed." )
+        RETHROW_TRACE( e, "processStream() failed"
+            << " (Processing State = " << getProcessingStateString()
+            << ")." )
     }
     catch ( exception &e )
     {
         THROW_TRACE( ERR_GENERAL_ERROR,
-            "processStream() exception {" << e.what() << "}" )
+            "processStream() exception {" << e.what() << "} "
+                << " (Processing State = " << getProcessingStateString()
+                << ")." )
     }
     catch ( ... )
     {
         THROW_TRACE( ERR_GENERAL_ERROR,
-            "processStream() unexpected exception." )
+            "processStream() unexpected exception"
+                << " (Processing State = " << getProcessingStateString()
+                << ")." )
     }
 }
 
@@ -393,13 +405,16 @@ StreamParser::rxPacket
         {
             m_processing_state = PROCESSING_RUN_HEADER;
             syslog( LOG_INFO,
-                "[%i] Run Status Start-of-Run Received.", g_pid );
+                "[%i] Run Status Start-of-Run Received (%s = %s).",
+                g_pid, "Processing State",
+                getProcessingStateString().c_str() );
         }
         else
         {
             syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: Start-of-Run with state=0x%x.",
-                g_pid, "STS Error:", m_processing_state );
+                "[%i] %s Run Status Error: %s = %s.",
+                g_pid, "STS Error:", "Start-of-Run with Processing State",
+                getProcessingStateString().c_str() );
             bad_state = true;
         }
     }
@@ -420,14 +435,17 @@ StreamParser::rxPacket
             // need to forcibly terminate the POSIX read() loop, which in
             // our case _sometimes_ hangs on relentlessly... <sigh/>
             syslog( LOG_INFO,
-                "[%i] Run Status End-of-Run Received.", g_pid );
+                "[%i] Run Status End-of-Run Received (%s = %s).",
+                g_pid, "Processing State",
+                getProcessingStateString().c_str() );
             return true;
         }
         else
         {
             syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: End-of-Run with state=0x%x.",
-                g_pid, "STS Error:", m_processing_state );
+                "[%i] %s Run Status Error: %s = %s.",
+                g_pid, "STS Error:", "End-of-Run with Processing State",
+                getProcessingStateString().c_str() );
             bad_state = true;
         }
     }
@@ -435,7 +453,8 @@ StreamParser::rxPacket
     if ( bad_state )
     {
         THROW_TRACE( ERR_UNEXPECTED_INPUT,
-            "Recvd Run Status pkt in wrong state.")
+            "Recvd Run Status pkt in Wrong Processing State = "
+                << getProcessingStateString() << "." )
     }
 
     return false;
@@ -548,6 +567,11 @@ StreamParser::rxPacket
     // The receipt of a pixel mapping packet allows state to progress
     // to event processing
     m_processing_state = PROCESSING_EVENTS;
+    syslog( LOG_INFO,
+        "[%i] %s: Pixel Mapping Table Processed (%s = %s).",
+        g_pid, "StreamParser::rxPacket( ADARA::PixelMappingPkt )",
+        "Processing State", getProcessingStateString().c_str() );
+    usleep(30000); // give syslog a chance...
 
     return false;
 }
@@ -2241,22 +2265,26 @@ StreamParser::rxPacket
     // (tho check for the normal completion status & squawk... :-)
     if ( m_processing_state == DONE_PROCESSING )
     {
-        syslog( LOG_INFO, "[%i] Data Done Received.", g_pid );
+        syslog( LOG_INFO, "[%i] Data Done Received (%s = %s).",
+            g_pid, "Processing State",
+            getProcessingStateString().c_str() );
         usleep(30000); // give syslog a chance...
     }
 
     else if ( m_processing_state != DONE_PROCESSING )
     {
         syslog( LOG_INFO,
-            "[%i] STS failed: Data Done Received, Not Done Processing!",
-            g_pid );
+            "[%i] STS failed: Data Done Received, %s (%s = %s)!",
+            g_pid, "Not Done Processing", "Processing State",
+            getProcessingStateString().c_str() );
         usleep(30000); // give syslog a chance...
 
         if ( m_processing_state == PROCESSING_EVENTS )
         {
             syslog( LOG_INFO,
-                "[%i] Data Done Received, Still Processing Events!",
-                g_pid );
+                "[%i] Data Done Received, %s (%s = %s)!",
+                g_pid, "Still Processing Events", "Processing State",
+                getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
 
             // On fatal error, flush buffers to Nexus before terminating
@@ -2271,7 +2299,9 @@ StreamParser::rxPacket
         }
 
         THROW_TRACE( ERR_GENERAL_ERROR,
-            "ADARA stream ended unexpectedly." );
+            "ADARA stream ended unexpectedly"
+                << " (Processing State = " << getProcessingStateString()
+                << ")." )
     }
 
     return false;
