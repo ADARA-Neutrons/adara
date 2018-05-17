@@ -17,7 +17,7 @@
 	-> liveconf sys_status
 
 7. Set RescanRunDir to `pwd`
-	-> caput -S RescanRunDir `pwd`
+	-> caput -S BLXXX:SMS:StorageManager:RescanRunDir `pwd`
 
 3d55c90: XXXX XXXX 0c00 0000 0003 4000 4dde 3835  ed........@.M.85
 3d55ca0: e67a da31 dfd4 0200 bbcc 3835 0100 0004  .z.1......85....
