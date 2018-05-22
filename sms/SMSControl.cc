@@ -307,6 +307,7 @@ void SMSControl::addSource(const std::string &name,
 	uint32_t data_timeout_retry;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	bool ignore_local_sawtooth;
 	bool mixed_data_packets;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
@@ -336,6 +337,7 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout = info.get<double>("data_timeout", 3.0);
 	data_timeout_retry = info.get<uint32_t>("data_timeout_retry", 3);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	ignore_local_sawtooth = info.get<bool>("ignore_local_sawtooth", false);
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
@@ -352,6 +354,13 @@ void SMSControl::addSource(const std::string &name,
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Should probably let someone know if we're gonna
+	// Ignore Local SAWTOOTH Time Inconsistencies for this Data Source...
+	if (ignore_local_sawtooth) {
+		DEBUG("Ignore-Local-SAWTOOTH Flag Set to True for " << name
+			<< " - Ignoring Out-of-Time-Order Pulse Times!");
 	}
 
 	// Should probably let someone know if we're Mixing Data Packets
@@ -379,6 +388,7 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout,
 							 data_timeout_retry,
 							 ignore_eop,
+							 ignore_local_sawtooth,
 							 mixed_data_packets,
 							 chunk_size,
 							 rtdlNoDataThresh,
