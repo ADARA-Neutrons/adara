@@ -139,6 +139,14 @@ option_label[$num_options]="[Ignore End-of-Pulse]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_local_sawtooth"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreLocalSAWTOOTH"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Ignore Local SAWTOOTH Times]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="mixed_data_packets"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -1413,6 +1421,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:DataTimeout
 					caget $WAIT ${dsprefix}:DataTimeoutRetry
 					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
 					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
