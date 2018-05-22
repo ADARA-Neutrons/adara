@@ -101,18 +101,30 @@ private:
 class HWSource {
 public:
 	HWSource( const std::string &name, int32_t hwIndex,
-		uint32_t hwId, uint32_t smsId,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceHwId,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceSmsId,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthSecond,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthMinute,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceEventBandwidthTenMin,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthSecond,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthMinute,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceMetaBandwidthTenMin,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthSecond,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthMinute,
-		boost::shared_ptr<smsUint32PV> & pvHWSourceErrBandwidthTenMin ) :
+			uint32_t hwId, uint32_t smsId,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceHwId,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceSmsId,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceEventBandwidthSecond,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceEventBandwidthMinute,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceEventBandwidthTenMin,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceMetaBandwidthSecond,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceMetaBandwidthMinute,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceMetaBandwidthTenMin,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceErrBandwidthSecond,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceErrBandwidthMinute,
+			boost::shared_ptr<smsUint32PV> &
+				pvHWSourceErrBandwidthTenMin,
+			DataSource *dataSource ) :
 		m_hwIndex(hwIndex),
 		m_pvHWSourceHwId(pvHWSourceHwId),
 		m_pvHWSourceSmsId(pvHWSourceSmsId),
@@ -125,6 +137,7 @@ public:
 		m_pvHWSourceErrBandwidthSecond(pvHWSourceErrBandwidthSecond),
 		m_pvHWSourceErrBandwidthMinute(pvHWSourceErrBandwidthMinute),
 		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
+		m_dataSource(dataSource),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
 		m_intermittent(false), m_recoverPktCount(0),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
@@ -279,7 +292,8 @@ public:
 			m_dupCount = 0;
 
 		// also check for SAWTOOTH Pulse Times in event packets...
-		if (m_activePulse < m_lastPulse) {
+		if ( !(m_dataSource->ignoreLocalSAWTOOTH())
+				&& m_activePulse < m_lastPulse ) {
 			/* Rate-limited logging of local sawtooth pulses */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
@@ -441,6 +455,8 @@ public:
 
 private:
 
+	DataSource *m_dataSource;
+
 	SMSControl *m_ctrl;
 
 	const std::string &m_name;
@@ -477,16 +493,18 @@ DataSource::DataSource( const std::string &name,
 			const std::string &uri, uint32_t id,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
-			bool ignore_eop, bool mixed_data_packets,
-			unsigned int read_chunk, uint32_t rtdlNoDataThresh,
-			bool save_input_stream ) :
+			bool ignore_eop, bool ignore_local_sawtooth,
+			bool mixed_data_packets, unsigned int read_chunk,
+			uint32_t rtdlNoDataThresh, bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
 	m_state(DISABLED), m_smsSourceId(id), m_fd(-1),
 	m_connect_retry(connect_retry), m_connect_timeout(connect_timeout),
 	m_data_timeout(data_timeout), m_data_timeout_retry(data_timeout_retry),
 	m_data_timeout_retry_count(0),
-	m_ignore_eop(ignore_eop), m_mixed_data_packets(mixed_data_packets),
+	m_ignore_eop(ignore_eop),
+	m_ignore_local_sawtooth(ignore_local_sawtooth),
+	m_mixed_data_packets(mixed_data_packets),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -598,6 +616,10 @@ DataSource::DataSource( const std::string &name,
 	m_pvIgnoreEoP = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IgnoreEoP", /* AutoSave */ true));
 
+	m_pvIgnoreLocalSAWTOOTH = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":IgnoreLocalSAWTOOTH",
+			/* AutoSave */ true));
+
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
 
@@ -661,6 +683,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvDataTimeout);
 	m_ctrl->addPV(m_pvDataTimeoutRetry);
 	m_ctrl->addPV(m_pvIgnoreEoP);
+	m_ctrl->addPV(m_pvIgnoreLocalSAWTOOTH);
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvMaxReadChunk);
 	m_ctrl->addPV(m_pvRTDLNoDataThresh);
@@ -694,6 +717,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvDataTimeout->update(m_data_timeout, &now);
 	m_pvDataTimeoutRetry->update(m_data_timeout_retry, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
+	m_pvIgnoreLocalSAWTOOTH->update(m_ignore_local_sawtooth, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
@@ -787,6 +811,12 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_ignore_eop = bvalue;
 		m_pvIgnoreEoP->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvIgnoreLocalSAWTOOTH->getName(),
+			bvalue, ts ) ) {
+		m_ignore_local_sawtooth = bvalue;
+		m_pvIgnoreLocalSAWTOOTH->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvMixedDataPackets->getName(),
@@ -1617,8 +1647,10 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 	// Optionally Save Input Stream to Storage Container File...
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
+	// (And While We're At It, Also Check "Ignore Local SAWTOOTH" PV... :-)
 	if ( !( ++cnt % 99999 ) ) {
 		m_save_input_stream = m_pvSaveInputStream->value();
+		m_ignore_local_sawtooth = m_pvIgnoreLocalSAWTOOTH->value();
 	}
 	if (m_save_input_stream) {
 		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
@@ -1913,7 +1945,8 @@ boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
 			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
 			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
-			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin ) );
+			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin,
+			this ) );
 
 		// Add to HWSource List for This DataSource...
 		it = m_hwSources.insert(HWSrcMap::value_type(hwId, src)).first;
@@ -2179,7 +2212,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	else m_dupRTDL = 0;
 
 	// also check for "Local" SAWTOOTH, from within given DataSource stream
-	if (pkt.pulseId() < m_lastRTDLPulseId) {
+	if ( !m_ignore_local_sawtooth && pkt.pulseId() < m_lastRTDLPulseId ) {
 		/* Rate-limited logging of local sawtooth RTDLs */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
