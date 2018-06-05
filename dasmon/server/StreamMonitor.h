@@ -399,6 +399,7 @@ private:
     bool        rxPacket( const ADARA::RunStatusPkt &a_pkt );
     bool        rxPacket( const ADARA::BankedEventPkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingPkt &a_pkt );
+    bool        rxPacket( const ADARA::PixelMappingAltPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorPkt &a_pkt );
     bool        rxPacket( const ADARA::RunInfoPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamlineInfoPkt &a_pkt );
@@ -485,8 +486,8 @@ private:
     uint32_t                        m_maxtof;
     std::map<int16_t,BankInfo>      m_bank_info;
     std::vector<uint32_t>           m_sources;
-    std::vector<int16_t>            m_pixmap;
-    bool                            m_pixmap_processed;
+    std::vector<int16_t>            m_pixbankmap;
+    bool                            m_pixbankmap_processed;
     uint32_t                        m_proc_ticker;      ///< "Alive" indicator for stream processing thread
     static uint32_t                 m_proc_state;       ///< General state/step of stream processing thread.
     static uint32_t                 m_notify_state;

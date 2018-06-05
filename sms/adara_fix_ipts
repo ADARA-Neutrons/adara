@@ -54,6 +54,15 @@ CP="/bin/cp"
 MV="/bin/mv"
 LS="/bin/ls"
 
+#
+# Set Umask for Any/All Files Created/Generated Herein...! ;-D
+#
+# (to avoid situations like the POWGEN SMS Restart Failures
+#    caused by "Fix IPTS" leftovers & edits that were owned
+#    by Jeeem and Not Readable by User "SNSData" Group "ADARA"... ;-b)
+#
+umask 0000
+
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"

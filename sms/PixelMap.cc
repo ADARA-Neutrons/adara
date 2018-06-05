@@ -4,6 +4,7 @@
 #include <utility>
 #include <stdexcept>
 #include <string>
+#include <iterator>
 #include <queue>
 #include <map>
 #include <set>
@@ -111,7 +112,8 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		map->insert(make_pair(phys, std::make_pair(logical, bank)));
 	}
 
-	INFO("readMap(): Done Reading Pixel Map File.");
+	INFO("readMap(): Done Reading Pixel Map File."
+		<< " [" << ( lineno - 1 ) << " Lines Read.]");
 
 	if (!f.eof()) {
 		std::string msg("Read Error in Pixel Map File ");
@@ -128,6 +130,143 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 	return map;
 }
 
+boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
+					      uint32_t &packetSize)
+{
+	std::queue<uint16_t> sections;
+	TempMap::iterator it, end;
+	uint32_t payload, expected, bank_count;
+	uint32_t tot_pixelid_count;
+	uint32_t section_count;
+	struct timespec now;
+	uint32_t *u32;
+	uint16_t i, entries, bank;
+	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
+
+	DEBUG("genAltPacket() Entry");
+
+	/* We now support Non-One-to-One Pixel Mappings, therefore
+	 * we must also avoid using any "Inverse" Mappings, as these
+	 * are practically impossible for some beamlines (e.g. HFIR WAND).
+	 * Just use physical->logical map "as is" for generating the
+	 * pixel map packet.
+	 */
+
+	/* NOTE: This "Alternate" Pixel Mapping Table Packet is effectively
+	 * a "Mirror Image" of the Original Pixel Mapping Table Packet,
+	 * with "Logical" PixelIds now Swapped with "Physical" PixelIds
+	 * Everywhere, in a "Inverted" (ha ha) organizational structure. ;-D
+	 *
+	 * We also pack in One Handy Extra Value _Before_ the Mapping Data,
+	 * to Avoid Future Issues - explicitly include the "Number of Banks"!
+	 */
+
+	/* We're always going to have at least one section, with the first
+	 * physical pixel in it.
+	 */
+	it = map->begin();
+	expected = it->first + 1; // expected next Physical PixelId...
+	entries = 1;
+	bank = it->second.second;
+
+	tot_pixelid_count = 0;
+	section_count = 0;
+
+	for (++it, end = map->end(); it != end; ++it) {
+		/* If we've found a discontinuity in the physical pixels,
+		 * or we changed banks, OR we have _Filled Up_ this section
+		 * with the Max Section PixelId Count (16 bits, 0xffff = 65535),
+		 * then we have to start a new section.
+		 */
+		if (it->first != expected || it->second.second != bank
+				|| entries >= max_section_pixelid_count) {
+			sections.push(entries);
+			// Skip Unmapped Banks...! Don't Count/Send Unmapped PixelIds...
+			// No Need to Send These Over the Wire!
+			if ( bank != (uint16_t) -1 ) {
+				tot_pixelid_count += entries;
+				section_count++;
+			}
+			entries = 0;
+			bank = it->second.second;
+		}
+		entries++;
+		expected = it->first + 1; // expected next Physical PixelId...
+	}
+
+	/* Push the last section we were working on. */
+	sections.push(entries);
+	// Skip Unmapped Banks...! No Need to Send These Over the Wire!
+	if ( bank != (uint16_t) -1 ) {
+		tot_pixelid_count += entries;
+		section_count++;
+	}
+
+	DEBUG("section_count=" << section_count);
+	DEBUG("sections.size()=" << sections.size());
+	DEBUG("tot_pixelid_count=" << tot_pixelid_count);
+	DEBUG("map->size()=" << map->size());
+
+	/* Now, build the packet; we have enough information to calculate
+	 * its size.
+	 */
+	payload = section_count * ( sizeof(uint32_t) + (2 * sizeof(uint16_t)) );
+	DEBUG("payload(sections)=" << payload);
+	payload += tot_pixelid_count * sizeof(uint32_t);
+	DEBUG("payload(tot_pixelid_count)=" << payload);
+	payload += sizeof(uint32_t); // for Explicit "Number of Banks"! ;-D
+	DEBUG("payload(numbanks)=" << payload);
+	packetSize = payload + sizeof(ADARA::Header);
+	DEBUG("packetSize=" << packetSize);
+
+	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
+
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	u32 = (uint32_t *) pkt.get();
+	*u32++ = payload;
+	*u32++ = ADARA_PKT_TYPE(
+		ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE,
+		ADARA::PacketType::PIXEL_MAPPING_ALT_VERSION );
+	*u32++ = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	*u32++ = now.tv_nsec;
+
+	*u32++ = (m_numBanks - 1); // Note: Artificially Incremented By 1...!
+
+	it = map->begin();
+	while ( !sections.empty() ) {
+		entries = sections.front();
+		sections.pop();
+
+		// Skip Unmapped Banks...! No Need to Send These Over the Wire!
+		if ( it->second.second == (uint16_t) -1 ) {
+			std::advance( it, entries );
+			continue;
+		}
+
+		/* First the header (base physical ID, bankid, count) */
+		bank_count = (uint32_t) it->second.second << 16;
+		bank_count |= entries;
+
+		*u32++ = it->first;
+		*u32++ = bank_count;
+
+		/* Then the entries (logical id) */
+		for (i = 0; i < entries; ++it, ++i) {
+			*u32++ = it->second.first;
+		}
+	}
+
+	//DEBUG("Resulting Size: u32=" << std::hex << u32
+		//<< " Starting Payload: pkt.get()=" << ((uint32_t *) pkt.get())
+		//<< " Effective Size: (4 * (u32 - pkt.get()))="
+		//<< std::dec << ( 4 * ( u32 - ((uint32_t *) pkt.get()) ) ) );
+
+	DEBUG("Done");
+
+	return pkt;
+}
+
 boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 					      uint32_t &packetSize)
 {
@@ -140,14 +279,18 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 	uint16_t i, entries, bank;
 	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
 
+DEBUG("genPacket() Entry");
+
 	/* A physical->logical map is better for parsing and for building
 	 * the lookup table used for normal operations, but going logical
 	 * to physical is better for generating the pixel map packet.
 	 * Since we guarantee a one-to-one mapping during load, we don't
 	 * have to worry about duplicate keys here.
 	 */
-	// TODO Handle the "m_allowNonOneToOnePixelMapping == true" case...!
-	// -> needed for HFIR WAND...
+	// NOTE: _Can_ Break for "m_allowNonOneToOnePixelMapping == true" case!!
+	// -> Ordering of Banks in Map can "Cover Up" some Bank Numbers...!
+	// -> Where Possible going forward, Use "PixelMappingAltPkt"...! ;-D
+	// -> See Trac Ticket #1043, for HFIR WAND/HB2C...
 	for (it = map->begin(), end = map->end(); it != end; ++it) {
 		phys = it->first;
 		logical = it->second.first;
@@ -159,7 +302,7 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 	 * logical pixel in it.
 	 */
 	it = inverted.begin();
-	expected = it->first + 1;
+	expected = it->first + 1; // expected next Logical PixelId...
 	entries = 1;
 	bank = it->second.second;
 
@@ -176,18 +319,22 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 			bank = it->second.second;
 		}
 		entries++;
-		expected = it->first + 1;
+		expected = it->first + 1; // expected next Logical PixelId...
 	}
 
 	/* Push the last section we were working on. */
 	sections.push(entries);
+
+DEBUG("sections.size()=" << sections.size());
 
 	/* Now, build the packet; we have enough information to calculate
 	 * its size.
 	 */
 	payload = sections.size() * (sizeof(uint32_t) + 2 * sizeof(uint16_t));
 	payload += inverted.size() * sizeof(uint32_t);
+DEBUG("payload=" << payload);
 	packetSize = payload + sizeof(ADARA::Header);
+DEBUG("packetSize=" << packetSize);
 
 	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
 
@@ -202,7 +349,7 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 	*u32++ = now.tv_nsec;
 
 	it = inverted.begin();
-	while (!sections.empty()) {
+	while ( !sections.empty() ) {
 		entries = sections.front();
 		sections.pop();
 
@@ -218,12 +365,15 @@ boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 			*u32++ = it->second.first;
 	}
 
+DEBUG("Done");
+
 	return pkt;
 }
 
 PixelMap::PixelMap(const std::string &path,
-		bool allowNonOneToOnePixelMapping)
+		bool allowNonOneToOnePixelMapping, bool useOrigPixelMappingPkt)
 	: m_allowNonOneToOnePixelMapping(allowNonOneToOnePixelMapping),
+	m_useOrigPixelMappingPkt(useOrigPixelMappingPkt),
 	m_numBanks(0)
 {
 	std::auto_ptr<TempMap> map;
@@ -290,7 +440,10 @@ PixelMap::PixelMap(const std::string &path,
 		}
 	}
 
-	m_packet = genPacket(map.get(), m_packetSize);
+	if ( m_useOrigPixelMappingPkt )
+		m_packet = genPacket(map.get(), m_packetSize);
+	else
+		m_packet = genAltPacket(map.get(), m_packetSize);
 
 	m_connection = StorageManager::onPrologue(
 				boost::bind(&PixelMap::onPrologue, this));

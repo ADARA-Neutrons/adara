@@ -196,6 +196,14 @@ option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="no_rtdl_pulses"
+option_pv[$num_options]="SMS:Control:NoRTDLPulses"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[No RTDL Pulses on This Beamline]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="do_pulse_pcharge_correction"
 option_pv[$num_options]="SMS:Control:DoPulsePchgCorrect"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -215,7 +223,7 @@ option_id_type[$num_options]="ctrl"
 option_name[$num_options]="send_sample_in_run_info"
 option_pv[$num_options]="SMS:RunInfo:SendSampleInRunInfo"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
-option_default[$num_options]="true"
+option_default[$num_options]="false"
 option_label[$num_options]="[Send Sample In Run Info]"
 num_options=$(( num_options + 1 ))
 
@@ -1383,6 +1391,7 @@ if [[ "$command" == "status" \
 				dsprefix="${PRE}:SMS:DataSource:${ds}"
 
 				caget $WAIT -S ${dsprefix}:Name
+				caget $WAIT -S ${dsprefix}:BaseName
 				caget $WAIT -S ${dsprefix}:DataURI
 				caget $WAIT ${dsprefix}:Enabled
 				caget $WAIT ${dsprefix}:Required
@@ -1483,6 +1492,7 @@ if [[ "$command" == "status" \
 
 		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
 		caget $WAIT ${PRE}:SMS:Control:MaxPulseBufferSize
+		caget $WAIT ${PRE}:SMS:Control:NoRTDLPulses
 		caget $WAIT ${PRE}:SMS:Control:DoPulsePchgCorrect
 		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
 

@@ -746,7 +746,8 @@ NxGen::writeSTSConfigUnitsAttributes(
         // then Set Units Attribute from ElementInfo
         // (If we captured a "Units Value" PV Value,
         // or else Explicit Units were Specified!)
-        if ( E->unitsValue.size() || E->units.size() )
+        if ( ( E->unitsValue.size() && E->unitsValue.compare("(unset)") )
+                || ( E->units.size() && E->units.compare("(unset)") ) )
         {
             // Add Given Units Attribute for Every Saved Element Path...
             for ( it = E->unitsPaths.begin() ;
@@ -756,7 +757,8 @@ NxGen::writeSTSConfigUnitsAttributes(
                 std::string units;
 
                 // PV Units Value Supersedes Explicit Units
-                if ( E->unitsValue.size() )
+                if ( E->unitsValue.size()
+                        && E->unitsValue.compare("(unset)") )
                 {
                     label = "PV Value Units";
                     units = E->unitsValue;
@@ -2457,7 +2459,7 @@ NxGen::makeDataset
                 << ", name: " << a_name )
     }
 
-    if ( a_units.size() )
+    if ( a_units.size() && a_units.compare("(unset)") )
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
                 "units", a_units ) != SUCCEED )
@@ -2495,7 +2497,7 @@ NxGen::writeMultidimDataset
                 << ", name: " << a_name )
     }
 
-    if ( a_units.size() )
+    if ( a_units.size() && a_units.compare("(unset)") )
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
                 "units", a_units ) != SUCCEED )
@@ -3777,7 +3779,7 @@ NxGen::writeScalar
                      << a_name << ", value: " << a_value )
     }
 
-    if ( a_units.size())
+    if ( a_units.size() && a_units.compare("(unset)") )
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {

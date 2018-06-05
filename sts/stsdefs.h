@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <vector>
+#include <sstream>
 #include <string>
 #include <syslog.h>
 #include "ADARAUtils.h"
@@ -11,6 +12,8 @@
 // Global syslog info
 #define STS_VERSION "1.9.2"
 extern pid_t g_pid;
+
+#define STS_DOUBLE_EPSILON (0.00000000000001)
 
 namespace STS {
 
@@ -827,6 +830,141 @@ public:
     {}
 
     virtual void addToStats( T a_value ) = 0;
+
+    /// Compare Two Uint32 PV Values
+    bool valuesEqual
+    (
+        uint32_t value1,               ///< Uint32 Value
+        uint32_t value2                ///< Uint32 Value
+    )
+    {
+        return( value1 == value2 );
+    }
+
+    /// Compare Two Double PV Values
+    bool valuesEqual
+    (
+        double value1,                 ///< Double Value
+        double value2                  ///< Double Value
+    )
+    {
+        return( approximatelyEqual( value1, value2, STS_DOUBLE_EPSILON ) );
+    }
+
+    /// Compare Two String PV Values
+    bool valuesEqual
+    (
+        std::string value1,            ///< String Value
+        std::string value2             ///< String Value
+    )
+    {
+        return( !(value1.compare( value2 )) );
+    }
+
+    /// Compare Two Uint32 PV Arrays
+    bool valuesEqual
+    (
+        std::vector<uint32_t> value1,  ///< Uint32 Array
+        std::vector<uint32_t> value2   ///< Uint32 Array
+    )
+    {
+        if ( value1.size() != value2.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < value1.size() ; i++ )
+        {
+            if ( value1[i] != value2[i] )
+                return( false );
+        }
+
+        return( true );
+    }
+
+    /// Compare Two Double PV Arrays
+    bool valuesEqual
+    (
+        std::vector<double> value1,    ///< Double Array
+        std::vector<double> value2     ///< Double Array
+    )
+    {
+        if ( value1.size() != value2.size() )
+            return( false );
+
+        for ( uint32_t i=0 ; i < value1.size() ; i++ )
+        {
+            if ( !approximatelyEqual( value1[i], value2[i],
+                    STS_DOUBLE_EPSILON ) ) {
+                return( false );
+            }
+        }
+
+        return( true );
+    }
+
+    /// Convert Uint32 PV Value to String
+    std::string valueToString
+    (
+        uint32_t value                 ///< Uint32 Value
+    )
+    {
+        std::stringstream ss;
+        ss << value;
+        return( ss.str() );
+    }
+
+    /// Convert Double PV Value to String
+    std::string valueToString
+    (
+        double value                   ///< Double Value
+    )
+    {
+        std::stringstream ss;
+        ss << value;
+        return( ss.str() );
+    }
+
+    /// Convert String PV Value to String (Lol... ;-D)
+    std::string valueToString
+    (
+        std::string value              ///< String Value
+    )
+    {
+        return( value );
+    }
+
+    /// Convert Uint32 PV Array to String
+    std::string valueToString
+    (
+        std::vector<uint32_t> value    ///< Uint32 Array
+    )
+    {
+        std::stringstream ss;
+        ss << "[";
+        for ( uint32_t j=0 ; j < value.size() ; j++ )
+        {
+            if ( j ) ss << ", ";
+            ss << value[j];
+        }
+        ss << "]";
+        return( ss.str() );
+    }
+
+    /// Convert Double PV Array to String
+    std::string valueToString
+    (
+        std::vector<double> value      ///< Double Array
+    )
+    {
+        std::stringstream ss;
+        ss << "[";
+        for ( uint32_t j=0 ; j < value.size() ; j++ )
+        {
+            if ( j ) ss << ", ";
+            ss << value[j];
+        }
+        ss << "]";
+        return( ss.str() );
+    }
 
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
 

@@ -23,6 +23,7 @@ public:
 	std::string propId(void) const { return m_propId; }
 	uint32_t numFiles(void) const { return m_numFiles; }
 	uint32_t numPauseFiles(void) const { return m_numPauseFiles; }
+	uint32_t totFileCount(void) const { return m_totFileCount; }
 	const std::string &name(void) const { return m_name; }
 	bool isTranslated(void) const { return m_translated; }
 	bool isManual(void) const { return m_manual; }
@@ -33,6 +34,7 @@ public:
 
 	bool active(void) const { return m_active; }
 	bool paused(void) const { return m_paused; }
+	void setPaused(bool paused) { m_paused = paused; }
 
 	boost::signals2::connection connect(const onNewFile::slot_type &slot) {
 		return m_newFile.connect(slot);
@@ -64,6 +66,18 @@ public:
 
 	uint64_t openSize(void);
 
+	size_t numSaveDataSources(void) { return m_ds_input_files.size(); }
+
+	StorageFile::SharedPtr &savefile(uint32_t dataSourceId)
+	{
+		if ( dataSourceId < m_ds_input_files.size()
+				&& m_ds_input_files[dataSourceId] ) {
+			return m_ds_input_files[dataSourceId];
+		}
+		else
+			return m_dummy_file;
+	}
+
 private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;
@@ -71,6 +85,7 @@ private:
 	std::string m_propId;
 	uint32_t m_numFiles;
 	uint32_t m_numPauseFiles;
+	uint32_t m_totFileCount;
 	std::string m_name;
 	StorageFile::SharedPtr m_cur_file;
 	onNewFile m_newFile;
@@ -85,6 +100,7 @@ private:
 
 	std::vector<StorageFile::SharedPtr> m_ds_input_files;
 	std::vector<uint32_t> m_ds_input_num_files;
+	StorageFile::SharedPtr m_dummy_file;
 
 	StorageContainer(const struct timespec &start,
 		uint32_t run, std::string &propId);

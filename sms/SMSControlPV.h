@@ -5,6 +5,14 @@
 #include <string>
 #include <stdint.h>
 
+#ifndef FLOAT64_MAX
+#define FLOAT64_MAX (1.7976931348623157E308)
+#endif
+
+#ifndef FLOAT64_MIN
+#define FLOAT64_MIN (-1.7976931348623157E308)
+#endif
+
 #ifndef INT32_MAX
 #define INT32_MAX (2147483647)
 #endif
@@ -53,7 +61,11 @@ public:
 					  const char * const user,
 					  const char * const host);
 
+	void timestamp(struct timespec &ts);
+
 	void destroy(void);
+
+	virtual void changed(void);
 
 protected:
 	smartGDDPointer m_value;
@@ -91,6 +103,8 @@ public:
 	casChannel *createChannel(const casCtx &ctx, const char * const user,
 				  const char * const host);
 
+	virtual void changed(void);
+
 private:
 	gddAppFuncTableStatus getValue(gdd &value);
 
@@ -110,6 +124,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
+	virtual void changed(void);
+
 private:
 	SMSControl *m_ctrl;
 
@@ -121,7 +137,7 @@ class smsStringPV : public smsPV {
 public:
 	enum { MAX_LENGTH = 2048 };
 
-	smsStringPV(const std::string &name);
+	smsStringPV(const std::string &name, bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -132,7 +148,9 @@ public:
 	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
 
-	void unset(void);
+	void unset(bool init = false,
+		struct timespec *ts = (struct timespec *) NULL);
+
 	bool valid(void);
 	std::string value(void);
 
@@ -141,37 +159,51 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	bool m_first_set;
+
+private:
+	bool m_auto_save;
 };
 
 class smsBooleanPV : public smsPV {
 public:
-	smsBooleanPV(const std::string &name);
+	smsBooleanPV(const std::string &name,
+		bool auto_save = false,
+		bool no_changed_on_update = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
 
 	virtual aitEnum bestExternalType(void) const;
 
-	virtual void update(bool val, struct timespec *ts);
+	virtual void update(bool val, struct timespec *ts,
+		bool force_changed = false);
 
 	bool valid(void);
 	bool value(void);
 
-public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+
+	bool m_first_set;
+
+private:
+	bool m_auto_save;
+	bool m_no_changed_on_update;
 };
 
 class smsEnabledPV : public smsBooleanPV {
 public:
-	smsEnabledPV(const std::string &name, DataSource *dataSource);
+	smsEnabledPV(const std::string &name, DataSource *dataSource,
+		bool auto_save = false);
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
+	void update(bool val, struct timespec *ts, bool force_changed = false);
 
 	gddAppFuncTableStatus getEnums(gdd &value);
 
@@ -179,25 +211,36 @@ private:
 	DataSource *m_dataSource;
 };
 
-class smsErrorPV : public smsBooleanPV {
+class smsErrorPV : public smsPV {
 public:
 	smsErrorPV(const std::string &name);
 
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts);
-	void update(bool val, struct timespec *ts, bool major);
+	void update(bool val, bool major, struct timespec *ts);
+
 	void set(void);
 	void reset(void);
 
+	bool valid(void);
+	bool value(void);
+
+	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
 };
 
 class smsUint32PV : public smsPV {
 public:
 	smsUint32PV(const std::string &name,
-		uint32_t min = 0, uint32_t max = INT32_MAX);
-		// Uint32's in EPICS are Really Int32's...
+		// Note: Uint32's in EPICS are Really Int32's...
+		uint32_t min = 0, uint32_t max = INT32_MAX,
+		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -217,6 +260,8 @@ public:
 
 	uint32_t m_min, m_max;
 
+	bool m_first_set;
+
 protected:
 	gddAppFuncTable<smsUint32PV>	m_read_table;
 
@@ -226,6 +271,9 @@ protected:
 	gddAppFuncTableStatus minimumNumber(gdd &in);
 
 	void initReadTable(void);
+
+private:
+	bool m_auto_save;
 };
 
 class smsInt32PV : public smsPV {
@@ -285,6 +333,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
+	virtual void changed(void);
+
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
@@ -295,8 +345,9 @@ public:
 class smsFloat64PV : public smsPV {
 public:
 	smsFloat64PV(const std::string &name,
-		double min = -1.7976931348623157E308,
-		double max = 1.7976931348623157E308);
+		double min = FLOAT64_MIN,
+		double max = FLOAT64_MAX,
+		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
@@ -316,6 +367,8 @@ public:
 
 	double m_min, m_max;
 
+	bool m_first_set;
+
 protected:
 	gddAppFuncTable<smsFloat64PV>    m_read_table;
 
@@ -326,6 +379,9 @@ protected:
 	gddAppFuncTableStatus minimumNumber(gdd &in);
 
 	void initReadTable(void);
+
+private:
+	bool m_auto_save;
 };
 
 #endif /* __SMS_CONTROL_PV_H */

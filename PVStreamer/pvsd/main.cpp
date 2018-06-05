@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
     // Parse program options
 
     namespace po = boost::program_options;
-    po::options_description options( "dasmon server options" );
+    po::options_description options( "pvsd server options" );
     options.add_options()
             ("help,h", "show help")
             ("version,v", "show version number")

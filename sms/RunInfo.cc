@@ -31,13 +31,13 @@ public:
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
 
-private:
-	RunInfo *m_master;
-	bool m_unlocked;
-
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
 	void triggered(void) { m_master->reset(); }
+
+private:
+	RunInfo *m_master;
+	bool m_unlocked;
 };
 
 class RunInfoPV : public smsStringPV {
@@ -56,21 +56,28 @@ public:
 
 	bool lastValid(void) { return m_lastValid; }
 
+	bool allowUpdate(const gdd &) { return m_unlocked; }
+
+	void changed(void)
+	{
+		INFO("RunInfoPV::changed()");
+
+		m_runInfo->pvChanged(this);
+		m_lastValid = this->valid();
+		m_runInfo->checkPacket();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
+	}
+
 private:
 	std::string m_label;
 	bool m_isRequired;
 	RunInfo *m_runInfo;
 	bool m_unlocked;
 	bool m_lastValid;
-
-	bool allowUpdate(const gdd &) { return m_unlocked; }
-
-	void changed(void)
-	{
-		m_runInfo->pvChanged(this);
-		m_lastValid = this->valid();
-		m_runInfo->checkPacket();
-	}
 
 	friend class RunInfoFloat64PV;
 };
@@ -79,12 +86,9 @@ class RunInfoFloat64PV : public smsFloat64PV {
 public:
 	RunInfoFloat64PV(const std::string &name,
 			RunInfo::RunInfoPVSharedPtr stringRunInfoPV,
-			double min = -1.7976931348623157E308,
-			double max = 1.7976931348623157E308) :
+			double min = FLOAT64_MIN,
+			double max = FLOAT64_MAX) :
 		smsFloat64PV(name, min, max), m_stringRunInfoPV(stringRunInfoPV) {}
-
-private:
-	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
 
 	// Defer to Regular *String* Version of This PV for Locking/Unlocking...
 	bool allowUpdate(const gdd &val)
@@ -113,14 +117,21 @@ private:
 
 	void changed(void)
 	{
+		INFO("RunInfoFloat64PV::changed()");
+
 		// Just Set the Associated String RunInfoPV to Latest Float Value...
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
 		std::stringstream ss;
 		ss << std::setprecision(17) << value();
-		m_stringRunInfoPV->update( ss.str(), &now );
-		m_stringRunInfoPV->changed();
+		m_stringRunInfoPV->update( ss.str(), &ts );
+
+		// AutoSave PV Value Change...
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 	}
+
+private:
+	RunInfo::RunInfoPVSharedPtr m_stringRunInfoPV;
 };
 
 class RunUserInfoPV : public smsStringPV {
@@ -131,10 +142,6 @@ public:
 
 	void lock(void) { m_unlocked = false; }
 	void unlock(void) { m_unlocked = true; }
-
-private:
-	RunInfo *m_runInfo;
-	bool m_unlocked;
 
 	bool validateUser(const std::string &val) {
 		size_t sep, next;
@@ -219,9 +226,21 @@ private:
 	}
 
 	void changed(void) {
+
+		INFO("RunUserInfoPV::changed()");
+
 		m_runInfo->invalidateCache();
 		m_runInfo->checkPacket();
+
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
+
+private:
+	RunInfo *m_runInfo;
+	bool m_unlocked;
 };
 
 static void xmlEncodeTo(std::string &out, const std::string &in,
@@ -401,7 +420,7 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 
 	// Send Sample Info in RunInfo...?
 	m_sendSampleInRunInfoPV.reset(new smsBooleanPV(prefix
-		+ "SendSampleInRunInfo"));
+		+ "SendSampleInRunInfo", /* AutoSave */ true));
 	m_ctrl->addPV(m_sendSampleInRunInfoPV);
 
 	struct timespec now;
@@ -536,6 +555,116 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 
 	m_connection = StorageManager::onPrologue(
 		boost::bind(&RunInfo::onPrologue, this));
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+	double dvalue;
+	bool bvalue;
+
+	// SendSampleInRunInfo
+
+	if ( StorageManager::getAutoSavePV(
+			m_sendSampleInRunInfoPV->getName(), bvalue, ts ) ) {
+		m_sendSampleInRunInfo = bvalue;
+		m_sendSampleInRunInfoPV->update(bvalue, &ts);
+	}
+
+	// RunInfoFloat64PVs...
+
+	if ( StorageManager::getAutoSavePV(
+			m_massFloat64PV->getName(), dvalue, ts ) ) {
+		m_massFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_densityFloat64PV->getName(), dvalue, ts ) ) {
+		m_densityFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_heightInContainerFloat64PV->getName(), dvalue, ts ) ) {
+		m_heightInContainerFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorDiameterFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorDiameterFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorHeightFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorHeightFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorWidthFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorWidthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_interiorDepthFloat64PV->getName(), dvalue, ts ) ) {
+		m_interiorDepthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerDiameterFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerDiameterFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerHeightFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerHeightFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerWidthFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerWidthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_outerDepthFloat64PV->getName(), dvalue, ts ) ) {
+		m_outerDepthFloat64PV->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_volumeCubicFloat64PV->getName(), dvalue, ts ) ) {
+		m_volumeCubicFloat64PV->update(dvalue, &ts);
+	}
+
+	// UserInfo PV
+	if ( StorageManager::getAutoSavePV( m_userPV->getName(), value, ts ) ) {
+		m_userPV->update(value, &ts);
+	}
+
+	// RunInfoPVs by Map...
+
+	RunInfoMap::iterator it;
+
+	// Required RunInfoPVs...
+	for ( it = m_required.begin(); it != m_required.end(); it++ ) {
+		if ( StorageManager::getAutoSavePV( it->second->getName(),
+				value, ts ) ) {
+			it->second->update(value, &ts);
+		}
+	}
+
+	// Optional RunInfoPVs...
+	for ( it = m_optional.begin(); it != m_optional.end(); it++ ) {
+		if ( StorageManager::getAutoSavePV( it->second->getName(),
+				value, ts ) ) {
+			it->second->update(value, &ts);
+		}
+	}
+
+	// Sample RunInfoPVs...
+	for ( it = m_sample.begin(); it != m_sample.end(); it++ ) {
+		if ( StorageManager::getAutoSavePV( it->second->getName(),
+				value, ts ) ) {
+			it->second->update(value, &ts);
+		}
+	}
 }
 
 RunInfo::~RunInfo()
@@ -551,8 +680,9 @@ RunInfo::RunInfoPVSharedPtr RunInfo::addPV(
 	std::string pvName = prefix + pv_name;
 	map[xml_name].reset(
 		new RunInfoPV(pvName, pv_name, (map == m_required), this));
-	m_ctrl->addPV(map[xml_name]);
-	return(map[xml_name]);
+	RunInfoPVSharedPtr pv = map[xml_name];
+	m_ctrl->addPV(pv);
+	return(pv);
 }
 
 std::string RunInfo::getPropId(void)
@@ -632,14 +762,14 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 			|| !(pv->label().compare("ContainerName")) )
 	{
 		// Concatenate Container Id and Name to Get "Component"... ;-D
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
+		struct timespec ts;
+		pv->timestamp(ts);
 		std::stringstream ss;
 		ss << m_containerIdPV->value()
 			<< ": " << m_containerNamePV->value();
 		DEBUG("pvChanged(): PV " << pv->label() << " Changed"
 			<< " - Re-Concatenating Sample Component PV: " << ss.str());
-		m_componentPV->update( ss.str(), &now );
+		m_componentPV->update( ss.str(), &ts );
 	}
 
 	// Check for Change in "Required" PV Status...

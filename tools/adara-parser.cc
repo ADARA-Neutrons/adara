@@ -9,7 +9,7 @@
 #include "ADARAUtils.h"
 
 /// This sets the size of the ADARA parser stream buffer in bytes
-#define ADARA_IN_BUF_SIZE   0x1000000
+#define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
 
 #include <boost/program_options.hpp>
 
@@ -187,6 +187,7 @@ public:
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
 	bool rxPacket(const ADARA::PixelMappingPkt &pkt);
+	bool rxPacket(const ADARA::PixelMappingAltPkt &pkt);
 	bool rxPacket(const ADARA::RunStatusPkt &pkt);
 	bool rxPacket(const ADARA::RunInfoPkt &pkt);
 	bool rxPacket(const ADARA::TransCompletePkt &pkt);
@@ -606,6 +607,20 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 		}
 
 		len -= nEvents * sizeof(uint32_t);
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::PixelMappingAltPkt &pkt)
+{
+	if ( !m_terse ) {
+		// TODO display more fields (check that the table doesn't change)
+		printf("%u.%09u PIXEL MAP TABLE ALT (0x%x,v%u) [%u bytes]\n"
+			"    numBanks %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.numBanks());
 	}
 
 	return false;

@@ -20,6 +20,8 @@ ADARA SMS Install Checklist
 		-rw-r--r-- 1 root root 513 Apr 13  2017
 			/etc/rsyslog.d/adaraMailer.conf
 
+	./confck
+
 -OR-
 
 1. Create Initial SMSD Configuration on New Beamline/Host:
@@ -55,6 +57,8 @@ ADARA SMS Install Checklist
 	git add sms
 	git commit sms
 
+	./confck
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
@@ -64,6 +68,8 @@ ADARA SMS Install Checklist
 		# smsd log
 		if $programname == 'smsd' then /var/log/smsd.log
 		& ~
+
+	ls -l /var/log/smsd.log
 
 	sudo touch /var/log/smsd.log
 
@@ -78,6 +84,13 @@ ADARA SMS Install Checklist
 	sudo /sbin/service rsyslog restart
 
 	sudo tail /var/log/messages
+
+	cp /etc/rsyslog.conf ./sms/rsyslog.conf
+
+	git add ./sms/rsyslog.conf
+	git commit ./sms/rsyslog.conf
+
+	./confck
 
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
@@ -95,7 +108,19 @@ ADARA SMS Install Checklist
 
 	sudo vi /etc/crontab
 
-		*/5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+		# MAILTO=root
+		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		MAILTO="root@localhost"
+		HOME=/
+
+		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+	cp /etc/crontab ./sms/etc.crontab
+
+	git add ./sms/etc.crontab
+	git commit ./sms/etc.crontab
+
+	./confck
 
 4. Administrator Crontab Setup:
 
@@ -106,11 +131,36 @@ ADARA SMS Install Checklist
 		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
 		0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon
 		0 8,17 * * * /home/controls/config-daq1/confck --quiet
-		0 8,17 * * * /usr/local/bin/liveconf-1.6.20-devel --terse --quiet confck
+		0 8,17 * * * /usr/local/bin/liveconf --terse --quiet confck
 
 	crontab -l
 
-5. User Local Bin Soft Link Setup:
+5. Add SMS to Local Run Levels
+
+	chkconfig --list smsd
+
+	sudo chkconfig --add smsd
+
+	chkconfig --list smsd
+
+	sudo chkconfig smsd on
+
+	chkconfig --list smsd
+
+	(rm ./sms/chkconfig.smsd)
+
+	chkconfig --list smsd > ./sms/chkconfig.smsd 2>&1
+
+	git add ./sms/chkconfig.smsd
+	git commit ./sms/chkconfig.smsd
+
+	git diff ; git pull ; git push ; git status
+
+	./confck
+
+6. User Local Bin Soft Link Setup:
+
+	ls -l /usr/local/bin/
 
 	sudo ln -s /home/controls/config-daq1/deploy/adaracat \
 		/usr/local/bin/adaracat
@@ -136,24 +186,38 @@ ADARA SMS Install Checklist
 	sudo ln -s /home/controls/config-daq1/deploy/smsd \
 		/usr/local/bin/smsd
 
-6. ADARA Production EPICS Soft Links Setup:
+	ls -l /usr/local/bin/
 
-	(rm EpicsBaseLink)
+7. ADARA Production EPICS Soft Links Setup:
+
+	ls -l /home/controls/prod/ADARA
+
+	mkdir /home/controls/prod/ADARA
+
+	ls -l /home/controls/prod/ADARA
+
+	(rm /home/controls/prod/ADARA/EpicsBaseLink)
 
 	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
-		EpicsBaseLink
+		/home/controls/prod/ADARA/EpicsBaseLink
 
-	(rm EpicsBaseV4Link)
+	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
 
 	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
-		EpicsBaseV4Link
+		/home/controls/prod/ADARA/EpicsBaseV4Link
 
-	(rm EpicsExtensionsLink)
+	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
 
 	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
-		EpicsExtensionsLink
+		/home/controls/prod/ADARA/EpicsExtensionsLink
 
-7. Deploy SMS Daemon:
+	ls -l /home/controls/prod/ADARA
+
+	source $HOME/.bashrc
+
+	printenv | grep EPICS
+
+8. Deploy SMS Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
@@ -165,7 +229,7 @@ ADARA SMS Install Checklist
 
 	./deploy_adara sms
 
-8. Start SMS Daemon:
+9. Start SMS Daemon:
 
 	sudo /sbin/service smsd status
 
@@ -178,18 +242,6 @@ ADARA SMS Install Checklist
 	caput -S BL17:SMS:RunInfo:ProposalId IPTS-0000
 
 	liveconf status
-
-9. Add SMS to Local Run Levels
-
-	chkconfig --list smsd
-
-	sudo chkconfig --add smsd
-
-	chkconfig --list smsd
-
-	sudo chkconfig smsd on
-
-	chkconfig --list smsd
 
 DONE!!! :-D
 

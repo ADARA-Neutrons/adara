@@ -168,7 +168,8 @@ To deploy the Dasmon GUI and Dasmon Daemon startup files:
 		- add:
 			#MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
 			MAILTO=kohlja@ornl.gov
-			0-59/5 * * * * /SNS/users/y8y/stuff/exec/dasmond_mon
+			0-59/10 * * * * /SNS/users/y8y/stuff/exec/dasmond_mon
+			0 8,17 * * * /home/controls/config-dasmon/confck --quiet
 	crontab -l
 
 To deploy/restart dasmond and dasmon:

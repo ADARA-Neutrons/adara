@@ -18,10 +18,13 @@ namespace STS {
 RateLimitedLogging::History RLLHistory_StreamParserH;
 
 // Rate-Limited Logging IDs...
-#define RLL_PV_VALUE_UPDATE_SAWTOOTH  0
+#define RLL_PV_VALUE_UPDATE_WEIRD            0
+#define RLL_PV_VALUE_UPDATE_SAWTOOTH         1
+#define RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP   2
+#define RLL_PV_VALUE_UPDATE_PURGE_EARLY      3
 
 /// This sets the size of the ADARA parser stream buffer in bytes
-#define ADARA_IN_BUF_SIZE   0x1000000
+#define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
 
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -323,6 +326,7 @@ StreamParser::rxPacket
         // Note: these should arrive before event processing,
         // but it is no guaranteed.
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+        case ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE:
             PROCESS_IN_STATES_ONCE(PROCESSING_RUN_HEADER|PROCESSING_EVENTS,
                 PKT_BIT_PIXELMAP)
 
@@ -464,6 +468,131 @@ StreamParser::rxPacket
 // ADARA Pixel Mapping packet processing
 //---------------------------------------------------------------------------------------------------------------------
 
+/*! \brief This method processes Pixel Mapping Alt ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA PixelMappingAlt packets. Detector source and
+ * bank information is extracted from the received packet and BankInfo
+ * instances are created (using the makeBankInfo() virtual factory method)
+ * to capture essential bank parameters need for subsequent banked event
+ * processing. The receipt of a Pixel Mapping packets also triggers
+ * progression to the internal event processing state.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::PixelMappingAltPkt &a_pkt     ///< [in] ADARA PixelMappingAltPkt object to process
+)
+{
+    const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+    const uint32_t *epos = (const uint32_t *)
+        ( a_pkt.mappingData() + a_pkt.payload_length()
+            - sizeof(uint32_t) );
+
+    //uint32_t        base_physical;
+    uint16_t        bank_id;
+    uint16_t        pix_count;
+
+    // Note: a vector is used for BankInfo instances where the bank_id
+    // is the offset into the vector. This is safe as bank IDs are
+    // monotonically increasing integers starting at 0. IF this ever
+    // changes, then the bank container will need to be changed to a map
+    // (which would result in a slight performance drop). Also note that
+    // the current code accommodates gaps in the banks by zeroing and
+    // subsequently checking entries when iterating over the container.
+
+    // Get number of banks (largest bank id) explicitly from packet and
+    // reserve bank container storage
+
+    uint16_t bank_count = (uint16_t) a_pkt.numBanks();
+
+    m_banks.resize( bank_count + 1, 0 );
+
+    syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
+        "PixelMappingAltPkt", bank_count );
+    usleep(30000); // give syslog a chance...
+
+    // Now build banks and populate bank container
+
+    uint32_t skip_pix_count = 0;
+    uint32_t tot_pix_count = 0;
+    uint32_t skip_sections = 0;
+    uint32_t section_count = 0;
+
+    while ( rpos < epos )
+    {
+        //base_physical = *rpos++;
+        rpos++;   // Skip Base Physical PixelId...
+        bank_id = (uint16_t)(*rpos >> 16);
+        pix_count = (uint16_t)(*rpos & 0xFFFF);
+        rpos++;
+
+        //syslog( LOG_INFO,
+            //"[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
+            //g_pid, "PixelMappingAltPkt",
+            //base_physical, bank_id, pix_count );
+        //usleep(30000); // give syslog a chance...
+
+        // Skip Unmapped Sections of Pixel Map...!
+        if ( bank_id == (uint16_t) UNMAPPED_BANK )
+        {
+            //syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
+                //g_pid, "PixelMappingAltPkt" );
+            //usleep(30000); // give syslog a chance...
+
+            // Next Section
+            skip_pix_count += pix_count;
+            rpos += pix_count;
+            skip_sections++;
+            continue;
+        }
+
+        // Create New BankInfo...
+        if ( !m_banks[bank_id] )
+        {
+            // Create BankInfo Instance
+            m_banks[bank_id] = makeBankInfo( bank_id,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            m_banks[bank_id]->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+        }
+
+        // Append This Section's Logical PixelIds...
+        const uint32_t *epos2 = rpos + pix_count;
+        tot_pix_count += pix_count;
+        while ( rpos < epos2 ) {
+            m_banks[bank_id]->m_logical_pixelids.push_back(*rpos++);
+        }
+
+        section_count++;
+
+        // syslog( LOG_INFO,
+            // "[%i] %s: %s, %s=%u %s=%u %s = %u count=%u tot=%lu",
+            // g_pid, "PixelMappingAltPkt", "Done with Section",
+            // "bank_id", bank_id, "base_physical", base_physical,
+            // "Last Logical PixelId",
+            // m_banks[bank_id]->m_logical_pixelids.back(),
+            // pix_count, m_banks[bank_id]->m_logical_pixelids.size() );
+        // usleep(30000); // give syslog a chance...
+    }
+
+    syslog( LOG_INFO,
+        "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
+        g_pid, "PixelMappingAltPkt", "Done with Packet",
+        tot_pix_count, skip_pix_count, section_count, skip_sections );
+    usleep(30000); // give syslog a chance...
+
+    // The receipt of a pixel mapping packet allows state to progress
+    // to event processing
+    m_processing_state = PROCESSING_EVENTS;
+
+    return false;
+}
+
+
 /*! \brief This method processes Pixel Mapping ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
@@ -480,9 +609,9 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
-    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
-        + a_pkt.payload_length());
+    const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+    const uint32_t *epos = (const uint32_t *)
+        ( a_pkt.mappingData() + a_pkt.payload_length() );
 
     uint32_t        base_logical;
     uint16_t        bank_id;
@@ -509,8 +638,18 @@ StreamParser::rxPacket
         bank_id = (uint16_t)(*rpos2 >> 16);
         pix_count = (uint16_t)(*rpos2 & 0xFFFF);
         rpos2++;
+        syslog( LOG_INFO,
+            "[%i] %s: bank_id=%u pix_count=%u", g_pid, "PixelMappingPkt",
+            bank_id, pix_count );
+        usleep(30000); // give syslog a chance...
         if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
+        {
             bank_count = bank_id;
+            syslog( LOG_INFO,
+                "[%i] %s: bank_count -> %u", g_pid, "PixelMappingPkt",
+                bank_count );
+            usleep(30000); // give syslog a chance...
+        }
         rpos2 += pix_count;
     }
 
@@ -518,6 +657,7 @@ StreamParser::rxPacket
 
     syslog( LOG_INFO,
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
+    usleep(30000); // give syslog a chance...
 
     // Now build banks and populate bank container
     while ( rpos < epos )
@@ -559,6 +699,7 @@ StreamParser::rxPacket
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
             // m_banks[bank_id]->m_logical_pixelids.size() );
+        // usleep(30000); // give syslog a chance...
 
         // Next Section
         rpos += pix_count;
@@ -3392,79 +3533,210 @@ StreamParser::pvValueUpdate
 
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
-    // Only process this update if the timestamp is newer than the
+    // Check this update to see if the timestamp is newer than the
     // last time. (m_last_time is initialized to 0, so first real update
-    // will succeed.) This will reject PV updates that are at negative time
+    // will be Ok.) This will *Log* PV updates that are at negative time
     // displacements and filter-out duplicate updates caused by
     // SMS file boundary crossings.
-    if ( ts_nano > pvinfo->m_last_time )
+
+    // *** Otherwise, Pass the Data Thru! *** [Change in Behavior! 1/2018.]
+
+    // 1/2018 Note: Because the SMS _Repeats_ the Last Value for
+    // Each PV in the Prologue of Each New Local ADARA Stream File,
+    // we see Lots of "Duplicate" PV Value Updates for the "Same Time";
+    // However, if the PV Value Update Frequency is Sub-Pulse, then
+    // we _Still_ Need to Include a given PV Value Update
+    // IFF the PV Value has *Changed* since the Last Update...! ;-D
+
+    // Here, Both the PV Time and Value are the Same as the Last Update,
+    // So Assume SMS File Boundary Duplicate - Ignore PV Update...
+    // (*Don't* Log, Frequent Occurrence...)
+    if ( ts_nano == pvinfo->m_last_time
+            && pvinfo->m_last_value_set
+            && pvinfo->valuesEqual( pvinfo->m_last_value, a_value ) )
     {
-        // Relative time of update in seconds from first pulse of run
-        double t = 0;
+        return;
+    }
 
-        // Note: if first pulse has not arrived, truncate all PV times to 0
-        if ( m_pulse_info.start_time )
-        {
-            // Truncate negative time offsets to 0
-            if ( ts_nano > m_pulse_info.start_time )
-            {
-                t = ( ts_nano - m_pulse_info.start_time )
-                    / NANO_PER_SECOND_D;
-            }
-            else if ( pvinfo->m_value_buffer.size() )
-            {
-                // Because the time value is 0, erase any values recvd
-                // before now to avoid duplicate time entries.
-                pvinfo->m_value_buffer.clear();
-                pvinfo->m_time_buffer.clear();
-                pvinfo->m_stats.reset();
-            }
+    // Log Weird Leftover Case, "Just in Case", Lol... ;-D
+    // (But Still Pass Thru Any PV Value Data...!)
+    if ( ts_nano == pvinfo->m_last_time
+            && !(pvinfo->m_last_value_set) )
+    {
+        /* Rate-limited logging of weird update case */
+        std::stringstream ss;
+        ss << a_device_id << "." << a_pv_id;
+        std::string log_info;
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_PV_VALUE_UPDATE_WEIRD, ss.str(),
+                60, 10, 100, log_info ) ) {
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu [%s] %s",
+                g_pid, "STS Error:", log_info.c_str(),
+                "StreamParser::pvValueUpdate()",
+                "Variable Value Update WEIRD, Same Time But No Value Set!",
+                ssinfo.str().c_str(),
+                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
+                "- Ignoring PV Value Update...!"
+            );
+            // give syslog a chance...
+            usleep(30000);
         }
-        else if ( pvinfo->m_value_buffer.size() )
-        {
-            // If we recv multiple value updates before first pulse,
-            // keep only latest
-            pvinfo->m_value_buffer.clear();
-            pvinfo->m_time_buffer.clear();
-            pvinfo->m_stats.reset();
-        }
-
-        pvinfo->m_last_time = ts_nano;
-        pvinfo->m_value_buffer.push_back(a_value);
-        pvinfo->m_time_buffer.push_back(t);
-        pvinfo->addToStats(a_value);
-
-        // Check for buffer write
-        if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-            pvinfo->flushBuffers(0);
     }
 
     // Log Value Update if Time Stamp Goes into the Past...! ;-D
-    // (Ignore the "Time Stamp Equals" case, as this happens All the Time
-    // on New SMS File boundaries...! ;-)
+    // (But Still Pass Thru Any PV Value Data...!)
     else if ( ts_nano < pvinfo->m_last_time )
     {
-        /* Rate-limited logging of duplicate pulses */
+        /* Rate-limited logging of tachyon PV update times */
         std::stringstream ss;
         ss << a_device_id << "." << a_pv_id;
         std::string log_info;
         if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
                 RLL_PV_VALUE_UPDATE_SAWTOOTH, ss.str(),
                 60, 10, 100, log_info ) ) {
-            syslog( LOG_ERR,
-                "[%i] %s %s%s %s devId=%u pvId=%u: %lu.%09lu < %lu.%09lu",
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu < %lu.%09lu %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
-                a_device_id, a_pv_id,
+                ssinfo.str().c_str(),
                 a_timestamp.tv_sec, a_timestamp.tv_nsec,
                 (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
-                (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL)
+                (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
+                "- Ignoring PV Value Update...!"
             );
             // give syslog a chance...
             usleep(30000);
         }
     }
+
+    // Now Proceed to Process PV Value Update, Regardless of Errors! ;-D
+
+    // Relative time of update in seconds from first pulse of run.
+    // Note: if first pulse has not arrived, truncate all PV times to 0.
+    double t = 0;
+
+    // First Pulse Has Arrived...
+    if ( m_pulse_info.start_time )
+    {
+        // Positive Time Update, Normalize PV Time to 1st Pulse...
+        if ( ts_nano > m_pulse_info.start_time )
+        {
+            t = ( ts_nano - m_pulse_info.start_time )
+                / NANO_PER_SECOND_D;
+        }
+
+        // Truncate Any Negative Time Offsets to 0...
+        // (Don't Purge Previous PV Values, Could be transient error...!)
+        // - Only Log Negative Time Truncation as Error After 1st PV Value.
+        // (otherwise we get spammed for nearly every PV in the run! ;-D)
+        else
+        {
+            /* Rate-limited logging of truncated negative update times */
+            std::stringstream ss;
+            ss << a_device_id << "." << a_pv_id;
+            std::string log_info;
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
+                    60, 10, 100, log_info ) ) {
+                std::string log_hdr = "";
+                int log_type = LOG_INFO;
+                if ( pvinfo->m_last_value_set ) {
+                    log_type = LOG_ERR;
+                    log_hdr = "STS Error: ";
+                }
+                std::stringstream ssinfo;
+                ssinfo << "devId=" << a_device_id
+                    << " (" << pvinfo->m_device_name << ")";
+                ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                    << " [" << pvinfo->m_connection << "]" << ")";
+                syslog( log_type,
+                    "[%i] %s%s%s %s %s %lu.%09lu < %lu.%09lu",
+                    g_pid, log_hdr.c_str(), log_info.c_str(),
+                    "StreamParser::pvValueUpdate()",
+                    "Truncate Negative Variable Value Update Time to Zero",
+                    ssinfo.str().c_str(),
+                    a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                    (unsigned long)(m_pulse_info.start_time
+                        / NANO_PER_SECOND_LL),
+                    (unsigned long)(m_pulse_info.start_time
+                        % NANO_PER_SECOND_LL)
+                );
+                // give syslog a chance...
+                usleep(30000);
+            }
+        }
+    }
+
+    // No Pulse Has Arrived as Yet, Leave PV Time at 0...
+    // (And Only Save Last of Pre-Pulse PV Value Data...)
+    else if ( pvinfo->m_value_buffer.size() )
+    {
+        // If we recv multiple value updates before first pulse,
+        // keep only latest
+
+        /* Rate-limited logging of duplicate pulses */
+        std::stringstream ss;
+        ss << a_device_id << "." << a_pv_id;
+        std::string log_info;
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_PV_VALUE_UPDATE_PURGE_EARLY, ss.str(),
+                60, 10, 100, log_info ) ) {
+            // If Logging, Include Actual Purged PV Values...
+            // (the times have all been zeroed out... ;-)
+            std::stringstream ssinfo;
+            ssinfo << "devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            std::stringstream pvs;
+            pvs << "Purging Previous Values [";
+            for ( uint32_t i=0 ; i < pvinfo->m_value_buffer.size() ; i++ )
+            {
+                if ( i ) pvs << ", ";
+                pvs << pvinfo->valueToString( pvinfo->m_value_buffer[i] );
+            }
+            pvs << "]";
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu - %s",
+                g_pid, "STS Error:", log_info.c_str(),
+                "StreamParser::pvValueUpdate()",
+                "Got Pre-Pulse Variable Value Update",
+                ssinfo.str().c_str(),
+                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                pvs.str().c_str()
+            );
+            // give syslog a chance...
+            usleep(30000);
+        }
+
+        // Purge Existing Pre-Pulse PV Data...
+        pvinfo->m_value_buffer.clear();
+        pvinfo->m_time_buffer.clear();
+        pvinfo->m_stats.reset();
+    }
+
+    pvinfo->m_last_time = ts_nano;
+    pvinfo->m_last_value = a_value;
+    pvinfo->m_last_value_set = true;
+
+    pvinfo->m_value_buffer.push_back(a_value);
+    pvinfo->m_time_buffer.push_back(t);
+
+    pvinfo->addToStats(a_value);
+
+    // Check for buffer write
+    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+        pvinfo->flushBuffers(0);
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
@@ -3698,7 +3970,6 @@ StreamParser::processPulseID
  * (Note that we naturally get *Lots* of Duplicate RunInfoPkt Packets
  * anyway, due to the redundancy at the start of each new SMS Data File.)
  */
-#define EPSILON (0.00000000000001)
 void
 StreamParser::updateRunInfo( const RunInfo &a_run_info )
 {
@@ -3784,7 +4055,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_formula = a_run_info.sample_formula;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass,
-            m_run_info.sample_mass, EPSILON ) ) {
+            m_run_info.sample_mass, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Mass",
@@ -3802,7 +4073,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_mass_units = a_run_info.sample_mass_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass_density,
-            m_run_info.sample_mass_density, EPSILON ) ) {
+            m_run_info.sample_mass_density, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Density",
@@ -3898,7 +4169,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         m_run_info.sample_comments = a_run_info.sample_comments;
     }
     if ( !approximatelyEqual( a_run_info.sample_height_in_container,
-            m_run_info.sample_height_in_container, EPSILON ) ) {
+            m_run_info.sample_height_in_container, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3921,7 +4192,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_height_in_container_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_diameter,
-            m_run_info.sample_interior_diameter, EPSILON ) ) {
+            m_run_info.sample_interior_diameter, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3944,7 +4215,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_height,
-            m_run_info.sample_interior_height, EPSILON ) ) {
+            m_run_info.sample_interior_height, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3967,7 +4238,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_width,
-            m_run_info.sample_interior_width, EPSILON ) ) {
+            m_run_info.sample_interior_width, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -3990,7 +4261,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_depth,
-            m_run_info.sample_interior_depth, EPSILON ) ) {
+            m_run_info.sample_interior_depth, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -4013,7 +4284,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_diameter,
-            m_run_info.sample_outer_diameter, EPSILON ) ) {
+            m_run_info.sample_outer_diameter, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()",
@@ -4036,7 +4307,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_height,
-            m_run_info.sample_outer_height, EPSILON ) ) {
+            m_run_info.sample_outer_height, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Height",
@@ -4057,7 +4328,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_width,
-            m_run_info.sample_outer_width, EPSILON ) ) {
+            m_run_info.sample_outer_width, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Width",
@@ -4078,7 +4349,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_depth,
-            m_run_info.sample_outer_depth, EPSILON ) ) {
+            m_run_info.sample_outer_depth, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Depth",
@@ -4099,7 +4370,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_volume_cubic,
-            m_run_info.sample_volume_cubic, EPSILON ) ) {
+            m_run_info.sample_volume_cubic, STS_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STS Error:", "updateRunInfo()", "Sample Volume Cubic",
@@ -4429,6 +4700,8 @@ StreamParser::getPktName(
             ss << "Beam Monitor Event"; break;
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
             ss << "Pixel Map"; break;
+        case ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE:
+            ss << "Pixel Map Alt"; break;
         case ADARA::PacketType::RUN_STATUS_TYPE:
             ss << "Run Stat"; break;
         case ADARA::PacketType::RUN_INFO_TYPE:

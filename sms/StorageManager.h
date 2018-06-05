@@ -123,6 +123,18 @@ public:
 		return m_scanStart;
 	}
 
+	static void autoSavePV(std::string pv_name, std::string pv_value,
+		struct timespec *pv_time);
+
+	static bool getAutoSavePV(std::string pv_name, std::string & pv_value,
+		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, double & pv_dvalue,
+		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, uint32_t & pv_ivalue,
+		struct timespec & pv_time);
+	static bool getAutoSavePV(std::string pv_name, bool & pv_bvalue,
+		struct timespec & pv_time);
+
 	static void config(const boost::property_tree::ptree &conf);
 
 	static bool set_max_blocks_allowed_value(
@@ -198,6 +210,14 @@ private:
 	static uint32_t m_nextIndexTime;
 	static uint32_t m_indexPeriod;
 
+	static std::map<std::string, std::pair<std::string, std::string> >
+		m_autoSaveConfig;
+
+	static std::string m_autosave_basename;
+	static std::string m_autosave_filesuffix;
+	static const char *m_autosave_filename;
+	static int m_autoSaveFd;
+
 	static boost::thread m_ioThread;
 	static bool m_ioActive;
 	static EventFd *m_ioStartEvent;
@@ -224,6 +244,10 @@ private:
 	static void scanDaily(const std::string &dir);
 	static bool isValidDaily(const std::string &dir);
 
+	static bool openAutoSaveFile(void);
+
+	static bool parseAutoSaveFile(void);
+
 	static void backgroundIo(void);
 	static void ioCompleted(void);
 	static void requestPurge(uint64_t goal, std::string logStr);
@@ -236,7 +260,7 @@ private:
 				const std::string &dir, uint64_t &total_size);
 
 	static void addBaseStorage(uint64_t size);
-	static void startContainer(uint32_t run = 0,
+	static void startContainer(bool paused = false, uint32_t run = 0,
 				std::string propId = std::string("UNKNOWN"));
 	static void endCurrentContainer(void);
 	static void fileCreated(StorageFile::SharedPtr &f);

@@ -7,12 +7,16 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <string>
+#include <fstream>
 #include <sstream>
+#include <iomanip>
 #include <algorithm>
 #include <stdexcept>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
@@ -25,7 +29,6 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
-#include "EventFd.h"
 #include "STSClientMgr.h"
 #include "Logging.h"
 #include "utils.h"
@@ -34,23 +37,36 @@ namespace fs = boost::filesystem;
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
+#include "EventFd.h"   // (Uses logger... :-)
+
 class PoolsizePV : public smsStringPV {
 public:
-	PoolsizePV(const std::string &name, uint32_t block_size) :
-		smsStringPV(name), m_block_size(block_size) {}
-private:
-
-	uint64_t m_block_size;
+	PoolsizePV(const std::string &name, uint32_t block_size,
+			bool auto_save = false) :
+		smsStringPV(name, auto_save), m_block_size(block_size),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
-		DEBUG("PoolsizePV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed...");
-
 		std::string poolsize = value();
+
+		DEBUG("PoolsizePV: " << m_pv_name
+			<< " PV Value Changed to [" << poolsize << "]"
+			<< ", Set Max Blocks Allowed...");
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			StorageManager::autoSavePV( m_pv_name, poolsize, &ts );
+		}
+
 		uint64_t maxSize;
 
-		if (poolsize.length()) {
+		// Make Sure Poolsize is Actually Set...! ;-D
+		if ( poolsize.length() && poolsize.compare("(unset)") ) {
 			try {
 				maxSize = parse_size(poolsize);
 			} catch (std::runtime_error e) {
@@ -60,7 +76,8 @@ private:
 				return;
 			}
 		} else {
-			DEBUG("PoolsizePV changed(): Ignoring Empty PV String Value");
+			DEBUG("PoolsizePV changed():"
+				<< " Ignoring Empty/Unset PV String Value");
 			return;
 		}
 
@@ -76,26 +93,50 @@ private:
 		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
+
+private:
+	uint64_t m_block_size;
+
+	bool m_auto_save;
 };
 
 class PercentPV : public smsUint32PV {
 public:
 	PercentPV(const std::string &name,
-			std::string baseDir, uint32_t block_size) :
-		smsUint32PV(name), m_baseDir(baseDir), m_block_size(block_size) {}
-
-private:
-
-	std::string m_baseDir;
-	uint64_t m_block_size;
+			std::string baseDir, uint32_t block_size,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save),
+		m_baseDir(baseDir), m_block_size(block_size),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
-		DEBUG("PercentPV: " << m_pv_name
-			<< " PV value changed, Set Max Blocks Allowed...");
-
 		uint32_t percent = value();
+
+		DEBUG("PercentPV: " << m_pv_name
+			<< " PV Value Changed to " << percent
+			<< ", Set Max Blocks Allowed...");
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			std::stringstream ss;
+			ss << percent;
+			StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		}
+
 		uint64_t maxSize;
+
+		// Make Sure Percent is Actually Set...! ;-D
+		//    -> *Don't* Set Max Blocks to Zero...! ;-o
+		if ( !percent ) {
+			DEBUG("PercentPV changed(): Ignoring Zero PV Value");
+			return;
+		}
 
 		/* If the user doesn't specify a size, we'll use a percentage
 		 * of the total space, 80% by default.
@@ -126,16 +167,24 @@ private:
 		/* Update Max Blocks Allowed EPICS PVs... */
 		StorageManager::update_max_blocks_allowed_pv();
 	}
+
+private:
+	std::string m_baseDir;
+
+	uint64_t m_block_size;
+
+	bool m_auto_save;
 };
 
 class MaxBlocksPV : public smsUint32PV {
 public:
-	MaxBlocksPV(const std::string &name, bool isMultiplier) :
-		smsUint32PV(name), m_isMultiplier(isMultiplier) {}
-
-private:
-
-	bool m_isMultiplier;
+	MaxBlocksPV(const std::string &name, bool isMultiplier,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save),
+		m_isMultiplier(isMultiplier),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
@@ -147,6 +196,16 @@ private:
 			<< " to "
 			<< max_blocks_allowed_value );
 
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			std::stringstream ss;
+			ss << max_blocks_allowed_value;
+			StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		}
+
 		// Set Max Blocks Allowed Value (Multiplier/Base)
 		// for StorageManager...
 		if ( StorageManager::set_max_blocks_allowed_value(
@@ -156,14 +215,17 @@ private:
 			StorageManager::update_max_blocks_allowed_pv();
 		}
 	}
+
+private:
+	bool m_isMultiplier;
+
+	bool m_auto_save;
 };
 
 class BlockSizePV : public smsUint32PV {
 public:
 	BlockSizePV(const std::string &name) :
 		smsUint32PV(name) {}
-
-private:
 
 	// Make "Read-Only" By Design... ;-D
 	bool allowUpdate(const gdd &)
@@ -176,13 +238,13 @@ class RescanRunDirPV : public smsStringPV {
 public:
 	RescanRunDirPV(const std::string &name) :
 		smsStringPV(name) {}
-private:
 
 	void changed(void)
 	{
 		std::string rescanRunDir = value();
 
-		if ( !rescanRunDir.length() ) {
+		if ( !rescanRunDir.length()
+				|| !rescanRunDir.compare( "(unset)" ) ) {
 			DEBUG("RescanRunDirPV changed():"
 				<< " Ignoring Empty Run Directory Path Value");
 			return;
@@ -309,6 +371,16 @@ uint32_t StorageManager::m_pulseTime;
 uint32_t StorageManager::m_nextIndexTime;
 uint32_t StorageManager::m_indexPeriod;
 std::list<StorageManager::IndexEntry> StorageManager::m_stateIndex;
+
+std::map<std::string, std::pair<std::string, std::string> >
+	StorageManager::m_autoSaveConfig;
+
+std::string StorageManager::m_autosave_basename = "SMS";
+std::string StorageManager::m_autosave_filesuffix = ".autosav";
+const char *StorageManager::m_autosave_filename;
+int StorageManager::m_autoSaveFd;
+
+#define SMS_AUTOSAVE_ROTATE_SIZE	(3)
 
 boost::thread StorageManager::m_ioThread;
 
@@ -545,8 +617,8 @@ void StorageManager::init(void)
 	 * their interest in descriptors.
 	 */
 	m_ioStartEvent = new EventFd();
-	m_ioCompleteEvent = new EventFd(boost::bind(
-					&StorageManager::ioCompleted));
+	m_ioCompleteEvent = new EventFd(
+		boost::bind( &StorageManager::ioCompleted ) );
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
@@ -564,6 +636,19 @@ void StorageManager::init(void)
 			throw std::runtime_error("Unable to retire stale index");
 		}
 	}
+
+	/* Construct the Default SMS AutoSave File Name... */
+	/* Make Copy, Don't Count on Compiler to return Permanent Reference! */
+	m_autosave_filename =
+		strdup( (m_autosave_basename + m_autosave_filesuffix).c_str() );
+
+	/* Parse Any AutoSave File & Capture PV Config... */
+	if ( !parseAutoSaveFile() ) {
+		ERROR("init(): Failed to Parse SMS AutoSave File...!");
+	}
+
+	/* Initialize AutoSave File Name & Descriptor */
+	m_autoSaveFd = -1;
 }
 
 void StorageManager::lateInit(void)
@@ -585,16 +670,20 @@ void StorageManager::lateInit(void)
 	prefix += ":StorageManager";
 
 	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new
-		PoolsizePV(prefix + ":Poolsize", m_block_size));
+		PoolsizePV(prefix + ":Poolsize", m_block_size,
+			/* AutoSave */ true));
 
 	m_pvPercent = boost::shared_ptr<PercentPV>(new
-		PercentPV(prefix + ":Percent", m_baseDir, m_block_size));
+		PercentPV(prefix + ":Percent", m_baseDir, m_block_size,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvMaxBlocksAllowed = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowed", false,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvMaxBlocksAllowedMultiplier = boost::shared_ptr<MaxBlocksPV>(new
-		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true));
+		MaxBlocksPV(prefix + ":MaxBlocksAllowedMultiplier", true,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvBlockSize = boost::shared_ptr<BlockSizePV>(new
 		BlockSizePV(prefix + ":BlockSize"));
@@ -633,6 +722,36 @@ void StorageManager::lateInit(void)
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
 
+	/* Restore Any PVs to AutoSaved Config Values... */
+
+	struct timespec ts;
+	std::string value;
+	uint32_t uvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvPoolsize->getName(), value, ts ) ) {
+		m_poolsize = value;
+		m_pvPoolsize->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvPercent->getName(), uvalue, ts ) ) {
+		m_percent = uvalue;
+		m_pvPercent->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxBlocksAllowed->getName(), uvalue, ts ) ) {
+		m_max_blocks_allowed_base = uvalue;
+		m_pvMaxBlocksAllowed->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxBlocksAllowedMultiplier->getName(), uvalue, ts ) ) {
+		m_max_blocks_allowed_multiplier = uvalue;
+		m_pvMaxBlocksAllowedMultiplier->update(uvalue, &ts);
+	}
+
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
 	 * to the beginning of the first container. We just set it here
@@ -669,10 +788,22 @@ void StorageManager::stop(void)
 	endCurrentContainer();
 	close(m_base_fd);
 
-	if (m_ioActive)
-		m_ioCompleteEvent->block();
+	uint64_t value = 0;
 
-	m_ioStartEvent->signal(IOCMD_SHUTDOWN);
+	if ( m_ioActive ) {
+		if ( !m_ioCompleteEvent->block( value ) ) {
+			ERROR("stop(): Error Blocking on I/O Complete Event!"
+				<< " value=" << value << "/0x"
+					<< std::hex << value << std::dec);
+		}
+	}
+
+	if ( !m_ioStartEvent->signal( IOCMD_SHUTDOWN ) ) {
+		ERROR("stop(): Error Signaling I/O Start Event Shutdown"
+			<< " with IOCMD_SHUTDOWN Notification = " << IOCMD_SHUTDOWN
+				<< "/0x" << std::hex << IOCMD_SHUTDOWN << std::dec);
+	}
+
 	m_ioThread.join();
 	m_ioActive = true;
 }
@@ -881,7 +1012,8 @@ void StorageManager::addBaseStorage(uint64_t size)
 	m_blocks_used += blocks;
 }
 
-void StorageManager::startContainer(uint32_t run, std::string propId)
+void StorageManager::startContainer(
+		bool paused, uint32_t run, std::string propId)
 {
 	struct timespec now;
 
@@ -897,6 +1029,10 @@ void StorageManager::startContainer(uint32_t run, std::string propId)
 
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_cur_container = StorageContainer::create(now, run, propId);
+
+	if ( paused ) {
+		m_cur_container->setPaused( paused );
+	}
 
 	if (run) {
 		m_combus->sendOriginal(run, propId,
@@ -986,7 +1122,7 @@ void StorageManager::startRecording(uint32_t run, std::string propId)
 	}
 
 	endCurrentContainer();
-	startContainer(run, propId);
+	startContainer(false /* paused */, run, propId);
 }
 
 void StorageManager::stopRecording(void)
@@ -1121,6 +1257,24 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 			break;
 	}
 
+	/* Check for Long-Non-Running Containers that Could Make the SMS
+	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
+	 * - If We're About to Create the 101st File Here (Current File
+	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 */
+	if ( !m_cur_container->runNumber()
+			&& m_cur_container->file()
+			&& m_cur_container->file()->oversize()
+			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+		WARN("addPacket(): Long-Non-Running Container "
+			<< m_baseDir << "/" << m_cur_container->name()
+			<< " Reached 100 Files"
+			<< " - Split Container for Purging...");
+		bool paused = m_cur_container->paused();
+		endCurrentContainer();
+		startContainer( paused );
+	}
+
 	/* Save off where we are in the stream, as we may need to point
 	 * to this location for replay after a snapshot.
 	 */
@@ -1172,6 +1326,24 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 
 	if (!m_cur_container)
 		throw std::logic_error("No container!");
+
+	/* Check for Long-Non-Running Containers that Could Make the SMS
+	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
+	 * - If We're About to Create the 101st File Here (Current File
+	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 */
+	if ( !m_cur_container->runNumber()
+			&& m_cur_container->savefile( dataSourceId )
+			&& m_cur_container->savefile( dataSourceId )->oversize()
+			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+		WARN("savePacket(): Long-Non-Running Container "
+			<< m_baseDir << "/" << m_cur_container->name()
+			<< " Reached 100 Files"
+			<< " - Split Container for Purging...");
+		bool paused = m_cur_container->paused();
+		endCurrentContainer();
+		startContainer( paused );
+	}
 
 	m_cur_container->save(iovec, len, dataSourceId, true);
 
@@ -1343,6 +1515,420 @@ void StorageManager::scanStorage(void)
 		<< m_pendingRuns.size() << " runs pending translation.");
 }
 
+void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
+		struct timespec *pv_time )
+{
+	if ( m_autoSaveFd < 0 && !openAutoSaveFile() )
+	{
+		ERROR("autoSavePV(): No Valid AutoSave File Descriptor!"
+			<< " *** Ignoring PV Write-Thru Value Save for " << pv_name
+			<< " = [" << pv_value << "]"
+			<< " at " << pv_time->tv_sec << "."
+			<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec);
+	}
+
+	// Assemble the PV AutoSave Entry...
+	std::stringstream ss;
+	ss << pv_time->tv_sec << "."
+		<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec;
+	ss << " " << pv_name << " " << pv_value << std::endl;
+	INFO("autoSavePV(): AutoSaving PV Value - " << ss.str());
+
+	// Write PV AutoSave Entry to File...
+	int rc = write( m_autoSaveFd, ss.str().c_str(), ss.str().length() );
+	if ( rc < 0 ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error Writing PV AutoSave Entry to File"
+			<< " [" << ss.str() << "] - "
+			<< strerror(e));
+		return;
+	}
+
+	if ( rc != (int) ss.str().length() ) {
+		ERROR("autoSavePV(): Short Write for PV AutoSave Entry"
+			<< " [" << ss.str() << "]"
+			<< " - Wrote " << rc << " out of "
+			<< ss.str().length() << " Bytes Expected!");
+	}
+
+	if ( fsync( m_autoSaveFd ) ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error Syncing PV AutoSave File"
+			<< " [" << ss.str() << "] - "
+			<< strerror(e));
+	}
+
+	/* We aren't guaranteed the new file names are safe on disk until
+	 * we sync the directory that contains them.
+	 */
+	if ( fsync( m_base_fd ) ) {
+		int e = errno;
+		ERROR("autoSavePV(): Error with Fsync on SMS Base Dir"
+			<< " for PV AutoSave File"
+			<< " [" << ss.str() << "] - "
+			<< strerror(e));
+	}
+}
+
+bool StorageManager::openAutoSaveFile(void)
+{
+	m_autoSaveFd = openat(m_base_fd, m_autosave_filename,
+			O_CREAT|O_APPEND|O_WRONLY, RUN_STORAGE_MODE);
+	if ( m_autoSaveFd < 0 ) {
+		int e = errno;
+		ERROR("openAutoSaveFile(): Unable to Open SMS AutoSave File"
+			<< " for Writing:"
+			<< " [" << m_autosave_filename << "] - "
+			<< strerror(e));
+		return false;
+	}
+	else {
+		ERROR("openAutoSaveFile(): Successfully Opened SMS AutoSave File"
+			<< " for Writing:"
+			<< " [" << m_autosave_filename << "]");
+		return true;
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		std::string & pv_value, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		pv_value = it->second.second;
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		double & pv_dvalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		try {
+			pv_dvalue = boost::lexical_cast<double>( it->second.second );
+		}
+		catch (...) {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Float64 Value for PV"
+				<< pv_name << " - (" << it->second.second << ")");
+			return( false );
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		uint32_t & pv_ivalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		try {
+			pv_ivalue = boost::lexical_cast<uint32_t>( it->second.second );
+		}
+		catch (...) {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Uint32 Value for PV"
+				<< pv_name << " - (" << it->second.second << ")");
+			return( false );
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::getAutoSavePV( std::string pv_name,
+		bool & pv_bvalue, struct timespec & pv_time )
+{
+	std::map<std::string,
+		std::pair<std::string, std::string> >::iterator it =
+			m_autoSaveConfig.find( pv_name );
+	
+	if ( it != m_autoSaveConfig.end() ) {
+
+		DEBUG("getAutoSavePV(): Found AutoSaved Config for PV " << pv_name
+			<< " at " << it->second.first
+			<< " = [" << it->second.second << "]");
+
+		if ( boost::iequals( it->second.second, "true" )
+				|| !it->second.second.compare( "1" ) ) {
+			pv_bvalue = true;
+		}
+		else if ( boost::iequals( it->second.second, "false" )
+				|| !it->second.second.compare( "0" ) ) {
+			pv_bvalue = false;
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Bool Value for PV"
+				<< pv_name << " - (" << it->second.second << ")"
+				<< ", Assuming *False*...");
+			pv_bvalue = false;
+		}
+
+		size_t dot = it->second.first.find(".");
+		if ( dot != std::string::npos ) {
+			try {
+				pv_time.tv_sec = boost::lexical_cast<time_t>(
+					it->second.first.substr(0, dot) );
+				pv_time.tv_nsec = boost::lexical_cast<long>(
+					it->second.first.substr( dot + 1 ) );
+			}
+			catch (...) {
+				ERROR("getAutoSavePV():"
+					<< " Error Parsing AutoSaved Config Time for PV"
+					<< pv_name << " - (" << it->second.first << ")");
+				return( false );
+			}
+		}
+		else {
+			ERROR("getAutoSavePV():"
+				<< " Error Parsing AutoSaved Config Time for PV"
+				<< pv_name << " - (" << it->second.first << ")");
+			return( false );
+		}
+
+		return( true );
+	}
+
+	else {
+		ERROR("getAutoSavePV(): No AutoSaved Config Found for PV "
+			<< pv_name << "!");
+			return( false );
+	}
+}
+
+bool StorageManager::parseAutoSaveFile(void)
+{
+	std::ifstream f(m_autosave_filename);
+
+	if ( f.fail() ) {
+		int e = errno;
+		ERROR("parseAutoSaveFile(): Unable to Open SMS AutoSave File"
+			<< " for Reading:"
+			<< " [" << m_autosave_filename << "] - "
+			<< strerror(e));
+		return false;
+	}
+
+	ERROR("parseAutoSaveFile(): Successfully Opened SMS AutoSave File"
+		<< " for Reading:"
+		<< " [" << m_autosave_filename << "]");
+
+	std::string line;
+	int lineno = 0;
+
+	for (;;) {
+
+		// Get Next Line from AutoSave File...
+		lineno++;
+		getline(f, line);
+		if ( f.fail() )
+			break;
+
+		// Parse the PV AutoSave Line...
+
+		std::istringstream iss(line);
+
+		std::string pv_time;
+		std::string pv_name;
+		std::string pv_value;
+
+		iss >> pv_time;
+
+		iss >> pv_name;
+
+		std::getline( iss, pv_value );
+
+		// Strip Off Preceding White Space...
+		if ( pv_value.at(0) == ' ' )
+			pv_value = pv_value.substr(1);
+
+		m_autoSaveConfig[ pv_name ] = std::pair<std::string, std::string>(
+			pv_time, pv_value );
+	}
+
+	DEBUG("parseAutoSaveFile(): Retrieved AutoSave Config, "
+		<< m_autoSaveConfig.size() << " Entries Captured");
+
+	// Dump AutoSave Config
+	//std::map<std::string,
+		//std::pair<std::string, std::string> >::iterator it;
+	//for ( it = m_autoSaveConfig.begin() ;
+			//it != m_autoSaveConfig.end(); ++it ) {
+		//DEBUG(it->first << "(" << it->second.first << ") = ["
+			//<< it->second.second << "]");
+	//}
+
+	// Rotate the AutoSave Files, Now That We've Retrieved
+	// All the PV Values into the Configuration...
+
+	struct stat stats;
+
+	for ( uint32_t i=SMS_AUTOSAVE_ROTATE_SIZE ; i > 0 ; i-- ) {
+
+		std::stringstream src_asf;
+		std::stringstream dst_asf;
+
+		// Move the Current SMS AutoSave File to "Slot 1"...
+		if ( i == 1 ) {
+			src_asf << m_autosave_filename;
+			dst_asf << m_autosave_basename << i << m_autosave_filesuffix;
+		}
+
+		// Move "Slot 'I-1'" AutoSave File into "Slot 'I'"...
+		else {
+			src_asf << m_autosave_basename << (i - 1)
+				<< m_autosave_filesuffix;
+			dst_asf << m_autosave_basename << i << m_autosave_filesuffix;
+		}
+
+		if ( stat( src_asf.str().c_str(), &stats ) ) {
+			DEBUG("parseAutoSaveFile(): SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() )
+				<< " Not Found - Skipping AutoSave Rotate...");
+			continue;
+		}
+
+		try {
+
+			// If It Exists (Not Already Rotated), Remove Old AutoSave File
+			if ( !stat( dst_asf.str().c_str(), &stats ) ) {
+				boost::filesystem::remove( boost::filesystem::path(
+					m_baseDir + "/" + dst_asf.str() ) );
+			}
+
+			// Rotate Newer AutoSave File into the Next Slot...
+	        boost::filesystem::rename(
+				boost::filesystem::path( m_baseDir + "/" + src_asf.str() ),
+				boost::filesystem::path( m_baseDir + "/" + dst_asf.str() )
+			);
+
+		}
+		catch( boost::filesystem::filesystem_error &e ) {
+			ERROR("parseAutoSaveFile(): Error Rotating SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
+		}
+
+		DEBUG("parseAutoSaveFile(): Rotated SMS AutoSave File "
+			<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+			<< ( m_baseDir + "/" + dst_asf.str() ) );
+	}
+
+	return true;
+}
+
 void StorageManager::backgroundIo(void)
 {
 	/* This is the background I/O thread. It is responsible for the
@@ -1369,30 +1955,67 @@ void StorageManager::backgroundIo(void)
 	 * m_purgedBlocks	IO thread, indicate how many blocks were purged
 	 */
 	scanStorage();
-	m_ioCompleteEvent->signal(IOCMD_INITIAL);
+
+	DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = " << IOCMD_INITIAL
+		<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	if ( !m_ioCompleteEvent->signal( IOCMD_INITIAL ) ) {
+		ERROR("backgroundIo(): Error Signaling I/O Complete Event"
+			<< " with IOCMD_INITIAL Completion = " << IOCMD_INITIAL
+				<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	}
 
 	bool alive = true;
-	while (alive) {
-		uint64_t cmd = m_ioStartEvent->block();
+	uint64_t cmd;
+
+	while ( alive ) {
+
+		if ( !m_ioStartEvent->block( cmd ) ) {
+			ERROR("backgroundIo(): Error Blocking on I/O Start Event!"
+				<< " cmd=" << cmd << "/0x" << std::hex << cmd << std::dec
+				<< " - Continuing...");
+			continue;
+		}
+		DEBUG("backgroundIo(): Received cmd = " << cmd
+			<< "/0x" << std::hex << cmd << std::dec);
 
 		/* We only accept two commands -- shutdown, and the
 		 * minimum number of blocks to purge.
 		 */
-		if (cmd == IOCMD_SHUTDOWN)
+		if ( cmd == IOCMD_SHUTDOWN )
 			alive = false;
 		else
-			m_purgedBlocks = purgeData(cmd);
-		m_ioCompleteEvent->signal(IOCMD_DONE);
+			m_purgedBlocks += purgeData( cmd );
+
+		DEBUG("backgroundIo(): Sending Value IOCMD_DONE = " << IOCMD_DONE
+			<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		if ( !m_ioCompleteEvent->signal( IOCMD_DONE ) ) {
+			ERROR("backgroundIo(): Error Signaling I/O Complete Event"
+				<< " with IOCMD_DONE Completion = " << IOCMD_DONE
+					<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		}
 	}
 }
 
 void StorageManager::ioCompleted(void)
 {
-	DEBUG("ioCompleted entry");
+	DEBUG("ioCompleted() entry");
 
-	uint64_t val = m_ioCompleteEvent->read();
+	uint64_t val = 0;
 
-	if (val == IOCMD_INITIAL) {
+	if ( !m_ioCompleteEvent->read( val ) ) {
+		ERROR("ioCompleted(): Error Reading I/O Complete Event!"
+			<< " val=" << val << "/0x" << std::hex << val << std::dec
+			<< " - Cancelling I/O Operation and Continuing...");
+		m_ioActive = false;
+		ERROR("ioCompleted() failure exit");
+		return;
+	}
+	DEBUG("ioCompleted(): Received val = " << val
+		<< "/0x" << std::hex << val << std::dec);
+
+	// Initial Data Directory Scan Results...
+	if ( val == IOCMD_INITIAL ) {
+
 		/* Initial scan is complete, so update the size of the
 		 * data store, and queue any runs needing translation.
 		 *
@@ -1401,6 +2024,7 @@ void StorageManager::ioCompleted(void)
 		 */
 		DEBUG("ioCompleted initially scanned " << m_scannedBlocks);
 		m_blocks_used += m_scannedBlocks;
+		m_scannedBlocks = 0;
 
 		STSClientMgr *sts = STSClientMgr::getInstance();
 		std::list<StorageContainer::SharedPtr>::iterator it;
@@ -1415,14 +2039,18 @@ void StorageManager::ioCompleted(void)
 		 */
 		if (!m_pendingRuns.empty())
 			sts->startConnect();
-	} else {
+	}
+	
+	// Data Directory Purge Request Completed...
+	else {
 		DEBUG("ioCompleted(): Purged " << m_purgedBlocks << " Blocks");
 		m_blocks_used -= m_purgedBlocks;
+		m_purgedBlocks = 0;
 	}
 
 	m_ioActive = false;
 
-	DEBUG("ioCompleted exit");
+	DEBUG("ioCompleted() exit");
 }
 
 void StorageManager::requestPurge( uint64_t goal, std::string logStr )
@@ -1444,7 +2072,13 @@ void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 		<< logStr );
 
 	m_ioActive = true;
-	m_ioStartEvent->signal(goal);
+	DEBUG("requestPurge(): Sending goal = " << goal
+		<< "/0x" << std::hex << goal << std::dec);
+	if ( !m_ioStartEvent->signal( goal ) ) {
+		ERROR("requestPurge(): Error Signaling I/O Start Event"
+			<< " with Goal = " << goal
+				<< "/0x" << std::hex << goal << std::dec);
+	}
 }
 
 void StorageManager::populateDailyCache(void)

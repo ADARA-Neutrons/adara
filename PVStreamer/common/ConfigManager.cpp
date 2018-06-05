@@ -284,7 +284,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
             (*ipv)->m_id = id++;
 
             syslog( LOG_INFO,
-        "%s %s: %s [%s] (Device ID=%d) New PV <%s> (%s) - assign PV ID=%d",
+        "%s %s: %s [%s] (Device ID=%d) New PV <%s> (%s) - Assign PV ID=%d",
                 "PVSD ERROR:", "ConfigManager::defineDevice()",
                 "Device", new_desc->m_name.c_str(), new_desc->m_id,
                 (*ipv)->m_name.c_str(),

@@ -334,11 +334,21 @@ BeamMonitorPkt::BeamMonitorPkt(const BeamMonitorPkt &pkt) :
 /* -------------------------------------------------------------------- */
 
 PixelMappingPkt::PixelMappingPkt(const uint8_t *data, uint32_t len) :
-	Packet(data, len)
+	Packet(data, len), m_fields((const uint32_t *)payload())
 {}
 
 PixelMappingPkt::PixelMappingPkt(const PixelMappingPkt &pkt) :
-	Packet(pkt)
+	Packet(pkt), m_fields((const uint32_t *)payload())
+{}
+
+/* -------------------------------------------------------------------- */
+
+PixelMappingAltPkt::PixelMappingAltPkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{}
+
+PixelMappingAltPkt::PixelMappingAltPkt(const PixelMappingAltPkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload())
 {}
 
 /* -------------------------------------------------------------------- */

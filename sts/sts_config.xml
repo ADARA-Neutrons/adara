@@ -21,116 +21,162 @@
 		<type>NXsample</type>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Id$</pattern>
+			<pattern>CS:ITEMS$</pattern>
+			<pattern>SampleId$</pattern>
 			<name>identifier</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Name$</pattern>
+			<pattern>CS:ITEMS:Name$</pattern>
+			<pattern>SampleName$</pattern>
 			<name>name</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Nature$</pattern>
+			<pattern>CS:ITEMS:Nature$</pattern>
+			<pattern>SampleNature$</pattern>
 			<name>nature</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Formula$</pattern>
+			<pattern>CS:ITEMS:Formula$</pattern>
+			<pattern>SampleFormula$</pattern>
 			<name>chemical_formula</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Mass$</pattern>
+			<pattern>CS:ITEMS:Mass$</pattern>
+			<pattern>SampleMass$</pattern>
 			<name>mass</name>
 			<units_value>SMS:RunInfo:Sample:MassUnits$</units_value>
+			<units_value>CS:ITEMS:MassUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Density$</pattern>
+			<pattern>CS:ITEMS:Density$</pattern>
+			<pattern>SampleDensity$</pattern>
 			<name>mass_density</name>
 			<units_value>SMS:RunInfo:Sample:DensityUnits$</units_value>
+			<units_value>CS:ITEMS:DensityUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<!-- Just a Concatenation of Container Id & Name... ;-b -->
 			<pattern>SMS:RunInfo:Sample:Component$</pattern>
+			<pattern>CS:ITEMS:Component$</pattern>
 			<name>component</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:ContainerId$</pattern>
+			<pattern>CS:ITEMS:ContainerId$</pattern>
 			<name>container_id</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:ContainerName$</pattern>
+			<pattern>CS:ITEMS:Container$</pattern>
+			<pattern>SampleContainer$</pattern>
 			<name>container_name</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:CanIndicator$</pattern>
+			<pattern>CS:ITEMS:CanIndicator$</pattern>
 			<name>can_indicator</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:CanBarcode$</pattern>
+			<pattern>CS:ITEMS:CanBarcode$</pattern>
 			<name>can_barcode</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:CanName$</pattern>
+			<pattern>CS:ITEMS:CanName$</pattern>
 			<name>can_name</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:CanMaterials$</pattern>
+			<pattern>CS:ITEMS:CanMaterials$</pattern>
 			<name>can_materials</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Description$</pattern>
+			<pattern>CS:ITEMS:Description$</pattern>
+			<pattern>SampleDescription$</pattern>
 			<name>description</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Comments$</pattern>
+			<pattern>CS:ITEMS:Comments$</pattern>
+			<pattern>SampleComments$</pattern>
 			<name>comments</name>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:HeightInContainer$</pattern>
+			<pattern>CS:ITEMS:HeightInContainer$</pattern>
 			<name>height_in_container</name>
 			<units_value>SMS:RunInfo:Sample:HeightInContainerUnits$</units_value>
+			<units_value>CS:ITEMS:HeightInContainerUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:InteriorDiameter$</pattern>
+			<pattern>CS:ITEMS:InteriorDiameter$</pattern>
 			<name>interior_diameter</name>
 			<units_value>SMS:RunInfo:Sample:InteriorDiameterUnits$</units_value>
+			<units_value>CS:ITEMS:InteriorDiameterUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:InteriorHeight$</pattern>
+			<pattern>CS:ITEMS:InteriorHeight$</pattern>
 			<name>interior_height</name>
 			<units_value>SMS:RunInfo:Sample:InteriorHeightUnits$</units_value>
+			<units_value>CS:ITEMS:InteriorHeightUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:InteriorWidth$</pattern>
+			<pattern>CS:ITEMS:InteriorWidth$</pattern>
 			<name>interior_width</name>
 			<units_value>SMS:RunInfo:Sample:InteriorWidthUnits$</units_value>
+			<units_value>CS:ITEMS:InteriorWidthUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:InteriorDepth$</pattern>
+			<pattern>CS:ITEMS:InteriorDepth$</pattern>
 			<name>interior_depth</name>
 			<units_value>SMS:RunInfo:Sample:InteriorDepthUnits$</units_value>
+			<units_value>CS:ITEMS:InteriorDepthUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:OuterDiameter$</pattern>
+			<pattern>CS:ITEMS:OuterDiameter$</pattern>
 			<name>outer_diameter</name>
 			<units_value>SMS:RunInfo:Sample:OuterDiameterUnits$</units_value>
+			<units_value>CS:ITEMS:OuterDiameterUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:OuterHeight$</pattern>
+			<pattern>CS:ITEMS:OuterHeight$</pattern>
 			<name>outer_height</name>
 			<units_value>SMS:RunInfo:Sample:OuterHeightUnits$</units_value>
+			<units_value>CS:ITEMS:OuterHeightUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:OuterWidth$</pattern>
+			<pattern>CS:ITEMS:OuterWidth$</pattern>
 			<name>outer_width</name>
 			<units_value>SMS:RunInfo:Sample:OuterWidthUnits$</units_value>
+			<units_value>CS:ITEMS:OuterWidthUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:OuterDepth$</pattern>
+			<pattern>CS:ITEMS:OuterDepth$</pattern>
 			<name>outer_depth</name>
 			<units_value>SMS:RunInfo:Sample:OuterDepthUnits$</units_value>
+			<units_value>CS:ITEMS:OuterDepthUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:VolumeCubic$</pattern>
+			<pattern>CS:ITEMS:VolumeCubic$</pattern>
 			<name>volume_cubic</name>
 			<units_value>SMS:RunInfo:Sample:VolumeCubicUnits$</units_value>
+			<units_value>CS:ITEMS:VolumeCubicUnits$</units_value>
 		</element_last_value>
 		<element_last_value>
 			<pattern>CS:IPTS:Resources$</pattern>

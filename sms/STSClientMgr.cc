@@ -9,6 +9,7 @@
 
 #include <boost/bind.hpp>
 #include <string>
+#include <sstream>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -40,21 +41,39 @@ RateLimitedLogging::History RLLHistory_STSClientMgr;
 
 class MaxConnectionsPV : public smsUint32PV {
 public:
-	MaxConnectionsPV(const std::string &name, STSClientMgr *stsClientMgr) :
-		smsUint32PV(name), m_stsClientMgr(stsClientMgr) {}
-
-private:
-	STSClientMgr *m_stsClientMgr;
+	MaxConnectionsPV(const std::string &name, STSClientMgr *stsClientMgr,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save),
+		m_stsClientMgr(stsClientMgr),
+		m_auto_save(auto_save)
+	{ }
 
 	void changed(void)
 	{
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			std::stringstream ss;
+			ss << value();
+			StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+		}
+
 		// Give Peace a Chance...
 		// When we change the Max Number of STS Connections,
 		// see if we have anything new to do now... ;-D
 		DEBUG("MaxConnectionsPV: " << m_pv_name
-			<< " PV value changed, Start Any STS Client Connections...");
+			<< " PV Value Changed to " << value()
+			<< ", Start Any STS Client Connections...");
 		m_stsClientMgr->startConnect();
 	}
+
+private:
+	STSClientMgr *m_stsClientMgr;
+
+	bool m_auto_save;
 };
 
 std::string STSClientMgr::m_node;
@@ -105,25 +124,30 @@ STSClientMgr::STSClientMgr() :
 	prefix += ":STSClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout", 0.0));
+		smsFloat64PV(prefix + ":ConnectTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0));
+		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":TransientTimeout", 0.0));
+		smsFloat64PV(prefix + ":TransientTimeout", 0.0, FLOAT64_MAX,
+			/* AutoSave */ true));
 
 	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
-		MaxConnectionsPV(prefix + ":MaxConnections", this));
+		MaxConnectionsPV(prefix + ":MaxConnections", this,
+			0, INT32_MAX, /* AutoSave */ true));
 
 	m_pvMaxRequeueCount = boost::shared_ptr<smsUint32PV>(new
-		smsUint32PV(prefix + ":MaxRequeueCount"));
+		smsUint32PV(prefix + ":MaxRequeueCount", 0, INT32_MAX,
+			/* AutoSave */ true));
 
 	m_pvSendPausedData = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":SendPausedData"));
+		smsBooleanPV(prefix + ":SendPausedData", /* AutoSave */ true));
 
 	m_pvServiceURI = boost::shared_ptr<smsStringPV>(new
-		smsStringPV(prefix + ":ServiceURI"));
+		smsStringPV(prefix + ":ServiceURI", /* AutoSave */ true));
 
 	ctrl->addPV(m_pvConnectTimeout);
 	ctrl->addPV(m_pvConnectRetryTimeout);
@@ -143,6 +167,77 @@ STSClientMgr::STSClientMgr() :
 	m_pvMaxRequeueCount->update(m_max_requeue_count, &now);
 	m_pvSendPausedData->update(m_send_paused_data, &now);
 	m_pvServiceURI->update(m_node + ":" + m_service, &now);
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	std::string value;
+	uint32_t uvalue;
+	double dvalue;
+	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV( m_pvConnectTimeout->getName(),
+			dvalue, ts ) ) {
+		m_connect_timeout = dvalue;
+		m_pvConnectTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvConnectRetryTimeout->getName(),
+			dvalue, ts ) ) {
+		m_connect_retry = dvalue;
+		m_pvConnectRetryTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvTransientTimeout->getName(),
+			dvalue, ts ) ) {
+		m_transient_timeout = dvalue;
+		m_pvTransientTimeout->update(dvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvMaxConnections->getName(),
+			uvalue, ts ) ) {
+		m_max_connections = uvalue;
+		m_pvMaxConnections->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvMaxRequeueCount->getName(),
+			uvalue, ts ) ) {
+		m_max_requeue_count = uvalue;
+		m_pvMaxRequeueCount->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvSendPausedData->getName(),
+			bvalue, ts ) ) {
+		m_send_paused_data = bvalue;
+		m_pvSendPausedData->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvServiceURI->getName(),
+			value, ts ) ) {
+		// Update STS Service URI from PV AutoSave Value...
+		std::string uri = value;
+		const char *default_service = "31417";
+		size_t pos = uri.find_first_of(':');
+		std::string node, service;
+		if (pos != std::string::npos) {
+			node = uri.substr(0, pos);
+			if (pos != uri.length())
+				service = uri.substr(pos + 1);
+			else
+				service = default_service;
+		} else {
+			node = uri;
+			service = default_service;
+		}
+		DEBUG("Updating STS Service URI from AutoSave PV Value: "
+			<< m_node << ":" << m_service
+			<< " -> " << node << ":" << service);
+		m_node = node;
+		m_service = service;
+		m_pvServiceURI->update(m_node + ":" + m_service, &ts);
+	}
+
+	// Done...
 
 	INFO("Remote is " << m_node << ":" << m_service);
 }

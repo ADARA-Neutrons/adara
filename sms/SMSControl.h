@@ -267,6 +267,9 @@ private:
 
 	boost::shared_ptr<PopPulseBufferPV> m_pvPopPulseBuffer;
 
+	boost::shared_ptr<smsBooleanPV> m_pvNoRTDLPulses;
+	static bool m_noRTDLPulses;
+
 	static uint64_t m_interPulseTimeChopGlitchMin;
 	static uint64_t m_interPulseTimeChopGlitchMax;
 
@@ -283,6 +286,8 @@ private:
 	static bool m_sendSampleInRunInfo;
 
 	static bool m_allowNonOneToOnePixelMapping;
+
+	static bool m_useOrigPixelMappingPkt;
 
 	static bool m_notesCommentAutoReset;
 

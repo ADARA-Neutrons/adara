@@ -33,15 +33,19 @@ public:
 		{
 			std::string name = value();
 
-			INFO("DetBankSetNamePV:"
-				<< " Changing Detector Bank Set Name in Config - "
-				<< m_pv_name << " Re-Named from " << m_info->getName()
-				<< " to " << name);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( name.compare( m_info->getName() ) )
+			{
+				INFO("DetBankSetNamePV:"
+					<< " Changing Detector Bank Set Name in Config - "
+					<< m_pv_name << " Re-Named from " << m_info->getName()
+					<< " to " << name);
  
-			m_info->setName(name);
+				m_info->setName(name);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -68,15 +72,19 @@ public:
 			std::string newBanklist;
 			Utils::printArrayString( banklist, newBanklist );
 
-			INFO("DetBankSetBanklistPV: Changing Detector Bank Set "
-				<< m_info->getName() << " Banks List for "
-				<< m_pv_name << " from " << oldBanklist
-				<< " to " << newBanklist);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( newBanklist.compare( oldBanklist ) )
+			{
+				INFO("DetBankSetBanklistPV: Changing Detector Bank Set "
+					<< m_info->getName() << " Banks List for "
+					<< m_pv_name << " from " << oldBanklist
+					<< " to " << newBanklist);
 
-			m_info->setBanklist( banklist );
+				m_info->setBanklist( banklist );
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -177,15 +185,19 @@ public:
 				newFormat = "both";
 			}
 
-			INFO("DetBankSetFormatPV: Changing Detector Bank Set "
-				<< m_info->getName() << " Output Format for "
-				<< m_pv_name << " from " << oldFormat
-				<< " to " << newFormat);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( newFormat.compare( oldFormat ) )
+			{
+				INFO("DetBankSetFormatPV: Changing Detector Bank Set "
+					<< m_info->getName() << " Output Format for "
+					<< m_pv_name << " from " << oldFormat
+					<< " to " << newFormat);
 
-			m_info->setFlags(newFlags);
+				m_info->setFlags(newFlags);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -203,15 +215,19 @@ public:
 		{
 			uint32_t tofOffset = value();
 
-			INFO("DetBankSetOffsetPV: Changing Detector Bank Set "
-				<< m_info->getName() << " TOF Offset for "
-				<< m_pv_name << " from " << m_info->getTofOffset()
-				<< " to " << tofOffset);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofOffset != m_info->getTofOffset() )
+			{
+				INFO("DetBankSetOffsetPV: Changing Detector Bank Set "
+					<< m_info->getName() << " TOF Offset for "
+					<< m_pv_name << " from " << m_info->getTofOffset()
+					<< " to " << tofOffset);
 
-			m_info->setTofOffset(tofOffset);
+				m_info->setTofOffset(tofOffset);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -229,15 +245,19 @@ public:
 		{
 			uint32_t tofMax = value();
 
-			INFO("DetBankSetMaxPV: Changing Detector Bank Set "
-				<< m_info->getName() << " Maximum TOF for "
-				<< m_pv_name << " from " << m_info->getTofMax()
-				<< " to " << tofMax);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofMax != m_info->getTofMax() )
+			{
+				INFO("DetBankSetMaxPV: Changing Detector Bank Set "
+					<< m_info->getName() << " Maximum TOF for "
+					<< m_pv_name << " from " << m_info->getTofMax()
+					<< " to " << tofMax);
 
-			m_info->setTofMax(tofMax);
+				m_info->setTofMax(tofMax);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -255,11 +275,6 @@ public:
 		{
 			uint32_t tofBin = value();
 
-			INFO("DetBankSetBinPV: Changing Detector Bank Set "
-				<< m_info->getName() << " TOF Histogram Bin Size for "
-				<< m_pv_name << " from " << m_info->getTofBin()
-				<< " to " << tofBin);
-
 			if ( tofBin < 1 )
 			{
 				ERROR("DetBankSetBinPV: TOF Histogram Bin Size < 1!"
@@ -267,10 +282,19 @@ public:
 				tofBin = 1;
 			}
 
-			m_info->setTofBin(tofBin);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( tofBin != m_info->getTofBin() )
+			{
+				INFO("DetBankSetBinPV: Changing Detector Bank Set "
+					<< m_info->getName() << " TOF Histogram Bin Size for "
+					<< m_pv_name << " from " << m_info->getTofBin()
+					<< " to " << tofBin);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				m_info->setTofBin(tofBin);
+
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -288,15 +312,20 @@ public:
 		{
 			double throttle = value();
 
-			INFO("DetBankSetBinPV: Changing Detector Bank Set "
-				<< m_info->getName() << " Throttle Frequency for "
-				<< m_pv_name << " from " << m_info->getThrottle()
-				<< " to " << throttle);
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
+			if ( throttle != m_info->getThrottle() )
+			{
+				INFO("DetBankSetThrottlePV: Changing Detector Bank Set "
+					<< m_info->getName() << " Throttle Frequency for "
+					<< m_pv_name << " from " << m_info->getThrottle()
+					<< " to " << throttle);
 
-			m_info->setThrottle(throttle);
+				m_info->setThrottle(throttle);
 
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 		}
 
 	private:
@@ -314,22 +343,47 @@ public:
 		{
 			std::string suffix = value();
 
-			INFO("DetBankSetSuffixPV: Changing Detector Bank Set "
-				<< m_info->getName() << " Throttle NXentry Suffix for "
-				<< m_pv_name << " from " << m_info->getSuffix()
-				<< " to " << suffix);
+			bool changed = false;
 
-			m_info->setSuffix(suffix);
+			// Sanitize Suffix String for NeXus File NXentry Usage...
+			if ( Utils::sanitizeString( suffix, false ) )
+			{
+				ERROR("DetBankSetSuffixPV changed(): Sanitized"
+					<< " Throttle NXentry Suffix for Detector Bank Set "
+					<< value() << " to " << suffix);
+				changed = true;
+			}
+
+			// Truncate Suffix String to Max Size for Network Packet...
+			if ( m_config->truncateString(
+				suffix, ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE,
+				"DetBankSetSuffixPV changed()",
+				"Throttle NXentry Suffix", true ) )
+			{
+				changed = true;
+			}
+
+			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
+			if ( suffix.compare( m_info->getSuffix() ) )
+			{
+				INFO("DetBankSetSuffixPV: Changing Detector Bank Set "
+					<< m_info->getName() << " Throttle NXentry Suffix for "
+					<< m_pv_name << " from " << m_info->getSuffix()
+					<< " to " << suffix);
+
+				m_info->setSuffix(suffix);
+
+				// Reset Timestamp on Prologue Packet...
+				m_config->resetPacketTime();
+			}
 
 			// The Suffix String got Sanitized or Truncated, Update PV...!
-			if ( suffix.compare( m_info->getSuffix() ) ) {
+			if ( changed )
+			{
 				struct timespec ts;
 				clock_gettime(CLOCK_REALTIME, &ts);
 				update(m_info->getSuffix(), &ts);
 			}
-
-			// Reset Timestamp on Prologue Packet...
-			m_config->resetPacketTime();
 		}
 
 	private:
@@ -463,23 +517,7 @@ public:
 		{ m_throttle = throttle; m_changed = true; }
 
 	void setSuffix(std::string suffix)
-	{
-		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( Utils::sanitizeString( suffix, false ) ) {
-			ERROR("setSuffix(): Sanitized"
-				<< " Throttle NXentry Suffix for Detector Bank Set "
-				<< m_suffix << " to " << suffix);
-		}
-
-		// Truncate Suffix String to Max Size for Network Packet...
-		m_config->truncateString(
-			suffix, ADARA::DetectorBankSetsPkt::THROTTLE_SUFFIX_SIZE,
-			"setSuffix()", "Throttle NXentry Suffix", true );
-
-		m_suffix = suffix;
-
-		m_changed = true;
-	}
+		{ m_suffix = suffix; m_changed = true; }
 
 	// Did Anything Change since the last Prologue Packet Update...?
 	bool changed() { return m_changed; }
@@ -576,8 +614,8 @@ private:
 	boost::shared_ptr<DetBankSetSuffixPV> m_pvSuffix;
 };
 
-DetectorBankSet::DetectorBankSet(
-		const boost::property_tree::ptree & conf)
+DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
+	: m_packet(NULL)
 {
 	boost::property_tree::ptree::const_iterator it;
 	std::string conf_prefix("bankset ");
@@ -834,6 +872,14 @@ bool DetectorBankSet::truncateString( std::string & str, size_t sz,
 
 void DetectorBankSet::resetPacketTime(void)
 {
+	// Whoa... Make Sure Some Premature PV Change Doesn't Try to Call This
+	// _Before_ the Packet has been Allocated...! ;-o
+	if ( m_packet == NULL ) {
+		DEBUG("resetPacketTime():"
+			<< " Premature, NULL Packet - Ignoring Packet Time Reset...");
+		return;
+	}
+
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 

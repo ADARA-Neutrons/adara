@@ -165,6 +165,8 @@ system.
 		\ref{section:protocol_beam_monitor_events_v1} \\
 	0x4002.0 & Pixel Mapping Table &
 		\ref{section:protocol_pixel_mapping_table} \\
+	0x4102.0 & Pixel Mapping Alternate Table &
+		\ref{section:protocol_pixel_mapping_alt_table} \\
 	0x4003.0 & Run Status &
 		\ref{section:protocol_run_status} \\
 	0x4004.0 & Run Informtaion &
@@ -735,9 +737,10 @@ of the pixel IDs for neutron events.
 The pixel ID transformation would usually occur in the SMS
 when sorting event data into Detector Banks
 for the Banked Event Data packet,
-and is done using a one-to-one ``Pixel Mapping Table''
-(communicated in the stream via packets defined
-in Section~\ref{section:protocol_pixel_mapping_table}).
+and is done using a ``Pixel Mapping Table''
+(communicated in the stream via one of the packet types defined
+in Section~\ref{section:protocol_pixel_mapping_table}
+or \ref{section:protocol_pixel_mapping_alt_table}).
 As part of the normal mapping process, the detector bank is determined,
 and the events are sorted into buckets accordingly.
 So in this case of Mapped Event Data packets,
@@ -906,9 +909,10 @@ of the pixel IDs for neutron events.
 The pixel ID transformation would usually occur in the SMS
 when sorting event data into Detector Banks
 for the Banked Event Data packet,
-and is done using a one-to-one ``Pixel Mapping Table''
-(communicated in the stream via packets defined
-in Section~\ref{section:protocol_pixel_mapping_table}).
+and is done using a ``Pixel Mapping Table''
+(communicated in the stream via one of the packet types defined
+in Section~\ref{section:protocol_pixel_mapping_table}
+or \ref{section:protocol_pixel_mapping_alt_table}).
 As part of the normal mapping process, the detector bank is determined,
 and the events are sorted into buckets accordingly.
 So in this case of Mapped Event Data packets,
@@ -1257,6 +1261,7 @@ for an experimental run. Prior to sending the event and environmental data
 for the run, the SMS will send the following prologue:
 \begin{itemize}
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table})
+\item Pixel Mapping Alt Table (Section~\ref{section:protocol_pixel_mapping_alt_table})
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Run Information (Section~\ref{section:protocol_run_information})
 \item Geometry (Section~\ref{section:protocol_geometry})
@@ -1303,6 +1308,7 @@ and provide client requests to the SMS. Once the SMS has received the Client
 Hello, it will send the following prologue:
 \begin{itemize}
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table})
+\item Pixel Mapping Alt Table (Section~\ref{section:protocol_pixel_mapping_alt_table})
 \item Run Status (Section~\ref{section:protocol_run_status})
 \item Geometry (Section~\ref{section:protocol_geometry})
 \item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
@@ -1442,8 +1448,10 @@ The physical layout of pixel IDs in the detector systems for an instrument
 do not always match up with the layout that the scientists wish to use for
 analysis. The Stream Management Service (SMS) will transform the pixel IDs
 from physical in the Raw packets to logical in the Banked packets using a
-one-to-one mapping (communicated in the stream via ``Pixel Mapping Table''
-packets defined in Section~\ref{section:protocol_pixel_mapping_table}).
+mapping (often one-to-one, communicated in the stream via one of the
+``Pixel Mapping Table''
+packets defined in Section~\ref{section:protocol_pixel_mapping_table}
+or \ref{section:protocol_pixel_mapping_alt_table}).
 These logical pixels are then communicated in the ``Banked Event Data''
 packets. As part of this mapping process, the detector bank is determined,
 and the events are sorted into buckets accordingly. It is expected that
@@ -1839,7 +1847,7 @@ is given in Figure~\ref{fig:protocol_monitor_event_section}.
 
 
 \newpage
-\subsubsection{Pixel Mapping Table Packet}
+\subsubsection{Pixel Mapping Table Packet (to be deprecated...)}
 \label{section:protocol_pixel_mapping_table}
 
 \begin{figure}[h]
@@ -1859,9 +1867,21 @@ is given in Figure~\ref{fig:protocol_monitor_event_section}.
 \end{figure}
 
 As part of its processing of the neutron event data, the SMS will map the
-physical pixel ID to a logical pixel ID. This mapping must be one-to-one and
-reversible. The ``Pixel Mapping Table'' packet defined in
-Figure~\ref{fig:protocol_packet_pixel_map} will preserve the table for
+physical pixel ID to a logical pixel ID.
+Normally, this mapping is one-to-one and reversible, and hence this
+convenient packet type can be used to communicate the details
+of all such pixel maps.
+Note, however, that as of the commissioning of the
+High Flux Isotope Reactor (HFIR) ``WAND'' Beamline (HB2C),
+there exists the potential for {\it Non One-to-One} pixel mappings.
+it is for this reason that the base ``Pixel Mapping Table'' packet
+described here will ultimately be phased out in favor of the
+more flexible ``Pixel Mapping Table Alternate'' packet type
+(see Section~\ref{section:protocol_pixel_mapping_alt_table}).
+
+The ``Pixel Mapping Table'' packet defined in
+Figure~\ref{fig:protocol_packet_pixel_map} will preserve
+any one-to-one pixel mapping table for
 consumers of the event stream. This packet must be present near the beginning
 of a new experiment recording, but may occur multiple times in the transmitted
 stream. Each additional copy transmitted must be identical to the first copy
@@ -1912,6 +1932,107 @@ given by the section header.
 
 Note that a {\it Single Bank} may be described by {\bf multiple sections}
 if the logical ID space is not contiguous,
+{\bf OR} if the total number of pixel IDs in the bank is ``too large,''
+i.e. specifically more than 65535
+(the capacity of the 16-bit section {\bf Count}).
+
+
+\newpage
+\subsubsection{Pixel Mapping Table Alternate Packet}
+\label{section:protocol_pixel_mapping_alt_table}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{$N$} \\
+    \wordbox{1}{0x00410200} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,0} \\
+    \wordbox{1}{Number of Detector Banks} \\
+    \wordbox{2}{Mapping Data ($N - 4$ bytes)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x4102.0: Pixel Map Alt Packet}
+  \label{fig:protocol_packet_pixel_map_alt}
+\end{figure}
+
+As part of its processing of the neutron event data, the SMS will map the
+physical pixel ID to a logical pixel ID.
+Normally, this mapping is one-to-one and reversible,
+however, as of the commissioning of the
+High Flux Isotope Reactor (HFIR) ``WAND'' Beamline (HB2C),
+there exists the potential for {\it Non One-to-One} pixel mappings.
+Therefore, this new ``Alternate'' Pixel Mapping Table packet type
+must be used to communicate the details of such pixel maps,
+and indeed can and should be subsequently used
+for any or all pixel mapping tables from this point forward.
+(Note that the original ``Pixel Mapping Table'' packet
+described in Section~\ref{section:protocol_pixel_mapping_table}
+will ultimately be phased out in favor of this new ``Alternate''
+packet type.)
+The ``Pixel Mapping Table Alternate'' packet type is effectively an
+{\it inverted organization} or ``mirror image'' of the original
+``Pixel Mapping Table'' packet type,
+with ``Physical'' and ``Logical'' Pixel IDs {\it swapped}
+in the section organization,
+and an additional explicit ``Number of Detector Banks'' value
+inserted before the ``Mapping Data'' for convenience.
+
+The ``Pixel Mapping Table Alternate'' packet defined in
+Figure~\ref{fig:protocol_packet_pixel_map_alt} will preserve any table for
+consumers of the event stream. This packet must be present near the beginning
+of a new experiment recording, but may occur multiple times in the transmitted
+stream. Each additional copy transmitted must be identical to the first copy
+for the same experiment recording.
+
+\begin{figure}[ht]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,16,15,0} \\
+    \bitbox{32}{Base Physical ID (u32)} \\
+    \bitbox{16}{Bank ID (u16)} & 
+    \bitbox{16}{Count (``$P$'', u16)} \\
+    \wordbox{1}{Logical ID 1 (u32)} \\
+    \wordbox{1}{Logical ID 2 (u32)} \\
+    \wordbox{1}{$\cdots$} \\
+    \wordbox{1}{Logical ID $P$ (u32)} \\
+  \end{bytefield}
+  \caption{Pixel Map Alt Section}
+  \label{fig:protocol_packet_pixel_map_alt_section}
+\end{figure}
+
+%\begin{figure}[ht]
+  %\centering
+  %\begin{bytefield}{32}
+    %%\bitheader{31,0} \\
+    %\bitbox{32}{Physical ID (u32)} \\
+  %\end{bytefield}
+  %\caption{Pixel Map Entry}
+  %\label{fig:protocol_packet_pixel_map_entry}
+%\end{figure}
+
+The physical/logical pixel ID space may not be compactly populated.
+It often contains sequential clusters of IDs with large gaps
+between the clusters.
+To reduce the size of the mapping table, it is described using sections as
+defined in Figure~\ref{fig:protocol_packet_pixel_map_alt_section}.
+{\bf Base Physical ID} defines the offset into the physical ID space for
+which this section defines mappings. {\bf Count} gives the number of
+mapping entries in this section, and {\bf Bank ID} describes the bank
+containing these pixels.
+
+Each entry in the section describes a physical to logical (and bank) mapping.
+Each entry gives the logical ID for the mapping, and the physical ID is
+determined by adding the entry's zero-based index (from the section header) to
+the {\bf Base Physical ID}. For example, the pixel in {\bf Logical ID 1} maps
+to physical pixel {\bf Base Physical ID}. {\bf Logical ID 2} maps to physical
+pixel ${\bf Base Physical ID} + 1$, and so on.  The bank ID for each mapping is
+given by the section header.
+
+Note that a {\it Single Bank} may be described by {\bf multiple sections}
+if the physical/logical ID space is not contiguous,
 {\bf OR} if the total number of pixel IDs in the bank is ``too large,''
 i.e. specifically more than 65535
 (the capacity of the 16-bit section {\bf Count}).

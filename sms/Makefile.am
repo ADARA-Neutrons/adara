@@ -12,7 +12,8 @@ sms_smsd_SOURCES = sms/smsd.cc \
 		sms/RunInfo.cc sms/Geometry.cc sms/PixelMap.cc \
 		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/DetectorBankSet.cc \
-		sms/utils.cc sms/ComBusSMSMon.cc combus/ComBus.cpp $(POSIX_PARSER)
+		sms/ComBusSMSMon.cc combus/ComBus.cpp \
+		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
 		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
@@ -30,8 +31,8 @@ sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/Geometry.cc sms/Markers.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/BeamlineInfo.cc sms/DataSource.cc sms/PixelMap.cc \
 		sms/SignalEvents.cc sms/BeamMonitorConfig.cc \
-		sms/DetectorBankSet.cc sms/utils.cc sms/ComBusSMSMon.cc \
-		combus/ComBus.cpp $(POSIX_PARSER)
+		sms/DetectorBankSet.cc sms/ComBusSMSMon.cc combus/ComBus.cpp \
+		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 sms_test_storage_test_CPPFLAGS = -Isms $(activemq_CPPFLAGS) $(apr_CPPFLAGS)\
 		$(COMMON_CPPFLAGS) \
 		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \

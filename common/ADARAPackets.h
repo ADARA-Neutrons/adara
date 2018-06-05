@@ -286,10 +286,34 @@ private:
 class PixelMappingPkt : public Packet {
 public:
 	PixelMappingPkt(const PixelMappingPkt &pkt);
+
 	// TODO implement accessors for fields
+	const uint8_t *mappingData(void) const {
+		return( (const uint8_t *) &(m_fields[0]) );
+	}
 
 private:
+	const uint32_t *m_fields;
+
 	PixelMappingPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
+class PixelMappingAltPkt : public Packet {
+public:
+	PixelMappingAltPkt(const PixelMappingAltPkt &pkt);
+
+	// TODO implement accessors for fields
+	uint32_t numBanks(void) const { return m_fields[0]; }
+	const uint8_t *mappingData(void) const {
+		return( (const uint8_t *) &(m_fields[1]) );
+	}
+
+private:
+	const uint32_t *m_fields;
+
+	PixelMappingAltPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
@@ -304,6 +328,13 @@ public:
 	RunStatus::Enum status(void) const {
 		return static_cast<RunStatus::Enum>(m_fields[2] >> 24);
 	}
+
+	void setRunStart(uint32_t runStart) // ;-b
+	{
+		uint32_t *field = (uint32_t *) m_fields;
+		field[1] = runStart;
+	}
+
 #if 0
 	uint32_t pauseFileNumber(void) const { return m_fields[3] & 0xffffff; }
 	uint32_t paused(void) const { return m_fields[3] >> 24; }

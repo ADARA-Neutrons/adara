@@ -989,7 +989,7 @@ private:
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
-                if ( val == value )
+                if ( approximatelyEqual( val, value, STS_DOUBLE_EPSILON ) )
                 {
                     syslog( LOG_INFO, "[%i] Value Match (%lf)",
                         g_pid, value );
@@ -1079,7 +1079,8 @@ private:
                 // (Meh, it's something... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
-                    if ( val == value[j] )
+                    if ( approximatelyEqual( val, value[j],
+                            STS_DOUBLE_EPSILON ) )
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Match (%lf)",
                             g_pid, j, value[j] );
@@ -1132,7 +1133,8 @@ private:
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
-                if ( val != value )
+                if ( !approximatelyEqual( val, value,
+                        STS_DOUBLE_EPSILON ) )
                 {
                     syslog( LOG_INFO, "[%i] Value Not-Match (%lf)",
                         g_pid, value );
@@ -1222,7 +1224,8 @@ private:
                 // (Meh, this is really terrible... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
-                    if ( val != value[j] )
+                    if ( !approximatelyEqual( val, value[j],
+                            STS_DOUBLE_EPSILON ) )
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%lf)",
                             g_pid, j, value[j] );
@@ -1286,71 +1289,6 @@ private:
             return( false );
         }
 
-        /// Convert Uint32 PV Value to String
-        std::string valueToString
-        (
-            uint32_t value                 ///< Uint32 Value
-        )
-        {
-            std::stringstream ss;
-            ss << value;
-            return( ss.str() );
-        }
-
-        /// Convert Double PV Value to String
-        std::string valueToString
-        (
-            double value                   ///< Double Value
-        )
-        {
-            std::stringstream ss;
-            ss << value;
-            return( ss.str() );
-        }
-
-        /// Convert String PV Value to String (Lol... ;-D)
-        std::string valueToString
-        (
-            std::string value              ///< String Value
-        )
-        {
-            return( value );
-        }
-
-        /// Convert Uint32 PV Array to String
-        std::string valueToString
-        (
-            std::vector<uint32_t> value    ///< Uint32 Array
-        )
-        {
-            std::stringstream ss;
-            ss << "[";
-            for ( uint32_t j=0 ; j < value.size() ; j++ )
-            {
-                if ( j ) ss << ", ";
-                ss << value[j];
-            }
-            ss << "]";
-            return( ss.str() );
-        }
-
-        /// Convert Double PV Array to String
-        std::string valueToString
-        (
-            std::vector<double> value      ///< Double Array
-        )
-        {
-            std::stringstream ss;
-            ss << "[";
-            for ( uint32_t j=0 ; j < value.size() ; j++ )
-            {
-                if ( j ) ss << ", ";
-                ss << value[j];
-            }
-            ss << "]";
-            return( ss.str() );
-        }
-
         /// Write Scalar Uint32 PV Value to NeXus
         void writeScalarValue
         (
@@ -1385,7 +1323,7 @@ private:
         )
         {
             m_nxgen.writeString( path, name, value );
-            if ( units.size() ) {
+            if ( units.size() && units.compare("(unset)") ) {
                 m_nxgen.writeStringAttribute( path + "/" + name,
                     "units", units );
             }
@@ -1890,7 +1828,8 @@ private:
                         if ( ! E->unitsValue.size() )
                         {
                             std::stringstream ss;
-                            ss << valueToString( this->m_last_value );
+                            ss << this->valueToString(
+                                this->m_last_value );
 
                             // REMOVE ME...
                             syslog( LOG_INFO,

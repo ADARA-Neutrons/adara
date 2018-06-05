@@ -1216,14 +1216,6 @@ DeviceAgent::epicsConnectionHandler(
     }
 }
 
-/// Macro for common state parsing below
-/*
-#define SET_STATE( state, type, src ) \
-    state.m_time.sec = ((struct type *)src)->stamp.secPastEpoch; \
-    state.m_time.nsec = ((struct type *)src)->stamp.nsec; \
-    state.m_status = ((struct type *)src)->status; \
-    state.m_severity = ((struct type *)src)->severity;
-*/
 
 template<typename T>
 void
@@ -1231,7 +1223,8 @@ DeviceAgent::updateState( const void *a_src, PVState &a_state )
 {
     if ( ((T*)a_src)->stamp.secPastEpoch == 0 )
     {
-        // Use a local timestamp if a valid timestamp has not yet been received
+        // Use a local timestamp if a valid timestamp has
+        // not yet been received
         if ( a_state.m_time.sec == 0 )
         {
             a_state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;;
@@ -1240,14 +1233,11 @@ DeviceAgent::updateState( const void *a_src, PVState &a_state )
     }
     else
     {
-        // Make sure timestamp does not go backwards
-        if ( ((T*)a_src)->stamp.secPastEpoch > a_state.m_time.sec
-                || ( ((T*)a_src)->stamp.secPastEpoch == a_state.m_time.sec
-                    && ((T*)a_src)->stamp.nsec > a_state.m_time.nsec ) )
-        {
-            a_state.m_time.sec = ((T*)a_src)->stamp.secPastEpoch;
-            a_state.m_time.nsec = ((T*)a_src)->stamp.nsec;
-        }
+        // It's *OK*" if the timestamp goes backwards, Let It Be! ;-D
+        // (always just pass the data through; maybe something else
+        // later on can sort it out... ;-)
+        a_state.m_time.sec = ((T*)a_src)->stamp.secPastEpoch;
+        a_state.m_time.nsec = ((T*)a_src)->stamp.nsec;
     }
 
     a_state.m_status = ((T*)a_src)->status;

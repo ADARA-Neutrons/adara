@@ -7,25 +7,17 @@
 #include <time.h>
 #include <map>
 #include <epicsMessageQueue.h>
-#include <cadef.h>
+//#include <cadef.h>
 #include <epicsEvent.h>
 #include "combus/ComBus.h"
 #include "combus/SMSMessages.h"
-#include "SMSControlPV.h"
+//#include "SMSControlPV.h"
 
-/*
- * Local version of SEVCHK from cadef.h, which "provides efficient test and 
- * display of channel access errors"
- */
+class EventFd;
 
-#define     SMSSEVCHK(CA_ERROR_CODE, MESSAGE_STRING) 	\
-{ 							\
-    int ca_unique_status_name  = (CA_ERROR_CODE); 	\
-    if(!(ca_unique_status_name & CA_M_SUCCESS)) 	\
-	ERROR("Channel Access Error: " << 		\
-	ca_message(ca_unique_status_name) << 		\
-	" - " << MESSAGE_STRING);				\
-}
+class RestartComBusPV;
+class smsBooleanPV;
+class smsStringPV;
 
 
 class SMSRunStatus
@@ -70,13 +62,34 @@ public:
 	void sendUpdate( uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state );
 
-	static uint16_t		m_restart_combus;
+	static EventFd		*m_commRestart;
+
+	static bool			m_restart_combus;
+
+	struct restart_comm_struct
+	{
+		std::string domain;
+		std::string broker_uri;
+		std::string broker_user;
+		std::string broker_pass;
+	};
+
+	static struct restart_comm_struct m_restartCommData;
+
+	void restartComBus();
 
 private:
-	void openComm();
-	void reOpenComm();
 	void commThread();
-	static void restartCallback(struct event_handler_args);
+
+	void openComm();
+
+	void reOpenComm(
+		std::string a_domain,
+		std::string a_broker_uri,
+		std::string a_broker_user,
+		std::string a_broker_pass );
+
+	void checkRestart();
 
 	std::map<uint32_t, SMSRunStatus *> m_run_dict;
 
@@ -90,7 +103,7 @@ private:
 	static std::string		m_broker_user;
 	static std::string		m_broker_pass;
 
-	boost::shared_ptr<smsBooleanPV> m_pvRestartCombus;
+	boost::shared_ptr<RestartComBusPV> m_pvRestartComBus;
 	boost::shared_ptr<smsStringPV> m_pvDomain;
 	boost::shared_ptr<smsStringPV> m_pvBrokerURI;
 	boost::shared_ptr<smsStringPV> m_pvBrokerUser;

@@ -25,6 +25,8 @@ ADARA PVSD Install Checklist
 
 		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
 
+	./confck
+
 -OR-
 
 1. Create Initial PVSD Configuration on New Beamline/Host:
@@ -69,6 +71,8 @@ ADARA PVSD Install Checklist
 	git add pvsd
 	git commit pvsd
 
+	./confck
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
@@ -93,6 +97,15 @@ ADARA PVSD Install Checklist
 
 	sudo tail /var/log/messages
 
+	./confck 
+
+	cp /etc/rsyslog.conf pvsd/rsyslog.conf
+
+	git add pvsd/rsyslog.conf
+	git commit pvsd/rsyslog.conf
+
+	./confck
+
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
 	ls -l /etc/rsyslog.pipes
@@ -109,7 +122,21 @@ ADARA PVSD Install Checklist
 
 	sudo vi /etc/crontab
 
-		*/5 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+		# MAILTO=root
+		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		MAILTO="root@localhost"
+		HOME=/
+
+		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+	./confck
+
+	cp /etc/crontab pvsd/etc.crontab
+
+	git add pvsd/etc.crontab
+	git commit pvsd/etc.crontab
+
+	./confck
 
 4. Administrator Crontab Setup:
 
@@ -125,28 +152,69 @@ ADARA PVSD Install Checklist
 
 	crontab -l
 
-5. User Local Bin Soft Link Setup:
+5. Add SMS to Local Run Levels
+
+	chkconfig --list pvsd
+
+	sudo chkconfig --add pvsd
+
+	chkconfig --list pvsd
+
+	sudo chkconfig pvsd on
+
+	chkconfig --list pvsd
+
+	./confck
+
+	(rm pvsd/chkconfig.pvsd)
+
+	chkconfig --list pvsd > pvsd/chkconfig.pvsd 2>&1
+
+	git add pvsd/chkconfig.pvsd
+	git commit pvsd/chkconfig.pvsd
+
+	git diff ; git pull ; git push ; git status
+
+	./confck
+
+6. User Local Bin Soft Link Setup:
+
+	ls -l /usr/sbin/pvsd
 
 	sudo ln -s /home/controls/config-dassrv1/deploy/pvsd /usr/sbin/pvsd
 
-6. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+	ls -l /usr/sbin/pvsd
 
-	(rm EpicsBaseLink)
+7. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+
+	ls -l /home/controls/prod/ADARA
+
+	mkdir /home/controls/prod/ADARA
+
+	ls -l /home/controls/prod/ADARA
+
+	(rm /home/controls/prod/ADARA/EpicsBaseLink)
 
 	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20170606 \
-		EpicsBaseLink
+		/home/controls/prod/ADARA/EpicsBaseLink
 
-	(rm EpicsBaseV4Link)
+	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
 
 	ln -s /home/controls/prod/epics/basev4/rel4.5-SNS2_20170606 \
-		EpicsBaseV4Link
+		/home/controls/prod/ADARA/EpicsBaseV4Link
 
-	(rm EpicsExtensionsLink)
+	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
 
 	ln -s /home/controls/prod/epics/extensions/rel1.3_20170606 \
-		EpicsExtensionsLink
+		/home/controls/prod/ADARA/EpicsExtensionsLink
 
-7. Deploy PVSD Daemon:
+	ls -l /home/controls/prod/ADARA
+
+	source $HOME/.bashrc
+
+	printenv | grep EPICS
+
+8. Deploy PVSD Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
@@ -158,25 +226,13 @@ ADARA PVSD Install Checklist
 
 	./deploy_adara pvsd
 
-8. Start PVSD Daemon:
+9. Start PVSD Daemon:
 
 	sudo /sbin/service pvsd status
 
 	sudo /sbin/service pvsd start
 
 	pvsdlog
-
-9. Add SMS to Local Run Levels
-
-	chkconfig --list pvsd
-
-	sudo chkconfig --add pvsd
-
-	chkconfig --list pvsd
-
-	sudo chkconfig pvsd on
-
-	chkconfig --list pvsd
 
 DONE!!! :-D
 

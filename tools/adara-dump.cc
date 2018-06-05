@@ -53,6 +53,7 @@ public:
         bool rxPacket(const ADARA::BankedEventPkt &pkt);
         bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
         bool rxPacket(const ADARA::PixelMappingPkt &pkt);
+        bool rxPacket(const ADARA::PixelMappingAltPkt &pkt);
 
         using ADARA::POSIXParser::rxPacket;
 
@@ -145,6 +146,30 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 	}
 
 	dump_events(m_ev, m_nEvents, m_cycle);
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::PixelMappingAltPkt &pkt)
+{
+	if (!m_unmap.empty())
+		return false;
+
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+
+	while (len) {
+		uint32_t physical = p[0];
+		uint32_t count = p[1] & 0xffff;
+
+		p += 2;
+		len -= 8;
+
+		while (count--) {
+			m_unmap[*p++] = physical++;
+			len -= 4;
+		}
+	}
 
 	return false;
 }

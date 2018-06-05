@@ -63,7 +63,7 @@ StreamMonitor::StreamMonitor(
       m_stream_size(0), m_stream_rate(0), m_diagnostics(true),
       m_last_cycle(0), m_last_time(0), m_this_time(0),
       m_bnk_pkt_count(0), m_mon_pkt_count(0),
-      m_maxtof(a_maxtof), m_pixmap_processed(false),
+      m_maxtof(a_maxtof), m_pixbankmap_processed(false),
       m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT),
       m_in_prolog(false)
 #ifndef NO_DB
@@ -572,6 +572,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             // These packets shall always be processed
             case ADARA::PacketType::RUN_STATUS_TYPE:
             case ADARA::PacketType::PIXEL_MAPPING_TYPE:
+            case ADARA::PacketType::PIXEL_MAPPING_ALT_TYPE:
             case ADARA::PacketType::RUN_INFO_TYPE:
             case ADARA::PacketType::BEAMLINE_INFO_TYPE:
             case ADARA::PacketType::DEVICE_DESC_TYPE:
@@ -660,7 +661,7 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
-        m_pixmap_processed = false;
+        m_pixbankmap_processed = false;
         resetRunStats();
 
         m_notify.runStatus( true, m_run_num,
@@ -700,21 +701,22 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
 
 /**
- * \brief ADARA pixel mapping packet handler.
+ * \brief ADARA pixel mapping (alt) packet handler.
  */
 bool
-StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
+StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
 {
     m_proc_state = TS_PKT_PIXEL_MAPPING;
 
-    if ( !m_pixmap_processed )
+    if ( !m_pixbankmap_processed )
     {
-        const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-        const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+        const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+        const uint32_t *epos = (const uint32_t *)
+            ( a_pkt.mappingData() + a_pkt.payload_length()
+                - sizeof(uint32_t) );
         const uint32_t *epos2;
 
         uint32_t        pid;
-        uint32_t        min_pid = 0;
         uint32_t        max_pid = 0;
         bool            first_pid = true;
         uint16_t        bank_id;
@@ -722,10 +724,10 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
 
         m_bank_info.clear();
 
-        // Build banks and analyze pid range
-        while( rpos < epos )
+        // Build banks and analyze Logical pid range
+        while ( rpos < epos )
         {
-            rpos++; // Skip base ID
+            rpos++; // Skip Base Physical ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -739,30 +741,31 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
             epos2 = rpos + pix_count;
             while ( rpos < epos2 )
             {
+                // Logical PixelId...
                 pid = *rpos++;
+                if ( pid == (uint32_t) -1 )
+                    continue;
                 if ( first_pid )
                 {
-                    min_pid = max_pid = pid;
+                    max_pid = pid;
                     first_pid = false;
                 }
-                else
-                {
-                    if ( pid < min_pid )
-                        min_pid = pid;
-                    else if ( pid > max_pid )
-                        max_pid = pid;
-                }
+                else if ( pid > max_pid )
+                    max_pid = pid;
             }
         }
 
-        m_pixmap.clear();
-        m_pixmap.resize( max_pid + 1, -1 );
+        m_pixbankmap.clear();
+        m_pixbankmap.resize( max_pid + 1, -1 );
 
-        // Build pid-to-bank index
-        rpos = (const uint32_t*)a_pkt.payload();
-        while( rpos < epos )
+        syslog( LOG_ERR, "%s: Max Logical PixelId = %u",
+            "ADARA::PixelMappingAltPkt", max_pid );
+
+        // Build Logical-Pid-to-Bank Index
+        rpos = (const uint32_t *) a_pkt.mappingData();
+        while ( rpos < epos )
         {
-            rpos++; // Skip base ID
+            rpos++; // Skip Base Physical ID
             bank_id = (uint16_t)(*rpos >> 16);
             pix_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
@@ -770,11 +773,91 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
             epos2 = rpos + pix_count;
             while ( rpos < epos2 )
             {
-                // Store logical pixel IDs to bank ID
-                m_pixmap[*rpos++] = bank_id;
+                pid = *rpos++;
+                if ( pid == (uint32_t) -1 )
+                    continue;
+
+                // Store Bank ID to Logical PixelIds Map
+                m_pixbankmap[pid] = bank_id;
             }
         }
-        m_pixmap_processed = true;
+        m_pixbankmap_processed = true;
+    }
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA pixel mapping packet handler.
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_PIXEL_MAPPING;
+
+    if ( !m_pixbankmap_processed )
+    {
+        const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
+        const uint32_t *epos = (const uint32_t *)
+            ( a_pkt.mappingData() + a_pkt.payload_length() );
+        const uint32_t *epos2;
+
+        uint32_t        pid;
+        uint32_t        max_pid = 0;
+        bool            first_pid = true;
+        uint16_t        bank_id;
+        uint16_t        pix_count;
+
+        m_bank_info.clear();
+
+        // Build banks and analyze Logical pid range
+        while ( rpos < epos )
+        {
+            pid = *rpos++; // Base Logical ID
+            bank_id = (uint16_t)(*rpos >> 16);
+            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            rpos++;
+
+            // Save bank ID
+            // (Can be Overwritten in the case of
+            // Multiple Pixel Map Section sub-headers for a given Bank,
+            // but this is O.K., as BankInfo() is Just for Bookkeeping. :-)
+            m_bank_info[bank_id] = BankInfo(bank_id);
+
+            // Max Logical PixelId for This Section is Base + Count - 1...
+            pid += pix_count - 1;
+
+            if ( first_pid )
+            {
+                max_pid = pid;
+                first_pid = false;
+            }
+            else if ( pid > max_pid )
+                max_pid = pid;
+        }
+
+        m_pixbankmap.clear();
+        m_pixbankmap.resize( max_pid + 1, -1 );
+
+        // Build Logical-Pid-to-Bank Index
+        rpos = (const uint32_t *) a_pkt.mappingData();
+        while ( rpos < epos )
+        {
+            pid = *rpos++; // Base Logical ID
+            bank_id = (uint16_t)(*rpos >> 16);
+            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            rpos++;
+
+            epos2 = rpos + pix_count;
+            while ( rpos < epos2 )
+            {
+                // Store Bank ID to Logical PixelIds Map
+                m_pixbankmap[pid++] = bank_id;
+                rpos++;
+            }
+        }
+        m_pixbankmap_processed = true;
     }
 
     return false;
@@ -924,10 +1007,10 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
                     if ( tof > m_maxtof ) // in 100nsec units, compare to 2e8 usec
                         ++m_stream_metrics.m_pixel_invalid_tof;
 
-                    if ( pid >= m_pixmap.size() )
+                    if ( pid >= m_pixbankmap.size() )
                         pixbank = -1;
                     else
-                        pixbank = m_pixmap[pid];
+                        pixbank = m_pixbankmap[pid];
 
                     if ( pixbank < 0 )
                         ++m_stream_metrics.m_pixel_unknown_id;

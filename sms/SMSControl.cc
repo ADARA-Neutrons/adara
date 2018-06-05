@@ -61,6 +61,8 @@ std::string SMSControl::m_pixelMapPath;
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
 
+bool SMSControl::m_noRTDLPulses;
+
 uint64_t SMSControl::m_interPulseTimeChopGlitchMin;
 uint64_t SMSControl::m_interPulseTimeChopGlitchMax;
 
@@ -76,6 +78,8 @@ bool SMSControl::m_sendSampleInRunInfo;
 
 bool SMSControl::m_allowNonOneToOnePixelMapping;
 
+bool SMSControl::m_useOrigPixelMappingPkt;
+
 bool SMSControl::m_notesCommentAutoReset;
 
 class PopPulseBufferPV : public smsInt32PV {
@@ -83,7 +87,6 @@ public:
 	PopPulseBufferPV(const std::string &name) :
 		smsInt32PV(name) {}
 
-private:
 	void changed(void)
 	{
 		int32_t pop_state = value();
@@ -111,7 +114,6 @@ public:
 	CleanShutdownPV(const std::string &name) :
 		smsTriggerPV(name) {}
 
-private:
 	void triggered(void)
 	{
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
@@ -181,6 +183,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	INFO("Setting Max Pulse Buffer Size to "
 		<< m_maxPulseBufferSize << ".");
 
+	m_noRTDLPulses = conf.get<bool>("sms.no_rtdl_pulses", false);
+	INFO("Setting No RTDL Pulses to " << m_noRTDLPulses << ".");
+
 	m_doPulsePchgCorrect =
 			conf.get<bool>("sms.do_pulse_pcharge_correction", true);
 	INFO("Setting Do Pulse Proton Charge Correction to "
@@ -192,7 +197,7 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		<< m_doPulseVetoCorrect << ".");
 
 	m_sendSampleInRunInfo =
-			conf.get<bool>("sms.send_sample_in_run_info", true);
+			conf.get<bool>("sms.send_sample_in_run_info", false);
 	INFO("Setting Send Sample in Run Info to "
 		<< m_sendSampleInRunInfo << ".");
 
@@ -201,6 +206,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 				false);
 	INFO("Setting Allow Non-One-to-One Pixel Mapping to "
 		<< m_allowNonOneToOnePixelMapping << ".");
+
+	m_useOrigPixelMappingPkt =
+			conf.get<bool>("sms.use_orig_pixel_mapping_pkt", false);
+	INFO("Setting Use Original Pixel Mapping Packet to "
+		<< m_useOrigPixelMappingPkt << ".");
 
 	m_notesCommentAutoReset =
 			conf.get<bool>("sms.run_notes_auto_reset", true);
@@ -409,23 +419,32 @@ SMSControl::SMSControl() :
 
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
-							+ "NoEoPPulseBufferSize"));
+							+ "NoEoPPulseBufferSize", 0, INT32_MAX,
+						/* AutoSave */ true));
 
 	m_pvMaxPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
-							+ "MaxPulseBufferSize"));
+							+ "MaxPulseBufferSize", 0, INT32_MAX,
+						/* AutoSave */ true));
 
 	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
 						PopPulseBufferPV(prefix + ":Control:"
 							+ "PopPulseBuffer"));
 
+	m_pvNoRTDLPulses = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "NoRTDLPulses",
+						/* AutoSave */ true));
+
 	m_pvDoPulsePchgCorrect = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
-							+ "DoPulsePchgCorrect"));
+							+ "DoPulsePchgCorrect",
+						/* AutoSave */ true));
 
 	m_pvDoPulseVetoCorrect = boost::shared_ptr<smsBooleanPV>(new
 						smsBooleanPV(prefix + ":Control:"
-							+ "DoPulseVetoCorrect"));
+							+ "DoPulseVetoCorrect",
+						/* AutoSave */ true));
 
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
@@ -447,6 +466,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
+	addPV(m_pvNoRTDLPulses);
 	addPV(m_pvDoPulsePchgCorrect);
 	addPV(m_pvDoPulseVetoCorrect);
 	addPV(m_pvNumDataSources);
@@ -488,6 +508,9 @@ SMSControl::SMSControl() :
 	// Initialize Pop Pulse Buffer PV to Zero...
 	m_pvPopPulseBuffer->update(0, &now);
 
+	// Initialize No RTDL Pulses PV from Config Value...
+	m_pvNoRTDLPulses->update(m_noRTDLPulses, &now);
+
 	// Initialize Pulse Proton Charge Correction PV & InterPulse Time Range
 	uint64_t baseInterPulseTime = NANO_PER_SECOND_LL / CYCLE_FREQUENCY;
 	m_interPulseTimeChopGlitchMin = 90 * 2 * baseInterPulseTime / 100;
@@ -505,6 +528,43 @@ SMSControl::SMSControl() :
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
 
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	uint32_t uvalue;
+	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNoEoPPulseBufferSize->getName(), uvalue, ts ) ) {
+		m_noEoPPulseBufferSize = uvalue;
+		m_pvNoEoPPulseBufferSize->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMaxPulseBufferSize->getName(), uvalue, ts ) ) {
+		m_maxPulseBufferSize = uvalue;
+		m_pvMaxPulseBufferSize->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNoRTDLPulses->getName(), bvalue, ts ) ) {
+		m_noRTDLPulses = bvalue;
+		m_pvNoRTDLPulses->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvDoPulsePchgCorrect->getName(), bvalue, ts ) ) {
+		m_doPulsePchgCorrect = bvalue;
+		m_pvDoPulsePchgCorrect->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvDoPulseVetoCorrect->getName(), bvalue, ts ) ) {
+		m_doPulseVetoCorrect = bvalue;
+		m_pvDoPulseVetoCorrect->update(bvalue, &ts);
+	}
+
+	// Initialize Next Run Number...
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to Get Next Run Number");
@@ -515,7 +575,7 @@ SMSControl::SMSControl() :
 		m_sendSampleInRunInfo));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath,
-		m_allowNonOneToOnePixelMapping));
+		m_allowNonOneToOnePixelMapping, m_useOrigPixelMappingPkt));
 
 	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 
@@ -1098,7 +1158,7 @@ void SMSControl::setSummaryReason( bool setBase, bool changedValid,
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	m_pvSummary->update( m_summaryIsError, &now, major );
+	m_pvSummary->update( m_summaryIsError, major, &now );
 	m_pvSummaryReason->update( m_reason, &now );
 }
 
@@ -1467,8 +1527,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
+					2, 10, 200, log_info ) ) {
+				WARN(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Interleaved Global SAWTOOTH Pulse(0x"
 					<< std::hex << id << ", 0x" << dup << ")"
@@ -2518,11 +2578,15 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 
 void SMSControl::recordPulse(PulsePtr &pulse)
 {
+	static uint32_t cnt = 0;
+
 	/* Send the RTDL packet, followed by the banked event packet */
 
 	// XXX avoid sending the RTDL for a pulse twice (if duplicated)
 
 	try {
+
+		// Got RTDL... :-D
 		if (pulse->m_rtdl) {
 			/* Don't notify clients; we want to keep the banked
 			 * event packet with the RTDL packet.
@@ -2530,18 +2594,36 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						pulse->m_rtdl->packet_length(),
 						false);
-		} else {
-			/* Rate-limited logging of no RTDL for pulse */
-			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
-					RLL_NO_RTDL_FOR_PULSE, "none",
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
-					<< ( m_recording ? "[RECORDING] " : "" )
-					<< "recordPulse: NO RTDL for Pulse"
-					<< " id=0x" << std::hex << pulse->m_id.first
-					<< " dup=0x" << pulse->m_id.second << std::dec);
+		}
+
+		// NO RTDL for Pulse!
+		else {
+
+			// Only Check Live Control PV _Very Infrequently_...
+			//    - This Option is Not Likely to Ever Change... ;-D
+			//    - On HFIR, Where this is Needed, We Run at "1 HZ"...
+			//       -> so this should only check the PV once per hour...
+			//    - Otherwise, on SNS, this is like "once per minute"...
+			if ( !(++cnt % 3600) ) {
+				m_noRTDLPulses = m_pvNoRTDLPulses->value();
 			}
+
+			// Skip Error Logging if We Don't Expect Any RTDLs Anyway...
+			if ( !m_noRTDLPulses ) {
+				/* Rate-limited logging of no RTDL for pulse */
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
+						RLL_NO_RTDL_FOR_PULSE, "none",
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info
+						<< ( m_recording ? "[RECORDING] " : "" )
+						<< "recordPulse: NO RTDL for Pulse"
+						<< " id=0x" << std::hex << pulse->m_id.first
+						<< " dup=0x" << pulse->m_id.second << std::dec);
+				}
+			}
+
+			// Always Mark Pulse as Missing RTDL if it Doesn't Have One!
 			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
 		}
 

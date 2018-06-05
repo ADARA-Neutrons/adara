@@ -1,6 +1,9 @@
 
+#include <sstream>
+
 #include "EPICS.h"
 #include "DataSource.h"
+#include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
@@ -31,7 +34,7 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
  */
 #define uninitialized_var(x) x = 0
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 {
@@ -58,7 +61,7 @@ static gddAppFuncTableStatus getBooleanEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getEnabledEnums(gdd &in)
 {
@@ -84,7 +87,7 @@ static gddAppFuncTableStatus getEnabledEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getErrorEnums(gdd &in)
 {
@@ -110,7 +113,7 @@ static gddAppFuncTableStatus getErrorEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 {
@@ -142,7 +145,7 @@ static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsPV::smsPV() : m_interested(false)
 {
@@ -232,9 +235,18 @@ void smsPV::notify(void)
 	}
 }
 
+void smsPV::timestamp(struct timespec &ts)
+{
+    m_value->getTimeStamp(&ts);
+}
+
 void smsPV::destroy(void)
 {
 	/* PVs are pre-allocated; SMControl will clean us up */
+}
+
+void smsPV::changed(void)
+{
 }
 
 gddAppFuncTableStatus smsPV::getEnums(gdd &)
@@ -271,7 +283,7 @@ gddAppFuncTableStatus smsPV::maximumNumber(gdd &in)
 	return S_cas_success;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsReadOnlyChannel::smsReadOnlyChannel(const casCtx &cas) : casChannel(cas)
 {
@@ -282,16 +294,15 @@ bool smsReadOnlyChannel::writeAccess(void) const
 	return false;
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 {
-	struct timespec ts;
-
 	/* Default to not recording on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumUint32);
 	m_value->put(0);
 
+	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	m_value->setTimeStamp(&ts);
 
@@ -352,20 +363,24 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 	m_value = val;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+void smsRunNumberPV::changed(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
 
 smsRecordingPV::smsRecordingPV(const std::string &prefix,
 	SMSControl *ctrl) :
 		m_ctrl(ctrl)
 {
-	struct timespec ts;
-
 	/* Default to not recording on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->put(0);
 
+	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	m_value->setTimeStamp(&ts);
 
@@ -427,12 +442,17 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
-	if (m_ctrl->setRecording(v))
+	if (m_ctrl->setRecording(v)) {
+		notify();
+		changed();
 		return S_casApp_success;
+	}
 
 	/* don't cause disruption at the CA level just because the run 
 	 * couldn't start
 	 */
+	notify();
+	changed();
 	return S_casApp_success;
 }
 
@@ -455,14 +475,19 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 	m_value = val;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
-
-smsStringPV::smsStringPV(const std::string &name) : smsPV(name)
+void smsRecordingPV::changed(void)
 {
-	m_pv_name = name;
-	unset();
+}
+
+/* -------------------------------------------------------------------- */
+
+smsStringPV::smsStringPV(const std::string &name, bool auto_save)
+		: smsPV(name), m_first_set(true), m_auto_save(auto_save)
+{
+	unset( true );
 }
 
 unsigned int smsStringPV::maxDimension(void) const
@@ -586,9 +611,20 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		do_log = true;
 	}
 
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+
 	if ( !strcmp(new_str, old_str)
 			&& m_value->getStat() == epicsAlarmNone ) {
-		if ( do_log ) {
+		if ( m_first_set ) {
+			DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
+				<< " String Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(&ts);
+			m_first_set = false;
+			changed();
+		}
+		else if ( do_log ) {
 			DEBUG("smsStringPV::write() m_pv_name=" << m_pv_name
 				<< " String Value Did Not Change - Ignore...");
 		}
@@ -599,13 +635,14 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					MAX_LENGTH);
 	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 
-	struct timespec ts;
-	val.getTimeStamp(&ts);
 	nv->setTimeStamp(&ts);
 	nv->setStat(epicsAlarmNone);
 	nv->setSevr(epicsSevNone);
 
 	m_value = nv;
+
+	m_first_set = false;
+
 	notify();
 	changed();
 
@@ -619,12 +656,49 @@ bool smsStringPV::allowUpdate(const gdd &)
 
 void smsStringPV::update(const std::string str, struct timespec *ts)
 {
+	if ( str.size() == 0 ) {
+		DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+			<< " Setting to Empty String, Unset Value.");
+		unset( false, ts );
+		return;
+	}
+
 	/* We ensure we have room for MAX_LENGTH characters, plus a
 	 * trailing nul to make live easier when converting to a std::string.
 	 */
 	char *new_str = new char[MAX_LENGTH+1];
 	memset(new_str, 0, MAX_LENGTH+1);
 	memcpy(new_str, (void *)str.c_str(), str.length());
+
+	char *old_str = (char *) m_value->dataPointer();
+
+	if ( !strcmp(new_str, old_str)
+			&& m_value->getStat() == epicsAlarmNone ) {
+		if ( m_first_set ) {
+			DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+				<< " String Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+					<< " String Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, Call changed()...");
+				m_value->setTimeStamp(ts);
+				changed();
+			}
+			else {
+				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+					<< " String Value Did Not Change - Ignore...");
+			}
+		}
+		return;
+	}
 
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
@@ -638,29 +712,78 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 	 */
 	m_value = nv;
 
+	m_first_set = false;
+
 	notify();
+	changed();
 }
 
-void smsStringPV::unset(void)
+void smsStringPV::unset(bool init, struct timespec *ts)
 {
 	if (m_value.valid() && m_value->getStat() == epicsAlarmUDF)
 		return;
 
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
+	struct timespec new_ts;
+	if ( ts != NULL ) {
+		new_ts = *ts;
+	}
+	else {
+		clock_gettime(CLOCK_REALTIME, &new_ts);
+	}
 
 	char *new_str = new char[MAX_LENGTH+1];
 	memset(new_str, 0, MAX_LENGTH+1);
 	strcpy(new_str, "(unset)");
 
+	if ( !init )
+	{
+		char *old_str = (char *) m_value->dataPointer();
+
+		if ( !strcmp(new_str, old_str)
+				&& m_value->getStat() == epicsAlarmNone ) {
+			if ( m_first_set ) {
+				DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
+					<< " String Value Did Not Change, But First Setting"
+					<< " - Call changed()...");
+				m_value->setTimeStamp(ts);
+				m_first_set = false;
+				changed();
+			}
+			else {
+				struct timespec old_ts;
+				m_value->getTimeStamp(&old_ts);
+				if ( calcDiffSeconds( new_ts, old_ts ) < 0.0 ) {
+					DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
+						<< " String Value Did Not Change, But Time Earlier"
+						<< " - Likely AutoSave Recovery,"
+						<< " Call changed()...");
+					m_value->setTimeStamp(&new_ts);
+					changed();
+				}
+				else {
+					DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
+						<< " String Value Did Not Change - Ignore...");
+				}
+			}
+			return;
+		}
+	}
+	else {
+		DEBUG("smsStringPV::unset() Init m_pv_name=" << m_pv_name
+			<< " to value=[" << new_str << "]");
+	}
+
 	m_value = new gddAtomic(gddAppType_value, aitEnumUint8, 1, MAX_LENGTH);
 	m_value->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 	m_value->setStat(epicsAlarmUDF);
 	m_value->setSevr(epicsSevNone);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&new_ts);
 
 	unsigned int start, nelem;
 	m_value->getBound(0, start, nelem);
+
+	if ( !init )
+		m_first_set = false;
 
 	notify();
 	changed();
@@ -678,22 +801,29 @@ std::string smsStringPV::value(void)
 
 void smsStringPV::changed(void)
 {
+	if ( m_auto_save && !m_first_set )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		StorageManager::autoSavePV( m_pv_name, value(), &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
-smsBooleanPV::smsBooleanPV(const std::string &name) : smsPV(name)
+smsBooleanPV::smsBooleanPV(const std::string &name,
+		bool auto_save, bool no_changed_on_update)
+	: smsPV(name), m_first_set(true), m_auto_save(auto_save),
+	m_no_changed_on_update(no_changed_on_update)
 {
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsBooleanPV::bestExternalType(void) const
@@ -733,7 +863,6 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint16 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
-	struct timespec ts;
 
 	if (!val.isScalar()) {
 		ERROR("smsBooleanPV::write() m_pv_name=" << m_pv_name
@@ -753,13 +882,23 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
-	m_value->get(cur);
-	if (v == cur)
-		return S_casApp_success;
-
+	struct timespec ts;
 	val.getTimeStamp(&ts);
-	update(v, &ts);
-	changed();
+
+	m_value->get(cur);
+	if (v == cur) {
+		if ( m_first_set ) {
+			DEBUG("smsBooleanPV::write() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(&ts);
+			m_first_set = false;
+			changed();
+		}
+		return S_casApp_success;
+	}
+
+	update(v, &ts, true /* force_changed */);
 
 	return S_casApp_success;
 }
@@ -769,14 +908,47 @@ bool smsBooleanPV::allowUpdate(const gdd &)
 	return true;
 }
 
-void smsBooleanPV::update(bool val, struct timespec *ts)
+void smsBooleanPV::update(bool val, struct timespec *ts,
+		bool force_changed)
 {
 	aitUint16 uninitialized_var(v);
 	gdd *nval;
 
 	m_value->get(v);
-	if (v == val)
+	if (v == val) {
+		if ( m_first_set ) {
+			DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting - "
+				<< ( ( !m_no_changed_on_update || force_changed )
+					? "" : "*Don't* " )
+				<< "Call changed()..."
+				<< " (m_no_changed_on_update=" << m_no_changed_on_update
+				<< " force_changed=" << force_changed << ")");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			if ( !m_no_changed_on_update || force_changed )
+				changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, "
+					<< ( ( !m_no_changed_on_update || force_changed )
+						? "" : "*Don't* " )
+					<< "Call changed()..."
+					<< " (m_no_changed_on_update="
+						<< m_no_changed_on_update
+					<< " force_changed=" << force_changed << ")");
+				m_value->setTimeStamp(ts);
+				if ( !m_no_changed_on_update || force_changed )
+					changed();
+			}
+		}
 		return;
+	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
@@ -787,7 +959,14 @@ void smsBooleanPV::update(bool val, struct timespec *ts)
 	 */
 	m_value = nval;
 
+	m_first_set = false;
+
 	notify();
+
+	// _Conditionally_ Call "changed()" in "update()" for smsBooleanPV...
+	//    - needed _Not_ to call for "MarkerPausedPV" in SMS Markers Class
+	if ( !m_no_changed_on_update || force_changed )
+		changed();
 }
 
 bool smsBooleanPV::valid(void)
@@ -805,13 +984,25 @@ bool smsBooleanPV::value(void)
 
 void smsBooleanPV::changed(void)
 {
+	if ( m_auto_save && !m_first_set )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		bool bval = value();
+		// Use String Representation of Boolean for AutoSave File... :-D
+		std::string bvalstr = ( bval ) ? "true" : "false";
+		StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsEnabledPV::smsEnabledPV(const std::string &name,
-		DataSource *dataSource) :
-	smsBooleanPV(name), m_dataSource(dataSource) { }
+		DataSource *dataSource, bool auto_save) :
+	smsBooleanPV(name, auto_save), m_dataSource(dataSource)
+{
+}
 
 gddAppFuncTableStatus smsEnabledPV::getEnums(gdd &in)
 {
@@ -823,14 +1014,35 @@ aitEnum smsEnabledPV::bestExternalType(void) const
 	return aitEnumEnum16;
 }
 
-void smsEnabledPV::update(bool val, struct timespec *ts)
+void smsEnabledPV::update(bool val, struct timespec *ts,
+		bool UNUSED(force_changed))
 {
 	aitUint16 uninitialized_var(v);
 	gdd *nval;
 
 	m_value->get(v);
-	if (v == val)
+	if (v == val) {
+		if ( m_first_set ) {
+			DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, Call changed()...");
+				m_value->setTimeStamp(ts);
+				changed();
+			}
+		}
 		return;
+	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
@@ -848,17 +1060,24 @@ void smsEnabledPV::update(bool val, struct timespec *ts)
 	 */
 	m_value = nval;
 
+	m_first_set = false;
+
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
-smsErrorPV::smsErrorPV(const std::string &name) :
-						smsBooleanPV(name) { }
-
-gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
+smsErrorPV::smsErrorPV(const std::string &name)
+	: smsPV(name)
 {
-	return getErrorEnums(in);
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	/* Default all booleans (and derivatives) to false on startup */
+	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
 }
 
 aitEnum smsErrorPV::bestExternalType(void) const
@@ -866,28 +1085,107 @@ aitEnum smsErrorPV::bestExternalType(void) const
 	return aitEnumEnum16;
 }
 
+gddAppFuncTableStatus smsErrorPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsErrorPV::getEnums(gdd &in)
+{
+	return getErrorEnums(in);
+}
+
+caStatus smsErrorPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
+{
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsErrorPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	aitUint16 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+
+	if (!val.isScalar()) {
+		ERROR("smsErrorPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
+		return S_casApp_noSupport;
+	}
+
+	val.get(v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsErrorPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
+	if (v > 1)
+		return S_casApp_noSupport;
+
+	if (!allowUpdate(val)) {
+		/* We don't want to update the PV at this time; still
+		 * send a notification to any watchers, and just return
+		 * success.
+		 */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+				RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+			DEBUG(log_info
+				<< "smsErrorPV::write() m_pv_name=" << m_pv_name
+				<< " Updates Not Allowed, Ignore Value.");
+		}
+		notify();
+		return S_casApp_success;
+	}
+
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+
+	m_value->get(cur);
+	if (v == cur) {
+		return S_casApp_success;
+	}
+
+	update(v, val.getSevr(), &ts);
+
+	return S_casApp_success;
+}
+
+// No External Writes Allowed...!
+bool smsErrorPV::allowUpdate(const gdd &)
+{
+	return false;
+}
+
 void smsErrorPV::set() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
-	update(1, &ts);
+	update(1, true /* major */, &ts);
 }
 
 void smsErrorPV::reset() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
-	update(0, &ts);
+	update(0, false /* major */, &ts);
 }
 
-void smsErrorPV::update(bool val, struct timespec *ts)
-{
-	update(val, ts, true);
-}
-
-void smsErrorPV::update(bool val, struct timespec *ts, bool major)
+void smsErrorPV::update(bool val, bool major, struct timespec *ts)
 {
 	aitUint16 uninitialized_var(v);
 	gdd *nval;
@@ -914,22 +1212,37 @@ void smsErrorPV::update(bool val, struct timespec *ts, bool major)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
-/* ----------------------------------------------------------------------- */
+bool smsErrorPV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+bool smsErrorPV::value(void)
+{
+	aitUint16 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsErrorPV::changed(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
 
 smsConnectedPV::smsConnectedPV(const std::string &name) : smsPV(name)
 {
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsConnectedPV::bestExternalType(void) const
@@ -969,7 +1282,6 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint16 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
-	struct timespec ts;
 
 	if (!val.isScalar()) {
 		ERROR("smsConnectedPV::write() m_pv_name=" << m_pv_name
@@ -993,9 +1305,9 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v == cur)
 		return S_casApp_success;
 
+	struct timespec ts;
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1030,12 +1342,12 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 void smsConnectedPV::connected() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(0, &ts);
 
@@ -1051,7 +1363,6 @@ void smsConnectedPV::connected() {
 void smsConnectedPV::disconnected() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(1, &ts);
 
@@ -1067,7 +1378,6 @@ void smsConnectedPV::disconnected() {
 void smsConnectedPV::failed() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(2, &ts);
 
@@ -1083,7 +1393,6 @@ void smsConnectedPV::failed() {
 void smsConnectedPV::trying_to_connect() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(3, &ts);
 
@@ -1099,7 +1408,6 @@ void smsConnectedPV::trying_to_connect() {
 void smsConnectedPV::waiting_for_connect_ack() {
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 	update(4, &ts);
 
@@ -1130,10 +1438,11 @@ void smsConnectedPV::changed(void)
 {
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsUint32PV::smsUint32PV(const std::string &name,
-		uint32_t min, uint32_t max) : smsPV(name)
+		uint32_t min, uint32_t max, bool auto_save) :
+	smsPV(name), m_first_set(true), m_auto_save(auto_save)
 {
 	// Apply Min and Max Limits
 	m_min = min;
@@ -1142,14 +1451,11 @@ smsUint32PV::smsUint32PV(const std::string &name,
 	initReadTable();
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumUint32);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsUint32PV::bestExternalType(void) const
@@ -1250,7 +1556,6 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitUint32 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
-	struct timespec ts;
 
 	if (!val.isScalar()) {
 		DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
@@ -1267,13 +1572,23 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			<< " value=" << v);
 	}
 
-	m_value->get(cur);
-	if (v == cur)
-		return S_casApp_success;
-
+	struct timespec ts;
 	val.getTimeStamp(&ts);
+
+	m_value->get(cur);
+	if (v == cur) {
+		if ( m_first_set ) {
+			DEBUG("smsUint32PV::write() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(&ts);
+			m_first_set = false;
+			changed();
+		}
+		return S_casApp_success;
+	}
+
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1289,8 +1604,28 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 	gdd *nval;
 
 	m_value->get(v);
-	if (v == val)
+	if (v == val) {
+		if ( m_first_set ) {
+			DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, Call changed()...");
+				m_value->setTimeStamp(ts);
+				changed();
+			}
+		}
 		return;
+	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumUint32);
 	nval->put(val);
@@ -1301,7 +1636,10 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 	 */
 	m_value = nval;
 
+	m_first_set = false;
+
 	notify();
+	changed();
 }
 
 bool smsUint32PV::valid(void)
@@ -1319,21 +1657,27 @@ uint32_t smsUint32PV::value(void)
 
 void smsUint32PV::changed(void)
 {
+	if ( m_auto_save && !m_first_set )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsInt32PV::smsInt32PV(const std::string &name) : smsPV(name)
 {
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumInt32);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsInt32PV::bestExternalType(void) const
@@ -1368,7 +1712,6 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitInt32 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
-	struct timespec ts;
 
 	if (!val.isScalar()) {
 		DEBUG("smsInt32PV::write() m_pv_name=" << m_pv_name
@@ -1389,9 +1732,9 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v == cur)
 		return S_casApp_success;
 
+	struct timespec ts;
 	val.getTimeStamp(&ts);
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1420,6 +1763,7 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 	m_value = nval;
 
 	notify();
+	changed();
 }
 
 bool smsInt32PV::valid(void)
@@ -1439,20 +1783,19 @@ void smsInt32PV::changed(void)
 {
 }
 
-/* ----------------------------------------------------------------------- */
+/* -------------------------------------------------------------------- */
 
 smsTriggerPV::smsTriggerPV(const std::string &name)
 {
-	struct timespec ts;
+	m_pv_name = name;
 
+	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	/* We'll stay false except for briefly when someone sets us true */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsTriggerPV::bestExternalType(void) const
@@ -1518,9 +1861,10 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			casEventMask mask = cas->valueEventMask() |
 						cas->logEventMask();
 			smartGDDPointer edge;
-			struct timespec ts;
 
+			struct timespec ts;
 			val.getTimeStamp(&ts);
+
 			edge = new gddScalar(gddAppType_value, aitEnumEnum16);
 			edge->setTimeStamp(&ts);
 			edge->put(1);
@@ -1534,15 +1878,22 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			m_value->setTimeStamp(&ts);
 			postEvent(mask, *m_value);
 		}
+
+		changed();
 	}
 
 	return S_casApp_success;
 }
 
-/* ----------------------------------------------------------------------- */
+void smsTriggerPV::changed(void)
+{
+}
+
+/* -------------------------------------------------------------------- */
 
 smsFloat64PV::smsFloat64PV(const std::string &name,
-		double min, double max) : smsPV(name)
+		double min, double max, bool auto_save)
+	: smsPV(name), m_first_set(true), m_auto_save(auto_save)
 {
 	// Apply Min and Max Limits
 	m_min = min;
@@ -1551,14 +1902,11 @@ smsFloat64PV::smsFloat64PV(const std::string &name,
 	initReadTable();
 
 	struct timespec ts;
-
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumFloat64);
 	m_value->setTimeStamp(&ts);
 	m_value->put(0.0);
-
-	m_pv_name = name;
 }
 
 aitEnum smsFloat64PV::bestExternalType(void) const
@@ -1667,7 +2015,6 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 {
 	aitFloat64 uninitialized_var(v), uninitialized_var(cur);
 	smartGDDPointer nval;
-	struct timespec ts;
 
 	if (!val.isScalar()) {
 		DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
@@ -1684,13 +2031,24 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			<< " value=" << v);
 	}
 
-	m_value->get(cur);
-	if (v == cur)
-		return S_casApp_success;
-
+	struct timespec ts;
 	val.getTimeStamp(&ts);
+
+	m_value->get(cur);
+	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
+	if (v == cur) {
+		if ( m_first_set ) {
+			DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(&ts);
+			m_first_set = false;
+			changed();
+		}
+		return S_casApp_success;
+	}
+
 	update(v, &ts);
-	changed();
 
 	return S_casApp_success;
 }
@@ -1706,8 +2064,29 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	gdd *nval;
 
 	m_value->get(v);
-	if (v == val)
+	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
+	if (v == val) {
+		if ( m_first_set ) {
+			DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, Call changed()...");
+				m_value->setTimeStamp(ts);
+				changed();
+			}
+		}
 		return;
+	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumFloat64);
 	nval->put(val);
@@ -1718,7 +2097,10 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	 */
 	m_value = nval;
 
+	m_first_set = false;
+
 	notify();
+	changed();
 }
 
 bool smsFloat64PV::valid(void)
@@ -1736,5 +2118,14 @@ double smsFloat64PV::value(void)
 
 void smsFloat64PV::changed(void)
 {
+	if ( m_auto_save && !m_first_set )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << std::setprecision(17) << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 

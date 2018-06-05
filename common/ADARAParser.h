@@ -15,7 +15,7 @@ namespace ADARA {
 class Parser {
 public:
 	Parser(unsigned int inital_buffer_size = 1024 * 1024,
-	       unsigned int max_pkt_size = 8 * 1024 * 1024);
+	       unsigned int max_pkt_size = 48 * 1024 * 1024); // For PixelMap!
 
 	virtual ~Parser();
 
@@ -140,6 +140,7 @@ protected:
 	virtual bool rxPacket(const BankedEventPkt &pkt);
 	virtual bool rxPacket(const BeamMonitorPkt &pkt);
 	virtual bool rxPacket(const PixelMappingPkt &pkt);
+	virtual bool rxPacket(const PixelMappingAltPkt &pkt);
 	virtual bool rxPacket(const RunStatusPkt &pkt);
 	virtual bool rxPacket(const RunInfoPkt &pkt);
 	virtual bool rxPacket(const TransCompletePkt &pkt);
