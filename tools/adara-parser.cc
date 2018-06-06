@@ -185,6 +185,7 @@ public:
 
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
+	bool rxPacket(const ADARA::BankedEventStatePkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
 	bool rxPacket(const ADARA::PixelMappingPkt &pkt);
 	bool rxPacket(const ADARA::PixelMappingAltPkt &pkt);
@@ -364,7 +365,7 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 
 		while (len) {
 			if (len < 8) {
-				fprintf(stderr, "%s event packet too short\n",
+				fprintf(stderr, "%s Event packet too short\n",
 					is_mapped ? "Mapped" : "Raw");
 				return true;
 			}
@@ -434,25 +435,25 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 			pkt.pulseEnergy(), pkt.vetoFlags());
 		if (pkt.flags()) {
 			printf("    flags");
-			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
 				printf(" ERROR");
-			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
 				printf(" PARTIAL");
-			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			if (pkt.flags() & ADARA::PULSE_VETO)
 				printf(" VETO");
-			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			if (pkt.flags() & ADARA::MISSING_RTDL)
 				printf(" NO_RTDL");
-			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
 				printf(" MAPPING");
-			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
 				printf(" DUP_PULSE");
-			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
 				printf(" PCHG_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+			if (pkt.flags() & ADARA::GOT_METADATA)
 				printf(" GOT_METADATA");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
 				printf(" GOT_NEUTRONS");
 			printf("\n");
 		}
@@ -467,15 +468,16 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 	len -= 4 * sizeof(uint32_t);
 
 	while (len) {
+
 		if (len < 16) {
-			fprintf(stderr, "Banked event packet too short "
+			fprintf(stderr, "Banked Event packet too short "
 					"(source section header)\n");
 			return true;
 		}
 
 		if ( !m_terse || m_showEvents ) {
-			printf("    Source %08x intrapulse %luns "
-				"tofOffset %luns%s\n", p[0],
+			printf("    Source %08x nBanks %u intrapulse %luns "
+				"tofOffset %luns%s\n", p[0], p[3],
 				(uint64_t) p[1] * 100,
 				((uint64_t) p[2] & 0x7fffffff) * 100,
 				(p[2] & 0x80000000) ? "" : " (raw)");
@@ -486,8 +488,9 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 		len -= 16;
 
 		for (uint32_t i = 0; i < nBanks; i++) {
+
 			if (len < 8) {
-				fprintf(stderr, "Banked event packet "
+				fprintf(stderr, "Banked Event packet "
 					"too short (bank section "
 					"header)\n");
 				return true;
@@ -500,6 +503,115 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 			nEvents = p[1];
 			p += 2;
 			len -= 8;
+
+			if (len < (nEvents * 2 * sizeof(uint32_t))) {
+				fprintf(stderr, "Banked Event packet "
+					"too short (events)\n");
+				return true;
+			}
+
+			if ( m_showEvents ) {
+				for (uint32_t j = 0; j < nEvents; j++) {
+					printf("\t  %u: %08x %08x"
+						"    (%0.7f seconds)\n",
+						j, p[0], p[1],
+						1e-9 * 100 * p[0]);
+					p += 2;
+					len -= 8;
+				}
+			}
+			else {
+				p += 2 * nEvents;
+				len -= 8 * nEvents;
+			}
+		}
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
+{
+	if ( !m_terse || m_showEvents ) {
+		printf("%u.%09u BANKED EVENT STATE DATA (0x%x,v%u) [%u bytes]\n"
+			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+			pkt.pulseEnergy(), pkt.vetoFlags());
+		if (pkt.flags()) {
+			printf("    flags");
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
+				printf(" ERROR");
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
+				printf(" PARTIAL");
+			if (pkt.flags() & ADARA::PULSE_VETO)
+				printf(" VETO");
+			if (pkt.flags() & ADARA::MISSING_RTDL)
+				printf(" NO_RTDL");
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
+				printf(" MAPPING");
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
+				printf(" DUP_PULSE");
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
+				printf(" PCHG_UNCOR");
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
+				printf(" VETO_UNCOR");
+			if (pkt.flags() & ADARA::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
+			if (pkt.flags() & ADARA::HAS_STATES)
+				printf(" HAS_STATES");
+			printf("\n");
+		}
+	}
+
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+	uint32_t nBanks, nEvents;
+
+	/* Skip the header we handled above */
+	p += 4;
+	len -= 4 * sizeof(uint32_t);
+
+	while (len) {
+
+		if (len < 16) {
+			fprintf(stderr, "Banked Event State packet too short "
+					"(source section header)\n");
+			return true;
+		}
+
+		if ( !m_terse || m_showEvents ) {
+			printf("    Source %08x nBanks %u intrapulse %luns "
+				"tofOffset %luns%s\n", p[0], p[3],
+				(uint64_t) p[1] * 100,
+				((uint64_t) p[2] & 0x7fffffff) * 100,
+				(p[2] & 0x80000000) ? "" : " (raw)");
+		}
+
+		nBanks = p[3];
+		p += 4;
+		len -= 16;
+
+		for (uint32_t i = 0; i < nBanks; i++) {
+
+			if (len < 12) {
+				fprintf(stderr, "Banked event packet "
+					"too short (bank section "
+					"header)\n");
+				return true;
+			}
+
+			if ( !m_terse || m_showEvents ) {
+				printf("\tBank 0x%x State 0x%x (%u events)\n",
+					p[0], p[1], p[2]);
+			}
+
+			nEvents = p[2];
+			p += 3;
+			len -= 12;
 
 			if (len < (nEvents * 2 * sizeof(uint32_t))) {
 				fprintf(stderr, "Banked event packet "
@@ -538,25 +650,25 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 			pkt.pulseEnergy(), pkt.vetoFlags());
 		if (pkt.flags()) {
 			printf("    flags");
-			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
 				printf(" ERROR");
-			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
 				printf(" PARTIAL");
-			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			if (pkt.flags() & ADARA::PULSE_VETO)
 				printf(" VETO");
-			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			if (pkt.flags() & ADARA::MISSING_RTDL)
 				printf(" NO_RTDL");
-			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
 				printf(" MAPPING");
-			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
 				printf(" DUP_PULSE");
-			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
 				printf(" PCHG_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+			if (pkt.flags() & ADARA::GOT_METADATA)
 				printf(" GOT_METADATA");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
 				printf(" GOT_NEUTRONS");
 			printf("\n");
 		}

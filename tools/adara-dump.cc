@@ -51,6 +51,7 @@ public:
 	}
 
         bool rxPacket(const ADARA::BankedEventPkt &pkt);
+        bool rxPacket(const ADARA::BankedEventStatePkt &pkt);
         bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
         bool rxPacket(const ADARA::PixelMappingPkt &pkt);
         bool rxPacket(const ADARA::PixelMappingAltPkt &pkt);
@@ -124,6 +125,59 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 			nEvents = p[1];
 			p += 2;
 			len -= 8;
+
+			for (uint32_t j = 0; j < nEvents; ev++, j++) {
+				ev->tof = p[0];
+				if (bank == 0xffffffff) {
+					/* Wasn't mapped */
+					ev->pixel = p[1] & ~(1U << 31);
+				} else if (bank == 0xfffffffe) {
+					/* Had an error */
+					ev->pixel = 0x80000000 | p[1];
+				} else {
+					/* Need to undo the mapping applied */
+					ev->pixel = m_unmap[p[1]];
+				}
+				p += 2;
+				len -= 8;
+			}
+
+			m_nEvents += nEvents;
+		}
+	}
+
+	dump_events(m_ev, m_nEvents, m_cycle);
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
+{
+	if (!m_hadMonitors) {
+		fprintf(stderr, "Missing monitors...\n");
+		m_nEvents = 0;
+		m_cycle = 999;
+	}
+
+	struct pevent *ev = m_ev + m_nEvents;
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+	uint32_t nBanks, nEvents, bank;
+
+	p += 4;
+	len -= 4 * sizeof(uint32_t);
+
+	while (len) {
+		nBanks = p[3];
+		p += 4;
+		len -= 16;
+
+		for (uint32_t i = 0; i < nBanks; i++) {
+			bank = p[0];
+			// state = p[1];
+			nEvents = p[2];
+			p += 3;
+			len -= 12;
 
 			for (uint32_t j = 0; j < nEvents; ev++, j++) {
 				ev->tof = p[0];
