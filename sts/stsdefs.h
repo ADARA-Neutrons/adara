@@ -10,7 +10,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.9.2"
+#define STS_VERSION "1.10.0"
 extern pid_t g_pid;
 
 #define STS_DOUBLE_EPSILON (0.00000000000001)
@@ -59,11 +59,13 @@ public:
     BankInfo
     (
         uint16_t a_id,              ///< [in] ID of detector bank
+        uint32_t a_state,           ///< [in] State of detector bank
         uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
         uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
     )
     :
         m_id(a_id),
+        m_state(a_state),
         m_buf_reserve(a_buf_reserve),
         m_idx_buf_reserve(a_idx_buf_reserve),
         m_initialized(false),
@@ -98,15 +100,18 @@ public:
             // Histo-based Detector Bank
             if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
             {
-                // Only Room for *One* Histogram per Detector Bank (for now)
+                // Only Room for *One* Histogram per Detector Bank
+                // (for now)
                 if ( m_has_histo )
                 {
                     syslog( LOG_ERR,
-                    "[%i] %s %s %u %s! Ignoring %s %s (%u to %u by %u).",
+                    "[%i] %s %s %u %s %u %s! %s %s %s (%u to %u by %u).",
                         g_pid, "STS Error:", "Detector Bank", m_id,
-                        "Duplicate Histogram Request",
+                        "State", m_state,
+                        "Duplicate Histogram Request", "Ignoring",
                         (*dbs)->name.c_str(), "Bank Set",
-                        (*dbs)->tofOffset, (*dbs)->tofMax, (*dbs)->tofBin );
+                        (*dbs)->tofOffset,
+                        (*dbs)->tofMax, (*dbs)->tofBin );
                     usleep(30000); // give syslog a chance...
                 }
 
@@ -120,9 +125,10 @@ public:
                     {
                         // Better Alert Someone... (this shouldn't happen)
                         syslog( LOG_ERR,
-                       "[%i] %s %s %u %s! Ignoring %s %s (%u to %u by %u).",
+                      "[%i] %s %s %u %s %u %s! %s %s %s (%u to %u by %u).",
                             g_pid, "STS Error:", "Detector Bank", m_id,
-                            "No PixelIds for Histogram",
+                            "State", m_state,
+                            "No PixelIds for Histogram", "Ignoring",
                             (*dbs)->name.c_str(), "Bank Set",
                             (*dbs)->tofOffset, (*dbs)->tofMax,
                             (*dbs)->tofBin );
@@ -145,8 +151,10 @@ public:
                         m_tof_bin_size = (*dbs)->tofMax / 2;
 
                         syslog( LOG_ERR,
-                            "[%i] %s %u %s: Setting %s to %u, %s to %u",
-                            g_pid, "Detector Bank", m_id, "Empty Histogram",
+                            "[%i] %s %u %s %u %s: %s %s to %u, %s to %u",
+                            g_pid, "Detector Bank", m_id,
+                            "State", m_state,
+                            "Empty Histogram", "Setting",
                             "num_tof_bins", m_num_tof_bins,
                             "tof_bin_size", m_tof_bin_size);
                         usleep(30000); // give syslog a chance...
@@ -172,9 +180,11 @@ public:
                         if ( m_num_tof_bins < 2 )
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s %s %u %s: num_tof_bins=%u < 2!",
+                                "[%i] %s %s %u %s %u %s: %s=%u < 2!",
                                 g_pid, "STS Error:", "Detector Bank", m_id,
-                                "Histogram Warning", m_num_tof_bins);
+                                "State", m_state,
+                                "Histogram Warning",
+                                "num_tof_bins", m_num_tof_bins);
                             usleep(30000); // give syslog a chance...
                             m_num_tof_bins = 2;
                         }
@@ -184,8 +194,10 @@ public:
                     }
 
                     // syslog( LOG_ERR,
-                        // "[%i] %s %u Histogram: %s=%u %s=%u %s=%u (%u)",
+                        // "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%u (%u)",
                         // g_pid, "Detector Bank", m_id,
+                        // "State", m_state,
+                        // "Histogram",
                         // "num_tof_bins", m_num_tof_bins,
                         // "tof_bin_size", m_tof_bin_size,
                         // "num_pids", num_pids,
@@ -200,10 +212,13 @@ public:
                     m_tofbin_buffer.reserve(m_num_tof_bins);
 
                     syslog( LOG_INFO,
-                        "[%i] %s %u Histogram: %u %s, %u to %u by %u",
-                        g_pid, "Detector Bank", m_id, m_num_tof_bins,
+                        "[%i] %s %u %s %u %s: %u %s, %u to %u by %u",
+                        g_pid, "Detector Bank", m_id,
+                        "State", m_state, "Histogram",
+                        m_num_tof_bins,
                         "Time Bin Values",
-                        (*dbs)->tofOffset, (*dbs)->tofMax, m_tof_bin_size );
+                        (*dbs)->tofOffset,
+                        (*dbs)->tofMax, m_tof_bin_size );
                     usleep(30000); // give syslog a chance...
 
                     uint32_t tofbin = (*dbs)->tofOffset;
@@ -225,11 +240,13 @@ public:
                             num_pids * ( m_num_tof_bins - 1 ) )
                     {
                         syslog( LOG_ERR,
-                            "[%i] %s %s %u %s: %s %s.size()=%lu vs. %s %u",
+                      "[%i] %s %s %u %s %u %s: %s %s.size()=%lu vs. %s %u",
                             g_pid, "STS Error:", "Detector Bank", m_id,
+                            "State", m_state,
                             "Histogram", "Verifying",
                             "m_data_buffer", m_data_buffer.size(),
-                            "expected", num_pids * ( m_num_tof_bins - 1 ) );
+                            "expected",
+                            num_pids * ( m_num_tof_bins - 1 ) );
                         usleep(30000); // give syslog a chance...
                     }
 
@@ -256,8 +273,9 @@ public:
                     size_t offset_size = maxPid - minPid + 1;
 
                     syslog( LOG_ERR,
-                        "[%i] %s %u Histogram: %s=%u %s=%u %s=%lu (%u)",
+                        "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%lu (%u)",
                         g_pid, "Detector Bank", m_id,
+                        "State", m_state, "Histogram",
                         "minPid", minPid, "maxPid", maxPid,
                         "offset_size", offset_size,
                         num_pids * ( m_num_tof_bins - 1 ) );
@@ -270,8 +288,9 @@ public:
                         m_histo_pid_offset.push_back( -1 );
 
                     // syslog( LOG_ERR,
-                        // "[%i] %s %u Histogram: Filling in Offsets...",
-                        // g_pid, "Detector Bank", m_id );
+                        // "[%i] %s %u %s %u %s: Filling in Offsets...",
+                        // g_pid, "Detector Bank", m_id,
+                        // "State", m_state, "Histogram" );
                     // usleep(30000); // give syslog a chance...
 
                     // Fill In Offsets per PixelId...
@@ -289,8 +308,9 @@ public:
                                 offset++ * ( m_num_tof_bins - 1 );
 
                             // syslog( LOG_ERR,
-                            // "[%i] %s %u Histogram: p=%u offset[%lu]=%d",
+                            // "[%i] %s %u %s %u %s: p=%u offset[%lu]=%d",
                                 // g_pid, "Detector Bank", m_id,
+                                // "State", m_state, "Histogram",
                                 // p, index, m_histo_pid_offset[ index ] );
                             // give sleep a chance...
                             // usleep(10000);
@@ -300,8 +320,9 @@ public:
                         else
                         {
                             syslog( LOG_INFO,
-                                "[%i] %s: %s %u has %s %lu - Ignoring!",
+                             "[%i] %s: %s %u %s %u has %s %lu - Ignoring!",
                                 g_pid, "STS Error", "Detector Bank", m_id,
+                                "State", m_state,
                                 "Duplicate PixelId in Histo Offset Map",
                                 index );
                             usleep(30000); // give syslog a chance...
@@ -312,8 +333,9 @@ public:
                     }
 
                     syslog( LOG_ERR,
-                        "[%i] %s %u Done with Histogram Init.",
-                        g_pid, "Detector Bank", m_id );
+                        "[%i] %s %u %s %u Done with Histogram Init.",
+                        g_pid, "Detector Bank", m_id,
+                        "State", m_state );
                     usleep(30000); // give syslog a chance...
 
                     // Got One, That's All We'll Ever Need... ;-D
@@ -353,6 +375,7 @@ public:
     }
 
     uint32_t                m_id;                   ///< ID of detector bank
+    uint32_t                m_state;                ///< State of detector bank
     std::vector<uint32_t>   m_logical_pixelids;     ///< Logical PixelIds in detector bank
     uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
     uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
@@ -997,7 +1020,7 @@ public:
                                 uint32_t a_enum_index,
                                 const std::string &a_units,
                                 bool a_ignore ) = 0;
-    virtual BankInfo*       makeBankInfo( uint16_t a_id,
+    virtual BankInfo*       makeBankInfo( uint16_t a_id, uint32_t a_state,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve ) = 0;
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,

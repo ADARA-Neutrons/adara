@@ -38,19 +38,34 @@ private:
         NxBankInfo
         (
             uint16_t a_id,              ///< [in] ID of detector bank
+            uint16_t a_state,           ///< [in] State of detector bank
             uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve, ///< [in] Index buffer initial capacity
             NxGen &a_nxgen              ///< [in] Parent NxGen instance
         )
         :
-            BankInfo(a_id, a_buf_reserve, a_idx_buf_reserve),
+            BankInfo(a_id, a_state, a_buf_reserve, a_idx_buf_reserve),
             m_nexus_init(false),
             m_event_cur_size(0),
             m_index_cur_size(0),
             m_nxgen(a_nxgen)
         {
-            m_name = std::string("bank")
-                + boost::lexical_cast<std::string>(a_id);
+            if ( a_id == (uint16_t) UNMAPPED_BANK ) {
+                m_name = std::string("bank_unmapped");
+            }
+            else if ( a_id == (uint16_t) ERROR_BANK ) {
+                m_name = std::string("bank_error");
+            }
+            else if ( a_state != 0 ) {
+                m_name = std::string("bank")
+                    + boost::lexical_cast<std::string>(a_id)
+                    + std::string("_state")
+                    + boost::lexical_cast<std::string>(a_state);
+            }
+            else {
+                m_name = std::string("bank")
+                    + boost::lexical_cast<std::string>(a_id);
+            }
 
             // Entry Instrument Path
 
@@ -2095,7 +2110,7 @@ protected:
                             uint32_t a_enum_index,
                             const std::string &a_units,
                             bool a_ignore );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id,
+    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint32_t a_state,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
     void                initializeNxBank( NxBankInfo *a_bi,

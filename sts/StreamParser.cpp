@@ -88,10 +88,10 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open() )
         m_ofs_adara.close();
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi ) {
-        if ( *ibi )
-            delete *ibi;
+        if ( ibi->second )
+            delete ibi->second;
     }
 
     for ( vector<STS::DetectorBankSet *>::iterator dbs =
@@ -363,6 +363,7 @@ StreamParser::rxPacket
 
         // These packets shall only be processed during event processing
         case ADARA::PacketType::BANKED_EVENT_TYPE:
+        case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
         case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             PROCESS_IN_STATES(PROCESSING_EVENTS)
 
@@ -484,6 +485,10 @@ StreamParser::rxPacket
     const ADARA::PixelMappingAltPkt &a_pkt     ///< [in] ADARA PixelMappingAltPkt object to process
 )
 {
+    BankInfoMap::iterator isi;
+
+    BankIndex bsindex;
+
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
         ( a_pkt.mappingData() + a_pkt.payload_length()
@@ -505,8 +510,6 @@ StreamParser::rxPacket
     // reserve bank container storage
 
     uint16_t bank_count = (uint16_t) a_pkt.numBanks();
-
-    m_banks.resize( bank_count + 1, 0 );
 
     syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
         "PixelMappingAltPkt", bank_count );
@@ -547,24 +550,31 @@ StreamParser::rxPacket
             continue;
         }
 
+        // For Initial Creation of BankInfo Map, Just Do All as State=0...
+        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+
+        isi = m_banks.find( bsindex );
+
         // Create New BankInfo...
-        if ( !m_banks[bank_id] )
+        if ( isi == m_banks.end() )
         {
             // Create BankInfo Instance
-            m_banks[bank_id] = makeBankInfo( bank_id,
+            BankInfo *bi = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
-            m_banks[bank_id]->m_bank_sets =
+            bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         const uint32_t *epos2 = rpos + pix_count;
         tot_pix_count += pix_count;
         while ( rpos < epos2 ) {
-            m_banks[bank_id]->m_logical_pixelids.push_back(*rpos++);
+            isi->second->m_logical_pixelids.push_back(*rpos++);
         }
 
         section_count++;
@@ -574,10 +584,50 @@ StreamParser::rxPacket
             // g_pid, "PixelMappingAltPkt", "Done with Section",
             // "bank_id", bank_id, "base_physical", base_physical,
             // "Last Logical PixelId",
-            // m_banks[bank_id]->m_logical_pixelids.back(),
-            // pix_count, m_banks[bank_id]->m_logical_pixelids.size() );
+            // isi->second->m_logical_pixelids.back(),
+            // pix_count, isi->second->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
     }
+
+    // Also Add Unmapped and Error BankInfo to Map, as State=0...
+
+    // Unmapped BankInfo
+
+    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Unmapped Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Error BankInfo
+
+    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Error Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Done
 
     syslog( LOG_INFO,
         "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
@@ -653,8 +703,6 @@ StreamParser::rxPacket
         rpos2 += pix_count;
     }
 
-    m_banks.resize( bank_count + 1, 0 );
-
     syslog( LOG_INFO,
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
     usleep(30000); // give syslog a chance...
@@ -675,30 +723,37 @@ StreamParser::rxPacket
             continue;
         }
 
+        // For Initial Creation of BankInfo Map, Just Do All as State=0...
+        BankIndex bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+
+        BankInfoMap::iterator isi = m_banks.find( bsindex );
+
         // Create New BankInfo...
-        if ( !m_banks[bank_id] )
+        if ( isi == m_banks.end() )
         {
             // Create BankInfo Instance
-            m_banks[bank_id] = makeBankInfo( bank_id,
+            BankInfo *bi = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
-            m_banks[bank_id]->m_bank_sets =
+            bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         for (uint32_t i=0 ; i < pix_count ; ++i)
         {
-            m_banks[bank_id]->m_logical_pixelids.push_back(
+            isi->second->m_logical_pixelids.push_back(
                 base_logical + i );
         }
 
         // syslog( LOG_INFO,
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
-            // m_banks[bank_id]->m_logical_pixelids.size() );
+            // isi->second->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
 
         // Next Section
@@ -725,8 +780,10 @@ StreamParser::rxPacket
 /*! \brief This method processes Banked Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by this method with the
- * pulse data attached to the received Banked Event packet. The payload of the Banked Event packet is parsed for neutron
+ * This method processes ADARA Banked Event packets.
+ * The processPulseInfo() method is called by this method with the
+ * pulse data attached to the received Banked Event packet.
+ * The payload of the Banked Event packet is parsed for neutron
  * events which are then handled by the processBankEvents() method.
  */
 bool
@@ -736,7 +793,7 @@ StreamParser::rxPacket
 )
 {
     // Ignore duplicate pulses
-    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
     {
         // Log Duplicate Pulse if it had Any Events...!
         uint32_t nbytes = a_pkt.payload_length() - 16;
@@ -808,7 +865,110 @@ StreamParser::rxPacket
         {
             bank_id = *rpos++;
             event_count = *rpos++;
-            processBankEvents( bank_id, event_count, rpos );
+            processBankEvents( bank_id, /* state */ 0, event_count, rpos );
+            rpos += event_count << 1;
+        }
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Banked Event State packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+/*! \brief This method processes Banked Event State ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Banked Event State packets.
+ * The processPulseInfo() method is called by this method with the
+ * pulse data attached to the received Banked Event State packet.
+ * The payload of the Banked Event State packet is parsed for neutron
+ * events which are then handled by the processBankEvents() method.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::BankedEventStatePkt &a_pkt     ///< [in] ADARA BankedEventStatePkt object to process
+)
+{
+    // Ignore duplicate pulses
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
+    {
+        // Log Duplicate Pulse if it had Any Events...!
+        uint32_t nbytes = a_pkt.payload_length() - 16;
+        if ( nbytes > 16 ) // appears to be minimal "empty"-ish packet...
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u.%09u with Events (%u %s) in %s - Ignoring!",
+                g_pid, "STS Error:", "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventStatePkt" );
+            usleep(30000); // give syslog a chance...
+        }
+        // Else Just Note the Dropped Duplicate Pulse
+        // (if for no other reason than diagnostics and testing :-)
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] %s %u.%09u (%u %s) in %s - Ignoring!",
+                g_pid, "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventStatePkt" );
+            usleep(30000); // give syslog a chance...
+        }
+        return false;
+    }
+
+    // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
+    // any other value indicates an error with SMS packet generation
+
+    if ( m_pulse_flag == 0 )
+    {
+        // First packet of new pulse - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag |= 1;
+    }
+    else if ( m_pulse_flag == 2 )
+        m_pulse_flag = 0;
+    else
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid banked event state packet sequence received" )
+
+
+    processPulseInfo( a_pkt );
+
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+
+    rpos += 4; // Skip over pulse info
+
+    uint32_t source_id;
+    uint32_t bank_count;
+    uint32_t bank_id;
+    uint32_t state;
+    uint32_t event_count;
+
+    // Process banks per-source
+    while ( rpos < epos )
+    {
+        source_id = *rpos++;
+        rpos += 2; // TODO For now, skip over source-specific pulse info. Should eventually process this data
+        bank_count = *rpos++;
+
+        // Process events per-bank
+        while( bank_count-- )
+        {
+            bank_id = *rpos++;
+            state = *rpos++;
+            event_count = *rpos++;
+            processBankEvents( bank_id, state, event_count, rpos );
             rpos += event_count << 1;
         }
     }
@@ -855,6 +1015,8 @@ StreamParser::rxOversizePkt
 
         if ( hdr->base_type() == ADARA::PacketType::BANKED_EVENT_TYPE
                 || hdr->base_type()
+                    == ADARA::PacketType::BANKED_EVENT_STATE_TYPE
+                || hdr->base_type()
                     == ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
         {
             // Pulse flag should be 0 (no data processed yet) or 2 (monitor
@@ -867,7 +1029,9 @@ StreamParser::rxOversizePkt
                 // indicating it was counted
                 ++m_pulse_count;
                 if ( hdr->base_type()
-                        == ADARA::PacketType::BANKED_EVENT_TYPE )
+                        == ADARA::PacketType::BANKED_EVENT_TYPE
+                    || hdr->base_type()
+                        == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
                 {
                     m_pulse_flag |= 1;
                 }
@@ -877,8 +1041,10 @@ StreamParser::rxOversizePkt
                     m_pulse_flag |= 2;
                 }
             }
-            else if ( ( hdr->base_type()
+            else if ( ( ( hdr->base_type()
                             == ADARA::PacketType::BANKED_EVENT_TYPE
+                        || hdr->base_type()
+                            == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
                         && m_pulse_flag == 2 )
                     || ( hdr->base_type() ==
                             ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE
@@ -887,7 +1053,9 @@ StreamParser::rxOversizePkt
                 m_pulse_flag = 0;
             }
             else if ( hdr->base_type()
-                    == ADARA::PacketType::BANKED_EVENT_TYPE )
+                    == ADARA::PacketType::BANKED_EVENT_TYPE
+                || hdr->base_type()
+                    == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid banked event packet sequence received" )
@@ -986,6 +1154,78 @@ StreamParser::processPulseInfo
 }
 
 
+/*! \brief This method processes the neutron pulse data associated with a Banked Event State packet.
+ *
+ * This method accumulates pulse charge, time, and frequency data associated with a Banked Event State packet (the same but different from the Banked Event packet ;-D). The various
+ * data are collected in ancillary buffers until ready to be flushed to a subclassed stream adapter via the
+ * pulseBuffersReady() virtual method.
+ */
+void
+StreamParser::processPulseInfo
+(
+    const ADARA::BankedEventStatePkt &a_pkt      ///< [in] ADARA BankedEventStatePkt object to process
+)
+{
+    // accumulate pulse charge
+    double charge = a_pkt.pulseCharge()*10.0; // ADARA charge is in units of 10 pC
+    m_run_metrics.total_charge += charge;
+    m_pulse_info.charges.push_back( charge );
+    m_run_metrics.charge_stats.push( charge );
+
+    // Accumulate flags
+    m_pulse_info.flags.push_back( a_pkt.flags() );
+
+    // Handle time and frequency info
+    if ( m_pulse_info.start_time )
+    {
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
+
+        // It is (or should be) considered a fatal error if
+        // pulse times are not monotonically increasing
+        if ( pulse_time < m_pulse_info.start_time )
+        {
+            syslog( LOG_INFO,
+                "[%i] Unexpected input: %s at pulse #%ld ID=0x%lx, %s.",
+                g_pid, "Pulse time went backwards",
+                m_pulse_info.times.size(), a_pkt.pulseId(),
+                "Clamping to zero" );
+            usleep(30000); // give syslog a chance...
+            pulse_time = 0;
+        }
+        else
+            pulse_time -= m_pulse_info.start_time;
+
+        m_pulse_info.times.push_back( pulse_time / NANO_PER_SECOND_D );
+        m_pulse_info.freqs.push_back( NANO_PER_SECOND_D
+            / ( pulse_time - m_pulse_info.last_time ) );
+        m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
+        m_pulse_info.last_time = pulse_time;
+    }
+    else
+    {
+        m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
+        m_pulse_info.last_time = 0;
+        m_pulse_info.times.push_back(0);
+        m_pulse_info.freqs.push_back(0);
+        // Freq stats ignores first point since it can't be calculated
+
+        // Run "start time" is defined as time of first pulse
+        m_run_metrics.start_time = a_pkt.timestamp();
+    }
+
+    // Is is time to write pulse info?
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    {
+        pulseBuffersReady( m_pulse_info );
+
+        m_pulse_info.times.clear();
+        m_pulse_info.freqs.clear();
+        m_pulse_info.flags.clear();
+        m_pulse_info.charges.clear();
+    }
+}
+
+
 /*! \brief This method processes the neutron events for a specific detector bank.
  *
  * This method processes incoming neutron events for a specified detector
@@ -1001,14 +1241,74 @@ void
 StreamParser::processBankEvents
 (
     uint32_t        a_bank_id,        ///< [in] Bank ID of detector bank to be processed
+    uint32_t        a_state,          ///< [in] State of detector bank to be processed
     uint32_t        a_event_count,    ///< [in] Number of events contained in stream buffer
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
+    BankIndex bsindex = std::make_pair( a_bank_id, a_state );
+
+    BankInfoMap::iterator isi = m_banks.find( bsindex );
+
+    // No BankInfo for This Detector Bank ID/State Yet...?
+    if ( isi == m_banks.end() ) {
+
+        syslog( LOG_ERR,
+            "[%i] %s: No BankInfo Found for bank_id=%u state=%u",
+            g_pid, "StreamParser::processBankEvents()",
+            a_bank_id, a_state );
+        usleep(30000); // give syslog a chance...
+
+        // Search for the State=0 BankInfo...
+
+        BankIndex bsindex0 = std::make_pair( a_bank_id, 0 );
+
+        BankInfoMap::iterator isi0 = m_banks.find( bsindex0 );
+
+        // Valid State=0 Detector Bank ID...
+        if ( isi0 != m_banks.end() ) {
+
+            syslog( LOG_ERR,
+                "[%i] %s: Found State=0 BankInfo for bank_id=%u state=%u",
+                g_pid, "StreamParser::processBankEvents()",
+                a_bank_id, a_state );
+            usleep(30000); // give syslog a chance...
+
+            // Carefully "Clone" the Base State=0 BankInfo for This State
+
+            // Create BankInfo Instance
+            BankInfo *bi = makeBankInfo( a_bank_id, a_state,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            bi->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(a_bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+
+            // Copy Any Saved Logical PixelIds for This Detector Bank...
+            isi->second->m_logical_pixelids =
+                isi0->second->m_logical_pixelids;
+
+            // Copy Any Saved Detector Bank Sets for This Detector Bank...
+            isi->second->m_bank_sets =
+                isi0->second->m_bank_sets;
+        }
+
+        else {
+            syslog( LOG_ERR,
+                "[%i] %s: No State=0 BankInfo Found! bank_id=%u state=%u",
+                g_pid, "StreamParser::processBankEvents()",
+                a_bank_id, a_state );
+            usleep(30000); // give syslog a chance...
+        }
+    }
+
     // Valid Detector Bank ID...
-    if ( a_bank_id < m_banks.size() )
+    if ( isi != m_banks.end() )
     {
-        BankInfo *bi = m_banks[a_bank_id];
+        BankInfo *bi = isi->second;
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
@@ -1084,7 +1384,10 @@ StreamParser::processBankEvents
                 bi->m_index_buffer.clear();
             }
 
-            m_run_metrics.events_counted += a_event_count;
+            if ( a_bank_id != UNMAPPED_BANK && a_bank_id != ERROR_BANK )
+                m_run_metrics.events_counted += a_event_count;
+            else
+                m_run_metrics.events_uncounted += a_event_count;
         }
 
         // Histogram-based Data Processing
@@ -1212,6 +1515,12 @@ StreamParser::processBankEvents
 
         }   // m_has_histo
 
+        // Collect Event Count Stats for Unmapped & Error Banks...!
+        if ( a_bank_id == UNMAPPED_BANK )
+            m_run_metrics.events_unmapped += a_event_count;
+        else if ( a_bank_id == ERROR_BANK )
+            m_run_metrics.events_error += a_event_count;
+
     }   // Valid Detector Bank ID...
 
     // Not a Valid Detector Bank ID...
@@ -1220,7 +1529,7 @@ StreamParser::processBankEvents
         // Add to Uncounted Events Count...
         m_run_metrics.events_uncounted += a_event_count;
 
-        // Also Add to Special Bank Ids Counts...
+        // Also Add to Special Bank Ids Counts... (REMOVE)
         if ( a_bank_id == UNMAPPED_BANK )
             m_run_metrics.events_unmapped += a_event_count;
         else if ( a_bank_id == ERROR_BANK )
@@ -1289,7 +1598,7 @@ StreamParser::rxPacket
 )
 {
     // Ignore duplicate pulses
-    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
     {
         // Log Duplicate Pulse if it had Any Events...!
         uint32_t nevents = ( a_pkt.payload_length() / 4 ) - 4;
@@ -2357,24 +2666,24 @@ StreamParser::associateDetectorBankSet
     // Look for Detector Banks that are Listed in This Set...
     //    - append to given BankInfo Bank Sets vector
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi )
     {
-        if ( !*ibi )
+        if ( !(ibi->second) )
             continue;
 
         for ( vector<uint32_t>::iterator b = a_bank_set->banklist.begin();
                 b != a_bank_set->banklist.end(); ++b )
         {
-            if ((*b) == (*ibi)->m_id)
+            if ( (*b) == ibi->second->m_id )
             {
                 syslog( LOG_INFO,
                     "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
                     g_pid, "StreamParser::associateDetectorBankSet()",
-                    a_bank_set->name.c_str(), (*ibi)->m_id );
+                    a_bank_set->name.c_str(), ibi->second->m_id );
                 usleep(30000); // give syslog a chance...
 
-                (*ibi)->m_bank_sets.push_back(a_bank_set);
+                ibi->second->m_bank_sets.push_back(a_bank_set);
             }
         }
     }
@@ -4570,21 +4879,35 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in bank buffers
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi )
     {
-        if ( !*ibi )
+        if ( !(ibi->second) ) {
+            syslog( LOG_WARNING,
+              "[%i] %s: Can't Finalize Empty Detector Bank ID %u State %u",
+                g_pid, "StreamParser::finalizeStreamProcessing()",
+                ibi->first.first, ibi->first.second );
+            // give syslog a chance...
+            usleep(30000);
             continue;
+        }
+
+        syslog( LOG_INFO,
+            "[%i] %s: Finalizing Detector Bank ID %u State %u",
+            g_pid, "StreamParser::finalizeStreamProcessing()",
+            ibi->second->m_id, ibi->second->m_state );
+        // give syslog a chance...
+        usleep(30000);
 
         // Make Sure Data has been (Late) Initialized...
-        if ( !((*ibi)->m_initialized) )
-            (*ibi)->initializeBank( true );
+        if ( !(ibi->second->m_initialized) )
+            ibi->second->initializeBank( true );
 
         // Detect gaps in bank data and fill event index if present
-        if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
+        if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
         {
-            handleBankPulseGap( **ibi,
-                m_pulse_count - (*ibi)->m_last_pulse_with_data );
+            handleBankPulseGap( *(ibi->second),
+                m_pulse_count - ibi->second->m_last_pulse_with_data );
         }
 
         // Write Bank Pid/TOF and Event Index Buffers Independently
@@ -4592,13 +4915,13 @@ StreamParser::finalizeStreamProcessing()
 
         // _Always_ Flush Pid/TOF bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankPidTOFBuffersReady( **ibi );
+        bankPidTOFBuffersReady( *(ibi->second) );
 
         // _Always_ Flush Event Index bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankIndexBuffersReady( **ibi, false );
+        bankIndexBuffersReady( *(ibi->second), false );
 
-        bankFinalize( **ibi );
+        bankFinalize( *(ibi->second) );
     }
 
     // Write any remaining data in monitor buffers
@@ -4696,6 +5019,8 @@ StreamParser::getPktName(
             ss << "Src List"; break;
         case ADARA::PacketType::BANKED_EVENT_TYPE:
             ss << "Banked Event"; break;
+        case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
+            ss << "Banked Event State"; break;
         case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             ss << "Beam Monitor Event"; break;
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:

@@ -31,6 +31,14 @@ namespace STS {
 class StreamParser : public ADARA::POSIXParser, public IStreamAdapter
 {
 public:
+
+    /// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
+    enum SpecialBank
+    {
+        UNMAPPED_BANK   = 0xffffffff,
+        ERROR_BANK      = 0xfffffffe
+    };
+
     StreamParser( int a_fd, const std::string & a_adara_out_file,
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
@@ -58,6 +66,11 @@ public:
         { return (m_info_rcvd & INFO_SENT); }
 
 private:
+
+    typedef std::pair<uint32_t, uint32_t> BankIndex;
+
+    typedef std::map< BankIndex, BankInfo * > BankInfoMap;
+
     /// Defines internal stream processing states of StreamParser class
     enum ProcessingState
     {
@@ -115,6 +128,7 @@ private:
     bool        rxPacket( const ADARA::Packet &a_pkt );
     bool        rxPacket( const ADARA::RunStatusPkt &a_pkt );
     bool        rxPacket( const ADARA::BankedEventPkt &a_pkt );
+    bool        rxPacket( const ADARA::BankedEventStatePkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingPkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingAltPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorPkt &a_pkt );
@@ -139,15 +153,9 @@ private:
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors
                                         // to base class implementations
 
-    /// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
-    enum SpecialBank
-    {
-        UNMAPPED_BANK   = 0xffffffff,
-        ERROR_BANK      = 0xfffffffe
-    };
-
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
-    void        processBankEvents( uint32_t a_bank_id,
+    void        processPulseInfo( const ADARA::BankedEventStatePkt &a_pkt );
+    void        processBankEvents( uint32_t a_bank_id, uint32_t a_state,
                     uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleBankPulseGap( BankInfo &a_bi, uint64_t a_count );
     void        processMonitorEvents( Identifier a_monitor_id,
@@ -183,7 +191,7 @@ private:
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<STS::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
-    std::vector<BankInfo*>                  m_banks;                    ///< Container of detector bank information
+    BankInfoMap                             m_banks;                    ///< Container of detector bank information
     std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)

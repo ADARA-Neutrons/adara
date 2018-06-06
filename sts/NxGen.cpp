@@ -251,13 +251,14 @@ STS::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
+    uint32_t a_state,           ///< [in] State of detector bank
     uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
     try
     {
-        NxBankInfo* bi = new NxBankInfo( a_id,
+        NxBankInfo* bi = new NxBankInfo( a_id, a_state,
             a_buf_reserve, a_idx_buf_reserve, *this );
 
         // "Late" Initialization Now via NxGen::initializeNxBank()...
@@ -267,7 +268,8 @@ NxGen::makeBankInfo
     }
     catch ( TraceException &e )
     {
-        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id << " ) failed." )
+        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id
+            << " state: " << a_state << " ) failed." )
     }
 }
 
@@ -335,6 +337,7 @@ NxGen::initializeNxBank
     catch ( TraceException &e )
     {
         RETHROW_TRACE( e, "initializeNxBank( bank: " << a_bi->m_id
+            << " state: " << a_bi->m_state
             << ", end_of_run=" << a_end_of_run
             << " ) initialization failed." )
     }
@@ -1219,15 +1222,15 @@ NxGen::pulseBuffersReady
             // write them to pulse_flags DASLog
             // (For Forward-/Backwards-Compatibility, Strip Off Veto Flags
             //  in top 12 bits of flags...)
-            if ( (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO )
+            if ( (*f & 0xfffff) & ~ADARA::PULSE_VETO )
             {
                 m_pulse_flags_time.push_back( *t );
                 m_pulse_flags_value.push_back(
-                    (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
+                    (*f & 0xfffff) & ~ADARA::PULSE_VETO );
             }
 
             // Write pulse vetoes to dedicated DASlog buffer
-            if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
+            if ( *f & ADARA::PULSE_VETO )
                 m_pulse_vetoes.push_back( *t );
         }
 
@@ -1354,7 +1357,7 @@ NxGen::bankPidTOFBuffersReady
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankPidTOFBuffersReady() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
@@ -1434,7 +1437,7 @@ NxGen::bankIndexBuffersReady
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankIndexBuffersReady() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
@@ -1485,7 +1488,8 @@ NxGen::bankPulseGap
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankPulseGap() failed for bank id: "
-            << a_bank.m_id << ", gap count: " << a_count )
+            << a_bank.m_id << " state: " << a_bank.m_state
+            << ", gap count: " << a_count )
     }
 }
 
@@ -1538,8 +1542,8 @@ NxGen::bankFinalize
         if ( bi->m_has_histo )
         {
             syslog( LOG_INFO,
-                "[%i] Detector Bank %d - Writing Histogram Data",
-                g_pid, a_bank.m_id );
+                "[%i] Detector Bank %d State %u - Writing Histogram Data",
+                g_pid, a_bank.m_id, a_bank.m_state );
             usleep(30000); // give syslog a chance...
 
             // Create & Write Histogram Multi-dimensional Data...
@@ -1622,7 +1626,7 @@ NxGen::bankFinalize
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankFinalize() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
