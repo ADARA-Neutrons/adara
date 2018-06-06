@@ -1252,6 +1252,7 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 
 		case ADARA::PacketType::RTDL_TYPE:
 		case ADARA::PacketType::BANKED_EVENT_TYPE:
+		case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
 		case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
 			m_pulseTime = hdr->ts_sec;
 			break;
