@@ -230,22 +230,23 @@ private:
 	friend class Parser;
 };
 
+enum PulseFlags {
+	ERROR_PIXELS        = 0x00001,
+	PARTIAL_DATA        = 0x00002,
+	PULSE_VETO          = 0x00004,
+	MISSING_RTDL        = 0x00008,
+	MAPPING_ERROR       = 0x00010,
+	DUPLICATE_PULSE     = 0x00020,
+	PCHARGE_UNCORRECTED = 0x00040,
+	VETO_UNCORRECTED    = 0x00080,
+	GOT_METADATA        = 0x00100,
+	GOT_NEUTRONS        = 0x00200,
+	HAS_STATES          = 0x00400,
+};
+
 class BankedEventPkt : public Packet {
 public:
 	BankedEventPkt(const BankedEventPkt &pkt);
-
-	enum Flags {
-		ERROR_PIXELS        = 0x00001,
-		PARTIAL_DATA        = 0x00002,
-		PULSE_VETO          = 0x00004,
-		MISSING_RTDL        = 0x00008,
-		MAPPING_ERROR       = 0x00010,
-		DUPLICATE_PULSE     = 0x00020,
-		PCHARGE_UNCORRECTED = 0x00040,
-		VETO_UNCORRECTED    = 0x00080,
-		GOT_METADATA        = 0x00100,
-		GOT_NEUTRONS        = 0x00200,
-	};
 
 	uint32_t pulseCharge(void) const { return m_fields[0]; }
 	uint32_t pulseEnergy(void) const { return m_fields[1]; }
@@ -259,6 +260,26 @@ private:
 	const uint32_t *m_fields;
 
 	BankedEventPkt(const uint8_t *data, uint32_t len);
+
+	friend class Parser;
+};
+
+class BankedEventStatePkt : public Packet {
+public:
+	BankedEventStatePkt(const BankedEventStatePkt &pkt);
+
+	uint32_t pulseCharge(void) const { return m_fields[0]; }
+	uint32_t pulseEnergy(void) const { return m_fields[1]; }
+	uint32_t cycle(void) const { return m_fields[2]; }
+	uint32_t vetoFlags(void) const { return (m_fields[3] >> 20) & 0xfff; }
+	uint32_t flags(void) const { return m_fields[3] & 0xfffff; }
+
+	// TODO implment bank/event accessors
+
+private:
+	const uint32_t *m_fields;
+
+	BankedEventStatePkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
