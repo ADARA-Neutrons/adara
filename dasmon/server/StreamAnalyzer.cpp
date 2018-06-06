@@ -81,6 +81,7 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_PULSE_PCHG_UNCOR]    = "RUN_PULSE_PCHG_UNCOR";
     m_fact_name[BIF_GOT_METADATA_COUNT]  = "RUN_GOT_METADATA_COUNT";
     m_fact_name[BIF_GOT_NEUTRONS_COUNT]  = "RUN_GOT_NEUTRONS_COUNT";
+    m_fact_name[BIF_HAS_STATES_COUNT]    = "RUN_HAS_STATES_COUNT";
     m_fact_name[BIF_TOTAL_PULSES_COUNT]  = "RUN_TOTAL_PULSES_COUNT";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
@@ -665,6 +666,7 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_PULSE_PCHG_UNCOR]);
     a_facts.insert(m_fact_name[BIF_GOT_METADATA_COUNT]);
     a_facts.insert(m_fact_name[BIF_GOT_NEUTRONS_COUNT]);
+    a_facts.insert(m_fact_name[BIF_HAS_STATES_COUNT]);
     a_facts.insert(m_fact_name[BIF_TOTAL_PULSES_COUNT]);
 
     vector<string> facts;
@@ -1042,6 +1044,7 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_PULSE_PCHG_UNCOR], a_metrics.m_pulse_pcharge_uncorrected );
     m_engine->assert( m_fact[BIF_GOT_METADATA_COUNT], a_metrics.m_got_metadata_count );
     m_engine->assert( m_fact[BIF_GOT_NEUTRONS_COUNT], a_metrics.m_got_neutrons_count );
+    m_engine->assert( m_fact[BIF_HAS_STATES_COUNT], a_metrics.m_has_states_count );
     m_engine->assert( m_fact[BIF_TOTAL_PULSES_COUNT], a_metrics.m_total_pulses_count );
 }
 
