@@ -869,6 +869,7 @@ protected:
                                       "pulse_pcharge_uncorrected", 0UL );
         m_got_metadata_count    = a_prop_tree.get( "got_metadata_count", 0UL );
         m_got_neutrons_count    = a_prop_tree.get( "got_neutrons_count", 0UL );
+        m_has_states_count      = a_prop_tree.get( "has_states_count", 0UL );
         m_total_pulses_count    = a_prop_tree.get( "total_pulses_count", 0UL );
     }
 
@@ -888,6 +889,7 @@ protected:
             m_pulse_pcharge_uncorrected );
         a_prop_tree.put( "got_metadata_count", m_got_metadata_count );
         a_prop_tree.put( "got_neutrons_count", m_got_neutrons_count );
+        a_prop_tree.put( "has_states_count", m_has_states_count );
         a_prop_tree.put( "total_pulses_count", m_total_pulses_count );
     }
 };
