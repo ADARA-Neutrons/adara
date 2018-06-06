@@ -659,6 +659,10 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
+    BankInfoMap::iterator isi;
+
+    BankIndex bsindex;
+
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
         ( a_pkt.mappingData() + a_pkt.payload_length() );
@@ -724,9 +728,9 @@ StreamParser::rxPacket
         }
 
         // For Initial Creation of BankInfo Map, Just Do All as State=0...
-        BankIndex bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
 
-        BankInfoMap::iterator isi = m_banks.find( bsindex );
+        isi = m_banks.find( bsindex );
 
         // Create New BankInfo...
         if ( isi == m_banks.end() )
@@ -759,6 +763,46 @@ StreamParser::rxPacket
         // Next Section
         rpos += pix_count;
     }
+
+    // Also Add Unmapped and Error BankInfo to Map, as State=0...
+
+    // Unmapped BankInfo
+
+    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Unmapped Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Error BankInfo
+
+    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Error Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Done
 
     // The receipt of a pixel mapping packet allows state to progress
     // to event processing
