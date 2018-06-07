@@ -2209,11 +2209,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					state = ( phys & m_neutronEventStateMask )
 						>> (28 - m_neutronEventStateBits);
 					base_phys = phys & (~m_neutronEventStateMask);
-					DEBUG("pulseEvents(): PixelId 0x"
-						<< std::hex << phys
-						<< " Decodes to State 0x" << state
-						<< " and Base PixelId 0x" << base_phys
-						<< std::dec);
+					// DEBUG("pulseEvents(): PixelId 0x"
+						// << std::hex << phys
+						// << " Decodes to State 0x" << state
+						// << " and Base PixelId 0x" << base_phys
+						// << std::dec);
 				}
 				else {
 					base_phys = phys;
