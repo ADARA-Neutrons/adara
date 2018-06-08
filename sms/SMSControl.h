@@ -306,8 +306,10 @@ private:
 	static uint32_t m_intermittentDataThreshold;
 
 	boost::shared_ptr<smsUint32PV> m_pvNeutronEventStateBits;
+	boost::shared_ptr<smsBooleanPV> m_pvNeutronEventSortByState;
 	static uint32_t m_neutronEventStateBits;
 	static uint32_t m_neutronEventStateMask;
+	static bool m_neutronEventSortByState;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 

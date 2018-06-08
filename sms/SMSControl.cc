@@ -86,6 +86,7 @@ uint32_t SMSControl::m_intermittentDataThreshold;
 
 uint32_t SMSControl::m_neutronEventStateBits;
 uint32_t SMSControl::m_neutronEventStateMask;
+bool SMSControl::m_neutronEventSortByState;
 
 class PopPulseBufferPV : public smsInt32PV {
 public:
@@ -241,6 +242,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		INFO("Setting Neutron Event State Mask to 0x"
 			<< std::hex << m_neutronEventStateMask << std::dec << ".");
 	}
+
+	m_neutronEventSortByState =
+			conf.get<bool>("sms.neutron_event_sort_by_state", 0);
+	INFO("Setting Neutron Event Sort By State to "
+		<< m_neutronEventSortByState << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -491,6 +497,11 @@ SMSControl::SMSControl() :
 							+ "NeutronEventStateBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
+	m_pvNeutronEventSortByState = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "NeutronEventSortByState",
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -516,6 +527,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvDoPulseVetoCorrect);
 	addPV(m_pvIntermittentDataThreshold);
 	addPV(m_pvNeutronEventStateBits);
+	addPV(m_pvNeutronEventSortByState);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -575,6 +587,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Neutron Event State Bits PV...
 	m_pvNeutronEventStateBits->update( m_neutronEventStateBits, &now);
+
+	// Initialize Neutron Event Sort By State PV...
+	m_pvNeutronEventSortByState->update( m_neutronEventSortByState, &now);
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -637,6 +652,12 @@ SMSControl::SMSControl() :
 			INFO("Setting Neutron Event State Mask to 0x"
 				<< std::hex << m_neutronEventStateMask << std::dec << ".");
 		}
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNeutronEventSortByState->getName(), bvalue, ts ) ) {
+		m_neutronEventSortByState = bvalue;
+		m_pvNeutronEventSortByState->update(bvalue, &ts);
 	}
 
 	// Initialize Next Run Number...
@@ -2158,6 +2179,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< ".");
 			}
 		}
+		m_neutronEventSortByState = m_pvNeutronEventSortByState->value();
 	}
 
 	ADARA::Event translated;
@@ -2287,6 +2309,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 
 		if ( state > 0 )
 			pulse->m_flags |= ADARA::HAS_STATES;
+
+		// If _Not_ Sorting Neutron Events By State,
+		// Then Clamp All Events to State=0...!
+		if ( !m_neutronEventSortByState )
+			state = 0;
 
 		// Get the BankMap Iterator for This Bank+State... (If It Exists)
 
