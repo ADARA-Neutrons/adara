@@ -2157,7 +2157,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pkt.pulseCharge();
 	}
 
-	// Infrequently Check Live Control PV for Intermittent Data Threshold
+	// Infrequently Check Live Control PV for Neutron Event State Handling
 	// (Once Per Minute...)
 	if ( !(++cnt % 3600) ) {
 		uint32_t tmp = m_pvNeutronEventStateBits->value();
