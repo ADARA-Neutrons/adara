@@ -259,6 +259,14 @@ option_default[$num_options]="0"
 option_label[$num_options]="[Number of Neutron Event State Bits]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="neutron_event_sort_by_state"
+option_pv[$num_options]="SMS:Control:NeutronEventSortByState"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="0"
+option_label[$num_options]="[Whether to Sort Neutron Events By State]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -1522,6 +1530,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
 		caget $WAIT ${PRE}:SMS:Control:IntermittentDataThreshold
 		caget $WAIT ${PRE}:SMS:Control:NeutronEventStateBits
+		caget $WAIT ${PRE}:SMS:Control:NeutronEventSortByState
 
 		echo
 
