@@ -10,7 +10,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.9.2"
+#define STS_VERSION "1.9.3"
 extern pid_t g_pid;
 
 #define STS_DOUBLE_EPSILON (0.00000000000001)
