@@ -3559,19 +3559,22 @@ NxGen::parseSTSConfigFile
 
                     // Add Group Container to STS Config...
                     // (If Required Fields are Present, Else Error)
+                    // Note: It's Ok to have No Elements, Only Conditions!
                     if ( group.name.size()
                             && group.path.size()
                             && group.type.size()
-                            && group.elements.size() )
+                            && ( group.elements.size()
+                                || group.conditions.size() ) )
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO,
-                            "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s)",
+                    "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "Adding Group Container",
                             group.name.c_str(), "to STS Config",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
-                            group.elements.size(), "elements" );
+                            group.elements.size(), "elements",
+                            group.conditions.size(), "conditions" );
                         usleep(30000); // give syslog a chance
 
                         m_config_groups.push_back( group );
@@ -3582,12 +3585,13 @@ NxGen::parseSTSConfigFile
                             + group.name
                             + "\" in STS Config";
                         syslog( LOG_ERR,
-                            "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s)",
+                        "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "STS Error:", err.c_str(),
                             "Ignoring",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
-                            group.elements.size(), "elements" );
+                            group.elements.size(), "elements",
+                            group.conditions.size(), "conditions" );
                         usleep(30000); // give syslog a chance
                     }
                 }
