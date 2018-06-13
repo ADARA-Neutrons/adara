@@ -524,5 +524,75 @@
 		</condition>
 	</group>
 
+	<!-- Analyzer/Polarizer State Conditional Links (REF_M) -->
+	<group>
+		<name>DASlogs</name>
+		<path>/entry</path>
+		<type>NXcollection</type>
+		<!-- Analyzer State Conditional Links... -->
+		<!-- "Fan Analyzer and SF2" Conditional Analyzer Element -->
+		<condition>
+			<name>Fan Analyzer and SF2</name>
+			<pattern>:CS:Inst:AnalyzerSel$</pattern>
+			<pattern>^Analyzer$</pattern>
+			<value_string>Fan Analyzer and SF2</value_string><!-- 1 -->
+			<value_string>Fan Analyzer + SF2</value_string><!-- 1 -->
+			<element>
+				<pattern>SF2$</pattern>
+				<name>AnalyzerState</name>
+			</element>
+			<element>
+				<pattern>SF2_Veto$</pattern>
+				<name>AnalyzerVeto</name>
+			</element>
+		</condition>
+		<!-- "3He Analyzer" Conditional Analyzer Element -->
+		<condition>
+			<name>3He Analyzer</name>
+			<pattern>:CS:Inst:AnalyzerSel$</pattern>
+			<pattern>^Analyzer$</pattern>
+			<value_string>3He Analyzer</value_string><!-- 2 -->
+			<element>
+				<pattern>He3State$</pattern>
+				<name>AnalyzerState</name>
+			</element>
+			<element>
+				<pattern>He3_Veto$</pattern>
+				<name>AnalyzerVeto</name>
+			</element>
+		</condition>
+		<!-- (Unnecessary?) Polarizer State Conditional Links... -->
+		<!-- "Super Mirror Polarizer" Conditional Polarizer Element -->
+		<condition>
+			<name>Super Mirror Polarizer</name>
+			<pattern>:CS:Inst:PolarizerSel$</pattern>
+			<pattern>^Polarizer$</pattern>
+			<value_string>Super Mirror Polarizer</value_string><!-- 1 -->
+			<element>
+				<pattern>SF1$</pattern>
+				<name>PolarizerState</name>
+			</element>
+			<element>
+				<pattern>SF1_Veto$</pattern>
+				<name>PolarizerVeto</name>
+			</element>
+		</condition>
+		<!-- "Transmission Polarizer" Conditional Polarizer Element -->
+		<condition>
+			<name>Transmission Polarizer</name>
+			<pattern>:CS:Inst:PolarizerSel$</pattern>
+			<pattern>^Polarizer$</pattern>
+			<value_string>Transmission Polarizer</value_string><!-- 2 -->
+			<element>
+				<pattern>SF1$</pattern>
+				<name>PolarizerState</name>
+			</element>
+			<element>
+				<pattern>SF1_Veto$</pattern>
+				<name>PolarizerVeto</name>
+			</element>
+		</condition>
+	</group>
+
 </sts_config>
 
