@@ -1534,7 +1534,7 @@ private:
                                 continue;
                             }
 
-                            // Create Group if Not Yet Created...
+                            // Create Group If Not Yet Created...
                             if ( G->createdIndices.find( indexedName )
                                     == G->createdIndices.end() )
                             {
@@ -1564,17 +1564,42 @@ private:
                                     continue;
                                 }
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
-                                    g_pid,
-                                    "Creating Indexed Group",
-                                    indexedName.c_str(),
-                                    "path", group_path.c_str(),
-                                    "type", G->type.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                // Allow Group Elements to Be Created
+                                // Directly in Top-Level DASlogs Group...
+                                // (Just Skip Creating the Group Though!)
+                                if ( ! group_path.compare(
+                                        m_nxgen.m_daslogs_path ) )
+                                {
+                                    std::stringstream ss;
+                                    ss << "Skip Creation of Indexed Group"
+                                        << " for Top-Level DASlogs Usage"
+                                        << " - \"" << indexedName << "\""
+                                        << " for " << device_str
+                                        << " " << pv_str;
+                                    syslog( LOG_INFO,
+                                        "[%i] %s, %s=[%s] %s=[%s]",
+                                        g_pid, ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
-                                m_nxgen.makeGroup( group_path, G->type );
+                                else
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                        g_pid,
+                                        "Creating Indexed Group",
+                                        indexedName.c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    m_nxgen.makeGroup( group_path,
+                                        G->type );
+                                }
 
                                 G->createdIndices.insert( indexedName );
                             }
@@ -1614,16 +1639,41 @@ private:
                                     continue;
                                 }
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
-                                    g_pid,
-                                    "Creating Group", G->name.c_str(),
-                                    "path", group_path.c_str(),
-                                    "type", G->type.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                // Allow Group Elements to Be Created
+                                // Directly in Top-Level DASlogs Group...
+                                // (Just Skip Creating the Group Though!)
+                                if ( ! group_path.compare(
+                                        m_nxgen.m_daslogs_path ) )
+                                {
+                                    std::stringstream ss;
+                                    ss << "Skip Creation of Group"
+                                        << " for Top-Level DASlogs Usage"
+                                        << " - \"" << G->name << "\""
+                                        << " for " << device_str
+                                        << " " << pv_str;
+                                    syslog( LOG_INFO,
+                                        "[%i] %s, %s=[%s] %s=[%s]",
+                                        g_pid, ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
-                                m_nxgen.makeGroup( group_path, G->type );
+                                else
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                        g_pid,
+                                        "Creating Group", G->name.c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    m_nxgen.makeGroup( group_path,
+                                        G->type );
+                                }
 
                                 G->created = true;
                             }
