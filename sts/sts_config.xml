@@ -5,7 +5,7 @@
 	Stored in Git Repository at: git+ssh://trac.sns.gov/var/repos/config
 		- in the "sts-config" branch
 
-	Deployed to /SNS/lustre/stsdata/sts_config.xml
+	Deployed to /SNS/snfs1/stsdata/sts_config.xml
 
 	Please Commit Any Changes to Git...! Thanks! :-D
 -->
