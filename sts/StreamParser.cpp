@@ -3933,7 +3933,8 @@ StreamParser::pvValueUpdate
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update WEIRD, Same Time But No Value Set!",
                 ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                a_timestamp.tv_nsec,
                 pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
                 "- Ignoring PV Value Update...!"
             );
@@ -3963,8 +3964,10 @@ StreamParser::pvValueUpdate
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
-                (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
+                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                a_timestamp.tv_nsec,
+                (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
                 "- Ignoring PV Value Update...!"
             );
@@ -4019,9 +4022,11 @@ StreamParser::pvValueUpdate
                     "StreamParser::pvValueUpdate()",
                     "Truncate Negative Variable Value Update Time to Zero",
                     ssinfo.str().c_str(),
-                    a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                    a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                    a_timestamp.tv_nsec,
                     (unsigned long)(m_pulse_info.start_time
-                        / NANO_PER_SECOND_LL),
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_pulse_info.start_time
                         % NANO_PER_SECOND_LL)
                 );
@@ -4065,7 +4070,8 @@ StreamParser::pvValueUpdate
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
                 ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
+                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                a_timestamp.tv_nsec,
                 pvs.str().c_str()
             );
             // give syslog a chance...
