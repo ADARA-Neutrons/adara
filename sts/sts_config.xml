@@ -533,6 +533,7 @@
 		<!-- "Fan Analyzer and SF2" Conditional Analyzer Element -->
 		<condition>
 			<name>Fan Analyzer and SF2</name>
+			<pattern>:CS:ARConfig:AnalyzerSel$</pattern>
 			<pattern>:CS:Inst:AnalyzerSel$</pattern>
 			<pattern>^Analyzer$</pattern>
 			<value_string>Fan Analyzer and SF2</value_string><!-- 1 -->
@@ -549,6 +550,7 @@
 		<!-- "3He Analyzer" Conditional Analyzer Element -->
 		<condition>
 			<name>3He Analyzer</name>
+			<pattern>:CS:ARConfig:AnalyzerSel$</pattern>
 			<pattern>:CS:Inst:AnalyzerSel$</pattern>
 			<pattern>^Analyzer$</pattern>
 			<value_string>3He Analyzer</value_string><!-- 2 -->
@@ -562,11 +564,14 @@
 			</element>
 		</condition>
 		<!-- (Unnecessary?) Polarizer State Conditional Links... -->
-		<!-- "Super Mirror Polarizer" Conditional Polarizer Element -->
+		<!-- "Reflection Polarizer" Conditional Polarizer Element -->
+		<!-- (Formerly "Super Mirror Polarizer"...) -->
 		<condition>
-			<name>Super Mirror Polarizer</name>
+			<name>Reflection Polarizer</name>
+			<pattern>:CS:ARConfig:PolarizerSel$</pattern>
 			<pattern>:CS:Inst:PolarizerSel$</pattern>
 			<pattern>^Polarizer$</pattern>
+			<value_string>Reflection Polarizer</value_string><!-- 1 -->
 			<value_string>Super Mirror Polarizer</value_string><!-- 1 -->
 			<element>
 				<pattern>SF1$</pattern>
@@ -580,6 +585,7 @@
 		<!-- "Transmission Polarizer" Conditional Polarizer Element -->
 		<condition>
 			<name>Transmission Polarizer</name>
+			<pattern>:CS:ARConfig:PolarizerSel$</pattern>
 			<pattern>:CS:Inst:PolarizerSel$</pattern>
 			<pattern>^Polarizer$</pattern>
 			<value_string>Transmission Polarizer</value_string><!-- 2 -->
