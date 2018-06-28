@@ -3886,40 +3886,6 @@ StreamParser::pvValueUpdate
 
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
-std::stringstream ssinfoX;
-ssinfoX << "devId=" << a_device_id
-    << " (" << pvinfo->m_device_name << ")";
-ssinfoX << " pvId=" << a_pv_id << " (" << pvinfo->m_name
-    << " [" << pvinfo->m_connection << "]" << ")";
-syslog( LOG_ERR,
-    "[%i] %s %s %s=%lu.%09lu %s=%lu.%09lu (%lu) %s=%lu.%09lu (%lu) %s=%lu %s=%d %s=%d %s=%d",
-    g_pid, "XXX StreamParser::pvValueUpdate()",
-    ssinfoX.str().c_str(),
-    "a_timestamp",
-    a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
-    a_timestamp.tv_nsec,
-    "m_pulse_info.start_time",
-    (unsigned long)(m_pulse_info.start_time
-            / NANO_PER_SECOND_LL)
-        - ADARA::EPICS_EPOCH_OFFSET,
-    (unsigned long)(m_pulse_info.start_time
-        % NANO_PER_SECOND_LL),
-    m_pulse_info.start_time,
-    "ts_nano",
-    (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
-        - ADARA::EPICS_EPOCH_OFFSET,
-    (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
-    ts_nano,
-    "pvinfo->m_last_time", pvinfo->m_last_time,
-    "pvinfo->m_last_value_set", pvinfo->m_last_value_set,
-    "pvinfo->valuesEqual( pvinfo->m_last_value, a_value )",
-    pvinfo->valuesEqual( pvinfo->m_last_value, a_value ),
-    "( ts_nano > m_pulse_info.start_time )",
-    ( ts_nano > m_pulse_info.start_time )
-);
-// give syslog a chance...
-usleep(30000);
-
     // Check this update to see if the timestamp is newer than the
     // last time. (m_last_time is initialized to 0, so first real update
     // will be Ok.) This will *Log* PV updates that are at negative time
@@ -4028,33 +3994,6 @@ usleep(30000);
         {
             t = ( ts_nano - m_pulse_info.start_time )
                 / NANO_PER_SECOND_D;
-
-std::stringstream ssinfoY;
-ssinfoY << "devId=" << a_device_id
-    << " (" << pvinfo->m_device_name << ")";
-ssinfoY << " pvId=" << a_pv_id << " (" << pvinfo->m_name
-    << " [" << pvinfo->m_connection << "]" << ")";
-syslog( LOG_ERR,
-    "[%i] %s %s %s=%lu.%09lu (%lu) %s=%lu.%09lu (%lu) %s=%lf",
-    g_pid, "XXX StreamParser::pvValueUpdate()",
-    ssinfoY.str().c_str(),
-    "ts_nano",
-    (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
-        - ADARA::EPICS_EPOCH_OFFSET,
-    (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
-    ts_nano,
-    "m_pulse_info.start_time",
-    (unsigned long)(m_pulse_info.start_time
-            / NANO_PER_SECOND_LL)
-        - ADARA::EPICS_EPOCH_OFFSET,
-    (unsigned long)(m_pulse_info.start_time
-        % NANO_PER_SECOND_LL),
-    m_pulse_info.start_time,
-    "t", t
-);
-// give syslog a chance...
-usleep(30000);
-
         }
 
         // Truncate Any Negative Time Offsets to 0...
