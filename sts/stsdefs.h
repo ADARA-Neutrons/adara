@@ -617,8 +617,8 @@ struct RunMetrics
     uint64_t                events_unmapped;
     uint64_t                events_error;
     uint64_t                non_events_counted;
-    struct timespec         start_time;
-    struct timespec         end_time;
+    struct timespec         run_start_time;
+    struct timespec         run_end_time;
     Statistics              charge_stats;       ///< Pulse charge statistics
     Statistics              freq_stats;         ///< Pulse frequency statistics
 };

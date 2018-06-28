@@ -768,17 +768,18 @@ private:
                         // Add start time (offset) properties
                         // to all time axis in DAS logs
                         std::string time = timeToISO8601(
-                            a_run_metrics->start_time );
+                            a_run_metrics->run_start_time );
                         std::string time_path = m_log_path + "/time";
                         m_nxgen.writeStringAttribute( time_path,
                             "start", time );
                         m_nxgen.writeScalarAttribute( time_path,
                             "offset_seconds",
-                            (uint32_t)a_run_metrics->start_time.tv_sec
+                            (uint32_t)a_run_metrics->run_start_time.tv_sec
                                 - ADARA::EPICS_EPOCH_OFFSET );
                         m_nxgen.writeScalarAttribute( time_path,
                             "offset_nanoseconds",
-                            (uint32_t)a_run_metrics->start_time.tv_nsec );
+                            (uint32_t)a_run_metrics->run_start_time.tv_nsec
+                        );
 
                         if ( m_cur_size
                                 // No Statistics for Strings!
@@ -2371,7 +2372,7 @@ private:
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
     uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
-    struct timespec             m_sts_start_time;       /// STS Start of Processing Time
+    struct timespec             m_sts_run_start_time;   /// STS Start of Processing Time
 };
 
 #endif // NXGEN_H

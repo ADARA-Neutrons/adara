@@ -67,7 +67,7 @@ StreamParser::StreamParser
 {
     // Capture Default Run "Start Time"...
     // (In case there are No Neutron Pulses, for Faking It...! ;-D)
-    clock_gettime( CLOCK_REALTIME, &m_default_start_time );
+    clock_gettime( CLOCK_REALTIME, &m_default_run_start_time );
 
     if ( !a_adara_out_file.empty() )
     {
@@ -186,7 +186,7 @@ StreamParser::processStream()
                             m_pulse_info.start_time
                                 + m_pulse_info.last_time,
                             "Stream processing terminated abnormally." );
-                        m_run_metrics.end_time = nsec_to_timespec(
+                        m_run_metrics.run_end_time = nsec_to_timespec(
                             m_pulse_info.start_time
                                 + m_pulse_info.last_time );
                         finalizeStreamProcessing();
@@ -429,7 +429,7 @@ StreamParser::rxPacket
         {
             // Run "end time" is defined as time of last pulse
             // (which is nanoseconds epoch offset)
-            m_run_metrics.end_time = nsec_to_timespec(
+            m_run_metrics.run_end_time = nsec_to_timespec(
                 m_pulse_info.start_time + m_pulse_info.last_time );
 
             finalizeStreamProcessing();
@@ -1182,7 +1182,7 @@ StreamParser::processPulseInfo
         // Freq stats ignores first point since it can't be calculated
 
         // Run "start time" is defined as time of first pulse
-        m_run_metrics.start_time = a_pkt.timestamp();
+        m_run_metrics.run_start_time = a_pkt.timestamp();
     }
 
     // Is is time to write pulse info?
@@ -1254,7 +1254,7 @@ StreamParser::processPulseInfo
         // Freq stats ignores first point since it can't be calculated
 
         // Run "start time" is defined as time of first pulse
-        m_run_metrics.start_time = a_pkt.timestamp();
+        m_run_metrics.run_start_time = a_pkt.timestamp();
     }
 
     // Is is time to write pulse info?
@@ -2787,7 +2787,7 @@ StreamParser::rxPacket
                     / NANO_PER_SECOND_D,
                 m_pulse_info.start_time + m_pulse_info.last_time,
                 "Stream processing terminated abnormally." );
-            m_run_metrics.end_time = nsec_to_timespec(
+            m_run_metrics.run_end_time = nsec_to_timespec(
                 m_pulse_info.start_time + m_pulse_info.last_time );
             finalizeStreamProcessing();
         }
@@ -3886,6 +3886,40 @@ StreamParser::pvValueUpdate
 
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
+std::stringstream ssinfoX;
+ssinfoX << "devId=" << a_device_id
+    << " (" << pvinfo->m_device_name << ")";
+ssinfoX << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+    << " [" << pvinfo->m_connection << "]" << ")";
+syslog( LOG_ERR,
+    "[%i] %s %s %s=%lu.%09lu %s=%lu.%09lu (%lu) %s=%lu.%09lu (%lu) %s=%lu %s=%d %s=%d %s=%d",
+    g_pid, "XXX StreamParser::pvValueUpdate()",
+    ssinfoX.str().c_str(),
+    "a_timestamp",
+    a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+    a_timestamp.tv_nsec,
+    "m_pulse_info.start_time",
+    (unsigned long)(m_pulse_info.start_time
+            / NANO_PER_SECOND_LL)
+        - ADARA::EPICS_EPOCH_OFFSET,
+    (unsigned long)(m_pulse_info.start_time
+        % NANO_PER_SECOND_LL),
+    m_pulse_info.start_time,
+    "ts_nano",
+    (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
+        - ADARA::EPICS_EPOCH_OFFSET,
+    (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
+    ts_nano,
+    "pvinfo->m_last_time", pvinfo->m_last_time,
+    "pvinfo->m_last_value_set", pvinfo->m_last_value_set,
+    "pvinfo->valuesEqual( pvinfo->m_last_value, a_value )",
+    pvinfo->valuesEqual( pvinfo->m_last_value, a_value ),
+    "( ts_nano > m_pulse_info.start_time )",
+    ( ts_nano > m_pulse_info.start_time )
+);
+// give syslog a chance...
+usleep(30000);
+
     // Check this update to see if the timestamp is newer than the
     // last time. (m_last_time is initialized to 0, so first real update
     // will be Ok.) This will *Log* PV updates that are at negative time
@@ -3928,13 +3962,14 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu [%s] %s",
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu (%lu) [%s] %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update WEIRD, Same Time But No Value Set!",
                 ssinfo.str().c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
+                ts_nano,
                 pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
                 "- Ignoring PV Value Update...!"
             );
@@ -3959,16 +3994,19 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu < %lu.%09lu %s",
+            syslog( LOG_ERR,
+                "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 ssinfo.str().c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
+                ts_nano,
                 (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
+                pvinfo->m_last_time,
                 "- Ignoring PV Value Update...!"
             );
             // give syslog a chance...
@@ -3990,6 +4028,33 @@ StreamParser::pvValueUpdate
         {
             t = ( ts_nano - m_pulse_info.start_time )
                 / NANO_PER_SECOND_D;
+
+std::stringstream ssinfoY;
+ssinfoY << "devId=" << a_device_id
+    << " (" << pvinfo->m_device_name << ")";
+ssinfoY << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+    << " [" << pvinfo->m_connection << "]" << ")";
+syslog( LOG_ERR,
+    "[%i] %s %s %s=%lu.%09lu (%lu) %s=%lu.%09lu (%lu) %s=%lf",
+    g_pid, "XXX StreamParser::pvValueUpdate()",
+    ssinfoY.str().c_str(),
+    "ts_nano",
+    (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
+        - ADARA::EPICS_EPOCH_OFFSET,
+    (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
+    ts_nano,
+    "m_pulse_info.start_time",
+    (unsigned long)(m_pulse_info.start_time
+            / NANO_PER_SECOND_LL)
+        - ADARA::EPICS_EPOCH_OFFSET,
+    (unsigned long)(m_pulse_info.start_time
+        % NANO_PER_SECOND_LL),
+    m_pulse_info.start_time,
+    "t", t
+);
+// give syslog a chance...
+usleep(30000);
+
         }
 
         // Truncate Any Negative Time Offsets to 0...
@@ -4017,18 +4082,20 @@ StreamParser::pvValueUpdate
                 ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                     << " [" << pvinfo->m_connection << "]" << ")";
                 syslog( log_type,
-                    "[%i] %s%s%s %s %s %lu.%09lu < %lu.%09lu",
+                    "[%i] %s%s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
                     g_pid, log_hdr.c_str(), log_info.c_str(),
                     "StreamParser::pvValueUpdate()",
                     "Truncate Negative Variable Value Update Time to Zero",
                     ssinfo.str().c_str(),
                     a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                     a_timestamp.tv_nsec,
+                    ts_nano,
                     (unsigned long)(m_pulse_info.start_time
                             / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_pulse_info.start_time
-                        % NANO_PER_SECOND_LL)
+                        % NANO_PER_SECOND_LL),
+                    m_pulse_info.start_time
                 );
                 // give syslog a chance...
                 usleep(30000);
@@ -4065,13 +4132,14 @@ StreamParser::pvValueUpdate
                 pvs << pvinfo->valueToString( pvinfo->m_value_buffer[i] );
             }
             pvs << "]";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu - %s",
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu (%lu) - %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
                 ssinfo.str().c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
+                ts_nano,
                 pvs.str().c_str()
             );
             // give syslog a chance...
@@ -4911,10 +4979,10 @@ StreamParser::finalizeStreamProcessing()
         }
 
         // Make Sure We Have "Reasonable" Run Time Values... (Fake It!)
-        struct timespec end_time;
-        clock_gettime( CLOCK_REALTIME, &end_time );
-        m_run_metrics.start_time = m_default_start_time;
-        m_run_metrics.end_time = end_time;
+        struct timespec run_end_time;
+        clock_gettime( CLOCK_REALTIME, &run_end_time );
+        m_run_metrics.run_start_time = m_default_run_start_time;
+        m_run_metrics.run_end_time = run_end_time;
     }
 
     // Write remaining pulse info and statistics

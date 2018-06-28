@@ -69,7 +69,7 @@ NxGen::NxGen
     m_haveRunComment(false)
 {
     // Capture STS "Start of Processing Time"...
-    clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
+    clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
 
     if ( !a_nexus_out_file.empty() )
     {
@@ -590,7 +590,7 @@ NxGen::finalize
 
         // Capture Run Total Duration (for processing bandwidth statistics)
         m_duration = calcDiffSeconds(
-            a_run_metrics.end_time, a_run_metrics.start_time );
+            a_run_metrics.run_end_time, a_run_metrics.run_start_time );
 
         writeScalar( m_entry_path, "duration",
             m_duration, TIME_SEC_UNITS );
@@ -622,69 +622,69 @@ NxGen::finalize
             a_run_metrics.total_charge, CHARGE_UNITS );
 
         // Start time
-        string time = timeToISO8601( a_run_metrics.start_time );
+        string time = timeToISO8601( a_run_metrics.run_start_time );
         writeString( m_entry_path, "start_time", time );
 
         // Add start time (offset) properties to all time axis in DAS logs
         writeStringAttribute( m_daslogs_freq_path + "/time",
             "offset", time );
         writeScalarAttribute( m_daslogs_freq_path + "/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_freq_path + "/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pause/time",
             "start", time );
         writeScalarAttribute( m_daslogs_path + "/pause/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/pause/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/scan_index/time",
             "start", time );
         writeScalarAttribute( m_daslogs_path + "/scan_index/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/scan_index/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/comments/time",
             "start", time );
         writeScalarAttribute( m_daslogs_path + "/comments/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/comments/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
             "start", time );
         writeScalarAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pulse_flags/time",
             "start", time );
         writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         // End time
-        time = timeToISO8601( a_run_metrics.end_time );
+        time = timeToISO8601( a_run_metrics.run_end_time );
         writeString( m_entry_path, "end_time", time );
 
         m_h5nx.H5NXclose_file();
@@ -864,11 +864,12 @@ NxGen::dumpProcessingStatistics(void)
 
     // STS Processing Statistics
 
-    struct timespec sts_end_time;
+    struct timespec sts_run_end_time;
 
-    clock_gettime( CLOCK_REALTIME, &sts_end_time );
+    clock_gettime( CLOCK_REALTIME, &sts_run_end_time );
 
-    float sts_duration = calcDiffSeconds( sts_end_time, m_sts_start_time );
+    float sts_duration = calcDiffSeconds(
+        sts_run_end_time, m_sts_run_start_time );
 
     syslog( LOG_INFO, "[%i] %s = %f seconds",
         g_pid, "Total STS Processing Time", sts_duration );

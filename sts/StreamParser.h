@@ -212,7 +212,7 @@ private:
 
     uint16_t                                m_pulse_flag;
 
-    struct timespec                         m_default_start_time;       ///< Default Run Start Time (No Neutron Pulses)...
+    struct timespec                         m_default_run_start_time;   ///< Default Run Start Time (No Neutron Pulses)...
     bool                                    m_verbose;                  ///< STS Verbosity
 };
 
