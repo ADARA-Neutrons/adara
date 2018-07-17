@@ -59,6 +59,10 @@ ADARA SMS Install Checklist
 
 	./confck
 
+	# Create Initial SMS "Next Run" Data File...
+
+	sudo vi /SNSlocal/sms/data/next_run
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
