@@ -117,8 +117,8 @@ ADARA STS Install Checklist
 
 	sudo vi /etc/crontab
 
-		# MAILTO=root
 		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		# MAILTO=root
 		MAILTO="root@localhost"
 		HOME=/
 
@@ -194,6 +194,22 @@ ADARA STS Install Checklist
 	source $HOME/.bashrc
 
 	printenv | grep EPICS
+
+7. Make Sure Accelerator Timing Git Repo is Deployed:
+
+	ls -l /home/controls/Accelerator/
+
+		total 388
+		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+			snsTiming.h
+		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+			SNS.Timing.Master.Functional.System.Description.pdf
+
+	cd /home/controls
+
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
+
+	ls -l /home/controls/Accelerator/
 
 8. Deploy STS Daemon:
 
