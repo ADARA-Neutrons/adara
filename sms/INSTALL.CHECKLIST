@@ -217,7 +217,23 @@ ADARA SMS Install Checklist
 
 	printenv | grep EPICS
 
-8. Deploy SMS Daemon:
+8. Make Sure Accelerator Timing Git Repo is Deployed:
+
+	ls -l /home/controls/Accelerator/
+
+		total 388
+		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+		   snsTiming.h
+		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+		   SNS.Timing.Master.Functional.System.Description.pdf
+
+	cd /home/controls
+
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
+
+	ls -l /home/controls/Accelerator/
+
+9. Deploy SMS Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
@@ -229,7 +245,7 @@ ADARA SMS Install Checklist
 
 	./deploy_adara sms
 
-9. Start SMS Daemon:
+10. Start SMS Daemon:
 
 	sudo /sbin/service smsd status
 
