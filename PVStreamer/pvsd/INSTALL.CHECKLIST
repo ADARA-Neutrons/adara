@@ -3,35 +3,67 @@ ADARA PVSD Install Checklist
 
 	- for a New or Upgraded DASSRV1 Host...
 
-1. Verify State of Any Existing Git Config Repository:
+# NOTE: If Verifying the State of an Existing Git Config Repository,
+# Please Skip Step 1.a. and Proceed to Step 1.b. :-D
 
-	pushd /home/controls/config-dassrv1/ ; git pull ; git diff ; git status
+1.a. Create Initial PVSD Configuration on New Beamline/Host:
 
-	./confck
+	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
 
-	sudo cp pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
+	ls -l /home/controls/config-dassrv1/
 
-	sudo cp pvsd/pvsd.initscript /etc/init.d/pvsd
-
-	sudo cp pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
-
-	ls -l /usr/local/bin/pvsd /etc/init.d/pvsd \
-		/etc/rsyslog.d/adaraMailer.conf   
-
-		-rwxr-xr-x 1 root root 2146 Mar 31  2017 /etc/init.d/pvsd*
-
-		-rw-r--r-- 1 root root  513 Mar 27  2017
-			/etc/rsyslog.d/adaraMailer.conf
-
-		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
-
-	./confck
-
--OR-
-
-1. Create Initial PVSD Configuration on New Beamline/Host:
+	git clone git+ssh://trac.sns.gov/var/repos/config \
+		/home/controls/config-dassrv1/
 
 	cd /home/controls/config-dassrv1/
+
+	OLD="blXXX-dassrv1"   # "Old" or Existing Beamline Branch to Copy From
+
+	NEW="blYYY-dassrv1"   # "New" Beamline Branch Being Created
+
+	git checkout ${OLD}
+
+	git branch ${NEW}
+
+	git checkout ${NEW}
+
+	git branch -d ${OLD}
+
+	git branch -a | head
+
+		* blYYY-dassrv1
+		  master
+		  remotes/origin/HEAD -> origin/master
+		  . . .
+
+	git rm -r deploy/ pvsd.deployment.history.txt
+
+	git commit -m "Clearing Deployment History from Copied Branch" \
+		deploy/ pvsd.deployment.history.txt
+
+	git status
+
+	git push origin ${NEW}
+
+	git branch --set-upstream-to=origin/${NEW} ${NEW}
+
+	git push
+
+	git status
+
+	# Populate New Branch with Schtuff...! ;-D
+
+	### NOTE: If Just Copied Complete Setup from Existing Branch,
+	### Then Edit PVSD Wrapper Script and Please Proceed to Step 1.b. :-D
+
+	# Replace "--domain" name with New Beamline Short Name, "SNS.INST",
+	# And Perhaps Edit "--broker_uri" to use "amqbrokerdev"... ;-D
+
+	vi pvsd/usr.local.bin.pvsd
+
+	### Else...
+
+	# Get/Copy/Create a "confck" Script...
 
 	cp /SNS/users/y8y/confck.pvsd confck
 	git add confck
@@ -73,6 +105,44 @@ ADARA PVSD Install Checklist
 
 	./confck
 
+-OR-
+
+1.b. Verify State of Any Existing Git Config Repository:
+
+	pushd /home/controls/config-dassrv1/ ; git pull ; git diff ; git status
+
+	./confck
+
+	sudo cp pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
+
+	sudo cp pvsd/pvsd.initscript /etc/init.d/pvsd
+
+	sudo cp pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /usr/local/bin/pvsd /etc/init.d/pvsd \
+		/etc/rsyslog.d/adaraMailer.conf   
+
+		-rwxr-xr-x 1 root root 2146 Mar 31  2017 /etc/init.d/pvsd*
+
+		-rw-r--r-- 1 root root  513 Mar 27  2017
+			/etc/rsyslog.d/adaraMailer.conf
+
+		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
+
+	./confck
+
+	diff pvsd/rsyslog.conf /etc/rsyslog.conf
+
+	sudo cp pvsd/rsyslog.conf /etc/rsyslog.conf
+
+	./confck
+
+	diff pvsd/etc.crontab /etc/crontab
+
+	sudo cp pvsd/etc.crontab /etc/crontab
+
+	./confck
+
 2. RSyslog Setup:
 
 	sudo vi /etc/rsyslog.conf
@@ -82,6 +152,8 @@ ADARA PVSD Install Checklist
 		# pvsd log
 		if $programname == 'pvsd' then /var/log/pvsd.log
 		& ~
+
+	ls -l /var/log/pvsd.log
 
 	sudo touch /var/log/pvsd.log
 
@@ -142,7 +214,7 @@ ADARA PVSD Install Checklist
 
 	crontab -l
 
-	crontab -e
+	crontab -e   # Edit "blXXX" to New Beamline Number...! :-D
 
 		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
 		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
@@ -210,6 +282,9 @@ ADARA PVSD Install Checklist
 
 	ls -l /home/controls/prod/ADARA
 
+	# Note: See Below for Jeeem's Production ADARA EPICS Setup
+	# in "$HOME/.bashrc"... ;-D
+
 	source $HOME/.bashrc
 
 	printenv | grep EPICS
@@ -253,4 +328,60 @@ ADARA PVSD Install Checklist
 DONE!!! :-D
 
    Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+
+ADDENDUMS:
+
+	# Note: Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+
+	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
+	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+	export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+	export EPICS_CA_AUTO_ADDR_LIST="NO"
+	export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+
+	if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
+   		export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
+	else
+   		export EPICS_HOST_ARCH="none"
+	fi
+
+	if [[ -z $EPICS_CA_ADDR_LIST ]]; then
+   		#export EPICS_CA_ADDR_LIST="localhost"
+   		# support multiple local iocs on a host...! ;-D
+   		export EPICS_CA_ADDR_LIST="127.255.255.255"
+	fi
+
+	# From EPICS V4 setup_profile.sh...
+
+	export EPICS4_DIR="$EPICS_BASEV4"
+
+	# From EPICS Extensions setup_profile.sh...
+
+	export EDMOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMPVOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMFILES="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMHELPFILES="${EPICS_EXTENSIONS}/src/edm/helpFiles"
+	export EDMLIBS="${EPICS_EXTENSIONS}/lib/$EPICS_HOST_ARCH"
+	export EDMLIB_SUFFIX="so"
+	export EDMACTIONS="${EPICS_EXTENSIONS}/pref/edm"
+
+	# Executable Path Stuff...
+
+	epicspath="/home/controls/bin"
+	epicspath="$epicspath:${EPICS_BASE}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_BASEV4}/pvAccessCPP/bin/linux-x86_64/"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin"
+
+	### NOTE: Customize to Your Path Setup...!
+	export PATH="...:$epicspath:..."
+
+	# Additional EPICS Python Cruft...
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy/build/lib.linux-x86_64-2.6/pcaspy/"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pyepics/build/lib"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/python"
 
