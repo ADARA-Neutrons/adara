@@ -223,9 +223,9 @@ ADARA SMS Install Checklist
 
 		total 388
 		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
-		   snsTiming.h
+			snsTiming.h
 		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
-		   SNS.Timing.Master.Functional.System.Description.pdf
+			SNS.Timing.Master.Functional.System.Description.pdf
 
 	cd /home/controls
 
