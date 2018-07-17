@@ -2577,8 +2577,7 @@ CONFCK()
 		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
 			echo "   Indexed Option."
 			numVarsPV="${PRE}:${index_pv[$opt_id_type]}"
-			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV \
-				| awk '{print $2}'`
+			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV | awk '{print $2}'`
 			# Make Sure We Got Something...
 			if [[ $numIndexedVars == "" ]]; then
 				echo -e -n "\nWarning: Unable to Obtain"
