@@ -108,8 +108,8 @@ ADARA SMS Install Checklist
 
 	sudo vi /etc/crontab
 
-		# MAILTO=root
 		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		# MAILTO=root
 		MAILTO="root@localhost"
 		HOME=/
 
