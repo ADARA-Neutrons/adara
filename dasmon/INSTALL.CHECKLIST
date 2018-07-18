@@ -458,7 +458,7 @@ DONE!!! :-D
 
 ADDENDUMS:
 
-	# Note: Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
 
 	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
 	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
@@ -511,4 +511,22 @@ ADDENDUMS:
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy/build/lib.linux-x86_64-2.6/pcaspy/"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pyepics/build/lib"
 	export PYTHONPATH="${PYTHONPATH}:/home/controls/python"
+
+B. Former "Additional Software Packages" Required for DASMON Install:
+
+	- for hysterical record... ;-D
+
+	sudo yum install git.x86_64 gcc.x86_64 gcc-c++.x86_64
+
+	sudo yum install readline-devel.x86_64
+
+	sudo yum install python-devel.x86_64
+	sudo yum install autoconf.noarch automake.noarch
+
+	sudo yum install hdf.x86_64 hdf-devel.x86_64
+	sudo yum install hdf5.x86_64 hdf5-devel.x86_64 hdf5-static.x86_64
+	sudo yum install nexus.x86_64 nexus-devel.x86_64
+	sudo yum install nexus-tools.x86_64 nexus-python.x86_64
+	sudo yum install log4cxx-devel.x86_64
+	sudo yum install openldap-devel.x86_64
 
