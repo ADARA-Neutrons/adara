@@ -152,6 +152,20 @@ ADARA STS Install Checklist
 				-> sts_dummy = "/TESTING/SNS/stsdata_dummy/sts_config.xml"
 				-> sts_hfir = "/HFIR/stsdata_hfir/sts_config.xml"
 				-> sts_hfir_test = "/HFIR/stsdata_hfir_test/sts_config.xml"
+			- set binary executable path to:
+				-> sts = "/usr/sbin/sts"
+				-> sts_test = "/usr/sbin/sts_test"
+				-> sts_dummy = "/usr/sbin/sts_dummy"
+				-> sts_hfir = "/usr/sbin/sts_hfir"
+				-> sts_hfir_test = "/usr/sbin/sts_hfir_test"
+			- set "STS Working Directory" (-w <path>) to:
+				-> sts = "-w /SNS/snfs1/stsdata"
+				-> sts_test = "-w /SNS/snfs1/stsdata_test"
+				-> sts_dummy = "-w /TESTING/SNS/stsdata_dummy"
+				-> sts_hfir = "-w /HFIR/HB2C/stsdata_hfir"
+					NOTE: HFIR STS Deployments are Per Beamline...!
+				-> sts_hfir_test = "-w /HFIR/HB2C/stsdata_hfir_test"
+					NOTE: HFIR STS Deployments are Per Beamline...!
 
 		cp /usr/local/bin/${STS} usr/local/bin/${STS}
 
