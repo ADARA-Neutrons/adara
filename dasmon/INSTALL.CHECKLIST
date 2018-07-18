@@ -285,17 +285,27 @@ ADARA DASMOND Install Checklist
 
 5. Semi-Manually Deploy Local EPICS Libraries and Utilities...
 
-	cd /home/controls/
+	# Temporarily Edit $HOME/.bashrc EPICS Settings for the Build Process
 
-	mkdir shared
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/epics/base/master
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+	   - EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	   - EPICS_BASEV4=/home/controls/epics/basev4/master
+	   - EPICS4_DIR=/home/controls/epics/basev4/master
 
-	cd shared
+	mkdir /tmp/share
 
-	git clone git+ssh://trac.sns.gov/var/repos/share master
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
 
-	cd master/scripts/
+	/tmp/share/master/scripts/setup_controls.sh
+	   - Note: Prompts for User Password for Sudo Commands...
+	   - script can be re-executed repeatedly after fixing any errors... :-)
 
-	XXX
+	rm -rf /tmp/share
 
 	mkdir -p /home/controls/prod/epics/base
 
@@ -340,6 +350,18 @@ ADARA DASMOND Install Checklist
 	# Note: See Below for Jeeem's Production ADARA EPICS Setup
 	# in "$HOME/.bashrc"... ;-D
 
+	# Generally, Set the basic EPICS Environment to:
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/prod/ADARA/EpicsBaseLink
+	   - EPICS_EXTENSIONS=/home/controls/prod/ADARA/EpicsExtensionsLink
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_BASEV4=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS4_DIR=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+
 	source $HOME/.bashrc
 
 	printenv | grep EPICS
@@ -348,17 +370,17 @@ ADARA DASMOND Install Checklist
 
 	ls -l /home/controls/Accelerator/
 
-		total 388
-		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
-			snsTiming.h
-		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
-			SNS.Timing.Master.Functional.System.Description.pdf
-
 	cd /home/controls
 
 	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
 
 	ls -l /home/controls/Accelerator/
+
+		total 388
+		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+			snsTiming.h
+		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+			SNS.Timing.Master.Functional.System.Description.pdf
 
 8. Deploy DASMOND Daemon:
 
@@ -402,6 +424,9 @@ ADARA DASMOND Install Checklist
 
 	/bin/cat /home/dasmon/dasmond.cfg
 
+		[rules]
+		[signals]
+
 10. Start DASMOND Daemon:
 
 	sudo /sbin/status dasmond
@@ -409,6 +434,7 @@ ADARA DASMOND Install Checklist
 	sudo /sbin/start dasmond
 
 	dasmondlog
+	(tail -f /var/log/dasmond.log)
 
 11. (Optional) Start DASMON GUI Client
 
