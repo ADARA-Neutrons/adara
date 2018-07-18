@@ -436,6 +436,16 @@ ADARA DASMOND Install Checklist
 	dasmondlog
 	(tail -f /var/log/dasmond.log)
 
+		. . .
+		Jul 18 12:25:37 topaz-dasmon dasmond: ComBus: Connected to AMQP.
+		Jul 18 12:25:37 topaz-dasmon dasmond: Database update thread started.
+		Jul 18 12:25:37 topaz-dasmon dasmond: ComBus connection active.
+		Jul 18 12:25:37 topaz-dasmon dasmond: Start processing request.
+		Jul 18 12:25:37 topaz-dasmon dasmond: Stream monitor process thread started.
+		Jul 18 12:25:37 topaz-dasmon dasmond: Stream metrics thread started.
+		Jul 18 12:25:37 topaz-dasmon dasmond: Connected to SMS.
+		. . .
+
 11. (Optional) Start DASMON GUI Client
 
 	sudo /sbin/status dasmongui
