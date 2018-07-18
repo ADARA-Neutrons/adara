@@ -85,13 +85,18 @@ ADARA DASMOND Install Checklist
 
 	vi dasmon/xinitrc.dasmon
 
-	### Else...
+	### Else Proceed with Step 1.a to Create Brand New Config. :-D
+
+	# Remove Any "brdo" (BranchDo) Script Inherited from "master" Branch...
+
+	git rm brdo
+	git commit -m "Remove BranchDo Script from Master Branch" brdo
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.dasmond confck
+	cp /SNS/users/y8y/confck.dasmon confck
 	git add confck
-	git commit confck
+	git commit -m "Install ConfCk Script." confck
 
 	./confck
 

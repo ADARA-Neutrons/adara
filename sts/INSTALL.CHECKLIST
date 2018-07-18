@@ -3,7 +3,162 @@ ADARA STS Install Checklist
 
 	- for a New or Upgraded STS1/STS2 (or Labanalysis) Host...
 
-1. Verify State of Existing Git Config Repository:
+# NOTE: If Verifying the State of an Existing Git Config Repository,
+# Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
+
+1.a. Create Initial STS Configuration on New Beamline/Host:
+
+	# Make Top Level Home Controls Area...
+
+	ls -ld /home/controls
+
+	sudo mkdir /home/controls
+
+	sudo chown controls /home/controls
+
+	sudo chgrp slowcontrols_developers /home/controls
+
+	sudo chmod g+ws /home/controls/
+
+	ls -ld /home/controls
+
+	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
+
+	ls -l /home/controls/config/
+
+	git clone git+ssh://trac.sns.gov/var/repos/config \
+		/home/controls/config/
+
+	cd /home/controls/config/
+
+	OLD="stsXXX"   # "Old" or Existing Beamline Branch to Copy From
+
+	NEW="stsYYY"   # "New" Beamline Branch Being Created
+
+	git checkout ${OLD}
+
+	git branch ${NEW}
+
+	git checkout ${NEW}
+
+	git branch -d ${OLD}
+
+	git branch -a | head
+
+		* stsYYY
+		  master
+		  remotes/origin/HEAD -> origin/master
+		  . . .
+
+	git rm -r deploy/ sts.deployment.history.txt
+
+	git commit -m "Clearing Deployment History from Copied Branch" \
+		deploy/ sts.deployment.history.txt
+
+	git status
+
+	git push origin ${NEW}
+
+	RedHat6:
+	vi .git/config
+		- add section:
+			[branch "stsYYY"]
+				remote = origin
+				merge = refs/heads/stsYYY
+
+	RedHat7:
+	git branch --set-upstream-to=origin/${NEW} ${NEW}
+
+	git push
+
+	git status
+
+	# Populate New Branch with Schtuff...! ;-D
+
+	### NOTE: If Just Copied Complete Setup from Existing Branch,
+	### Then Please Proceed to Step 1.b. :-D
+
+	### Else Proceed with Step 1.a to Create Brand New Config. :-D
+
+	# Remove Any "brdo" (BranchDo) Script Inherited from "master" Branch...
+
+	git rm brdo
+	git commit -m "Remove BranchDo Script from Master Branch" brdo
+
+	# Get/Copy/Create a "confck" Script...
+
+	cp /SNS/users/y8y/confck.sts confck
+	git add confck
+	git commit -m "Install ConfCk Script." confck
+
+	./confck
+
+	# STS XInetd Configurations
+
+	mkdir -p etc/xinetd.d
+
+	-> Do For Each ${STS} Deployment in:
+		"sts", "sts_test", "sts_dummy", "sts_hfir" and "sts_hfir_test"
+
+		sudo cp ~/gitsrc/ADARA/sts/sts.xinetd /etc/xinetd.d/${STS}
+
+		sudo vi /etc/xinetd.d/${STS}
+			- set "id" to "${STS}-stream"
+			- set "server" to "/usr/local/bin/${STS}"
+			- set "port" to:
+				-> sts = 31417
+				-> sts_test = 31418
+				-> sts_dummy = 31419
+				-> sts_hfir = 31420
+				-> sts_hfir_test = 31421
+
+		cp /etc/xinetd.d/${STS} etc/xinetd.d/${STS}
+
+	# STS Services
+
+	-> Add the Following Ports to /etc/services:
+
+	sudo vi /etc/services
+
+		sts             31417/udp
+		sts             31417/tcp
+		sts_test        31418/udp
+		sts_test        31418/tcp
+		sts_dummy       31419/udp
+		sts_dummy       31419/tcp
+		sts_hfir        31420/udp
+		sts_hfir        31420/tcp
+		sts_hfir_test   31421/udp
+		sts_hfir_test   31421/tcp
+
+	cp /etc/services etc/services
+
+	git add etc
+	git commit -m "STS Etc and XInetd Config Files." etc
+
+	# STS Wrapper Scripts
+
+	mkdir -p usr/local/bin
+
+	-> Do For Each ${STS} Deployment in:
+		"sts", "sts_test", "sts_dummy", "sts_hfir" and "sts_hfir_test"
+
+		sudo cp ~/gitsrc/ADARA/sts/sts.wrapper /usr/local/bin/${STS}
+
+		sudo vi /usr/local/bin/${STS}
+			- set "CONFIG_FILE" to:
+				-> sts = "/SNS/snfs1/stsdata/sts_config.xml"
+				-> sts_test = "/SNS/snfs1/stsdata_test/sts_config.xml"
+				-> sts_dummy = "/TESTING/SNS/stsdata_dummy/sts_config.xml"
+				-> sts_hfir = "/HFIR/stsdata_hfir/sts_config.xml"
+				-> sts_hfir_test = "/HFIR/stsdata_hfir_test/sts_config.xml"
+
+		cp /usr/local/bin/${STS} usr/local/bin/${STS}
+
+	git add usr
+	git commit -m "STS Usr Local Bin Wrapper Scripts." usr
+
+1.b. Verify State of Existing Git Config Repository:
 
 	pushd /home/controls/config/ ; git pull ; git diff ; git status
 
@@ -166,7 +321,46 @@ ADARA STS Install Checklist
 
 	ls -l /usr/sbin/sts*
 
-6. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+6. Semi-Manually Deploy Local EPICS Libraries and Utilities...
+
+	# Temporarily Edit $HOME/.bashrc EPICS Settings for the Build Process
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/epics/base/master
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+	   - EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	   - EPICS_BASEV4=/home/controls/epics/basev4/master
+	   - EPICS4_DIR=/home/controls/epics/basev4/master
+
+	mkdir /tmp/share
+
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
+
+	/tmp/share/master/scripts/setup_controls.sh
+	   - Note: Prompts for User Password for Sudo Commands...
+	   - script can be re-executed repeatedly after fixing any errors... :-)
+
+	rm -rf /tmp/share
+
+	mkdir -p /home/controls/prod/epics/base
+
+	cp -rp /home/controls/epics/base/master \
+		/home/controls/prod/epics/base/rel3.14.12.6_20170606
+
+	mkdir -p /home/controls/prod/epics/extensions
+
+	cp -rp /home/controls/epics/extensions/master \
+		/home/controls/prod/epics/extensions/rel1.3_20170606
+
+	mkdir -p /home/controls/prod/epics/basev4
+
+	cp -rp /home/controls/epics/basev4/master \
+		/home/controls/prod/epics/basev4/rel4.5-SNS2_20170606
+
+7. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
 
 	ls -l /home/controls/prod/ADARA
 
@@ -191,11 +385,32 @@ ADARA STS Install Checklist
 
 	ls -l /home/controls/prod/ADARA
 
+	# Note: See Below for Jeeem's Production ADARA EPICS Setup
+	# in "$HOME/.bashrc"... ;-D
+
+	# Generally, Set the basic EPICS Environment to:
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/prod/ADARA/EpicsBaseLink
+	   - EPICS_EXTENSIONS=/home/controls/prod/ADARA/EpicsExtensionsLink
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_BASEV4=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS4_DIR=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+
 	source $HOME/.bashrc
 
 	printenv | grep EPICS
 
-7. Make Sure Accelerator Timing Git Repo is Deployed:
+8. Make Sure Accelerator Timing Git Repo is Deployed:
+
+	ls -l /home/controls/Accelerator/
+
+	cd /home/controls
+
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
 
 	ls -l /home/controls/Accelerator/
 
@@ -205,13 +420,7 @@ ADARA STS Install Checklist
 		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
-	cd /home/controls
-
-	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
-
-	ls -l /home/controls/Accelerator/
-
-8. Deploy STS Daemon:
+9. Deploy STS Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
@@ -221,9 +430,74 @@ ADARA STS Install Checklist
 			/home/controls/config/deploy/sts ->
 				/home/controls/prod/ADARA/20170717/v1.6.19/sts*
 
+	# Best Deployment Order for "All Local Everything" Hosts:
+
+	./deploy_adara sts_dummy
+	./deploy_adara sts_test
+	./deploy_adara sts_hfir_test
+	./deploy_adara sts_hfir
 	./deploy_adara sts
+
+	(Note: The "Last" STS Deployment Sets the Version for All the
+		SMS, PVSD and DASMON Binaries in /home/controls/<config>/deploy/.)
 
 DONE!!! :-D
 
    Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+
+ADDENDUMS:
+
+A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+
+	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
+	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+	export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+	export EPICS_CA_AUTO_ADDR_LIST="NO"
+	export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+
+	if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
+   		export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
+	else
+   		export EPICS_HOST_ARCH="none"
+	fi
+
+	if [[ -z $EPICS_CA_ADDR_LIST ]]; then
+   		#export EPICS_CA_ADDR_LIST="localhost"
+   		# support multiple local iocs on a host...! ;-D
+   		export EPICS_CA_ADDR_LIST="127.255.255.255"
+	fi
+
+	# From EPICS V4 setup_profile.sh...
+
+	export EPICS4_DIR="$EPICS_BASEV4"
+
+	# From EPICS Extensions setup_profile.sh...
+
+	export EDMOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMPVOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMFILES="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMHELPFILES="${EPICS_EXTENSIONS}/src/edm/helpFiles"
+	export EDMLIBS="${EPICS_EXTENSIONS}/lib/$EPICS_HOST_ARCH"
+	export EDMLIB_SUFFIX="so"
+	export EDMACTIONS="${EPICS_EXTENSIONS}/pref/edm"
+
+	# Executable Path Stuff...
+
+	epicspath="/home/controls/bin"
+	epicspath="$epicspath:${EPICS_BASE}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_BASEV4}/pvAccessCPP/bin/linux-x86_64/"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin"
+
+	### NOTE: Customize to Your Path Setup...!
+	export PATH="...:$epicspath:..."
+
+	# Additional EPICS Python Cruft...
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy/build/lib.linux-x86_64-2.6/pcaspy/"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pyepics/build/lib"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/python"
 

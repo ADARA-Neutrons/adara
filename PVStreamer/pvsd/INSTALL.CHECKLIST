@@ -8,6 +8,20 @@ ADARA PVSD Install Checklist
 
 1.a. Create Initial PVSD Configuration on New Beamline/Host:
 
+	# Make Top Level Home Controls Area...
+
+	ls -ld /home/controls
+
+	sudo mkdir /home/controls
+
+	sudo chown controls /home/controls
+
+	sudo chgrp slowcontrols_developers /home/controls
+
+	sudo chmod g+ws /home/controls/
+
+	ls -ld /home/controls
+
 	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
 
 	ls -l /home/controls/config-dassrv1/
@@ -45,6 +59,14 @@ ADARA PVSD Install Checklist
 
 	git push origin ${NEW}
 
+	RedHat6:
+	vi .git/config
+		- add section:
+			[branch "YYY-dassrv1"]
+				remote = origin
+				merge = refs/heads/YYY-dassrv1
+	
+	RedHat7:
 	git branch --set-upstream-to=origin/${NEW} ${NEW}
 
 	git push
@@ -61,13 +83,18 @@ ADARA PVSD Install Checklist
 
 	vi pvsd/usr.local.bin.pvsd
 
-	### Else...
+	### Else Proceed with Step 1.a to Create Brand New Config. :-D
+
+	# Remove Any "brdo" (BranchDo) Script Inherited from "master" Branch...
+
+	git rm brdo
+	git commit -m "Remove BranchDo Script from Master Branch" brdo
 
 	# Get/Copy/Create a "confck" Script...
 
 	cp /SNS/users/y8y/confck.pvsd confck
 	git add confck
-	git commit confck
+	git commit -m "Install ConfCk Script." confck
 
 	./confck
 
@@ -257,7 +284,46 @@ ADARA PVSD Install Checklist
 
 	ls -l /usr/sbin/pvsd
 
-7. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+7. Semi-Manually Deploy Local EPICS Libraries and Utilities...
+
+	# Temporarily Edit $HOME/.bashrc EPICS Settings for the Build Process
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/epics/base/master
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+	   - EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	   - EPICS_BASEV4=/home/controls/epics/basev4/master
+	   - EPICS4_DIR=/home/controls/epics/basev4/master
+
+	mkdir /tmp/share
+
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
+
+	/tmp/share/master/scripts/setup_controls.sh
+	   - Note: Prompts for User Password for Sudo Commands...
+	   - script can be re-executed repeatedly after fixing any errors... :-)
+
+	rm -rf /tmp/share
+
+	mkdir -p /home/controls/prod/epics/base
+
+	cp -rp /home/controls/epics/base/master \
+		/home/controls/prod/epics/base/rel3.14.12.6_20170606
+
+	mkdir -p /home/controls/prod/epics/extensions
+
+	cp -rp /home/controls/epics/extensions/master \
+		/home/controls/prod/epics/extensions/rel1.3_20170606
+
+	mkdir -p /home/controls/prod/epics/basev4
+
+	cp -rp /home/controls/epics/basev4/master \
+		/home/controls/prod/epics/basev4/rel4.5-SNS2_20170606
+
+8. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
 
 	ls -l /home/controls/prod/ADARA
 
@@ -285,11 +351,29 @@ ADARA PVSD Install Checklist
 	# Note: See Below for Jeeem's Production ADARA EPICS Setup
 	# in "$HOME/.bashrc"... ;-D
 
+	# Generally, Set the basic EPICS Environment to:
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/prod/ADARA/EpicsBaseLink
+	   - EPICS_EXTENSIONS=/home/controls/prod/ADARA/EpicsExtensionsLink
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_BASEV4=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS4_DIR=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+
 	source $HOME/.bashrc
 
 	printenv | grep EPICS
 
-8. Make Sure Accelerator Timing Git Repo is Deployed:
+9. Make Sure Accelerator Timing Git Repo is Deployed:
+
+	ls -l /home/controls/Accelerator/
+
+	cd /home/controls
+
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
 
 	ls -l /home/controls/Accelerator/
 
@@ -299,13 +383,7 @@ ADARA PVSD Install Checklist
 		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
-	cd /home/controls
-
-	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
-
-	ls -l /home/controls/Accelerator/
-
-9. Deploy PVSD Daemon:
+10. Deploy PVSD Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
@@ -317,7 +395,7 @@ ADARA PVSD Install Checklist
 
 	./deploy_adara pvsd
 
-10. Start PVSD Daemon:
+11. Start PVSD Daemon:
 
 	sudo /sbin/service pvsd status
 
@@ -331,7 +409,7 @@ DONE!!! :-D
 
 ADDENDUMS:
 
-	# Note: Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
 
 	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
 	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
