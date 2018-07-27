@@ -1181,25 +1181,26 @@ void Parser::read_file(int fd)
 
 void Parser::parse(int argc, char **argv)
 {
-		po::options_description opts("Allowed options");
-		opts.add_options()
-		("help,h", "Show usage information")
-		("hexdump,x", "Dump the contents of each packet in hex (bytes)")
-		("worddump,w", "Dump the contents of each packet in hex (words)")
-		("hidevars,H", "Hide variable update packets")
-		("showddp,D", "Show payload of device descriptor packets")
-		("low,l", "Set low data rate mode (uses very small buffer size)")
-		("events,e", "Show events")
-		("showrun,R", "Show payload of RunInfo packets")
-		("showgeom,G", "Show payload of Geometry packets")
-		("showframe,F", "Show FNA/Frame Data of RTDL packets")
-		("posixread,P", "Use POSIX read() to parse incoming stream")
-		("terse,T", "Terse Mode, Produce no output (except as requested)")
-		("catch,C", "Catch Exceptions, Try to parse past bad packets");
+	po::options_description opts("Allowed options");
+	opts.add_options()
+	("help,h", "Show usage information")
+	("version,V", "Show version information")
+	("hexdump,x", "Dump the contents of each packet in hex (bytes)")
+	("worddump,w", "Dump the contents of each packet in hex (words)")
+	("hidevars,H", "Hide variable update packets")
+	("showddp,D", "Show payload of device descriptor packets")
+	("low,l", "Set low data rate mode (uses very small buffer size)")
+	("events,e", "Show events")
+	("showrun,R", "Show payload of RunInfo packets")
+	("showgeom,G", "Show payload of Geometry packets")
+	("showframe,F", "Show FNA/Frame Data of RTDL packets")
+	("posixread,P", "Use POSIX read() to parse incoming stream")
+	("terse,T", "Terse Mode, Produce no output (except as requested)")
+	("catch,C", "Catch Exceptions, Try to parse past bad packets");
 
 	po::options_description hidden("Hidden options");
 	hidden.add_options()
-		("file", po::value<std::vector<std::string> >(), "input files");
+	("file", po::value<std::vector<std::string> >(), "input files");
 
 	po::options_description cmdline_options;
 	cmdline_options.add(opts).add(hidden);
@@ -1207,21 +1208,29 @@ void Parser::parse(int argc, char **argv)
 	po::positional_options_description p;
 	p.add("file", -1);
 
-		po::variables_map vm;
-		try {
-			po::store(po::command_line_parser(argc, argv).
-				options(cmdline_options).positional(p).run(), vm);
-			po::notify(vm);
-		} catch (po::unknown_option e) {
-			std::cerr << argv[0] << ": " << e.what() << std::endl
-				<< std::endl << opts << std::endl;
-			exit(2);
-		}
+	po::variables_map vm;
+	try {
+		po::store(po::command_line_parser(argc, argv).
+			options(cmdline_options).positional(p).run(), vm);
+		po::notify(vm);
+	} catch (po::unknown_option e) {
+		std::cerr << argv[0] << ": " << e.what() << std::endl
+			<< std::endl << opts << std::endl;
+		exit(2);
+	}
 
-		if (vm.count("help")) {
-			std::cerr << opts << std::endl;
-			exit(2);
-		}
+	if (vm.count("help")) {
+		std::cerr << opts << std::endl;
+		exit(2);
+	}
+
+	if (vm.count("version")) {
+		std::cerr << "ADARA Parser Tool"
+			<< " - ADARA Common Version " << ADARA::VERSION
+			<< ", Tag Name " << ADARA::TAG_NAME
+			<< std::endl;
+		exit(0);
+	}
 
 	m_hexDump = !!vm.count("hexdump");
 	m_wordDump = !!vm.count("worddump");
