@@ -10,6 +10,7 @@
 #include "TraceException.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "combus/ComBus.h"
 #include "UserIdLdap.h"
 
 // Do Stu's Dummy PixelId-Filled Histogram Test...
@@ -463,10 +464,20 @@ NxGen::initialize()
         makeGroup( m_software_path + "/Translation", "NXprocess" );
         writeString( m_software_path + "/Translation", "program",
             "ADARA STS" );
-        writeString( m_software_path + "/Translation", "version",
-            STS_VERSION );
         writeString( m_software_path + "/Translation", "note",
             ADARA::ATTRIB );
+
+        // ADARA STS Version String
+        string sts_version = "ADARA STS ";
+        sts_version += STS_VERSION;
+        sts_version += ", Common ";
+        sts_version += ADARA::VERSION;
+        sts_version += ", ComBus ";
+        sts_version += ADARA::ComBus::VERSION;
+        sts_version += ", Tag ";
+        sts_version += ADARA::TAG_NAME;
+        writeString( m_software_path + "/Translation", "version",
+            sts_version );
 
         // ADARA STS Processing Start Time
         struct timespec now;
