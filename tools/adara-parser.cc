@@ -1220,15 +1220,19 @@ void Parser::parse(int argc, char **argv)
 	}
 
 	if (vm.count("help")) {
+		std::cerr << std::endl << "ADARA Parser Tool"
+			<< " - ADARA Common Version " << ADARA::VERSION
+			<< ", Tag Name " << ADARA::TAG_NAME
+			<< std::endl << std::endl;
 		std::cerr << opts << std::endl;
 		exit(2);
 	}
 
 	if (vm.count("version")) {
-		std::cerr << "ADARA Parser Tool"
+		std::cerr << std::endl << "ADARA Parser Tool"
 			<< " - ADARA Common Version " << ADARA::VERSION
 			<< ", Tag Name " << ADARA::TAG_NAME
-			<< std::endl;
+			<< std::endl << std::endl;
 		exit(0);
 	}
 
