@@ -561,6 +561,7 @@ struct RunInfo
     std::string             run_title;
     std::string             proposal_id;
     std::string             proposal_title;
+    std::string             das_version;
     std::string             facility_name;
     bool                    no_sample_info;
     std::string             sample_id;
@@ -1007,7 +1008,8 @@ class IStreamAdapter
 {
 public:
     virtual void            initialize() = 0;
-    virtual void            finalize( const RunMetrics &a_run_metrics ) = 0;
+    virtual void            finalize( const RunMetrics &a_run_metrics,
+                                const RunInfo &a_run_info ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;
     virtual PVInfoBase*     makePVInfo( const std::string &a_device_name,
                                 const std::string &a_name,
