@@ -516,7 +516,7 @@ NxGen::finalize
         // Create ADARA Software Provenance Note
         makeGroup( m_software_path + "/DataAcquistion", "NXprocess" );
         writeString( m_software_path + "/DataAcquistion", "program",
-            "ADARA SMS/PVSD" );
+            "ADARA SMS" );
         writeString( m_software_path + "/DataAcquistion", "version",
             a_run_info.das_version );
         writeString( m_software_path + "/DataAcquistion", "note",
