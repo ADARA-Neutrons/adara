@@ -1984,6 +1984,11 @@ StreamParser::rxPacket
                     tmp_run_info.run_title = value;
                 }
                 else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "das_version") == 0 )
+                {
+                    tmp_run_info.das_version = value;
+                }
+                else if (xmlStrcmp( node->name,
                         (const xmlChar*) "facility_name") == 0 )
                 {
                     tmp_run_info.facility_name = value;
@@ -4372,6 +4377,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         usleep(30000); // give syslog a chance...
         m_run_info.proposal_title = a_run_info.proposal_title;
     }
+    if ( m_run_info.das_version.compare( a_run_info.das_version ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "DAS Version",
+            m_run_info.das_version.c_str(),
+            a_run_info.das_version.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.das_version = a_run_info.das_version;
+    }
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
     if ( m_run_info.facility_name.compare( a_run_info.facility_name ) ) {
         syslog( LOG_ERR,
@@ -5046,7 +5059,7 @@ StreamParser::finalizeStreamProcessing()
     checkSTSConfigElementUnitsPaths();
 
     // Let adapter do anything else it wants to
-    finalize( m_run_metrics );
+    finalize( m_run_metrics, m_run_info );
 }
 
 
