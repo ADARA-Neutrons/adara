@@ -2149,7 +2149,8 @@ public:
 protected:
 
     void                initialize(void);
-    void                finalize( const STS::RunMetrics &a_run_metrics );
+    void                finalize( const STS::RunMetrics &a_run_metrics,
+                            const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
                             const std::string &a_name,
                             const std::string &a_connection,
@@ -2343,6 +2344,7 @@ private:
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
     std::string         m_daslogs_freq_path;    ///< Path to Nexus Frequency DAS Log
     std::string         m_daslogs_pchg_path;    ///< Path to Nexus Proton Charge DAS Log
+    std::string         m_software_path;        ///< Path to Software Provenance Collection
     std::string         m_pid_name;             ///< Name of PID data in Nexus file
     std::string         m_tof_name;             ///< Name of TOF data in Nexus file
     std::string         m_index_name;           ///< Name of Event Index data in Nexus file

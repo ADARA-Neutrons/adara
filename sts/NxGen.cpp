@@ -54,6 +54,7 @@ NxGen::NxGen
     m_daslogs_path(m_entry_path + string("/DASlogs")),
     m_daslogs_freq_path(m_daslogs_path + string("/frequency")),
     m_daslogs_pchg_path(m_daslogs_path + string("/proton_charge")),
+    m_software_path(m_entry_path + string("/Software")),
     m_pid_name(string("event_id")),
     m_tof_name(string("event_time_offset")),
     m_index_name(string("event_index")),
@@ -455,6 +456,24 @@ NxGen::initialize()
         //     to pulseBuffersReady() or finalize(),
         //     create & write in one shot...)
 
+        // Create Software Provenance Collection
+        makeGroup( m_software_path, "NXcollection" );
+
+        // Create ADARA STS Software Provenance Note
+        makeGroup( m_software_path + "/Translation", "NXprocess" );
+        writeString( m_software_path + "/Translation", "program",
+            "ADARA STS" );
+        writeString( m_software_path + "/Translation", "version",
+            STS_VERSION );
+        writeString( m_software_path + "/Translation", "note",
+            ADARA::ATTRIB );
+
+        // ADARA STS Processing Start Time
+        struct timespec now;
+        clock_gettime( CLOCK_REALTIME_COARSE, &now );
+        string time = timeToISO8601( now );
+        writeString( m_software_path + "/Translation", "date", time );
+
         // Insert initial "not in scan" value:
         //     - Current Nexus scan log calls for 0
         //     to be used for all scan stops
@@ -483,7 +502,8 @@ NxGen::initialize()
 void
 NxGen::finalize
 (
-    const STS::RunMetrics &a_run_metrics    ///< [in] Run metrics object
+    const STS::RunMetrics &a_run_metrics,   ///< [in] Run metrics object
+    const STS::RunInfo &a_run_info          ///< [in] Run information object
 )
 {
     if (!m_gen_nexus)
@@ -492,6 +512,21 @@ NxGen::finalize
     try
     {
         writeString( m_entry_path, "definition", "NXsnsevent" );
+
+        // Create ADARA Software Provenance Note
+        makeGroup( m_software_path + "/DataAcquistion", "NXprocess" );
+        writeString( m_software_path + "/DataAcquistion", "program",
+            "ADARA SMS/PVSD" );
+        writeString( m_software_path + "/DataAcquistion", "version",
+            a_run_info.das_version );
+        writeString( m_software_path + "/DataAcquistion", "note",
+            ADARA::ATTRIB );
+
+        // ADARA SMS Processing Start Time
+        string run_start_time_str =
+            timeToISO8601( a_run_metrics.run_start_time );
+        writeString( m_software_path + "/DataAcquistion", "date",
+            run_start_time_str );
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
         if ( !m_haveRunComment ) {
@@ -622,12 +657,11 @@ NxGen::finalize
             a_run_metrics.total_charge, CHARGE_UNITS );
 
         // Start time
-        string time = timeToISO8601( a_run_metrics.run_start_time );
-        writeString( m_entry_path, "start_time", time );
+        writeString( m_entry_path, "start_time", run_start_time_str );
 
         // Add start time (offset) properties to all time axis in DAS logs
         writeStringAttribute( m_daslogs_freq_path + "/time",
-            "offset", time );
+            "offset", run_start_time_str );
         writeScalarAttribute( m_daslogs_freq_path + "/time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
@@ -636,7 +670,7 @@ NxGen::finalize
             (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pause/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/pause/time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
@@ -645,7 +679,7 @@ NxGen::finalize
             (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/scan_index/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/scan_index/time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
@@ -654,7 +688,7 @@ NxGen::finalize
             (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/comments/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/comments/time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
@@ -664,7 +698,7 @@ NxGen::finalize
 
         writeStringAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
@@ -675,7 +709,7 @@ NxGen::finalize
             (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pulse_flags/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
             "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
@@ -684,8 +718,9 @@ NxGen::finalize
             (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         // End time
-        time = timeToISO8601( a_run_metrics.run_end_time );
-        writeString( m_entry_path, "end_time", time );
+        string run_end_time_str =
+            timeToISO8601( a_run_metrics.run_end_time );
+        writeString( m_entry_path, "end_time", run_end_time_str );
 
         m_h5nx.H5NXclose_file();
     }
