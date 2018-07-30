@@ -3,6 +3,26 @@ ADARA STS Install Checklist
 
 	- for a New or Upgraded STS1/STS2 (or Labanalysis) Host...
 
+*** ADARA Git Repository ***
+
+Please note that in the following installation instructions, it is
+assumed the ADARA Git Repository has been checked out/cloned into:
+
+   ~/gitsrc/ADARA
+
+from the Git repository in:
+
+   git+ssh://trac.sns.gov/var/repos/ADARA
+
+i.e.:
+
+   git clone git+ssh://trac.sns.gov/var/repos/ADARA ~/gitsrc
+
+If you place your clone of the ADARA Git Repository into a different
+base directory in the filesystem, then you will need to update this
+source directory location for any configuration files being copied
+from the ADARA Git Repository.
+
 # NOTE: If Verifying the State of an Existing Git Config Repository,
 # Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
 
