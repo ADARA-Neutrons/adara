@@ -725,7 +725,8 @@ public:
         m_enum_index(a_enum_index),
         m_units(a_units),
         m_ignore(a_ignore),
-        m_last_time(0)
+        m_last_time(0),
+        m_has_non_normalized(false)
     {}
 
     /// PVInfoBase destructor
@@ -803,7 +804,8 @@ public:
     }
 
     /// Virtual method to allow subclasses to write buffered PV values and time axis
-    virtual void flushBuffers( struct RunMetrics *a_run_metrics = 0 ) = 0;
+    virtual int32_t flushBuffers( uint64_t start_time,
+        struct RunMetrics *a_run_metrics = 0 ) = 0;
 
     virtual void createSTSConfigConditionalGroups(void) = 0;
 
@@ -820,7 +822,9 @@ public:
     bool                m_ignore;       ///< PV Ignore Flag
     Statistics          m_stats;        ///< Statistics of PV
     uint64_t            m_last_time;    ///< Nanosec time (EPICS epoch) of last received update
+    std::vector<uint64_t> m_abs_time_buffer; ///< Buffer that holds absolute (non-normalized) timestamp (nanoseconds) of PV value updates
     std::vector<double> m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
+    bool                m_has_non_normalized; ///< This PV received value updates before 1st pulse...
 };
 
 /// Intermmediary PV template class that provides typed value buffer
@@ -943,7 +947,7 @@ public:
     )
     {
         std::stringstream ss;
-        ss << value;
+        ss << std::setprecision(16) << value;
         return( ss.str() );
     }
 
@@ -980,7 +984,7 @@ public:
     )
     {
         std::stringstream ss;
-        ss << "[";
+        ss << "[" << std::setprecision(16);
         for ( uint32_t j=0 ; j < value.size() ; j++ )
         {
             if ( j ) ss << ", ";
