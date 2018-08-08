@@ -674,11 +674,14 @@ private:
         }
 
         /// Writes buffered PV values and time axis to Nexus file and performs finalization
-        void flushBuffers
+        int32_t flushBuffers
         (
-            struct STS::RunMetrics *a_run_metrics      ///< If non-zero, indicates finalization code should be executed for this PV
+            uint64_t start_time,    ///< 1st Pulse Time (nanosecs), if set
+            struct STS::RunMetrics *a_run_metrics   ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
+            int32_t num_values = -1;
+
             try
             {
                 std::stringstream device_ss;
@@ -688,6 +691,194 @@ private:
 
                 std::string pv_str = "PV ";
                 pv_str += this->m_internal_name.c_str();
+
+                // Handle Not-Yet-Normalized Variable Value Update Times...
+                if ( this->m_has_non_normalized )
+                {
+                    // Have We Received Our 1st Pulse Yet...?
+                    // If So, Then Fix Non-Normalized Value Updates Now.
+                    if ( start_time )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s: %s %s %s %s, %s: %s",
+                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            device_str.c_str(),
+                            "Normalizing PV Value Times",
+                            "with First Pulse Time",
+                            "Now Available",
+                            pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        // Normalize All Non-Normalized Timestamps...
+                        int32_t last_pre_pulse_index = -1;
+                        bool done = false;
+                        for ( uint32_t i=0 ;
+                            !done && i < this->m_time_buffer.size(); ++i )
+                        {
+                            // Not-Yet-Normalized Time...
+                            if ( this->m_time_buffer[i] < 0.0 )
+                            {
+                                // Positive Time Update,
+                                // Normalize PV Time to 1st Pulse...
+                                if ( this->m_abs_time_buffer[i]
+                                        > start_time )
+                                {
+                                    double t = ( this->m_abs_time_buffer[i]
+                                        - start_time ) / NANO_PER_SECOND_D;
+                                    this->m_time_buffer[i] = t;
+
+                                    syslog( LOG_INFO,
+                                        "[%i] %s %s %s: %s = %s @ %lf",
+                                        g_pid, "NxGen::flushBuffers()",
+                                        device_str.c_str(),
+                                        "Positive Time Update",
+                                        pv_str.c_str(),
+                                        this->valueToString(
+                                            this->m_value_buffer[i] )
+                                                .c_str(),
+                                        this->m_time_buffer[i] );
+                                    usleep(30000); // give syslog a chance
+
+                                    // Time is Normalized Now,
+                                    // We Can Add This Value to Stats.
+                                    addToStats( this->m_value_buffer[i] );
+                                }
+
+                                // Truncate Any Negative Time Offsets to 0.
+                                // Log Negative Time Truncation as Error
+                                // After 1st PV Value.
+                                // (otherwise we get spammed for nearly
+                                // every PV in the run! ;-D)
+                                else
+                                {
+                                    std::string log_hdr = "";
+                                    int log_type = LOG_INFO;
+                                    if ( this->m_last_value_set ) {
+                                        log_type = LOG_ERR;
+                                        log_hdr = "STS Error: ";
+                                    }
+                                    std::stringstream ss;
+                                    ss << log_hdr;
+                                    ss << "NxGen::flushBuffers() ";
+                                    ss << device_str;
+                                    ss << pv_str;
+                                    ss << " = ";
+                                    ss << this->valueToString(
+                                        this->m_value_buffer[i] ).c_str();
+                                    ss << ":";
+                                    ss << " Truncate Negative Variable";
+                                    ss << " Value Update Time to Zero";
+                                    syslog( log_type,
+                               "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                                        g_pid, ss.str().c_str(),
+                                        (unsigned long)(
+                                                this->m_abs_time_buffer[i]
+                                                / NANO_PER_SECOND_LL )
+                                            - ADARA::EPICS_EPOCH_OFFSET,
+                                        (unsigned long)(
+                                                this->m_abs_time_buffer[i]
+                                                % NANO_PER_SECOND_LL ),
+                                        this->m_abs_time_buffer[i],
+                                        (unsigned long)( start_time
+                                                / NANO_PER_SECOND_LL )
+                                            - ADARA::EPICS_EPOCH_OFFSET,
+                                        (unsigned long)( start_time
+                                                % NANO_PER_SECOND_LL ),
+                                        start_time );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    this->m_time_buffer[i] = 0.0;
+
+                                    last_pre_pulse_index = i;
+                                }
+                            }
+
+                            // Done...!
+                            else
+                                done = true;
+                        }
+
+                        // Now Trim Off Any But the Last Pre-First-Pulse
+                        // Variable Value Update (& Add This One to Stats!)
+                        if ( last_pre_pulse_index >= 0 )
+                        {
+                            // Log PV Values We're About to Throw Away...
+                            std::stringstream ss;
+                            ss << "NxGen::flushBuffers() ";
+                            ss << device_str;
+                            ss << pv_str;
+                            ss << ":";
+                            ss << " Purging Pre-First-Pulse Values [";
+                            for ( uint32_t i=0 ;
+                                    i < last_pre_pulse_index ; i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << this->valueToString(
+                                    this->m_value_buffer[i] );
+                                ss << " @ " << this->m_abs_time_buffer[i];
+                            }
+                            ss << "]";
+                            ss << " (up to last_pre_pulse_index=";
+                            ss << last_pre_pulse_index;
+                            ss << ")";
+                            syslog( LOG_ERR,
+                               "[%i] %s %s < %lu.%09lu (%lu)",
+                                g_pid, "STS Error:", ss.str().c_str(),
+                                (unsigned long)( start_time
+                                        / NANO_PER_SECOND_LL )
+                                    - ADARA::EPICS_EPOCH_OFFSET,
+                                (unsigned long)( start_time
+                                        % NANO_PER_SECOND_LL ),
+                                start_time );
+                            usleep(30000); // give syslog a chance...
+
+                            // Erase PV Value Updates Up to the
+                            // "Last" Pre-First-Pulse Update...
+
+                            this->m_value_buffer.erase(
+                                this->m_value_buffer.begin(),
+                                this->m_value_buffer.begin()
+                                    + last_pre_pulse_index );
+
+                            this->m_abs_time_buffer.erase(
+                                this->m_abs_time_buffer.begin(),
+                                this->m_abs_time_buffer.begin()
+                                    + last_pre_pulse_index );
+
+                            this->m_time_buffer.erase(
+                                this->m_time_buffer.begin(),
+                                this->m_time_buffer.begin()
+                                    + last_pre_pulse_index );
+
+                            // Now Add the "Last" Pre-First-Pulse Update
+                            // to the Stats for this PV...
+
+                            addToStats( this->m_value_buffer[0] );
+                        }
+
+                        // Done Normalizing This PV's Value Updates.
+                        this->m_has_non_normalized = false;
+                    }
+
+                    // Nope, No 1st Pulse Time to Normalize From Yet...
+                    // Not Soup Yet, Wait for Later...
+                    // (Tho Log Error About It, Lest We Swell Up & Pop!)
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s: %s %s %s %s, %s: %s",
+                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            device_str.c_str(),
+                            "Non-Normalized PV Buffer Full",
+                            "With No First Pulse Time Yet",
+                            "Deferring For Now",
+                            pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        return( -1 );
+                    }
+                }
 
                 // Write PV Values to NeXus File _If_ We're Writing to
                 // NeXus and _If_ We Care About This PV (_Not_ Ignored!)
@@ -705,14 +896,16 @@ private:
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s: %s - %s, %s: %s",
-                                g_pid, "STS Error", device_str.c_str(),
+                                "[%i] %s: %s %s: %s, %s: %s",
+                                g_pid, "STS Error",
+                                "NxGen::flushBuffers()",
+                                device_str.c_str(),
                                 "String/Array PV Buffer Full",
                                 "Deferring to Run End",
-                                this->m_internal_name.c_str() );
+                                pv_str.c_str() );
                             usleep(30000); // give syslog a chance...
                         }
-                        return;
+                        return( -1 );
                     }
 
                     // Create log if no data has been written yet
@@ -724,7 +917,7 @@ private:
                         // [Need this check because _Always_ called
                         //    in finalizeStreamProcessing() now... ;-]
                         if ( !(this->m_value_buffer.size()) )
-                            return;
+                            return( 0 );
 
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
 
@@ -762,6 +955,8 @@ private:
 
                         m_cur_size += this->m_value_buffer.size();
                     }
+
+                    num_values = this->m_value_buffer.size();
 
                     if ( a_run_metrics )
                     {
@@ -818,9 +1013,11 @@ private:
                             std::stringstream ss_dst;
                             ss_dst << m_log_path << "/" << "enum";
 
-                            syslog( LOG_INFO,
-                                "[%i] Linking Enum Group %s to %s",
-                                g_pid, ss_src.str().c_str(),
+                            syslog( LOG_INFO, "[%i] %s %s %s: %s %s to %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                device_str.c_str(), pv_str.c_str(),
+                                "Linking Enum Group",
+                                ss_src.str().c_str(),
                                 ss_dst.str().c_str() );
                             usleep(30000); // give syslog a chance...
 
@@ -835,11 +1032,13 @@ private:
                                 if ( m_value_enum_strings_not_found > 0 )
                                 {
                                     syslog( LOG_ERR,
-                                        "[%i] %s: %d %s Not Found For %s!",
+                                        "[%i] %s: %s %s: %d %s %s %s!",
                                         g_pid, "STS Error",
+                                        "NxGen::flushBuffers()",
+                                        device_str.c_str(),
                                         m_value_enum_strings_not_found,
                                         "Enumerated Type Value Strings",
-                                        pv_str.c_str() );
+                                        "Not Found For", pv_str.c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
 
@@ -853,10 +1052,13 @@ private:
                                 }
 
                                 syslog( LOG_ERR,
-                                    "[%i] %s for %s size=%lu max_len=%u",
-                                    g_pid, "Enumerated Type Value Strings",
+                                    "[%i] %s %s: %s for %s %s=%lu %s=%u",
+                                    g_pid, "NxGen::flushBuffers()",
+                                    device_str.c_str(),
+                                    "Enumerated Type Value Strings",
                                     pv_str.c_str(),
-                                    m_value_enum_strings.size(),
+                                    "size", m_value_enum_strings.size(),
+                                    "max_len",
                                     m_value_enum_strings_max_len );
                                 usleep(30000); // give syslog a chance...
 
@@ -892,8 +1094,10 @@ private:
                             else
                             {
                                 syslog( LOG_ERR,
-                                    "[%i] %s: %s for %s - %s",
+                                    "[%i] %s: %s %s: %s for %s - %s",
                                     g_pid, "STS Error",
+                                    "NxGen::flushBuffers()",
+                                    device_str.c_str(),
                                     "Empty Enumerated Type Value Strings",
                                     pv_str.c_str(),
                                     "Creating Dummy Value Strings" );
@@ -908,8 +1112,11 @@ private:
                         if ( !m_link_path.empty() )
                         {
                             syslog( LOG_INFO,
-                                "[%i] Linking PV Channel %s to Alias %s",
-                                g_pid, m_log_path.c_str(),
+                                "[%i] %s %s %s: %s %s to Alias %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                device_str.c_str(), pv_str.c_str(),
+                                "Linking PV Channel",
+                                m_log_path.c_str(),
                                 m_link_path.c_str() );
                             usleep(30000); // give syslog a chance...
 
@@ -930,8 +1137,11 @@ private:
                             else
                             {
                                 syslog( LOG_INFO,
-                                    "[%i] PV Channel %s %s - %s",
-                                    g_pid, m_log_path.c_str(),
+                                    "[%i] %s %s %s: PV Channel %s %s - %s",
+                                    g_pid, "NxGen::flushBuffers()",
+                                    device_str.c_str(),
+                                    pv_str.c_str(),
+                                    m_log_path.c_str(),
                                     "Already Has Target Group Link String",
                                     "Skipping..." );
                                 usleep(30000); // give syslog a chance...
@@ -948,9 +1158,11 @@ private:
                 }
                 else if ( this->m_ignore )
                 {
-                    syslog( LOG_INFO, "[%i] %s - Ignoring %s",
-                        g_pid, device_str.c_str(), pv_str.c_str() );
+                    syslog( LOG_INFO, "[%i] %s %s - Ignoring %s",
+                        g_pid, "NxGen::flushBuffers()",
+                        device_str.c_str(), pv_str.c_str() );
                     usleep(30000); // give syslog a chance...
+                    num_values = 0;
                 }
             }
             catch( TraceException &e )
@@ -962,6 +1174,8 @@ private:
 
             this->m_value_buffer.clear();
             this->m_time_buffer.clear();
+
+            return( num_values );
         }
 
         /// Compare Uint32 PV Value to Conditional STS Config Group Strings

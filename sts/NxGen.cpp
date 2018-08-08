@@ -101,7 +101,8 @@ NxGen::~NxGen()
  * This method constructs Nexus-specific PVInfoBase objects for use by
  * the generalized process variable handlers in the StreamParser class.
  * Due to ADARA protocol limitations, only uint32, double and string
- * types are supported (others are mapped to these).
+ * scalar types are supported (others are mapped to these), in addition
+ * to the new uint32 and double array PVs.
  */
 STS::PVInfoBase*
 NxGen::makePVInfo
