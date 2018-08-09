@@ -947,7 +947,7 @@ public:
     )
     {
         std::stringstream ss;
-        ss << std::setprecision(16) << value;
+        ss << std::setprecision(17) << value;
         return( ss.str() );
     }
 
@@ -984,7 +984,7 @@ public:
     )
     {
         std::stringstream ss;
-        ss << "[" << std::setprecision(16);
+        ss << "[" << std::setprecision(17);
         for ( uint32_t j=0 ; j < value.size() ; j++ )
         {
             if ( j ) ss << ", ";
