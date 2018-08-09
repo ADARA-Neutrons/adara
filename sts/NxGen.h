@@ -810,7 +810,7 @@ private:
                             ss << pv_str;
                             ss << ":";
                             ss << " Purging Pre-First-Pulse Values [";
-                            for ( uint32_t i=0 ;
+                            for ( int32_t i=0 ;
                                     i < last_pre_pulse_index ; i++ )
                             {
                                 if ( i ) ss << ", ";
