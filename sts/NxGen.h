@@ -289,7 +289,7 @@ private:
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
-            if ( m_internal_name == m_internal_connection )
+            if ( !(m_internal_name.compare( m_internal_connection )) )
             {
                 m_log_path =
                     m_nxgen.m_daslogs_path + "/" + m_internal_name;
@@ -314,9 +314,10 @@ private:
             m_device_str = device_ss.str();
 
             std::stringstream pv_ss;
-            pv_ss << "PV " << m_internal_name
-                << " (" << m_internal_connection << ")"
-                << " (id=" << this->m_pv_id << ")";
+            pv_ss << "PV " << m_internal_name;
+            if ( m_internal_name.compare( m_internal_connection ) )
+                pv_ss << " (" << m_internal_connection << ")";
+            pv_ss << " (id=" << this->m_pv_id << ")";
             m_pv_str = pv_ss.str();
 
             m_device_pv_str = "[" + m_device_str + " " + m_pv_str + "]";
