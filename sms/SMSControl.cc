@@ -88,6 +88,8 @@ uint32_t SMSControl::m_neutronEventStateBits;
 uint32_t SMSControl::m_neutronEventStateMask;
 bool SMSControl::m_neutronEventSortByState;
 
+bool SMSControl::m_ignoreInterleavedSawtooth;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -244,9 +246,14 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	}
 
 	m_neutronEventSortByState =
-			conf.get<bool>("sms.neutron_event_sort_by_state", 0);
+			conf.get<bool>("sms.neutron_event_sort_by_state", false);
 	INFO("Setting Neutron Event Sort By State to "
 		<< m_neutronEventSortByState << ".");
+
+	m_ignoreInterleavedSawtooth =
+		conf.get<bool>("sms.ignore_interleaved_sawtooth", true);
+	INFO("Setting Ignore-Interleaved-Global-SAWTOOTH Flag to "
+		<< ( ( m_ignoreInterleavedSawtooth ) ? "True" : "False" ));
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -502,6 +509,11 @@ SMSControl::SMSControl() :
 							+ "NeutronEventSortByState",
 						/* AutoSave */ true));
 
+	m_pvIgnoreInterleavedSawtooth = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "IgnoreInterleavedGlobalSAWTOOTH",
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -528,6 +540,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvIntermittentDataThreshold);
 	addPV(m_pvNeutronEventStateBits);
 	addPV(m_pvNeutronEventSortByState);
+	addPV(m_pvIgnoreInterleavedSawtooth);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -590,6 +603,10 @@ SMSControl::SMSControl() :
 
 	// Initialize Neutron Event Sort By State PV...
 	m_pvNeutronEventSortByState->update( m_neutronEventSortByState, &now);
+
+	// Initialize Ignore Interleaved-Global-SAWTOOTH Flag...
+	m_pvIgnoreInterleavedSawtooth->update(
+		m_ignoreInterleavedSawtooth, &now );
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -658,6 +675,12 @@ SMSControl::SMSControl() :
 			m_pvNeutronEventSortByState->getName(), bvalue, ts ) ) {
 		m_neutronEventSortByState = bvalue;
 		m_pvNeutronEventSortByState->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvIgnoreInterleavedSawtooth->getName(), bvalue, ts ) ) {
+		m_ignoreInterleavedSawtooth = bvalue;
+		m_pvIgnoreInterleavedSawtooth->update(bvalue, &ts);
 	}
 
 	// Initialize Next Run Number...
@@ -1416,7 +1439,7 @@ void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 		// been Marked Complete; the Pulses are Insertion-Sorted in
 		// Pulse Time Order, so if This Pulse is Complete, then
 		// All Preceding Pulses Should Also Be...!
-		// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+		// (Even Any "SAWTOOTH" Pulses that arrived Out of Time Order, as
 		// These should be Correctly Handled by Sufficient Buffer Size!)
 
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
@@ -1594,6 +1617,8 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t id, uint32_t dup)
 {
+	static uint32_t cnt = 0;
+
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
@@ -1611,11 +1636,19 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		return it;
 	}
 
+	// Infrequently Check Live Control PV for
+	// Ignore-Interleaved-Global-SAWTOOTH Flag...
+	// (Once Per Minute...)
+	if ( !(++cnt % 3600) ) {
+		m_ignoreInterleavedSawtooth =
+			m_pvIgnoreInterleavedSawtooth->value();
+	}
+
 	// New Pulse...! If Any Pulses in list, Check for SAWTOOTH...
 	// Note: Map is _Already_ Sorted by Pulse Time (PulseIdentifier),
 	// so we can just grab Min and Max Time from the "ends" of the list
 	// to check for any SAWTOOTH Pulses... ;-b
-	if (m_pulses.begin() != m_pulses.end()) {
+	if ( m_pulses.begin() != m_pulses.end() ) {
 
 		// Get Min Pulse Time
 		it = m_pulses.begin();
@@ -1626,7 +1659,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t max_id = it->first.first;
 
 		// Log any SAWTOOTH pulses... :-o
-		if (id < min_id) {
+		if ( id < min_id ) {
 			/* Rate-limited logging of Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
@@ -1640,8 +1673,9 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					<< " max=0x" << max_id << std::dec);
 			}
 		}
-		else if (id >= min_id && id < max_id) {
-			/* Rate-limited logging of Global SAWTOOTH Pulse */
+		else if ( !m_ignoreInterleavedSawtooth
+				&& id >= min_id && id < max_id ) {
+			/* Rate-limited logging of Interleaved Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
@@ -1696,12 +1730,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// Some Pulses from Our Internal Pulse Buffer, so we Don't Swell Up
 	// and Pop...! ;-D
 
-	static uint32_t cnt = 0;
-
 	// Once Per Second...
 	uint32_t freq = 60;
 
-	if ( !(++cnt % freq) )
+	// ("cnt" already incremented above... :-)
+	if ( !(cnt % freq) )
 	{
 		// Update Max Pulse Buffer Size from PV...
 		m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
@@ -2673,7 +2706,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// been Marked Complete; the Pulses are Insertion-Sorted in
 	// Pulse Time Order, so if This Pulse is Complete, then
 	// All Preceding Pulses Should Also Be...!
-	// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+	// (Even Any "SAWTOOTH" Pulses that arrived Out of Time Order, as
 	// These should be Correctly Handled by Sufficient Buffer Size!)
 
 	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
