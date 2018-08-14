@@ -148,9 +148,10 @@ NxGen::makePVInfo
             if ( name_ver > 0 )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s Device %s: %s Clash %s -> %s",
+                    "[%i] %s Device %s: %s %s -> %s",
                     g_pid, "STS Error:", a_device_name.c_str(),
-                    "PV Name", a_name.c_str(), internal_name.c_str() );
+                    "PV Name Clash", a_name.c_str(),
+                    internal_name.c_str() );
                 usleep(30000); // give syslog a chance...
             }
             m_pv_name_history.insert( internal_name );
@@ -195,9 +196,9 @@ NxGen::makePVInfo
                 if ( connection_ver > 0 )
                 {
                     syslog( LOG_ERR,
-                        "[%i] %s Device %s: %s Clash %s -> %s",
+                        "[%i] %s Device %s: %s %s -> %s",
                         g_pid, "STS Error:", a_device_name.c_str(),
-                        "PV Connection String", a_connection.c_str(),
+                        "PV Connection String Clash", a_connection.c_str(),
                         internal_connection.c_str() );
                     usleep(30000); // give syslog a chance...
                 }
