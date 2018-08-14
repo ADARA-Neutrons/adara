@@ -807,7 +807,7 @@ private:
 
                         // Now Trim Off Any But the Last Pre-First-Pulse
                         // Variable Value Update (& Add This One to Stats!)
-                        if ( last_pre_pulse_index >= 0 )
+                        if ( last_pre_pulse_index > 0 )
                         {
                             // Log PV Values We're About to Throw Away...
                             std::stringstream ss;
@@ -855,10 +855,12 @@ private:
                                 this->m_time_buffer.begin(),
                                 this->m_time_buffer.begin()
                                     + last_pre_pulse_index );
+                        }
 
-                            // Now Add the "Last" Pre-First-Pulse Update
-                            // to the Stats for this PV...
-
+                        // Now Add the "Last" Pre-First-Pulse Update
+                        // to the Stats for this PV...
+                        if ( last_pre_pulse_index >= 0 )
+                        {
                             addToStats( this->m_value_buffer[0] );
                         }
 
