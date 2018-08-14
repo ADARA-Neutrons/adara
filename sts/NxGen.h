@@ -285,7 +285,8 @@ private:
             m_cur_size(0),
             m_full_buffer_count(0),
             m_value_enum_strings_max_len(-1),
-            m_value_enum_strings_not_found(0)
+            m_value_enum_strings_not_found(0),
+            m_finalized(false)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
@@ -965,7 +966,9 @@ private:
 
                     num_values = this->m_value_buffer.size();
 
-                    if ( a_run_metrics )
+                    // Do Final Statistics & Links Pass
+                    // (Unless We've Already Done It, Duplicate Keys...)
+                    if ( a_run_metrics && !(this->m_finalized) )
                     {
                         // Add start time (offset) properties
                         // to all time axis in DAS logs
@@ -1161,6 +1164,20 @@ private:
                         // Search STS Config for Associated Groups
                         if ( m_nxgen.m_config_groups.size() )
                             createSTSConfigGroups();
+
+                        // Done, We've Finalized This PV Log.
+                        this->m_finalized = true;
+                    }
+
+                    // Log That We had a Duplicate Key & Finalized "Twice"
+                    else if ( a_run_metrics && this->m_finalized )
+                    {
+                        syslog( LOG_WARNING,
+                            "[%i] Warning in %s: %s: PV %s",
+                            g_pid, "NxGen::flushBuffers()",
+                            this->m_device_pv_str.c_str(),
+                            "Was Already Finalized, Duplicate Key...?" );
+                        usleep(30000); // give syslog a chance...
                     }
                 }
                 else if ( this->m_ignore )
@@ -2323,6 +2340,7 @@ private:
                         m_value_enum_strings;   ///< Vector of Enumerated Type Value Strings
         uint32_t        m_value_enum_strings_max_len;   ///< Max Length of Enumerated Type Value Strings
         uint32_t        m_value_enum_strings_not_found;   ///< Number of Enumerated Type Value Strings Not Found
+        bool            m_finalized;    ///< Flag to Indicate PV Log has been Finalized
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
