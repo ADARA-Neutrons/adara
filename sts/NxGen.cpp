@@ -168,17 +168,17 @@ NxGen::makePVInfo
         internal_connection = internal_name;
     }
 
-    // Otherwise Check for Connection String Collisions: This code looks
-    // for this connection string across all PVs and if found increments
-    // a version number.  Then it checks again to make sure _This_
-    // auto-generated internal connection string doesn't collide with
-    // an existing (top-level) PV name or connection string.
+    // Otherwise Check for Connection String Collisions: This code
+    // looks for this connection string across all PVs and, if found,
+    // increments a version number.  Then it checks again to make sure
+    // _This_ auto-generated internal connection string doesn't collide
+    // with an existing (top-level) PV name or connection string.
     // This continues until a version is found that doesn't collide.
 
     // Let's *Not* Assume that any Connection String collisions
     // correspond to 2 Different Aliases of the Same Variable, just
-    // in case that happens Not to be true... Better to duplicate a
-    // PV than throw away the values for a distinct PV with a Name Clash.)
+    // in case that happens _Not_ to be true... Better to duplicate a
+    // PV than throw away the values for a distinct PV with a Name Clash.
 
     else
     {
@@ -210,34 +210,34 @@ NxGen::makePVInfo
 
     switch ( a_type )
     {
-    case STS::PVT_INT:  // ADARA only supports uint32_t currently
-    case STS::PVT_ENUM:
-    case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_FLOAT: // ADARA only supports double currently
-    case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_STRING:
-        return new NxPVInfo<string>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_UINT_ARRAY:
-        return new NxPVInfo< vector<uint32_t> >( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_DOUBLE_ARRAY:
-        return new NxPVInfo< vector<double> >( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
+        case STS::PVT_INT:  // ADARA only supports uint32_t currently
+        case STS::PVT_ENUM:
+        case STS::PVT_UINT:
+            return new NxPVInfo<uint32_t>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, *this );
+        case STS::PVT_FLOAT: // ADARA only supports double currently
+        case STS::PVT_DOUBLE:
+            return new NxPVInfo<double>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, *this );
+        case STS::PVT_STRING:
+            return new NxPVInfo<string>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, *this );
+        case STS::PVT_UINT_ARRAY:
+            return new NxPVInfo< vector<uint32_t> >( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, *this );
+        case STS::PVT_DOUBLE_ARRAY:
+            return new NxPVInfo< vector<double> >( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
