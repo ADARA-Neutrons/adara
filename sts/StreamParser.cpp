@@ -3048,7 +3048,7 @@ StreamParser::rxPacket
                                 // with the PV itself (name, type, units),
                                 // then the internal ID-to-name mapping
                                 // will be updated. However, if the type
-                                // or units of an previously defined PV
+                                // or units of a previously defined PV
                                 // ever change, then a new PV must be
                                 // dynamically created to prevent an error
                                 // in the Nexus output.
@@ -3098,11 +3098,11 @@ StreamParser::rxPacket
                                     m_pvs_by_key.find( key );
                                 map<string,PVKey>::iterator xref;
 
+                                // This is a NEW Device/PV Key...!
                                 if ( ipv == m_pvs_by_key.end() )
                                 {
-                                    // This is a NEW key - see if there
-                                    // is an existing entry
-                                    // (by "dev:name:conn")
+                                    // See if there is an existing
+                                    // Name XRef entry (by "dev:name:conn")
                                     // that matches this PV EXACTLY...
 
                                     bool create = true;
@@ -3110,12 +3110,21 @@ StreamParser::rxPacket
                                         dev_name + ":" + pv_name
                                             + ":" + pv_connection );
 
+                                    // Ok, We Found the Name XRef Entry
+                                    // for this Device/PV...
                                     if ( xref != m_pv_name_xref.end() )
                                     {
+                                        // See if this XRef Points to a
+                                        // Valid PV-by-Key PVInfo Entry...
                                         ipv = m_pvs_by_key.find(
                                             xref->second );
+
+                                        // Yep, Found a PVInfo Instance...
                                         if ( ipv != m_pvs_by_key.end() )
                                         {
+                                            // Does PVInfo Instance Match?
+                                            // If So, then the Device/PV
+                                            // Key was *Re-Numbered*...!
                                             if ( ipv->second->
                                                 sameDefinition( dev_name,
                                                     pv_name,
@@ -3128,8 +3137,10 @@ StreamParser::rxPacket
                                             {
                                                 // There is an existing
                                                 // PVInfo instance with
-                                                // EXACTLY the same
-                                                // definition.
+                                                // EXACTLY the same defn
+                                                // (yet with a Different
+                                                // Device/PV Key), i.e.
+                                                // it's been *Re-Numbered*.
                                                 // This will happen if
                                                 // PVSD restarts during
                                                 // a recording.
@@ -3155,45 +3166,51 @@ StreamParser::rxPacket
                                                 // give syslog a chance...
                                                 usleep(30000);
 
-                                                // Re-use this entry
+                                                // Re-Use this PVInfo Entry
                                                 create = false;
 
-                                                if ( m_verbose ) {
-                                                    stringstream ss2;
-                                                    ss2 << "Erasing Old "
-                                                        << ipv->first.first
-                                                        << "."
-                                                        << ipv->first
-                                                            .second
-                                                        << " - Device "
-                                                        << ipv->second
-                                                            ->m_device_name
-                                                        << ": "
-                                                        << ipv->second
-                                                            ->m_name
-                                                        << " ("
-                                                        << ipv->second
-                                                            ->m_connection
-                                                        << ")";
-                                                    syslog( LOG_ERR,
-                                                        "[%i] %s(%s): %s",
-                                                        g_pid,
-                                                        "rxPacket",
-                                                        "DeviceDescriptor",
-                                                        ss2.str().c_str()
-                                                    );
-                                                    // give syslog a chance
-                                                    usleep(30000);
-                                                }
-
-                                                // Update key mappings
+                                                // *ADD* Key Mapping from
+                                                // New Key to this Existing
+                                                // PVInfo Instance Entry...
                                                 m_pvs_by_key[key] =
                                                     ipv->second;
-                                                m_pvs_by_key.erase( ipv );
 
-                                                // Update xref entry to
-                                                // point to new key
+                                                // Update Name XRef entry
+                                                // to point to New Key...
                                                 xref->second = key;
+
+                                                // *Don't* Erase Original
+                                                // Key Mapping Tho, Btw.
+                                                // Leave It Hanging Around
+                                                // for Any Straggling
+                                                // Variable Value Updates!
+
+                                                stringstream ss2;
+                                                ss2 << "NOTE:"
+                                                    << " Still Retaining"
+                                                    << " Original Mapping"
+                                                    << " to Device "
+                                                    << ipv->second
+                                                        ->m_device_name
+                                                    << ": "
+                                                    << ipv->second->m_name
+                                                    << " ("
+                                                    << ipv->second
+                                                        ->m_connection
+                                                    << ")"
+                                                    << " Under Former Key "
+                                                    << ipv->first.first
+                                                    << "."
+                                                    << ipv->first.second;
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance
+                                                usleep(30000);
                                             }
                                             else
                                             {
@@ -3402,10 +3419,11 @@ StreamParser::rxPacket
                                     // is reconfigured (in which case the
                                     // definition can be different).
                                     // Pvsd tries to keep ID-to-Name
-                                    // mappings consistent accross re-
+                                    // mappings consistent across re-
                                     // configurations, but it may
                                     // not always be able to.
 
+                                    // _Not_ the Same Definition...! Uh-Oh!
                                     if ( !ipv->second->sameDefinition(
                                             dev_name,
                                             pv_name,
@@ -3435,7 +3453,7 @@ StreamParser::rxPacket
                                             << " ignore="
                                             << ipv->second->m_ignore
                                             << "]"
-                                            << " Define New PV"
+                                            << " and Define New PV"
                                             << " [Device " << dev_name
                                             << ": " << pv_name
                                             << " (" << pv_connection
@@ -3454,6 +3472,7 @@ StreamParser::rxPacket
                                         usleep(30000);
 
                                         // Did the name change?
+                                        // Clean Up the Old XRef Entry...
                                         if ( dev_name !=
                                                 ipv->second->m_device_name
                                             || pv_name !=
@@ -3485,15 +3504,19 @@ StreamParser::rxPacket
                                             // (if PV type is supported)
                                         }
 
-                                        // PV definition has changed,
-                                        // flush and replace existing
-                                        // PVInfo object
+                                        // Nothing We Can Do Here:
+                                        // A New PV is Steamrolling Us
+                                        // Using Our Device/PV Key...
+                                        // New PV definition is different,
+                                        // so flush and replace existing
+                                        // PVInfo object...
                                         ipv->second->flushBuffers(
                                             m_pulse_info.start_time, 0 );
                                         delete ipv->second;
 
-                                        // If PV type not supported,
-                                        // makePVInfo will return NULL
+                                        // If PV type bogus/not supported,
+                                        // makePVInfo will return NULL...!
+                                        // (Else, it should work... :-)
                                         info = makePVInfo( dev_name,
                                             pv_name,
                                             pv_connection,
@@ -3507,10 +3530,13 @@ StreamParser::rxPacket
                                         if ( info )
                                         {
                                             m_pvs_by_key[key] = info;
+                                            // map[] = always overwrites!
+
                                             m_pv_name_xref[
                                                 dev_name + ":" + pv_name
                                                     + ":" + pv_connection ]
                                                 = key;
+                                            // map[] = always overwrites!
 
                                             if ( m_verbose ) {
                                                 stringstream ss2;
@@ -3585,6 +3611,8 @@ StreamParser::rxPacket
                                             m_pvs_by_key.erase( ipv );
                                         }
                                     }
+                                    // Else, Same Definition... That's Ok!
+                                    // Just Let It Ride... ;-D
                                 }
                             }
                             else
@@ -3949,7 +3977,7 @@ StreamParser::pvValueUpdate
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
                 pvinfo->m_last_time,
-                "- Ignoring PV Value Update...!"
+                "- Pass Thru Anyway..."
             );
             // give syslog a chance...
             usleep(30000);
