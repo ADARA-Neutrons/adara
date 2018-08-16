@@ -3856,34 +3856,28 @@ StreamParser::rxPacket
                                                 // give syslog a chance...
                                                 usleep(30000);
 
-                                                if ( m_verbose ) {
-                                                    stringstream ss2;
-                                                    ss2 << "Erasing Old"
-                                                        << " Key "
-                                                        << ipk->first.first
-                                                        << "."
-                                                        << ipk->
-                                                            first.second
-                                                        << " - Device "
-                                                        << ipk->second
-                                                            ->m_device_name
-                                                        << ": "
-                                                        << ipk->second->
-                                                            m_name
-                                                        << " ("
-                                                        << ipk->second
-                                                            ->m_connection
-                                                        << ")";
-                                                    syslog( LOG_ERR,
-                                                        "[%i] %s(%s): %s",
-                                                        g_pid,
-                                                        "rxPacket",
-                                                        "DeviceDescriptor",
-                                                        ss2.str().c_str()
-                                                    );
-                                                    // give syslog a chance
-                                                    usleep(30000);
-                                                }
+                                                stringstream ss2;
+                                                ss2 << "Erasing Old Key "
+                                                    << ipk->first.first
+                                                    << "."
+                                                    << ipk->first.second
+                                                    << " - Device "
+                                                    << ipk->second
+                                                        ->m_device_name
+                                                    << ": "
+                                                    << ipk->second->m_name
+                                                    << " ("
+                                                    << ipk->second
+                                                        ->m_connection
+                                                    << ")";
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid, "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance
+                                                usleep(30000);
 
                                                 m_pvs_by_key.erase( ipk );
                                             }
