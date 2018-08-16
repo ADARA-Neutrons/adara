@@ -194,8 +194,9 @@ private:
     BankInfoMap                             m_banks;                    ///< Container of detector bank information
     std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
+    std::vector<PVInfoBase*>                m_pvs_list;                 ///< Collection of all process variable information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
-    std::map<std::string,PVKey>             m_pv_name_xref;             ///< Index of process variable information (by name)
+    std::map<std::string,PVKey>             m_pvs_by_name_xref;         ///< Index of process variable information (by name)
     std::map<Identifier,std::vector<PVEnumeratedType> >
                                             m_enums_by_dev;             ///< Container of Enumerated Types (by device)
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors; number of elements)
