@@ -65,8 +65,12 @@ public:
 		std::string &existing_attr_value, bool &wasSet );
 
     //create/write a STRING dataset
-    int H5NXmake_dataset_string(const std::string &group_path,
+    int H5NXmake_dataset_string( const std::string &group_path,
         const std::string &dataset_name, const std::string &data );
+
+	//check for existence of dataset
+	int H5NXcheck_dataset_path( const std::string &group_path,
+		const std::string &dataset_name, bool &exists );
 
     //create/write a SCALAR NUMERICAL attribute
     template <typename NumT>
