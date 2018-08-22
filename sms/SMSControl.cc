@@ -1329,9 +1329,19 @@ uint32_t SMSControl::registerEventSource(uint32_t srcId, uint32_t hwId)
 
 void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 {
-	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "unregisterEventSource(): srcId=" << srcId
-		<< " smsId=" << smsId );
+	// Safety Check... ;-b
+	if ( smsId == (uint32_t) -1 ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource(): INVALID SMS ID SNUCK THRU:"
+			<< " srcId=" << srcId << " smsId=" << smsId
+			<< " - Skipping Unregister..." );
+		return;
+	}
+	else {
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource():"
+			<< " srcId=" << srcId << " smsId=" << smsId );
+	}
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
