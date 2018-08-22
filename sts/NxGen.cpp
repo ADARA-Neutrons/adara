@@ -120,93 +120,119 @@ NxGen::makePVInfo
     bool                    a_ignore        ///< [in] PV Ignore Flag
 )
 {
-    string internal_name = a_name;
-    uint32_t name_ver = 0;
-
     string internal_connection = a_connection;
-    uint32_t connection_ver = 0;
+    string internal_name = a_name;
 
-    set<string>::iterator i;
+    // *Only* When PV Name (Alias) is Different than PV Connection String,
+    // Check for Name Clashes & Do Versioning of PV Name (Alias) Here...
+    // (If the PV Name == Connection String, then the "Name" is Actually
+    // just a copy of the Connection String, so Defer to Duplicates Below!)
+    // [Note: This is True for All Recent PVSD Incarnations, tho this is
+    // _Not_ True for Ancient Legacy Test Cases in the ADARA Test Harness;
+    // But These Test Cases have been Checked and Have No Name Clashes.]
 
-    // Check for PV Name Collisions: This code looks for the Name (Alias)
-    // across all PV names and connection strings encountered thus far,
-    // and if found increments/appends a version number.
-    // Then it checks again to make sure _This_ auto-generated internal
-    // name doesn't collide with an existing (top-level) name.
-    // This continues until a version is found that doesn't collide.
-
-    while ( 1 )
+    if ( a_name.compare( a_connection ) )
     {
-        i = m_pv_name_history.find( internal_name );
-        if ( i != m_pv_name_history.end() )
-        {
-            internal_name = a_name + "("
-                + boost::lexical_cast<string>( ++name_ver ) + ")";
-        }
-        else
-        {
-            if ( name_ver > 0 )
-            {
-                syslog( LOG_ERR,
-                    "[%i] %s Device %s: %s %s -> %s",
-                    g_pid, "STS Error:", a_device_name.c_str(),
-                    "PV Name Clash", a_name.c_str(),
-                    internal_name.c_str() );
-                usleep(30000); // give syslog a chance...
-            }
-            m_pv_name_history.insert( internal_name );
-            break;
-        }
-    }
+        // Check for PV Name Collisions:
+        // This code looks for the Name (Alias) across all PV Names and
+        // Connection Strings encountered thus far, and if found
+        // Increments/Appends a Version Number to the Name.
+        // Then, it checks again to make sure _This_ New Auto-Generated
+        // Internal Name doesn't collide with an existing (top-level) Name.
+        // This continues until a Version is found that doesn't collide.
 
-    // Now Handle Connection String Issues/Collisions.
+        set<string>::iterator i;
 
-    // If the Name and Connection String were the same before,
-    // then just make them the same again now... ;-D
-    if ( a_name == a_connection )
-    {
-        internal_connection = internal_name;
-    }
+        uint32_t name_ver = 0;
 
-    // Otherwise Check for Connection String Collisions: This code
-    // looks for this connection string across all PVs and, if found,
-    // increments a version number.  Then it checks again to make sure
-    // _This_ auto-generated internal connection string doesn't collide
-    // with an existing (top-level) PV name or connection string.
-    // This continues until a version is found that doesn't collide.
-
-    // Let's *Not* Assume that any Connection String collisions
-    // correspond to 2 Different Aliases of the Same Variable, just
-    // in case that happens _Not_ to be true... Better to duplicate a
-    // PV than throw away the values for a distinct PV with a Name Clash.
-
-    else
-    {
         while ( 1 )
         {
-            i = m_pv_name_history.find( internal_connection );
-            if ( i != m_pv_name_history.end())
+            i = m_pv_name_history.find( internal_name );
+            if ( i != m_pv_name_history.end() )
             {
-                internal_connection = a_connection + "("
-                    + boost::lexical_cast<string>( ++connection_ver )
-                    + ")";
+                internal_name = a_name + "("
+                    + boost::lexical_cast<string>( ++name_ver ) + ")";
             }
             else
             {
-                if ( connection_ver > 0 )
+                if ( name_ver > 0 )
                 {
                     syslog( LOG_ERR,
-                        "[%i] %s Device %s: %s %s -> %s",
-                        g_pid, "STS Error:", a_device_name.c_str(),
-                        "PV Connection String Clash", a_connection.c_str(),
-                        internal_connection.c_str() );
+                        "[%i] %s %s: %s: Device %s: %s -> %s",
+                        g_pid, "STS Error:", "makePVInfo()",
+                        "PV Name Clash",
+                        a_device_name.c_str(),
+                        a_name.c_str(),
+                        internal_name.c_str() );
                     usleep(30000); // give syslog a chance...
                 }
-                m_pv_name_history.insert( internal_connection );
+                m_pv_name_history.insert( internal_name );
                 break;
             }
         }
     }
+
+    // Now, Check for PV Connection String Collisions/Duplicates:
+    // This code looks for this PV Connection String across All Known PVs,
+    // and, if found, Marks This PV (and its Dopplegangers) as "Duplicate".
+
+    // NOTE: We *Now* Indeed Assume that PV Connection Strings are
+    // *Unique* Across a Given Beamline, so that any PV Connection String
+    // Collisions _Must_ Correspond to 2 Different Aliases of the
+    // Same Variable.
+
+    // In the case of such Duplicates, We Collect All the PV Value Updates
+    // for *All* Copies of the PV, in the hopes that we can Authoritatively
+    // Verify a Complete Match, and/or Stitch Together _All_ the Values
+    // from All Copies, as needed.
+
+    vector<STS::PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+
+    bool isDuplicate = false;
+
+    while ( ipv != m_pvs_list.end() )
+    {
+        // Check for Duplicate PV Connections...
+        // (Ignore Device Name and PV Name (Alias)... ;-D)
+        if ( (*ipv)->sameDefinitionPVConn( internal_connection,
+                a_type, a_enum_vector, a_enum_index, a_units, a_ignore ) )
+        {
+            // Mark This PV as a Duplicate...!
+            // (And It's Doppleganger, Too...! ;-D)
+
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s: Device %s %s == Device %s %s",
+                g_pid, "STS Error:", "makePVInfo()",
+                "Duplicate PV Connection",
+                a_device_name.c_str(),
+                internal_connection.c_str(),
+                (*ipv)->m_device_name.c_str(),
+                (*ipv)->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Create New PVInfo as a "Duplicate", with flag set...
+            isDuplicate = true;
+
+            // Mark This Matching PV
+            (*ipv)->m_duplicate = true;
+
+            // Once We've Found One Duplicate,
+            // We've Added Ourselves to the Chain... ;-D
+            break;
+        }
+
+        ++ipv;
+    }
+
+    // If _Not_ a Duplicate PV Connection String,
+    // Add This Connection String to the List of PV Names...
+
+    if ( !isDuplicate )
+    {
+        m_pv_name_history.insert( internal_connection );
+    }
+
+    // Now Proceed to Create the New PVInfo Instance for This Device/PV...
 
     switch ( a_type )
     {
@@ -216,28 +242,28 @@ NxGen::makePVInfo
             return new NxPVInfo<uint32_t>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore, *this );
+                a_units, a_ignore, isDuplicate, *this );
         case STS::PVT_FLOAT: // ADARA only supports double currently
         case STS::PVT_DOUBLE:
             return new NxPVInfo<double>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore, *this );
+                a_units, a_ignore, isDuplicate, *this );
         case STS::PVT_STRING:
             return new NxPVInfo<string>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore, *this );
+                a_units, a_ignore, isDuplicate, *this );
         case STS::PVT_UINT_ARRAY:
             return new NxPVInfo< vector<uint32_t> >( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore, *this );
+                a_units, a_ignore, isDuplicate, *this );
         case STS::PVT_DOUBLE_ARRAY:
             return new NxPVInfo< vector<double> >( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore, *this );
+                a_units, a_ignore, isDuplicate, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
@@ -3763,6 +3789,27 @@ NxGen::writeString
             THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: "
                          << a_value )
         }
+    }
+}
+
+
+/*! \brief Checks existence of a Nexus dataset location
+ *
+ * This method tries to open a dataset path, to see if it exists.
+ */
+void
+NxGen::checkDataset
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write string
+    const string &a_dataset,    ///< [in] Name of dataset at specified path to receive string value
+    bool &a_exists              ///< [out] Does the dataset exist?
+)
+{
+    if ( m_h5nx.H5NXcheck_dataset_path( a_path, a_dataset, a_exists )
+            != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXcheck_dataset_path() failed for path: " << a_path )
     }
 }
 
