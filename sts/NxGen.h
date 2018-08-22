@@ -259,25 +259,26 @@ private:
         /// NxPVInfo constructor
         NxPVInfo
         (
-            const std::string     &a_device_name,  ///< [in] Name of owning device
-            const std::string     &a_name,         ///< [in] Name of PV
-            const std::string     &a_internal_name,///< [in] Internal (Nexus) name of PV
-            const std::string     &a_connection,   ///< [in] PV Connection String
-            const std::string     &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
-            STS::Identifier        a_device_id,    ///< [in] ID of device that owns the PV
-            STS::Identifier        a_pv_id,        ///< [in] ID of the PV
-            STS::PVType            a_type,         ///< [in] Type of PV
+            const std::string   &a_device_name, ///< [in] Name of owning device
+            const std::string   &a_name,        ///< [in] Name of PV
+            const std::string   &a_internal_name, ///< [in] Internal (Nexus) name of PV
+            const std::string   &a_connection,  ///< [in] PV Connection String
+            const std::string   &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
+            STS::Identifier      a_device_id,   ///< [in] ID of device that owns the PV
+            STS::Identifier      a_pv_id,       ///< [in] ID of the PV
+            STS::PVType          a_type,        ///< [in] Type of PV
             std::vector<STS::PVEnumeratedType>
-                                  *a_enum_vector,  ///< [in] Enumerated Type Vector
-            uint32_t               a_enum_index,   ///< [in] Enumerated Type Index
-            const std::string     &a_units,        ///< [in] Units of PV (empty if not needed)
-            bool                   a_ignore,       ///< [in] PV Ignore Flag
-            NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
+                                *a_enum_vector, ///< [in] Enumerated Type Vector
+            uint32_t             a_enum_index,  ///< [in] Enumerated Type Index
+            const std::string   &a_units,       ///< [in] Units of PV (empty if not needed)
+            bool                 a_ignore,      ///< [in] PV Ignore Flag
+            bool                 a_duplicate,   ///< [in] PV is a Duplicate
+            NxGen               &a_nxgen        ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_device_name, a_name, a_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore ),
+                a_units, a_ignore, a_duplicate ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
@@ -312,16 +313,17 @@ private:
             std::stringstream device_ss;
             device_ss << "Device " << this->m_device_name
                 << " (id=" << this->m_device_id << ")";
-            m_device_str = device_ss.str();
+            this->m_device_str = device_ss.str();
 
             std::stringstream pv_ss;
             pv_ss << "PV " << m_internal_name;
             if ( m_internal_name.compare( m_internal_connection ) )
                 pv_ss << " (" << m_internal_connection << ")";
             pv_ss << " (id=" << this->m_pv_id << ")";
-            m_pv_str = pv_ss.str();
+            this->m_pv_str = pv_ss.str();
 
-            m_device_pv_str = "[" + m_device_str + " " + m_pv_str + "]";
+            this->m_device_pv_str =
+                "[" + this->m_device_str + " " + this->m_pv_str + "]";
         }
 
         /// NxPVInfo destructor
@@ -717,156 +719,7 @@ private:
                             this->m_pv_str.c_str() );
                         usleep(30000); // give syslog a chance...
 
-                        // Normalize All Non-Normalized Timestamps...
-                        int32_t last_pre_pulse_index = -1;
-                        bool done = false;
-                        for ( uint32_t i=0 ;
-                            !done && i < this->m_time_buffer.size(); ++i )
-                        {
-                            // Not-Yet-Normalized Time...
-                            if ( this->m_time_buffer[i] < 0.0 )
-                            {
-                                // Positive Time Update,
-                                // Normalize PV Time to 1st Pulse...
-                                if ( this->m_abs_time_buffer[i]
-                                        > start_time )
-                                {
-                                    double t = ( this->m_abs_time_buffer[i]
-                                        - start_time ) / NANO_PER_SECOND_D;
-                                    this->m_time_buffer[i] = t;
-
-                                    syslog( LOG_INFO,
-                                        "[%i] %s %s %s: %s = %s @ %lf",
-                                        g_pid, "NxGen::flushBuffers()",
-                                        this->m_device_str.c_str(),
-                                        "Positive Time Update",
-                                        this->m_pv_str.c_str(),
-                                        this->valueToString(
-                                            this->m_value_buffer[i] )
-                                                .c_str(),
-                                        this->m_time_buffer[i] );
-                                    usleep(30000); // give syslog a chance
-
-                                    // Time is Normalized Now,
-                                    // We Can Add This Value to Stats.
-                                    addToStats( this->m_value_buffer[i] );
-                                }
-
-                                // Truncate Any Negative Time Offsets to 0.
-                                // Log Negative Time Truncation as Error
-                                // After 1st PV Value.
-                                // (otherwise we get spammed for nearly
-                                // every PV in the run! ;-D)
-                                else
-                                {
-                                    std::string log_hdr = "";
-                                    int log_type = LOG_INFO;
-                                    if ( this->m_last_value_set ) {
-                                        log_type = LOG_ERR;
-                                        log_hdr = "STS Error: ";
-                                    }
-                                    std::stringstream ss;
-                                    ss << log_hdr;
-                                    ss << "NxGen::flushBuffers() ";
-                                    ss << this->m_device_pv_str;
-                                    ss << " = ";
-                                    ss << this->valueToString(
-                                        this->m_value_buffer[i] ).c_str();
-                                    ss << ":";
-                                    ss << " Truncate Negative Variable";
-                                    ss << " Value Update Time to Zero";
-                                    syslog( log_type,
-                               "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
-                                        g_pid, ss.str().c_str(),
-                                        (unsigned long)(
-                                                this->m_abs_time_buffer[i]
-                                                / NANO_PER_SECOND_LL )
-                                            - ADARA::EPICS_EPOCH_OFFSET,
-                                        (unsigned long)(
-                                                this->m_abs_time_buffer[i]
-                                                % NANO_PER_SECOND_LL ),
-                                        this->m_abs_time_buffer[i],
-                                        (unsigned long)( start_time
-                                                / NANO_PER_SECOND_LL )
-                                            - ADARA::EPICS_EPOCH_OFFSET,
-                                        (unsigned long)( start_time
-                                                % NANO_PER_SECOND_LL ),
-                                        start_time );
-                                    // give syslog a chance...
-                                    usleep(30000);
-
-                                    this->m_time_buffer[i] = 0.0;
-
-                                    last_pre_pulse_index = i;
-                                }
-                            }
-
-                            // Done...!
-                            else
-                                done = true;
-                        }
-
-                        // Now Trim Off Any But the Last Pre-First-Pulse
-                        // Variable Value Update (& Add This One to Stats!)
-                        if ( last_pre_pulse_index > 0 )
-                        {
-                            // Log PV Values We're About to Throw Away...
-                            std::stringstream ss;
-                            ss << "NxGen::flushBuffers() ";
-                            ss << this->m_device_pv_str;
-                            ss << ":";
-                            ss << " Purging Pre-First-Pulse Values [";
-                            for ( int32_t i=0 ;
-                                    i < last_pre_pulse_index ; i++ )
-                            {
-                                if ( i ) ss << ", ";
-                                ss << this->valueToString(
-                                    this->m_value_buffer[i] );
-                                ss << " @ " << this->m_abs_time_buffer[i];
-                            }
-                            ss << "]";
-                            ss << " (up to last_pre_pulse_index=";
-                            ss << last_pre_pulse_index;
-                            ss << ")";
-                            syslog( LOG_ERR,
-                               "[%i] %s %s < %lu.%09lu (%lu)",
-                                g_pid, "STS Error:", ss.str().c_str(),
-                                (unsigned long)( start_time
-                                        / NANO_PER_SECOND_LL )
-                                    - ADARA::EPICS_EPOCH_OFFSET,
-                                (unsigned long)( start_time
-                                        % NANO_PER_SECOND_LL ),
-                                start_time );
-                            usleep(30000); // give syslog a chance...
-
-                            // Erase PV Value Updates Up to the
-                            // "Last" Pre-First-Pulse Update...
-
-                            this->m_value_buffer.erase(
-                                this->m_value_buffer.begin(),
-                                this->m_value_buffer.begin()
-                                    + last_pre_pulse_index );
-
-                            this->m_abs_time_buffer.erase(
-                                this->m_abs_time_buffer.begin(),
-                                this->m_abs_time_buffer.begin()
-                                    + last_pre_pulse_index );
-
-                            this->m_time_buffer.erase(
-                                this->m_time_buffer.begin(),
-                                this->m_time_buffer.begin()
-                                    + last_pre_pulse_index );
-                        }
-
-                        // Now Add the "Last" Pre-First-Pulse Update
-                        // to the Stats for this PV...
-                        if ( last_pre_pulse_index >= 0 )
-                        {
-                            addToStats( this->m_value_buffer[0] );
-                        }
-
-                        // Done Normalizing This PV's Value Updates.
-                        this->m_has_non_normalized = false;
+                        this->normalizeTimestamps( start_time );
                     }
 
                     // Nope, No 1st Pulse Time to Normalize From Yet...
@@ -874,6 +727,7 @@ private:
                     // (Tho Log Error About It, Lest We Swell Up & Pop!)
                     else
                     {
+                        // TODO Add Rate-Limiting...?
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
                             g_pid, "STS Error", "NxGen::flushBuffers()",
@@ -893,6 +747,23 @@ private:
                 // :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
+                    // If This PV is Marked as a "Duplicate" of
+                    // Another PV Log, Hold Off Writing Its Values
+                    // to the NeXus file.
+                    // We Hope to Merge/Collapse All Duplicates
+                    // Just Prior to the Finalization Pass... ;-D
+                    if ( this->m_duplicate )
+                    {
+                        // TODO Add Rate-Limiting...?
+                        syslog( LOG_WARNING, "[%i] %s: %s: %s for %s",
+                            g_pid, "Warning", "NxGen::flushBuffers()",
+                            "Deferring Write of Duplicate PV Log",
+                            this->m_device_pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        return( -1 );
+                    }
+
                     // Wait for End of Run to Dump String/Array PV Types...
                     // (Need to Determine Max String Length for 2D Array)
                     if ( !a_run_metrics &&
@@ -1180,14 +1051,82 @@ private:
                         usleep(30000); // give syslog a chance...
                     }
                 }
+
+                // Else Ignore This PV...
+                // (or Maybe It's a Subsumed Duplicate?)
                 else if ( this->m_ignore )
                 {
-                    syslog( LOG_INFO, "[%i] %s %s - Ignoring %s",
+                    syslog( LOG_INFO, "[%i] %s %s - Ignoring %s%s",
                         g_pid, "NxGen::flushBuffers()",
                         this->m_device_str.c_str(),
+                        ( ( this->m_duplicate ) ? "Duplicate " : "" ),
                         this->m_pv_str.c_str() );
                     usleep(30000); // give syslog a chance...
                     num_values = 0;
+
+                    // For Subsumed Duplicate PV Logs, We May
+                    // Still Need to Create Any Alias Links on Final Pass
+                    // (Unless We've Already Done It, Duplicate Keys...)
+                    if ( this->m_duplicate && a_run_metrics
+                            && !(this->m_finalized)
+                            && !m_link_path.empty() )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s: %s %s to Alias %s",
+                            g_pid, "NxGen::flushBuffers()",
+                            this->m_device_pv_str.c_str(),
+                            "Linking Duplicate PV Channel",
+                            m_log_path.c_str(),
+                            m_link_path.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        // Only Create "Target" String for Group Links
+                        // if we haven't already done so... ;-D
+                        // (For a Duplicate PV, We Have to Manually Check!)
+                        bool exists = false;
+                        m_nxgen.checkDataset(
+                            m_log_path, "target", exists );
+                        if ( !m_has_link && !exists )
+                        {
+                            // Manually Create "Target" String for
+                            // Group Link (as per makeGroupLink usage)
+                            m_nxgen.writeString( m_log_path,
+                                "target", m_log_path );
+
+                            // Mark This PV as Having Created the
+                            // "Target" String for Group Links!
+                            // (so we only do it _Once_!)
+                            m_has_link = true;
+                        }
+                        else
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s: %s PV Channel %s %s - %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                this->m_device_pv_str.c_str(),
+                                "Duplicate", m_log_path.c_str(),
+                                "Already Has Target Group Link String",
+                                "Skipping..." );
+                            usleep(30000); // give syslog a chance...
+                        }
+
+                        m_nxgen.makeGroupLink(
+                            m_log_path, m_link_path );
+
+                        // Search STS Config for Associated Groups
+                        // NOTE: All of This will "Still Work" for
+                        // Any Subsumed Duplicate PVs "By Alias",
+                        // _Except_ for Any Links to the "Last PV Value",
+                        // which may Erroneously Grab _This Duplicate PV's_
+                        // Last Value, Rather than the Overall Last
+                        // Value for the Combined PV Log... ;-b
+                        // (This could be fixed, but probably unnecessary.)
+                        if ( m_nxgen.m_config_groups.size() )
+                            createSTSConfigGroups();
+
+                        // Done, We've Finalized This PV Log.
+                        this->m_finalized = true;
+                    }
                 }
             }
             catch( TraceException &e )
@@ -2330,9 +2269,6 @@ private:
         std::string     m_internal_connection;///< Internal Nexus connection string of variable
         std::string     m_log_path;     ///< Nexus path to log entry for PV
         std::string     m_link_path;    ///< (Optional) Nexus path for (alias) link to PV log entry
-        std::string     m_device_str;   ///< Handy Device String for Logging
-        std::string     m_pv_str;       ///< Handy PV String for Logging
-        std::string     m_device_pv_str;///< Handy Device/PV String for Logging
         bool            m_has_link;     ///< Flag to Note Creation of "Target" String for Group Links
         uint64_t        m_cur_size;     ///< Running size of time and value datasets (same size for both)
         uint64_t        m_full_buffer_count;    ///< Rate-Limited Logging
@@ -2469,6 +2405,9 @@ private:
     void                writeString( const std::string &a_path,
                             const std::string &a_dataset,
                             const std::string &a_value );
+    void                checkDataset( const std::string &a_path,
+                            const std::string &a_dataset,
+                            bool &a_exists );
     void                writeStringAttribute( const std::string &a_path,
                             const std::string &a_attrib,
                             const std::string &a_value );
