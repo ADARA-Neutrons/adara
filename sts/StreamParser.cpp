@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <time.h>
+#include "NxGen.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 
@@ -5354,6 +5355,9 @@ StreamParser::finalizeStreamProcessing()
         monitorFinalize( *imi->second );
     }
 
+    // Reconcile Any Duplicate PV Connection Logs...
+    collapseDuplicatePVs();
+
     // Write any Enumerated Types, per DeviceId, into logs...
 
     for ( map<Identifier,std::vector<PVEnumeratedType> >::iterator ienum =
@@ -5392,6 +5396,427 @@ StreamParser::finalizeStreamProcessing()
 
     // Let adapter do anything else it wants to
     finalize( m_run_metrics, m_run_info );
+}
+
+
+/*! \brief This method tries to Merge/Collapse Duplicate PV Logs...!
+ *
+ * This method is called just prior to actually writing out all the
+ * final PV Logs into DASlogs, and tries to Reconcile Any Duplicate PVs
+ * (i.e. PVs with the _Same_ Connection Information).
+ * We try to Merge Differing Sections that hopefully Don't Overlap in Time,
+ * thereby Collapsing Away Any Duplicate PV Logs...! ;-D
+ */
+void
+StreamParser::collapseDuplicatePVs()
+{
+    PVInfo<uint32_t> *pvinfoU32, *pvinfoDupU32;
+    PVInfo<double> *pvinfoDbl, *pvinfoDupDbl;
+    PVInfo<string> *pvinfoStr, *pvinfoDupStr;
+    PVInfo< vector<uint32_t> > *pvinfoU32Arr, *pvinfoDupU32Arr;
+    PVInfo< vector<double> > *pvinfoDblArr, *pvinfoDupDblArr;
+
+    uint64_t start_time = timespec_to_nsec( m_run_metrics.run_start_time );
+
+    std::string cast_fail = "collapseDuplicatePVs()";
+    cast_fail += " Failed to Cast PVInfoBase to PVInfo for ";
+
+    // Search PV List for "Duplicates"...
+    for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+            ipv != m_pvs_list.end(); ++ipv )
+    {
+        // Found a PV Marked as Duplicate...!
+        if ( (*ipv)->m_duplicate && !((*ipv)->m_ignore) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "Found PV Marked as Duplicate",
+                (*ipv)->m_device_pv_str.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Search Remaining List of PVs for Matching Connections,
+            // and Try to Absorb/Subsume Any Duplicate PV Values...
+            for ( vector<PVInfoBase*>::iterator ipvDup = ipv + 1;
+                    ipvDup != m_pvs_list.end(); ++ipvDup )
+            {
+                // Found a Matching PV Log, try to Absorb/Subsume It...!
+                if ( (*ipv)->sameDefinitionPVConn( *ipvDup ) )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
+                        g_pid, "STS Error:",
+                        "StreamParser::collapseDuplicatePVs()",
+                        "Found Matching Duplicate PV",
+                        (*ipvDup)->m_device_pv_str.c_str(),
+                        "Try to Subsume Its Values..." );
+                    // give syslog a chance...
+                    usleep(30000);
+
+                    switch ( (*ipv)->m_type )
+                    {
+                        case STS::PVT_INT:  // ADARA only supports uint32_t
+                        case STS::PVT_ENUM:
+                        case STS::PVT_UINT:
+
+                            pvinfoU32 =
+                                dynamic_cast<PVInfo<uint32_t>*>( *ipv );
+                            if ( !pvinfoU32 ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoU32->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoU32->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupU32 =
+                                dynamic_cast<PVInfo<uint32_t>*>( *ipvDup );
+                            if ( !pvinfoDupU32 ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupU32->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupU32->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoU32->subsumeValues(
+                                pvinfoDupU32->m_value_buffer,
+                                pvinfoDupU32->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_FLOAT: // ADARA only supports double
+                        case STS::PVT_DOUBLE:
+
+                            pvinfoDbl =
+                                dynamic_cast<PVInfo<double>*>( *ipv );
+                            if ( !pvinfoDbl ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDbl->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDbl->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupDbl =
+                                dynamic_cast<PVInfo<double>*>( *ipvDup );
+                            if ( !pvinfoDupDbl ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupDbl->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupDbl->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDbl->subsumeValues(
+                                pvinfoDupDbl->m_value_buffer,
+                                pvinfoDupDbl->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDbl->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_STRING:
+
+                            pvinfoStr =
+                                dynamic_cast<PVInfo<string>*>( *ipv );
+                            if ( !pvinfoStr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoStr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoStr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupStr =
+                                dynamic_cast<PVInfo<string>*>( *ipvDup );
+                            if ( !pvinfoDupStr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupStr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupStr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoStr->subsumeValues(
+                                pvinfoDupStr->m_value_buffer,
+                                pvinfoDupStr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupStr->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_UINT_ARRAY:
+
+                            pvinfoU32Arr =
+                                dynamic_cast<PVInfo< vector<uint32_t> >*>(
+                                    *ipv );
+                            if ( !pvinfoU32Arr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoU32Arr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoU32Arr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupU32Arr =
+                                dynamic_cast<PVInfo< vector<uint32_t> >*>(
+                                    *ipvDup );
+                            if ( !pvinfoDupU32Arr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupU32Arr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupU32Arr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoU32Arr->subsumeValues(
+                                pvinfoDupU32Arr->m_value_buffer,
+                                pvinfoDupU32Arr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32Arr->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_DOUBLE_ARRAY:
+
+                            pvinfoDblArr =
+                                dynamic_cast<PVInfo< vector<double> >*>(
+                                    *ipv );
+                            if ( !pvinfoDblArr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDblArr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDblArr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupDblArr =
+                                dynamic_cast<PVInfo< vector<double> >*>(
+                                    *ipvDup );
+                            if ( !pvinfoDupDblArr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupDblArr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupDblArr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDblArr->subsumeValues(
+                                pvinfoDupDblArr->m_value_buffer,
+                                pvinfoDupDblArr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDblArr->m_ignore = true;
+
+                            break;
+                    }
+
+                    // Leave Subsumed PV Log Marked as "Duplicate",
+                    // So We Won't Try to Write Its Values to DASlogs...
+                }
+            }
+
+            // This PV has Now Subsumed All Other Duplicate PV Logs,
+            // So We Can Let It Thru into the DASlogs Output...
+            (*ipv)->m_duplicate = false;
+
+            syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "PV Has Subsumed All Duplicate PV Log Values",
+                (*ipv)->m_device_pv_str.c_str(),
+                "Cleared for Writing to DASlogs." );
+            // give syslog a chance...
+            usleep(30000);
+        }
+
+        // This Duplicate has Already Been Subsumed...! ;-D
+        else if ( (*ipv)->m_duplicate )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "Ignoring Already Subsumed PV Duplicate",
+                (*ipv)->m_device_pv_str.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+    }
 }
 
 
@@ -5577,7 +6002,6 @@ StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
         stats.max_pkt_size = a_pkt.packet_length();
     stats.total_size += a_pkt.packet_length();
 }
-
 
 } // End namespace STS
 
