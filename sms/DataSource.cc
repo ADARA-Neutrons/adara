@@ -1020,27 +1020,55 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	HWSrcMap::iterator it;
 
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME_COARSE, &now);
+	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
-	for (it = m_hwSources.begin(); it != m_hwSources.end(); it++) {
+	INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+		<< "unregisterHWSources():"
+		<< " Data Source " << m_name << " is " << why
+		<< " - Source is" << ( isSourceDown ? "" : " Not" ) << " Down,"
+		<< " State" << ( stateChanged ? " Changed" : " Did Not Change" ) );
+
+	for ( it=m_hwSources.begin(); it != m_hwSources.end(); it++ )
+	{
 		// Reset HWSource PV Index Bit, Clear Out SMS Id PV Value...
 		if ( it->second->m_hwIndex >= 0 ) {
-			it->second->m_pvHWSourceSmsId->update(-1, &now);
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "unregisterHWSources():"
+				<< " Resetting HW Index=" << it->second->m_hwIndex
+				<< " for " << why << " Data Source " << m_name
+				<< " smsId=" << it->second->smsId() );
+			it->second->m_pvHWSourceSmsId->update( -1, &now );
 			m_hwIndices.reset( it->second->m_hwIndex );
 		}
-		// Only End Pulse & Unregister Event Source if Still Active...!
+
+		// Only End Current Pulse if Event Source Still Active...!
 		if ( it->second->smsId() != (uint32_t) -1 ) {
 			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "Unregistering Event Source " << it->second->smsId()
-				<< " for " << why << " Data Source " << m_name );
-			it->second->endPulse(false);
-			m_ctrl->unregisterEventSource(m_smsSourceId,
-				it->second->smsId());
+				<< "unregisterHWSources():"
+				<< " Ending Current Pulse"
+				<< " for " << why << " Data Source " << m_name
+				<< " smsId=" << it->second->smsId() );
+			it->second->endPulse( false );
+		}
+
+		// Only Unregister Event Source if Still Active...!
+		// NOTE: endPulse() above calls SMSControl::markComplete(),
+		// which could identify this as an Intermittent Data Source,
+		// in which case it Already Unregistered This Event Source...! ;-Q
+		if ( it->second->smsId() != (uint32_t) -1 ) {
+			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "unregisterHWSources():"
+				<< " Unregistering Event Source"
+				<< " for " << why << " Data Source " << m_name
+				<< " smsId=" << it->second->smsId() );
+			m_ctrl->unregisterEventSource( m_smsSourceId,
+				it->second->smsId() );
 		}
 		else {
 			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Skipping Unregistering of Inactive Event Source"
-				<< " (hwId=" << it->second->hwId() << ")"
+				<< " (hwId=" << it->second->hwId() << ","
+				<< " smsId=" << it->second->smsId() << ")"
 				<< " for " << why << " Data Source " << m_name );
 		}
 	}
@@ -1048,10 +1076,10 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	m_hwSources.clear();
 
 	// Update Number of HWSources PV...
-	m_pvNumHWSources->update(0, &now);
+	m_pvNumHWSources->update( 0, &now );
 
-	if (isSourceDown)
-		m_ctrl->sourceDown(m_smsSourceId, stateChanged);
+	if ( isSourceDown )
+		m_ctrl->sourceDown( m_smsSourceId, stateChanged );
 }
 
 void DataSource::dumpLastReadStats(std::string who)
