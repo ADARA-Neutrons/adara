@@ -2,6 +2,7 @@
 #define STSDEFS_H
 
 #include <unistd.h>
+#include <stdint.h>
 #include <vector>
 #include <sstream>
 #include <string>
@@ -663,7 +664,7 @@ struct PVEnumeratedType
     std::vector<std::string>   element_names;
     std::vector<uint32_t>      element_values;
 
-    bool sameEnum( PVEnumeratedType *a_enum )
+    bool sameEnum( const PVEnumeratedType *a_enum ) const
     {
         if ( a_enum == NULL )
             return( false );
@@ -712,7 +713,8 @@ public:
                            *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
         uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
         const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
-        bool                a_ignore        ///< [in] PV Ignore Flag
+        bool                a_ignore,       ///< [in] PV Ignore Flag
+        bool                a_duplicate     ///< [in] Flag to Indicate PV Connection is a Duplicate...!
     )
     :
         m_device_name(a_device_name),
@@ -726,14 +728,17 @@ public:
         m_units(a_units),
         m_ignore(a_ignore),
         m_last_time(0),
-        m_has_non_normalized(false)
+        m_has_non_normalized(false),
+        m_duplicate(a_duplicate)
     {}
 
     /// PVInfoBase destructor
     virtual ~PVInfoBase()
     {}
 
-    bool diffEnum( PVEnumeratedType *a_enum1, PVEnumeratedType *a_enum2 )
+    bool diffEnum(
+        const PVEnumeratedType *a_enum1,
+        const PVEnumeratedType *a_enum2 ) const
     {
         // Both NULL Enum Pointers... (Most Common Case...)
         if ( a_enum1 == NULL && a_enum2 == NULL )
@@ -748,17 +753,15 @@ public:
         return( ! a_enum1->sameEnum( a_enum2 ) );
     }
 
-    bool sameDefinition(
-            const std::string &a_device_name,
-            const std::string &a_name,
+    bool sameDefinitionPVConn(
             const std::string &a_connection,
-            PVType a_type,
-            std::vector<PVEnumeratedType> *a_enum_vector,
-            uint32_t a_enum_index,
+            const PVType a_type,
+            const std::vector<PVEnumeratedType> *a_enum_vector,
+            const uint32_t a_enum_index,
             const std::string &a_units,
-            bool a_ignore )
+            const bool a_ignore ) const
     {
-        PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
+        const PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
 
         if ( m_enum_vector != NULL && m_enum_index != (uint32_t) -1 )
             enum1 = &((*m_enum_vector)[ m_enum_index ]);
@@ -766,8 +769,7 @@ public:
         if ( a_enum_vector != NULL && a_enum_index != (uint32_t) -1 )
             enum2 = &((*a_enum_vector)[ a_enum_index ]);
 
-        if ( m_device_name == a_device_name
-                && m_name == a_name && m_connection == a_connection
+        if ( m_connection == a_connection
                 && m_type == a_type && !diffEnum( enum1, enum2 )
                 && m_units == a_units && m_ignore == a_ignore ) {
             return true;
@@ -778,29 +780,41 @@ public:
     }
 
     /// Determine if PVs have equivalent definitions
-    bool sameDefinition( const PVInfoBase &a_pv )
+    bool sameDefinitionPVConn( const PVInfoBase* a_pv ) const
     {
-        PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
+        return sameDefinitionPVConn( a_pv->m_connection,
+            a_pv->m_type, a_pv->m_enum_vector, a_pv->m_enum_index,
+            a_pv->m_units, a_pv->m_ignore );
+    }
 
-        if ( m_enum_vector != NULL && m_enum_index != (uint32_t) -1 )
-            enum1 = &((*m_enum_vector)[ m_enum_index ]);
-
-        if ( a_pv.m_enum_vector != NULL
-                && a_pv.m_enum_index != (uint32_t) -1 )
-        {
-            enum2 = &((*(a_pv.m_enum_vector))[ a_pv.m_enum_index ]);
-        }
-
-        if ( m_device_name == a_pv.m_device_name
-                && m_name == a_pv.m_name
-                && m_connection == a_pv.m_connection
-                && m_type == a_pv.m_type && !diffEnum( enum1, enum2 )
-                && m_units == a_pv.m_units && m_ignore == a_pv.m_ignore ) {
+    bool sameDefinition(
+            const std::string &a_device_name,
+            const std::string &a_name,
+            const std::string &a_connection,
+            const PVType a_type,
+            const std::vector<PVEnumeratedType> *a_enum_vector,
+            const uint32_t a_enum_index,
+            const std::string &a_units,
+            const bool a_ignore ) const
+    {
+        if ( m_device_name == a_device_name && m_name == a_name
+                && sameDefinitionPVConn( a_connection,
+                    a_type, a_enum_vector, a_enum_index,
+                    a_units, a_ignore ) ) {
             return true;
         }
         else {
             return false;
         }
+    }
+
+    /// Determine if PVs have equivalent definitions
+    bool sameDefinition( const PVInfoBase* a_pv ) const
+    {
+        return sameDefinition( a_pv->m_device_name,
+            a_pv->m_name, a_pv->m_connection, a_pv->m_type,
+            a_pv->m_enum_vector, a_pv->m_enum_index,
+            a_pv->m_units, a_pv->m_ignore );
     }
 
     /// Virtual method to allow subclasses to write buffered PV values and time axis
@@ -814,6 +828,9 @@ public:
     std::string         m_connection;   ///< PV Connection String
     Identifier          m_device_id;    ///< ID of device that owns the PV
     Identifier          m_pv_id;        ///< ID of the PV
+    std::string         m_device_str;   ///< Handy Device String for Logging
+    std::string         m_pv_str;       ///< Handy PV String for Logging
+    std::string         m_device_pv_str;///< Handy Device/PV String for Logging
     PVType              m_type;         ///< Type of PV
     std::vector<PVEnumeratedType>
                        *m_enum_vector;  ///< Enumerated Type Vector of PV
@@ -825,6 +842,7 @@ public:
     std::vector<uint64_t> m_abs_time_buffer; ///< Buffer that holds absolute (non-normalized) timestamp (nanoseconds) of PV value updates
     std::vector<double> m_time_buffer;  ///< Buffer that holds time axis (seconds) of PV values
     bool                m_has_non_normalized; ///< This PV received value updates before 1st pulse...
+    bool                m_duplicate;    ///< Flag to Indicate PV Connection is a Duplicate...!
 };
 
 /// Intermmediary PV template class that provides typed value buffer
@@ -845,11 +863,12 @@ public:
                            *a_enum_vector,  ///< [in] Enumerated Type Vector of PV
         uint32_t            a_enum_index,   ///< [in] Enumerated Type Index of PV
         const std::string  &a_units,        ///< [in] Units of PV (empty if not needed)
-        bool                a_ignore        ///< [in] PV Ignore Flag
+        bool                a_ignore,       ///< [in] PV Ignore Flag
+        bool                a_duplicate     ///< [in] Flag to Indicate PV Connection is a Duplicate...!
     )
     : PVInfoBase( a_device_name, a_name, a_connection,
         a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-        a_units, a_ignore ),
+        a_units, a_ignore, a_duplicate ),
     m_last_value_set(false), m_last_value_more(false)
     {}
 
@@ -992,6 +1011,293 @@ public:
         }
         ss << "]";
         return( ss.str() );
+    }
+
+    /// Normalize PV values/timestamps relative to 1st Pulse Start Time
+    void normalizeTimestamps
+    (
+        uint64_t start_time     ///< 1st Pulse Time (nanosecs)
+    )
+    {
+        // Normalize All Non-Normalized Timestamps...
+
+        int32_t last_pre_pulse_index = -1;
+
+        bool done = false;
+
+        for ( uint32_t i=0 ; !done && i < this->m_time_buffer.size(); ++i )
+        {
+            // Not-Yet-Normalized Time...
+            if ( this->m_time_buffer[i] < 0.0 )
+            {
+                // Positive Time Update,
+                // Normalize PV Time to 1st Pulse...
+                if ( this->m_abs_time_buffer[i] > start_time )
+                {
+                    double t = ( this->m_abs_time_buffer[i] - start_time )
+                        / NANO_PER_SECOND_D;
+                    this->m_time_buffer[i] = t;
+
+                    syslog( LOG_INFO,
+                        "[%i] %s %s %s: %s = %s @ %lf",
+                        g_pid, "PVInfo::normalizeTimestamps()",
+                        this->m_device_str.c_str(),
+                        "Positive Time Update",
+                        this->m_pv_str.c_str(),
+                        this->valueToString(
+                            this->m_value_buffer[i] ).c_str(),
+                        this->m_time_buffer[i] );
+                    usleep(30000); // give syslog a chance
+
+                    // Time is Normalized Now,
+                    // We Can Add This Value to Stats.
+                    addToStats( this->m_value_buffer[i] );
+                }
+
+                // Truncate Any Negative Time Offsets to 0.
+                // Log Negative Time Truncation as Error
+                // After 1st PV Value.
+                // (otherwise we get spammed for nearly
+                // every PV in the run! ;-D)
+                else
+                {
+                    std::string log_hdr = "";
+                    int log_type = LOG_INFO;
+                    if ( this->m_last_value_set ) {
+                        log_type = LOG_ERR;
+                        log_hdr = "STS Error: ";
+                    }
+                    std::stringstream ss;
+                    ss << log_hdr;
+                    ss << "PVInfo::normalizeTimestamps() ";
+                    ss << this->m_device_pv_str;
+                    ss << " = ";
+                    ss << this->valueToString(
+                        this->m_value_buffer[i] ).c_str();
+                    ss << ":";
+                    ss << " Truncate Negative Variable";
+                    ss << " Value Update Time to Zero";
+                    syslog( log_type,
+                        "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                        g_pid, ss.str().c_str(),
+                        (unsigned long)( this->m_abs_time_buffer[i]
+                                / NANO_PER_SECOND_LL )
+                            - ADARA::EPICS_EPOCH_OFFSET,
+                        (unsigned long)( this->m_abs_time_buffer[i]
+                                % NANO_PER_SECOND_LL ),
+                        this->m_abs_time_buffer[i],
+                        (unsigned long)( start_time
+                                / NANO_PER_SECOND_LL )
+                            - ADARA::EPICS_EPOCH_OFFSET,
+                        (unsigned long)( start_time
+                                % NANO_PER_SECOND_LL ),
+                        start_time );
+                    // give syslog a chance...
+                    usleep(30000);
+
+                    this->m_time_buffer[i] = 0.0;
+
+                    last_pre_pulse_index = i;
+                }
+            }
+
+            // Done...!
+            else
+                done = true;
+        }
+
+        // Now Trim Off Any But the Last Pre-First-Pulse
+        // Variable Value Update (& Add This One to Stats!)
+        if ( last_pre_pulse_index > 0 )
+        {
+            // Log PV Values We're About to Throw Away...
+            std::stringstream ss;
+            ss << "PVInfo::normalizeTimestamps() ";
+            ss << this->m_device_pv_str;
+            ss << ":";
+            ss << " Purging Pre-First-Pulse Values [";
+            for ( int32_t i=0 ; i < last_pre_pulse_index ; i++ )
+            {
+                if ( i ) ss << ", ";
+                ss << this->valueToString( this->m_value_buffer[i] );
+                ss << " @ " << this->m_abs_time_buffer[i];
+            }
+            ss << "]";
+            ss << " (up to last_pre_pulse_index=";
+            ss << last_pre_pulse_index;
+            ss << ")";
+            syslog( LOG_ERR,
+               "[%i] %s %s < %lu.%09lu (%lu)",
+                g_pid, "STS Error:", ss.str().c_str(),
+                (unsigned long)( start_time
+                        / NANO_PER_SECOND_LL )
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)( start_time
+                        % NANO_PER_SECOND_LL ),
+                start_time );
+            usleep(30000); // give syslog a chance...
+
+            // Erase PV Value Updates Up to the
+            // "Last" Pre-First-Pulse Update...
+
+            this->m_value_buffer.erase(
+                this->m_value_buffer.begin(),
+                this->m_value_buffer.begin()
+                    + last_pre_pulse_index );
+
+            this->m_abs_time_buffer.erase(
+                this->m_abs_time_buffer.begin(),
+                this->m_abs_time_buffer.begin()
+                    + last_pre_pulse_index );
+
+            this->m_time_buffer.erase(
+                this->m_time_buffer.begin(),
+                this->m_time_buffer.begin()
+                    + last_pre_pulse_index );
+        }
+
+        // Now Add the "Last" Pre-First-Pulse Update
+        // to the Stats for this PV...
+        if ( last_pre_pulse_index >= 0 )
+        {
+            addToStats( this->m_value_buffer[0] );
+        }
+
+        // Done Normalizing This PV's Value Updates.
+        this->m_has_non_normalized = false;
+    }
+
+    /// Subsume Values from a Duplicate PV Connection Log...
+    void subsumeValues
+    (
+        std::vector<T> a_value_buffer,      ///< Duplicate PV Values
+        std::vector<double> a_time_buffer   ///< Duplicate PV Timestamps
+    )
+    {
+        // Go Thru PV Values/Timestamps and Subsume Any Omitted...
+
+        typename std::vector<T>::iterator ival =
+            this->m_value_buffer.begin();
+        std::vector<double>::iterator itim =
+            this->m_time_buffer.begin();
+
+        uint32_t index = 0;
+
+        typename std::vector<T>::iterator ivalDup =
+            a_value_buffer.begin();
+        std::vector<double>::iterator itimDup =
+            a_time_buffer.begin();
+
+        while ( ivalDup != a_value_buffer.end() )
+        {
+            // If We're at the End of Our Log Values, Then Just
+            // Snag the Rest of the Duplicate's Values/Timestamps...
+            if ( ival == this->m_value_buffer.end() )
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s: %s @ %.9lf",
+                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    "END of Our Log",
+                    "ADD Omitted Value/Timestamp from Duplicate",
+                    valueToString( *ivalDup ).c_str(),
+                    (*itimDup) );
+                usleep(30000); // give syslog a chance...
+    
+                this->m_value_buffer.insert( ival, *ivalDup );
+                this->m_time_buffer.insert( itim, *itimDup );
+    
+                // Stay at the End of the Main PV, Reset Iterators...!
+                ival = this->m_value_buffer.end();
+                itim = this->m_time_buffer.end();
+
+                ++ivalDup; ++itimDup;
+            }
+
+            // Skip Our Values/Timestamps that are Omitted in Duplicate...
+            else if ( (*itim) < (*itimDup) - STS_DOUBLE_EPSILON )
+            {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
+                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    "Skip Our Value/Timestamp Omitted in Duplicate",
+                    valueToString( *ival ).c_str(),
+                    (*itim), (*itimDup), STS_DOUBLE_EPSILON );
+                usleep(30000); // give syslog a chance...
+    
+                ++ival; ++itim; ++index;
+            }
+
+            // Add in Any Omitted Values/Timestamps from Duplicate...
+            else if ( (*itimDup) < (*itim) - STS_DOUBLE_EPSILON )
+            {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
+                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    "ADD Omitted Value/Timestamp from Duplicate",
+                    valueToString( *ivalDup ).c_str(),
+                    (*itimDup), (*itim), STS_DOUBLE_EPSILON );
+                usleep(30000); // give syslog a chance...
+    
+                this->m_value_buffer.insert( ival, *ivalDup );
+                this->m_time_buffer.insert( itim, *itimDup );
+    
+                // Reset Iterators...!
+                ++index;
+                ival = this->m_value_buffer.begin() + index;
+                itim = this->m_time_buffer.begin() + index;
+
+                ++ivalDup; ++itimDup;
+            }
+
+            // Next Timestamp is Identical with Duplicate... 
+            else if ( approximatelyEqual( *itim, *itimDup,
+                    STS_DOUBLE_EPSILON ) )
+            {
+                // Skip Past Any Identical Values... (Present in Both Logs)
+                if ( this->valuesEqual( *ival, *ivalDup ) )
+                {
+                    syslog( LOG_ERR,
+                        "[%i] %s %s: %s: %s @ %.9lf == %s @ %.9lf [%lg]",
+                        g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                        "Skip Past Identical Values",
+                        valueToString( *ival ).c_str(), (*itim),
+                        valueToString( *ivalDup ).c_str(), (*itimDup),
+                        STS_DOUBLE_EPSILON );
+                    usleep(30000); // give syslog a chance...
+
+                    ++ival; ++itim; ++index;
+                    ++ivalDup; ++itimDup;
+                }
+
+                // Hmmm... Two Different Values at "Same" Timestamp...?!
+                // Man, I hope these two PVs are _Really_ "Duplicates"...
+                // Go Ahead and Subsume Duplicate's Value Anyway,
+                // With Fingers Crossed... ;-Q
+                else
+                {
+                    syslog( LOG_ERR,
+                    "[%i] %s %s: %s %s: %s @ %.9lf vs %s @ %.9lf [%lg]",
+                        g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                        "WHOA...! Two Different Values at Same Timestamp!",
+                        "ADD Other Value/Timestamp from Duplicate Anyway",
+                        valueToString( *ivalDup ).c_str(), (*itimDup),
+                        valueToString( *ival ).c_str(), (*itim),
+                        STS_DOUBLE_EPSILON );
+                    usleep(30000); // give syslog a chance...
+     
+                    // Insert These Weirdos _After_ Current Value...
+                    ++ival; ++itim; ++index;
+                    this->m_value_buffer.insert( ival, *ivalDup );
+                    this->m_time_buffer.insert( itim, *itimDup );
+    
+                    // Reset Iterators...!
+                    ++index;
+                    ival = this->m_value_buffer.begin() + index;
+                    itim = this->m_time_buffer.begin() + index;
+
+                    ++ivalDup; ++itimDup;
+                }
+            }
+        }
     }
 
     std::vector<T>      m_value_buffer; ///< Value buffer for PV
